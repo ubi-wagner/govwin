@@ -33,7 +33,7 @@ CREATE TABLE opportunities (
     content_hash          TEXT NOT NULL,
     status                TEXT DEFAULT 'active',
     raw_data              JSONB,
-    description_embedding vector(384),
+    -- description_embedding vector(384), -- re-add when pgvector available
     created_at            TIMESTAMPTZ DEFAULT NOW(),
     updated_at            TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(source, source_id)
@@ -44,9 +44,7 @@ CREATE INDEX idx_opp_close_date  ON opportunities(close_date) WHERE status = 'ac
 CREATE INDEX idx_opp_naics       ON opportunities USING GIN(naics_codes);
 CREATE INDEX idx_opp_type        ON opportunities(opportunity_type);
 CREATE INDEX idx_opp_hash        ON opportunities(content_hash);
-CREATE INDEX idx_opp_embedding   ON opportunities
-    USING ivfflat(description_embedding vector_cosine_ops)
-    WITH (lists = 100);
+-- idx_opp_embedding -- re-add when pgvector available
 CREATE INDEX idx_opp_fts         ON opportunities
     USING GIN(to_tsvector('english', COALESCE(title,'') || ' ' || COALESCE(description,'')));
 
@@ -235,7 +233,7 @@ SELECT
     to2.scored_at,
 
     -- Computed deadline fields
-    (o.close_date - NOW())::INT AS days_to_close,
+    EXTRACT(DAY FROM (o.close_date - NOW()))::INT AS days_to_close,
     CASE
         WHEN o.close_date < NOW()                          THEN 'closed'
         WHEN o.close_date < NOW() + INTERVAL '7 days'     THEN 'urgent'

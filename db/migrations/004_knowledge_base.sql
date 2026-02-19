@@ -26,7 +26,7 @@ CREATE TABLE past_performance (
     poc_phone           TEXT,
     clearance_required  BOOLEAN DEFAULT FALSE,
     active              BOOLEAN DEFAULT TRUE,
-    embedding           vector(384),
+    -- embedding vector(384), -- re-add when pgvector available
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(tenant_id, contract_number)
@@ -48,7 +48,7 @@ CREATE TABLE capabilities (
     differentiators     TEXT[],
     certifications      TEXT[],
     active              BOOLEAN DEFAULT TRUE,
-    embedding           vector(384),
+    -- embedding vector(384), -- re-add when pgvector available
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(tenant_id, domain)
