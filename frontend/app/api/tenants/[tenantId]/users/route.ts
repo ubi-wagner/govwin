@@ -57,15 +57,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     })
 
     // TODO: Send welcome email with temp password via Resend/SMTP
-    // For now, return the temp password so admin can share it
-    // In production: always send via email, never return in API response
+    // tempPassword is generated above — deliver via email, never in API response
 
-    return NextResponse.json({
-      data: user,
-      // Remove this in production — only use email delivery
-      _tempPassword: tempPassword,
-      _note: 'Send this password to the user via secure channel. Remove _tempPassword from production.',
-    }, { status: 201 })
+    return NextResponse.json({ data: user }, { status: 201 })
 
   } catch (error: any) {
     if (error.code === '23505') {

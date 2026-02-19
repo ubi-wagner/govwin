@@ -6,15 +6,12 @@
  * - Custom session includes role + tenantId
  */
 import NextAuth from 'next-auth'
-import { PostgresAdapter } from '@auth/pg-adapter'
+import PostgresAdapter from '@auth/pg-adapter'
 import Credentials from 'next-auth/providers/credentials'
 import Resend from 'next-auth/providers/resend'
-import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
+import { pool } from '@/lib/db'
 import type { AppSession, UserRole } from '@/types'
-
-// Separate pg Pool for Auth.js adapter (uses callback-style, not postgres.js)
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PostgresAdapter(pool),

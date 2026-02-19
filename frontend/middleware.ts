@@ -60,15 +60,16 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
     // Master admin can view any tenant's portal
     if (role === 'master_admin') return NextResponse.next()
 
-    // Tenant users can only access their own tenant's portal
-    // We need to verify the slug matches their tenant_id
-    // This check is done via a fast DB lookup via the API
-    // For now: attach tenant context header for API routes to use
+    // Non-admin users must belong to a tenant
+    if (!tenantId) {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+
+    // Note: slug-to-tenantId verification happens in API routes via
+    // verifyTenantAccess(). Middleware cannot do DB lookups on Edge runtime.
+    // Page shells are accessible but data fetches are tenant-isolated.
     const response = NextResponse.next()
-    response.headers.set('x-tenant-slug', slugInUrl)
-    response.headers.set('x-user-id', session.user.id)
-    response.headers.set('x-user-role', role)
-    if (tenantId) response.headers.set('x-tenant-id', tenantId)
+    response.headers.set('x-tenant-id', tenantId)
     return response
   }
 

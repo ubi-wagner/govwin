@@ -31,7 +31,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
+  const userId = session.user.id!
+
+  const hasAccess = await verifyTenantAccess(userId, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         DELETE FROM tenant_actions
         WHERE tenant_id = ${tenant.id}
           AND opportunity_id = ${params.opportunityId}
-          AND user_id = ${session.user.id}
+          AND user_id = ${userId}
           AND action_type = ${opposite}
       `
 
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         SELECT id FROM tenant_actions
         WHERE tenant_id = ${tenant.id}
           AND opportunity_id = ${params.opportunityId}
-          AND user_id = ${session.user.id}
+          AND user_id = ${userId}
           AND action_type = ${actionType}
       `
 
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         tenant_id, opportunity_id, user_id, action_type,
         value, metadata, score_at_action, agency_at_action, type_at_action
       ) VALUES (
-        ${tenant.id}, ${params.opportunityId}, ${session.user.id},
+        ${tenant.id}, ${params.opportunityId}, ${userId},
         ${actionType}, ${value ?? null},
         ${metadata ? JSON.stringify(metadata) : null},
         ${tenantOpp?.totalScore ?? null},
@@ -124,7 +126,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
+  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const actions = await sql`

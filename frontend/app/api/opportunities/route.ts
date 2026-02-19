@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   // Verify access
-  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
+  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Parse filters
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
             OR agency ILIKE ${'%' + (filters.search ?? '') + '%'}
           )
         ORDER BY ${sql(orderCol)} ${filters.sortDir === 'asc' ? sql`ASC` : sql`DESC NULLS LAST`}
-        LIMIT ${filters.limit}
-        OFFSET ${filters.offset}
+        LIMIT ${filters.limit ?? 50}
+        OFFSET ${filters.offset ?? 0}
       `,
       sql<[{ count: string }]>`
         SELECT COUNT(*) FROM tenant_pipeline
@@ -81,12 +81,13 @@ export async function GET(request: NextRequest) {
       `,
     ])
 
-    return NextResponse.json({
-      data: rows,
+    const response: PaginatedResponse<TenantPipelineItem> = {
+      data: rows as unknown as TenantPipelineItem[],
       total: Number(count),
-      limit: filters.limit,
-      offset: filters.offset,
-    } as PaginatedResponse<TenantPipelineItem>)
+      limit: filters.limit ?? 50,
+      offset: filters.offset ?? 0,
+    }
+    return NextResponse.json(response)
 
   } catch (error) {
     console.error('[/api/opportunities] Error:', error)

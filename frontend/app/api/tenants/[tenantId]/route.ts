@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   `
 
   await auditLog({
-    userId: session.user.id,
+    userId: session.user!.id,
     tenantId: params.tenantId,
     action: 'tenant.updated',
     entityType: 'tenant',
