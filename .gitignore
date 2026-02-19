@@ -1,0 +1,41 @@
+# Environment
+.env
+.env.local
+.env.production
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Documents (never commit downloaded opportunity docs)
+docs/opportunity_store/
+docs/uploads/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Railway / Docker
+.railway/
+
+# IDE
+.vscode/
+.idea/
+*.swp
