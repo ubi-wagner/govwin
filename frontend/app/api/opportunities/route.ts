@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
-import type { OpportunityFilters, TenantPipelineItem, PaginatedResponse } from '@/types'
+import type { OpportunityFilters, TenantPipelineItem, PaginatedResponse, PursuitStatus, DeadlineStatus } from '@/types'
 
 export async function GET(request: NextRequest) {
   const session = await auth()
@@ -24,21 +24,33 @@ export async function GET(request: NextRequest) {
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   // Verify access
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Parse filters
+  // Parse and validate filters
+  const validPursuitStatuses: PursuitStatus[] = ['unreviewed', 'pursuing', 'monitoring', 'passed']
+  const validDeadlineStatuses: DeadlineStatus[] = ['urgent', 'soon', 'ok', 'closed']
+  const validSortBy = ['score', 'close_date', 'posted_date', 'value', 'last_action'] as const
+  const validSortDir = ['asc', 'desc'] as const
+
+  const rawPursuitStatus = searchParams.get('pursuitStatus')
+  const rawDeadlineStatus = searchParams.get('deadlineStatus')
+  const rawSortBy = searchParams.get('sortBy') ?? 'score'
+  const rawSortDir = searchParams.get('sortDir') ?? 'desc'
+
   const filters: OpportunityFilters = {
     search:          searchParams.get('search') ?? undefined,
     source:          searchParams.get('source') ?? undefined,
     opportunityType: searchParams.get('opportunityType') ?? undefined,
     minScore:        Number(searchParams.get('minScore') ?? 0) || undefined,
     agency:          searchParams.get('agency') ?? undefined,
-    pursuitStatus:   searchParams.get('pursuitStatus') as any ?? undefined,
-    deadlineStatus:  searchParams.get('deadlineStatus') as any ?? undefined,
+    pursuitStatus:   rawPursuitStatus && validPursuitStatuses.includes(rawPursuitStatus as PursuitStatus)
+                       ? rawPursuitStatus as PursuitStatus : undefined,
+    deadlineStatus:  rawDeadlineStatus && validDeadlineStatuses.includes(rawDeadlineStatus as DeadlineStatus)
+                       ? rawDeadlineStatus as DeadlineStatus : undefined,
     isPinned:        searchParams.get('isPinned') === 'true' ? true : undefined,
-    sortBy:          (searchParams.get('sortBy') ?? 'score') as any,
-    sortDir:         (searchParams.get('sortDir') ?? 'desc') as any,
+    sortBy:          validSortBy.includes(rawSortBy as any) ? rawSortBy as OpportunityFilters['sortBy'] : 'score',
+    sortDir:         validSortDir.includes(rawSortDir as any) ? rawSortDir as OpportunityFilters['sortDir'] : 'desc',
     limit:           Math.max(1, Math.min(Number(searchParams.get('limit') ?? 50) || 50, 100)),
     offset:          Math.max(0, Number(searchParams.get('offset') ?? 0) || 0),
   }
@@ -47,6 +59,7 @@ export async function GET(request: NextRequest) {
     score:       'total_score',
     close_date:  'close_date',
     posted_date: 'posted_date',
+    value:       'estimated_value_max',
     last_action: 'last_action_at',
   }
   const orderCol = orderMap[filters.sortBy ?? 'score'] ?? 'total_score'

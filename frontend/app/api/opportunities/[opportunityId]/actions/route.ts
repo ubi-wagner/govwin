@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const userId = session.user.id!
+  const userId = session.user.id
 
   const hasAccess = await verifyTenantAccess(userId, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -45,6 +45,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       WHERE to2.tenant_id = ${tenant.id}
         AND to2.opportunity_id = ${params.opportunityId}
     `
+
+    if (!tenantOpp) {
+      return NextResponse.json({ error: 'Opportunity not found for this tenant' }, { status: 404 })
+    }
 
     // For thumbs: toggle (remove if already set, add if not)
     if (actionType === 'thumbs_up' || actionType === 'thumbs_down') {
@@ -100,9 +104,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         ${tenant.id}, ${params.opportunityId}, ${userId},
         ${actionType}, ${value ?? null},
         ${metadata ? JSON.stringify(metadata) : null},
-        ${tenantOpp?.totalScore ?? null},
-        ${tenantOpp?.agencyCode ?? null},
-        ${tenantOpp?.opportunityType ?? null}
+        ${tenantOpp.totalScore ?? null},
+        ${tenantOpp.agencyCode ?? null},
+        ${tenantOpp.opportunityType ?? null}
       )
       RETURNING *
     `
@@ -126,7 +130,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const actions = await sql`

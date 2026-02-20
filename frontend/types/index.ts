@@ -27,6 +27,7 @@ export interface AppSession {
     email: string
     role: UserRole
     tenantId: string | null
+    tempPassword: boolean
   }
   expires: string
 }

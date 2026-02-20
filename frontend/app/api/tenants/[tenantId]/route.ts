@@ -78,8 +78,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     RETURNING *
   `
 
+  if (!updated) {
+    return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  }
+
   await auditLog({
-    userId: session.user!.id,
+    userId: session.user.id,
     tenantId: params.tenantId,
     action: 'tenant.updated',
     entityType: 'tenant',

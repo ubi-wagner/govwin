@@ -52,9 +52,10 @@ export function getPool() {
 
 // Re-export as `sql` and `pool` via getters for ergonomic usage
 // These resolve lazily on first property access at runtime, not at import time
-export const sql = new Proxy({} as ReturnType<typeof postgres>, {
+// Note: Proxy target must be a function for the `apply` trap (tagged templates) to work
+export const sql = new Proxy((() => {}) as unknown as ReturnType<typeof postgres>, {
   get(_, prop) { return (getSql() as any)[prop] },
-  apply(_, thisArg, args) { return (getSql() as any)(...args) },
+  apply(_, _thisArg, args) { return (getSql() as any)(...args) },
 })
 
 export const pool = new Proxy({} as Pool, {
