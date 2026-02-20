@@ -20,9 +20,9 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   const session = req.auth
 
   // ── Public routes ──────────────────────────────────────────
-  if (pathname.startsWith('/login')) {
-    // Already logged in → redirect to appropriate home
-    if (session?.user) {
+  if (pathname.startsWith('/login') || pathname.startsWith('/change-password')) {
+    // Already logged in → redirect to appropriate home (unless temp password)
+    if (session?.user && !session.user.tempPassword && pathname.startsWith('/login')) {
       return NextResponse.redirect(new URL(getHomeUrl(session.user), req.url))
     }
     return NextResponse.next()
@@ -36,6 +36,11 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   }
 
   const { role, tenantId } = session.user
+
+  // ── Temp password: force password change ────────────────────
+  if (session.user.tempPassword && !pathname.startsWith('/change-password')) {
+    return NextResponse.redirect(new URL('/change-password', req.url))
+  }
 
   // ── Admin routes: master_admin only ───────────────────────
   if (pathname.startsWith('/admin')) {

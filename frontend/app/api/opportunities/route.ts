@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
     isPinned:        searchParams.get('isPinned') === 'true' ? true : undefined,
     sortBy:          (searchParams.get('sortBy') ?? 'score') as any,
     sortDir:         (searchParams.get('sortDir') ?? 'desc') as any,
-    limit:           Math.min(Number(searchParams.get('limit') ?? 50), 100),
-    offset:          Number(searchParams.get('offset') ?? 0),
+    limit:           Math.max(1, Math.min(Number(searchParams.get('limit') ?? 50) || 50, 100)),
+    offset:          Math.max(0, Number(searchParams.get('offset') ?? 0) || 0),
   }
 
   const orderMap: Record<string, string> = {

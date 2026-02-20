@@ -27,6 +27,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'name and email required' }, { status: 400 })
   }
 
+  if (typeof name !== 'string' || name.length < 2 || name.length > 100) {
+    return NextResponse.json({ error: 'name must be 2-100 characters' }, { status: 400 })
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+  }
+
   const validRoles = ['tenant_admin', 'tenant_user']
   if (!validRoles.includes(role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })

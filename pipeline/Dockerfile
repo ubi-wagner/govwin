@@ -22,6 +22,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY config/ ./config/
 
+# Run as non-root user
+RUN useradd -m -u 1001 appuser
+USER appuser
+
 # Railway: no PORT needed — this is a worker, not a web server
 # Railway will keep it running as long as the process stays alive
 

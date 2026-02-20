@@ -75,15 +75,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         [user.id]
       )
       const dbUser = result.rows[0]
+      if (!dbUser) {
+        // User was deleted after session was created — force re-login
+        return { ...session, expires: new Date(0).toISOString() } as AppSession
+      }
 
       return {
         ...session,
         user: {
           ...session.user,
           id:          user.id,
-          role:        dbUser?.role as UserRole ?? 'tenant_user',
-          tenantId:    dbUser?.tenant_id ?? null,
-          tempPassword: dbUser?.temp_password ?? false,
+          role:        dbUser.role as UserRole,
+          tenantId:    dbUser.tenant_id ?? null,
+          tempPassword: dbUser.temp_password ?? false,
         },
       } as AppSession
     },
