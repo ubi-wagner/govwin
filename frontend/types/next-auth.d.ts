@@ -14,7 +14,7 @@ declare module 'next-auth' {
       email?: string | null
       role: UserRole
       tenantId: string | null
-      tempPassword?: boolean
+      tempPassword: boolean
     }
   }
 }

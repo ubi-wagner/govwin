@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: tenant }, { status: 201 })
 
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === '23505') {
       return NextResponse.json({ error: 'Slug already taken' }, { status: 409 })
     }
     console.error('[POST /api/tenants] Error:', error)

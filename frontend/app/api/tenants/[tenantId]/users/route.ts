@@ -70,8 +70,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ data: user }, { status: 201 })
 
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as { code: string }).code === '23505') {
       return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
     }
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
