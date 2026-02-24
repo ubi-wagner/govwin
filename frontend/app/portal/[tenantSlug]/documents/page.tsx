@@ -9,7 +9,6 @@ interface DownloadLink {
   description: string | null
   url: string
   linkType: string
-  isActive: boolean
   accessCount: number
   createdAt: string
 }
@@ -21,9 +20,11 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Documents/links are fetched per-tenant
-    // For now, show placeholder since the API route is for admin-curated links
-    setLoading(false)
+    fetch(`/api/portal/${slug}/documents`)
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(d => setLinks(d.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [slug])
 
   return (

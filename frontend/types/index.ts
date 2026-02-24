@@ -27,6 +27,7 @@ export interface AppSession {
     email: string
     role: UserRole
     tenantId: string | null
+    tempPassword: boolean
   }
   expires: string
 }
@@ -150,6 +151,8 @@ export interface TenantAction {
   value: string | null
   metadata: Record<string, unknown> | null
   scoreAtAction: number | null
+  agencyAtAction: string | null
+  typeAtAction: string | null
   createdAt: string
 }
 
@@ -187,6 +190,7 @@ export interface DownloadLink {
   lastAccessedAt: string | null
   createdBy: string
   createdAt: string
+  updatedAt: string
 }
 
 export interface TenantUpload {
@@ -218,8 +222,11 @@ export interface PipelineJob {
   triggeredAt: string
   startedAt: string | null
   completedAt: string | null
+  workerId: string | null
   priority: number
   attempt: number
+  maxAttempts: number
+  parameters: Record<string, unknown>
   result: PipelineRunResult | null
   errorMessage: string | null
 }
@@ -242,8 +249,10 @@ export interface PipelineSchedule {
   displayName: string
   runType: string
   cronExpression: string
+  timezone: string
   enabled: boolean
   priority: number
+  timeoutMinutes: number
   lastRunAt: string | null
   nextRunAt: string | null
 }
@@ -294,6 +303,10 @@ export interface AuditEntry {
   action: string
   entityType: string | null
   entityId: string | null
+  oldValue: unknown | null
+  newValue: unknown | null
+  ipAddress: string | null
+  userAgent: string | null
   createdAt: string
 }
 

@@ -1,5 +1,5 @@
-# Database — psycopg3 async + connection pool
-psycopg[binary,pool]==3.1.18
+# Database — asyncpg for async Postgres
+asyncpg==0.29.0
 
 # HTTP & APIs
 httpx==0.26.0

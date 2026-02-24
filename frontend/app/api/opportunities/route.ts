@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     score:       'total_score',
     close_date:  'close_date',
     posted_date: 'posted_date',
+    value:       'estimated_value_max',
     last_action: 'last_action_at',
   }
   const orderCol = orderMap[filters.sortBy ?? 'score'] ?? 'total_score'

@@ -9,15 +9,19 @@ export default async function PortalLayout({
   params,
 }: {
   children: React.ReactNode
-  params: { tenantSlug: string }
+  params: Promise<{ tenantSlug: string }> | { tenantSlug: string }
 }) {
+  // Next.js 15+: params is a Promise; Next.js 13-14: params is an object
+  const resolvedParams = await Promise.resolve(params)
+  const tenantSlug = resolvedParams.tenantSlug
+
   const session = await auth()
   if (!session?.user) redirect('/login')
 
   // Resolve tenant from slug
   const [tenant] = await sql`
     SELECT id, slug, name, status FROM tenants
-    WHERE slug = ${params.tenantSlug} AND status = 'active'
+    WHERE slug = ${tenantSlug} AND status = 'active'
   `
 
   if (!tenant) redirect('/')
@@ -36,12 +40,12 @@ export default async function PortalLayout({
       {/* Sidebar */}
       <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
         <div className="flex h-14 items-center border-b border-gray-200 px-4">
-          <Link href={`/portal/${params.tenantSlug}/dashboard`} className="text-lg font-bold text-brand-700 truncate">
+          <Link href={`/portal/${tenantSlug}/dashboard`} className="text-lg font-bold text-brand-700 truncate">
             {tenant.name}
           </Link>
         </div>
 
-        <PortalNav tenantSlug={params.tenantSlug} />
+        <PortalNav tenantSlug={tenantSlug} />
 
         <div className="border-t border-gray-200 p-4">
           <div className="text-sm font-medium text-gray-900 truncate">

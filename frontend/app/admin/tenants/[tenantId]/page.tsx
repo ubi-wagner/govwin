@@ -232,6 +232,8 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
     website: tenant.website ?? '',
     uei_number: tenant.ueiNumber ?? '',
     cage_code: tenant.cageCode ?? '',
+    sam_registered: tenant.samRegistered ?? false,
+    billing_email: tenant.billingEmail ?? '',
     internal_notes: tenant.internalNotes ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -289,6 +291,17 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
       <div>
         <label className="label">CAGE Code</label>
         <input className="input" value={form.cage_code} onChange={e => setForm({ ...form, cage_code: e.target.value })} />
+      </div>
+      <div>
+        <label className="label">SAM Registered</label>
+        <select className="input" value={form.sam_registered ? 'true' : 'false'} onChange={e => setForm({ ...form, sam_registered: e.target.value === 'true' })}>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+      <div>
+        <label className="label">Billing Email</label>
+        <input className="input" type="email" value={form.billing_email} onChange={e => setForm({ ...form, billing_email: e.target.value })} />
       </div>
       <div className="col-span-2">
         <label className="label">Internal Notes</label>

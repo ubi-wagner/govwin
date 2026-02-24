@@ -17,8 +17,7 @@ import signal
 import sys
 from datetime import datetime, timezone
 
-import psycopg
-from psycopg.rows import dict_row
+import asyncpg
 
 from ingest.sam_gov import SamGovIngester
 from scoring.engine import ScoringEngine
@@ -91,7 +90,8 @@ async def dequeue_and_run(conn):
     row = await conn.fetchrow(
         "SELECT * FROM dequeue_job($1)", WORKER_ID
     )
-    if not row:
+    # dequeue_job returns a composite row with all NULLs when no job is pending
+    if not row or row["id"] is None:
         return False
 
     job = dict(row)
@@ -174,9 +174,7 @@ async def main():
 
     log.info(f"Pipeline worker starting (id={WORKER_ID})")
 
-    conn = await psycopg.AsyncConnection.connect(
-        DATABASE_URL, autocommit=True, row_factory=dict_row
-    )
+    conn = await asyncpg.connect(DATABASE_URL)
 
     # Process any pending jobs first
     while await dequeue_and_run(conn):
@@ -185,34 +183,55 @@ async def main():
     log.info("Listening for new jobs on 'pipeline_worker' channel...")
 
     # LISTEN for notifications
-    await conn.execute("LISTEN pipeline_worker")
+    await conn.add_listener("pipeline_worker", lambda *args: None)
 
     try:
         while not shutdown_event.is_set():
-            # Wait for notification or timeout (to check shutdown)
+            # Poll for notifications
             try:
-                async for notify in conn.notifies(timeout=30):
-                    if shutdown_event.is_set():
-                        break
-                    log.info(f"Received notification: {notify.payload}")
-                    # Process all pending jobs
-                    while await dequeue_and_run(conn):
-                        if shutdown_event.is_set():
-                            break
-                    break  # Re-enter the outer while loop to check shutdown
+                # asyncpg delivers notifications via callbacks, but we use
+                # a simple poll pattern: check for pending jobs periodically
+                # and on notification
+                msg = await asyncio.wait_for(
+                    _wait_for_notify(conn),
+                    timeout=30,
+                )
+                if msg:
+                    log.info(f"Received notification: {msg}")
             except asyncio.TimeoutError:
                 pass
-            except psycopg.OperationalError:
+            except asyncpg.PostgresConnectionError:
                 log.warning("Connection lost, reconnecting...")
                 await asyncio.sleep(5)
-                conn = await psycopg.AsyncConnection.connect(
-                    DATABASE_URL, autocommit=True, row_factory=dict_row
-                )
-                await conn.execute("LISTEN pipeline_worker")
+                conn = await asyncpg.connect(DATABASE_URL)
+                await conn.add_listener("pipeline_worker", lambda *args: None)
+
+            if shutdown_event.is_set():
+                break
+
+            # Process all pending jobs
+            while await dequeue_and_run(conn):
+                if shutdown_event.is_set():
+                    break
 
     finally:
         await conn.close()
         log.info("Pipeline worker stopped")
+
+
+async def _wait_for_notify(conn):
+    """Wait for a notification on any channel. Returns the payload."""
+    future = asyncio.get_event_loop().create_future()
+
+    def callback(conn, pid, channel, payload):
+        if not future.done():
+            future.set_result(payload)
+
+    await conn.add_listener("pipeline_worker", callback)
+    try:
+        return await future
+    finally:
+        await conn.remove_listener("pipeline_worker", callback)
 
 
 if __name__ == "__main__":

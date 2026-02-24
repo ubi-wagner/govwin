@@ -33,7 +33,12 @@ class ScoringEngine:
 
         tenants = await self.conn.fetch(
             """
-            SELECT t.id, t.slug, tp.*
+            SELECT t.id AS t_id, t.slug,
+                   tp.tenant_id, tp.primary_naics, tp.secondary_naics,
+                   tp.keyword_domains, tp.is_small_business, tp.is_sdvosb,
+                   tp.is_wosb, tp.is_hubzone, tp.is_8a,
+                   tp.agency_priorities, tp.min_contract_value, tp.max_contract_value,
+                   tp.min_surface_score, tp.high_priority_score
             FROM tenants t
             JOIN tenant_profiles tp ON tp.tenant_id = t.id
             WHERE t.status = 'active'
