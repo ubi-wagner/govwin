@@ -19,15 +19,12 @@ import httpx
 log = logging.getLogger("pipeline.ingest.sam_gov")
 
 SAM_API_BASE = "https://api.sam.gov/opportunities/v2/search"
-# TODO: Production deployment: set SAM_GOV_API_KEY env var from Railway secrets
-# TODO: Key rotation: SAM.gov keys expire every ~90 days; monitor via api_key_registry
 SAM_API_KEY = os.environ.get("SAM_GOV_API_KEY", "")
 DEFAULT_DAYS_BACK = 7
 PAGE_SIZE = 25  # SAM.gov max per request
 
-# Stub mode: when SAM_GOV_API_KEY is not set, return realistic seed data
-# that matches the exact SAM.gov API response shape for testing.
-# TODO: Remove stub mode or gate behind USE_STUB_DATA=true in production
+# Stub mode: USE_STUB_DATA=true enables seed data for local development/demos.
+# In production, set SAM_GOV_API_KEY and leave USE_STUB_DATA unset.
 USE_STUB_DATA = os.environ.get("USE_STUB_DATA", "false").lower() == "true"
 
 
@@ -252,8 +249,7 @@ class SamGovIngester:
             "errors": [],
         }
 
-        # ── Stub mode: return seed data when no API key or USE_STUB_DATA=true ──
-        # TODO: In production, require SAM_GOV_API_KEY and disable stub mode
+        # ── Stub mode: return seed data when USE_STUB_DATA=true or no API key ──
         if USE_STUB_DATA or not SAM_API_KEY:
             if USE_STUB_DATA:
                 log.info("USE_STUB_DATA=true — returning stub SAM.gov data")

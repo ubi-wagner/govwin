@@ -172,8 +172,10 @@ export interface OpportunityFilters {
   offset?: number
 }
 
-// ─── Downloads & Uploads ──────────────────────────────────────
+// ─── Downloads (V1: external links only) ─────────────────────
 export type LinkType    = 'resource' | 'template' | 'guidance' | 'opportunity_doc'
+
+// Phase 2: file upload support — types kept for DB schema parity
 export type UploadType  = 'general' | 'capability_doc' | 'cut_sheet' | 'past_performance' | 'personnel_resume'
 
 export interface DownloadLink {
@@ -193,6 +195,7 @@ export interface DownloadLink {
   updatedAt: string
 }
 
+// Phase 2: file upload support — interface kept for DB schema parity
 export interface TenantUpload {
   id: string
   tenantId: string
@@ -266,7 +269,7 @@ export interface SystemStatus {
   checkedAt: string
 }
 
-// ─── Knowledge Base ───────────────────────────────────────────
+// ─── Knowledge Base (Phase 2 — tables exist but no API/UI yet) ─
 export interface PastPerformance {
   id: string
   tenantId: string
