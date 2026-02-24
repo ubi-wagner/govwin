@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const tenant = await getTenantBySlug(params.tenantSlug)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
+  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const links = await sql`

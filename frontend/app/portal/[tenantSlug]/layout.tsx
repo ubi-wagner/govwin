@@ -30,7 +30,7 @@ export default async function PortalLayout({
   if (session.user.role !== 'master_admin') {
     const [access] = await sql`
       SELECT id FROM users
-      WHERE id = ${session.user.id} AND tenant_id = ${tenant.id} AND is_active = true
+      WHERE id = ${session.user.id!} AND tenant_id = ${tenant.id} AND is_active = true
     `
     if (!access) redirect('/')
   }

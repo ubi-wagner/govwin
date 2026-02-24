@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import type { Tenant, TenantProfile, AppUser } from '@/types'
+import type { Tenant, TenantProfile, AppUser, TenantStatus, TenantPlan } from '@/types'
 
 interface TenantDetail {
   tenant: Tenant
@@ -257,7 +257,7 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
       </div>
       <div>
         <label className="label">Status</label>
-        <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+        <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value as TenantStatus })}>
           <option value="active">Active</option>
           <option value="trial">Trial</option>
           <option value="suspended">Suspended</option>
@@ -266,7 +266,7 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
       </div>
       <div>
         <label className="label">Plan</label>
-        <select className="input" value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })}>
+        <select className="input" value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value as TenantPlan })}>
           <option value="starter">Starter</option>
           <option value="professional">Professional</option>
           <option value="enterprise">Enterprise</option>

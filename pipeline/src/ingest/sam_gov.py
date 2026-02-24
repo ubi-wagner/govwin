@@ -19,9 +19,220 @@ import httpx
 log = logging.getLogger("pipeline.ingest.sam_gov")
 
 SAM_API_BASE = "https://api.sam.gov/opportunities/v2/search"
+# TODO: Production deployment: set SAM_GOV_API_KEY env var from Railway secrets
+# TODO: Key rotation: SAM.gov keys expire every ~90 days; monitor via api_key_registry
 SAM_API_KEY = os.environ.get("SAM_GOV_API_KEY", "")
 DEFAULT_DAYS_BACK = 7
 PAGE_SIZE = 25  # SAM.gov max per request
+
+# Stub mode: when SAM_GOV_API_KEY is not set, return realistic seed data
+# that matches the exact SAM.gov API response shape for testing.
+# TODO: Remove stub mode or gate behind USE_STUB_DATA=true in production
+USE_STUB_DATA = os.environ.get("USE_STUB_DATA", "false").lower() == "true"
+
+
+def _generate_stub_opportunities() -> list[dict]:
+    """Return realistic SAM.gov API response data for testing/development.
+
+    Each dict matches the exact field names from the SAM.gov GET /opportunities/v2/search
+    response as documented at https://open.gsa.gov/api/get-opportunities-public-api/
+
+    Fields included:
+      noticeId, title, solicitationNumber, department, subTier, office,
+      fullParentPathName, fullParentPathCode, postedDate, type, baseType,
+      archiveType, archiveDate, typeOfSetAside, typeOfSetAsideDescription,
+      responseDeadLine, naicsCode, classificationCode, active,
+      organizationType, additionalInfoLink, uiLink, description,
+      award, pointOfContact, officeAddress, placeOfPerformance
+    """
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "noticeId": "stub_001_cloud_migration_disa",
+            "title": "Enterprise Cloud Migration and Managed Services — DISA",
+            "solicitationNumber": "HC1028-25-R-0042",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEFENSE INFORMATION SYSTEMS AGENCY",
+            "office": "DISA PL8",
+            "fullParentPathName": "DEPT OF DEFENSE.DEFENSE INFORMATION SYSTEMS AGENCY.DISA PL8",
+            "fullParentPathCode": "097.DISA.PL8",
+            "postedDate": (now - timedelta(days=3)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=60)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "SDVOSBA",
+            "typeOfSetAsideDescription": "Service-Disabled Veteran-Owned Small Business (SDVOSB) Set-Aside",
+            "responseDeadLine": (now + timedelta(days=25)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541512",
+            "classificationCode": "D302",
+            "active": "Yes",
+            "description": (
+                "The Department of Defense seeks a qualified SDVOSB to provide enterprise "
+                "cloud migration services including assessment, planning, and execution of "
+                "migration from on-premises infrastructure to AWS GovCloud. Scope includes "
+                "FedRAMP authorization support, continuous monitoring, and 24/7 managed cloud "
+                "infrastructure services. Requires NIST 800-53 compliance and STIG hardening."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_001_cloud_migration_disa/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "John Smith",
+                    "email": "john.smith.test@disa.mil",
+                    "phone": "571-555-0100",
+                    "fax": None,
+                    "title": "Contracting Officer",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "22060",
+                "city": "Fort Belvoir",
+                "countryCode": "USA",
+                "state": "VA",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "24000", "name": "Fort Belvoir"},
+                "state": {"code": "VA", "name": "Virginia"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        {
+            "noticeId": "stub_002_cybersecurity_gsa",
+            "title": "Cybersecurity Risk Assessment and Continuous Monitoring Services",
+            "solicitationNumber": "47QTCA-25-R-0089",
+            "department": "GENERAL SERVICES ADMINISTRATION",
+            "subTier": "FEDERAL ACQUISITION SERVICE",
+            "office": "GSA/FAS OFFICE OF IT CATEGORY",
+            "fullParentPathName": "GENERAL SERVICES ADMINISTRATION.FEDERAL ACQUISITION SERVICE.GSA/FAS OFFICE OF IT CATEGORY",
+            "fullParentPathCode": "047.4732.47QTCA",
+            "postedDate": (now - timedelta(days=5)).strftime("%Y-%m-%d"),
+            "type": "Combined Synopsis/Solicitation",
+            "baseType": "Combined Synopsis/Solicitation",
+            "archiveType": "auto15",
+            "typeOfSetAside": "SBA",
+            "typeOfSetAsideDescription": "Small Business Set-Aside (FAR 19.5)",
+            "responseDeadLine": (now + timedelta(days=18)).strftime("%Y-%m-%dT14:00:00-05:00"),
+            "naicsCode": "541512",
+            "classificationCode": "D310",
+            "active": "Yes",
+            "description": (
+                "GSA requires a contractor to perform comprehensive cybersecurity risk "
+                "assessments across multiple agency information systems. Services include "
+                "vulnerability assessment, penetration testing, NIST 800-53 Rev 5 security "
+                "control assessment, Risk Management Framework (RMF) support, and continuous "
+                "monitoring. Requires Secret clearance and CISSP or CEH certifications."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_002_cybersecurity_gsa/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Maria Rodriguez",
+                    "email": "maria.rodriguez.test@gsa.gov",
+                    "phone": "202-555-0200",
+                },
+            ],
+        },
+        {
+            "noticeId": "stub_003_pmo_hhs",
+            "title": "Program Management Office (PMO) Support Services — HHS OCIO",
+            "solicitationNumber": "OS-OCIO-25-R-0015",
+            "department": "DEPARTMENT OF HEALTH AND HUMAN SERVICES",
+            "subTier": "OFFICE OF THE SECRETARY",
+            "office": "OS OFFICE OF THE CIO",
+            "fullParentPathName": "DEPARTMENT OF HEALTH AND HUMAN SERVICES.OFFICE OF THE SECRETARY.OS OFFICE OF THE CIO",
+            "fullParentPathCode": "075.OS.OCIO",
+            "postedDate": (now - timedelta(days=7)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "typeOfSetAside": "SBA",
+            "typeOfSetAsideDescription": "Total Small Business Set-Aside",
+            "responseDeadLine": (now + timedelta(days=10)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541611",
+            "classificationCode": "R408",
+            "active": "Yes",
+            "description": (
+                "HHS requires program management support including EVMS, Agile program "
+                "management, risk management, stakeholder reporting, and organizational "
+                "change management for the Office of the CIO."
+            ),
+            "uiLink": "https://sam.gov/opp/stub_003_pmo_hhs/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "James Williams",
+                    "email": "james.williams.test@hhs.gov",
+                    "phone": "202-555-0300",
+                },
+            ],
+        },
+        {
+            "noticeId": "stub_004_devsecops_army",
+            "title": "DevSecOps CI/CD Pipeline Implementation and Kubernetes Platform",
+            "solicitationNumber": "W911QY-25-R-0108",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE ARMY",
+            "office": "W6QK ACC-APG NATICK",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.W6QK ACC-APG NATICK",
+            "fullParentPathCode": "012.21A1.W6QK",
+            "postedDate": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "typeOfSetAside": "SDVOSBA",
+            "typeOfSetAsideDescription": "Service-Disabled Veteran-Owned Small Business (SDVOSB) Set-Aside",
+            "responseDeadLine": (now + timedelta(days=30)).strftime("%Y-%m-%dT16:00:00-05:00"),
+            "naicsCode": "541512",
+            "active": "Yes",
+            "description": (
+                "U.S. Army requires a qualified small business to design, implement, and "
+                "maintain a DevSecOps CI/CD pipeline based on Kubernetes, Docker, and GitLab CI/CD. "
+                "Includes zero trust architecture, STIG hardening, and FedRAMP High authorization."
+            ),
+            "uiLink": "https://sam.gov/opp/stub_004_devsecops_army/view",
+            "award": None,
+            "pointOfContact": [],
+        },
+        {
+            "noticeId": "stub_005_training_va",
+            "title": "Workforce Development and Training Program Support — VA",
+            "solicitationNumber": "VA-HRA-25-I-0033",
+            "department": "DEPARTMENT OF VETERANS AFFAIRS",
+            "subTier": "VA HUMAN RESOURCES AND ADMINISTRATION",
+            "office": None,
+            "fullParentPathName": "DEPARTMENT OF VETERANS AFFAIRS.VA HUMAN RESOURCES AND ADMINISTRATION",
+            "fullParentPathCode": "036.HRA",
+            "postedDate": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "type": "Sources Sought",
+            "baseType": "Sources Sought",
+            "typeOfSetAside": "SBA",
+            "typeOfSetAsideDescription": "Total Small Business Set-Aside",
+            "responseDeadLine": (now + timedelta(days=14)).strftime("%Y-%m-%dT12:00:00-05:00"),
+            "naicsCode": "611430",
+            "active": "Yes",
+            "description": (
+                "VA seeks information from qualified small businesses for workforce development, "
+                "instructor-led training, LMS administration, curriculum development, strategic "
+                "planning, and Lean Six Sigma process improvement support."
+            ),
+            "uiLink": "https://sam.gov/opp/stub_005_training_va/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Sarah Johnson",
+                    "email": "sarah.johnson.test@va.gov",
+                    "phone": "202-555-0500",
+                },
+            ],
+        },
+    ]
 
 
 class SamGovIngester:
@@ -41,9 +252,22 @@ class SamGovIngester:
             "errors": [],
         }
 
-        if not SAM_API_KEY:
-            result["errors"].append("SAM_GOV_API_KEY not set")
-            log.warning("SAM_GOV_API_KEY not configured, skipping ingest")
+        # ── Stub mode: return seed data when no API key or USE_STUB_DATA=true ──
+        # TODO: In production, require SAM_GOV_API_KEY and disable stub mode
+        if USE_STUB_DATA or not SAM_API_KEY:
+            if USE_STUB_DATA:
+                log.info("USE_STUB_DATA=true — returning stub SAM.gov data")
+            else:
+                log.warning("SAM_GOV_API_KEY not configured — using stub data")
+            stub_opps = _generate_stub_opportunities()
+            for opp in stub_opps:
+                try:
+                    await self._upsert_opportunity(opp)
+                    result["opportunities_fetched"] += 1
+                    result["opportunities_new"] += 1
+                except Exception as e:
+                    result["errors"].append(f"Stub upsert error for {opp.get('noticeId')}: {e}")
+                    log.error("Stub upsert error: %s", e)
             return result
 
         # Check rate limit
@@ -169,7 +393,9 @@ class SamGovIngester:
             description = description.get("body", "")
 
         agency = raw.get("fullParentPathName", "")
-        agency_code = raw.get("organizationCode", "")
+        # Extract top-level agency code from fullParentPathCode (e.g., "097.DISA.PL8" → "097")
+        full_parent_code = raw.get("fullParentPathCode", "")
+        agency_code = full_parent_code.split(".")[0] if full_parent_code else ""
 
         naics = raw.get("naicsCode", "")
         naics_codes = [naics] if naics else []
@@ -177,8 +403,23 @@ class SamGovIngester:
         set_aside = raw.get("typeOfSetAsideDescription", "")
         set_aside_code = raw.get("typeOfSetAside", "")
 
-        opp_type_map = {"o": "solicitation", "k": "sources_sought", "p": "presolicitation"}
-        opp_type = opp_type_map.get(raw.get("type", ""), raw.get("type", "other"))
+        # SAM.gov returns full type names; map to our normalized enum values
+        opp_type_map = {
+            # Short codes (ptype query param values)
+            "o": "solicitation",
+            "k": "sources_sought",
+            "p": "presolicitation",
+            # Full names (actual response values from SAM.gov type field)
+            "Solicitation": "solicitation",
+            "Combined Synopsis/Solicitation": "solicitation",
+            "Sources Sought": "sources_sought",
+            "Presolicitation": "presolicitation",
+            "Special Notice": "special_notice",
+            "Award Notice": "award",
+            "Intent to Bundle Requirements": "intent_bundle",
+            "Justification and Approval": "justification",
+        }
+        opp_type = opp_type_map.get(raw.get("type", ""), "other")
 
         posted_date = self._parse_date(raw.get("postedDate"))
         close_date = self._parse_date(raw.get("responseDeadLine") or raw.get("archiveDate"))

@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     `
 
     await auditLog({
-      userId: session.user.id,
+      userId: session.user!.id,
       tenantId: tenant.id,
       action: 'tenant.created',
       entityType: 'tenant',

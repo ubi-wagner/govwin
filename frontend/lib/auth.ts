@@ -6,7 +6,7 @@
  * - Custom session includes role + tenantId
  */
 import NextAuth from 'next-auth'
-import { PostgresAdapter } from '@auth/pg-adapter'
+import PostgresAdapter from '@auth/pg-adapter'
 import Credentials from 'next-auth/providers/credentials'
 import Resend from 'next-auth/providers/resend'
 import { Pool } from 'pg'
