@@ -3,8 +3,6 @@
  * Admin creates a user for a tenant.
  * Generates a temporary password, marks temp_password=true.
  * User is prompted to set new password on first login.
- *
- * Future: swap temp password for magic link via Resend.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
@@ -56,15 +54,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       newValue: { name, email, role, tenantId: params.tenantId },
     })
 
-    // TODO: Send welcome email with temp password via Resend/SMTP
-    // For now, return the temp password so admin can share it
-    // In production: always send via email, never return in API response
-
+    // V1: return temp password for admin to share via secure channel.
+    // Phase 2: send welcome email via Resend/SMTP instead.
     return NextResponse.json({
       data: user,
-      // Remove this in production — only use email delivery
       _tempPassword: tempPassword,
-      _note: 'Send this password to the user via secure channel. Remove _tempPassword from production.',
     }, { status: 201 })
 
   } catch (error: any) {

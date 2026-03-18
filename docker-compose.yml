@@ -11,6 +11,7 @@ services:
     ports: ["5432:5432"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-govtech}"]
       interval: 10s; timeout: 5s; retries: 5
@@ -34,6 +35,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3000}
     container_name: govtech_frontend
     restart: unless-stopped
     depends_on:

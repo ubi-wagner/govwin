@@ -1,14 +1,12 @@
 /**
  * NextAuth.js v5 (Auth.js) configuration
  * - Email/password via Credentials provider
- * - Magic link via Email provider (Resend or SMTP)
  * - Postgres adapter for session/user storage
  * - Custom session includes role + tenantId
  */
 import NextAuth from 'next-auth'
-import { PostgresAdapter } from '@auth/pg-adapter'
+import PostgresAdapter from '@auth/pg-adapter'
 import Credentials from 'next-auth/providers/credentials'
-import Resend from 'next-auth/providers/resend'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
 import type { AppSession, UserRole } from '@/types'
@@ -61,12 +59,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           tempPassword: user.temp_password,
         }
       },
-    }),
-
-    // ── Magic Link (email) ───────────────────────────────────
-    // Uses Resend — swap for Nodemailer if preferred
-    Resend({
-      from: process.env.EMAIL_FROM ?? 'noreply@yourdomain.com',
     }),
   ],
 
