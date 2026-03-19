@@ -353,7 +353,7 @@ function AddUserModal({ tenantId, onClose, onCreated }: { tenantId: string; onCl
           <div className="mt-4 rounded-lg bg-yellow-50 p-4">
             <p className="text-sm font-medium text-yellow-800">Temporary Password</p>
             <code className="mt-1 block text-lg font-mono font-bold text-yellow-900">{result.tempPassword}</code>
-            <p className="mt-2 text-xs text-yellow-600">Share this securely with the user. They'll be prompted to change it on first login.</p>
+            <p className="mt-2 text-xs text-yellow-600">Share this securely with the user. They&apos;ll be prompted to change it on first login.</p>
           </div>
           <button onClick={onCreated} className="btn-primary mt-4 w-full">Done</button>
         </div>
