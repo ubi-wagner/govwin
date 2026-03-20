@@ -134,20 +134,25 @@ function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCrea
     setSaving(true)
     setError('')
 
-    const res = await fetch('/api/tenants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, slug, plan, primaryEmail: email || null }),
-    })
+    try {
+      const res = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, plan, primaryEmail: email || null }),
+      })
 
-    if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Failed to create tenant')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Failed to create tenant')
+        setSaving(false)
+        return
+      }
+
+      onCreated()
+    } catch (err: any) {
+      setError(err.message ?? 'Network error')
       setSaving(false)
-      return
     }
-
-    onCreated()
   }
 
   return (

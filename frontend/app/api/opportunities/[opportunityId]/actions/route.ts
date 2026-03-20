@@ -33,10 +33,22 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Invalid actionType' }, { status: 400 })
   }
 
-  const tenant = await getTenantBySlug(tenantSlug)
+  let tenant: any
+  try {
+    tenant = await getTenantBySlug(tenantSlug)
+  } catch (error) {
+    console.error('[/api/opportunities/actions] Tenant resolution error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  let hasAccess: boolean
+  try {
+    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  } catch (error) {
+    console.error('[/api/opportunities/actions] Access check error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
@@ -126,10 +138,22 @@ export async function GET(request: NextRequest, { params }: Params) {
   const tenantSlug = searchParams.get('tenantSlug')
   if (!tenantSlug) return NextResponse.json({ error: 'tenantSlug required' }, { status: 400 })
 
-  const tenant = await getTenantBySlug(tenantSlug)
+  let tenant: any
+  try {
+    tenant = await getTenantBySlug(tenantSlug)
+  } catch (error) {
+    console.error('[GET /api/opportunities/actions] Tenant resolution error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  let hasAccess: boolean
+  try {
+    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  } catch (error) {
+    console.error('[GET /api/opportunities/actions] Access check error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {

@@ -13,11 +13,17 @@ export default async function PortalRoot() {
 
   // Tenant user → find their tenant slug
   if (session.user.tenantId) {
-    const [tenant] = await sql`
-      SELECT slug FROM tenants WHERE id = ${session.user.tenantId} AND status IN ('active', 'trial')
-    `
-    if (tenant) {
-      redirect(`/portal/${tenant.slug}/dashboard`)
+    try {
+      const [tenant] = await sql`
+        SELECT slug FROM tenants WHERE id = ${session.user.tenantId} AND status IN ('active', 'trial')
+      `
+      if (tenant) {
+        redirect(`/portal/${tenant.slug}/dashboard`)
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message === 'NEXT_REDIRECT') throw e
+      console.error('[PortalRoot] Failed to resolve tenant:', e)
+      throw new Error('Unable to load your account. Please try again later.')
     }
   }
 

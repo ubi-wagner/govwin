@@ -13,10 +13,22 @@ export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const tenant = await getTenantBySlug(params.tenantSlug)
+  let tenant: any
+  try {
+    tenant = await getTenantBySlug(params.tenantSlug)
+  } catch (error) {
+    console.error('[GET /api/portal/profile] Tenant resolution error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  let hasAccess: boolean
+  try {
+    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+  } catch (error) {
+    console.error('[GET /api/portal/profile] Access check error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {

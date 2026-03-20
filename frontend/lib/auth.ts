@@ -14,6 +14,9 @@ import type { AppSession, UserRole } from '@/types'
 
 // Separate pg Pool for Auth.js adapter (uses callback-style, not postgres.js)
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+pool.on('error', (err) => {
+  console.error('[auth] Unexpected pool error:', err)
+})
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // Adapter retained for OAuth providers (Google) — stores users/accounts in PG
@@ -35,12 +38,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const result = await pool.query(
-          'SELECT id, email, name, password_hash, role, tenant_id, is_active, temp_password FROM users WHERE email = $1',
-          [credentials.email]
-        )
+        let user: any
+        try {
+          const result = await pool.query(
+            'SELECT id, email, name, password_hash, role, tenant_id, is_active, temp_password FROM users WHERE email = $1',
+            [credentials.email]
+          )
+          user = result.rows[0]
+        } catch (e) {
+          console.error('[auth] authorize DB query failed:', e)
+          return null
+        }
 
-        const user = result.rows[0]
         if (!user || !user.is_active) return null
 
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash)

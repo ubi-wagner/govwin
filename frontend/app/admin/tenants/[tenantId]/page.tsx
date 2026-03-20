@@ -358,20 +358,25 @@ function AddUserModal({ tenantId, onClose, onCreated }: { tenantId: string; onCl
     setSaving(true)
     setError('')
 
-    const res = await fetch(`/api/tenants/${tenantId}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, role }),
-    })
+    try {
+      const res = await fetch(`/api/tenants/${tenantId}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role }),
+      })
 
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error ?? 'Failed to create user')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to create user')
+        setSaving(false)
+        return
+      }
+
+      setResult({ tempPassword: data._tempPassword })
+    } catch (err: any) {
+      setError(err.message ?? 'Network error')
       setSaving(false)
-      return
     }
-
-    setResult({ tempPassword: data._tempPassword })
   }
 
   if (result) {

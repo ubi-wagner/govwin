@@ -36,22 +36,39 @@ export default function PipelinePage() {
 
   async function triggerJob(source: string, runType = 'full') {
     setTriggering(true)
-    await fetch('/api/pipeline', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, runType }),
-    })
-    setTriggering(false)
-    loadData()
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source, runType }),
+      })
+      if (!res.ok) {
+        setError(`Failed to trigger job: HTTP ${res.status}`)
+        return
+      }
+      loadData()
+    } catch (err: any) {
+      setError(err.message ?? 'Network error triggering job')
+    } finally {
+      setTriggering(false)
+    }
   }
 
   async function toggleSchedule(id: string, enabled: boolean) {
-    await fetch('/api/pipeline/schedules', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, enabled }),
-    })
-    loadData()
+    try {
+      const res = await fetch('/api/pipeline/schedules', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enabled }),
+      })
+      if (!res.ok) {
+        setError(`Failed to toggle schedule: HTTP ${res.status}`)
+        return
+      }
+      loadData()
+    } catch (err: any) {
+      setError(err.message ?? 'Network error toggling schedule')
+    }
   }
 
   return (
