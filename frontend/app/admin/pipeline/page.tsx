@@ -12,20 +12,25 @@ export default function PipelinePage() {
   const [runs, setRuns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [triggering, setTriggering] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [tab])
 
   function loadData() {
     setLoading(true)
+    setError(null)
     const view = tab === 'jobs' ? 'jobs' : tab === 'schedules' ? 'schedules' : 'runs'
     fetch(`/api/pipeline?view=${view}`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(d => {
         if (tab === 'jobs') setJobs(d.data ?? [])
         else if (tab === 'schedules') setSchedules(d.data ?? [])
         else setRuns(d.data ?? [])
       })
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load pipeline data'))
       .finally(() => setLoading(false))
   }
 
@@ -81,7 +86,12 @@ export default function PipelinePage() {
         ))}
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load: {error}
+          <button onClick={loadData} className="ml-3 underline">Retry</button>
+        </div>
+      ) : loading ? (
         <div className="mt-6 space-y-3">
           {[...Array(5)].map((_, i) => <div key={i} className="card animate-pulse h-12" />)}
         </div>

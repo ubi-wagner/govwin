@@ -19,17 +19,22 @@ export async function GET(request: NextRequest, { params }: Params) {
   const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [profile] = await sql`
-    SELECT * FROM tenant_profiles WHERE tenant_id = ${tenant.id}
-  `
+  try {
+    const [profile] = await sql`
+      SELECT * FROM tenant_profiles WHERE tenant_id = ${tenant.id}
+    `
 
-  return NextResponse.json({
-    tenant: {
-      name: tenant.name,
-      slug: tenant.slug,
-      plan: tenant.plan,
-      status: tenant.status,
-    },
-    profile: profile ?? null,
-  })
+    return NextResponse.json({
+      tenant: {
+        name: tenant.name,
+        slug: tenant.slug,
+        plan: tenant.plan,
+        status: tenant.status,
+      },
+      profile: profile ?? null,
+    })
+  } catch (error) {
+    console.error('[GET /api/portal/profile] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

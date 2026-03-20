@@ -18,12 +18,16 @@ export default function DocumentsPage() {
   const slug = params.tenantSlug as string
   const [links, setLinks] = useState<DownloadLink[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/portal/${slug}/documents`)
-      .then(r => r.ok ? r.json() : { data: [] })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(d => setLinks(d.data ?? []))
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load documents'))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -32,7 +36,11 @@ export default function DocumentsPage() {
       <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
       <p className="mt-1 text-sm text-gray-500">Admin-curated resources and downloads</p>
 
-      {loading ? (
+      {error ? (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load documents: {error}
+        </div>
+      ) : loading ? (
         <div className="mt-6 space-y-3">
           {[...Array(3)].map((_, i) => <div key={i} className="card animate-pulse h-16" />)}
         </div>

@@ -27,24 +27,29 @@ export async function GET() {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const tenants = await sql`
-    SELECT
-      t.*,
-      COUNT(DISTINCT u.id)::INT              AS user_count,
-      COUNT(DISTINCT to2.opportunity_id)::INT AS opportunity_count,
-      COUNT(DISTINCT to2.opportunity_id)
-        FILTER (WHERE to2.pursuit_status = 'pursuing')::INT AS pursuing_count,
-      ROUND(AVG(to2.total_score), 1)         AS avg_score,
-      MAX(ta.created_at)                     AS last_activity_at
-    FROM tenants t
-    LEFT JOIN users u ON u.tenant_id = t.id AND u.is_active = true
-    LEFT JOIN tenant_opportunities to2 ON to2.tenant_id = t.id
-    LEFT JOIN tenant_actions ta ON ta.tenant_id = t.id
-    GROUP BY t.id
-    ORDER BY t.created_at DESC
-  `
+  try {
+    const tenants = await sql`
+      SELECT
+        t.*,
+        COUNT(DISTINCT u.id)::INT              AS user_count,
+        COUNT(DISTINCT to2.opportunity_id)::INT AS opportunity_count,
+        COUNT(DISTINCT to2.opportunity_id)
+          FILTER (WHERE to2.pursuit_status = 'pursuing')::INT AS pursuing_count,
+        ROUND(AVG(to2.total_score), 1)         AS avg_score,
+        MAX(ta.created_at)                     AS last_activity_at
+      FROM tenants t
+      LEFT JOIN users u ON u.tenant_id = t.id AND u.is_active = true
+      LEFT JOIN tenant_opportunities to2 ON to2.tenant_id = t.id
+      LEFT JOIN tenant_actions ta ON ta.tenant_id = t.id
+      GROUP BY t.id
+      ORDER BY t.created_at DESC
+    `
 
-  return NextResponse.json({ data: tenants })
+    return NextResponse.json({ data: tenants })
+  } catch (error) {
+    console.error('[GET /api/tenants] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }
 
 // POST /api/tenants
@@ -52,7 +57,12 @@ export async function POST(request: NextRequest) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
   const { name, slug, plan = 'starter', primaryEmail, internalNotes } = body
 
   if (!name || !slug) {

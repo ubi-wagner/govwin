@@ -4,11 +4,9 @@ const nextConfig = {
   // Produces a minimal self-contained build in .next/standalone
   output: 'standalone',
 
-  // Silence build errors on missing env vars during CI
-  // Real values are injected by Railway at runtime
-  experimental: {
-    serverComponentsExternalPackages: ['pg', 'postgres'],
-  },
+  // Ensure pg and postgres are not bundled by webpack
+  // (moved from experimental.serverComponentsExternalPackages in Next.js 14.2+)
+  serverExternalPackages: ['pg', 'postgres'],
 }
 
 export default nextConfig

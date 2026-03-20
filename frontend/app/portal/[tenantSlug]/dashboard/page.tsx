@@ -12,11 +12,18 @@ export default function PortalDashboard() {
   const [urgentOpps, setUrgentOpps] = useState<TenantPipelineItem[]>([])
   const [stats, setStats] = useState({ total: 0, highPriority: 0, pursuing: 0, closingSoon: 0 })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/opportunities?tenantSlug=${slug}&sortBy=score&limit=5`).then(r => r.json()),
-      fetch(`/api/opportunities?tenantSlug=${slug}&deadlineStatus=urgent&sortBy=close_date&sortDir=asc&limit=5`).then(r => r.json()),
+      fetch(`/api/opportunities?tenantSlug=${slug}&sortBy=score&limit=5`).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch(`/api/opportunities?tenantSlug=${slug}&deadlineStatus=urgent&sortBy=close_date&sortDir=asc&limit=5`).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
     ])
       .then(([top, urgent]) => {
         setTopOpps(top.data ?? [])
@@ -28,7 +35,7 @@ export default function PortalDashboard() {
           closingSoon: (urgent.data ?? []).length,
         })
       })
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load dashboard data'))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -38,6 +45,17 @@ export default function PortalDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="mt-6 grid grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => <div key={i} className="card animate-pulse h-20" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load dashboard: {error}
         </div>
       </div>
     )

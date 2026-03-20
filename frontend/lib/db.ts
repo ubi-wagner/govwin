@@ -39,7 +39,7 @@ export async function getTenantBySlug(slug: string) {
   const [tenant] = await sql`
     SELECT id, slug, name, status, plan, features
     FROM tenants
-    WHERE slug = ${slug} AND status = 'active'
+    WHERE slug = ${slug} AND status IN ('active', 'trial')
   `
   return tenant ?? null
 }

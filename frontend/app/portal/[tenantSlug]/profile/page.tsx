@@ -33,12 +33,16 @@ export default function ProfilePage() {
   const slug = params.tenantSlug as string
   const [data, setData] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/portal/${slug}/profile`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(setData)
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load profile'))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -53,7 +57,11 @@ export default function ProfilePage() {
         <span className="text-gray-400">Contact your admin to update.</span>
       </p>
 
-      {loading ? (
+      {error ? (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load profile: {error}
+        </div>
+      ) : loading ? (
         <div className="mt-6 space-y-4">
           {[...Array(3)].map((_, i) => <div key={i} className="card animate-pulse h-32" />)}
         </div>
