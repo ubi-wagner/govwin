@@ -36,7 +36,7 @@ function LoginForm() {
   return (
     <div className="w-full max-w-sm">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">GovTech Intel</h1>
+        <h1 className="text-2xl font-bold text-gray-900">RFP Pipeline</h1>
         <p className="mt-1 text-sm text-gray-500">Government Opportunity Intelligence</p>
       </div>
 

@@ -8,7 +8,7 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
-    "test": "vitest run",
+    "test": "vitest run --exclude '__tests__/integration/**'",
     "test:unit": "vitest run __tests__/api-guards.test.ts __tests__/middleware.test.ts",
     "test:integration": "vitest run __tests__/integration/",
     "test:e2e": "playwright test",

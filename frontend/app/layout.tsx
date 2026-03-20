@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'GovTech Intel',
+  title: 'RFP Pipeline',
   description: 'Government Opportunity Intelligence Platform',
 }
 

@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
         <div className="flex h-14 items-center border-b border-gray-200 px-4">
           <Link href="/admin/dashboard" className="text-lg font-bold text-brand-700">
-            GovTech Intel
+            RFP Pipeline
           </Link>
         </div>
 
