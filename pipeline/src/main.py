@@ -158,10 +158,13 @@ async def dequeue_and_run(conn):
 
     except Exception as e:
         log.error(f"Job {job_id} failed hard: {e}", exc_info=True)
-        await conn.execute(
-            "UPDATE pipeline_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2",
-            str(e), job_id,
-        )
+        try:
+            await conn.execute(
+                "UPDATE pipeline_jobs SET status = 'failed', error_message = $1, completed_at = NOW() WHERE id = $2",
+                str(e)[:500], job_id,
+            )
+        except Exception as db_err:
+            log.error(f"Failed to update job {job_id} status: {db_err}")
 
     return True
 
@@ -200,11 +203,20 @@ async def main():
                     log.info(f"Received notification: {msg}")
             except asyncio.TimeoutError:
                 pass
-            except asyncpg.PostgresConnectionError:
+            except (asyncpg.PostgresConnectionError, asyncpg.InterfaceError):
                 log.warning("Connection lost, reconnecting...")
+                try:
+                    await conn.close()
+                except Exception:
+                    pass
                 await asyncio.sleep(5)
-                conn = await asyncpg.connect(DATABASE_URL)
-                await conn.add_listener("pipeline_worker", lambda *args: None)
+                try:
+                    conn = await asyncpg.connect(DATABASE_URL)
+                    await conn.add_listener("pipeline_worker", lambda *args: None)
+                except Exception as reconn_err:
+                    log.error(f"Reconnect failed: {reconn_err}")
+                    await asyncio.sleep(10)
+                    continue
 
             if shutdown_event.is_set():
                 break
@@ -220,18 +232,23 @@ async def main():
 
 
 async def _wait_for_notify(conn):
-    """Wait for a notification on any channel. Returns the payload."""
+    """Wait for a notification on the pipeline_worker channel. Returns the payload."""
     future = asyncio.get_event_loop().create_future()
 
     def callback(conn, pid, channel, payload):
         if not future.done():
             future.set_result(payload)
 
+    # Use the existing persistent listener; only add a temporary one for the future
+    conn._pipeline_notify_cb = callback
     await conn.add_listener("pipeline_worker", callback)
     try:
         return await future
     finally:
-        await conn.remove_listener("pipeline_worker", callback)
+        try:
+            await conn.remove_listener("pipeline_worker", callback)
+        except Exception:
+            pass  # Connection may already be closed
 
 
 if __name__ == "__main__":

@@ -384,9 +384,11 @@ class SamGovIngester:
 
         # Parse fields
         title = raw.get("title", "Untitled")[:500]
-        description = raw.get("description", {})
+        description = raw.get("description", "")
         if isinstance(description, dict):
             description = description.get("body", "")
+        if not isinstance(description, str):
+            description = str(description) if description else ""
 
         agency = raw.get("fullParentPathName", "")
         # Extract top-level agency code from fullParentPathCode (e.g., "097.DISA.PL8" → "097")
@@ -479,7 +481,12 @@ class SamGovIngester:
             return None
         for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%m/%d/%Y", "%Y-%m-%d"):
             try:
-                return datetime.strptime(date_str.strip(), fmt).replace(tzinfo=timezone.utc)
+                dt = datetime.strptime(date_str.strip(), fmt)
+                # For tz-aware formats, convert to UTC (don't replace, which drops the offset)
+                if dt.tzinfo is not None:
+                    return dt.astimezone(timezone.utc)
+                # For naive formats, assume UTC
+                return dt.replace(tzinfo=timezone.utc)
             except (ValueError, AttributeError):
                 continue
         return None
