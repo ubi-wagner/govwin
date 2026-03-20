@@ -35,6 +35,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
   }
 
+  try {
   // Verify tenant exists
   const [tenant] = await sql`SELECT id, name FROM tenants WHERE id = ${params.tenantId}`
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
@@ -42,8 +43,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   // Generate temp password
   const tempPassword = crypto.randomBytes(8).toString('base64url')
   const passwordHash = await bcrypt.hash(tempPassword, 12)
-
-  try {
     const [user] = await sql`
       INSERT INTO users (name, email, role, tenant_id, password_hash, temp_password)
       VALUES (${name}, ${email}, ${role}, ${params.tenantId}, ${passwordHash}, true)
@@ -80,12 +79,17 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const users = await sql`
-    SELECT id, name, email, role, is_active, last_login_at, temp_password, created_at
-    FROM users
-    WHERE tenant_id = ${params.tenantId}
-    ORDER BY created_at DESC
-  `
+  try {
+    const users = await sql`
+      SELECT id, name, email, role, is_active, last_login_at, temp_password, created_at
+      FROM users
+      WHERE tenant_id = ${params.tenantId}
+      ORDER BY created_at DESC
+    `
 
-  return NextResponse.json({ data: users })
+    return NextResponse.json({ data: users })
+  } catch (error) {
+    console.error('[GET /api/tenants/[id]/users] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

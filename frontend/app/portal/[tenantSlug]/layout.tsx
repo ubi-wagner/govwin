@@ -18,21 +18,33 @@ export default async function PortalLayout({
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  // Resolve tenant from slug
-  const [tenant] = await sql`
-    SELECT id, slug, name, status FROM tenants
-    WHERE slug = ${tenantSlug} AND status IN ('active', 'trial')
-  `
+  let tenant: Record<string, any> | undefined
+  try {
+    // Resolve tenant from slug
+    const [row] = await sql`
+      SELECT id, slug, name, status FROM tenants
+      WHERE slug = ${tenantSlug} AND status IN ('active', 'trial')
+    `
+    tenant = row
+  } catch (e) {
+    console.error('[PortalLayout] Failed to resolve tenant:', e)
+    throw new Error('Unable to load tenant. Please try again later.')
+  }
 
   if (!tenant) redirect('/')
 
   // Verify access: master admin can view any, tenant users must match
   if (session.user.role !== 'master_admin') {
-    const [access] = await sql`
-      SELECT id FROM users
-      WHERE id = ${session.user.id!} AND tenant_id = ${tenant.id} AND is_active = true
-    `
-    if (!access) redirect('/')
+    try {
+      const [access] = await sql`
+        SELECT id FROM users
+        WHERE id = ${session.user.id!} AND tenant_id = ${tenant.id} AND is_active = true
+      `
+      if (!access) redirect('/')
+    } catch (e) {
+      console.error('[PortalLayout] Failed to verify tenant access:', e)
+      throw new Error('Unable to verify access. Please try again later.')
+    }
   }
 
   return (

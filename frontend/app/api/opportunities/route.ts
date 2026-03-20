@@ -19,13 +19,19 @@ export async function GET(request: NextRequest) {
 
   if (!tenantSlug) return NextResponse.json({ error: 'tenantSlug required' }, { status: 400 })
 
-  // Resolve slug → tenant
-  const tenant = await getTenantBySlug(tenantSlug)
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  let tenant: any
+  try {
+    // Resolve slug → tenant
+    tenant = await getTenantBySlug(tenantSlug)
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  // Verify access
-  const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
-  if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Verify access
+    const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (error) {
+    console.error('[/api/opportunities] Tenant resolution error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 
   // Parse filters
   const filters: OpportunityFilters = {
