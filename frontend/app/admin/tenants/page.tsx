@@ -8,14 +8,20 @@ export default function TenantsPage() {
   const [tenants, setTenants] = useState<TenantWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => { loadTenants() }, [])
 
   function loadTenants() {
+    setLoading(true)
+    setError(null)
     fetch('/api/tenants')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(d => setTenants(d.data ?? []))
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load tenants'))
       .finally(() => setLoading(false))
   }
 
@@ -38,7 +44,12 @@ export default function TenantsPage() {
         />
       )}
 
-      {loading ? (
+      {error ? (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load tenants: {error}
+          <button onClick={loadTenants} className="ml-3 underline">Retry</button>
+        </div>
+      ) : loading ? (
         <div className="mt-6 space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="card animate-pulse h-20" />

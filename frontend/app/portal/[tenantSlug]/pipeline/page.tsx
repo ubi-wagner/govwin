@@ -1,10 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { TenantPipelineItem, PursuitStatus } from '@/types'
 
 export default function PortalPipeline() {
+  return (
+    <Suspense fallback={<div className="animate-pulse"><div className="h-8 w-48 rounded bg-gray-200" /></div>}>
+      <PortalPipelineInner />
+    </Suspense>
+  )
+}
+
+function PortalPipelineInner() {
   const params = useParams()
   const searchParams = useSearchParams()
   const slug = params.tenantSlug as string
@@ -12,6 +20,7 @@ export default function PortalPipeline() {
   const [opps, setOpps] = useState<TenantPipelineItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
   const limit = 25
 
@@ -24,6 +33,7 @@ export default function PortalPipeline() {
 
   const loadOpps = useCallback(() => {
     setLoading(true)
+    setError(null)
     const params = new URLSearchParams({
       tenantSlug: slug,
       sortBy,
@@ -36,12 +46,15 @@ export default function PortalPipeline() {
     if (minScore) params.set('minScore', minScore)
 
     fetch(`/api/opportunities?${params}`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(d => {
         setOpps(d.data ?? [])
         setTotal(d.total ?? 0)
       })
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load opportunities'))
       .finally(() => setLoading(false))
   }, [slug, sortBy, sortDir, page, search, pursuitFilter, minScore])
 
@@ -97,7 +110,12 @@ export default function PortalPipeline() {
       </div>
 
       {/* Results */}
-      {loading ? (
+      {error ? (
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load opportunities: {error}
+          <button onClick={loadOpps} className="ml-3 underline">Retry</button>
+        </div>
+      ) : loading ? (
         <div className="mt-6 space-y-3">
           {[...Array(5)].map((_, i) => <div key={i} className="card animate-pulse h-24" />)}
         </div>

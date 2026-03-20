@@ -16,7 +16,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
   const { tenantSlug, actionType, value, metadata } = body
 
   if (!tenantSlug || !actionType) {
@@ -127,14 +132,19 @@ export async function GET(request: NextRequest, { params }: Params) {
   const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const actions = await sql`
-    SELECT ta.*, u.name AS user_name
-    FROM tenant_actions ta
-    JOIN users u ON u.id = ta.user_id
-    WHERE ta.tenant_id = ${tenant.id}
-      AND ta.opportunity_id = ${params.opportunityId}
-    ORDER BY ta.created_at DESC
-  `
+  try {
+    const actions = await sql`
+      SELECT ta.*, u.name AS user_name
+      FROM tenant_actions ta
+      JOIN users u ON u.id = ta.user_id
+      WHERE ta.tenant_id = ${tenant.id}
+        AND ta.opportunity_id = ${params.opportunityId}
+      ORDER BY ta.created_at DESC
+    `
 
-  return NextResponse.json({ data: actions })
+    return NextResponse.json({ data: actions })
+  } catch (error) {
+    console.error('[GET /api/opportunities/actions] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

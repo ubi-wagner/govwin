@@ -21,33 +21,38 @@ export async function GET(request: NextRequest, { params }: Params) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const [tenant, profile, users, recentActions] = await Promise.all([
-    sql`SELECT * FROM tenants WHERE id = ${params.tenantId}`,
-    sql`SELECT * FROM tenant_profiles WHERE tenant_id = ${params.tenantId}`,
-    sql`
-      SELECT id, name, email, role, is_active, last_login_at, created_at
-      FROM users WHERE tenant_id = ${params.tenantId}
-      ORDER BY created_at DESC
-    `,
-    sql`
-      SELECT ta.action_type, ta.created_at, u.name AS user_name, o.title AS opp_title
-      FROM tenant_actions ta
-      JOIN users u ON u.id = ta.user_id
-      JOIN opportunities o ON o.id = ta.opportunity_id
-      WHERE ta.tenant_id = ${params.tenantId}
-      ORDER BY ta.created_at DESC
-      LIMIT 20
-    `,
-  ])
+  try {
+    const [tenant, profile, users, recentActions] = await Promise.all([
+      sql`SELECT * FROM tenants WHERE id = ${params.tenantId}`,
+      sql`SELECT * FROM tenant_profiles WHERE tenant_id = ${params.tenantId}`,
+      sql`
+        SELECT id, name, email, role, is_active, last_login_at, created_at
+        FROM users WHERE tenant_id = ${params.tenantId}
+        ORDER BY created_at DESC
+      `,
+      sql`
+        SELECT ta.action_type, ta.created_at, u.name AS user_name, o.title AS opp_title
+        FROM tenant_actions ta
+        JOIN users u ON u.id = ta.user_id
+        JOIN opportunities o ON o.id = ta.opportunity_id
+        WHERE ta.tenant_id = ${params.tenantId}
+        ORDER BY ta.created_at DESC
+        LIMIT 20
+      `,
+    ])
 
-  if (!tenant[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!tenant[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  return NextResponse.json({
-    tenant: tenant[0],
-    profile: profile[0] ?? null,
-    users,
-    recentActions,
-  })
+    return NextResponse.json({
+      tenant: tenant[0],
+      profile: profile[0] ?? null,
+      users,
+      recentActions,
+    })
+  } catch (error) {
+    console.error('[GET /api/tenants/[id]] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }
 
 // PATCH /api/tenants/[tenantId]
@@ -55,7 +60,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
   // Only allow updating safe fields
   const allowed = ['name', 'plan', 'status', 'primary_email', 'primary_phone',
@@ -71,21 +81,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
   }
 
-  const [updated] = await sql`
-    UPDATE tenants
-    SET ${sql(updates)}, updated_at = NOW()
-    WHERE id = ${params.tenantId}
-    RETURNING *
-  `
+  try {
+    const [updated] = await sql`
+      UPDATE tenants
+      SET ${sql(updates)}, updated_at = NOW()
+      WHERE id = ${params.tenantId}
+      RETURNING *
+    `
 
-  await auditLog({
-    userId: session.user!.id,
-    tenantId: params.tenantId,
-    action: 'tenant.updated',
-    entityType: 'tenant',
-    entityId: params.tenantId,
-    newValue: updates,
-  })
+    if (!updated) {
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+    }
 
-  return NextResponse.json({ data: updated })
+    await auditLog({
+      userId: session.user!.id,
+      tenantId: params.tenantId,
+      action: 'tenant.updated',
+      entityType: 'tenant',
+      entityId: params.tenantId,
+      newValue: updates,
+    })
+
+    return NextResponse.json({ data: updated })
+  } catch (error) {
+    console.error('[PATCH /api/tenants/[id]] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

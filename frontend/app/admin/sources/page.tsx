@@ -28,10 +28,14 @@ export default function SourcesPage() {
   const [sources, setSources] = useState<SourceInfo[]>([])
   const [apiKeys, setApiKeys] = useState<ApiKeyInfo[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/system')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (data.sourceHealth) {
           setSources(Object.entries(data.sourceHealth).map(([source, status]) => ({
@@ -58,9 +62,20 @@ export default function SourcesPage() {
           })))
         }
       })
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load source data'))
       .finally(() => setLoading(false))
   }, [])
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
+        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          Failed to load source data: {error}
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

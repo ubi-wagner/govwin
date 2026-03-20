@@ -9,18 +9,33 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await request.json()
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
   const { id, enabled } = body
 
   if (!id || typeof enabled !== 'boolean') {
     return NextResponse.json({ error: 'id and enabled required' }, { status: 400 })
   }
 
-  const [schedule] = await sql`
-    UPDATE pipeline_schedules SET enabled = ${enabled}, updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING *
-  `
+  try {
+    const [schedule] = await sql`
+      UPDATE pipeline_schedules SET enabled = ${enabled}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `
 
-  return NextResponse.json({ data: schedule })
+    if (!schedule) {
+      return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ data: schedule })
+  } catch (error) {
+    console.error('[PATCH /api/pipeline/schedules] Error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
 }

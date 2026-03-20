@@ -21,7 +21,7 @@ export default async function PortalLayout({
   // Resolve tenant from slug
   const [tenant] = await sql`
     SELECT id, slug, name, status FROM tenants
-    WHERE slug = ${tenantSlug} AND status = 'active'
+    WHERE slug = ${tenantSlug} AND status IN ('active', 'trial')
   `
 
   if (!tenant) redirect('/')

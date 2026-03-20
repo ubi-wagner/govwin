@@ -14,7 +14,7 @@ export default async function PortalRoot() {
   // Tenant user → find their tenant slug
   if (session.user.tenantId) {
     const [tenant] = await sql`
-      SELECT slug FROM tenants WHERE id = ${session.user.tenantId} AND status = 'active'
+      SELECT slug FROM tenants WHERE id = ${session.user.tenantId} AND status IN ('active', 'trial')
     `
     if (tenant) {
       redirect(`/portal/${tenant.slug}/dashboard`)

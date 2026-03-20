@@ -41,7 +41,7 @@ class ScoringEngine:
                    tp.min_surface_score, tp.high_priority_score
             FROM tenants t
             JOIN tenant_profiles tp ON tp.tenant_id = t.id
-            WHERE t.status = 'active'
+            WHERE t.status IN ('active', 'trial')
             """
         )
 

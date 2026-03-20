@@ -1,8 +1,9 @@
 /**
  * NextAuth.js v5 (Auth.js) configuration
  * - Email/password via Credentials provider
- * - Postgres adapter for session/user storage
- * - Custom session includes role + tenantId
+ * - JWT strategy (required for Credentials; also works with OAuth providers)
+ * - Postgres adapter kept for OAuth user storage (Google login planned)
+ * - Custom JWT/session includes role + tenantId
  */
 import NextAuth from 'next-auth'
 import PostgresAdapter from '@auth/pg-adapter'
@@ -15,10 +16,11 @@ import type { AppSession, UserRole } from '@/types'
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Adapter retained for OAuth providers (Google) — stores users/accounts in PG
   adapter: PostgresAdapter(pool),
 
   session: {
-    strategy: 'database',   // Sessions stored in Postgres (not JWT)
+    strategy: 'jwt',   // JWT required for Credentials provider; works with OAuth too
     maxAge: 30 * 24 * 60 * 60,  // 30 days
   },
 
@@ -44,11 +46,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash)
         if (!valid) return null
 
-        // Update last_login_at
-        await pool.query(
-          'UPDATE users SET last_login_at = NOW() WHERE id = $1',
-          [user.id]
-        )
+        // Update last_login_at (non-critical — don't block login on failure)
+        try {
+          await pool.query(
+            'UPDATE users SET last_login_at = NOW() WHERE id = $1',
+            [user.id]
+          )
+        } catch (e) {
+          console.error('[auth] Failed to update last_login_at:', e)
+        }
 
         return {
           id:          user.id,
@@ -60,25 +66,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       },
     }),
+    // ── Google OAuth (planned) ────────────────────────────────
+    // Google({ clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! }),
   ],
 
   callbacks: {
-    // Attach role + tenantId to the session object
-    async session({ session, user }) {
-      const result = await pool.query(
-        'SELECT role, tenant_id, temp_password FROM users WHERE id = $1',
-        [user.id]
-      )
-      const dbUser = result.rows[0]
+    // Encode custom fields into the JWT on sign-in and on every token refresh
+    async jwt({ token, user }) {
+      // `user` is only present on initial sign-in
+      if (user) {
+        token.id           = user.id
+        token.role         = (user as any).role
+        token.tenantId     = (user as any).tenantId
+        token.tempPassword = (user as any).tempPassword
+      }
 
+      // For OAuth users whose role/tenantId aren't set by authorize(),
+      // look them up from the DB on first sign-in
+      if (user && !token.role) {
+        try {
+          const result = await pool.query(
+            'SELECT role, tenant_id, temp_password FROM users WHERE id = $1',
+            [user.id]
+          )
+          const dbUser = result.rows[0]
+          if (dbUser) {
+            token.role         = dbUser.role
+            token.tenantId     = dbUser.tenant_id
+            token.tempPassword = dbUser.temp_password
+          }
+        } catch (e) {
+          console.error('[auth] JWT callback DB lookup error:', e)
+        }
+      }
+
+      return token
+    },
+
+    // Populate the session from the JWT (no DB call needed on every request)
+    async session({ session, token }) {
       return {
         ...session,
         user: {
           ...session.user,
-          id:          user.id,
-          role:        dbUser?.role as UserRole ?? 'tenant_user',
-          tenantId:    dbUser?.tenant_id ?? null,
-          tempPassword: dbUser?.temp_password ?? false,
+          id:          token.id as string,
+          role:        (token.role as UserRole) ?? 'tenant_user',
+          tenantId:    (token.tenantId as string) ?? null,
+          tempPassword: (token.tempPassword as boolean) ?? false,
         },
       } as AppSession
     },

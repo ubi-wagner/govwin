@@ -7,16 +7,28 @@ import type { SystemStatus } from '@/types'
 export default function AdminDashboard() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/system')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(setStatus)
-      .catch(() => {})
+      .catch(err => setError(err.message ?? 'Failed to load system status'))
       .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <DashboardSkeleton />
+  if (error) return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
+        Failed to load system status: {error}
+      </div>
+    </div>
+  )
 
   return (
     <div>

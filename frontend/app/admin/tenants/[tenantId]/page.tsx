@@ -23,20 +23,35 @@ export default function TenantDetailPage() {
   const tenantId = params.tenantId as string
   const [data, setData] = useState<TenantDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showAddUser, setShowAddUser] = useState(false)
   const [editing, setEditing] = useState(false)
 
   useEffect(() => { loadTenant() }, [tenantId])
 
   function loadTenant() {
+    setLoading(true)
+    setError(null)
     fetch(`/api/tenants/${tenantId}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(setData)
-      .catch(() => router.push('/admin/tenants'))
+      .then(r => {
+        if (r.status === 404) { router.push('/admin/tenants'); return null }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then(d => { if (d) setData(d) })
+      .catch(err => setError(err.message ?? 'Failed to load tenant'))
       .finally(() => setLoading(false))
   }
 
   if (loading) return <div className="animate-pulse"><div className="h-8 w-48 rounded bg-gray-200" /></div>
+  if (error) return (
+    <div>
+      <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+        Failed to load tenant: {error}
+        <button onClick={loadTenant} className="ml-3 underline">Retry</button>
+      </div>
+    </div>
+  )
   if (!data) return null
 
   const { tenant, profile, users, recentActions } = data
@@ -237,20 +252,34 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
     internal_notes: tenant.internalNotes ?? '',
   })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    await fetch(`/api/tenants/${tenant.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    onSaved()
+    setSaveError('')
+    try {
+      const res = await fetch(`/api/tenants/${tenant.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setSaveError(data.error ?? 'Failed to save')
+        setSaving(false)
+        return
+      }
+      onSaved()
+    } catch {
+      setSaveError('Network error')
+      setSaving(false)
+    }
   }
 
   return (
     <form onSubmit={handleSave} className="mt-4 grid grid-cols-2 gap-4">
+      {saveError && <div className="col-span-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">{saveError}</div>}
       <div>
         <label className="label">Name</label>
         <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
