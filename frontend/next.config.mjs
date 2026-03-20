@@ -5,8 +5,10 @@ const nextConfig = {
   output: 'standalone',
 
   // Ensure pg and postgres are not bundled by webpack
-  // (moved from experimental.serverComponentsExternalPackages in Next.js 14.2+)
-  serverExternalPackages: ['pg', 'postgres', 'bcryptjs'],
+  // Next.js 14.x uses experimental.serverComponentsExternalPackages
+  experimental: {
+    serverComponentsExternalPackages: ['pg', 'postgres', 'bcryptjs'],
+  },
 }
 
 export default nextConfig
