@@ -10,11 +10,13 @@ import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess, auditLog } from '@/lib/db'
 import type { ActionType } from '@/types'
 
-type Params = { params: { opportunityId: string } }
+type Params = { params: Promise<{ opportunityId: string }> }
 
 export async function POST(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { opportunityId } = await params
 
   let body: any
   try {
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       FROM tenant_opportunities to2
       JOIN opportunities o ON o.id = to2.opportunity_id
       WHERE to2.tenant_id = ${tenant.id}
-        AND to2.opportunity_id = ${params.opportunityId}
+        AND to2.opportunity_id = ${opportunityId}
     `
 
     // For thumbs: toggle (remove if already set, add if not)
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       await sql`
         DELETE FROM tenant_actions
         WHERE tenant_id = ${tenant.id}
-          AND opportunity_id = ${params.opportunityId}
+          AND opportunity_id = ${opportunityId}
           AND user_id = ${session.user.id!}
           AND action_type = ${opposite}
       `
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       const [existing] = await sql`
         SELECT id FROM tenant_actions
         WHERE tenant_id = ${tenant.id}
-          AND opportunity_id = ${params.opportunityId}
+          AND opportunity_id = ${opportunityId}
           AND user_id = ${session.user.id!}
           AND action_type = ${actionType}
       `
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         UPDATE tenant_opportunities
         SET pursuit_status = ${value}
         WHERE tenant_id = ${tenant.id}
-          AND opportunity_id = ${params.opportunityId}
+          AND opportunity_id = ${opportunityId}
       `
     }
 
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         tenant_id, opportunity_id, user_id, action_type,
         value, metadata, score_at_action, agency_at_action, type_at_action
       ) VALUES (
-        ${tenant.id}, ${params.opportunityId}, ${session.user.id!},
+        ${tenant.id}, ${opportunityId}, ${session.user.id!},
         ${actionType}, ${value ?? null},
         ${metadata ? JSON.stringify(metadata) : null},
         ${tenantOpp?.totalScore ?? null},
@@ -134,6 +136,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { opportunityId } = await params
   const { searchParams } = new URL(request.url)
   const tenantSlug = searchParams.get('tenantSlug')
   if (!tenantSlug) return NextResponse.json({ error: 'tenantSlug required' }, { status: 400 })
@@ -162,7 +165,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       FROM tenant_actions ta
       JOIN users u ON u.id = ta.user_id
       WHERE ta.tenant_id = ${tenant.id}
-        AND ta.opportunity_id = ${params.opportunityId}
+        AND ta.opportunity_id = ${opportunityId}
       ORDER BY ta.created_at DESC
     `
 

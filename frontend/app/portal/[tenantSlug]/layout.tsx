@@ -9,11 +9,9 @@ export default async function PortalLayout({
   params,
 }: {
   children: React.ReactNode
-  params: Promise<{ tenantSlug: string }> | { tenantSlug: string }
+  params: Promise<{ tenantSlug: string }>
 }) {
-  // Next.js 15+: params is a Promise; Next.js 13-14: params is an object
-  const resolvedParams = await Promise.resolve(params)
-  const tenantSlug = resolvedParams.tenantSlug
+  const { tenantSlug } = await params
 
   const session = await auth()
   if (!session?.user) redirect('/login')
