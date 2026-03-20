@@ -235,12 +235,10 @@ async def _wait_for_notify(conn):
     """Wait for a notification on the pipeline_worker channel. Returns the payload."""
     future = asyncio.get_event_loop().create_future()
 
-    def callback(conn, pid, channel, payload):
+    def callback(conn_ref, pid, channel, payload):
         if not future.done():
             future.set_result(payload)
 
-    # Use the existing persistent listener; only add a temporary one for the future
-    conn._pipeline_notify_cb = callback
     await conn.add_listener("pipeline_worker", callback)
     try:
         return await future
