@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
 COPY src/ ./src/
-COPY config/ ./config/
 
 # Railway: no PORT needed — this is a worker, not a web server
 # Railway will keep it running as long as the process stays alive
