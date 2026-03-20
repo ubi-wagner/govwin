@@ -44,11 +44,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash)
         if (!valid) return null
 
-        // Update last_login_at
-        await pool.query(
-          'UPDATE users SET last_login_at = NOW() WHERE id = $1',
-          [user.id]
-        )
+        // Update last_login_at (non-critical — don't block login on failure)
+        try {
+          await pool.query(
+            'UPDATE users SET last_login_at = NOW() WHERE id = $1',
+            [user.id]
+          )
+        } catch (e) {
+          console.error('[auth] Failed to update last_login_at:', e)
+        }
 
         return {
           id:          user.id,
@@ -65,22 +69,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     // Attach role + tenantId to the session object
     async session({ session, user }) {
-      const result = await pool.query(
-        'SELECT role, tenant_id, temp_password FROM users WHERE id = $1',
-        [user.id]
-      )
-      const dbUser = result.rows[0]
+      try {
+        const result = await pool.query(
+          'SELECT role, tenant_id, temp_password FROM users WHERE id = $1',
+          [user.id]
+        )
+        const dbUser = result.rows[0]
 
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id:          user.id,
-          role:        dbUser?.role as UserRole ?? 'tenant_user',
-          tenantId:    dbUser?.tenant_id ?? null,
-          tempPassword: dbUser?.temp_password ?? false,
-        },
-      } as AppSession
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id:          user.id,
+            role:        dbUser?.role as UserRole ?? 'tenant_user',
+            tenantId:    dbUser?.tenant_id ?? null,
+            tempPassword: dbUser?.temp_password ?? false,
+          },
+        } as AppSession
+      } catch (e) {
+        console.error('[auth] Session callback DB error:', e)
+        return {
+          ...session,
+          user: {
+            ...session.user,
+            id:          user.id,
+            role:        'tenant_user' as UserRole,
+            tenantId:    null,
+            tempPassword: false,
+          },
+        } as AppSession
+      }
     },
   },
 

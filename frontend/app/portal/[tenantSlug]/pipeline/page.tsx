@@ -1,10 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { TenantPipelineItem, PursuitStatus } from '@/types'
 
 export default function PortalPipeline() {
+  return (
+    <Suspense fallback={<div className="animate-pulse"><div className="h-8 w-48 rounded bg-gray-200" /></div>}>
+      <PortalPipelineInner />
+    </Suspense>
+  )
+}
+
+function PortalPipelineInner() {
   const params = useParams()
   const searchParams = useSearchParams()
   const slug = params.tenantSlug as string

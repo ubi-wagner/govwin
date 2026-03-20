@@ -89,16 +89,20 @@ export async function auditLog(params: {
   oldValue?: unknown
   newValue?: unknown
 }) {
-  await sql`
-    INSERT INTO audit_log (user_id, tenant_id, action, entity_type, entity_id, old_value, new_value)
-    VALUES (
-      ${params.userId ?? null},
-      ${params.tenantId ?? null},
-      ${params.action},
-      ${params.entityType ?? null},
-      ${params.entityId ?? null},
-      ${params.oldValue ? JSON.stringify(params.oldValue) : null},
-      ${params.newValue ? JSON.stringify(params.newValue) : null}
-    )
-  `
+  try {
+    await sql`
+      INSERT INTO audit_log (user_id, tenant_id, action, entity_type, entity_id, old_value, new_value)
+      VALUES (
+        ${params.userId ?? null},
+        ${params.tenantId ?? null},
+        ${params.action},
+        ${params.entityType ?? null},
+        ${params.entityId ?? null},
+        ${params.oldValue ? JSON.stringify(params.oldValue) : null},
+        ${params.newValue ? JSON.stringify(params.newValue) : null}
+      )
+    `
+  } catch (e) {
+    console.error('[auditLog] Failed to write audit entry:', e)
+  }
 }

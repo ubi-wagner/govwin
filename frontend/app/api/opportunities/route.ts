@@ -79,6 +79,18 @@ export async function GET(request: NextRequest) {
         SELECT COUNT(*) FROM tenant_pipeline
         WHERE tenant_id = ${tenant.id}
           AND (${filters.minScore ?? 0} = 0 OR total_score >= ${filters.minScore ?? 0})
+          AND (${filters.source        ?? ''} = '' OR source          = ${filters.source        ?? ''})
+          AND (${filters.opportunityType ?? ''} = '' OR opportunity_type = ${filters.opportunityType ?? ''})
+          AND (${filters.agency        ?? ''} = '' OR agency_code     = ${filters.agency        ?? ''})
+          AND (${filters.pursuitStatus ?? ''} = '' OR pursuit_status  = ${filters.pursuitStatus ?? ''})
+          AND (${filters.deadlineStatus ?? ''} = '' OR deadline_status = ${filters.deadlineStatus ?? ''})
+          AND (${filters.isPinned ?? false} = false OR is_pinned = true)
+          AND (
+            ${filters.search ?? ''} = ''
+            OR title ILIKE ${'%' + (filters.search ?? '') + '%'}
+            OR solicitation_number ILIKE ${'%' + (filters.search ?? '') + '%'}
+            OR agency ILIKE ${'%' + (filters.search ?? '') + '%'}
+          )
       `,
     ])
 

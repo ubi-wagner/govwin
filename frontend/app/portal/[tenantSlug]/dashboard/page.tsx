@@ -24,15 +24,24 @@ export default function PortalDashboard() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       }),
+      // Separate queries for accurate stats (not derived from 5-item subsets)
+      fetch(`/api/opportunities?tenantSlug=${slug}&minScore=75&limit=1`).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
+      fetch(`/api/opportunities?tenantSlug=${slug}&pursuitStatus=pursuing&limit=1`).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }),
     ])
-      .then(([top, urgent]) => {
+      .then(([top, urgent, highPri, pursuing]) => {
         setTopOpps(top.data ?? [])
         setUrgentOpps(urgent.data ?? [])
         setStats({
           total: top.total ?? 0,
-          highPriority: (top.data ?? []).filter((o: TenantPipelineItem) => o.priorityTier === 'high').length,
-          pursuing: (top.data ?? []).filter((o: TenantPipelineItem) => o.pursuitStatus === 'pursuing').length,
-          closingSoon: (urgent.data ?? []).length,
+          highPriority: highPri.total ?? 0,
+          pursuing: pursuing.total ?? 0,
+          closingSoon: urgent.total ?? 0,
         })
       })
       .catch(err => setError(err.message ?? 'Failed to load dashboard data'))
