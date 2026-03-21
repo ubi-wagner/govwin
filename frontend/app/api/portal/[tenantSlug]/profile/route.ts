@@ -7,15 +7,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
 
-type Params = { params: { tenantSlug: string } }
+type Params = { params: Promise<{ tenantSlug: string }> }
 
 export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { tenantSlug } = await params
+
   let tenant: any
   try {
-    tenant = await getTenantBySlug(params.tenantSlug)
+    tenant = await getTenantBySlug(tenantSlug)
   } catch (error) {
     console.error('[GET /api/portal/profile] Tenant resolution error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })

@@ -87,6 +87,8 @@ function getHomeUrl(user: { role: string; tenantId?: string | null }): string {
 }
 
 export const config = {
+  // Use Node.js runtime (stable in Next.js 15.5+) — auth imports pg + bcryptjs
+  runtime: 'nodejs',
   matcher: [
     '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],

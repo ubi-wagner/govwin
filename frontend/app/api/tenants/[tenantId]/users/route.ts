@@ -10,13 +10,15 @@ import { sql, auditLog } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
-type Params = { params: { tenantId: string } }
+type Params = { params: Promise<{ tenantId: string }> }
 
 export async function POST(request: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user || session.user.role !== 'master_admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  const { tenantId } = await params
 
   let body: any
   try {
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
   // Verify tenant exists
-  const [tenant] = await sql`SELECT id, name FROM tenants WHERE id = ${params.tenantId}`
+  const [tenant] = await sql`SELECT id, name FROM tenants WHERE id = ${tenantId}`
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   // Generate temp password
@@ -45,17 +47,17 @@ export async function POST(request: NextRequest, { params }: Params) {
   const passwordHash = await bcrypt.hash(tempPassword, 12)
     const [user] = await sql`
       INSERT INTO users (name, email, role, tenant_id, password_hash, temp_password)
-      VALUES (${name}, ${email}, ${role}, ${params.tenantId}, ${passwordHash}, true)
+      VALUES (${name}, ${email}, ${role}, ${tenantId}, ${passwordHash}, true)
       RETURNING id, name, email, role, tenant_id, created_at
     `
 
     await auditLog({
       userId: session.user.id,
-      tenantId: params.tenantId,
+      tenantId,
       action: 'user.created',
       entityType: 'user',
       entityId: user.id,
-      newValue: { name, email, role, tenantId: params.tenantId },
+      newValue: { name, email, role, tenantId },
     })
 
     // V1: return temp password for admin to share via secure channel.
@@ -79,11 +81,13 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const { tenantId } = await params
+
   try {
     const users = await sql`
       SELECT id, name, email, role, is_active, last_login_at, temp_password, created_at
       FROM users
-      WHERE tenant_id = ${params.tenantId}
+      WHERE tenant_id = ${tenantId}
       ORDER BY created_at DESC
     `
 

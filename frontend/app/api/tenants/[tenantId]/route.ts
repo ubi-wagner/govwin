@@ -8,7 +8,7 @@ import { auth } from '@/lib/auth'
 import { sql, auditLog } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 
-type Params = { params: { tenantId: string } }
+type Params = { params: Promise<{ tenantId: string }> }
 
 async function requireAdmin() {
   const session = await auth()
@@ -21,13 +21,15 @@ export async function GET(request: NextRequest, { params }: Params) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const { tenantId } = await params
+
   try {
     const [tenant, profile, users, recentActions] = await Promise.all([
-      sql`SELECT * FROM tenants WHERE id = ${params.tenantId}`,
-      sql`SELECT * FROM tenant_profiles WHERE tenant_id = ${params.tenantId}`,
+      sql`SELECT * FROM tenants WHERE id = ${tenantId}`,
+      sql`SELECT * FROM tenant_profiles WHERE tenant_id = ${tenantId}`,
       sql`
         SELECT id, name, email, role, is_active, last_login_at, created_at
-        FROM users WHERE tenant_id = ${params.tenantId}
+        FROM users WHERE tenant_id = ${tenantId}
         ORDER BY created_at DESC
       `,
       sql`
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         FROM tenant_actions ta
         JOIN users u ON u.id = ta.user_id
         JOIN opportunities o ON o.id = ta.opportunity_id
-        WHERE ta.tenant_id = ${params.tenantId}
+        WHERE ta.tenant_id = ${tenantId}
         ORDER BY ta.created_at DESC
         LIMIT 20
       `,
@@ -59,6 +61,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { tenantId } = await params
 
   let body: any
   try {
@@ -85,7 +89,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const [updated] = await sql`
       UPDATE tenants
       SET ${sql(updates)}, updated_at = NOW()
-      WHERE id = ${params.tenantId}
+      WHERE id = ${tenantId}
       RETURNING *
     `
 
@@ -95,10 +99,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     await auditLog({
       userId: session.user!.id,
-      tenantId: params.tenantId,
+      tenantId,
       action: 'tenant.updated',
       entityType: 'tenant',
-      entityId: params.tenantId,
+      entityId: tenantId,
       newValue: updates,
     })
 

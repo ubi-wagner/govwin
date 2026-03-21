@@ -11,8 +11,9 @@
 import postgres from 'postgres'
 import { Pool } from 'pg'
 
-// ── Validate DATABASE_URL at startup ──────────────────────────
-if (!process.env.DATABASE_URL) {
+// ── Validate DATABASE_URL at runtime (skip during build) ─────
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl && process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
   throw new Error(
     'DATABASE_URL environment variable is not set. ' +
     'The application cannot start without a database connection.'
@@ -20,7 +21,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 // ── postgres.js — primary query client ────────────────────────
-export const sql = postgres(process.env.DATABASE_URL, {
+export const sql = postgres(databaseUrl ?? '', {
   max: 10,
   idle_timeout: 30,
   connect_timeout: 10,
@@ -32,7 +33,7 @@ export const sql = postgres(process.env.DATABASE_URL, {
 
 // ── pg Pool — Auth.js adapter ──────────────────────────────────
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl ?? '',
   max: 5,
 })
 
