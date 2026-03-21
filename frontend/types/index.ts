@@ -30,6 +30,7 @@ export interface AppSession {
     tempPassword: boolean
   }
   expires: string
+  googleAccessToken: string | null
 }
 
 // ─── Tenants ──────────────────────────────────────────────────
@@ -209,6 +210,26 @@ export interface TenantUpload {
   description: string | null
   isActive: boolean
   createdAt: string
+}
+
+// ─── Google Drive ────────────────────────────────────────────
+export type DriveFileType = 'FOLDER' | 'DOCUMENT' | 'SPREADSHEET' | 'PRESENTATION' | 'PDF' | 'FILE'
+
+export interface DriveFile {
+  id: string
+  gid: string
+  name: string
+  type: DriveFileType
+  mimeType: string | null
+  tenantId: string
+  parentGid: string | null
+  webViewLink: string | null
+  downloadLink: string | null
+  permissions: Record<string, unknown>[]
+  isProcessed: boolean
+  autoCreated: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 // ─── Pipeline / Control Plane ─────────────────────────────────

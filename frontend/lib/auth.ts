@@ -8,6 +8,7 @@
 import NextAuth from 'next-auth'
 import PostgresAdapter from '@auth/pg-adapter'
 import Credentials from 'next-auth/providers/credentials'
+import Google from 'next-auth/providers/google'
 import { Pool } from 'pg'
 import bcrypt from 'bcryptjs'
 import type { AppSession, UserRole } from '@/types'
@@ -75,19 +76,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       },
     }),
-    // ── Google OAuth (planned) ────────────────────────────────
-    // Google({ clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! }),
+    // ── Google OAuth ─────────────────────────────────────────
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: 'openid email profile https://www.googleapis.com/auth/drive.readonly',
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    }),
   ],
 
   callbacks: {
     // Encode custom fields into the JWT on sign-in and on every token refresh
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       // `user` is only present on initial sign-in
       if (user) {
         token.id           = user.id
         token.role         = (user as any).role
         token.tenantId     = (user as any).tenantId
         token.tempPassword = (user as any).tempPassword
+      }
+
+      // Capture Google OAuth tokens on initial sign-in
+      if (account?.provider === 'google') {
+        token.googleAccessToken  = account.access_token
+        token.googleRefreshToken = account.refresh_token
       }
 
       // For OAuth users whose role/tenantId aren't set by authorize(),
@@ -123,6 +140,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           tenantId:    (token.tenantId as string) ?? null,
           tempPassword: (token.tempPassword as boolean) ?? false,
         },
+        googleAccessToken: (token.googleAccessToken as string) ?? null,
       } as AppSession
     },
   },
