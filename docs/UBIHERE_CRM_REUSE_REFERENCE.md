@@ -16,8 +16,6 @@
 | Google Calendar scheduling | 13 step functions | Not started | MEDIUM |
 | Service account domain-wide delegation | Implemented | Not started | HIGH |
 | Activity event stream | Full tracker + worker | Not started | MEDIUM |
-| Workflow template engine | 48 step functions | Not started | LOW |
-| Prisma ORM models | Full schema | Using raw SQL | LOW |
 
 ---
 
@@ -178,11 +176,11 @@ Pattern: `startOperation()` → do work → `endOperation()` with:
 
 ---
 
-## 3. Database Schema Patterns to Adopt
+## 3. Database Migrations to Create
 
-### From UbiHere's Prisma Schema
+Inspired by UbiHere's data models, adapted for GovWin's raw SQL (postgres.js) stack:
 
-**GDriveArtifact model** — Index of all Drive files per tenant:
+**drive_files** — Index of all Drive files per tenant:
 ```sql
 CREATE TABLE drive_files (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -204,7 +202,7 @@ CREATE INDEX idx_drive_files_tenant ON drive_files(tenant_id);
 CREATE INDEX idx_drive_files_parent ON drive_files(parent_gid);
 ```
 
-**EmailArchive model** — Track all sent emails:
+**email_log** — Track all sent emails:
 ```sql
 CREATE TABLE email_log (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -220,7 +218,7 @@ CREATE TABLE email_log (
 );
 ```
 
-**StepFunctionExecution model** — Audit trail for automated operations:
+**integration_executions** — Audit trail for automated operations:
 ```sql
 CREATE TABLE integration_executions (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -239,7 +237,7 @@ CREATE TABLE integration_executions (
 
 ### Columns to Add to `tenants` Table
 
-Per GovWin architecture doc (section 7.2), these match UbiHere's `Organization.gdrive_folder_id` pattern:
+Per GovWin architecture doc (section 7.2):
 ```sql
 ALTER TABLE tenants ADD COLUMN drive_folder_id TEXT;
 ALTER TABLE tenants ADD COLUMN gmail_thread_label_id TEXT;
@@ -308,7 +306,7 @@ Based on GovWin's architecture doc and UbiHere's proven patterns:
 1. Create migration for `email_log` and `integration_executions` tables
 2. Create `frontend/lib/google-gmail.ts` (send only, initially)
 3. Implement Drive file browser in portal UI (embed Google Docs/Sheets)
-4. Add GDriveArtifact sync worker pattern from UbiHere
+4. Add Drive file sync to keep `drive_files` table in sync with actual Drive contents
 
 ### Phase 3: Notifications (Week 3)
 1. Implement daily digest email sender in Python pipeline
@@ -326,20 +324,30 @@ Based on GovWin's architecture doc and UbiHere's proven patterns:
 
 | Aspect | UbiHere CRM | GovWin |
 |---|---|---|
-| Framework | Express + Prisma | Next.js 15 + raw SQL (postgres.js) |
+| Framework | Express | Next.js 15 App Router |
+| Database access | Prisma ORM | postgres.js tagged templates (`sql\`...\``) |
 | Auth | Session-based + JWT | NextAuth.js |
 | Multi-tenancy | `organization_id` FK | `tenant_id` FK + slug routing |
 | Error handling | Basic try-catch | Mandatory per CLAUDE.md SOP |
-| API style | Express routes | Next.js API routes (app router) |
+| API style | Express routes | Next.js API routes (`route.ts`) |
 | Frontend | React + Vite + TanStack Query | React + Next.js SSR/client split |
 | Workers | Node.js setInterval | Python pipeline (+ potential Next.js cron) |
 
-### Adaptation Notes
-- UbiHere's Express routes → convert to Next.js `route.ts` handlers
-- UbiHere's Prisma queries → convert to postgres.js tagged templates (`sql\`...\``)
-- UbiHere's `req.user` → GovWin's `authorize()` from `lib/auth.ts`
-- UbiHere's `ServiceFactory` → GovWin's simpler function exports from `lib/google.ts`
-- UbiHere's `console.log` → GovWin's `console.error` with tagged prefixes per CLAUDE.md
+### What to Reuse vs. Rewrite
+
+**Reuse directly (Google API logic is framework-agnostic):**
+- `googleapis` auth patterns (service account, delegation, scopes)
+- Google Drive folder/file CRUD calls
+- Gmail message construction and sending
+- Rate limiting and retry logic
+- OAuth scope configuration
+
+**Rewrite for GovWin's stack:**
+- All database queries → use `sql\`...\`` not Prisma
+- All API routes → Next.js `route.ts` with `NextResponse`
+- Auth checks → `authorize()` from `lib/auth.ts`, not `req.user`
+- Error handling → follow CLAUDE.md SOP (try-catch, tagged `console.error`, re-throw NEXT_REDIRECT)
+- Background workers → Python pipeline or Next.js cron, not Express setInterval
 
 ---
 
@@ -360,12 +368,11 @@ All files from `ubi-wagner/ubihere-crm` (master branch):
 | `packages/api/src/lib/activityTracker.ts` | Operation tracking | ~200 |
 | `packages/api/src/workflows/stepFunctions/executor.ts` | Step function executor | ~80 |
 
-### Schema & Types
+### Types & Config
 | File | Purpose |
 |---|---|
-| `packages/api/prisma/schema.prisma` | Full Prisma schema (all models + enums) |
-| `packages/api/src/workflows/types.ts` | TypeScript interfaces for workflows |
-| `packages/api/package.json` | Dependencies list |
+| `packages/api/src/workflows/types.ts` | TypeScript interfaces (StepFunctionContext, etc.) |
+| `packages/api/package.json` | Dependencies list (googleapis, google-auth-library) |
 
 ### Documentation
 | File | Purpose |
