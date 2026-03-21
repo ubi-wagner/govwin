@@ -7,48 +7,54 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { sql, getTenantBySlug, verifyTenantAccess, auditLog } from '@/lib/db'
-import type { ActionType } from '@/types'
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
+import type { ActionType, AppSession } from '@/types'
 
 type Params = { params: Promise<{ opportunityId: string }> }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = (await auth()) as AppSession | null
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = session.user.id
   const { opportunityId } = await params
 
-  let body: any
+  let body: Record<string, unknown>
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const { tenantSlug, actionType, value, metadata } = body
+  const { tenantSlug, actionType, value, metadata } = body as {
+    tenantSlug?: string
+    actionType?: string
+    value?: string
+    metadata?: Record<string, unknown>
+  }
 
   if (!tenantSlug || !actionType) {
     return NextResponse.json({ error: 'tenantSlug and actionType required' }, { status: 400 })
   }
 
   const validActions: ActionType[] = ['thumbs_up', 'thumbs_down', 'comment', 'note', 'status_change', 'pin']
-  if (!validActions.includes(actionType)) {
+  if (!validActions.includes(actionType as ActionType)) {
     return NextResponse.json({ error: 'Invalid actionType' }, { status: 400 })
   }
 
-  let tenant: any
+  let tenant: Record<string, unknown> | null
   try {
     tenant = await getTenantBySlug(tenantSlug)
   } catch (error) {
-    console.error('[/api/opportunities/actions] Tenant resolution error:', error)
+    console.error('[POST /api/opportunities/actions] Tenant resolution error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   let hasAccess: boolean
   try {
-    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+    hasAccess = await verifyTenantAccess(userId, session.user.role, tenant.id as string)
   } catch (error) {
-    console.error('[/api/opportunities/actions] Access check error:', error)
+    console.error('[POST /api/opportunities/actions] Access check error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
   if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       SELECT total_score, o.agency_code, o.opportunity_type
       FROM tenant_opportunities to2
       JOIN opportunities o ON o.id = to2.opportunity_id
-      WHERE to2.tenant_id = ${tenant.id}
+      WHERE to2.tenant_id = ${tenant.id as string}
         AND to2.opportunity_id = ${opportunityId}
     `
 
@@ -70,18 +76,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       // Remove opposite reaction if exists
       await sql`
         DELETE FROM tenant_actions
-        WHERE tenant_id = ${tenant.id}
+        WHERE tenant_id = ${tenant.id as string}
           AND opportunity_id = ${opportunityId}
-          AND user_id = ${session.user.id!}
+          AND user_id = ${userId}
           AND action_type = ${opposite}
       `
 
       // Toggle this reaction
       const [existing] = await sql`
         SELECT id FROM tenant_actions
-        WHERE tenant_id = ${tenant.id}
+        WHERE tenant_id = ${tenant.id as string}
           AND opportunity_id = ${opportunityId}
-          AND user_id = ${session.user.id!}
+          AND user_id = ${userId}
           AND action_type = ${actionType}
       `
 
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       // Enforce active opp cap when moving to 'pursuing' or 'monitoring'
       if (value === 'pursuing' || value === 'monitoring') {
         const [cap] = await sql`
-          SELECT * FROM check_opp_cap(${tenant.id}::uuid)
+          SELECT * FROM check_opp_cap(${tenant.id as string}::uuid)
         `
         if (cap && !cap.can_attach) {
           return NextResponse.json({
@@ -117,13 +123,13 @@ export async function POST(request: NextRequest, { params }: Params) {
 
       const [prevStatus] = await sql`
         SELECT pursuit_status FROM tenant_opportunities
-        WHERE tenant_id = ${tenant.id} AND opportunity_id = ${opportunityId}
+        WHERE tenant_id = ${tenant.id as string} AND opportunity_id = ${opportunityId}
       `
 
       await sql`
         UPDATE tenant_opportunities
         SET pursuit_status = ${value}
-        WHERE tenant_id = ${tenant.id}
+        WHERE tenant_id = ${tenant.id as string}
           AND opportunity_id = ${opportunityId}
       `
 
@@ -140,8 +146,8 @@ export async function POST(request: NextRequest, { params }: Params) {
             INSERT INTO customer_events
               (tenant_id, user_id, event_type, opportunity_id, description, metadata)
             VALUES (
-              ${tenant.id},
-              ${session.user.id!},
+              ${tenant.id as string},
+              ${userId},
               ${eventType},
               ${opportunityId},
               ${'Status changed from ' + (prevStatus?.pursuit_status ?? 'unreviewed') + ' to ' + value},
@@ -153,7 +159,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             )
           `
         } catch (eventErr) {
-          console.error('[/api/opportunities/actions] Event emission error:', eventErr)
+          console.error('[POST /api/opportunities/actions] Event emission error:', eventErr)
         }
       }
     }
@@ -164,34 +170,39 @@ export async function POST(request: NextRequest, { params }: Params) {
         tenant_id, opportunity_id, user_id, action_type,
         value, metadata, score_at_action, agency_at_action, type_at_action
       ) VALUES (
-        ${tenant.id}, ${opportunityId}, ${session.user.id!},
+        ${tenant.id as string}, ${opportunityId}, ${userId},
         ${actionType}, ${value ?? null},
         ${metadata ? JSON.stringify(metadata) : null},
-        ${tenantOpp?.totalScore ?? null},
-        ${tenantOpp?.agencyCode ?? null},
-        ${tenantOpp?.opportunityType ?? null}
+        ${tenantOpp?.total_score ?? null},
+        ${tenantOpp?.agency_code ?? null},
+        ${tenantOpp?.opportunity_type ?? null}
       )
       RETURNING *
     `
 
     return NextResponse.json({ action: 'created', data: action })
 
-  } catch (error) {
-    console.error('[/api/opportunities/actions] Error:', error)
+  } catch (error: unknown) {
+    // Handle unique constraint violations
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === '23505') {
+      return NextResponse.json({ error: 'Action already exists' }, { status: 409 })
+    }
+    console.error('[POST /api/opportunities/actions] Error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const session = (await auth()) as AppSession | null
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const userId = session.user.id
   const { opportunityId } = await params
   const { searchParams } = new URL(request.url)
   const tenantSlug = searchParams.get('tenantSlug')
   if (!tenantSlug) return NextResponse.json({ error: 'tenantSlug required' }, { status: 400 })
 
-  let tenant: any
+  let tenant: Record<string, unknown> | null
   try {
     tenant = await getTenantBySlug(tenantSlug)
   } catch (error) {
@@ -202,7 +213,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   let hasAccess: boolean
   try {
-    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+    hasAccess = await verifyTenantAccess(userId, session.user.role, tenant.id as string)
   } catch (error) {
     console.error('[GET /api/opportunities/actions] Access check error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
@@ -214,7 +225,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       SELECT ta.*, u.name AS user_name
       FROM tenant_actions ta
       JOIN users u ON u.id = ta.user_id
-      WHERE ta.tenant_id = ${tenant.id}
+      WHERE ta.tenant_id = ${tenant.id as string}
         AND ta.opportunity_id = ${opportunityId}
       ORDER BY ta.created_at DESC
     `

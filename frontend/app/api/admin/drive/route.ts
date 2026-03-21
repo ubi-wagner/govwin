@@ -125,17 +125,21 @@ export async function POST(_request: NextRequest) {
       console.error('[POST /api/admin/drive] Master index error:', indexErr)
     }
 
-    // Log execution
-    await sql`
-      INSERT INTO integration_executions (function_name, status, completed_at, success, result)
-      VALUES (
-        'drive.provisionGlobal',
-        'COMPLETED',
-        now(),
-        true,
-        ${JSON.stringify({ ...structure, masterIndexGid })}::jsonb
-      )
-    `
+    // Log execution (non-critical — don't let logging failures mask success)
+    try {
+      await sql`
+        INSERT INTO integration_executions (function_name, status, completed_at, success, result)
+        VALUES (
+          'drive.provisionGlobal',
+          'COMPLETED',
+          now(),
+          true,
+          ${JSON.stringify({ ...structure, masterIndexGid })}::jsonb
+        )
+      `
+    } catch (logErr) {
+      console.error('[POST /api/admin/drive] Failed to log execution:', logErr)
+    }
 
     return NextResponse.json({
       data: { ...structure, masterIndexGid },

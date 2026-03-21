@@ -248,20 +248,20 @@ export async function POST(_request: NextRequest, { params }: Params) {
     if (structure.binderFolderId) {
       folderEntries.push({ gid: structure.binderFolderId, name: 'Binder', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'binder' })
     }
-    if (structure.binderProjectsFolderId) {
-      folderEntries.push({ gid: structure.binderProjectsFolderId, name: 'Active Projects', parentGid: structure.binderFolderId!, artifactType: 'project_folder', productTier: 'binder' })
+    if (structure.binderProjectsFolderId && structure.binderFolderId) {
+      folderEntries.push({ gid: structure.binderProjectsFolderId, name: 'Active Projects', parentGid: structure.binderFolderId, artifactType: 'project_folder', productTier: 'binder' })
     }
-    if (structure.binderProfileFolderId) {
-      folderEntries.push({ gid: structure.binderProfileFolderId, name: 'Company Profile', parentGid: structure.binderFolderId!, artifactType: 'opp_folder', productTier: 'binder' })
+    if (structure.binderProfileFolderId && structure.binderFolderId) {
+      folderEntries.push({ gid: structure.binderProfileFolderId, name: 'Company Profile', parentGid: structure.binderFolderId, artifactType: 'opp_folder', productTier: 'binder' })
     }
-    if (structure.binderTeamingFolderId) {
-      folderEntries.push({ gid: structure.binderTeamingFolderId, name: 'Teaming', parentGid: structure.binderFolderId!, artifactType: 'opp_folder', productTier: 'binder' })
+    if (structure.binderTeamingFolderId && structure.binderFolderId) {
+      folderEntries.push({ gid: structure.binderTeamingFolderId, name: 'Teaming', parentGid: structure.binderFolderId, artifactType: 'opp_folder', productTier: 'binder' })
     }
     if (structure.grinderFolderId) {
       folderEntries.push({ gid: structure.grinderFolderId, name: 'Grinder', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'grinder' })
     }
-    if (structure.grinderProposalsFolderId) {
-      folderEntries.push({ gid: structure.grinderProposalsFolderId, name: 'Proposals', parentGid: structure.grinderFolderId!, artifactType: 'proposal_draft', productTier: 'grinder' })
+    if (structure.grinderProposalsFolderId && structure.grinderFolderId) {
+      folderEntries.push({ gid: structure.grinderProposalsFolderId, name: 'Proposals', parentGid: structure.grinderFolderId, artifactType: 'proposal_draft', productTier: 'grinder' })
     }
 
     for (const entry of folderEntries) {
@@ -331,19 +331,23 @@ export async function POST(_request: NextRequest, { params }: Params) {
       }
     }
 
-    // Log the execution
-    await sql`
-      INSERT INTO integration_executions (function_name, tenant_id, status, completed_at, success, parameters, result)
-      VALUES (
-        'drive.provisionTenant',
-        ${tenantId},
-        'COMPLETED',
-        now(),
-        true,
-        ${sql.json({ tenantName, tier })}::jsonb,
-        ${JSON.stringify(structure)}::jsonb
-      )
-    `
+    // Log the execution (non-critical — don't let logging failures mask success)
+    try {
+      await sql`
+        INSERT INTO integration_executions (function_name, tenant_id, status, completed_at, success, parameters, result)
+        VALUES (
+          'drive.provisionTenant',
+          ${tenantId},
+          'COMPLETED',
+          now(),
+          true,
+          ${sql.json({ tenantName, tier })}::jsonb,
+          ${JSON.stringify(structure)}::jsonb
+        )
+      `
+    } catch (logErr) {
+      console.error('[POST /api/portal/drive] Failed to log execution:', logErr)
+    }
 
     // Emit customer event
     try {
