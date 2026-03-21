@@ -1,8 +1,11 @@
 /**
  * Google Drive integration — service account only
  *
- * All Drive operations use a service account with domain-wide delegation.
- * Tenant users authenticate via email/password (no Google OAuth).
+ * Service account: automation@rfppipeline.com (domain-wide delegation)
+ * Delegated as:    admin@rfppipeline.com (Drive ops + email sending)
+ * Workspace admin: eric@rfppipeline.com
+ *
+ * Tenant users authenticate via email/password — no Google OAuth.
  * The service account creates/manages folders and shares them with tenant users.
  */
 import { google, type drive_v3 } from 'googleapis'
