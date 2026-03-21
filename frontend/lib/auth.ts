@@ -75,8 +75,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       },
     }),
-    // ── Google OAuth (planned) ────────────────────────────────
-    // Google({ clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! }),
+    // Google OAuth not used — tenants authenticate via email/password only.
+    // Drive integration uses a service account with domain-wide delegation.
   ],
 
   callbacks: {

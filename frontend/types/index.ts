@@ -54,6 +54,14 @@ export interface Tenant {
   trialEndsAt: string | null
   features: Record<string, boolean>
   billingEmail: string | null
+  // 007 additions
+  productTier: ProductTier
+  maxActiveOpps: number
+  driveFinderFolderId: string | null
+  driveRemindersFolderId: string | null
+  driveBinderFolderId: string | null
+  driveGrinderFolderId: string | null
+  driveUploadsFolderId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -209,6 +217,121 @@ export interface TenantUpload {
   description: string | null
   isActive: boolean
   createdAt: string
+}
+
+// ─── Google Drive ────────────────────────────────────────────
+export type DriveFileType = 'FOLDER' | 'DOCUMENT' | 'SPREADSHEET' | 'PRESENTATION' | 'PDF' | 'FILE'
+
+export type ArtifactType =
+  // Global (/Opportunities/)
+  | 'weekly_folder' | 'opp_folder' | 'opp_attachment' | 'opp_extract'
+  | 'opp_analysis' | 'weekly_digest' | 'master_index'
+  // Tenant Finder
+  | 'pipeline_snapshot' | 'curated_summary' | 'saved_shortcut'
+  // Tenant Reminder
+  | 'deadline_tracker' | 'amendment_log'
+  // Tenant Binder
+  | 'project_folder' | 'requirements_matrix' | 'compliance_checklist'
+  | 'pwin_assessment' | 'tenant_upload'
+  // Tenant Grinder
+  | 'proposal_draft' | 'proposal_section' | 'compliance_matrix'
+  | 'executive_summary'
+  // System
+  | 'template'
+
+export type ArtifactScope = 'global' | 'tenant' | 'system'
+export type ProductTier   = 'finder' | 'reminder' | 'binder' | 'grinder'
+
+export interface DriveFile {
+  id: string
+  gid: string
+  name: string
+  type: DriveFileType
+  mimeType: string | null
+  tenantId: string | null
+  parentGid: string | null
+  webViewLink: string | null
+  downloadLink: string | null
+  permissions: Record<string, unknown>[]
+  isProcessed: boolean
+  autoCreated: boolean
+  // 007 additions
+  opportunityId: string | null
+  artifactType: ArtifactType | null
+  artifactScope: ArtifactScope | null
+  productTier: ProductTier | null
+  version: number
+  contentHash: string | null
+  lastSyncedAt: string | null
+  weekLabel: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Event Bus ──────────────────────────────────────────────
+
+// Opportunity event types by worker namespace
+export type OpportunityEventType =
+  | 'ingest.new' | 'ingest.updated' | 'ingest.closed' | 'ingest.cancelled'
+  | 'ingest.document_added' | 'ingest.field_changed'
+  | 'scoring.scored' | 'scoring.rescored'
+  | 'drive.archived' | 'drive.extracted' | 'drive.analyzed'
+
+// Customer event types by worker namespace
+export type CustomerEventType =
+  | 'finder.opp_presented' | 'finder.opp_attached' | 'finder.opp_dismissed'
+  | 'finder.summary_generated' | 'finder.summary_reviewed' | 'finder.cap_reached'
+  | 'reminder.nudge_sent' | 'reminder.amendment_alert' | 'reminder.digest_sent'
+  | 'reminder.deadline_acknowledged'
+  | 'binder.project_created' | 'binder.upload_added' | 'binder.pwin_updated'
+  | 'binder.stage_advanced'
+  | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
+  | 'account.tier_upgraded' | 'account.tier_downgraded' | 'account.cap_increased'
+  | 'account.user_added' | 'account.profile_updated' | 'account.drive_provisioned'
+
+export interface OpportunityEvent {
+  id: string
+  opportunityId: string
+  eventType: OpportunityEventType
+  source: string
+  fieldChanged: string | null
+  oldValue: string | null
+  newValue: string | null
+  snapshotHash: string | null
+  metadata: Record<string, unknown>
+  processed: boolean
+  processedBy: string | null
+  processedAt: string | null
+  createdAt: string
+}
+
+export interface CustomerEvent {
+  id: string
+  tenantId: string
+  userId: string | null
+  eventType: CustomerEventType
+  opportunityId: string | null
+  entityType: string | null
+  entityId: string | null
+  description: string | null
+  metadata: Record<string, unknown>
+  processed: boolean
+  processedBy: string | null
+  processedAt: string | null
+  createdAt: string
+}
+
+// ─── Tenant Active Opp Cap ──────────────────────────────────
+
+export interface TenantOppCap {
+  tenantId: string
+  tenantName: string
+  productTier: ProductTier
+  maxActiveOpps: number
+  pursuingCount: number
+  monitoringCount: number
+  activeCount: number
+  slotsRemaining: number
 }
 
 // ─── Pipeline / Control Plane ─────────────────────────────────
