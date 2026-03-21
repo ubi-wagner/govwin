@@ -100,12 +100,62 @@ export async function POST(request: NextRequest, { params }: Params) {
         return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
       }
 
+      // Enforce active opp cap when moving to 'pursuing' or 'monitoring'
+      if (value === 'pursuing' || value === 'monitoring') {
+        const [cap] = await sql`
+          SELECT * FROM check_opp_cap(${tenant.id}::uuid)
+        `
+        if (cap && !cap.can_attach) {
+          return NextResponse.json({
+            error: `Active opportunity limit reached (${cap.active_count}/${cap.max_allowed}). Upgrade your plan or dismiss existing opportunities.`,
+            code: 'OPP_CAP_REACHED',
+            activeCount: Number(cap.active_count),
+            maxAllowed: cap.max_allowed,
+          }, { status: 429 })
+        }
+      }
+
+      const [prevStatus] = await sql`
+        SELECT pursuit_status FROM tenant_opportunities
+        WHERE tenant_id = ${tenant.id} AND opportunity_id = ${opportunityId}
+      `
+
       await sql`
         UPDATE tenant_opportunities
         SET pursuit_status = ${value}
         WHERE tenant_id = ${tenant.id}
           AND opportunity_id = ${opportunityId}
       `
+
+      // Emit customer event for status change
+      const eventType = value === 'pursuing' || value === 'monitoring'
+        ? 'finder.opp_attached'
+        : value === 'passed'
+          ? 'finder.opp_dismissed'
+          : null
+
+      if (eventType) {
+        try {
+          await sql`
+            INSERT INTO customer_events
+              (tenant_id, user_id, event_type, opportunity_id, description, metadata)
+            VALUES (
+              ${tenant.id},
+              ${session.user.id!},
+              ${eventType},
+              ${opportunityId},
+              ${'Status changed from ' + (prevStatus?.pursuit_status ?? 'unreviewed') + ' to ' + value},
+              ${JSON.stringify({
+                old_status: prevStatus?.pursuit_status ?? 'unreviewed',
+                new_status: value,
+                total_score: tenantOpp?.total_score ?? null,
+              })}::jsonb
+            )
+          `
+        } catch (eventErr) {
+          console.error('[/api/opportunities/actions] Event emission error:', eventErr)
+        }
+      }
     }
 
     // Insert action record

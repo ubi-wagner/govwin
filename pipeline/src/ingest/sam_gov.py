@@ -444,6 +444,7 @@ class SamGovIngester:
                 json.dumps(raw, default=str), existing["id"],
             )
 
+            # Legacy amendment record (kept for backward compat)
             await self.conn.execute(
                 """
                 INSERT INTO amendments (opportunity_id, change_type, old_value, new_value)
@@ -451,10 +452,24 @@ class SamGovIngester:
                 """,
                 existing["id"], existing["content_hash"], content_hash,
             )
+
+            # Emit opportunity event: ingest.updated
+            await self.conn.execute(
+                """
+                INSERT INTO opportunity_events
+                    (opportunity_id, event_type, source, old_value, new_value, snapshot_hash, metadata)
+                VALUES ($1, 'ingest.updated', 'sam_gov', $2, $3, $4, $5::jsonb)
+                """,
+                existing["id"],
+                existing["content_hash"],
+                content_hash,
+                content_hash,
+                json.dumps({"source_id": source_id, "title": title}, default=str),
+            )
             return "updated"
         else:
             # Insert new
-            await self.conn.execute(
+            row = await self.conn.fetchrow(
                 """
                 INSERT INTO opportunities (
                     source, source_id, title, description, agency, agency_code,
@@ -467,12 +482,34 @@ class SamGovIngester:
                     $10, $11, $12, $13,
                     $14, $15::jsonb
                 )
+                RETURNING id
                 """,
                 source_id, title, description, agency, agency_code,
                 naics_codes, set_aside, set_aside_code, opp_type,
                 posted_date, close_date, sol_number, source_url,
                 content_hash, json.dumps(raw, default=str),
             )
+
+            # Emit opportunity event: ingest.new
+            if row:
+                await self.conn.execute(
+                    """
+                    INSERT INTO opportunity_events
+                        (opportunity_id, event_type, source, snapshot_hash, metadata)
+                    VALUES ($1, 'ingest.new', 'sam_gov', $2, $3::jsonb)
+                    """,
+                    row["id"],
+                    content_hash,
+                    json.dumps({
+                        "source_id": source_id,
+                        "title": title,
+                        "solicitation_number": sol_number,
+                        "agency": agency,
+                        "naics_codes": naics_codes,
+                        "set_aside": set_aside_code,
+                        "opp_type": opp_type,
+                    }, default=str),
+                )
             return "new"
 
     @staticmethod
