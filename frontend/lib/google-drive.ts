@@ -1,14 +1,9 @@
 /**
- * Google Drive integration — dual auth pattern
+ * Google Drive integration — service account only
  *
- * Service account (domain-wide delegation):
- *   Used for automated operations — tenant provisioning, folder creation,
- *   file moves, pipeline-triggered artifacts.
- *
- * User OAuth token:
- *   Used for user-initiated browsing/viewing (respects their Drive permissions).
- *
- * Reuse reference: docs/UBIHERE_CRM_REUSE_REFERENCE.md
+ * All Drive operations use a service account with domain-wide delegation.
+ * Tenant users authenticate via email/password (no Google OAuth).
+ * The service account creates/manages folders and shares them with tenant users.
  */
 import { google, type drive_v3 } from 'googleapis'
 import { GoogleAuth } from 'google-auth-library'
@@ -38,13 +33,6 @@ export function getServiceAccountDrive(delegateEmail?: string): drive_v3.Drive {
     clientOptions: delegateEmail ? { subject: delegateEmail } : undefined,
   })
 
-  return google.drive({ version: 'v3', auth })
-}
-
-// ── User OAuth client (user-initiated browsing) ────────────────
-export function getUserDrive(accessToken: string): drive_v3.Drive {
-  const auth = new google.auth.OAuth2()
-  auth.setCredentials({ access_token: accessToken })
   return google.drive({ version: 'v3', auth })
 }
 
@@ -114,13 +102,13 @@ export async function shareDriveFolder(
 }
 
 /**
- * List files in a Drive folder. Works with either service account or user token.
+ * List files in a Drive folder using the service account.
  */
 export async function listDriveFiles(
-  drive: drive_v3.Drive,
   folderId: string,
   pageToken?: string
 ): Promise<{ files: drive_v3.Schema$File[]; nextPageToken: string | null }> {
+  const drive = getServiceAccountDrive(process.env.GOOGLE_DELEGATED_ADMIN)
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields: 'nextPageToken, files(id, name, mimeType, webViewLink, exportLinks, size, createdTime, modifiedTime, permissions)',

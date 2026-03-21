@@ -9,8 +9,6 @@ import {
   provisionTenantDrive,
   shareDriveFolder,
   listDriveFiles,
-  getUserDrive,
-  getServiceAccountDrive,
   driveFileType,
 } from '@/lib/google-drive'
 import type { AppSession } from '@/types'
@@ -59,9 +57,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const pageToken = request.nextUrl.searchParams.get('pageToken') ?? undefined
 
   try {
-    // Use service account to list (always has access to provisioned folders)
-    const drive = getServiceAccountDrive(process.env.GOOGLE_DELEGATED_ADMIN)
-    const { files, nextPageToken } = await listDriveFiles(drive, folderId, pageToken)
+    const { files, nextPageToken } = await listDriveFiles(folderId, pageToken)
 
     // Sync file index to DB
     for (const file of files) {

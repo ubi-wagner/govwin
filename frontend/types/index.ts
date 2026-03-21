@@ -30,7 +30,6 @@ export interface AppSession {
     tempPassword: boolean
   }
   expires: string
-  googleAccessToken: string | null
 }
 
 // ─── Tenants ──────────────────────────────────────────────────
