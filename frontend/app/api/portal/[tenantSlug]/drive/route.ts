@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   if ('error' in ctx) return ctx.error
   const { tenant } = ctx
 
-  const driveFolderId = tenant.drive_folder_id as string | null ?? tenant.driveFolderId as string | null
+  const driveFolderId = (tenant.driveFolderId as string | null) ?? null
   if (!driveFolderId) {
     return NextResponse.json({ data: [], driveFolderId: null })
   }
@@ -193,7 +193,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  const driveFolderId = tenant.drive_folder_id as string | null ?? tenant.driveFolderId as string | null
+  const driveFolderId = (tenant.driveFolderId as string | null) ?? null
   // Don't re-provision
   if (driveFolderId) {
     return NextResponse.json({ error: 'Drive folder already provisioned', driveFolderId }, { status: 409 })
@@ -201,7 +201,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
   const tenantId = tenant.id as string
   const tenantName = tenant.name as string
-  const tier = (tenant.product_tier as ProductTier | null ?? tenant.productTier as ProductTier | null) ?? 'finder'
+  const tier = (tenant.productTier as ProductTier | null) ?? 'finder'
 
   // Get the customers folder from system config
   let customersFolderId: string | undefined

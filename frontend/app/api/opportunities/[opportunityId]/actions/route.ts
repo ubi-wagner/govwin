@@ -150,11 +150,11 @@ export async function POST(request: NextRequest, { params }: Params) {
               ${userId},
               ${eventType},
               ${opportunityId},
-              ${'Status changed from ' + (prevStatus?.pursuit_status ?? 'unreviewed') + ' to ' + value},
+              ${'Status changed from ' + (prevStatus?.pursuitStatus ?? 'unreviewed') + ' to ' + value},
               ${JSON.stringify({
-                old_status: prevStatus?.pursuit_status ?? 'unreviewed',
+                old_status: prevStatus?.pursuitStatus ?? 'unreviewed',
                 new_status: value,
-                total_score: tenantOpp?.total_score ?? null,
+                total_score: tenantOpp?.totalScore ?? null,
               })}::jsonb
             )
           `
@@ -173,9 +173,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         ${tenant.id as string}, ${opportunityId}, ${userId},
         ${actionType}, ${value ?? null},
         ${metadata ? JSON.stringify(metadata) : null},
-        ${tenantOpp?.total_score ?? null},
-        ${tenantOpp?.agency_code ?? null},
-        ${tenantOpp?.opportunity_type ?? null}
+        ${tenantOpp?.totalScore ?? null},
+        ${tenantOpp?.agencyCode ?? null},
+        ${tenantOpp?.opportunityType ?? null}
       )
       RETURNING *
     `
