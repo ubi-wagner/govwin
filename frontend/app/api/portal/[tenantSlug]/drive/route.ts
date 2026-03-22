@@ -1,19 +1,11 @@
 /**
- * GET  /api/portal/[tenantSlug]/drive — List Drive files for tenant
- * POST /api/portal/[tenantSlug]/drive — Provision tenant Drive folder (tier-aware)
+ * GET  /api/portal/[tenantSlug]/drive — List files for tenant from local storage
+ * POST /api/portal/[tenantSlug]/drive — Provision tenant storage folder (tier-aware)
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
-import {
-  provisionTenantDrive,
-  shareDriveFolder,
-  listDriveFiles,
-  driveFileType,
-  createPipelineSnapshot,
-  createDeadlineTracker,
-  createAmendmentLog,
-} from '@/lib/google-drive'
+import { provisionTenantStorage, listDirectory, fileType } from '@/lib/storage'
 import type { AppSession, ProductTier } from '@/types'
 
 type Params = { params: Promise<{ tenantSlug: string }> }
@@ -46,143 +38,77 @@ async function resolveContext(params: Promise<{ tenantSlug: string }>) {
   return { session, tenant }
 }
 
-// ── GET: List files from tenant's Drive folder ─────────────────
+// ── GET: List files from tenant's local storage folder ──────────
 export async function GET(request: NextRequest, { params }: Params) {
   const ctx = await resolveContext(params)
   if ('error' in ctx) return ctx.error
   const { tenant } = ctx
 
-  const driveFolderId = (tenant.driveFolderId as string | null) ?? null
-  if (!driveFolderId) {
-    return NextResponse.json({ data: [], driveFolderId: null })
+  const storagePath = (tenant.storageRootPath as string | null) ?? null
+  if (!storagePath) {
+    return NextResponse.json({ data: [], storagePath: null })
   }
 
-  const folderId = request.nextUrl.searchParams.get('folderId') ?? driveFolderId
-  const pageToken = request.nextUrl.searchParams.get('pageToken') ?? undefined
+  // Allow browsing subfolders via ?folder= param
+  const folder = request.nextUrl.searchParams.get('folder') ?? storagePath
+
+  // Ensure the requested folder is within the tenant's root (security)
+  if (!folder.startsWith(storagePath)) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
 
   try {
-    const { files, nextPageToken } = await listDriveFiles(folderId, pageToken)
-
-    // Sync file index to DB
-    for (const file of files) {
-      if (!file.id) continue
-      try {
-        await sql`
-          INSERT INTO drive_files (gid, name, type, mime_type, tenant_id, parent_gid, web_view_link, auto_created)
-          VALUES (
-            ${file.id},
-            ${file.name ?? 'Untitled'},
-            ${driveFileType(file.mimeType)},
-            ${file.mimeType ?? null},
-            ${tenant.id as string},
-            ${folderId},
-            ${file.webViewLink ?? null},
-            false
-          )
-          ON CONFLICT (gid) DO UPDATE SET
-            name = EXCLUDED.name,
-            mime_type = EXCLUDED.mime_type,
-            web_view_link = EXCLUDED.web_view_link,
-            updated_at = now()
-        `
-      } catch (syncError) {
-        console.error('[GET /api/portal/drive] File sync error:', syncError)
-      }
-    }
+    const entries = await listDirectory(folder)
 
     return NextResponse.json({
-      data: files.map((f) => ({
-        gid: f.id,
-        name: f.name,
-        mimeType: f.mimeType,
-        type: driveFileType(f.mimeType),
-        webViewLink: f.webViewLink,
-        size: f.size,
-        createdTime: f.createdTime,
-        modifiedTime: f.modifiedTime,
+      data: entries.map((e) => ({
+        name: e.name,
+        path: e.path,
+        type: e.isDirectory ? 'FOLDER' : fileType(e.name),
+        isDirectory: e.isDirectory,
+        size: e.size,
+        modifiedAt: e.modifiedAt,
       })),
-      driveFolderId,
-      nextPageToken,
+      storagePath,
+      currentFolder: folder,
     })
   } catch (error) {
-    console.error('[GET /api/portal/drive] Drive API error:', error)
-    return NextResponse.json({ error: 'Failed to list Drive files' }, { status: 500 })
+    console.error('[GET /api/portal/drive] Storage error:', error)
+    return NextResponse.json({ error: 'Failed to list files' }, { status: 500 })
   }
 }
 
-// ── Helper: index a Drive folder in the DB ─────────────────────
-async function indexDriveFolder(opts: {
-  gid: string
+// ── Helper: index a stored folder in the DB ─────────────────────
+async function indexStoredFolder(opts: {
   name: string
+  storagePath: string
   tenantId: string | null
-  parentGid: string | null
+  parentPath: string | null
   artifactType: string
   artifactScope: string
   productTier: string | null
-  opportunityId?: string | null
 }) {
   await sql`
-    INSERT INTO drive_files (
-      gid, name, type, mime_type, tenant_id, parent_gid,
-      auto_created, artifact_type, artifact_scope, product_tier, opportunity_id
+    INSERT INTO stored_files (
+      name, type, storage_path, tenant_id, parent_gid,
+      auto_created, artifact_type, artifact_scope, product_tier, storage_backend
     ) VALUES (
-      ${opts.gid},
       ${opts.name},
       'FOLDER',
-      'application/vnd.google-apps.folder',
+      ${opts.storagePath},
       ${opts.tenantId},
-      ${opts.parentGid},
+      ${opts.parentPath},
       true,
       ${opts.artifactType},
       ${opts.artifactScope},
       ${opts.productTier},
-      ${opts.opportunityId ?? null}
+      'local'
     )
-    ON CONFLICT (gid) DO UPDATE SET
-      name = EXCLUDED.name,
-      artifact_type = EXCLUDED.artifact_type,
-      artifact_scope = EXCLUDED.artifact_scope,
-      product_tier = EXCLUDED.product_tier,
-      updated_at = now()
+    ON CONFLICT DO NOTHING
   `
 }
 
-// ── Helper: index a Drive file (doc/sheet) in the DB ───────────
-async function indexDriveFile(opts: {
-  gid: string
-  name: string
-  type: string
-  mimeType: string
-  tenantId: string | null
-  parentGid: string
-  artifactType: string
-  artifactScope: string
-  productTier: string | null
-}) {
-  await sql`
-    INSERT INTO drive_files (
-      gid, name, type, mime_type, tenant_id, parent_gid,
-      auto_created, artifact_type, artifact_scope, product_tier
-    ) VALUES (
-      ${opts.gid},
-      ${opts.name},
-      ${opts.type},
-      ${opts.mimeType},
-      ${opts.tenantId},
-      ${opts.parentGid},
-      true,
-      ${opts.artifactType},
-      ${opts.artifactScope},
-      ${opts.productTier}
-    )
-    ON CONFLICT (gid) DO UPDATE SET
-      name = EXCLUDED.name,
-      artifact_type = EXCLUDED.artifact_type,
-      updated_at = now()
-  `
-}
-
-// ── POST: Provision tenant Drive folder (tier-aware) ───────────
+// ── POST: Provision tenant storage folder (tier-aware) ──────────
 export async function POST(_request: NextRequest, { params }: Params) {
   const ctx = await resolveContext(params)
   if ('error' in ctx) return ctx.error
@@ -193,84 +119,69 @@ export async function POST(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 
-  const driveFolderId = (tenant.driveFolderId as string | null) ?? null
-  // Don't re-provision
-  if (driveFolderId) {
-    return NextResponse.json({ error: 'Drive folder already provisioned', driveFolderId }, { status: 409 })
+  const existingPath = (tenant.storageRootPath as string | null) ?? null
+  if (existingPath) {
+    return NextResponse.json({ error: 'Storage already provisioned', storagePath: existingPath }, { status: 409 })
   }
 
   const tenantId = tenant.id as string
-  const tenantName = tenant.name as string
+  const tenantSlug = tenant.slug as string
   const tier = (tenant.productTier as ProductTier | null) ?? 'finder'
 
-  // Get the customers folder from system config
-  let customersFolderId: string | undefined
   try {
-    const [config] = await sql`
-      SELECT value FROM system_config WHERE key = 'drive.customers_folder_id'
-    `
-    const val = config?.value
-    if (val && val !== 'null' && val !== '"null"') {
-      customersFolderId = typeof val === 'string' ? val : JSON.stringify(val).replace(/"/g, '')
-    }
-  } catch (e) {
-    console.error('[POST /api/portal/drive] Config lookup error:', e)
-  }
+    const structure = await provisionTenantStorage(tenantSlug, tier)
 
-  try {
-    const structure = await provisionTenantDrive(tenantName, tier, customersFolderId)
-
-    // Save folder IDs to tenant
+    // Save paths to tenant record
     await sql`
       UPDATE tenants SET
-        drive_folder_id = ${structure.rootFolderId},
-        drive_finder_folder_id = ${structure.finderFolderId},
-        drive_reminders_folder_id = ${structure.remindersFolderId},
-        drive_binder_folder_id = ${structure.binderFolderId},
-        drive_grinder_folder_id = ${structure.grinderFolderId},
-        drive_uploads_folder_id = ${structure.uploadsFolderId},
+        storage_root_path = ${structure.rootPath},
+        storage_finder_path = ${structure.finderPath},
+        storage_reminders_path = ${structure.remindersPath},
+        storage_binder_path = ${structure.binderPath},
+        storage_grinder_path = ${structure.grinderPath},
+        storage_uploads_path = ${structure.uploadsPath},
         updated_at = now()
       WHERE id = ${tenantId}
     `
 
-    // Index all created folders in drive_files
-    const folderEntries: Array<{ gid: string; name: string; parentGid: string | null; artifactType: string; productTier: string | null }> = [
-      { gid: structure.rootFolderId, name: tenantName, parentGid: customersFolderId ?? null, artifactType: 'opp_folder', productTier: null },
-      { gid: structure.finderFolderId, name: 'Finder', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'finder' },
-      { gid: structure.finderCuratedFolderId, name: 'Curated', parentGid: structure.finderFolderId, artifactType: 'opp_folder', productTier: 'finder' },
-      { gid: structure.finderSavedFolderId, name: 'Saved', parentGid: structure.finderFolderId, artifactType: 'opp_folder', productTier: 'finder' },
-      { gid: structure.uploadsFolderId, name: 'Uploads', parentGid: structure.rootFolderId, artifactType: 'tenant_upload', productTier: null },
+    // Index all created folders in stored_files
+    const folderEntries: Array<{ name: string; path: string; parentPath: string | null; artifactType: string; productTier: string | null }> = [
+      { name: tenantSlug, path: structure.rootPath, parentPath: 'customers', artifactType: 'opp_folder', productTier: null },
+      { name: 'finder', path: structure.finderPath, parentPath: structure.rootPath, artifactType: 'opp_folder', productTier: 'finder' },
+      { name: 'curated', path: structure.finderCuratedPath, parentPath: structure.finderPath, artifactType: 'curated_summary', productTier: 'finder' },
+      { name: 'saved', path: structure.finderSavedPath, parentPath: structure.finderPath, artifactType: 'saved_shortcut', productTier: 'finder' },
+      { name: 'uploads', path: structure.uploadsPath, parentPath: structure.rootPath, artifactType: 'tenant_upload', productTier: null },
     ]
 
-    if (structure.remindersFolderId) {
-      folderEntries.push({ gid: structure.remindersFolderId, name: 'Reminders', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'reminder' })
+    if (structure.remindersPath) {
+      folderEntries.push({ name: 'reminders', path: structure.remindersPath, parentPath: structure.rootPath, artifactType: 'deadline_tracker', productTier: 'reminder' })
     }
-    if (structure.binderFolderId) {
-      folderEntries.push({ gid: structure.binderFolderId, name: 'Binder', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'binder' })
+    if (structure.binderPath) {
+      folderEntries.push({ name: 'binder', path: structure.binderPath, parentPath: structure.rootPath, artifactType: 'project_folder', productTier: 'binder' })
     }
-    if (structure.binderProjectsFolderId && structure.binderFolderId) {
-      folderEntries.push({ gid: structure.binderProjectsFolderId, name: 'Active Projects', parentGid: structure.binderFolderId, artifactType: 'project_folder', productTier: 'binder' })
+    if (structure.binderProjectsPath) {
+      folderEntries.push({ name: 'active-projects', path: structure.binderProjectsPath, parentPath: structure.binderPath!, artifactType: 'project_folder', productTier: 'binder' })
     }
-    if (structure.binderProfileFolderId && structure.binderFolderId) {
-      folderEntries.push({ gid: structure.binderProfileFolderId, name: 'Company Profile', parentGid: structure.binderFolderId, artifactType: 'opp_folder', productTier: 'binder' })
+    if (structure.binderProfilePath) {
+      folderEntries.push({ name: 'company-profile', path: structure.binderProfilePath, parentPath: structure.binderPath!, artifactType: 'opp_folder', productTier: 'binder' })
     }
-    if (structure.binderTeamingFolderId && structure.binderFolderId) {
-      folderEntries.push({ gid: structure.binderTeamingFolderId, name: 'Teaming', parentGid: structure.binderFolderId, artifactType: 'opp_folder', productTier: 'binder' })
+    if (structure.binderTeamingPath) {
+      folderEntries.push({ name: 'teaming', path: structure.binderTeamingPath, parentPath: structure.binderPath!, artifactType: 'opp_folder', productTier: 'binder' })
     }
-    if (structure.grinderFolderId) {
-      folderEntries.push({ gid: structure.grinderFolderId, name: 'Grinder', parentGid: structure.rootFolderId, artifactType: 'opp_folder', productTier: 'grinder' })
+    if (structure.grinderPath) {
+      folderEntries.push({ name: 'grinder', path: structure.grinderPath, parentPath: structure.rootPath, artifactType: 'proposal_draft', productTier: 'grinder' })
     }
-    if (structure.grinderProposalsFolderId && structure.grinderFolderId) {
-      folderEntries.push({ gid: structure.grinderProposalsFolderId, name: 'Proposals', parentGid: structure.grinderFolderId, artifactType: 'proposal_draft', productTier: 'grinder' })
+    if (structure.grinderProposalsPath) {
+      folderEntries.push({ name: 'proposals', path: structure.grinderProposalsPath, parentPath: structure.grinderPath!, artifactType: 'proposal_draft', productTier: 'grinder' })
     }
 
     for (const entry of folderEntries) {
       try {
-        await indexDriveFolder({
-          gid: entry.gid,
+        await indexStoredFolder({
           name: entry.name,
+          storagePath: entry.path,
           tenantId: tenantId,
-          parentGid: entry.parentGid,
+          parentPath: entry.parentPath,
           artifactType: entry.artifactType,
           artifactScope: 'tenant',
           productTier: entry.productTier,
@@ -280,68 +191,17 @@ export async function POST(_request: NextRequest, { params }: Params) {
       }
     }
 
-    // Create initial artifacts: pipeline_snapshot for Finder
-    try {
-      const snapshotGid = await createPipelineSnapshot(structure.finderFolderId, tenantName)
-      await indexDriveFile({
-        gid: snapshotGid,
-        name: `${tenantName} - Pipeline Snapshot`,
-        type: 'SPREADSHEET',
-        mimeType: 'application/vnd.google-apps.spreadsheet',
-        tenantId: tenantId,
-        parentGid: structure.finderFolderId,
-        artifactType: 'pipeline_snapshot',
-        artifactScope: 'tenant',
-        productTier: 'finder',
-      })
-    } catch (artErr) {
-      console.error('[POST /api/portal/drive] Pipeline snapshot creation error:', artErr)
-    }
-
-    // Create Reminder artifacts if applicable
-    if (structure.remindersFolderId) {
-      try {
-        const trackerGid = await createDeadlineTracker(structure.remindersFolderId, tenantName)
-        await indexDriveFile({
-          gid: trackerGid,
-          name: `${tenantName} - Deadline Tracker`,
-          type: 'SPREADSHEET',
-          mimeType: 'application/vnd.google-apps.spreadsheet',
-          tenantId: tenantId,
-          parentGid: structure.remindersFolderId,
-          artifactType: 'deadline_tracker',
-          artifactScope: 'tenant',
-          productTier: 'reminder',
-        })
-
-        const amendGid = await createAmendmentLog(structure.remindersFolderId, tenantName)
-        await indexDriveFile({
-          gid: amendGid,
-          name: `${tenantName} - Amendment Log`,
-          type: 'SPREADSHEET',
-          mimeType: 'application/vnd.google-apps.spreadsheet',
-          tenantId: tenantId,
-          parentGid: structure.remindersFolderId,
-          artifactType: 'amendment_log',
-          artifactScope: 'tenant',
-          productTier: 'reminder',
-        })
-      } catch (artErr) {
-        console.error('[POST /api/portal/drive] Reminder artifact creation error:', artErr)
-      }
-    }
-
-    // Log the execution (non-critical — don't let logging failures mask success)
+    // Log execution
     try {
       await sql`
         INSERT INTO integration_executions (function_name, tenant_id, status, completed_at, success, parameters, result)
         VALUES (
-          'drive.provisionTenant',
+          'storage.provisionTenant',
           ${tenantId},
           'COMPLETED',
           now(),
           true,
-          ${sql.json({ tenantName, tier })}::jsonb,
+          ${sql.json({ tenantSlug, tier })}::jsonb,
           ${JSON.stringify(structure)}::jsonb
         )
       `
@@ -357,7 +217,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
           ${tenantId},
           ${session.user.id},
           'account.drive_provisioned',
-          ${'Drive folder provisioned for tier: ' + tier},
+          ${'Storage provisioned for tier: ' + tier},
           ${JSON.stringify({ tier, structure })}::jsonb
         )
       `
@@ -365,17 +225,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
       console.error('[POST /api/portal/drive] Event emission error:', eventErr)
     }
 
-    // Share with the requesting user if they have a Google email
-    if (session.user.email) {
-      try {
-        await shareDriveFolder(structure.rootFolderId, session.user.email, 'writer')
-      } catch (shareError) {
-        console.error('[POST /api/portal/drive] Share error (non-fatal):', shareError)
-      }
-    }
-
     return NextResponse.json({
-      data: { driveFolderId: structure.rootFolderId, structure },
+      data: { storagePath: structure.rootPath, structure },
     }, { status: 201 })
   } catch (error) {
     // Log failed execution
@@ -383,7 +234,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
       await sql`
         INSERT INTO integration_executions (function_name, tenant_id, status, completed_at, success, error_message)
         VALUES (
-          'drive.provisionTenant',
+          'storage.provisionTenant',
           ${tenantId},
           'FAILED',
           now(),
@@ -396,6 +247,6 @@ export async function POST(_request: NextRequest, { params }: Params) {
     }
 
     console.error('[POST /api/portal/drive] Provisioning error:', error)
-    return NextResponse.json({ error: 'Failed to provision Drive folder' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to provision storage' }, { status: 500 })
   }
 }

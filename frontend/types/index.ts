@@ -62,6 +62,13 @@ export interface Tenant {
   driveBinderFolderId: string | null
   driveGrinderFolderId: string | null
   driveUploadsFolderId: string | null
+  // 009 local storage paths
+  storageRootPath: string | null
+  storageFinderPath: string | null
+  storageRemindersPath: string | null
+  storageBinderPath: string | null
+  storageGrinderPath: string | null
+  storageUploadsPath: string | null
   createdAt: string
   updatedAt: string
 }
@@ -219,7 +226,8 @@ export interface TenantUpload {
   createdAt: string
 }
 
-// ─── Google Drive ────────────────────────────────────────────
+// ─── File Storage (local Railway volume + R2 archive) ────────
+export type StorageBackend = 'local' | 'r2' | 'gdrive_legacy'
 export type DriveFileType = 'FOLDER' | 'DOCUMENT' | 'SPREADSHEET' | 'PRESENTATION' | 'PDF' | 'FILE'
 
 export type ArtifactType =
@@ -242,9 +250,9 @@ export type ArtifactType =
 export type ArtifactScope = 'global' | 'tenant' | 'system'
 export type ProductTier   = 'finder' | 'reminder' | 'binder' | 'grinder'
 
-export interface DriveFile {
+export interface StoredFile {
   id: string
-  gid: string
+  gid: string | null            // Legacy: Google Drive file ID
   name: string
   type: DriveFileType
   mimeType: string | null
@@ -264,9 +272,16 @@ export interface DriveFile {
   contentHash: string | null
   lastSyncedAt: string | null
   weekLabel: string | null
+  // 009 local storage
+  storagePath: string | null
+  fileSizeBytes: number | null
+  storageBackend: StorageBackend
   createdAt: string
   updatedAt: string
 }
+
+/** @deprecated Use StoredFile instead */
+export type DriveFile = StoredFile
 
 // ─── Event Bus ──────────────────────────────────────────────
 

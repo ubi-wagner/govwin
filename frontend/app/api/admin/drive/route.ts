@@ -1,19 +1,19 @@
 /**
- * POST /api/admin/drive — Provision the global RFPPIPELINE Drive structure
- * GET  /api/admin/drive — Get current global Drive folder IDs from system_config
+ * POST /api/admin/drive — Provision the global storage structure (local filesystem)
+ * GET  /api/admin/drive — Get current storage config from system_config
  *
- * Admin-only. Creates:
- *   /RFPPIPELINE/
- *     /Opportunities/
- *     /Customers/
- *     /System/
+ * Admin-only. Creates on Railway volume:
+ *   /data/
+ *     /opportunities/
+ *     /customers/
+ *     /system/
  *       /templates/
  *       /logs/
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql } from '@/lib/db'
-import { provisionGlobalDrive, getOrCreateMasterIndex } from '@/lib/google-drive'
+import { provisionGlobalStorage } from '@/lib/storage'
 import type { AppSession } from '@/types'
 
 export async function GET(_request: NextRequest) {
@@ -26,16 +26,16 @@ export async function GET(_request: NextRequest) {
   try {
     const configs = await sql`
       SELECT key, value FROM system_config
-      WHERE key LIKE 'drive.%'
+      WHERE key LIKE 'storage.%' OR key LIKE 'drive.%'
     `
 
-    const driveConfig: Record<string, string | null> = {}
+    const storageConfig: Record<string, string | null> = {}
     for (const row of configs) {
       const val = row.value
-      driveConfig[row.key as string] = val === 'null' || val === '"null"' ? null : String(val).replace(/^"|"$/g, '')
+      storageConfig[row.key as string] = val === 'null' || val === '"null"' ? null : String(val).replace(/^"|"$/g, '')
     }
 
-    return NextResponse.json({ data: driveConfig })
+    return NextResponse.json({ data: storageConfig })
   } catch (error) {
     console.error('[GET /api/admin/drive] Error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
@@ -52,13 +52,12 @@ export async function POST(_request: NextRequest) {
   // Check if already provisioned
   try {
     const [existing] = await sql`
-      SELECT value FROM system_config WHERE key = 'drive.root_folder_id'
+      SELECT value FROM system_config WHERE key = 'storage.provisioned'
     `
     const val = existing?.value
-    if (val && val !== 'null' && val !== '"null"') {
+    if (val === true || val === 'true') {
       return NextResponse.json({
-        error: 'Global Drive structure already provisioned',
-        rootFolderId: String(val).replace(/^"|"$/g, ''),
+        error: 'Global storage structure already provisioned',
       }, { status: 409 })
     }
   } catch (error) {
@@ -67,17 +66,15 @@ export async function POST(_request: NextRequest) {
   }
 
   try {
-    const structure = await provisionGlobalDrive()
+    const structure = await provisionGlobalStorage()
 
-    // Create the master_index.gsheet in /Opportunities/
-    const masterIndexGid = await getOrCreateMasterIndex(structure.opportunitiesFolderId)
-
-    // Save all folder IDs to system_config
+    // Save paths to system_config
     const updates: Array<[string, string]> = [
-      ['drive.root_folder_id', structure.rootFolderId],
-      ['drive.opportunities_folder_id', structure.opportunitiesFolderId],
-      ['drive.customers_folder_id', structure.customersFolderId],
-      ['drive.templates_folder_id', structure.templatesFolderId],
+      ['storage.root_path', structure.rootPath || '/'],
+      ['storage.opportunities_path', structure.opportunitiesPath],
+      ['storage.customers_path', structure.customersPath],
+      ['storage.templates_path', structure.templatesPath],
+      ['storage.provisioned', 'true'],
     ]
 
     for (const [key, value] of updates) {
@@ -87,54 +84,39 @@ export async function POST(_request: NextRequest) {
       `
     }
 
-    // Index folders in drive_files (global scope, no tenant)
+    // Index root folders in stored_files
     const globalFolders = [
-      { gid: structure.rootFolderId, name: 'RFPPIPELINE', parentGid: null },
-      { gid: structure.opportunitiesFolderId, name: 'Opportunities', parentGid: structure.rootFolderId },
-      { gid: structure.customersFolderId, name: 'Customers', parentGid: structure.rootFolderId },
-      { gid: structure.systemFolderId, name: 'System', parentGid: structure.rootFolderId },
-      { gid: structure.templatesFolderId, name: 'templates', parentGid: structure.systemFolderId },
+      { name: 'opportunities', path: structure.opportunitiesPath, artifactType: 'opp_folder' },
+      { name: 'customers', path: structure.customersPath, artifactType: 'opp_folder' },
+      { name: 'system', path: structure.systemPath, artifactType: 'template' },
+      { name: 'templates', path: structure.templatesPath, artifactType: 'template' },
     ]
 
     for (const folder of globalFolders) {
       try {
         await sql`
-          INSERT INTO drive_files (gid, name, type, mime_type, parent_gid, auto_created, artifact_scope, artifact_type)
+          INSERT INTO stored_files (name, type, storage_path, auto_created, artifact_scope, artifact_type, storage_backend)
           VALUES (
-            ${folder.gid}, ${folder.name}, 'FOLDER', 'application/vnd.google-apps.folder',
-            ${folder.parentGid}, true, 'global', 'opp_folder'
+            ${folder.name}, 'FOLDER', ${folder.path},
+            true, 'global', ${folder.artifactType}, 'local'
           )
-          ON CONFLICT (gid) DO NOTHING
+          ON CONFLICT DO NOTHING
         `
       } catch (indexErr) {
         console.error('[POST /api/admin/drive] Index error:', indexErr)
       }
     }
 
-    // Index master_index
-    try {
-      await sql`
-        INSERT INTO drive_files (gid, name, type, mime_type, parent_gid, auto_created, artifact_scope, artifact_type)
-        VALUES (
-          ${masterIndexGid}, 'master_index', 'SPREADSHEET', 'application/vnd.google-apps.spreadsheet',
-          ${structure.opportunitiesFolderId}, true, 'global', 'master_index'
-        )
-        ON CONFLICT (gid) DO NOTHING
-      `
-    } catch (indexErr) {
-      console.error('[POST /api/admin/drive] Master index error:', indexErr)
-    }
-
-    // Log execution (non-critical — don't let logging failures mask success)
+    // Log execution
     try {
       await sql`
         INSERT INTO integration_executions (function_name, status, completed_at, success, result)
         VALUES (
-          'drive.provisionGlobal',
+          'storage.provisionGlobal',
           'COMPLETED',
           now(),
           true,
-          ${JSON.stringify({ ...structure, masterIndexGid })}::jsonb
+          ${JSON.stringify(structure)}::jsonb
         )
       `
     } catch (logErr) {
@@ -142,20 +124,20 @@ export async function POST(_request: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { ...structure, masterIndexGid },
+      data: structure,
     }, { status: 201 })
   } catch (error) {
     // Log failed execution
     try {
       await sql`
         INSERT INTO integration_executions (function_name, status, completed_at, success, error_message)
-        VALUES ('drive.provisionGlobal', 'FAILED', now(), false, ${error instanceof Error ? error.message : 'Unknown error'})
+        VALUES ('storage.provisionGlobal', 'FAILED', now(), false, ${error instanceof Error ? error.message : 'Unknown error'})
       `
     } catch (logError) {
       console.error('[POST /api/admin/drive] Failed to log execution:', logError)
     }
 
     console.error('[POST /api/admin/drive] Global provisioning error:', error)
-    return NextResponse.json({ error: 'Failed to provision global Drive structure' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to provision global storage structure' }, { status: 500 })
   }
 }
