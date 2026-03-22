@@ -32,6 +32,9 @@ const STATIC_CONTENT: AboutPageContent = {
     { step: '05', title: 'Fragmented Tools', description: 'Spreadsheets, email chains, and browser bookmarks instead of a real pipeline.' },
     { step: '06', title: 'Wasted Proposals', description: 'Time spent pursuing opportunities that were never a good fit to begin with.' },
   ],
+export const metadata: Metadata = {
+  title: 'About RFP Pipeline | Government Opportunity Intelligence',
+  description: 'Learn how RFP Pipeline helps companies discover, score, and win federal government contracts using AI-powered opportunity matching.',
 }
 
 const STATIC_META = {
@@ -56,6 +59,7 @@ export default async function AboutPage() {
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10">
             {content.hero.eyebrow}
+            About RFP Pipeline
           </div>
           <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
             {content.hero.title.includes('federal contracting') ? (
@@ -71,6 +75,8 @@ export default async function AboutPage() {
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-gray-600">
             {content.hero.description}
+            RFP Pipeline was created by a team with over two decades of experience in government contracting,
+            SBIR/STTR programs, and technology commercialization. We built the tool we wished we had.
           </p>
         </div>
       </section>
@@ -89,6 +95,16 @@ export default async function AboutPage() {
                 {p}
               </p>
             ))}
+            <p className="mt-6 text-sm leading-relaxed text-gray-600">
+              Federal procurement is a $700B+ market, but navigating it is overwhelming. Small businesses
+              spend countless hours searching SAM.gov, filtering through irrelevant postings, and missing
+              deadlines on opportunities they should have won.
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-gray-600">
+              RFP Pipeline changes that. Our AI-powered platform continuously scans federal procurement sources,
+              scores every opportunity against your unique business profile, and delivers a prioritized pipeline
+              so you can focus on what matters: writing winning proposals.
+            </p>
             <div className="mt-8">
               <Link href="/get-started" className="btn-primary">
                 Start Free Trial
