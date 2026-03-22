@@ -16,7 +16,8 @@ export function PortalNav({ tenantSlug }: { tenantSlug: string }) {
   const items = getNavItems(tenantSlug)
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
+    <nav className="flex-1 space-y-1 px-3 py-5">
+      <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Workspace</p>
       {items.map(item => {
         const active = pathname === item.href
         return (
@@ -24,10 +25,8 @@ export function PortalNav({ tenantSlug }: { tenantSlug: string }) {
             key={item.href}
             href={item.href}
             className={clsx(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              active
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              'sidebar-item',
+              active ? 'sidebar-item-active' : 'sidebar-item-inactive'
             )}
           >
             <PortalIcon name={item.icon} className="h-4 w-4" />

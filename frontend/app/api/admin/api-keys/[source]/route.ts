@@ -30,7 +30,7 @@ export async function GET(
                   ELSE (expires_date - CURRENT_DATE)::INT END AS days_until_expiry,
              CASE WHEN expires_date IS NULL THEN 'no_expiry'
                   WHEN (expires_date - CURRENT_DATE) < 0 THEN 'expired'
-                  WHEN (expires_date - CURRENT_DATE) < days_warning THEN 'expiring_soon'
+                  WHEN (expires_date - CURRENT_DATE) < 14 THEN 'expiring_soon'
                   ELSE 'ok' END AS expiry_status,
              encrypted_value IS NOT NULL AS has_stored_key
       FROM api_key_registry
@@ -79,8 +79,15 @@ export async function POST(
     }
 
     const trimmed = apiKey.trim()
-    const encrypted = encryptApiKey(trimmed)
-    const hint = keyHint(trimmed)
+    let encrypted: string
+    let hint: string
+    try {
+      encrypted = encryptApiKey(trimmed)
+      hint = keyHint(trimmed)
+    } catch (err) {
+      console.error('[POST /api/admin/api-keys] Encryption error:', err)
+      return NextResponse.json({ error: 'Failed to encrypt API key' }, { status: 500 })
+    }
 
     // Default SAM.gov keys to 90 days from now if no date provided
     const expires = expiresDate

@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   description: 'Latest news, product updates, and announcements from RFP Finder.',
 }
 
-/* ── Easy-to-update content array ────────────────── */
-
 const announcements = [
   {
     date: 'March 2026',
@@ -47,21 +45,21 @@ const announcements = [
   },
 ]
 
-/* ── Page ────────────────────────────────────────── */
-
 export default function AnnouncementsPage() {
   return (
     <>
-      <Section>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-white px-4 pt-16 pb-8 sm:px-6 sm:pt-24 sm:pb-12 lg:px-8">
+        <div className="absolute inset-0 -z-10 bg-hero-mesh" />
         <SectionHeader
           eyebrow="News & Announcements"
           title="What's new at RFP Finder"
           description="Product updates, company news, and important announcements for our customers and community."
         />
-      </Section>
+      </section>
 
-      <Section className="bg-gray-50">
-        <div className="mx-auto max-w-3xl space-y-6">
+      <Section className="bg-surface-50">
+        <div className="mx-auto max-w-3xl space-y-5">
           {announcements.map((item, i) => (
             <ContentCard
               key={i}
@@ -77,8 +75,8 @@ export default function AnnouncementsPage() {
       <CtaSection
         title="Stay informed"
         description="Contact us to learn more about upcoming features and how RFP Finder can help your business."
-        primaryLabel="Get in Touch"
-        primaryHref="/about#contact"
+        primaryLabel="Get Started"
+        primaryHref="/get-started"
         secondaryLabel="See our tips & tools"
         secondaryHref="/tips"
       />

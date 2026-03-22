@@ -71,6 +71,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (error.code === '23505') {
       return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
     }
+    console.error('[POST /api/tenants/[tenantId]/users] Error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })
   }
 }

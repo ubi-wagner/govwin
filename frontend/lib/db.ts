@@ -29,7 +29,16 @@ export const sql = postgres(databaseUrl ?? '', {
     // Auto-convert snake_case columns to camelCase
     column: postgres.toCamel,
   },
+  onnotice: () => {}, // Suppress notice messages
 })
+
+// postgres.js handles connection errors per-query (no global .on('error')),
+// but we hook into process-level unhandled rejections as a safety net.
+if (typeof process !== 'undefined' && !process.env.NEXT_PHASE) {
+  process.once('unhandledRejection', (err) => {
+    console.error('[db] Unhandled postgres.js rejection:', err)
+  })
+}
 
 // ── pg Pool — Auth.js adapter ──────────────────────────────────
 export const pool = new Pool({

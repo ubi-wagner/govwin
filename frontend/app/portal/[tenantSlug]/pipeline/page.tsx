@@ -61,12 +61,21 @@ function PortalPipelineInner() {
   useEffect(() => { loadOpps() }, [loadOpps])
 
   async function handleAction(oppId: string, actionType: string, value?: string) {
-    await fetch(`/api/opportunities/${oppId}/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenantSlug: slug, actionType, value }),
-    })
-    loadOpps()
+    try {
+      const res = await fetch(`/api/opportunities/${oppId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantSlug: slug, actionType, value }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? `Action failed (${res.status})`)
+        return
+      }
+      loadOpps()
+    } catch {
+      setError('Network error — please try again')
+    }
   }
 
   return (
