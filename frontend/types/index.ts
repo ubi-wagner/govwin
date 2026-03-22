@@ -486,6 +486,117 @@ export interface AuditEntry {
   createdAt: string
 }
 
+// ─── Content Management (Digital Twin CMS) ───────────────────
+
+export type ContentPageKey =
+  | 'home' | 'about' | 'team' | 'tips'
+  | 'customers' | 'announcements' | 'get_started'
+
+export type ContentSource = 'manual' | 'generated' | 'hybrid'
+
+export type ContentEventType =
+  | 'content.draft_saved'
+  | 'content.published'
+  | 'content.rolled_back'
+  | 'content.auto_generated'
+  | 'content.auto_published'
+  | 'content.unpublished'
+
+export interface SiteContent {
+  id: string
+  pageKey: ContentPageKey
+  displayName: string
+  draftContent: Record<string, unknown>
+  draftMetadata: ContentMetadata
+  draftUpdatedAt: string
+  draftUpdatedBy: string | null
+  publishedContent: Record<string, unknown> | null
+  publishedMetadata: ContentMetadata | null
+  publishedAt: string | null
+  publishedBy: string | null
+  previousContent: Record<string, unknown> | null
+  previousMetadata: ContentMetadata | null
+  previousPublishedAt: string | null
+  autoPublish: boolean
+  contentSource: ContentSource
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ContentMetadata {
+  title?: string
+  description?: string
+  keywords?: string[]
+}
+
+export interface ContentEvent {
+  id: string
+  pageKey: ContentPageKey
+  eventType: ContentEventType
+  userId: string | null
+  contentSnapshot: Record<string, unknown> | null
+  metadataSnapshot: ContentMetadata | null
+  diffSummary: string | null
+  source: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+// Page content section schemas — typed shapes for each page's JSON
+export interface HomePageContent {
+  hero: { title: string; subtitle: string; trustBadge: string }
+  features: { icon: string; title: string; description: string }[]
+  stats: { value: string; label: string }[]
+  testimonial: { quote: string; author: string; role: string }
+  pricingTeaser: { title: string; description: string }
+}
+
+export interface AboutPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  mission: { eyebrow: string; title: string; paragraphs: string[] }
+  features: { icon: string; title: string; description: string }[]
+  howItWorks: { step: string; title: string; description: string }[]
+}
+
+export interface TeamPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  members: {
+    name: string; title: string; linkedIn: string
+    bio: string[]; credentials: string[]
+  }[]
+  stats: { value: string; label: string; description: string }[]
+}
+
+export interface TipsPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  tips: { date: string; category: string; title: string; excerpt: string }[]
+  tools: { name: string; description: string; status: string }[]
+}
+
+export interface CustomersPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  stats: { value: string; label: string; description: string }[]
+  stories: {
+    company: string; industry: string; result: string
+    quote: string; metrics: string[]
+  }[]
+  clientTypes: { label: string; desc: string; icon: string }[]
+}
+
+export interface AnnouncementsPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  items: { date: string; category: string; title: string; excerpt: string }[]
+}
+
+export interface GetStartedPageContent {
+  hero: { eyebrow: string; title: string; description: string }
+  tiers: {
+    name: string; monthlyPrice: number; annualPrice: number
+    description: string; features: string[]; popular: boolean
+  }[]
+  faqs: { question: string; answer: string }[]
+}
+
 // ─── API responses ────────────────────────────────────────────
 export interface PaginatedResponse<T> {
   data: T[]

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useEffect, useState, useMemo } from 'react'
 import type { OpportunityEvent, CustomerEvent } from '@/types'
 
@@ -24,6 +25,7 @@ export default function EventsPage() {
   const [search, setSearch] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
 
+  const loadEvents = useCallback(() => {
   const loadEvents = () => {
     setLoading(true)
     setError(null)
@@ -44,6 +46,11 @@ export default function EventsPage() {
         else if (tab === 'system') setSystemEvents(d.data ?? [])
         else setAlertEvents(d.data ?? [])
       })
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load events'))
+      .finally(() => setLoading(false))
+  }, [tab])
+
+  useEffect(() => { loadEvents() }, [loadEvents])
       .catch(err => setError(err.message ?? 'Failed to load events'))
       .finally(() => setLoading(false))
   }
@@ -54,6 +61,7 @@ export default function EventsPage() {
     if (!autoRefresh) return
     const id = setInterval(loadEvents, 15000)
     return () => clearInterval(id)
+  }, [autoRefresh, loadEvents])
   }, [autoRefresh, tab])
 
   const tabConfig: { key: StreamTab; label: string; icon: React.ReactNode; description: string }[] = [
