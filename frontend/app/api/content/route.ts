@@ -260,6 +260,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Page not found' }, { status: 404 })
       }
 
+      // Log configuration change event
+      try {
+        const changes: string[] = []
+        if (body.autoPublish !== undefined) changes.push(`auto_publish=${body.autoPublish}`)
+        if (body.contentSource !== undefined) changes.push(`content_source=${body.contentSource}`)
+        await sql`
+          INSERT INTO content_events (page_key, event_type, user_id, diff_summary, source, metadata)
+          VALUES (${pageKey}, 'content.draft_saved', ${session.user.id},
+                  ${'Configuration updated: ' + changes.join(', ')}, 'admin',
+                  ${JSON.stringify({ action: 'configure', autoPublish: body.autoPublish, contentSource: body.contentSource })}::jsonb)
+        `
+      } catch (eventErr) {
+        console.error('[POST /api/content] Configure event log error:', eventErr)
+      }
+
       return NextResponse.json({ data: rows[0], message: 'Configuration updated' })
 
     } else {

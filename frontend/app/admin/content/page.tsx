@@ -128,16 +128,12 @@ export default function ContentManagerPage() {
           metadata: editMetadata,
         }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
       setActionMessage({ type: 'success', text: 'Draft saved successfully' })
-      // Refresh selected page data
-      const updated = await res.json()
-      if (updated.data) {
-        setSelectedPage(prev => prev ? { ...prev, draftContent: editContent, draftUpdatedAt: new Date().toISOString() } : prev)
-      }
+      setSelectedPage(prev => prev ? { ...prev, draftContent: editContent, draftUpdatedAt: new Date().toISOString() } : prev)
     } catch (err) {
       setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save' })
     } finally {
@@ -151,19 +147,23 @@ export default function ContentManagerPage() {
     setActionMessage(null)
     try {
       // Save draft first, then publish
-      await fetch('/api/content', {
+      const saveRes = await fetch('/api/content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pageKey: selectedPage.pageKey, content: editContent, metadata: editMetadata }),
       })
+      if (!saveRes.ok) {
+        const saveData = await saveRes.json().catch(() => ({}))
+        throw new Error(saveData.error ?? `Draft save failed: HTTP ${saveRes.status}`)
+      }
 
       const res = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pageKey: selectedPage.pageKey, action: 'publish' }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
       setActionMessage({ type: 'success', text: 'Content published and live!' })
@@ -222,14 +222,18 @@ export default function ContentManagerPage() {
 
   async function toggleAutoPublish(pageKey: string, enabled: boolean) {
     try {
-      await fetch('/api/content', {
+      const res = await fetch('/api/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pageKey, action: 'configure', autoPublish: enabled }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
       loadPages()
     } catch (err) {
-      console.error('Failed to toggle auto-publish:', err)
+      setActionMessage({ type: 'error', text: `Failed to toggle auto-publish: ${err instanceof Error ? err.message : 'Unknown error'}` })
     }
   }
 
