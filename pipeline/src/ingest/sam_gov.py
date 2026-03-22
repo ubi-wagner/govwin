@@ -16,16 +16,36 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from crypto import decrypt_api_key
+
 log = logging.getLogger("pipeline.ingest.sam_gov")
 
 SAM_API_BASE = "https://api.sam.gov/opportunities/v2/search"
-SAM_API_KEY = os.environ.get("SAM_GOV_API_KEY", "")
+SAM_API_KEY_ENV = os.environ.get("SAM_GOV_API_KEY", "")
 DEFAULT_DAYS_BACK = 7
 PAGE_SIZE = 25  # SAM.gov max per request
 
 # Stub mode: USE_STUB_DATA=true enables seed data for local development/demos.
 # In production, set SAM_GOV_API_KEY and leave USE_STUB_DATA unset.
 USE_STUB_DATA = os.environ.get("USE_STUB_DATA", "false").lower() == "true"
+
+
+async def _resolve_api_key(conn) -> str:
+    """Resolve SAM.gov API key: DB encrypted value first, env var fallback."""
+    try:
+        row = await conn.fetchrow(
+            "SELECT encrypted_value FROM api_key_registry WHERE source = 'sam_gov'"
+        )
+        if row and row["encrypted_value"]:
+            key = decrypt_api_key(row["encrypted_value"])
+            log.info("Using SAM.gov API key from database (encrypted)")
+            return key
+    except Exception as e:
+        log.warning("Could not load encrypted SAM.gov key from DB: %s", e)
+
+    if SAM_API_KEY_ENV:
+        log.info("Using SAM.gov API key from environment variable")
+    return SAM_API_KEY_ENV
 
 
 def _generate_stub_opportunities() -> list[dict]:
@@ -249,8 +269,11 @@ class SamGovIngester:
             "errors": [],
         }
 
+        # Resolve API key from DB (encrypted) or env var fallback
+        sam_api_key = await _resolve_api_key(self.conn)
+
         # ── Stub mode: return seed data when USE_STUB_DATA=true or no API key ──
-        if USE_STUB_DATA or not SAM_API_KEY:
+        if USE_STUB_DATA or not sam_api_key:
             if USE_STUB_DATA:
                 log.info("USE_STUB_DATA=true — returning stub SAM.gov data")
             else:
@@ -287,7 +310,7 @@ class SamGovIngester:
                     resp = await client.get(
                         SAM_API_BASE,
                         params={
-                            "api_key": SAM_API_KEY,
+                            "api_key": sam_api_key,
                             "postedFrom": posted_from,
                             "postedTo": posted_to,
                             "limit": PAGE_SIZE,
