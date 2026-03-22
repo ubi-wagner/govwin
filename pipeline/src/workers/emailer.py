@@ -16,12 +16,15 @@ Usage:
   Also runs as an event worker consuming customer_events for real-time alerts.
 """
 
+import asyncio
 import base64
+import html as html_module
 import json
 import logging
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from functools import partial
 
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2 import service_account
@@ -35,10 +38,18 @@ MAX_BATCH_SIZE = 50  # Max emails per flush cycle
 MAX_RETRIES = 3       # Max attempts per notification
 
 
+def _esc(value: object) -> str:
+    """HTML-escape any value for safe template insertion."""
+    return html_module.escape(str(value)) if value else ""
+
+
 def _get_gmail_service():
     """
     Build a Gmail API service using the service account with domain-wide delegation.
     Impersonates SENDER_EMAIL so emails come from admin@rfppipeline.com.
+
+    This is a synchronous function — callers in async contexts should use
+    _send_message_async() which runs the blocking call in an executor.
     """
     key_b64 = os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
     if not key_b64:
@@ -55,10 +66,26 @@ def _get_gmail_service():
         subject=SENDER_EMAIL,
     )
 
-    # Ensure credentials are fresh
+    # Refresh is synchronous (HTTP call to Google token endpoint)
     credentials.refresh(GoogleAuthRequest())
 
     return build("gmail", "v1", credentials=credentials, cache_discovery=False)
+
+
+def _send_message_sync(gmail, raw_message: str) -> dict:
+    """Synchronous Gmail send — meant to be called via run_in_executor."""
+    return gmail.users().messages().send(
+        userId="me",
+        body={"raw": raw_message},
+    ).execute()
+
+
+async def _send_message_async(gmail, raw_message: str) -> dict:
+    """Run the synchronous Gmail send in a thread pool to avoid blocking the event loop."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, partial(_send_message_sync, gmail, raw_message)
+    )
 
 
 def _build_mime_message(
@@ -96,7 +123,7 @@ def _strip_html(html: str) -> str:
 def _generate_notification_html(notification: dict, opp_details: dict | None) -> str:
     """Generate HTML email body from a notification_queue row."""
     ntype = notification.get("notification_type", "")
-    subject = notification.get("subject", "")
+    subject = _esc(notification.get("subject", ""))
 
     if ntype == "deadline_nudge":
         return _render_deadline_nudge(notification, opp_details)
@@ -104,6 +131,7 @@ def _generate_notification_html(notification: dict, opp_details: dict | None) ->
         return _render_amendment_alert(notification, opp_details)
     else:
         # Generic notification
+        body_text = _esc(notification.get("body_text", "You have a new notification from GovWin Pipeline."))
         return f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: #1a1a2e; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
@@ -111,7 +139,7 @@ def _generate_notification_html(notification: dict, opp_details: dict | None) ->
             </div>
             <div style="padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
                 <h3>{subject}</h3>
-                <p>{notification.get('body_text', 'You have a new notification from GovWin Pipeline.')}</p>
+                <p>{body_text}</p>
                 <p style="color: #666; font-size: 12px; margin-top: 20px;">
                     This is an automated message from GovWin Pipeline.
                 </p>
@@ -122,13 +150,14 @@ def _generate_notification_html(notification: dict, opp_details: dict | None) ->
 
 def _render_deadline_nudge(notification: dict, opp: dict | None) -> str:
     """Render a deadline nudge email."""
-    subject = notification.get("subject", "Deadline Approaching")
-    title = opp.get("title", "Unknown Opportunity") if opp else "Unknown Opportunity"
-    sol_num = opp.get("solicitation_number", "") if opp else ""
-    agency = opp.get("agency", "") if opp else ""
-    close_date = opp.get("close_date", "") if opp else ""
+    subject = _esc(notification.get("subject", "Deadline Approaching"))
+    title = _esc(opp.get("title", "Unknown Opportunity") if opp else "Unknown Opportunity")
+    sol_num = _esc(opp.get("solicitation_number", "") if opp else "")
+    agency = _esc(opp.get("agency", "") if opp else "")
+    close_date = _esc(opp.get("close_date", "") if opp else "")
 
-    urgency_color = "#dc3545" if "URGENT" in subject else "#ffc107" if "Reminder" in subject else "#17a2b8"
+    raw_subject = notification.get("subject", "")
+    urgency_color = "#dc3545" if "URGENT" in raw_subject else "#ffc107" if "Reminder" in raw_subject else "#17a2b8"
 
     return f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -144,7 +173,7 @@ def _render_deadline_nudge(notification: dict, opp: dict | None) -> str:
                 <tr><td style="padding: 8px 0; color: #666;">Opportunity</td><td style="padding: 8px 0;"><strong>{title}</strong></td></tr>
                 {'<tr><td style="padding: 8px 0; color: #666;">Sol #</td><td style="padding: 8px 0;">' + sol_num + '</td></tr>' if sol_num else ''}
                 {'<tr><td style="padding: 8px 0; color: #666;">Agency</td><td style="padding: 8px 0;">' + agency + '</td></tr>' if agency else ''}
-                {'<tr><td style="padding: 8px 0; color: #666;">Closes</td><td style="padding: 8px 0;"><strong>' + str(close_date) + '</strong></td></tr>' if close_date else ''}
+                {'<tr><td style="padding: 8px 0; color: #666;">Closes</td><td style="padding: 8px 0;"><strong>' + close_date + '</strong></td></tr>' if close_date else ''}
             </table>
             <p style="margin-top: 15px;">Log in to your GovWin Portal to review this opportunity and take action.</p>
         </div>
@@ -159,9 +188,9 @@ def _render_deadline_nudge(notification: dict, opp: dict | None) -> str:
 
 def _render_amendment_alert(notification: dict, opp: dict | None) -> str:
     """Render an amendment alert email."""
-    title = opp.get("title", "Unknown Opportunity") if opp else "Unknown Opportunity"
-    sol_num = opp.get("solicitation_number", "") if opp else ""
-    agency = opp.get("agency", "") if opp else ""
+    title = _esc(opp.get("title", "Unknown Opportunity") if opp else "Unknown Opportunity")
+    sol_num = _esc(opp.get("solicitation_number", "") if opp else "")
+    agency = _esc(opp.get("agency", "") if opp else "")
 
     return f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -230,9 +259,10 @@ async def deliver_pending_notifications(conn) -> dict:
 
     log.info(f"[emailer] Processing {len(rows)} pending notifications")
 
-    # Build Gmail service once for the batch
+    # Build Gmail service once for the batch (sync call — run in executor)
     try:
-        gmail = _get_gmail_service()
+        loop = asyncio.get_running_loop()
+        gmail = await loop.run_in_executor(None, _get_gmail_service)
     except Exception as e:
         log.error(f"[emailer] Gmail service init failed: {e}")
         # Mark all as failed with the auth error
@@ -302,10 +332,7 @@ async def deliver_pending_notifications(conn) -> dict:
                 body_text=row["body_text"],
             )
 
-            gmail.users().messages().send(
-                userId="me",
-                body={"raw": raw_message},
-            ).execute()
+            await _send_message_async(gmail, raw_message)
 
             # Mark as sent
             await conn.execute(

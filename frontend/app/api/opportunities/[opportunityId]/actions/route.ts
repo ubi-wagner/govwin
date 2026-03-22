@@ -112,6 +112,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             ? opp.resourceLinks
             : []
 
+          let seededCount = 0
           for (const link of resourceLinks) {
             if (!link) continue
             // SAM.gov resourceLinks can be plain strings or objects with a url/href field
@@ -141,10 +142,11 @@ export async function POST(request: NextRequest, { params }: Params) {
               INSERT INTO documents (opportunity_id, filename, original_url, download_status)
               VALUES (${opportunityId}, ${filename}, ${url}, 'pending')
             `
+            seededCount++
           }
 
-          // Emit opportunity event so the pipeline worker picks up the download
-          if (resourceLinks.length > 0) {
+          // Only emit event if new documents were actually seeded
+          if (seededCount > 0) {
             try {
               await sql`
                 INSERT INTO opportunity_events
@@ -157,7 +159,7 @@ export async function POST(request: NextRequest, { params }: Params) {
                     triggered_by: 'pin',
                     tenant_id: tenant.id,
                     user_id: userId,
-                    document_count: resourceLinks.length,
+                    document_count: seededCount,
                     solicitation_number: opp.solicitationNumber ?? null,
                     title: opp.title ?? null,
                   })}::jsonb

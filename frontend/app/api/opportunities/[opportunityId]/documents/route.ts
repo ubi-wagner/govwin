@@ -48,6 +48,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Verify the opportunity exists and is in this tenant's pipeline
+  try {
+    const [oppExists] = await sql`
+      SELECT 1 FROM tenant_opportunities
+      WHERE tenant_id = ${tenant.id as string}
+        AND opportunity_id = ${opportunityId}
+    `
+    if (!oppExists) {
+      return NextResponse.json({ error: 'Opportunity not found for this tenant' }, { status: 404 })
+    }
+  } catch (error) {
+    console.error('[GET /api/opportunities/documents] Tenant-opp check error:', error)
+    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+  }
+
   try {
     const documents = await sql`
       SELECT

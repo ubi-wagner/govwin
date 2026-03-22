@@ -57,15 +57,9 @@ def _build_opp_folder_path(
     """
     date = posted_date or datetime.now(timezone.utc)
 
-    # ISO week label
-    d = datetime(date.year, date.month, date.day, tzinfo=timezone.utc)
-    # Shift to Thursday of the ISO week
-    d_shifted = d.replace(
-        day=d.day + (4 - (d.isoweekday() % 7 or 7))
-    )
-    year_start = datetime(d_shifted.year, 1, 1, tzinfo=timezone.utc)
-    week_num = ((d_shifted - year_start).days // 7) + 1
-    week_label = f"{d_shifted.year}-W{week_num:02d}"
+    # ISO week label — use Python's isocalendar() for correctness
+    iso_year, iso_week, _ = date.isocalendar()
+    week_label = f"{iso_year}-W{iso_week:02d}"
 
     sol_part = _sanitize(solicitation_number) if solicitation_number else "NOSOL"
     title_part = _sanitize((title or "untitled")[:60])
