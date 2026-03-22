@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { Section, SectionHeader, StatHighlight, CtaSection } from '@/components/page-sections'
 
 export const metadata: Metadata = {
-  title: 'About RFP Finder | Government Opportunity Intelligence',
-  description: 'Learn how RFP Finder helps companies discover, score, and win federal government contracts using AI-powered opportunity matching.',
+  title: 'About RFP Pipeline | Government Opportunity Intelligence',
+  description: 'Learn how RFP Pipeline helps companies discover, score, and win federal government contracts using AI-powered opportunity matching.',
 }
 
 export default function AboutPage() {
@@ -15,7 +15,7 @@ export default function AboutPage() {
         <div className="absolute inset-0 -z-10 bg-hero-mesh" />
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10">
-            About RFP Finder
+            About RFP Pipeline
           </div>
           <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
             Built by people who know{' '}
@@ -24,7 +24,7 @@ export default function AboutPage() {
             </span>
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-gray-600">
-            RFP Finder was created by a team with over two decades of experience in government contracting,
+            RFP Pipeline was created by a team with over two decades of experience in government contracting,
             SBIR/STTR programs, and technology commercialization. We built the tool we wished we had.
           </p>
         </div>
@@ -45,7 +45,7 @@ export default function AboutPage() {
               deadlines on opportunities they should have won.
             </p>
             <p className="mt-4 text-sm leading-relaxed text-gray-600">
-              RFP Finder changes that. Our AI-powered platform continuously scans federal procurement sources,
+              RFP Pipeline changes that. Our AI-powered platform continuously scans federal procurement sources,
               scores every opportunity against your unique business profile, and delivers a prioritized pipeline
               so you can focus on what matters: writing winning proposals.
             </p>
@@ -104,7 +104,7 @@ export default function AboutPage() {
         <SectionHeader
           eyebrow="Get Started"
           title="Ready to transform your federal pipeline?"
-          description="Contact us for a demo or to learn more about how RFP Finder can help your business win government contracts."
+          description="Contact us for a demo or to learn more about how RFP Pipeline can help your business win government contracts."
         />
         <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-gray-200/80 bg-white p-8 shadow-card">
           <div className="space-y-5 text-center">
@@ -117,10 +117,10 @@ export default function AboutPage() {
               Reach out to discuss your needs and get set up with a personalized workspace.
             </p>
             <a
-              href="mailto:eric@rfpfinder.com"
+              href="mailto:eric@rfppipeline.com"
               className="block rounded-xl bg-brand-50 px-4 py-3.5 text-sm font-bold text-brand-700 hover:bg-brand-100 transition-all ring-1 ring-brand-600/10"
             >
-              eric@rfpfinder.com
+              eric@rfppipeline.com
             </a>
             <p className="text-xs text-gray-400">
               We typically respond within one business day.
@@ -131,7 +131,7 @@ export default function AboutPage() {
 
       <CtaSection
         title="Start winning government contracts today"
-        description="Join companies already using RFP Finder to find their next federal opportunity."
+        description="Join companies already using RFP Pipeline to find their next federal opportunity."
         primaryLabel="View Pricing"
         primaryHref="/get-started"
         secondaryLabel="Meet the founder"

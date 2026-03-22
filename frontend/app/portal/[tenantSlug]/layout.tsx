@@ -59,7 +59,7 @@ export default async function PortalLayout({
             </div>
             <div className="min-w-0">
               <span className="block text-sm font-bold text-gray-900 truncate">{tenant.name}</span>
-              <span className="block text-[10px] font-medium text-gray-400">RFP Finder</span>
+              <span className="block text-[10px] font-medium text-gray-400">RFP Pipeline</span>
             </div>
           </Link>
         </div>

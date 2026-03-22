@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { Section, SectionHeader, StatHighlight, CtaSection } from '@/components/page-sections'
 
 export const metadata: Metadata = {
-  title: 'Customer Wins | RFP Finder',
-  description: 'See how companies are using RFP Finder to discover and win government contracts.',
+  title: 'Customer Wins | RFP Pipeline',
+  description: 'See how companies are using RFP Pipeline to discover and win government contracts.',
 }
 
 const successStories = [
@@ -11,7 +11,7 @@ const successStories = [
     company: 'Defense Technology Startup',
     industry: 'Aerospace & Defense',
     result: 'Won first SBIR Phase I award within 60 days of onboarding',
-    quote: 'RFP Finder surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right.',
+    quote: 'RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right.',
     metrics: ['$150K SBIR Phase I', 'First federal contract', '94 relevance score'],
   },
   {
@@ -32,7 +32,7 @@ const successStories = [
     company: 'Environmental Services Startup',
     industry: 'Environmental & Energy',
     result: 'Built a federal pipeline from zero to 15 active pursuits',
-    quote: 'As a small WOSB, set-aside matching is critical. RFP Finder automatically flags every WOSB set-aside in our NAICS codes.',
+    quote: 'As a small WOSB, set-aside matching is critical. RFP Pipeline automatically flags every WOSB set-aside in our NAICS codes.',
     metrics: ['15 active pursuits', 'WOSB set-aside focus', '3 wins in 6 months'],
   },
 ]
@@ -119,7 +119,7 @@ export default function CustomersPage() {
 
       <CtaSection
         title="Join our growing list of winners"
-        description="Find out how RFP Finder can help your company win federal contracts."
+        description="Find out how RFP Pipeline can help your company win federal contracts."
         primaryLabel="Start Free Trial"
         primaryHref="/get-started"
         secondaryLabel="Meet the founder"

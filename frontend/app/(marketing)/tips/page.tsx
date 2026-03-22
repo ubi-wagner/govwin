@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Section, SectionHeader, ContentCard, CtaSection } from '@/components/page-sections'
 
 export const metadata: Metadata = {
-  title: 'Tips & Tools | RFP Finder',
+  title: 'Tips & Tools | RFP Pipeline',
   description: 'Expert guidance on federal contracting, SBIR/STTR programs, proposal writing, and winning government contracts.',
 }
 

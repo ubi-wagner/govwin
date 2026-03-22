@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </svg>
             </div>
             <div>
-              <span className="text-sm font-bold text-gray-900">RFP Finder</span>
+              <span className="text-sm font-bold text-gray-900">RFP Pipeline</span>
               <span className="block text-[10px] font-medium text-gray-400">Admin Console</span>
             </div>
           </Link>

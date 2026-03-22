@@ -29,7 +29,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
-            RFP Finder uses AI-powered scoring to surface the government opportunities most relevant to
+            RFP Pipeline uses AI-powered scoring to surface the government opportunities most relevant to
             your business. Stop searching. Start winning.
           </p>
 
@@ -60,7 +60,7 @@ export default function LandingPage() {
               <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
               <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <div className="ml-3 flex-1 rounded-md bg-white px-3 py-1 text-xs text-gray-400">
-                rfpfinder.com/portal/dashboard
+                rfppipeline.com/portal/dashboard
               </div>
             </div>
             {/* Mock dashboard content */}
@@ -123,7 +123,7 @@ export default function LandingPage() {
         <SectionHeader
           eyebrow="Platform Capabilities"
           title="Everything you need to win government contracts"
-          description="From opportunity discovery to proposal submission, RFP Finder streamlines the entire federal procurement process."
+          description="From opportunity discovery to proposal submission, RFP Pipeline streamlines the entire federal procurement process."
         />
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <FeatureCard
@@ -210,7 +210,7 @@ export default function LandingPage() {
             <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H0z" />
           </svg>
           <blockquote className="mt-6 text-xl font-medium leading-relaxed text-gray-900 sm:text-2xl">
-            &ldquo;RFP Finder surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first SBIR Phase I within 60 days.&rdquo;
+            &ldquo;RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first SBIR Phase I within 60 days.&rdquo;
           </blockquote>
           <div className="mt-6">
             <p className="text-sm font-bold text-gray-900">Defense Technology Startup</p>
@@ -242,7 +242,7 @@ export default function LandingPage() {
       {/* ───── CTA ───── */}
       <CtaSection
         title="Ready to find your next contract?"
-        description="Join the companies already using RFP Finder to discover and win government opportunities faster."
+        description="Join the companies already using RFP Pipeline to discover and win government opportunities faster."
         primaryLabel="Start Free Trial"
         primaryHref="/get-started"
         secondaryLabel="See customer wins"
