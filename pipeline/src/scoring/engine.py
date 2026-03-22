@@ -16,11 +16,31 @@ import logging
 import os
 from datetime import datetime, timezone
 
+from crypto import decrypt_api_key
+
 log = logging.getLogger("pipeline.scoring")
 
 LLM_TRIGGER_SCORE = 50  # Score above which we trigger Claude analysis
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_API_KEY_ENV = os.environ.get("ANTHROPIC_API_KEY", "")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
+
+async def _resolve_anthropic_key(conn) -> str:
+    """Resolve Anthropic API key: DB encrypted value first, env var fallback."""
+    try:
+        row = await conn.fetchrow(
+            "SELECT encrypted_value FROM api_key_registry WHERE source = 'anthropic'"
+        )
+        if row and row["encrypted_value"]:
+            key = decrypt_api_key(row["encrypted_value"])
+            log.info("Using Anthropic API key from database (encrypted)")
+            return key
+    except Exception as e:
+        log.warning("Could not load encrypted Anthropic key from DB: %s", e)
+
+    if ANTHROPIC_API_KEY_ENV:
+        log.info("Using Anthropic API key from environment variable")
+    return ANTHROPIC_API_KEY_ENV
 
 
 class ScoringEngine:
@@ -30,6 +50,9 @@ class ScoringEngine:
     async def score_all_tenants(self) -> dict:
         """Score all active opportunities against all active tenant profiles."""
         result = {"tenants_scored": 0, "errors": []}
+
+        # Resolve Anthropic key once per scoring run
+        self._anthropic_key = await _resolve_anthropic_key(self.conn)
 
         tenants = await self.conn.fetch(
             """
@@ -96,7 +119,7 @@ class ScoringEngine:
             comp_risks = []
             rfi_questions = []
 
-            if total >= LLM_TRIGGER_SCORE and ANTHROPIC_API_KEY:
+            if total >= LLM_TRIGGER_SCORE and self._anthropic_key:
                 try:
                     llm_result = await self._run_llm_analysis(profile, opp, total)
                     llm_adj = llm_result.get("adjustment", 0)
@@ -277,7 +300,7 @@ class ScoringEngine:
             log.warning("anthropic package not installed, skipping LLM analysis")
             return {}
 
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=self._anthropic_key)
 
         tenant_context = f"""
 Company profile:

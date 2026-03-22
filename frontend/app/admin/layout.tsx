@@ -14,8 +14,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {/* Sidebar */}
       <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
         <div className="flex h-14 items-center border-b border-gray-200 px-4">
-          <Link href="/admin/dashboard" className="text-lg font-bold text-brand-700">
-            RFP Pipeline
+          <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold text-brand-700">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-600">
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+            </div>
+            RFP Finder
           </Link>
         </div>
 

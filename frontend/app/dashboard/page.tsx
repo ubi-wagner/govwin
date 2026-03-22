@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
 
-export default async function Home() {
+export default async function DashboardRedirect() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
@@ -22,7 +22,7 @@ export default async function Home() {
     } catch (e) {
       // Re-throw redirect (Next.js throws NEXT_REDIRECT internally)
       if (e instanceof Error && e.message === 'NEXT_REDIRECT') throw e
-      console.error('[Home] Failed to resolve tenant:', e)
+      console.error('[DashboardRedirect] Failed to resolve tenant:', e)
       throw new Error('Unable to load your account. Please try again later.')
     }
   }
