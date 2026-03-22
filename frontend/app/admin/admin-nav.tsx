@@ -15,7 +15,8 @@ export function AdminNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
+    <nav className="flex-1 space-y-1 px-3 py-5">
+      <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Management</p>
       {navItems.map(item => {
         const active = pathname.startsWith(item.href)
         return (
@@ -23,10 +24,8 @@ export function AdminNav() {
             key={item.href}
             href={item.href}
             className={clsx(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              active
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              'sidebar-item',
+              active ? 'sidebar-item-active' : 'sidebar-item-inactive'
             )}
           >
             <NavIcon name={item.icon} className="h-4 w-4" />
@@ -39,7 +38,6 @@ export function AdminNav() {
 }
 
 function NavIcon({ name, className }: { name: string; className?: string }) {
-  // Simple SVG icons to avoid extra imports
   const icons: Record<string, React.ReactNode> = {
     LayoutDashboard: (
       <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

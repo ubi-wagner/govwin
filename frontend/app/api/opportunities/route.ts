@@ -12,7 +12,7 @@ import type { OpportunityFilters, TenantPipelineItem } from '@/types'
 
 export async function GET(request: NextRequest) {
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const tenantSlug = searchParams.get('tenantSlug')
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
     // Verify access
-    const hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+    const hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
     if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   } catch (error) {
     console.error('[/api/opportunities] Tenant resolution error:', error)

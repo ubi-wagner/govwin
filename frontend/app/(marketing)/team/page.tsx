@@ -9,14 +9,18 @@ export const metadata: Metadata = {
 export default function TeamPage() {
   return (
     <>
-      <Section>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-white px-4 pt-16 pb-8 sm:px-6 sm:pt-24 sm:pb-12 lg:px-8">
+        <div className="absolute inset-0 -z-10 bg-hero-mesh" />
         <SectionHeader
           eyebrow="Our Team"
           title="Led by a proven federal contracting expert"
           description="RFP Finder is built on decades of hands-on experience securing federal funding, launching startups, and navigating government procurement."
         />
+      </section>
 
-        <div className="mx-auto mt-12 max-w-3xl">
+      <Section className="bg-surface-50">
+        <div className="mx-auto max-w-3xl">
           <TeamCard
             name="Eric Wagner"
             title="Founder & CEO"
@@ -39,12 +43,12 @@ export default function TeamPage() {
       </Section>
 
       {/* Track record stats */}
-      <Section className="bg-gray-50">
+      <Section className="bg-white">
         <SectionHeader
           eyebrow="Track Record"
           title="Numbers that speak for themselves"
         />
-        <div className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-8 sm:grid-cols-4">
+        <div className="mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-8 sm:grid-cols-4">
           <StatHighlight value="$100M+" label="Non-Dilutive Capital" description="Acquired for clients and portfolio companies" />
           <StatHighlight value="13/13" label="SBIR/STTR Awards" description="100% success rate in most recent cohort" />
           <StatHighlight value="40+" label="Startups Advised" description="On Air Force APEX program" />
@@ -61,7 +65,8 @@ export default function TeamPage() {
       <CtaSection
         title="Work with a team that knows federal funding"
         description="Whether you're a first-time SBIR applicant or a seasoned contractor, our expertise helps you compete and win."
-        primaryLabel="Get Started"
+        primaryLabel="Start Free Trial"
+        primaryHref="/get-started"
         secondaryLabel="Learn about the platform"
         secondaryHref="/about"
       />

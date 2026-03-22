@@ -11,7 +11,7 @@ type Params = { params: Promise<{ tenantSlug: string }> }
 
 export async function GET(request: NextRequest, { params }: Params) {
   const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { tenantSlug } = await params
 
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   let hasAccess: boolean
   try {
-    hasAccess = await verifyTenantAccess(session.user.id!, session.user.role, tenant.id)
+    hasAccess = await verifyTenantAccess(session.user.id, session.user.role, tenant.id)
   } catch (error) {
     console.error('[GET /api/portal/documents] Access check error:', error)
     return NextResponse.json({ error: 'Database error' }, { status: 500 })

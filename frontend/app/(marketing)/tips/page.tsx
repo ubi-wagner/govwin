@@ -6,8 +6,6 @@ export const metadata: Metadata = {
   description: 'Expert guidance on federal contracting, SBIR/STTR programs, proposal writing, and winning government contracts.',
 }
 
-/* ── Easy-to-update content array ────────────────── */
-
 const tips = [
   {
     date: 'March 2026',
@@ -87,26 +85,26 @@ const tools = [
   },
 ]
 
-/* ── Page ────────────────────────────────────────── */
-
 export default function TipsPage() {
   return (
     <>
-      <Section>
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-white px-4 pt-16 pb-8 sm:px-6 sm:pt-24 sm:pb-12 lg:px-8">
+        <div className="absolute inset-0 -z-10 bg-hero-mesh" />
         <SectionHeader
           eyebrow="Tips & Tools"
           title="Expert resources for federal contracting"
           description="Practical guidance from a team that has helped secure over $100M in non-dilutive federal funding. Updated regularly with new strategies and tools."
         />
-      </Section>
+      </section>
 
       {/* Tips / Articles */}
-      <Section className="bg-gray-50">
+      <Section className="bg-surface-50">
         <SectionHeader
           eyebrow="Latest Tips"
           title="Strategies that win federal contracts"
         />
-        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {tips.map((tip, i) => (
             <ContentCard
               key={i}
@@ -120,21 +118,21 @@ export default function TipsPage() {
       </Section>
 
       {/* Tools */}
-      <Section>
+      <Section className="bg-white">
         <SectionHeader
           eyebrow="Free Tools"
           title="Resources to accelerate your federal pipeline"
         />
-        <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tools.map(tool => (
-            <div key={tool.name} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div key={tool.name} className="group rounded-2xl border border-gray-200/80 bg-white p-6 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold text-gray-900">{tool.name}</h3>
+                <h3 className="text-sm font-bold text-gray-900">{tool.name}</h3>
                 <span className={tool.status === 'Available' ? 'badge-green' : 'badge-yellow'}>
                   {tool.status}
                 </span>
               </div>
-              <p className="mt-3 text-sm text-gray-600">{tool.description}</p>
+              <p className="mt-3 text-sm leading-relaxed text-gray-500">{tool.description}</p>
             </div>
           ))}
         </div>
@@ -143,8 +141,8 @@ export default function TipsPage() {
       <CtaSection
         title="Need personalized guidance?"
         description="Our team has helped over 40 startups navigate SBIR/STTR programs with a 100% success rate in our most recent cohort."
-        primaryLabel="Contact Us"
-        primaryHref="/about#contact"
+        primaryLabel="Start Free Trial"
+        primaryHref="/get-started"
         secondaryLabel="Meet the expert"
         secondaryHref="/team"
       />

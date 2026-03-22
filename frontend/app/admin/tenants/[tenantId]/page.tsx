@@ -265,7 +265,7 @@ function EditTenantForm({ tenant, onSaved }: { tenant: Tenant; onSaved: () => vo
         body: JSON.stringify(form),
       })
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         setSaveError(data.error ?? 'Failed to save')
         setSaving(false)
         return
