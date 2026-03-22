@@ -153,8 +153,20 @@ def _generate_stub_opportunities() -> list[dict]:
                     "fullName": "Maria Rodriguez",
                     "email": "maria.rodriguez.test@gsa.gov",
                     "phone": "202-555-0200",
+                    "title": "Contract Specialist",
                 },
             ],
+            "officeAddress": {
+                "zipcode": "20405",
+                "city": "Washington",
+                "countryCode": "USA",
+                "state": "DC",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "50000", "name": "Washington"},
+                "state": {"code": "DC", "name": "District of Columbia"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
         },
         {
             "noticeId": "stub_003_pmo_hhs",
@@ -179,7 +191,11 @@ def _generate_stub_opportunities() -> list[dict]:
                 "management, risk management, stakeholder reporting, and organizational "
                 "change management for the Office of the CIO."
             ),
+            "organizationType": "OFFICE",
             "uiLink": "https://sam.gov/opp/stub_003_pmo_hhs/view",
+            "additionalInfoLink": None,
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=45)).strftime("%Y-%m-%d"),
             "award": None,
             "pointOfContact": [
                 {
@@ -187,8 +203,20 @@ def _generate_stub_opportunities() -> list[dict]:
                     "fullName": "James Williams",
                     "email": "james.williams.test@hhs.gov",
                     "phone": "202-555-0300",
+                    "title": "Contracting Officer",
                 },
             ],
+            "officeAddress": {
+                "zipcode": "20201",
+                "city": "Washington",
+                "countryCode": "USA",
+                "state": "DC",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "50000", "name": "Washington"},
+                "state": {"code": "DC", "name": "District of Columbia"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
         },
         {
             "noticeId": "stub_004_devsecops_army",
@@ -212,9 +240,24 @@ def _generate_stub_opportunities() -> list[dict]:
                 "maintain a DevSecOps CI/CD pipeline based on Kubernetes, Docker, and GitLab CI/CD. "
                 "Includes zero trust architecture, STIG hardening, and FedRAMP High authorization."
             ),
+            "organizationType": "OFFICE",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=75)).strftime("%Y-%m-%d"),
+            "additionalInfoLink": None,
             "uiLink": "https://sam.gov/opp/stub_004_devsecops_army/view",
             "award": None,
             "pointOfContact": [],
+            "officeAddress": {
+                "zipcode": "01760",
+                "city": "Natick",
+                "countryCode": "USA",
+                "state": "MA",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "45000", "name": "Natick"},
+                "state": {"code": "MA", "name": "Massachusetts"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
         },
         {
             "noticeId": "stub_005_training_va",
@@ -238,6 +281,10 @@ def _generate_stub_opportunities() -> list[dict]:
                 "instructor-led training, LMS administration, curriculum development, strategic "
                 "planning, and Lean Six Sigma process improvement support."
             ),
+            "organizationType": "OFFICE",
+            "archiveType": "auto15",
+            "archiveDate": (now + timedelta(days=30)).strftime("%Y-%m-%d"),
+            "additionalInfoLink": None,
             "uiLink": "https://sam.gov/opp/stub_005_training_va/view",
             "award": None,
             "pointOfContact": [
@@ -246,8 +293,20 @@ def _generate_stub_opportunities() -> list[dict]:
                     "fullName": "Sarah Johnson",
                     "email": "sarah.johnson.test@va.gov",
                     "phone": "202-555-0500",
+                    "title": "Contracting Specialist",
                 },
             ],
+            "officeAddress": {
+                "zipcode": "20420",
+                "city": "Washington",
+                "countryCode": "USA",
+                "state": "DC",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "50000", "name": "Washington"},
+                "state": {"code": "DC", "name": "District of Columbia"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
         },
     ]
 
@@ -405,51 +464,10 @@ class SamGovIngester:
         if existing and existing["content_hash"] == content_hash:
             return "unchanged"
 
-        # Parse fields
-        title = raw.get("title", "Untitled")[:500]
-        description = raw.get("description", "")
-        if isinstance(description, dict):
-            description = description.get("body", "")
-        if not isinstance(description, str):
-            description = str(description) if description else ""
-
-        agency = raw.get("fullParentPathName", "")
-        # Extract top-level agency code from fullParentPathCode (e.g., "097.DISA.PL8" → "097")
-        full_parent_code = raw.get("fullParentPathCode", "")
-        agency_code = full_parent_code.split(".")[0] if full_parent_code else ""
-
-        naics = raw.get("naicsCode", "")
-        naics_codes = [naics] if naics else []
-
-        set_aside = raw.get("typeOfSetAsideDescription", "")
-        set_aside_code = raw.get("typeOfSetAside", "")
-
-        # SAM.gov returns full type names; map to our normalized enum values
-        opp_type_map = {
-            # Short codes (ptype query param values)
-            "o": "solicitation",
-            "k": "sources_sought",
-            "p": "presolicitation",
-            # Full names (actual response values from SAM.gov type field)
-            "Solicitation": "solicitation",
-            "Combined Synopsis/Solicitation": "solicitation",
-            "Sources Sought": "sources_sought",
-            "Presolicitation": "presolicitation",
-            "Special Notice": "special_notice",
-            "Award Notice": "award",
-            "Intent to Bundle Requirements": "intent_bundle",
-            "Justification and Approval": "justification",
-        }
-        opp_type = opp_type_map.get(raw.get("type", ""), "other")
-
-        posted_date = self._parse_date(raw.get("postedDate"))
-        close_date = self._parse_date(raw.get("responseDeadLine") or raw.get("archiveDate"))
-
-        sol_number = raw.get("solicitationNumber", "")
-        source_url = f"https://sam.gov/opp/{source_id}/view"
+        # ── Parse all fields from SAM.gov response ──
+        fields = self._extract_all_fields(raw, source_id)
 
         if existing:
-            # Update + record amendment
             await self.conn.execute(
                 """
                 UPDATE opportunities SET
@@ -457,14 +475,39 @@ class SamGovIngester:
                     naics_codes = $5, set_aside_type = $6, set_aside_code = $7,
                     opportunity_type = $8, posted_date = $9, close_date = $10,
                     solicitation_number = $11, source_url = $12, content_hash = $13,
-                    raw_data = $14::jsonb, updated_at = NOW()
-                WHERE id = $15
+                    raw_data = $14::jsonb,
+                    classification_code = $15, department = $16, sub_tier = $17,
+                    office = $18, organization_type = $19, full_parent_path_code = $20,
+                    pop_city = $21, pop_state = $22, pop_country = $23, pop_zip = $24,
+                    office_city = $25, office_state = $26, office_zip = $27, office_country = $28,
+                    contact_name = $29, contact_email = $30, contact_phone = $31, contact_title = $32,
+                    award_date = $33, award_number = $34, award_amount = $35,
+                    awardee_name = $36, awardee_uei = $37, awardee_city = $38, awardee_state = $39,
+                    base_type = $40, archive_type = $41, archive_date = $42,
+                    is_active = $43, sam_ui_link = $44, additional_info_link = $45,
+                    resource_links = $46::jsonb, document_urls = $47::jsonb,
+                    estimated_value_min = $48, estimated_value_max = $49,
+                    updated_at = NOW()
+                WHERE id = $50
                 """,
-                title, description, agency, agency_code,
-                naics_codes, set_aside, set_aside_code,
-                opp_type, posted_date, close_date,
-                sol_number, source_url, content_hash,
-                json.dumps(raw, default=str), existing["id"],
+                fields["title"], fields["description"], fields["agency"], fields["agency_code"],
+                fields["naics_codes"], fields["set_aside"], fields["set_aside_code"],
+                fields["opp_type"], fields["posted_date"], fields["close_date"],
+                fields["sol_number"], fields["source_url"], content_hash,
+                json.dumps(raw, default=str),
+                fields["classification_code"], fields["department"], fields["sub_tier"],
+                fields["office"], fields["organization_type"], fields["full_parent_path_code"],
+                fields["pop_city"], fields["pop_state"], fields["pop_country"], fields["pop_zip"],
+                fields["office_city"], fields["office_state"], fields["office_zip"], fields["office_country"],
+                fields["contact_name"], fields["contact_email"], fields["contact_phone"], fields["contact_title"],
+                fields["award_date"], fields["award_number"], fields["award_amount"],
+                fields["awardee_name"], fields["awardee_uei"], fields["awardee_city"], fields["awardee_state"],
+                fields["base_type"], fields["archive_type"], fields["archive_date"],
+                fields["is_active"], fields["sam_ui_link"], fields["additional_info_link"],
+                json.dumps(fields["resource_links"], default=str),
+                json.dumps(fields["resource_links"], default=str),
+                fields["award_amount"], fields["award_amount"],
+                existing["id"],
             )
 
             # Legacy amendment record (kept for backward compat)
@@ -487,30 +530,63 @@ class SamGovIngester:
                 existing["content_hash"],
                 content_hash,
                 content_hash,
-                json.dumps({"source_id": source_id, "title": title}, default=str),
+                json.dumps({"source_id": source_id, "title": fields["title"]}, default=str),
             )
             return "updated"
         else:
-            # Insert new
             row = await self.conn.fetchrow(
                 """
                 INSERT INTO opportunities (
                     source, source_id, title, description, agency, agency_code,
                     naics_codes, set_aside_type, set_aside_code, opportunity_type,
                     posted_date, close_date, solicitation_number, source_url,
-                    content_hash, raw_data
+                    content_hash, raw_data,
+                    classification_code, department, sub_tier, office,
+                    organization_type, full_parent_path_code,
+                    pop_city, pop_state, pop_country, pop_zip,
+                    office_city, office_state, office_zip, office_country,
+                    contact_name, contact_email, contact_phone, contact_title,
+                    award_date, award_number, award_amount,
+                    awardee_name, awardee_uei, awardee_city, awardee_state,
+                    base_type, archive_type, archive_date,
+                    is_active, sam_ui_link, additional_info_link,
+                    resource_links, document_urls,
+                    estimated_value_min, estimated_value_max
                 ) VALUES (
                     'sam_gov', $1, $2, $3, $4, $5,
                     $6, $7, $8, $9,
                     $10, $11, $12, $13,
-                    $14, $15::jsonb
+                    $14, $15::jsonb,
+                    $16, $17, $18, $19,
+                    $20, $21,
+                    $22, $23, $24, $25,
+                    $26, $27, $28, $29,
+                    $30, $31, $32, $33,
+                    $34, $35, $36,
+                    $37, $38, $39, $40,
+                    $41, $42, $43,
+                    $44, $45, $46,
+                    $47::jsonb, $48::jsonb,
+                    $49, $50
                 )
                 RETURNING id
                 """,
-                source_id, title, description, agency, agency_code,
-                naics_codes, set_aside, set_aside_code, opp_type,
-                posted_date, close_date, sol_number, source_url,
+                source_id, fields["title"], fields["description"], fields["agency"], fields["agency_code"],
+                fields["naics_codes"], fields["set_aside"], fields["set_aside_code"], fields["opp_type"],
+                fields["posted_date"], fields["close_date"], fields["sol_number"], fields["source_url"],
                 content_hash, json.dumps(raw, default=str),
+                fields["classification_code"], fields["department"], fields["sub_tier"], fields["office"],
+                fields["organization_type"], fields["full_parent_path_code"],
+                fields["pop_city"], fields["pop_state"], fields["pop_country"], fields["pop_zip"],
+                fields["office_city"], fields["office_state"], fields["office_zip"], fields["office_country"],
+                fields["contact_name"], fields["contact_email"], fields["contact_phone"], fields["contact_title"],
+                fields["award_date"], fields["award_number"], fields["award_amount"],
+                fields["awardee_name"], fields["awardee_uei"], fields["awardee_city"], fields["awardee_state"],
+                fields["base_type"], fields["archive_type"], fields["archive_date"],
+                fields["is_active"], fields["sam_ui_link"], fields["additional_info_link"],
+                json.dumps(fields["resource_links"], default=str),
+                json.dumps(fields["resource_links"], default=str),
+                fields["award_amount"], fields["award_amount"],
             )
 
             # Emit opportunity event: ingest.new
@@ -525,15 +601,177 @@ class SamGovIngester:
                     content_hash,
                     json.dumps({
                         "source_id": source_id,
-                        "title": title,
-                        "solicitation_number": sol_number,
-                        "agency": agency,
-                        "naics_codes": naics_codes,
-                        "set_aside": set_aside_code,
-                        "opp_type": opp_type,
+                        "title": fields["title"],
+                        "solicitation_number": fields["sol_number"],
+                        "agency": fields["agency"],
+                        "naics_codes": fields["naics_codes"],
+                        "set_aside": fields["set_aside_code"],
+                        "opp_type": fields["opp_type"],
+                        "department": fields["department"],
+                        "classification_code": fields["classification_code"],
+                        "pop_state": fields["pop_state"],
                     }, default=str),
                 )
             return "new"
+
+    def _extract_all_fields(self, raw: dict, source_id: str) -> dict:
+        """Extract all metadata fields from a SAM.gov API response record."""
+        # ── Core fields ──
+        title = raw.get("title", "Untitled")[:500]
+        description = raw.get("description", "")
+        if isinstance(description, dict):
+            description = description.get("body", "")
+        if not isinstance(description, str):
+            description = str(description) if description else ""
+
+        # ── Organization hierarchy ──
+        agency = raw.get("fullParentPathName", "")
+        full_parent_code = raw.get("fullParentPathCode", "")
+        agency_code = full_parent_code.split(".")[0] if full_parent_code else ""
+        department = raw.get("department", "")
+        sub_tier = raw.get("subTier", "")
+        office = raw.get("office", "")
+        organization_type = raw.get("organizationType", "")
+
+        # ── Classification ──
+        naics = raw.get("naicsCode", "")
+        naics_codes = [naics] if naics else []
+        classification_code = raw.get("classificationCode", "")
+
+        # ── Set-aside ──
+        set_aside = raw.get("typeOfSetAsideDescription", "")
+        set_aside_code = raw.get("typeOfSetAside", "")
+
+        # ── Opportunity type mapping ──
+        opp_type_map = {
+            "o": "solicitation",
+            "k": "sources_sought",
+            "p": "presolicitation",
+            "Solicitation": "solicitation",
+            "Combined Synopsis/Solicitation": "solicitation",
+            "Sources Sought": "sources_sought",
+            "Presolicitation": "presolicitation",
+            "Special Notice": "special_notice",
+            "Award Notice": "award",
+            "Intent to Bundle Requirements": "intent_bundle",
+            "Justification and Approval": "justification",
+        }
+        opp_type = opp_type_map.get(raw.get("type", ""), "other")
+        base_type = raw.get("baseType", "")
+
+        # ── Dates ──
+        posted_date = self._parse_date(raw.get("postedDate"))
+        close_date = self._parse_date(raw.get("responseDeadLine") or raw.get("archiveDate"))
+        archive_date = self._parse_date(raw.get("archiveDate"))
+        archive_type = raw.get("archiveType", "")
+
+        # ── Active flag ──
+        is_active = (raw.get("active", "Yes") or "Yes").lower() == "yes"
+
+        # ── Identifiers & links ──
+        sol_number = raw.get("solicitationNumber", "")
+        source_url = f"https://sam.gov/opp/{source_id}/view"
+        sam_ui_link = raw.get("uiLink", "") or source_url
+        additional_info_link = raw.get("additionalInfoLink", "")
+
+        # ── Resource / attachment links ──
+        resource_links = raw.get("resourceLinks", []) or []
+        if not isinstance(resource_links, list):
+            resource_links = []
+
+        # ── Place of performance ──
+        pop = raw.get("placeOfPerformance") or {}
+        pop_city_obj = pop.get("city") or {}
+        pop_state_obj = pop.get("state") or {}
+        pop_country_obj = pop.get("country") or {}
+        pop_city = pop_city_obj.get("name", "") if isinstance(pop_city_obj, dict) else str(pop_city_obj)
+        pop_state = pop_state_obj.get("code", "") if isinstance(pop_state_obj, dict) else str(pop_state_obj)
+        pop_country = pop_country_obj.get("code", "USA") if isinstance(pop_country_obj, dict) else str(pop_country_obj or "USA")
+        pop_zip = pop.get("zip", "")
+
+        # ── Office address ──
+        off_addr = raw.get("officeAddress") or {}
+        office_city = off_addr.get("city", "")
+        office_state = off_addr.get("state", "")
+        office_zip = off_addr.get("zipcode", "")
+        office_country = off_addr.get("countryCode", "")
+
+        # ── Primary point of contact ──
+        contacts = raw.get("pointOfContact") or []
+        primary_contact = next(
+            (c for c in contacts if isinstance(c, dict) and c.get("type") == "primary"),
+            contacts[0] if contacts and isinstance(contacts[0], dict) else {},
+        )
+        contact_name = primary_contact.get("fullName", "")
+        contact_email = primary_contact.get("email", "")
+        contact_phone = primary_contact.get("phone", "")
+        contact_title = primary_contact.get("title", "")
+
+        # ── Award info (populated when type is "Award Notice") ──
+        award = raw.get("award") or {}
+        award_date = self._parse_date(award.get("date")) if award else None
+        award_number = award.get("number", "") if award else ""
+        award_amount_raw = award.get("amount") if award else None
+        award_amount = None
+        if award_amount_raw is not None:
+            try:
+                award_amount = float(str(award_amount_raw).replace(",", "").replace("$", ""))
+            except (ValueError, TypeError):
+                award_amount = None
+
+        awardee = award.get("awardee") or {} if award else {}
+        awardee_name = awardee.get("name", "") if awardee else ""
+        awardee_uei = awardee.get("ueiSAM", "") if awardee else ""
+        awardee_loc = awardee.get("location") or {} if awardee else {}
+        awardee_city = awardee_loc.get("city", "") if awardee_loc else ""
+        awardee_state = awardee_loc.get("state", "") if awardee_loc else ""
+
+        return {
+            "title": title,
+            "description": description,
+            "agency": agency,
+            "agency_code": agency_code,
+            "naics_codes": naics_codes,
+            "set_aside": set_aside,
+            "set_aside_code": set_aside_code,
+            "opp_type": opp_type,
+            "posted_date": posted_date,
+            "close_date": close_date,
+            "sol_number": sol_number,
+            "source_url": source_url,
+            "classification_code": classification_code or None,
+            "department": department or None,
+            "sub_tier": sub_tier or None,
+            "office": office or None,
+            "organization_type": organization_type or None,
+            "full_parent_path_code": full_parent_code or None,
+            "pop_city": pop_city or None,
+            "pop_state": pop_state or None,
+            "pop_country": pop_country or None,
+            "pop_zip": pop_zip or None,
+            "office_city": office_city or None,
+            "office_state": office_state or None,
+            "office_zip": office_zip or None,
+            "office_country": office_country or None,
+            "contact_name": contact_name or None,
+            "contact_email": contact_email or None,
+            "contact_phone": contact_phone or None,
+            "contact_title": contact_title or None,
+            "award_date": award_date,
+            "award_number": award_number or None,
+            "award_amount": award_amount,
+            "awardee_name": awardee_name or None,
+            "awardee_uei": awardee_uei or None,
+            "awardee_city": awardee_city or None,
+            "awardee_state": awardee_state or None,
+            "base_type": base_type or None,
+            "archive_type": archive_type or None,
+            "archive_date": archive_date,
+            "is_active": is_active,
+            "sam_ui_link": sam_ui_link or None,
+            "additional_info_link": additional_info_link or None,
+            "resource_links": resource_links,
+        }
 
     @staticmethod
     def _parse_date(date_str: str | None) -> datetime | None:

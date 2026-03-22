@@ -122,15 +122,42 @@ export interface TenantPipelineItem {
   description: string | null
   agency: string | null
   agencyCode: string | null
+  department: string | null
+  subTier: string | null
+  office: string | null
   naicsCodes: string[]
+  classificationCode: string | null
   setAsideType: string | null
+  setAsideCode: string | null
   opportunityType: string
+  baseType: string | null
   postedDate: string | null
   closeDate: string | null
+  archiveDate: string | null
   estimatedValueMin: number | null
   estimatedValueMax: number | null
   sourceUrl: string
+  samUiLink: string | null
+  additionalInfoLink: string | null
+  resourceLinks: ResourceLink[]
   oppStatus: OpportunityStatus
+  isActive: boolean
+  // Place of performance
+  popCity: string | null
+  popState: string | null
+  popCountry: string | null
+  popZip: string | null
+  // Point of contact
+  contactName: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  contactTitle: string | null
+  // Award info (populated when opp is awarded)
+  awardDate: string | null
+  awardNumber: string | null
+  awardAmount: number | null
+  awardeeName: string | null
+  awardeeUei: string | null
   // Tenant scores
   totalScore: number | null
   llmAdjustment: number | null
@@ -155,6 +182,14 @@ export interface TenantPipelineItem {
   lastActionAt: string | null
   docCount: number
   amendmentCount: number
+}
+
+// SAM.gov resource/attachment link
+export interface ResourceLink {
+  name?: string
+  url?: string
+  type?: string
+  size?: string
 }
 
 export interface TenantAction {
