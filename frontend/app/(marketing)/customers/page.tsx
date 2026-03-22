@@ -60,6 +60,41 @@ export async function generateMetadata(): Promise<Metadata> {
   const published = await getPageContent('customers')
   return mergeMetadata(published?.metadata ?? null, STATIC_META)
 }
+export const metadata: Metadata = {
+  title: 'Customer Wins | RFP Pipeline',
+  description: 'See how companies are using RFP Pipeline to discover and win government contracts.',
+}
+
+const successStories = [
+  {
+    company: 'Defense Technology Startup',
+    industry: 'Aerospace & Defense',
+    result: 'Won first SBIR Phase I award within 60 days of onboarding',
+    quote: 'RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right.',
+    metrics: ['$150K SBIR Phase I', 'First federal contract', '94 relevance score'],
+  },
+  {
+    company: 'Advanced Materials Company',
+    industry: 'Manufacturing',
+    result: 'Secured $1.2M in federal contracts within first year',
+    quote: 'We used to spend 10 hours a week searching SAM.gov. Now we spend 20 minutes reviewing our scored pipeline. The ROI is incredible.',
+    metrics: ['$1.2M total awards', '85% time saved', '6 contracts won'],
+  },
+  {
+    company: 'Cybersecurity Firm',
+    industry: 'Information Technology',
+    result: 'Identified and won a sole-source opportunity through early discovery',
+    quote: 'The deadline alert saved us. We had 5 days to respond to a sources-sought notice that turned into a sole-source award.',
+    metrics: ['$340K sole-source', '5-day response window', 'Ongoing IDIQ vehicle'],
+  },
+  {
+    company: 'Environmental Services Startup',
+    industry: 'Environmental & Energy',
+    result: 'Built a federal pipeline from zero to 15 active pursuits',
+    quote: 'As a small WOSB, set-aside matching is critical. RFP Pipeline automatically flags every WOSB set-aside in our NAICS codes.',
+    metrics: ['15 active pursuits', 'WOSB set-aside focus', '3 wins in 6 months'],
+  },
+]
 
 export default async function CustomersPage() {
   const published = await getPageContent('customers')
