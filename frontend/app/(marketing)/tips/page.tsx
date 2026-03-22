@@ -29,7 +29,6 @@ const STATIC_CONTENT: TipsPageContent = {
 }
 
 const STATIC_META = {
-export const metadata: Metadata = {
   title: 'Tips & Tools | RFP Pipeline',
   description: 'Expert guidance on federal contracting, SBIR/STTR programs, proposal writing, and winning government contracts.',
 }

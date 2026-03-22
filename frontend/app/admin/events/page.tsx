@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useEffect, useState, useMemo } from 'react'
 import type { OpportunityEvent, CustomerEvent } from '@/types'
 
 type StreamTab = 'user' | 'system' | 'alerts'
@@ -26,7 +25,6 @@ export default function EventsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
 
   const loadEvents = useCallback(() => {
-  const loadEvents = () => {
     setLoading(true)
     setError(null)
 
@@ -51,18 +49,12 @@ export default function EventsPage() {
   }, [tab])
 
   useEffect(() => { loadEvents() }, [loadEvents])
-      .catch(err => setError(err.message ?? 'Failed to load events'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { loadEvents() }, [tab])
 
   useEffect(() => {
     if (!autoRefresh) return
     const id = setInterval(loadEvents, 15000)
     return () => clearInterval(id)
   }, [autoRefresh, loadEvents])
-  }, [autoRefresh, tab])
 
   const tabConfig: { key: StreamTab; label: string; icon: React.ReactNode; description: string }[] = [
     { key: 'user', label: 'User Events', icon: <UserIcon />, description: 'Customer actions, pipeline updates, account changes' },
