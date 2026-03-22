@@ -20,6 +20,7 @@ import logging
 import sys
 
 from .base import EventWorkerManager
+from .document_fetcher import DocumentFetcherWorker
 from .finder import FinderOppIngestWorker, FinderDriveArchiveWorker
 from .reminder import ReminderAmendmentWorker, ReminderDeadlineWorker
 
@@ -35,6 +36,7 @@ WORKER_REGISTRY: dict[str, list[type]] = {
     "finder": [
         FinderOppIngestWorker,
         FinderDriveArchiveWorker,
+        DocumentFetcherWorker,
     ],
     "reminder": [
         ReminderAmendmentWorker,
