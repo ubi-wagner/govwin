@@ -504,9 +504,10 @@ class SamGovIngester:
                 fields["awardee_name"], fields["awardee_uei"], fields["awardee_city"], fields["awardee_state"],
                 fields["base_type"], fields["archive_type"], fields["archive_date"],
                 fields["is_active"], fields["sam_ui_link"], fields["additional_info_link"],
-                json.dumps(fields["resource_links"], default=str),
-                json.dumps(fields["resource_links"], default=str),
-                fields["award_amount"], fields["award_amount"],
+                json.dumps(fields["resource_links"], default=str),       # $46 resource_links
+                json.dumps(fields["resource_links"], default=str),       # $47 document_urls (same data — SAM resourceLinks ARE the attachments)
+                fields["award_amount"],                                  # $48 estimated_value_min (SAM only provides award.amount, no separate estimate)
+                fields["award_amount"],                                  # $49 estimated_value_max (same — exact figure when awarded, NULL otherwise)
                 existing["id"],
             )
 
@@ -584,9 +585,10 @@ class SamGovIngester:
                 fields["awardee_name"], fields["awardee_uei"], fields["awardee_city"], fields["awardee_state"],
                 fields["base_type"], fields["archive_type"], fields["archive_date"],
                 fields["is_active"], fields["sam_ui_link"], fields["additional_info_link"],
-                json.dumps(fields["resource_links"], default=str),
-                json.dumps(fields["resource_links"], default=str),
-                fields["award_amount"], fields["award_amount"],
+                json.dumps(fields["resource_links"], default=str),       # $47 resource_links
+                json.dumps(fields["resource_links"], default=str),       # $48 document_urls (same — SAM resourceLinks ARE the attachments)
+                fields["award_amount"],                                  # $49 estimated_value_min (SAM only provides award.amount, no separate estimate)
+                fields["award_amount"],                                  # $50 estimated_value_max (same — exact figure when awarded, NULL otherwise)
             )
 
             # Emit opportunity event: ingest.new
