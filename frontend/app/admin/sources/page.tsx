@@ -36,6 +36,7 @@ export default function SourcesPage() {
 
   const loadData = () => {
     setLoading(true)
+    setError(null)
     fetch('/api/system')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -66,7 +67,6 @@ export default function SourcesPage() {
             notes: null,
           })))
         }
-        // Fetch detailed key info for each source
         return Promise.all(
           ['sam_gov', 'anthropic'].map(s =>
             fetch(`/api/admin/api-keys/${s}`)
@@ -104,98 +104,130 @@ export default function SourcesPage() {
 
   useEffect(() => { loadData() }, [])
 
-  if (error) {
+  if (loading) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
-        <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-          Failed to load source data: {error}
+      <div className="animate-pulse">
+        <div className="h-8 w-28 rounded-lg bg-gray-200" />
+        <div className="mt-2 h-4 w-52 rounded bg-gray-100" />
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[...Array(4)].map((_, i) => <div key={i} className="card h-32" />)}
         </div>
       </div>
     )
   }
 
-  if (loading) {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
-        <div className="mt-6 space-y-3">
-          {[...Array(4)].map((_, i) => <div key={i} className="card animate-pulse h-16" />)}
-        </div>
-      </div>
-    )
-  }
+  const healthySources = sources.filter(s => s.status === 'healthy').length
+  const validKeys = apiKeys.filter(k => k.isValid).length
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
-      <p className="mt-1 text-sm text-gray-500">Data source health and API key management</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Sources</h1>
+          <p className="mt-1 text-sm text-gray-500">Data source health and API key management</p>
+        </div>
+        <button onClick={loadData} disabled={loading} className="btn-secondary text-sm gap-2">
+          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+          </svg>
+          Refresh
+        </button>
+      </div>
 
-      {/* Source Health */}
-      <div className="mt-6">
-        <h2 className="text-lg font-semibold text-gray-900">Data Sources</h2>
+      {error && (
+        <div className="mt-4 card border-red-200 bg-red-50">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+            </svg>
+            <p className="flex-1 text-sm text-red-700">{error}</p>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Summary Stats */}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="card bg-emerald-50/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <HeartIcon />
+            </div>
+            <div>
+              <p className="text-xl font-black text-gray-900">{healthySources}/{sources.length}</p>
+              <p className="text-xs font-medium text-gray-500">Healthy Sources</p>
+            </div>
+          </div>
+        </div>
+        <div className="card bg-brand-50/50">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
+              <KeyIcon />
+            </div>
+            <div>
+              <p className="text-xl font-black text-gray-900">{validKeys}/{apiKeys.length}</p>
+              <p className="text-xs font-medium text-gray-500">Valid API Keys</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+              <DatabaseIcon />
+            </div>
+            <div>
+              <p className="text-xl font-black text-gray-900">{sources.length}</p>
+              <p className="text-xs font-medium text-gray-500">Total Sources</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
+              <ShieldIcon />
+            </div>
+            <div>
+              <p className="text-xl font-black text-gray-900">
+                {apiKeys.filter(k => k.hasStoredKey).length}
+              </p>
+              <p className="text-xs font-medium text-gray-500">Encrypted Keys</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Source Health Cards */}
+      <div className="mt-8">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">Data Sources</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {sources.map(s => (
-            <div key={s.source} className="card flex items-start justify-between">
-              <div>
-                <h3 className="font-medium text-gray-900">{formatSource(s.source)}</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {s.successRate30d != null ? `${s.successRate30d}% success rate (30d)` : 'No history yet'}
-                </p>
-                {s.avgDurationSeconds && (
-                  <p className="text-xs text-gray-400">Avg {Math.round(s.avgDurationSeconds)}s per run</p>
-                )}
-              </div>
-              <HealthBadge status={s.status} />
-            </div>
+            <SourceCard key={s.source} source={s} />
           ))}
+          {sources.length === 0 && (
+            <div className="col-span-full text-center py-8">
+              <p className="text-sm text-gray-400">No sources configured</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* API Keys */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-900">API Keys</h2>
-        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Source</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Key</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Expires</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Last Rotated</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {apiKeys.map(k => (
-                <tr key={k.source} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatSource(k.source)}</td>
-                  <td className="px-4 py-3">
-                    {k.keyHint
-                      ? <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{k.keyHint}</code>
-                      : <span className="text-xs text-gray-400">env var only</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3"><ExpiryBadge status={k.expiryStatus} /></td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {k.daysUntilExpiry != null ? `${k.daysUntilExpiry} days` : k.expiresDate ?? 'No expiry'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {k.rotatedAt ? new Date(k.rotatedAt).toLocaleDateString() : 'Never'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setRotateSource(k.source)}
-                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
-                    >
-                      Rotate Key
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">API Keys</h2>
+        <div className="mt-4 space-y-3">
+          {apiKeys.map(k => (
+            <ApiKeyCard key={k.source} apiKey={k} onRotate={() => setRotateSource(k.source)} />
+          ))}
+          {apiKeys.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-400">No API keys configured</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -214,14 +246,124 @@ export default function SourcesPage() {
   )
 }
 
+/* ─── Cards ──────────────────────────────────────────────── */
+
+function SourceCard({ source }: { source: SourceInfo }) {
+  const statusColors: Record<string, { bg: string; border: string; dot: string }> = {
+    healthy:  { bg: 'bg-emerald-50/50', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+    degraded: { bg: 'bg-amber-50/50',   border: 'border-amber-200',   dot: 'bg-amber-500' },
+    error:    { bg: 'bg-red-50/50',      border: 'border-red-200',     dot: 'bg-red-500' },
+    unknown:  { bg: 'bg-gray-50',        border: 'border-gray-200',    dot: 'bg-gray-400' },
+  }
+  const c = statusColors[source.status] ?? statusColors.unknown
+
+  return (
+    <div className={`card ${c.bg} ${c.border}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-3 w-3">
+            {source.status === 'healthy' && (
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${c.dot} opacity-40`} />
+            )}
+            <span className={`relative inline-flex h-3 w-3 rounded-full ${c.dot}`} />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">{formatSource(source.source)}</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {source.successRate30d != null ? `${source.successRate30d}% success rate (30d)` : 'No historical data'}
+            </p>
+          </div>
+        </div>
+        <HealthBadge status={source.status} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-white/60 px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Avg Duration</p>
+          <p className="mt-0.5 text-sm font-semibold text-gray-700">
+            {source.avgDurationSeconds ? `${Math.round(source.avgDurationSeconds)}s` : '-'}
+          </p>
+        </div>
+        <div className="rounded-xl bg-white/60 px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Failures</p>
+          <p className={`mt-0.5 text-sm font-semibold ${source.consecutiveFailures > 0 ? 'text-red-600' : 'text-gray-700'}`}>
+            {source.consecutiveFailures} consecutive
+          </p>
+        </div>
+      </div>
+
+      {source.lastErrorMessage && (
+        <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 border border-red-100">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Last Error</p>
+          <p className="mt-0.5 text-xs text-red-600 truncate" title={source.lastErrorMessage}>
+            {source.lastErrorMessage}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ApiKeyCard({ apiKey, onRotate }: { apiKey: ApiKeyInfo; onRotate: () => void }) {
+  const expiryColors: Record<string, { bg: string; border: string }> = {
+    ok:            { bg: 'bg-white', border: 'border-gray-200/80' },
+    expiring_soon: { bg: 'bg-amber-50/30', border: 'border-amber-200' },
+    expired:       { bg: 'bg-red-50/30',   border: 'border-red-200' },
+    no_expiry:     { bg: 'bg-white', border: 'border-gray-200/80' },
+  }
+  const c = expiryColors[apiKey.expiryStatus] ?? expiryColors.no_expiry
+
+  return (
+    <div className={`card ${c.bg} ${c.border}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            apiKey.isValid ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+          }`}>
+            <KeyIcon />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">{formatSource(apiKey.source)}</h3>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {apiKey.keyHint ? (
+                <code className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-mono text-gray-600">{apiKey.keyHint}</code>
+              ) : (
+                <span className="text-xs text-gray-400">env var only</span>
+              )}
+              <ExpiryBadge status={apiKey.expiryStatus} />
+              {apiKey.hasStoredKey && <span className="badge-green">Encrypted</span>}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 sm:gap-6">
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Expires</p>
+            <p className="text-sm font-medium text-gray-700">
+              {apiKey.daysUntilExpiry != null ? `${apiKey.daysUntilExpiry} days` : apiKey.expiresDate ?? 'No expiry'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Rotated</p>
+            <p className="text-sm font-medium text-gray-700">
+              {apiKey.rotatedAt ? new Date(apiKey.rotatedAt).toLocaleDateString() : 'Never'}
+            </p>
+          </div>
+          <button onClick={onRotate} className="btn-primary text-xs">
+            Rotate Key
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── Rotate Key Modal ───────────────────────────────────── */
+
 function RotateKeyModal({
-  source,
-  onClose,
-  onSuccess,
+  source, onClose, onSuccess,
 }: {
-  source: string
-  onClose: () => void
-  onSuccess: () => void
+  source: string; onClose: () => void; onSuccess: () => void
 }) {
   const [apiKey, setApiKey] = useState('')
   const [expiresDate, setExpiresDate] = useState(() => {
@@ -268,64 +410,63 @@ function RotateKeyModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold text-gray-900">
-          Rotate {formatSource(source)} API Key
-        </h3>
-        <p className="mt-1 text-sm text-gray-500">
-          The key will be encrypted at rest. It replaces any previously stored key.
-        </p>
+    <div className="modal-overlay flex items-center justify-center" onClick={onClose}>
+      <div className="modal-panel w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
+              <ShieldIcon />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Rotate API Key</h3>
+              <p className="text-xs text-gray-500">{formatSource(source)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <div className="mt-3 rounded-xl bg-blue-50 px-4 py-3 border border-blue-100">
+          <p className="text-xs text-blue-700">
+            The key will be encrypted with AES-256-GCM at rest. It replaces any previously stored key.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
-            <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700">
-              New API Key
-            </label>
+            <label className="label">New API Key</label>
             <input
-              id="apiKey"
               type="password"
               autoComplete="off"
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               placeholder="Paste your new API key"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="input font-mono"
             />
           </div>
 
           <div>
-            <label htmlFor="expiresDate" className="block text-sm font-medium text-gray-700">
-              Expiration Date {source === 'sam_gov' && <span className="text-gray-400">(90 days default)</span>}
+            <label className="label">
+              Expiration Date {source === 'sam_gov' && <span className="text-gray-400 font-normal">(90 days default)</span>}
             </label>
             <input
-              id="expiresDate"
               type="date"
               value={expiresDate}
               onChange={e => setExpiresDate(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="input"
             />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700 border border-red-100">{error}</div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+          <div className="flex justify-end gap-3 pt-3">
+            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary">
               {saving ? 'Encrypting...' : 'Save & Rotate'}
             </button>
           </div>
@@ -334,6 +475,8 @@ function RotateKeyModal({
     </div>
   )
 }
+
+/* ─── Sub-components ──────────────────────────────────────── */
 
 function HealthBadge({ status }: { status: string }) {
   const styles: Record<string, string> = { healthy: 'badge-green', degraded: 'badge-yellow', error: 'badge-red', unknown: 'badge-gray' }
@@ -347,4 +490,38 @@ function ExpiryBadge({ status }: { status: string }) {
 
 function formatSource(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+/* ─── SVG Icons ──────────────────────────────────────────── */
+
+function HeartIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+    </svg>
+  )
+}
+
+function KeyIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+    </svg>
+  )
+}
+
+function DatabaseIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+    </svg>
+  )
+}
+
+function ShieldIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+    </svg>
+  )
 }

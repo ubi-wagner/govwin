@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import { Section, SectionHeader, TeamCard, StatHighlight, CtaSection } from '@/components/page-sections'
 
 export const metadata: Metadata = {
-  title: 'Our Team | RFP Finder',
-  description: 'Meet the team behind RFP Finder — decades of experience in federal contracting, technology commercialization, and startup support.',
+  title: 'Our Team | RFP Pipeline',
+  description: 'Meet the team behind RFP Pipeline — decades of experience in federal contracting, technology commercialization, and startup support.',
 }
 
 export default function TeamPage() {
@@ -15,7 +15,7 @@ export default function TeamPage() {
         <SectionHeader
           eyebrow="Our Team"
           title="Led by a proven federal contracting expert"
-          description="RFP Finder is built on decades of hands-on experience securing federal funding, launching startups, and navigating government procurement."
+          description="RFP Pipeline is built on decades of hands-on experience securing federal funding, launching startups, and navigating government procurement."
         />
       </section>
 
@@ -26,7 +26,7 @@ export default function TeamPage() {
             title="Founder & CEO"
             linkedIn="https://www.linkedin.com/in/eric-wagner-7480385/"
             bio={[
-              'Eric Wagner is a C-Suite executive, inventor, entrepreneur, and investor with more than 20 years of technology commercialization experience. He launched RFP Finder in early 2026 to solve a problem he has seen firsthand: small businesses and startups struggle to find and win the federal contracts they deserve.',
+              'Eric Wagner is a C-Suite executive, inventor, entrepreneur, and investor with more than 20 years of technology commercialization experience. He launched RFP Pipeline in early 2026 to solve a problem he has seen firsthand: small businesses and startups struggle to find and win the federal contracts they deserve.',
               'Eric is the co-founder, CSO and EVP of Business Development at Converge Technologies, a technology commercialization company with a successful history of supporting early-stage technology startups. He is also the co-founder and CEO of Converge Ventures, an $11 million startup studio developing high-potential companies from innovation at Ohio universities and federal laboratories.',
               'Prior to founding Converge, Eric was a founding executive at Ohio State University\'s Center for Design and Manufacturing Excellence (CDME), where he created and program-managed the Manufacturing Extension Partnership (MEP) program supporting small businesses across 35+ counties. At CDME, Eric supported the growth of over 50 early-stage technology companies and led the formation and launch of 20+ technology-focused startups from Ohio State.',
               'Eric served as President of D&S Consultants, an aerospace and defense commercialization company with annual revenues exceeding $270 million and more than 800 employees. He held positions of increasing responsibility over 12 years — from Vice President to COO to President — overseeing mergers and acquisitions, commercial product development, and strategic growth.',

@@ -2,16 +2,16 @@ import type { Metadata } from 'next'
 import { Section, SectionHeader, ContentCard, CtaSection } from '@/components/page-sections'
 
 export const metadata: Metadata = {
-  title: 'News & Announcements | RFP Finder',
-  description: 'Latest news, product updates, and announcements from RFP Finder.',
+  title: 'News & Announcements | RFP Pipeline',
+  description: 'Latest news, product updates, and announcements from RFP Pipeline.',
 }
 
 const announcements = [
   {
     date: 'March 2026',
     category: 'Product',
-    title: 'RFP Finder Platform Launch',
-    excerpt: 'We are excited to announce the official launch of the RFP Finder platform. After months of development and beta testing, our AI-powered government opportunity intelligence platform is now available to clients. The platform includes automated SAM.gov scanning, multi-factor scoring, deadline alerts, and secure multi-tenant workspaces.',
+    title: 'RFP Pipeline Platform Launch',
+    excerpt: 'We are excited to announce the official launch of the RFP Pipeline platform. After months of development and beta testing, our AI-powered government opportunity intelligence platform is now available to clients. The platform includes automated SAM.gov scanning, multi-factor scoring, deadline alerts, and secure multi-tenant workspaces.',
   },
   {
     date: 'March 2026',
@@ -23,19 +23,19 @@ const announcements = [
     date: 'March 2026',
     category: 'Feature',
     title: 'Automated Deadline Alerts and Reminders',
-    excerpt: 'Never miss a response deadline again. RFP Finder now sends automated email notifications when tracked opportunities approach their close dates, with configurable lead times for 30-day, 14-day, and 7-day reminders.',
+    excerpt: 'Never miss a response deadline again. RFP Pipeline now sends automated email notifications when tracked opportunities approach their close dates, with configurable lead times for 30-day, 14-day, and 7-day reminders.',
   },
   {
     date: 'February 2026',
     category: 'Company',
-    title: 'Eric Wagner Launches RFP Finder',
-    excerpt: 'After two decades of supporting startups and federal contracting, Eric Wagner has founded RFP Finder to bring enterprise-grade opportunity intelligence to small businesses. Drawing on his experience securing over $100M in non-dilutive capital and advising 40+ startups on SBIR/STTR programs, Eric is building the tool he wished existed.',
+    title: 'Eric Wagner Launches RFP Pipeline',
+    excerpt: 'After two decades of supporting startups and federal contracting, Eric Wagner has founded RFP Pipeline to bring enterprise-grade opportunity intelligence to small businesses. Drawing on his experience securing over $100M in non-dilutive capital and advising 40+ startups on SBIR/STTR programs, Eric is building the tool he wished existed.',
   },
   {
     date: 'February 2026',
     category: 'Partnership',
     title: 'Accelerator Program Integration',
-    excerpt: 'RFP Finder is now available as a batch onboarding solution for startup accelerator programs. Cohort managers can set up workspaces for all participants, enabling centralized pipeline tracking and mentorship support across the program.',
+    excerpt: 'RFP Pipeline is now available as a batch onboarding solution for startup accelerator programs. Cohort managers can set up workspaces for all participants, enabling centralized pipeline tracking and mentorship support across the program.',
   },
   {
     date: 'January 2026',
@@ -53,7 +53,7 @@ export default function AnnouncementsPage() {
         <div className="absolute inset-0 -z-10 bg-hero-mesh" />
         <SectionHeader
           eyebrow="News & Announcements"
-          title="What's new at RFP Finder"
+          title="What's new at RFP Pipeline"
           description="Product updates, company news, and important announcements for our customers and community."
         />
       </section>
@@ -74,7 +74,7 @@ export default function AnnouncementsPage() {
 
       <CtaSection
         title="Stay informed"
-        description="Contact us to learn more about upcoming features and how RFP Finder can help your business."
+        description="Contact us to learn more about upcoming features and how RFP Pipeline can help your business."
         primaryLabel="Get Started"
         primaryHref="/get-started"
         secondaryLabel="See our tips & tools"

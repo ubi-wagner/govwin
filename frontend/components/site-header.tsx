@@ -45,7 +45,7 @@ export function SiteHeader() {
             </svg>
           </div>
           <span className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            RFP Finder
+            RFP Pipeline
           </span>
         </Link>
 

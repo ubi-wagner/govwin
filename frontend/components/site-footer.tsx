@@ -35,17 +35,17 @@ export function SiteFooter() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
               </div>
-              <span className="text-lg font-bold text-gray-900">RFP Finder</span>
+              <span className="text-lg font-bold text-gray-900">RFP Pipeline</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-gray-500">
               AI-powered government opportunity intelligence. Find, score, and win federal contracts with confidence.
             </p>
             <div className="mt-6 flex items-center gap-4">
-              <a href="mailto:eric@rfpfinder.com" className="group flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-brand-50 hover:text-brand-700">
+              <a href="mailto:eric@rfppipeline.com" className="group flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-brand-50 hover:text-brand-700">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                 </svg>
-                eric@rfpfinder.com
+                eric@rfppipeline.com
               </a>
             </div>
           </div>
@@ -72,7 +72,7 @@ export function SiteFooter() {
       <div className="border-t border-gray-100">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 sm:flex-row sm:px-6 lg:px-8">
           <p className="text-xs text-gray-400">
-            &copy; {new Date().getFullYear()} RFP Finder. All rights reserved. Built in Dayton, Ohio.
+            &copy; {new Date().getFullYear()} RFP Pipeline. All rights reserved. Built in Dayton, Ohio.
           </p>
           <div className="flex items-center gap-4">
             <Link href="/about" className="text-xs text-gray-400 transition-colors hover:text-gray-600">

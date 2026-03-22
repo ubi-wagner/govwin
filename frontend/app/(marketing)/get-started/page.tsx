@@ -244,7 +244,7 @@ export default function GetStartedPage() {
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="mailto:eric@rfpfinder.com"
+              href="mailto:eric@rfppipeline.com"
               className="btn-cta bg-white text-brand-700 hover:bg-gray-100 shadow-xl"
             >
               Contact Sales

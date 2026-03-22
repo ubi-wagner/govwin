@@ -46,7 +46,7 @@ function LoginForm() {
           </div>
         </Link>
         <h1 className="mt-4 text-2xl font-extrabold text-gray-900">Welcome back</h1>
-        <p className="mt-1 text-sm text-gray-500">Sign in to your RFP Finder account</p>
+        <p className="mt-1 text-sm text-gray-500">Sign in to your RFP Pipeline account</p>
       </div>
 
       {/* Card */}

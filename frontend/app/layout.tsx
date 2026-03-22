@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 export const metadata: Metadata = {
-  title: 'RFP Finder | Government Opportunity Intelligence',
+  title: 'RFP Pipeline | Government Opportunity Intelligence',
   description: 'AI-powered platform to discover, score, and win federal government contracts. Built for small businesses and startups pursuing SBIR/STTR and federal procurement.',
 }
 
