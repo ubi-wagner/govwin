@@ -60,11 +60,6 @@ export async function generateMetadata(): Promise<Metadata> {
   const published = await getPageContent('customers')
   return mergeMetadata(published?.metadata ?? null, STATIC_META)
 }
-export const metadata: Metadata = {
-  title: 'Customer Wins | RFP Pipeline',
-  description: 'See how companies are using RFP Pipeline to discover and win government contracts.',
-}
-
 const successStories = [
   {
     company: 'Defense Technology Startup',
