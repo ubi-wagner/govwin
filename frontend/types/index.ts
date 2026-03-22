@@ -245,7 +245,8 @@ export interface DownloadLink {
   updatedAt: string
 }
 
-// Phase 2: file upload support — interface kept for DB schema parity
+export type LinkedRecordType = 'past_performance' | 'capability' | 'personnel' | 'partner' | 'boilerplate'
+
 export interface TenantUpload {
   id: string
   tenantId: string
@@ -257,6 +258,12 @@ export interface TenantUpload {
   mimeType: string | null
   uploadType: UploadType
   description: string | null
+  focusAreaId: string | null
+  linkedRecordType: LinkedRecordType | null
+  linkedRecordId: string | null
+  extractedText: string | null
+  processed: boolean
+  processedAt: string | null
   isActive: boolean
   createdAt: string
 }
@@ -442,13 +449,38 @@ export interface SystemStatus {
   checkedAt: string
 }
 
-// ─── Knowledge Base (Phase 2 — tables exist but no API/UI yet) ─
+// ─── Content Library (Knowledge Base + Teaming) ─────────────────
+
+export type PersonnelAffiliation = 'internal' | 'partner' | 'consultant' | 'advisor'
+export type PersonnelAvailability = 'available' | 'committed' | 'partial' | 'unavailable'
+export type PartnerType = 'subcontractor' | 'mentor' | 'jv_partner' | 'university' | 'lab' | 'consultant' | 'prime'
+export type RelationshipStatus = 'active' | 'prospective' | 'inactive' | 'past'
+export type PerformanceRating = 'exceptional' | 'very_good' | 'satisfactory' | 'marginal' | 'unsatisfactory'
+export type BoilerplateCategory =
+  | 'technical_approach' | 'management_approach' | 'past_performance'
+  | 'staffing' | 'quality' | 'security' | 'transition' | 'general'
+
+export interface FocusArea {
+  id: string
+  tenantId: string
+  name: string
+  description: string | null
+  naicsCodes: string[]
+  keywords: string[]
+  status: 'active' | 'inactive'
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PastPerformance {
   id: string
   tenantId: string
   contractNumber: string
   title: string
   agency: string
+  agencyCode: string | null
+  primeOrSub: 'prime' | 'sub'
   contractType: string | null
   naicsCode: string | null
   periodStart: string | null
@@ -458,17 +490,141 @@ export interface PastPerformance {
   relevanceDomains: string[]
   keyTechnologies: string[]
   outcomes: string[]
+  pocName: string | null
+  pocEmail: string | null
+  pocPhone: string | null
+  clearanceRequired: boolean
+  partnerId: string | null
+  performanceRating: PerformanceRating | null
+  cparsRating: string | null
   active: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Capability {
   id: string
   tenantId: string
   domain: string
+  naicsCodes: string[]
   maturityLevel: 'expert' | 'proficient' | 'developing'
+  yearsExperience: number | null
   summary: string
   keyTechnologies: string[]
+  differentiators: string[]
+  certifications: string[]
   active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface KeyPersonnel {
+  id: string
+  tenantId: string
+  fullName: string
+  title: string
+  roleType: string | null
+  affiliation: PersonnelAffiliation
+  partnerId: string | null
+  organization: string | null
+  email: string | null
+  phone: string | null
+  yearsExperience: number | null
+  bioShort: string | null
+  bioLong: string | null
+  certifications: string[]
+  clearanceLevel: string | null
+  domains: string[]
+  education: string[]
+  publications: number
+  laborCategory: string | null
+  hourlyRate: number | null
+  availability: PersonnelAvailability
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamingPartner {
+  id: string
+  tenantId: string
+  name: string
+  legalName: string | null
+  partnerType: PartnerType
+  relationshipStatus: RelationshipStatus
+  ueiNumber: string | null
+  cageCode: string | null
+  samRegistered: boolean
+  isSmallBusiness: boolean
+  isSdvosb: boolean
+  isWosb: boolean
+  isHubzone: boolean
+  is8a: boolean
+  businessSize: string | null
+  naicsCodes: string[]
+  capabilitiesSummary: string | null
+  keyTechnologies: string[]
+  certifications: string[]
+  priorContracts: number
+  teamingSince: string | null
+  pocName: string | null
+  pocEmail: string | null
+  pocPhone: string | null
+  pocTitle: string | null
+  website: string | null
+  notes: string | null
+  ndaOnFile: boolean
+  teamingAgreement: boolean
+  taExpiration: string | null
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BoilerplateSection {
+  id: string
+  tenantId: string
+  sectionKey: string
+  title: string
+  content: string
+  category: BoilerplateCategory
+  wordCount: number | null
+  lastUsedAt: string | null
+  usageCount: number
+  lastUpdated: string | null
+  version: number
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// Content library summary (from tenant_content_summary view)
+export interface TenantContentSummary {
+  tenantId: string
+  tenantName: string
+  focusAreaCount: number
+  pastPerformanceCount: number
+  capabilityCount: number
+  internalPersonnelCount: number
+  partnerPersonnelCount: number
+  teamingPartnerCount: number
+  boilerplateCount: number
+  uploadCount: number
+}
+
+// Focus area with linked content counts (from focus_area_content view)
+export interface FocusAreaContent {
+  focusAreaId: string
+  tenantId: string
+  focusAreaName: string
+  naicsCodes: string[]
+  keywords: string[]
+  pastPerformanceCount: number
+  capabilityCount: number
+  personnelCount: number
+  partnerCount: number
+  boilerplateCount: number
+  uploadCount: number
 }
 
 // ─── Admin ────────────────────────────────────────────────────
