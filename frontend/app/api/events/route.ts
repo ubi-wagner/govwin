@@ -102,10 +102,10 @@ export async function GET(request: Request) {
             source,
             COALESCE(error_message, 'Job failed with no error message') AS message,
             CASE WHEN result IS NOT NULL THEN result::text ELSE NULL END AS details,
-            created_at
+            triggered_at AS created_at
           FROM pipeline_jobs
           WHERE status = 'failed'
-          ORDER BY created_at DESC
+          ORDER BY triggered_at DESC
           LIMIT ${limitParam}
         )
         UNION ALL
