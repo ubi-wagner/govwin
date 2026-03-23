@@ -63,30 +63,58 @@ export async function GET(request: Request) {
       ORDER BY display_name
     `
 
-    // Auto-seed draft_content from static defaults for pages that have never been edited
-    // or were published with empty content. This ensures the CMS editor shows actual
-    // page content instead of empty objects.
-    const unseeded = rows.filter((r: Record<string, unknown>) => {
-      if (!PAGE_DEFAULTS[r.pageKey as string]) return false
-      const draft = r.draftContent as Record<string, unknown> | null
-      return !draft || Object.keys(draft).length === 0
-    })
-    for (const row of unseeded) {
+    // Auto-seed draft_content from PAGE_DEFAULTS when:
+    //   - draft_content is empty ({}) or null (never edited), OR
+    //   - draft_content is missing expected top-level keys (stale format from old migration)
+    // This ensures the CMS editor always shows current-format content.
+    for (const row of rows) {
       const key = row.pageKey as string
       const defaults = PAGE_DEFAULTS[key]
+      if (!defaults) continue
+
+      const draft = row.draftContent as Record<string, unknown> | null
+      const isEmpty = !draft || Object.keys(draft).length === 0
+      const expectedKeys = Object.keys(defaults.content)
+      const isStale = !isEmpty && expectedKeys.some(k => !(draft as Record<string, unknown>)[k])
+
+      if (!isEmpty && !isStale) continue
+
       try {
+        // Merge: keep any existing fields from draft, fill in missing ones from defaults
+        const merged = { ...defaults.content, ...(draft ?? {}) }
+        // For each section, deep-merge default fields into existing section objects
+        for (const sectionKey of expectedKeys) {
+          const defaultSection = defaults.content[sectionKey as keyof typeof defaults.content]
+          const draftSection = merged[sectionKey]
+          if (
+            defaultSection && draftSection &&
+            typeof defaultSection === 'object' && typeof draftSection === 'object' &&
+            !Array.isArray(defaultSection) && !Array.isArray(draftSection)
+          ) {
+            merged[sectionKey] = { ...defaultSection, ...(draftSection as Record<string, unknown>) }
+          } else if (draftSection === undefined) {
+            merged[sectionKey] = defaultSection
+          }
+        }
+
         await sql`
           UPDATE site_content
           SET
-            draft_content = ${JSON.stringify(defaults.content)}::jsonb,
-            draft_metadata = ${JSON.stringify(defaults.metadata)}::jsonb,
+            draft_content = ${JSON.stringify(merged)}::jsonb,
+            draft_metadata = CASE
+              WHEN draft_metadata IS NULL OR draft_metadata = '{}'::jsonb
+              THEN ${JSON.stringify(defaults.metadata)}::jsonb
+              ELSE draft_metadata
+            END,
             draft_updated_at = NOW(),
             updated_at = NOW()
-          WHERE page_key = ${key} AND (draft_content IS NULL OR draft_content = '{}'::jsonb)
+          WHERE page_key = ${key}
         `
-        // Patch the in-memory row so we return seeded content immediately
-        row.draftContent = defaults.content
-        row.draftMetadata = defaults.metadata
+        // Patch in-memory row so we return seeded content immediately
+        row.draftContent = merged
+        if (!row.draftMetadata || Object.keys(row.draftMetadata as Record<string, unknown>).length === 0) {
+          row.draftMetadata = defaults.metadata
+        }
       } catch (seedErr) {
         console.error(`[GET /api/content] Failed to seed defaults for ${key}:`, seedErr)
       }

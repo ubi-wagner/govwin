@@ -51,8 +51,12 @@ export async function getPageContent(pageKey: ContentPageKey): Promise<Published
 }
 
 /**
- * Helper to merge published content with static defaults.
- * If a section exists in the published content, use it. Otherwise use the static default.
+ * Deep-merge published content into static defaults.
+ *
+ * - Top-level sections missing from published → use static default
+ * - Published section is a plain object → recursively merge fields
+ *   (so partial CMS edits don't clobber fields the CMS didn't touch)
+ * - Published section is an array or primitive → replace entirely
  */
 export function mergeContent<T>(
   published: Record<string, unknown> | null,
@@ -60,10 +64,27 @@ export function mergeContent<T>(
 ): T {
   if (!published) return staticDefaults
 
-  const merged = { ...staticDefaults } as Record<string, unknown>
-  for (const key of Object.keys(staticDefaults as Record<string, unknown>)) {
-    if (published[key] !== undefined) {
-      merged[key] = published[key]
+  const defaults = staticDefaults as Record<string, unknown>
+  const merged = { ...defaults }
+
+  for (const key of Object.keys(defaults)) {
+    const pub = published[key]
+    if (pub === undefined) continue
+
+    const def = defaults[key]
+    // Deep-merge plain objects (not arrays, not null)
+    if (
+      pub && def &&
+      typeof pub === 'object' && typeof def === 'object' &&
+      !Array.isArray(pub) && !Array.isArray(def)
+    ) {
+      const mergedSection: Record<string, unknown> = { ...(def as Record<string, unknown>) }
+      for (const [k, v] of Object.entries(pub as Record<string, unknown>)) {
+        if (v !== undefined) mergedSection[k] = v
+      }
+      merged[key] = mergedSection
+    } else {
+      merged[key] = pub
     }
   }
   return merged as T
