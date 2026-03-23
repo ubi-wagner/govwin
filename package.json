@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "seed": "npx tsx scripts/seed_admin.ts"
+  },
+  "dependencies": {
+    "postgres": "^3.4.3",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6"
+  }
+}
