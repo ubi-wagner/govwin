@@ -1,7 +1,81 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Section, SectionHeader, FeatureCard, StatHighlight, CtaSection } from '@/components/page-sections'
+import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
+import type { HomePageContent } from '@/types'
 
-export default function LandingPage() {
+const STATIC_CONTENT: HomePageContent = {
+  hero: {
+    eyebrow: 'RFP Pipeline',
+    title: 'Find and win federal contracts before your competitors',
+    description: 'RFP Pipeline uses AI-powered scoring to surface the government opportunities most relevant to your business. Stop searching. Start winning.',
+    trustBadge: 'Trusted by 50+ startups · $100M+ secured',
+  },
+  features: [
+    { icon: 'Search', title: 'Smart Opportunity Discovery', description: 'Automated scanning of SAM.gov and federal procurement sources. Never miss a relevant RFP, RFI, or sources sought notice.' },
+    { icon: 'Chart', title: 'AI-Powered Scoring', description: 'Each opportunity is scored against your company profile, NAICS codes, keywords, set-aside eligibility, and past performance.' },
+    { icon: 'Bell', title: 'Deadline Alerts', description: 'Automated notifications for approaching deadlines, new high-scoring matches, and status changes on opportunities you\'re tracking.' },
+    { icon: 'Shield', title: 'Set-Aside Matching', description: 'Instant identification of small business, SDVOSB, WOSB, HUBZone, and 8(a) set-asides that match your certifications.' },
+    { icon: 'Document', title: 'Document Management', description: 'Centralized storage for capability statements, past performance records, and proposal templates — ready when you need them.' },
+    { icon: 'Team', title: 'Multi-Tenant Workspaces', description: 'Each client gets their own secure workspace with customized scoring profiles, opportunity pipelines, and team access.' },
+  ],
+  stats: [
+    { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured for clients' },
+    { value: '100%', label: 'Recent Win Rate', description: '13/13 SBIR/STTR awards' },
+    { value: '50+', label: 'Startups Supported', description: 'Early-stage technology companies' },
+    { value: '20+', label: 'Years Experience', description: 'Federal contracting expertise' },
+  ],
+  howItWorks: [
+    { step: '01', title: 'Profile Your Business', description: 'Enter your NAICS codes, keywords, set-aside certifications, and target agencies. Our scoring engine learns what matters to you.' },
+    { step: '02', title: 'Review Scored Opportunities', description: 'Every day, new federal opportunities are automatically scored and ranked. Focus on the highest-value matches first.' },
+    { step: '03', title: 'Pursue & Win', description: 'Track your pipeline, collaborate with your team, and leverage AI insights to craft winning proposals.' },
+  ],
+  partners: ['Air Force APEX', 'Parallax Advanced Research', 'Ohio State CDME', 'Converge Ventures', 'AFRL'],
+  testimonial: {
+    quote: 'RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first SBIR Phase I within 60 days.',
+    company: 'Defense Technology Startup',
+    result: '$150K SBIR Phase I Award',
+  },
+  pricingTeaser: {
+    eyebrow: 'Simple Pricing',
+    title: 'Plans that grow with your pipeline',
+    description: 'Start with a free trial. Upgrade when you\'re ready. No surprises.',
+    ctaText: 'View Plans & Pricing',
+    ctaLink: '/get-started',
+  },
+  cta: {
+    title: 'Ready to find your next contract?',
+    description: 'Join the companies already using RFP Pipeline to discover and win government opportunities faster.',
+    primaryLabel: 'Start Free Trial',
+    primaryHref: '/get-started',
+    secondaryLabel: 'See customer wins',
+    secondaryHref: '/customers',
+  },
+}
+
+const STATIC_META = {
+  title: 'RFP Pipeline | AI-Powered Government Contract Intelligence',
+  description: 'Find, score, and win federal contracts with AI-powered opportunity matching. Built for small businesses and SBIR/STTR applicants.',
+}
+
+const ICON_MAP: Record<string, () => React.JSX.Element> = {
+  Search: SearchIcon, Chart: ChartIcon, Bell: BellIcon,
+  Shield: ShieldIcon, Document: DocumentIcon, Team: TeamIcon,
+}
+
+const STEP_ICON_MAP: Record<string, () => React.JSX.Element> = {
+  '01': UserProfileIcon, '02': ScoreIcon, '03': TrophyIcon,
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const published = await getPageContent('home')
+  return mergeMetadata(published?.metadata ?? null, STATIC_META)
+}
+
+export default async function LandingPage() {
+  const published = await getPageContent('home')
+  const content = mergeContent(published?.content ?? null, STATIC_CONTENT)
+
   return (
     <>
       {/* ───── Hero ───── */}
@@ -18,19 +92,24 @@ export default function LandingPage() {
           {/* Trust badge */}
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10 animate-fade-in">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse-subtle" />
-            Trusted by 50+ startups &middot; $100M+ secured
+            {content.hero.trustBadge}
           </div>
 
           <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up">
-            Find and win federal contracts{' '}
-            <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
-              before your competitors
-            </span>
+            {content.hero.title.includes('before your competitors') ? (
+              <>
+                Find and win federal contracts{' '}
+                <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
+                  before your competitors
+                </span>
+              </>
+            ) : (
+              content.hero.title
+            )}
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
-            RFP Pipeline uses AI-powered scoring to surface the government opportunities most relevant to
-            your business. Stop searching. Start winning.
+            {content.hero.description}
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center animate-fade-in-up">
@@ -97,10 +176,9 @@ export default function LandingPage() {
       {/* ───── Social proof stats ───── */}
       <section className="relative border-y border-gray-100 bg-white px-4 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 sm:grid-cols-4">
-          <StatHighlight value="$100M+" label="Non-Dilutive Capital" description="Secured for clients" />
-          <StatHighlight value="100%" label="Recent Win Rate" description="13/13 SBIR/STTR awards" />
-          <StatHighlight value="50+" label="Startups Supported" description="Early-stage technology companies" />
-          <StatHighlight value="20+" label="Years Experience" description="Federal contracting expertise" />
+          {content.stats.map(stat => (
+            <StatHighlight key={stat.label} value={stat.value} label={stat.label} description={stat.description} />
+          ))}
         </div>
       </section>
 
@@ -111,7 +189,7 @@ export default function LandingPage() {
             Trusted by innovative companies across the defense & technology landscape
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
-            {['Air Force APEX', 'Parallax Advanced Research', 'Ohio State CDME', 'Converge Ventures', 'AFRL'].map(name => (
+            {content.partners.map(name => (
               <span key={name} className="text-sm font-semibold text-gray-300">{name}</span>
             ))}
           </div>
@@ -126,36 +204,17 @@ export default function LandingPage() {
           description="From opportunity discovery to proposal submission, RFP Pipeline streamlines the entire federal procurement process."
         />
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <FeatureCard
-            icon={<SearchIcon />}
-            title="Smart Opportunity Discovery"
-            description="Automated scanning of SAM.gov and federal procurement sources. Never miss a relevant RFP, RFI, or sources sought notice."
-          />
-          <FeatureCard
-            icon={<ChartIcon />}
-            title="AI-Powered Scoring"
-            description="Each opportunity is scored against your company profile, NAICS codes, keywords, set-aside eligibility, and past performance."
-          />
-          <FeatureCard
-            icon={<BellIcon />}
-            title="Deadline Alerts"
-            description="Automated notifications for approaching deadlines, new high-scoring matches, and status changes on opportunities you're tracking."
-          />
-          <FeatureCard
-            icon={<ShieldIcon />}
-            title="Set-Aside Matching"
-            description="Instant identification of small business, SDVOSB, WOSB, HUBZone, and 8(a) set-asides that match your certifications."
-          />
-          <FeatureCard
-            icon={<DocumentIcon />}
-            title="Document Management"
-            description="Centralized storage for capability statements, past performance records, and proposal templates — ready when you need them."
-          />
-          <FeatureCard
-            icon={<TeamIcon />}
-            title="Multi-Tenant Workspaces"
-            description="Each client gets their own secure workspace with customized scoring profiles, opportunity pipelines, and team access."
-          />
+          {content.features.map(feat => {
+            const IconComponent = ICON_MAP[feat.icon] ?? SearchIcon
+            return (
+              <FeatureCard
+                key={feat.title}
+                icon={<IconComponent />}
+                title={feat.title}
+                description={feat.description}
+              />
+            )
+          })}
         </div>
       </Section>
 
@@ -166,40 +225,23 @@ export default function LandingPage() {
           title="From search to submission in three steps"
         />
         <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {[
-            {
-              step: '01',
-              title: 'Profile Your Business',
-              description: 'Enter your NAICS codes, keywords, set-aside certifications, and target agencies. Our scoring engine learns what matters to you.',
-              icon: <UserProfileIcon />,
-            },
-            {
-              step: '02',
-              title: 'Review Scored Opportunities',
-              description: 'Every day, new federal opportunities are automatically scored and ranked. Focus on the highest-value matches first.',
-              icon: <ScoreIcon />,
-            },
-            {
-              step: '03',
-              title: 'Pursue & Win',
-              description: 'Track your pipeline, collaborate with your team, and leverage AI insights to craft winning proposals.',
-              icon: <TrophyIcon />,
-            },
-          ].map(item => (
-            <div key={item.step} className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-7 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
-              {/* Step number watermark */}
-              <span className="absolute -right-2 -top-4 text-8xl font-black text-gray-50 transition-colors duration-300 group-hover:text-brand-50">
-                {item.step}
-              </span>
-              <div className="relative">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
-                  {item.icon}
+          {content.howItWorks.map(item => {
+            const StepIcon = STEP_ICON_MAP[item.step] ?? UserProfileIcon
+            return (
+              <div key={item.step} className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-7 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
+                <span className="absolute -right-2 -top-4 text-8xl font-black text-gray-50 transition-colors duration-300 group-hover:text-brand-50">
+                  {item.step}
+                </span>
+                <div className="relative">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
+                    <StepIcon />
+                  </div>
+                  <h3 className="mt-5 text-lg font-bold text-gray-900">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
                 </div>
-                <h3 className="mt-5 text-lg font-bold text-gray-900">{item.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </Section>
 
@@ -210,11 +252,11 @@ export default function LandingPage() {
             <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H0z" />
           </svg>
           <blockquote className="mt-6 text-xl font-medium leading-relaxed text-gray-900 sm:text-2xl">
-            &ldquo;RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first SBIR Phase I within 60 days.&rdquo;
+            &ldquo;{content.testimonial.quote}&rdquo;
           </blockquote>
           <div className="mt-6">
-            <p className="text-sm font-bold text-gray-900">Defense Technology Startup</p>
-            <p className="text-sm text-gray-500">$150K SBIR Phase I Award</p>
+            <p className="text-sm font-bold text-gray-900">{content.testimonial.company}</p>
+            <p className="text-sm text-gray-500">{content.testimonial.result}</p>
           </div>
         </div>
       </section>
@@ -222,16 +264,16 @@ export default function LandingPage() {
       {/* ───── Pricing teaser ───── */}
       <Section className="bg-white">
         <SectionHeader
-          eyebrow="Simple Pricing"
-          title="Plans that grow with your pipeline"
-          description="Start with a free trial. Upgrade when you're ready. No surprises."
+          eyebrow={content.pricingTeaser.eyebrow}
+          title={content.pricingTeaser.title}
+          description={content.pricingTeaser.description}
         />
         <div className="mt-10 flex justify-center">
           <Link
-            href="/get-started"
+            href={content.pricingTeaser.ctaLink}
             className="group inline-flex items-center gap-2 rounded-xl bg-brand-50 px-6 py-3 text-sm font-bold text-brand-700 ring-1 ring-brand-600/10 transition-all hover:bg-brand-100 hover:ring-brand-600/20"
           >
-            View Plans & Pricing
+            {content.pricingTeaser.ctaText}
             <svg className="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
             </svg>
@@ -241,12 +283,12 @@ export default function LandingPage() {
 
       {/* ───── CTA ───── */}
       <CtaSection
-        title="Ready to find your next contract?"
-        description="Join the companies already using RFP Pipeline to discover and win government opportunities faster."
-        primaryLabel="Start Free Trial"
-        primaryHref="/get-started"
-        secondaryLabel="See customer wins"
-        secondaryHref="/customers"
+        title={content.cta.title}
+        description={content.cta.description}
+        primaryLabel={content.cta.primaryLabel}
+        primaryHref={content.cta.primaryHref}
+        secondaryLabel={content.cta.secondaryLabel}
+        secondaryHref={content.cta.secondaryHref}
       />
     </>
   )

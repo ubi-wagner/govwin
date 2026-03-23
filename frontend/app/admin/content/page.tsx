@@ -28,11 +28,14 @@ interface PageListItem {
 // Section definitions for each page type
 const PAGE_SECTIONS: Record<string, { key: string; label: string; description: string }[]> = {
   home: [
-    { key: 'hero', label: 'Hero Section', description: 'Main headline, subtitle, and trust badge' },
-    { key: 'features', label: 'Features', description: 'Platform feature cards' },
+    { key: 'hero', label: 'Hero Section', description: 'Headline, description, and trust badge' },
+    { key: 'features', label: 'Features', description: 'Platform feature cards (icon, title, description)' },
     { key: 'stats', label: 'Statistics', description: 'Key metric highlights' },
+    { key: 'howItWorks', label: 'How It Works', description: 'Step-by-step process cards' },
+    { key: 'partners', label: 'Partners', description: 'Trusted-by partner names' },
     { key: 'testimonial', label: 'Testimonial', description: 'Featured customer quote' },
     { key: 'pricingTeaser', label: 'Pricing Teaser', description: 'CTA to pricing page' },
+    { key: 'cta', label: 'Bottom CTA', description: 'Final call-to-action section' },
   ],
   about: [
     { key: 'hero', label: 'Hero Section', description: 'Page header with eyebrow, title, description' },
@@ -61,9 +64,11 @@ const PAGE_SECTIONS: Record<string, { key: string; label: string; description: s
     { key: 'items', label: 'Announcements', description: 'News and update entries' },
   ],
   get_started: [
-    { key: 'hero', label: 'Hero Section', description: 'Page header' },
-    { key: 'tiers', label: 'Pricing Tiers', description: 'Subscription plan cards' },
-    { key: 'faqs', label: 'FAQs', description: 'Frequently asked questions' },
+    { key: 'hero', label: 'Hero Section', description: 'Page header with eyebrow badge' },
+    { key: 'tiers', label: 'Pricing Tiers', description: 'Plan cards (name, price, period, features, cta, popular)' },
+    { key: 'comparison', label: 'Feature Comparison', description: 'Plan comparison table rows' },
+    { key: 'faqs', label: 'FAQs', description: 'Frequently asked questions (q/a pairs)' },
+    { key: 'contactCta', label: 'Contact CTA', description: 'Bottom section with sales email' },
   ],
 }
 
