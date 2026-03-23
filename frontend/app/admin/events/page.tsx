@@ -220,8 +220,8 @@ function SystemEventStream({ events, search }: { events: OpportunityEvent[]; sea
     const q = search.toLowerCase()
     return events.filter(e =>
       e.eventType.toLowerCase().includes(q) ||
-      e.source.toLowerCase().includes(q) ||
-      e.opportunityId.toLowerCase().includes(q)
+      (e.source?.toLowerCase().includes(q) ?? false) ||
+      (e.opportunityId?.toLowerCase().includes(q) ?? false)
     )
   }, [events, search])
 
@@ -258,7 +258,7 @@ function SystemEventStream({ events, search }: { events: OpportunityEvent[]; sea
                 </div>
               )}
               <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-gray-400">
-                <span>Opp: {e.opportunityId.slice(0, 8)}</span>
+                {e.opportunityId && <span>Opp: {e.opportunityId.slice(0, 8)}</span>}
                 {e.processedBy && <span>By: {e.processedBy}</span>}
                 <span>{formatTimestamp(e.createdAt)}</span>
               </div>
