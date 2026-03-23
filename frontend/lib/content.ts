@@ -8,6 +8,7 @@
  * This module is server-only — import only in Server Components or API routes.
  */
 import { sql } from '@/lib/db'
+import { unstable_noStore as noStore } from 'next/cache'
 import type { ContentPageKey, ContentMetadata } from '@/types'
 
 export interface PublishedContent {
@@ -23,6 +24,9 @@ export interface PublishedContent {
  * Safe to call in Server Components — errors return null silently.
  */
 export async function getPageContent(pageKey: ContentPageKey): Promise<PublishedContent | null> {
+  // Opt out of Next.js data cache so published content changes are visible immediately
+  noStore()
+
   try {
     const rows = await sql`
       SELECT published_content, published_metadata, published_at
