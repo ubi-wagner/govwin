@@ -19,6 +19,9 @@ pool.on('error', (err) => {
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Trust the host header behind Railway/Vercel reverse proxy
+  trustHost: true,
+
   // Adapter retained for OAuth providers (Google) — stores users/accounts in PG
   adapter: PostgresAdapter(pool),
 
@@ -36,7 +39,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+        if (!credentials?.email || !credentials?.password) {
+          console.error('[auth] authorize: missing email or password')
+          return null
+        }
 
         let user: any
         try {
@@ -50,10 +56,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
-        if (!user || !user.is_active) return null
+        if (!user) {
+          console.error('[auth] authorize: no user found for email:', credentials.email)
+          return null
+        }
+        if (!user.is_active) {
+          console.error('[auth] authorize: user is_active=false for:', credentials.email)
+          return null
+        }
+        if (!user.password_hash) {
+          console.error('[auth] authorize: no password_hash for:', credentials.email)
+          return null
+        }
 
         const valid = await bcrypt.compare(credentials.password as string, user.password_hash)
-        if (!valid) return null
+        if (!valid) {
+          console.error('[auth] authorize: password mismatch for:', credentials.email)
+          return null
+        }
 
         // Update last_login_at (non-critical — don't block login on failure)
         try {
