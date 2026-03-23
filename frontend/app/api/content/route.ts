@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { PAGE_DEFAULTS } from '@/lib/content-defaults'
+
+/** Map page_key to the public URL path so we can revalidate the route cache */
+function pageKeyToPath(pageKey: string): string {
+  if (pageKey === 'home') return '/'
+  return '/' + pageKey.replace('_', '-')
+}
 
 /**
  * GET /api/content — List all site content pages
@@ -208,6 +215,9 @@ export async function POST(request: Request) {
         console.error('[POST /api/content] Publish event log error:', eventErr)
       }
 
+      // Bust the Next.js route cache so the public page shows updated content
+      revalidatePath(pageKeyToPath(pageKey))
+
       return NextResponse.json({ data: rows[0], message: 'Content published' })
 
     } else if (action === 'rollback') {
@@ -243,6 +253,8 @@ export async function POST(request: Request) {
         console.error('[POST /api/content] Rollback event log error:', eventErr)
       }
 
+      revalidatePath(pageKeyToPath(pageKey))
+
       return NextResponse.json({ data: rows[0], message: 'Rolled back to previous version' })
 
     } else if (action === 'unpublish') {
@@ -273,6 +285,8 @@ export async function POST(request: Request) {
       } catch (eventErr) {
         console.error('[POST /api/content] Unpublish event log error:', eventErr)
       }
+
+      revalidatePath(pageKeyToPath(pageKey))
 
       return NextResponse.json({ data: rows[0], message: 'Content unpublished' })
 

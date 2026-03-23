@@ -700,11 +700,14 @@ export interface ContentEvent {
 
 // Page content section schemas — typed shapes for each page's JSON
 export interface HomePageContent {
-  hero: { title: string; subtitle: string; trustBadge: string }
+  hero: { eyebrow: string; title: string; description: string; trustBadge: string }
   features: { icon: string; title: string; description: string }[]
-  stats: { value: string; label: string }[]
-  testimonial: { quote: string; author: string; role: string }
-  pricingTeaser: { title: string; description: string }
+  stats: { value: string; label: string; description: string }[]
+  howItWorks: { step: string; title: string; description: string }[]
+  partners: string[]
+  testimonial: { quote: string; company: string; result: string }
+  pricingTeaser: { eyebrow: string; title: string; description: string; ctaText: string; ctaLink: string }
+  cta: { title: string; description: string; primaryLabel: string; primaryHref: string; secondaryLabel: string; secondaryHref: string }
 }
 
 export interface AboutPageContent {
@@ -747,10 +750,13 @@ export interface AnnouncementsPageContent {
 export interface GetStartedPageContent {
   hero: { eyebrow: string; title: string; description: string }
   tiers: {
-    name: string; monthlyPrice: number; annualPrice: number
-    description: string; features: string[]; popular: boolean
+    name: string; price: string; period: string
+    description: string; features: string[]
+    cta: string; popular: boolean
   }[]
-  faqs: { question: string; answer: string }[]
+  comparison: (string | boolean)[][]
+  faqs: { q: string; a: string }[]
+  contactCta: { title: string; description: string; email: string }
 }
 
 // ─── API responses ────────────────────────────────────────────
