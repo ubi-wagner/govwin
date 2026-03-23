@@ -19,6 +19,9 @@ pool.on('error', (err) => {
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Trust the host header behind Railway/Vercel reverse proxy
+  trustHost: true,
+
   // Adapter retained for OAuth providers (Google) — stores users/accounts in PG
   adapter: PostgresAdapter(pool),
 
