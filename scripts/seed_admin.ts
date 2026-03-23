@@ -16,19 +16,19 @@ import * as readline from 'readline'
 const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
 
 async function prompt(question: string, hidden = false): Promise<string> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-  return new Promise(resolve => {
-    if (hidden) {
-      // Don't echo password
+  if (hidden) {
+    return new Promise(resolve => {
       process.stdout.write(question)
       process.stdin.setRawMode?.(true)
+      process.stdin.resume()
       let input = ''
-      process.stdin.on('data', (char) => {
+      const onData = (char: Buffer) => {
         const c = char.toString()
         if (c === '\n' || c === '\r') {
           process.stdin.setRawMode?.(false)
+          process.stdin.removeListener('data', onData)
+          process.stdin.pause()
           process.stdout.write('\n')
-          rl.close()
           resolve(input)
         } else if (c === '\u0003') {
           process.exit()
@@ -36,11 +36,13 @@ async function prompt(question: string, hidden = false): Promise<string> {
           input += c
           process.stdout.write('*')
         }
-      })
-      process.stdin.resume()
-    } else {
-      rl.question(question, (answer) => { rl.close(); resolve(answer) })
-    }
+      }
+      process.stdin.on('data', onData)
+    })
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  return new Promise(resolve => {
+    rl.question(question, (answer) => { rl.close(); resolve(answer) })
   })
 }
 
