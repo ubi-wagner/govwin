@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql } from '@/lib/db'
+import { PAGE_DEFAULTS } from '@/lib/content-defaults'
 
 /**
  * GET /api/content — List all site content pages
@@ -54,6 +55,36 @@ export async function GET(request: Request) {
       FROM site_content
       ORDER BY display_name
     `
+
+    // Auto-seed draft_content from static defaults for pages that have never been edited
+    // or were published with empty content. This ensures the CMS editor shows actual
+    // page content instead of empty objects.
+    const unseeded = rows.filter((r: Record<string, unknown>) => {
+      if (!PAGE_DEFAULTS[r.pageKey as string]) return false
+      const draft = r.draftContent as Record<string, unknown> | null
+      return !draft || Object.keys(draft).length === 0
+    })
+    for (const row of unseeded) {
+      const key = row.pageKey as string
+      const defaults = PAGE_DEFAULTS[key]
+      try {
+        await sql`
+          UPDATE site_content
+          SET
+            draft_content = ${JSON.stringify(defaults.content)}::jsonb,
+            draft_metadata = ${JSON.stringify(defaults.metadata)}::jsonb,
+            draft_updated_at = NOW(),
+            updated_at = NOW()
+          WHERE page_key = ${key} AND (draft_content IS NULL OR draft_content = '{}'::jsonb)
+        `
+        // Patch the in-memory row so we return seeded content immediately
+        row.draftContent = defaults.content
+        row.draftMetadata = defaults.metadata
+      } catch (seedErr) {
+        console.error(`[GET /api/content] Failed to seed defaults for ${key}:`, seedErr)
+      }
+    }
+
     return NextResponse.json({ data: rows })
   } catch (error) {
     console.error('[GET /api/content] Admin list error:', error)

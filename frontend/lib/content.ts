@@ -31,8 +31,12 @@ export async function getPageContent(pageKey: ContentPageKey): Promise<Published
     `
     if (rows.length === 0) return null
 
+    const content = rows[0].publishedContent as Record<string, unknown>
+    // Treat empty objects as unpublished — they have no section data to merge
+    if (!content || Object.keys(content).length === 0) return null
+
     return {
-      content: rows[0].publishedContent as Record<string, unknown>,
+      content,
       metadata: rows[0].publishedMetadata as ContentMetadata,
       publishedAt: rows[0].publishedAt as string,
     }
