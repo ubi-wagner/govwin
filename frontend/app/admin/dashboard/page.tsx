@@ -52,9 +52,14 @@ export default function AdminDashboard() {
 
   const totalOpps = (status?.pipelineJobs?.pending ?? 0) + (status?.pipelineJobs?.running ?? 0)
   const healthySources = status?.sourceHealth
-    ? Object.values(status.sourceHealth).filter(s => s === 'healthy').length
+    ? Object.values(status.sourceHealth).filter(s => {
+        const detail = s as Record<string, any>
+        return (detail.status ?? detail) === 'healthy'
+      }).length
     : 0
   const totalSources = status?.sourceHealth ? Object.keys(status.sourceHealth).length : 0
+  const staleRunning = status?.pipelineJobs?.staleRunning ?? 0
+  const failedTotal = status?.pipelineJobs?.failedTotal ?? 0
 
   return (
     <div>
@@ -90,9 +95,9 @@ export default function AdminDashboard() {
           label="Pipeline Queue"
           value={totalOpps}
           total={null}
-          totalLabel={`${status?.pipelineJobs?.pending ?? 0} pending, ${status?.pipelineJobs?.running ?? 0} running`}
+          totalLabel={`${status?.pipelineJobs?.pending ?? 0} pending, ${status?.pipelineJobs?.running ?? 0} running${staleRunning > 0 ? `, ${staleRunning} stale` : ''}`}
           icon={<WorkflowIcon />}
-          color="blue"
+          color={staleRunning > 0 ? 'yellow' : 'blue'}
           href="/admin/pipeline"
         />
         <KpiCard
@@ -108,9 +113,9 @@ export default function AdminDashboard() {
           label="Failed Jobs (24h)"
           value={status?.pipelineJobs?.failed24h ?? 0}
           total={null}
-          totalLabel="pipeline failures"
+          totalLabel={failedTotal > 0 ? `${failedTotal} total all-time` : 'pipeline failures'}
           icon={<AlertIcon />}
-          color={status?.pipelineJobs?.failed24h ? 'red' : 'green'}
+          color={status?.pipelineJobs?.failed24h ? 'red' : failedTotal > 0 ? 'yellow' : 'green'}
           href="/admin/pipeline"
         />
       </div>
@@ -120,9 +125,29 @@ export default function AdminDashboard() {
         <MiniStat label="Trial Tenants" value={status?.tenants?.trial ?? 0} badge="awaiting conversion" badgeColor="purple" />
         <MiniStat
           label="API Keys"
-          value={status?.apiKeys ? Object.values(status.apiKeys).filter(v => v === 'ok').length : 0}
-          badge={`${status?.apiKeys ? Object.keys(status.apiKeys).length : 0} total`}
-          badgeColor="green"
+          value={status?.apiKeys ? Object.values(status.apiKeys).filter(v => {
+            const d = v as Record<string, any>
+            const expiry = d.expiryStatus ?? v
+            return expiry === 'ok' || expiry === 'no_expiry'
+          }).length : 0}
+          badge={(() => {
+            if (!status?.apiKeys) return '0 total'
+            const untested = Object.values(status.apiKeys).filter(v => {
+              const d = v as Record<string, any>
+              return d.hasStoredKey && d.lastValidationOk == null
+            }).length
+            if (untested > 0) return `${untested} untested`
+            return `${Object.keys(status.apiKeys).length} total`
+          })()}
+          badgeColor={(() => {
+            if (!status?.apiKeys) return 'gray'
+            const anyFailed = Object.values(status.apiKeys).some(v => {
+              const d = v as Record<string, any>
+              return d.lastValidationOk === false
+            })
+            if (anyFailed) return 'purple'
+            return 'green'
+          })()}
         />
         <MiniStat
           label="Rate Limit Usage"
@@ -154,13 +179,23 @@ export default function AdminDashboard() {
           </div>
           <div className="mt-5 space-y-3">
             {status?.sourceHealth ? (
-              Object.entries(status.sourceHealth).map(([source, health]) => (
-                <div key={source} className="flex items-center gap-3 rounded-xl bg-surface-50 px-4 py-3 transition-colors hover:bg-gray-100">
-                  <HealthDot status={health as string} />
-                  <span className="flex-1 text-sm font-medium text-gray-700">{formatSource(source)}</span>
-                  <HealthBadge status={health as string} />
-                </div>
-              ))
+              Object.entries(status.sourceHealth).map(([source, detail]) => {
+                const d = detail as Record<string, any>
+                const healthStatus = (d.status ?? detail) as string
+                const failures = d.consecutiveFailures ?? 0
+                return (
+                  <div key={source} className="rounded-xl bg-surface-50 px-4 py-3 transition-colors hover:bg-gray-100">
+                    <div className="flex items-center gap-3">
+                      <HealthDot status={healthStatus} />
+                      <span className="flex-1 text-sm font-medium text-gray-700">{formatSource(source)}</span>
+                      <HealthBadge status={healthStatus} />
+                    </div>
+                    {failures > 0 && (
+                      <p className="mt-1 ml-5 text-xs text-red-500">{failures} consecutive failures</p>
+                    )}
+                  </div>
+                )
+              })
             ) : (
               <EmptyRow message="No source data available" />
             )}
@@ -175,13 +210,31 @@ export default function AdminDashboard() {
           </div>
           <div className="mt-5 space-y-3">
             {status?.apiKeys ? (
-              Object.entries(status.apiKeys).map(([source, expiry]) => (
-                <div key={source} className="flex items-center gap-3 rounded-xl bg-surface-50 px-4 py-3 transition-colors hover:bg-gray-100">
-                  <KeyIcon expiry={expiry as string} />
-                  <span className="flex-1 text-sm font-medium text-gray-700">{formatSource(source)}</span>
-                  <ExpiryBadge status={expiry as string} />
-                </div>
-              ))
+              Object.entries(status.apiKeys).map(([source, detail]) => {
+                const d = detail as Record<string, any>
+                const expiry = (d.expiryStatus ?? detail) as string
+                const validationFailed = d.lastValidationOk === false
+                const neverTested = d.lastValidationOk == null && d.hasStoredKey
+                return (
+                  <div key={source} className="rounded-xl bg-surface-50 px-4 py-3 transition-colors hover:bg-gray-100">
+                    <div className="flex items-center gap-3">
+                      <KeyIcon expiry={validationFailed ? 'expired' : expiry} />
+                      <span className="flex-1 text-sm font-medium text-gray-700">{formatSource(source)}</span>
+                      {validationFailed ? (
+                        <span className="badge-red">failed</span>
+                      ) : (
+                        <ExpiryBadge status={expiry} />
+                      )}
+                    </div>
+                    {neverTested && (
+                      <p className="mt-1 ml-7 text-xs text-amber-500">Not connectivity-tested</p>
+                    )}
+                    {validationFailed && (
+                      <p className="mt-1 ml-7 text-xs text-red-500">{d.lastValidationMsg ?? 'Last test failed'}</p>
+                    )}
+                  </div>
+                )
+              })
             ) : (
               <EmptyRow message="No API key data" />
             )}

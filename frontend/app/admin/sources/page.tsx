@@ -25,6 +25,9 @@ interface ApiKeyInfo {
   hasStoredKey?: boolean
   rotatedAt?: string | null
   issuedBy?: string | null
+  lastValidatedAt?: string | null
+  lastValidationOk?: boolean | null
+  lastValidationMsg?: string | null
 }
 
 export default function SourcesPage() {
@@ -33,6 +36,7 @@ export default function SourcesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rotateSource, setRotateSource] = useState<string | null>(null)
+  const [validating, setValidating] = useState<string | null>(null)
 
   const loadData = () => {
     setLoading(true)
@@ -44,62 +48,64 @@ export default function SourcesPage() {
       })
       .then(data => {
         if (data.sourceHealth) {
-          setSources(Object.entries(data.sourceHealth).map(([source, status]) => ({
-            source,
-            status: status as string,
-            lastSuccessAt: null,
-            lastErrorAt: null,
-            lastErrorMessage: null,
-            consecutiveFailures: 0,
-            successRate30d: null,
-            avgDurationSeconds: null,
-          })))
+          setSources(Object.entries(data.sourceHealth).map(([source, detail]) => {
+            const d = detail as Record<string, any>
+            return {
+              source,
+              status: d.status ?? 'unknown',
+              lastSuccessAt: d.lastSuccessAt ?? null,
+              lastErrorAt: d.lastErrorAt ?? null,
+              lastErrorMessage: d.lastErrorMessage ?? null,
+              consecutiveFailures: d.consecutiveFailures ?? 0,
+              successRate30d: d.successRate30d ?? null,
+              avgDurationSeconds: d.avgDurationSeconds ?? null,
+            }
+          }))
         }
         if (data.apiKeys) {
-          setApiKeys(Object.entries(data.apiKeys).map(([source, expiryStatus]) => ({
-            source,
-            envVar: source === 'sam_gov' ? 'SAM_GOV_API_KEY' : 'ANTHROPIC_API_KEY',
-            keyHint: null,
-            expiresDate: null,
-            isValid: expiryStatus !== 'expired',
-            daysUntilExpiry: null,
-            expiryStatus: expiryStatus as string,
-            notes: null,
-          })))
-        }
-        return Promise.all(
-          ['sam_gov', 'anthropic'].map(s =>
-            fetch(`/api/admin/api-keys/${s}`)
-              .then(r => r.ok ? r.json() : null)
-              .catch(() => null)
-          )
-        )
-      })
-      .then(keyResults => {
-        if (keyResults) {
-          setApiKeys(prev => prev.map(k => {
-            const detail = keyResults.find(
-              (r: { data?: ApiKeyInfo } | null) => r?.data?.source === k.source
-            )
-            if (detail?.data) {
-              return {
-                ...k,
-                keyHint: detail.data.keyHint ?? k.keyHint,
-                expiresDate: detail.data.expiresDate ?? k.expiresDate,
-                daysUntilExpiry: detail.data.daysUntilExpiry ?? k.daysUntilExpiry,
-                expiryStatus: detail.data.expiryStatus ?? k.expiryStatus,
-                isValid: detail.data.isValid ?? k.isValid,
-                hasStoredKey: detail.data.hasStoredKey ?? false,
-                rotatedAt: detail.data.rotatedAt ?? null,
-                issuedBy: detail.data.issuedBy ?? null,
-              }
+          setApiKeys(Object.entries(data.apiKeys).map(([source, detail]) => {
+            const d = detail as Record<string, any>
+            return {
+              source,
+              envVar: source === 'sam_gov' ? 'SAM_GOV_API_KEY' : 'ANTHROPIC_API_KEY',
+              keyHint: d.keyHint ?? null,
+              expiresDate: d.expiresDate ?? null,
+              isValid: d.expiryStatus !== 'expired' && d.lastValidationOk !== false,
+              daysUntilExpiry: d.daysUntilExpiry ?? null,
+              expiryStatus: d.expiryStatus ?? 'no_expiry',
+              notes: null,
+              hasStoredKey: d.hasStoredKey ?? false,
+              rotatedAt: d.rotatedAt ?? null,
+              issuedBy: null,
+              lastValidatedAt: d.lastValidatedAt ?? null,
+              lastValidationOk: d.lastValidationOk ?? null,
+              lastValidationMsg: d.lastValidationMsg ?? null,
             }
-            return k
           }))
         }
       })
       .catch(err => setError(err.message ?? 'Failed to load source data'))
       .finally(() => setLoading(false))
+  }
+
+  async function validateKey(source: string) {
+    setValidating(source)
+    try {
+      const res = await fetch(`/api/admin/api-keys/${source}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'validate' }),
+      })
+      if (!res.ok) {
+        setError(`Validation request failed: HTTP ${res.status}`)
+        return
+      }
+      loadData() // Reload to show updated validation status
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Validation failed')
+    } finally {
+      setValidating(null)
+    }
   }
 
   useEffect(() => { loadData() }, [])
@@ -221,7 +227,13 @@ export default function SourcesPage() {
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">API Keys</h2>
         <div className="mt-4 space-y-3">
           {apiKeys.map(k => (
-            <ApiKeyCard key={k.source} apiKey={k} onRotate={() => setRotateSource(k.source)} />
+            <ApiKeyCard
+              key={k.source}
+              apiKey={k}
+              onRotate={() => setRotateSource(k.source)}
+              onValidate={() => validateKey(k.source)}
+              isValidating={validating === k.source}
+            />
           ))}
           {apiKeys.length === 0 && (
             <div className="text-center py-8">
@@ -304,21 +316,27 @@ function SourceCard({ source }: { source: SourceInfo }) {
   )
 }
 
-function ApiKeyCard({ apiKey, onRotate }: { apiKey: ApiKeyInfo; onRotate: () => void }) {
-  const expiryColors: Record<string, { bg: string; border: string }> = {
-    ok:            { bg: 'bg-white', border: 'border-gray-200/80' },
-    expiring_soon: { bg: 'bg-amber-50/30', border: 'border-amber-200' },
-    expired:       { bg: 'bg-red-50/30',   border: 'border-red-200' },
-    no_expiry:     { bg: 'bg-white', border: 'border-gray-200/80' },
-  }
-  const c = expiryColors[apiKey.expiryStatus] ?? expiryColors.no_expiry
+function ApiKeyCard({ apiKey, onRotate, onValidate, isValidating }: {
+  apiKey: ApiKeyInfo; onRotate: () => void; onValidate: () => void; isValidating: boolean
+}) {
+  // Determine true validity: not expired AND (never tested OR last test passed)
+  const expiryOk = apiKey.expiryStatus !== 'expired'
+  const validationFailed = apiKey.lastValidationOk === false
+  const neverValidated = apiKey.lastValidationOk == null
+  const trueValid = expiryOk && !validationFailed
+
+  const borderColor = !trueValid ? 'border-red-200 bg-red-50/30'
+    : validationFailed ? 'border-red-200 bg-red-50/30'
+    : apiKey.expiryStatus === 'expiring_soon' ? 'border-amber-200 bg-amber-50/30'
+    : neverValidated && apiKey.hasStoredKey ? 'border-amber-200 bg-amber-50/20'
+    : 'border-gray-200/80 bg-white'
 
   return (
-    <div className={`card ${c.bg} ${c.border}`}>
+    <div className={`card ${borderColor}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-            apiKey.isValid ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+            trueValid ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
           }`}>
             <KeyIcon />
           </div>
@@ -332,6 +350,9 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: ApiKeyInfo; onRotate: () => 
               )}
               <ExpiryBadge status={apiKey.expiryStatus} />
               {apiKey.hasStoredKey && <span className="badge-green">Encrypted</span>}
+              {validationFailed && <span className="badge-red">Connectivity failed</span>}
+              {neverValidated && apiKey.hasStoredKey && <span className="badge-yellow">Not tested</span>}
+              {apiKey.lastValidationOk === true && <span className="badge-green">Verified</span>}
             </div>
           </div>
         </div>
@@ -349,11 +370,34 @@ function ApiKeyCard({ apiKey, onRotate }: { apiKey: ApiKeyInfo; onRotate: () => 
               {apiKey.rotatedAt ? new Date(apiKey.rotatedAt).toLocaleDateString() : 'Never'}
             </p>
           </div>
+          {apiKey.hasStoredKey && (
+            <button onClick={onValidate} disabled={isValidating} className="btn-secondary text-xs">
+              {isValidating ? 'Testing...' : 'Test Key'}
+            </button>
+          )}
           <button onClick={onRotate} className="btn-primary text-xs">
             Rotate Key
           </button>
         </div>
       </div>
+
+      {/* Honest validation status commentary */}
+      {validationFailed && apiKey.lastValidationMsg && (
+        <div className="mt-3 rounded-xl bg-red-50 px-3 py-2 border border-red-100">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-red-400">Last Validation Failed</p>
+          <p className="mt-0.5 text-xs text-red-600">{apiKey.lastValidationMsg}</p>
+          {apiKey.lastValidatedAt && (
+            <p className="mt-0.5 text-[10px] text-red-400">Tested {new Date(apiKey.lastValidatedAt).toLocaleString()}</p>
+          )}
+        </div>
+      )}
+      {neverValidated && apiKey.hasStoredKey && (
+        <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 border border-amber-100">
+          <p className="text-xs text-amber-700">
+            Key stored but never tested against {formatSource(apiKey.source)}. Expiry date does not confirm the key actually works.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

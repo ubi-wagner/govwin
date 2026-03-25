@@ -122,8 +122,14 @@ export default function PipelinePage() {
           <div className="modal-panel w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-gray-900">Confirm Pipeline Run</h3>
             <p className="mt-2 text-sm text-gray-500">
-              This will trigger a <span className="font-semibold text-gray-700">{confirmTrigger.runType}</span> run
+              This will queue a <span className="font-semibold text-gray-700">{confirmTrigger.runType}</span> job
               for <span className="font-semibold text-gray-700">{formatSource(confirmTrigger.source)}</span>.
+            </p>
+            <p className="mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+              The job will be added to the queue and picked up by the pipeline worker.
+              It will not execute immediately in this browser — check the Jobs tab to monitor progress.
+              A &quot;completed&quot; status means the worker finished without crashing, not necessarily
+              that all records were successfully processed.
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button onClick={() => setConfirmTrigger(null)} className="btn-secondary text-sm">Cancel</button>
@@ -138,8 +144,21 @@ export default function PipelinePage() {
         </div>
       )}
 
+      {/* Status Interpretation Guide */}
+      <div className="mt-6 card bg-blue-50/50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <svg className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+          <div className="text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">How to read pipeline status:</p>
+            <p><span className="font-medium">Pending</span> = queued, waiting for worker pickup. <span className="font-medium">Running</span> = worker claimed it, but external API calls may still fail silently. <span className="font-medium">Completed</span> = worker finished without crashing — check Run History for actual results (records fetched, new opps, tenants scored). A run that &quot;completed&quot; with 0 records fetched likely had an API issue.</p>
+          </div>
+        </div>
+      </div>
+
       {/* Stats Row */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <PipelineStat label="Pending" value={pendingCount} color="amber" icon={<ClockIcon />} />
         <PipelineStat label="Running" value={runningCount} color="blue" icon={<SpinnerIcon />} />
         <PipelineStat label="Completed" value={completedCount} color="emerald" icon={<CheckIcon />} />
@@ -248,7 +267,7 @@ function JobsTable({ jobs }: { jobs: PipelineJob[] }) {
                   </div>
                 </td>
                 <td className="px-5 py-4"><span className="badge-gray">{j.runType}</span></td>
-                <td className="px-5 py-4"><JobStatusBadge status={j.status} /></td>
+                <td className="px-5 py-4"><JobStatusBadge status={j.status} triggeredAt={j.triggeredAt} /></td>
                 <td className="px-5 py-4 text-sm text-gray-500">{formatDate(j.triggeredAt)}</td>
                 <td className="px-5 py-4 text-sm text-gray-500">{j.triggeredBy}</td>
                 <td className="px-5 py-4 text-center">
@@ -351,7 +370,14 @@ function RunsTable({ runs }: { runs: RunRecord[] }) {
                   </div>
                 </td>
                 <td className="px-5 py-4"><span className="badge-gray">{r.runType}</span></td>
-                <td className="px-5 py-4"><JobStatusBadge status={r.status} /></td>
+                <td className="px-5 py-4">
+                  <JobStatusBadge status={r.status} />
+                  {r.status === 'completed' && r.opportunitiesFetched === 0 && r.runType !== 'score' && (
+                    <span className="ml-1.5 text-[10px] text-amber-600 cursor-help" title="Job completed but fetched zero records — this may indicate an API key issue, network failure, or the source returned no data for the query window.">
+                      (empty)
+                    </span>
+                  )}
+                </td>
                 <td className="px-5 py-4 text-right text-sm font-medium text-gray-700">{r.opportunitiesFetched}</td>
                 <td className="px-5 py-4 text-right">
                   <span className={`text-sm font-medium ${r.opportunitiesNew > 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
@@ -398,11 +424,27 @@ function PipelineStat({ label, value, color, icon }: { label: string; value: num
   )
 }
 
-function JobStatusBadge({ status }: { status: string }) {
+function JobStatusBadge({ status, triggeredAt }: { status: string; triggeredAt?: string }) {
   const styles: Record<string, string> = {
     pending: 'badge-yellow', running: 'badge-blue', completed: 'badge-green', failed: 'badge-red', cancelled: 'badge-gray',
   }
-  return <span className={styles[status] ?? 'badge-gray'}>{status}</span>
+  const tooltips: Record<string, string> = {
+    pending: 'Queued — waiting for the pipeline worker to pick this up',
+    running: 'Worker claimed this job — does not guarantee the external API call succeeded',
+    completed: 'Worker finished without crashing — check run history for actual results (records fetched, scored, etc.)',
+    failed: 'Worker encountered an unrecoverable error',
+    cancelled: 'Job was cancelled before completion',
+  }
+
+  // Detect stale running jobs (>1 hour)
+  const isStale = status === 'running' && triggeredAt &&
+    (Date.now() - new Date(triggeredAt).getTime()) > 60 * 60 * 1000
+
+  return (
+    <span className={`${styles[status] ?? 'badge-gray'} cursor-help`} title={tooltips[status] ?? ''}>
+      {isStale ? 'stale' : status}
+    </span>
+  )
 }
 
 function SourceDot({ status }: { status: string }) {

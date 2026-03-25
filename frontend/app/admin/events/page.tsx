@@ -64,8 +64,8 @@ export default function EventsPage() {
 
   const tabConfig: { key: StreamTab; label: string; icon: React.ReactNode; description: string }[] = [
     { key: 'user', label: 'User Events', icon: <UserIcon />, description: 'Customer actions, pipeline updates, account changes' },
-    { key: 'system', label: 'System & Automation', icon: <CpuIcon />, description: 'Ingest, scoring, file processing events' },
-    { key: 'alerts', label: 'Warnings & Errors', icon: <AlertTriangleIcon />, description: 'System warnings, errors, and informational notices' },
+    { key: 'system', label: 'System & Automation', icon: <CpuIcon />, description: 'Cron triggers, ingest runs, scoring — event fired ≠ action succeeded' },
+    { key: 'alerts', label: 'Warnings & Errors', icon: <AlertTriangleIcon />, description: 'Failures, credential issues, and service-level warnings' },
   ]
 
   return (
@@ -313,7 +313,11 @@ function UserEventStream({ events, search }: { events: CustomerEvent[]; search: 
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="badge-blue">{formatEventNamespace(e.eventType)}</span>
                 <span className="text-xs font-medium text-gray-700">{formatEventAction(e.eventType)}</span>
-                {e.processed && <span className="badge-green">Processed</span>}
+                {e.processed && (
+                  <span className="badge-green cursor-help" title="Event was picked up by the automation engine — downstream actions may still have failed if credentials or services are unavailable.">
+                    Handler ran
+                  </span>
+                )}
               </div>
               {e.description && (
                 <p className="mt-1.5 text-sm text-gray-600 truncate">{e.description}</p>
@@ -354,6 +358,18 @@ function SystemEventStream({ events, search }: { events: any[]; search: string }
 
   return (
     <div className="mt-6 space-y-2">
+      {/* Honest interpretation guide */}
+      <div className="card bg-amber-50/50 border-amber-200 mb-3">
+        <div className="flex items-start gap-3">
+          <svg className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <div className="text-xs text-amber-800 space-y-1">
+            <p className="font-semibold">Important: Events show what was triggered, not what succeeded</p>
+            <p>A cron-fired event (e.g. email digest, scheduled ingest) means the scheduler fired — it does <span className="font-semibold">not</span> confirm the action completed. For example, an email send event will appear even if the service account credentials are missing or expired. Check the Warnings &amp; Errors tab for delivery failures, and verify credentials on the Sources page.</p>
+          </div>
+        </div>
+      </div>
       {filtered.map(e => {
         const eventType = e.eventType ?? e.event_type ?? ''
         const oppId = e.opportunityId ?? e.opportunity_id
@@ -374,7 +390,11 @@ function SystemEventStream({ events, search }: { events: any[]; search: string }
                   <span className="text-xs font-medium text-gray-700">{formatEventAction(eventType)}</span>
                   <span className="badge-gray">{e.source}</span>
                   {bus && <span className={`text-[10px] font-medium ${bus === 'content' ? 'text-teal-500' : 'text-violet-400'}`}>{bus}</span>}
-                  {(e.processed ?? false) && <span className="badge-green">Processed</span>}
+                  {(e.processed ?? false) && (
+                    <span className="badge-green cursor-help" title="Event was picked up by a handler — this confirms the handler ran, not that the downstream action (API call, email delivery, etc.) succeeded.">
+                      Handler ran
+                    </span>
+                  )}
                 </div>
                 {fieldChanged && (
                   <div className="mt-1.5 flex items-center gap-2 text-xs">

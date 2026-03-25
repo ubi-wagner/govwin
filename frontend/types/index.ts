@@ -444,11 +444,40 @@ export interface PipelineSchedule {
   nextRunAt: string | null
 }
 
+export interface SourceHealthDetail {
+  status: SourceHealthStatus
+  consecutiveFailures: number
+  lastSuccessAt: string | null
+  lastErrorAt: string | null
+  lastErrorMessage: string | null
+  avgDurationSeconds: number | null
+  successRate30d: number | null
+}
+
+export interface ApiKeyDetail {
+  expiryStatus: ApiKeyExpiry
+  hasStoredKey: boolean
+  keyHint: string | null
+  expiresDate: string | null
+  daysUntilExpiry: number | null
+  lastValidatedAt: string | null
+  lastValidationOk: boolean | null
+  lastValidationMsg: string | null
+  rotatedAt: string | null
+}
+
 export interface SystemStatus {
-  pipelineJobs: { pending: number; running: number; failed24h: number }
+  pipelineJobs: {
+    pending: number
+    running: number
+    failed24h: number
+    failedTotal: number
+    completed24h: number
+    staleRunning: number
+  }
   tenants: { total: number; active: number; trial: number }
-  sourceHealth: Record<string, SourceHealthStatus>
-  apiKeys: Record<string, ApiKeyExpiry>
+  sourceHealth: Record<string, SourceHealthDetail>
+  apiKeys: Record<string, ApiKeyDetail>
   rateLimits: Record<string, { used: number; limit: number | null }>
   checkedAt: string
 }
