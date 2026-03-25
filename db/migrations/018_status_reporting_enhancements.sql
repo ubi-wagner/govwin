@@ -81,7 +81,7 @@ BEGIN
             'success_rate_30d',      success_rate_30d
         )), '{}'::jsonb) FROM source_health),
 
-        'api_keys', (SELECT COALESCE(jsonb_object_agg(source, jsonb_build_object(
+        'api_keys', (SELECT COALESCE(jsonb_object_agg(aks.source, jsonb_build_object(
             'expiry_status',       aks.expiry_status,
             'has_stored_key',      akr.encrypted_value IS NOT NULL,
             'key_hint',            akr.key_hint,
