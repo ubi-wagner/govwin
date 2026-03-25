@@ -59,13 +59,36 @@ export default function TermsPage() {
         details on how AI is used and its limitations.
       </p>
 
-      <h2>3. Subscription & Billing</h2>
+      <h2>3. Subscription, Pricing & Billing</h2>
+      <h3>3.1 Subscription Agreement</h3>
+      <p>
+        Your specific plan, pricing, feature entitlements, user seat limits, and billing terms are set forth
+        in your <strong>Subscription Agreement</strong>, which is presented and accepted at the time of account
+        registration or plan selection. The Subscription Agreement is incorporated into these Terms by reference.
+        In the event of a conflict between the Subscription Agreement and these Terms, the Subscription Agreement
+        shall control with respect to pricing and plan-specific terms.
+      </p>
+      <h3>3.2 Variable Terms</h3>
+      <p>
+        Pricing, feature limits, and plan configurations <strong>may vary by customer</strong> based on
+        negotiated terms, promotional offers, or volume commitments. The specific terms applicable to your
+        account are those presented to you at checkout or in your executed Subscription Agreement.
+      </p>
+      <h3>3.3 Changes to Pricing or Plans</h3>
+      <p>
+        We reserve the right to modify pricing, plan features, or billing terms at our discretion. If we
+        make changes that materially affect your subscription, we will provide at least <strong>30 days
+        advance notice</strong> via email and in-app notification. Upon the effective date of such changes,
+        you will be required to <strong>affirmatively accept</strong> the updated terms to continue using the
+        Service. If you do not accept the updated terms, your subscription will not automatically renew, and
+        you may cancel without penalty before the changes take effect.
+      </p>
+      <h3>3.4 General Billing Terms</h3>
       <ul>
-        <li><strong>Plans:</strong> Starter, Professional, and Enterprise tiers with published feature limits (user seats, scored opportunities per month, NAICS profiles).</li>
-        <li><strong>Trial:</strong> New accounts receive a 14-day free trial with no credit card required. At trial expiration, access is suspended until a paid plan is selected.</li>
-        <li><strong>Billing:</strong> Monthly or annual billing. Annual plans receive a 20% discount. Charges are non-refundable except as required by law.</li>
-        <li><strong>Upgrades:</strong> Take effect immediately. <strong>Downgrades:</strong> Take effect at the end of the current billing period.</li>
-        <li><strong>Overages:</strong> If usage exceeds plan limits, we may restrict functionality until the account is upgraded. We will not charge overage fees without prior notice.</li>
+        <li><strong>Trial:</strong> New accounts may receive a free trial period as specified during registration. At trial expiration, access is suspended until a paid plan is selected.</li>
+        <li><strong>Billing Frequency:</strong> As specified in your Subscription Agreement (monthly, annual, or custom). Charges are non-refundable except as required by law.</li>
+        <li><strong>Upgrades:</strong> Take effect immediately with prorated charges. <strong>Downgrades:</strong> Take effect at the end of the current billing period.</li>
+        <li><strong>Overages:</strong> If usage exceeds plan limits, we may restrict functionality until the account is upgraded. We will not charge overage fees without prior notice and acceptance.</li>
       </ul>
 
       <h2>4. User Responsibilities</h2>
@@ -141,9 +164,16 @@ export default function TermsPage() {
       <h2>11. Changes to Terms</h2>
       <p>
         We may update these Terms from time to time. When we do, we will update the version date at the
-        top of this page and notify active users via email and in-app notification. Continued use of the
-        Service after the effective date of updated Terms constitutes acceptance. If you do not agree to
-        updated Terms, you may terminate your account.
+        top of this page and notify active users via email and in-app notification. <strong>Updated Terms
+        require explicit acceptance.</strong> Upon your next login after a Terms update, you will be
+        presented with the updated Terms and must affirmatively accept them to continue using the Service.
+        If you do not accept the updated Terms within 30 days of notification, your access will be suspended
+        until acceptance is recorded or you choose to terminate your account.
+      </p>
+      <p>
+        Your acceptance or decline of updated Terms is recorded with a timestamp, IP address, and document
+        version for audit purposes. This consent record is immutable and retained for the duration required
+        by applicable law.
       </p>
 
       <h2>12. Contact</h2>
