@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
 import { provisionTenantStorage, listDirectory, fileType } from '@/lib/storage'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 import type { AppSession, ProductTier } from '@/types'
 
 type Params = { params: Promise<{ tenantSlug: string }> }
@@ -210,20 +211,21 @@ export async function POST(_request: NextRequest, { params }: Params) {
     }
 
     // Emit customer event
-    try {
-      await sql`
-        INSERT INTO customer_events (tenant_id, user_id, event_type, description, metadata)
-        VALUES (
-          ${tenantId},
-          ${session.user.id},
-          'account.drive_provisioned',
-          ${'Storage provisioned for tier: ' + tier},
-          ${JSON.stringify({ tier, structure })}::jsonb
-        )
-      `
-    } catch (eventErr) {
-      console.error('[POST /api/portal/drive] Event emission error:', eventErr)
-    }
+    await emitCustomerEvent({
+      tenantId,
+      eventType: 'account.drive_provisioned',
+      userId: session.user.id,
+      entityType: 'tenant',
+      entityId: tenantId,
+      description: `Storage provisioned for tier: ${tier}`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: {
+        tier,
+        rootPath: structure.rootPath,
+        folders_created: folderEntries.length,
+        tenant_slug: tenantSlug,
+      },
+    })
 
     return NextResponse.json({
       data: { storagePath: structure.rootPath, structure },

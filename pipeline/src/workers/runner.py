@@ -24,6 +24,7 @@ from .document_fetcher import DocumentFetcherWorker
 from .email_trigger import EmailTriggerWorker
 from .finder import FinderOppIngestWorker, FinderDriveArchiveWorker
 from .reminder import ReminderAmendmentWorker, ReminderDeadlineWorker
+from automation.worker import AutomationCustomerWorker, AutomationOpportunityWorker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +46,10 @@ WORKER_REGISTRY: dict[str, list[type]] = {
     ],
     "email": [
         EmailTriggerWorker,
+    ],
+    "automation": [
+        AutomationCustomerWorker,
+        AutomationOpportunityWorker,
     ],
     # Future:
     # "binder": [...],

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, auditLog } from '@/lib/db'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 import bcrypt from 'bcryptjs'
 
 type Params = { params: Promise<{ tenantId: string }> }
@@ -104,6 +105,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       entityType: 'tenant',
       entityId: tenantId,
       newValue: updates,
+    })
+
+    const changedFields = Object.keys(updates)
+    await emitCustomerEvent({
+      tenantId,
+      eventType: 'account.tenant_updated',
+      userId: session.user!.id,
+      entityType: 'tenant',
+      entityId: tenantId,
+      description: `Tenant updated: ${changedFields.join(', ')}`,
+      actor: userActor(session.user!.id, session.user!.email ?? undefined),
+      payload: {
+        fields_changed: changedFields,
+        new_values: updates,
+        tenant_name: updated.name,
+      },
     })
 
     return NextResponse.json({ data: updated })

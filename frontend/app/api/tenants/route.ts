@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, auditLog } from '@/lib/db'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
@@ -94,6 +95,17 @@ export async function POST(request: NextRequest) {
       entityType: 'tenant',
       entityId: tenant.id,
       newValue: { name, slug, plan },
+    })
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'account.tenant_created',
+      userId: session.user!.id,
+      entityType: 'tenant',
+      entityId: tenant.id,
+      description: `Tenant "${name}" created with plan: ${plan}`,
+      actor: userActor(session.user!.id, session.user!.email ?? undefined),
+      payload: { name, slug, plan, primaryEmail: primaryEmail ?? null },
     })
 
     return NextResponse.json({ data: tenant }, { status: 201 })

@@ -331,7 +331,7 @@ export type DriveFile = StoredFile
 export type OpportunityEventType =
   | 'ingest.new' | 'ingest.updated' | 'ingest.closed' | 'ingest.cancelled'
   | 'ingest.document_added' | 'ingest.field_changed'
-  | 'scoring.scored' | 'scoring.rescored'
+  | 'scoring.scored' | 'scoring.rescored' | 'scoring.llm_adjusted'
   | 'drive.archived' | 'drive.extracted' | 'drive.analyzed'
 
 // Customer event types by worker namespace
@@ -345,6 +345,8 @@ export type CustomerEventType =
   | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
   | 'account.tier_upgraded' | 'account.tier_downgraded' | 'account.cap_increased'
   | 'account.user_added' | 'account.profile_updated' | 'account.drive_provisioned'
+  | 'account.tenant_created' | 'account.tenant_updated'
+  | 'account.login' | 'account.login_failed'
 
 export interface OpportunityEvent {
   id: string
@@ -355,6 +357,7 @@ export interface OpportunityEvent {
   oldValue: string | null
   newValue: string | null
   snapshotHash: string | null
+  correlationId: string | null
   metadata: Record<string, unknown>
   processed: boolean
   processedBy: string | null
@@ -371,6 +374,7 @@ export interface CustomerEvent {
   entityType: string | null
   entityId: string | null
   description: string | null
+  correlationId: string | null
   metadata: Record<string, unknown>
   processed: boolean
   processedBy: string | null
@@ -657,6 +661,7 @@ export type ContentEventType =
   | 'content.auto_generated'
   | 'content.auto_published'
   | 'content.unpublished'
+  | 'content.configured'
 
 export interface SiteContent {
   id: string
@@ -694,6 +699,7 @@ export interface ContentEvent {
   metadataSnapshot: ContentMetadata | null
   diffSummary: string | null
   source: string
+  correlationId: string | null
   metadata: Record<string, unknown>
   createdAt: string
 }

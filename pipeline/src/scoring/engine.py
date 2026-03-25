@@ -17,6 +17,7 @@ import os
 from datetime import datetime, timezone
 
 from crypto import decrypt_api_key
+from events import emit_opportunity_event, pipeline_actor
 
 log = logging.getLogger("pipeline.scoring")
 
@@ -166,6 +167,50 @@ class ScoringEngine:
                 recommendation,
                 key_reqs, comp_risks, rfi_questions,
             )
+            # Emit scoring.scored event
+            await emit_opportunity_event(
+                self.conn,
+                opportunity_id=str(opp["id"]),
+                event_type="scoring.scored",
+                source="scoring_engine",
+                actor=pipeline_actor("scoring_engine"),
+                refs={"tenant_id": str(tenant_id)},
+                payload={
+                    "tenant_id": str(tenant_id),
+                    "total_score": total_with_llm,
+                    "surface_score": total,
+                    "naics_score": scores.get("naics", 0),
+                    "keyword_score": scores.get("keyword", 0),
+                    "set_aside_score": scores.get("set_aside", 0),
+                    "agency_score": scores.get("agency", 0),
+                    "type_score": scores.get("type", 0),
+                    "timeline_score": scores.get("timeline", 0),
+                    "recommendation": recommendation,
+                    "matched_keywords": matched_kw,
+                    "matched_domains": matched_domains,
+                },
+            )
+
+            # Emit scoring.llm_adjusted if LLM modified the score
+            if llm_adj != 0:
+                await emit_opportunity_event(
+                    self.conn,
+                    opportunity_id=str(opp["id"]),
+                    event_type="scoring.llm_adjusted",
+                    source="scoring_engine",
+                    actor=pipeline_actor("scoring_engine"),
+                    refs={"tenant_id": str(tenant_id)},
+                    payload={
+                        "tenant_id": str(tenant_id),
+                        "surface_score": total,
+                        "llm_adjustment": llm_adj,
+                        "final_score": total_with_llm,
+                        "llm_rationale": llm_rationale,
+                        "key_requirements": key_reqs,
+                        "competitive_risks": comp_risks,
+                    },
+                )
+
             scored_count += 1
 
         return scored_count

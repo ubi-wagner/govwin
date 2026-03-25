@@ -10,6 +10,7 @@ const navItems = [
   { href: '/admin/pipeline', label: 'Pipeline', icon: 'Workflow' },
   { href: '/admin/sources', label: 'Sources', icon: 'Database' },
   { href: '/admin/events', label: 'Events', icon: 'Activity' },
+  { href: '/admin/automation', label: 'Automation', icon: 'Zap' },
   { href: '/admin/content', label: 'Content', icon: 'FileText' },
 ]
 
@@ -64,6 +65,11 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
     Activity: (
       <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+      </svg>
+    ),
+    Zap: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
       </svg>
     ),
     FileText: (

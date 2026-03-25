@@ -17,24 +17,22 @@ interface AlertEvent {
 export default function EventsPage() {
   const [tab, setTab] = useState<StreamTab>('user')
   const [userEvents, setUserEvents] = useState<CustomerEvent[]>([])
-  const [systemEvents, setSystemEvents] = useState<OpportunityEvent[]>([])
+  const [systemEvents, setSystemEvents] = useState<any[]>([])
   const [alertEvents, setAlertEvents] = useState<AlertEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(false)
+  const [eventTypeFilter, setEventTypeFilter] = useState<string>('')
 
   const loadEvents = useCallback(() => {
     setLoading(true)
     setError(null)
 
-    const endpoints: Record<StreamTab, string> = {
-      user: '/api/events?stream=user',
-      system: '/api/events?stream=system',
-      alerts: '/api/events?stream=alerts',
-    }
+    let url = `/api/events?stream=${tab}`
+    if (eventTypeFilter) url += `&event_type=${encodeURIComponent(eventTypeFilter)}`
 
-    fetch(endpoints[tab])
+    fetch(url)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -46,7 +44,7 @@ export default function EventsPage() {
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load events'))
       .finally(() => setLoading(false))
-  }, [tab])
+  }, [tab, eventTypeFilter])
 
   useEffect(() => { loadEvents() }, [loadEvents])
 
@@ -55,6 +53,14 @@ export default function EventsPage() {
     const id = setInterval(loadEvents, 15000)
     return () => clearInterval(id)
   }, [autoRefresh, loadEvents])
+
+  // Collect unique event types for filter dropdown
+  const availableEventTypes = useMemo(() => {
+    const types = new Set<string>()
+    if (tab === 'user') userEvents.forEach(e => types.add(e.eventType))
+    else if (tab === 'system') systemEvents.forEach(e => types.add(e.eventType ?? e.event_type))
+    return Array.from(types).sort()
+  }, [tab, userEvents, systemEvents])
 
   const tabConfig: { key: StreamTab; label: string; icon: React.ReactNode; description: string }[] = [
     { key: 'user', label: 'User Events', icon: <UserIcon />, description: 'Customer actions, pipeline updates, account changes' },
@@ -99,7 +105,7 @@ export default function EventsPage() {
         {tabConfig.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); setEventTypeFilter('') }}
             className={`card text-left transition-all ${
               tab === t.key ? 'ring-2 ring-brand-500 border-brand-200' : 'hover:border-gray-300'
             }`}
@@ -119,18 +125,32 @@ export default function EventsPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <div className="mt-6 relative">
-        <svg className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search events..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input pl-10"
-        />
+      {/* Filters row */}
+      <div className="mt-6 flex gap-3">
+        <div className="relative flex-1">
+          <svg className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search events..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input pl-10"
+          />
+        </div>
+        {tab !== 'alerts' && availableEventTypes.length > 0 && (
+          <select
+            value={eventTypeFilter}
+            onChange={e => setEventTypeFilter(e.target.value)}
+            className="input w-auto min-w-[180px]"
+          >
+            <option value="">All event types</option>
+            {availableEventTypes.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Error */}
@@ -159,6 +179,108 @@ export default function EventsPage() {
         <AlertEventStream events={alertEvents} search={search} />
       )}
     </div>
+  )
+}
+
+/* ─── Expandable Payload Panel ─────────────────────────────── */
+
+function PayloadPanel({ metadata, correlationId }: { metadata: any; correlationId?: string | null }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const parsed = useMemo(() => {
+    if (!metadata) return null
+    if (typeof metadata === 'string') {
+      try { return JSON.parse(metadata) } catch { return null }
+    }
+    return metadata
+  }, [metadata])
+
+  if (!parsed && !correlationId) return null
+
+  const actor = parsed?.actor
+  const payload = parsed?.payload
+  const trigger = parsed?.trigger
+  const refs = parsed?.refs
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        <svg className={`h-3 w-3 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+        {expanded ? 'Hide details' : 'Show details'}
+        {actor && <ActorBadge actor={actor} />}
+        {correlationId && <span className="badge-gray text-[10px]">chain: {correlationId.slice(0, 8)}</span>}
+      </button>
+      {expanded && (
+        <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-3 space-y-2 text-xs">
+          {actor && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-500">Actor:</span>
+              <ActorBadge actor={actor} />
+              <span className="text-gray-600">{actor.id}{actor.email ? ` (${actor.email})` : ''}</span>
+            </div>
+          )}
+          {trigger && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-500">Triggered by:</span>
+              <span className="badge-purple text-[10px]">{trigger.eventType}</span>
+              <span className="text-gray-400">#{trigger.eventId?.slice(0, 8)}</span>
+            </div>
+          )}
+          {correlationId && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-500">Correlation:</span>
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{correlationId}</code>
+            </div>
+          )}
+          {refs && Object.keys(refs).length > 0 && (
+            <div>
+              <span className="font-medium text-gray-500">Refs:</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {Object.entries(refs as Record<string, string>).map(([k, v]) => v ? (
+                  <span key={k} className="badge-gray text-[10px]">{k}: {String(v).slice(0, 12)}</span>
+                ) : null)}
+              </div>
+            </div>
+          )}
+          {payload && Object.keys(payload).length > 0 && (
+            <div>
+              <span className="font-medium text-gray-500">Payload:</span>
+              <pre className="mt-1 overflow-x-auto rounded bg-white border border-gray-200 p-2 text-[11px] text-gray-700 leading-relaxed">
+                {JSON.stringify(payload, null, 2)}
+              </pre>
+            </div>
+          )}
+          {/* Fallback: show raw metadata if no structured fields */}
+          {!actor && !trigger && !payload && (
+            <pre className="overflow-x-auto rounded bg-white border border-gray-200 p-2 text-[11px] text-gray-700 leading-relaxed">
+              {JSON.stringify(parsed, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ActorBadge({ actor }: { actor: { type: string; id?: string; email?: string } }) {
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    user:     { bg: 'bg-blue-50',   text: 'text-blue-700',   label: 'user' },
+    pipeline: { bg: 'bg-violet-50', text: 'text-violet-700', label: 'pipeline' },
+    system:   { bg: 'bg-amber-50',  text: 'text-amber-700',  label: 'system' },
+  }
+  const c = config[actor.type] ?? { bg: 'bg-gray-50', text: 'text-gray-600', label: actor.type }
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.bg} ${c.text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${
+        actor.type === 'user' ? 'bg-blue-400' : actor.type === 'pipeline' ? 'bg-violet-400' : 'bg-amber-400'
+      }`} />
+      {c.label}
+    </span>
   )
 }
 
@@ -202,6 +324,7 @@ function UserEventStream({ events, search }: { events: CustomerEvent[]; search: 
                 {e.opportunityId && <span>Opp: {e.opportunityId.slice(0, 8)}</span>}
                 <span>{formatTimestamp(e.createdAt)}</span>
               </div>
+              <PayloadPanel metadata={e.metadata} correlationId={e.correlationId} />
             </div>
             <span className="text-xs text-gray-400 shrink-0">{formatRelative(e.createdAt)}</span>
           </div>
@@ -214,14 +337,14 @@ function UserEventStream({ events, search }: { events: CustomerEvent[]; search: 
 
 /* ─── System Event Stream ────────────────────────────────── */
 
-function SystemEventStream({ events, search }: { events: OpportunityEvent[]; search: string }) {
+function SystemEventStream({ events, search }: { events: any[]; search: string }) {
   const filtered = useMemo(() => {
     if (!search.trim()) return events
     const q = search.toLowerCase()
     return events.filter(e =>
-      e.eventType.toLowerCase().includes(q) ||
+      (e.eventType ?? e.event_type ?? '').toLowerCase().includes(q) ||
       (e.source?.toLowerCase().includes(q) ?? false) ||
-      (e.opportunityId?.toLowerCase().includes(q) ?? false)
+      (e.opportunityId ?? e.opportunity_id ?? '').toLowerCase().includes(q)
     )
   }, [events, search])
 
@@ -231,42 +354,53 @@ function SystemEventStream({ events, search }: { events: OpportunityEvent[]; sea
 
   return (
     <div className="mt-6 space-y-2">
-      {filtered.map(e => (
-        <div key={e.id} className="card hover:shadow-card-hover transition-all group">
-          <div className="flex items-start gap-4">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-              <SystemTypeIcon type={e.eventType} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="badge-purple">{formatEventNamespace(e.eventType)}</span>
-                <span className="text-xs font-medium text-gray-700">{formatEventAction(e.eventType)}</span>
-                <span className="badge-gray">{e.source}</span>
-                {e.processed && <span className="badge-green">Processed</span>}
+      {filtered.map(e => {
+        const eventType = e.eventType ?? e.event_type ?? ''
+        const oppId = e.opportunityId ?? e.opportunity_id
+        const fieldChanged = e.fieldChanged ?? e.field_changed
+        const oldValue = e.oldValue ?? e.old_value
+        const newValue = e.newValue ?? e.new_value
+        const correlationId = e.correlationId ?? e.correlation_id
+        const bus = e.bus
+        return (
+          <div key={e.id} className="card hover:shadow-card-hover transition-all group">
+            <div className="flex items-start gap-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                <SystemTypeIcon type={eventType} />
               </div>
-              {e.fieldChanged && (
-                <div className="mt-1.5 flex items-center gap-2 text-xs">
-                  <span className="text-gray-500">Field:</span>
-                  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{e.fieldChanged}</code>
-                  {e.oldValue && (
-                    <>
-                      <span className="text-red-400 line-through">{e.oldValue.slice(0, 30)}</span>
-                      <span className="text-gray-300">&rarr;</span>
-                      <span className="text-emerald-600">{e.newValue?.slice(0, 30)}</span>
-                    </>
-                  )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="badge-purple">{formatEventNamespace(eventType)}</span>
+                  <span className="text-xs font-medium text-gray-700">{formatEventAction(eventType)}</span>
+                  <span className="badge-gray">{e.source}</span>
+                  {bus && <span className={`text-[10px] font-medium ${bus === 'content' ? 'text-teal-500' : 'text-violet-400'}`}>{bus}</span>}
+                  {(e.processed ?? false) && <span className="badge-green">Processed</span>}
                 </div>
-              )}
-              <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-gray-400">
-                {e.opportunityId && <span>Opp: {e.opportunityId.slice(0, 8)}</span>}
-                {e.processedBy && <span>By: {e.processedBy}</span>}
-                <span>{formatTimestamp(e.createdAt)}</span>
+                {fieldChanged && (
+                  <div className="mt-1.5 flex items-center gap-2 text-xs">
+                    <span className="text-gray-500">Field:</span>
+                    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{fieldChanged}</code>
+                    {oldValue && (
+                      <>
+                        <span className="text-red-400 line-through">{String(oldValue).slice(0, 30)}</span>
+                        <span className="text-gray-300">&rarr;</span>
+                        <span className="text-emerald-600">{String(newValue ?? '').slice(0, 30)}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                  {oppId && <span>Opp: {oppId.slice(0, 8)}</span>}
+                  {(e.processedBy ?? e.processed_by) && <span>By: {e.processedBy ?? e.processed_by}</span>}
+                  <span>{formatTimestamp(e.createdAt ?? e.created_at)}</span>
+                </div>
+                <PayloadPanel metadata={e.metadata} correlationId={correlationId} />
               </div>
+              <span className="text-xs text-gray-400 shrink-0">{formatRelative(e.createdAt ?? e.created_at)}</span>
             </div>
-            <span className="text-xs text-gray-400 shrink-0">{formatRelative(e.createdAt)}</span>
           </div>
-        </div>
-      ))}
+        )
+      })}
       <EventCount count={filtered.length} total={events.length} />
     </div>
   )
@@ -369,6 +503,7 @@ function SystemTypeIcon({ type }: { type: string }) {
   if (type.startsWith('ingest.')) return <DownloadIcon />
   if (type.startsWith('scoring.')) return <ChartIcon />
   if (type.startsWith('drive.')) return <CloudIcon />
+  if (type.startsWith('content.')) return <DocumentIcon />
   return <CpuIcon />
 }
 

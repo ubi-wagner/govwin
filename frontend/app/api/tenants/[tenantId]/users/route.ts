@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, auditLog } from '@/lib/db'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
@@ -58,6 +59,23 @@ export async function POST(request: NextRequest, { params }: Params) {
       entityType: 'user',
       entityId: user.id,
       newValue: { name, email, role, tenantId },
+    })
+
+    await emitCustomerEvent({
+      tenantId,
+      eventType: 'account.user_added',
+      userId: session.user.id,
+      entityType: 'user',
+      entityId: user.id,
+      description: `User "${name}" (${email}) added as ${role}`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: {
+        new_user_id: user.id,
+        new_user_name: name,
+        new_user_email: email,
+        new_user_role: role,
+        tenant_name: tenant.name,
+      },
     })
 
     // V1: return temp password for admin to share via secure channel.
