@@ -85,6 +85,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.error('[auth] Failed to update last_login_at:', e)
         }
 
+        // Emit login event (non-critical)
+        if (user.tenant_id) {
+          try {
+            await pool.query(
+              `INSERT INTO customer_events
+                (tenant_id, user_id, event_type, description, metadata)
+               VALUES ($1, $2, 'account.login', $3, $4::jsonb)`,
+              [
+                user.tenant_id,
+                user.id,
+                `User "${user.name}" logged in`,
+                JSON.stringify({
+                  actor: { type: 'user', id: user.id, email: user.email },
+                  payload: { role: user.role, temp_password: user.temp_password },
+                }),
+              ]
+            )
+          } catch (e) {
+            console.error('[auth] Failed to emit login event:', e)
+          }
+        }
+
         return {
           id:          user.id,
           email:       user.email,

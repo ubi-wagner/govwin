@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from .base import BaseEventWorker
+from events import emit_customer_event, pipeline_actor, trigger_ref
 
 log = logging.getLogger("workers.reminder")
 
@@ -94,22 +95,30 @@ class ReminderDeadlineWorker(BaseEventWorker):
 
                 for opp in opps:
                     # Emit customer event
-                    await self.conn.execute(
-                        """
-                        INSERT INTO customer_events
-                            (tenant_id, event_type, opportunity_id, description, metadata)
-                        VALUES ($1, 'reminder.nudge_sent', $2, $3, $4::jsonb)
-                        """,
-                        tenant["tenant_id"],
-                        opp["id"],
-                        f"{nudge_type} deadline nudge: {opp['title']} closes in {days} day(s)",
-                        json.dumps({
+                    await emit_customer_event(
+                        self.conn,
+                        tenant_id=str(tenant["tenant_id"]),
+                        event_type="reminder.nudge_sent",
+                        opportunity_id=str(opp["id"]),
+                        entity_type="opportunity",
+                        entity_id=str(opp["id"]),
+                        description=f"{nudge_type} deadline nudge: {opp['title']} closes in {days} day(s)",
+                        actor=pipeline_actor("reminder_deadline"),
+                        refs={
+                            "tenant_id": str(tenant["tenant_id"]),
+                            "opportunity_id": str(opp["id"]),
+                        },
+                        payload={
                             "nudge_type": nudge_type,
                             "days_remaining": days,
                             "close_date": opp["close_date"].isoformat() if opp["close_date"] else None,
                             "pursuit_status": opp["pursuit_status"],
                             "total_score": float(opp["total_score"]) if opp["total_score"] else None,
-                        }),
+                            "solicitation_number": opp["solicitation_number"],
+                            "agency": opp["agency"],
+                            "tenant_name": tenant["name"],
+                            "product_tier": tenant["product_tier"],
+                        },
                     )
 
                     # Queue email notification
@@ -193,22 +202,31 @@ class ReminderAmendmentWorker(BaseEventWorker):
 
         for tenant in tenants:
             # Emit customer event
-            await self.conn.execute(
-                """
-                INSERT INTO customer_events
-                    (tenant_id, event_type, opportunity_id, description, metadata)
-                VALUES ($1, 'reminder.amendment_alert', $2, $3, $4::jsonb)
-                """,
-                tenant["tenant_id"],
-                opp_id,
-                f"Amendment detected on {opp['title']}: {field_changed} changed",
-                json.dumps({
+            await emit_customer_event(
+                self.conn,
+                tenant_id=str(tenant["tenant_id"]),
+                event_type="reminder.amendment_alert",
+                opportunity_id=str(opp_id),
+                entity_type="opportunity",
+                entity_id=str(opp_id),
+                description=f"Amendment detected on {opp['title']}: {field_changed} changed",
+                actor=pipeline_actor("reminder_amendment"),
+                trigger=trigger_ref(str(event["id"]), event["event_type"]),
+                refs={
+                    "tenant_id": str(tenant["tenant_id"]),
+                    "opportunity_id": str(opp_id),
+                },
+                payload={
                     "field_changed": field_changed,
                     "old_value": old_value,
                     "new_value": new_value,
                     "pursuit_status": tenant["pursuit_status"],
                     "total_score": float(tenant["total_score"]) if tenant["total_score"] else None,
-                }),
+                    "solicitation_number": opp["solicitation_number"],
+                    "agency": opp["agency"],
+                    "tenant_name": tenant["tenant_name"],
+                    "product_tier": tenant["product_tier"],
+                },
             )
 
             # Queue notification

@@ -6,8 +6,11 @@ import { sql } from '@/lib/db'
  * GET /api/events — Unified event stream API for the admin Events page
  *
  * Query params:
- *   stream: 'user' | 'system' | 'alerts' (required)
- *   limit:  number (default 100, max 500)
+ *   stream:     'user' | 'system' | 'alerts' (required)
+ *   limit:      number (default 100, max 500)
+ *   event_type: string — filter by exact event_type (e.g. 'ingest.new')
+ *   since:      ISO 8601 timestamp — only events after this time
+ *   tenant_id:  UUID — filter user events by tenant
  *
  * Streams:
  *   - user:    customer_events (user actions, pipeline updates, account changes)
@@ -23,6 +26,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const stream = searchParams.get('stream')
   const limitParam = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '100', 10) || 100, 1), 500)
+  const eventTypeFilter = searchParams.get('event_type')
+  const sinceFilter = searchParams.get('since')
+  const tenantIdFilter = searchParams.get('tenant_id')
 
   if (!stream || !['user', 'system', 'alerts'].includes(stream)) {
     return NextResponse.json({ error: 'stream parameter is required (user|system|alerts)' }, { status: 400 })
@@ -35,8 +41,13 @@ export async function GET(request: Request) {
         SELECT
           id, tenant_id, user_id, event_type, opportunity_id,
           entity_type, entity_id, description, metadata,
+          correlation_id,
           processed, processed_by, processed_at, created_at
         FROM customer_events
+        WHERE TRUE
+          ${eventTypeFilter ? sql`AND event_type = ${eventTypeFilter}` : sql``}
+          ${sinceFilter ? sql`AND created_at > ${sinceFilter}` : sql``}
+          ${tenantIdFilter ? sql`AND tenant_id = ${tenantIdFilter}` : sql``}
         ORDER BY created_at DESC
         LIMIT ${limitParam}
       `
@@ -49,6 +60,7 @@ export async function GET(request: Request) {
         (
           SELECT
             id,
+            'opportunity' AS bus,
             opportunity_id,
             event_type,
             source,
@@ -56,12 +68,16 @@ export async function GET(request: Request) {
             old_value,
             new_value,
             snapshot_hash,
+            correlation_id,
             metadata,
             processed,
             processed_by,
             processed_at,
             created_at
           FROM opportunity_events
+          WHERE TRUE
+            ${eventTypeFilter ? sql`AND event_type = ${eventTypeFilter}` : sql``}
+            ${sinceFilter ? sql`AND created_at > ${sinceFilter}` : sql``}
           ORDER BY created_at DESC
           LIMIT ${limitParam}
         )
@@ -69,6 +85,7 @@ export async function GET(request: Request) {
         (
           SELECT
             id,
+            'content' AS bus,
             NULL::uuid AS opportunity_id,
             event_type,
             source,
@@ -76,12 +93,16 @@ export async function GET(request: Request) {
             NULL AS old_value,
             diff_summary AS new_value,
             NULL AS snapshot_hash,
+            correlation_id,
             metadata,
             FALSE AS processed,
             NULL AS processed_by,
             NULL::timestamptz AS processed_at,
             created_at
           FROM content_events
+          WHERE TRUE
+            ${eventTypeFilter ? sql`AND event_type = ${eventTypeFilter}` : sql``}
+            ${sinceFilter ? sql`AND created_at > ${sinceFilter}` : sql``}
           ORDER BY created_at DESC
           LIMIT ${limitParam}
         )
@@ -92,8 +113,6 @@ export async function GET(request: Request) {
 
     } else {
       // Alerts stream — failed pipeline jobs + system warnings
-      // Pull from pipeline_jobs where status = 'failed', plus content events
-      // that may indicate issues
       const rows = await sql`
         (
           SELECT
@@ -105,6 +124,7 @@ export async function GET(request: Request) {
             triggered_at AS created_at
           FROM pipeline_jobs
           WHERE status = 'failed'
+          ${sinceFilter ? sql`AND triggered_at > ${sinceFilter}` : sql``}
           ORDER BY triggered_at DESC
           LIMIT ${limitParam}
         )
@@ -119,6 +139,7 @@ export async function GET(request: Request) {
             created_at
           FROM content_events
           WHERE event_type IN ('content.auto_generated', 'content.auto_published', 'content.unpublished', 'content.rolled_back')
+          ${sinceFilter ? sql`AND created_at > ${sinceFilter}` : sql``}
           ORDER BY created_at DESC
           LIMIT ${limitParam}
         )

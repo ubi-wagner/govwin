@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { PAGE_DEFAULTS } from '@/lib/content-defaults'
+import { emitContentEvent, userActor, diffSections } from '@/lib/events'
 
 /** Map page_key to the public URL path so we can revalidate the route cache */
 function pageKeyToPath(pageKey: string): string {
@@ -166,18 +167,27 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })
     }
 
-    // Log event
-    try {
-      await sql`
-        INSERT INTO content_events (page_key, event_type, user_id, content_snapshot, metadata_snapshot, diff_summary, source)
-        VALUES (${pageKey}, 'content.draft_saved', ${session.user.id},
-                ${content ? JSON.stringify(content) : null}::jsonb,
-                ${metadata ? JSON.stringify(metadata) : null}::jsonb,
-                'Draft saved by admin', 'admin')
-      `
-    } catch (eventErr) {
-      console.error('[PATCH /api/content] Event log error:', eventErr)
-    }
+    // Log event with actual diff
+    const prevDraft = rows[0].draftContent as Record<string, unknown> | null
+    const changedSections = content ? diffSections(prevDraft, content) : []
+    const diffDesc = changedSections.length > 0
+      ? `Draft saved: updated ${changedSections.join(', ')}`
+      : 'Draft saved (no content changes)'
+
+    await emitContentEvent({
+      pageKey,
+      eventType: 'content.draft_saved',
+      userId: session.user.id,
+      source: 'admin',
+      contentSnapshot: content ?? null,
+      metadataSnapshot: metadata ?? null,
+      diffSummary: diffDesc,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: {
+        changedSections,
+        displayName: rows[0].pageKey,
+      },
+    })
 
     return NextResponse.json({ data: rows[0] })
   } catch (error) {
@@ -230,18 +240,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Page not found' }, { status: 404 })
       }
 
-      // Log event
-      try {
-        await sql`
-          INSERT INTO content_events (page_key, event_type, user_id, content_snapshot, metadata_snapshot, diff_summary, source)
-          VALUES (${pageKey}, 'content.published', ${session.user.id},
-                  ${JSON.stringify(rows[0].publishedContent)}::jsonb,
-                  ${JSON.stringify(rows[0].publishedMetadata)}::jsonb,
-                  'Content published by admin', 'admin')
-        `
-      } catch (eventErr) {
-        console.error('[POST /api/content] Publish event log error:', eventErr)
-      }
+      const pubContent = rows[0].publishedContent as Record<string, unknown>
+      const pubSections = Object.keys(pubContent ?? {})
+      await emitContentEvent({
+        pageKey,
+        eventType: 'content.published',
+        userId: session.user.id,
+        source: 'admin',
+        contentSnapshot: pubContent,
+        metadataSnapshot: rows[0].publishedMetadata as Record<string, unknown> | null,
+        diffSummary: `Published ${pubSections.length} sections: ${pubSections.join(', ')}`,
+        actor: userActor(session.user.id, session.user.email ?? undefined),
+        payload: {
+          sectionsPublished: pubSections,
+          publishedAt: rows[0].publishedAt,
+          path: pageKeyToPath(pageKey),
+        },
+      })
 
       // Bust the Next.js route cache so the public page shows updated content
       revalidatePath(pageKeyToPath(pageKey))
@@ -269,23 +284,36 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No previous version to roll back to' }, { status: 404 })
       }
 
-      try {
-        await sql`
-          INSERT INTO content_events (page_key, event_type, user_id, content_snapshot, metadata_snapshot, diff_summary, source)
-          VALUES (${pageKey}, 'content.rolled_back', ${session.user.id},
-                  ${JSON.stringify(rows[0].publishedContent)}::jsonb,
-                  ${JSON.stringify(rows[0].publishedMetadata)}::jsonb,
-                  'Rolled back to previous version', 'admin')
-        `
-      } catch (eventErr) {
-        console.error('[POST /api/content] Rollback event log error:', eventErr)
-      }
+      await emitContentEvent({
+        pageKey,
+        eventType: 'content.rolled_back',
+        userId: session.user.id,
+        source: 'admin',
+        contentSnapshot: rows[0].publishedContent as Record<string, unknown> | null,
+        metadataSnapshot: rows[0].publishedMetadata as Record<string, unknown> | null,
+        diffSummary: 'Rolled back to previous version',
+        actor: userActor(session.user.id, session.user.email ?? undefined),
+        payload: {
+          restoredSections: Object.keys((rows[0].publishedContent as Record<string, unknown>) ?? {}),
+          path: pageKeyToPath(pageKey),
+        },
+      })
 
       revalidatePath(pageKeyToPath(pageKey))
 
       return NextResponse.json({ data: rows[0], message: 'Rolled back to previous version' })
 
     } else if (action === 'unpublish') {
+      // Fetch current published content BEFORE clearing it (for the event snapshot)
+      const [current] = await sql`
+        SELECT published_content, published_metadata, published_at
+        FROM site_content
+        WHERE page_key = ${pageKey} AND published_content IS NOT NULL
+      `
+      if (!current) {
+        return NextResponse.json({ error: 'Page is not published' }, { status: 404 })
+      }
+
       const rows = await sql`
         UPDATE site_content
         SET
@@ -305,14 +333,22 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Page is not published' }, { status: 404 })
       }
 
-      try {
-        await sql`
-          INSERT INTO content_events (page_key, event_type, user_id, diff_summary, source)
-          VALUES (${pageKey}, 'content.unpublished', ${session.user.id}, 'Content unpublished by admin', 'admin')
-        `
-      } catch (eventErr) {
-        console.error('[POST /api/content] Unpublish event log error:', eventErr)
-      }
+      const unpubContent = current.publishedContent as Record<string, unknown> | null
+      await emitContentEvent({
+        pageKey,
+        eventType: 'content.unpublished',
+        userId: session.user.id,
+        source: 'admin',
+        contentSnapshot: unpubContent,
+        metadataSnapshot: current.publishedMetadata as Record<string, unknown> | null,
+        diffSummary: `Unpublished ${Object.keys(unpubContent ?? {}).length} sections — site reverted to static content`,
+        actor: userActor(session.user.id, session.user.email ?? undefined),
+        payload: {
+          unpublishedSections: Object.keys(unpubContent ?? {}),
+          previouslyPublishedAt: current.publishedAt,
+          path: pageKeyToPath(pageKey),
+        },
+      })
 
       revalidatePath(pageKeyToPath(pageKey))
 
@@ -333,20 +369,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Page not found' }, { status: 404 })
       }
 
-      // Log configuration change event
-      try {
-        const changes: string[] = []
-        if (body.autoPublish !== undefined) changes.push(`auto_publish=${body.autoPublish}`)
-        if (body.contentSource !== undefined) changes.push(`content_source=${body.contentSource}`)
-        await sql`
-          INSERT INTO content_events (page_key, event_type, user_id, diff_summary, source, metadata)
-          VALUES (${pageKey}, 'content.draft_saved', ${session.user.id},
-                  ${'Configuration updated: ' + changes.join(', ')}, 'admin',
-                  ${JSON.stringify({ action: 'configure', autoPublish: body.autoPublish, contentSource: body.contentSource })}::jsonb)
-        `
-      } catch (eventErr) {
-        console.error('[POST /api/content] Configure event log error:', eventErr)
-      }
+      const changes: string[] = []
+      if (body.autoPublish !== undefined) changes.push(`auto_publish=${body.autoPublish}`)
+      if (body.contentSource !== undefined) changes.push(`content_source=${body.contentSource}`)
+
+      await emitContentEvent({
+        pageKey,
+        eventType: 'content.configured',
+        userId: session.user.id,
+        source: 'admin',
+        diffSummary: `Configuration updated: ${changes.join(', ')}`,
+        actor: userActor(session.user.id, session.user.email ?? undefined),
+        payload: {
+          autoPublish: body.autoPublish,
+          contentSource: body.contentSource,
+          changes,
+        },
+      })
 
       return NextResponse.json({ data: rows[0], message: 'Configuration updated' })
 

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
+import { emitOpportunityEvent, emitCustomerEvent, userActor } from '@/lib/events'
 import type { ActionType, AppSession } from '@/types'
 
 type Params = { params: Promise<{ opportunityId: string }> }
@@ -147,28 +148,20 @@ export async function POST(request: NextRequest, { params }: Params) {
 
           // Only emit event if new documents were actually seeded
           if (seededCount > 0) {
-            try {
-              await sql`
-                INSERT INTO opportunity_events
-                  (opportunity_id, event_type, source, metadata)
-                VALUES (
-                  ${opportunityId},
-                  'ingest.document_added',
-                  'pin_trigger',
-                  ${JSON.stringify({
-                    triggered_by: 'pin',
-                    tenant_id: tenant.id,
-                    user_id: userId,
-                    document_count: seededCount,
-                    solicitation_number: opp.solicitationNumber ?? null,
-                    title: opp.title ?? null,
-                  })}::jsonb
-                )
-              `
-            } catch (eventErr) {
-              console.error('[POST /api/opportunities/actions] Document event emission error:', eventErr)
-              // Non-critical — pin still succeeds even if event fails
-            }
+            await emitOpportunityEvent({
+              opportunityId,
+              eventType: 'ingest.document_added',
+              source: 'pin_trigger',
+              actor: userActor(userId, session.user.email ?? undefined),
+              refs: { tenant_id: tenant.id as string },
+              payload: {
+                triggered_by: 'pin',
+                document_count: seededCount,
+                solicitation_number: opp.solicitationNumber ?? null,
+                title: opp.title ?? null,
+                resource_links_count: resourceLinks.length,
+              },
+            })
           }
         }
       } catch (docErr) {
@@ -213,32 +206,30 @@ export async function POST(request: NextRequest, { params }: Params) {
 
       // Emit customer event for status change
       const eventType = value === 'pursuing' || value === 'monitoring'
-        ? 'finder.opp_attached'
+        ? 'finder.opp_attached' as const
         : value === 'passed'
-          ? 'finder.opp_dismissed'
+          ? 'finder.opp_dismissed' as const
           : null
 
       if (eventType) {
-        try {
-          await sql`
-            INSERT INTO customer_events
-              (tenant_id, user_id, event_type, opportunity_id, description, metadata)
-            VALUES (
-              ${tenant.id as string},
-              ${userId},
-              ${eventType},
-              ${opportunityId},
-              ${'Status changed from ' + (prevStatus?.pursuitStatus ?? 'unreviewed') + ' to ' + value},
-              ${JSON.stringify({
-                old_status: prevStatus?.pursuitStatus ?? 'unreviewed',
-                new_status: value,
-                total_score: tenantOpp?.totalScore ?? null,
-              })}::jsonb
-            )
-          `
-        } catch (eventErr) {
-          console.error('[POST /api/opportunities/actions] Event emission error:', eventErr)
-        }
+        const oldStatus = prevStatus?.pursuitStatus ?? 'unreviewed'
+        await emitCustomerEvent({
+          tenantId: tenant.id as string,
+          eventType,
+          userId,
+          opportunityId,
+          entityType: 'opportunity',
+          entityId: opportunityId,
+          description: `Status changed from ${oldStatus} to ${value}`,
+          actor: userActor(userId, session.user.email ?? undefined),
+          payload: {
+            old_status: oldStatus,
+            new_status: value,
+            total_score: tenantOpp?.totalScore ?? null,
+            agency: tenantOpp?.agencyCode ?? null,
+            opportunity_type: tenantOpp?.opportunityType ?? null,
+          },
+        })
       }
     }
 

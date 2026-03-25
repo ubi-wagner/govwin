@@ -521,17 +521,24 @@ class SamGovIngester:
             )
 
             # Emit opportunity event: ingest.updated
-            await self.conn.execute(
-                """
-                INSERT INTO opportunity_events
-                    (opportunity_id, event_type, source, old_value, new_value, snapshot_hash, metadata)
-                VALUES ($1, 'ingest.updated', 'sam_gov', $2, $3, $4, $5::jsonb)
-                """,
-                existing["id"],
-                existing["content_hash"],
-                content_hash,
-                content_hash,
-                json.dumps({"source_id": source_id, "title": fields["title"]}, default=str),
+            from events import emit_opportunity_event, pipeline_actor
+            await emit_opportunity_event(
+                self.conn,
+                opportunity_id=str(existing["id"]),
+                event_type="ingest.updated",
+                source="sam_gov",
+                old_value=existing["content_hash"],
+                new_value=content_hash,
+                snapshot_hash=content_hash,
+                actor=pipeline_actor("sam_gov_ingest"),
+                refs={"source_id": source_id},
+                payload={
+                    "title": fields["title"],
+                    "solicitation_number": fields["sol_number"],
+                    "agency": fields["agency"],
+                    "department": fields["department"],
+                    "opp_type": fields["opp_type"],
+                },
             )
             return "updated"
         else:
@@ -593,26 +600,27 @@ class SamGovIngester:
 
             # Emit opportunity event: ingest.new
             if row:
-                await self.conn.execute(
-                    """
-                    INSERT INTO opportunity_events
-                        (opportunity_id, event_type, source, snapshot_hash, metadata)
-                    VALUES ($1, 'ingest.new', 'sam_gov', $2, $3::jsonb)
-                    """,
-                    row["id"],
-                    content_hash,
-                    json.dumps({
-                        "source_id": source_id,
+                from events import emit_opportunity_event, pipeline_actor
+                await emit_opportunity_event(
+                    self.conn,
+                    opportunity_id=str(row["id"]),
+                    event_type="ingest.new",
+                    source="sam_gov",
+                    snapshot_hash=content_hash,
+                    actor=pipeline_actor("sam_gov_ingest"),
+                    refs={"source_id": source_id},
+                    payload={
                         "title": fields["title"],
                         "solicitation_number": fields["sol_number"],
                         "agency": fields["agency"],
+                        "agency_code": fields["agency_code"],
                         "naics_codes": fields["naics_codes"],
                         "set_aside": fields["set_aside_code"],
                         "opp_type": fields["opp_type"],
                         "department": fields["department"],
                         "classification_code": fields["classification_code"],
                         "pop_state": fields["pop_state"],
-                    }, default=str),
+                    },
                 )
             return "new"
 

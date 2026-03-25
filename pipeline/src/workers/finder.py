@@ -12,6 +12,12 @@ import logging
 from datetime import datetime, timezone
 
 from .base import BaseEventWorker
+from events import (
+    emit_opportunity_event,
+    emit_customer_event,
+    pipeline_actor,
+    trigger_ref,
+)
 
 log = logging.getLogger("workers.finder")
 
@@ -51,39 +57,41 @@ class FinderOppIngestWorker(BaseEventWorker):
             )
 
             for row in rows:
-                try:
-                    await self.conn.execute(
-                        """
-                        INSERT INTO customer_events
-                            (tenant_id, event_type, opportunity_id, description, metadata)
-                        VALUES ($1, 'finder.opp_presented', $2, $3, $4::jsonb)
-                        """,
-                        row["tenant_id"],
-                        opp_id,
-                        f"New opportunity scored at {row['total_score']}",
-                        json.dumps({
-                            "total_score": float(row["total_score"]) if row["total_score"] else None,
-                            "recommendation": row["pursuit_recommendation"],
-                            "product_tier": row["product_tier"],
-                        }),
-                    )
-                except Exception as e:
-                    log.error(f"[finder.ingest] Failed to emit customer event for tenant {row['tenant_id']}: {e}")
+                await emit_customer_event(
+                    self.conn,
+                    tenant_id=str(row["tenant_id"]),
+                    event_type="finder.opp_presented",
+                    opportunity_id=str(opp_id),
+                    entity_type="opportunity",
+                    entity_id=str(opp_id),
+                    description=f"New opportunity scored at {row['total_score']}",
+                    actor=pipeline_actor("finder_ingest"),
+                    trigger=trigger_ref(str(event["id"]), "ingest.new"),
+                    refs={"tenant_id": str(row["tenant_id"]), "opportunity_id": str(opp_id)},
+                    payload={
+                        "total_score": float(row["total_score"]) if row["total_score"] else None,
+                        "recommendation": row["pursuit_recommendation"],
+                        "product_tier": row["product_tier"],
+                        "max_active_opps": row["max_active_opps"],
+                    },
+                )
 
         elif event_type == "ingest.updated":
             # Emit a re-score event so the scoring engine picks it up
-            await self.conn.execute(
-                """
-                INSERT INTO opportunity_events
-                    (opportunity_id, event_type, source, metadata)
-                VALUES ($1, 'scoring.rescored', $2, $3::jsonb)
-                """,
-                opp_id,
-                event.get("source", "unknown"),
-                json.dumps({
+            await emit_opportunity_event(
+                self.conn,
+                opportunity_id=str(opp_id),
+                event_type="scoring.rescored",
+                source=event.get("source", "unknown"),
+                field_changed=event.get("field_changed"),
+                actor=pipeline_actor("finder_ingest"),
+                trigger=trigger_ref(str(event["id"]), "ingest.updated"),
+                payload={
                     "triggered_by": "ingest.updated",
                     "field_changed": event.get("field_changed"),
-                }),
+                    "old_value": event.get("old_value"),
+                    "new_value": event.get("new_value"),
+                },
             )
 
 
@@ -145,13 +153,18 @@ class FinderDriveArchiveWorker(BaseEventWorker):
         )
 
         # Mark the opp as having a drive archive event
-        await self.conn.execute(
-            """
-            INSERT INTO opportunity_events
-                (opportunity_id, event_type, source, metadata)
-            VALUES ($1, 'drive.archived', $2, $3::jsonb)
-            """,
-            opp_id,
-            opp["source"],
-            json.dumps({"queued_job": True}),
+        await emit_opportunity_event(
+            self.conn,
+            opportunity_id=str(opp_id),
+            event_type="drive.archived",
+            source=opp["source"],
+            actor=pipeline_actor("finder_drive_archive"),
+            trigger=trigger_ref(str(event["id"]), "ingest.new"),
+            refs={"solicitation_number": opp["solicitation_number"]},
+            payload={
+                "title": opp["title"],
+                "posted_date": opp["posted_date"].isoformat() if opp["posted_date"] else None,
+                "source_url": opp["source_url"],
+                "queued_job": True,
+            },
         )
