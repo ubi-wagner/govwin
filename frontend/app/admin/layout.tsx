@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AdminNav } from './admin-nav'
+import { ConsentGate } from '@/components/consent-gate'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -53,6 +54,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {children}
         </div>
       </main>
+
+      {/* Consent gate — blocks UI until legal docs accepted */}
+      <ConsentGate isRegistration />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
 import { PortalNav } from './portal-nav'
+import { ConsentGate } from '@/components/consent-gate'
 
 export default async function PortalLayout({
   children,
@@ -101,6 +102,9 @@ export default async function PortalLayout({
           {children}
         </div>
       </main>
+
+      {/* Consent gate — tenant users accept terms but not authority representation */}
+      <ConsentGate />
     </div>
   )
 }
