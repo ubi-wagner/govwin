@@ -1,0 +1,72 @@
+name: Run Database Migrations
+
+# Runs pending migrations against the production database.
+# Triggered on push to main (when migration files change) or manually.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'db/migrations/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — show what would run without executing'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      seed:
+        description: 'Seed admin account after migrations'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  migrate:
+    name: Run pending migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Check connection
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it in GitHub > Settings > Secrets."
+            exit 1
+          fi
+          echo "Testing database connection..."
+          psql "$DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          echo "Connection successful."
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          chmod +x db/migrations/run.sh
+
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="--dry-run"
+          fi
+          if [ "${{ github.event.inputs.seed }}" = "true" ]; then
+            FLAGS="$FLAGS --seed"
+          fi
+
+          ./db/migrations/run.sh $FLAGS
+
+      - name: Show migration status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ./db/migrations/run.sh --status
