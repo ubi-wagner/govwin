@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Modal } from '@/components/page-sections'
 
 /** Client wrapper: billing toggle + pricing cards + checkout modal */
@@ -136,6 +137,28 @@ export function InteractivePricingSection({
                 <p className="mt-1 text-[10px] text-gray-300">Payment processing will be connected here</p>
               </div>
             </div>
+
+            {/* Legal agreement — required before checkout */}
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-700">Legal Agreement</p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-[11px] text-gray-600 leading-relaxed">
+                  I represent that I am authorized to act on behalf of my organization.
+                  As Account Administrator, I accept responsibility for all users I add to this account.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                <span className="text-[11px] text-gray-600 leading-relaxed">
+                  I agree to the{' '}
+                  <Link href="/legal/terms" target="_blank" className="text-brand-600 underline">Terms of Service</Link>,{' '}
+                  <Link href="/legal/privacy" target="_blank" className="text-brand-600 underline">Privacy Policy</Link>, and{' '}
+                  <Link href="/legal/ai-disclosure" target="_blank" className="text-brand-600 underline">AI Disclosure</Link>.
+                </span>
+              </label>
+            </div>
+
             <button className="btn-primary w-full py-3 text-base" onClick={() => setCheckoutOpen(false)}>
               Subscribe &middot; Start 14-Day Trial
             </button>

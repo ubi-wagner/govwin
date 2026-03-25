@@ -75,10 +75,10 @@ export function SiteFooter() {
             &copy; {new Date().getFullYear()} RFP Pipeline. All rights reserved. Built in Dayton, Ohio.
           </p>
           <div className="flex items-center gap-4">
-            <Link href="/about" className="text-xs text-gray-400 transition-colors hover:text-gray-600">
+            <Link href="/legal/privacy" className="text-xs text-gray-400 transition-colors hover:text-gray-600">
               Privacy
             </Link>
-            <Link href="/about" className="text-xs text-gray-400 transition-colors hover:text-gray-600">
+            <Link href="/legal/terms" className="text-xs text-gray-400 transition-colors hover:text-gray-600">
               Terms
             </Link>
           </div>
