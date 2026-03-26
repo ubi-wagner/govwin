@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { signOut } from 'next-auth/react'
 import Link from 'next/link'
 
 interface ConsentStatus {
@@ -250,8 +251,18 @@ export function ConsentGate({
 
           {/* Error */}
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              {error}
+            <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
+              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-xs text-red-600">
+                If this persists, try{' '}
+                <button
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  className="underline font-medium hover:text-red-800"
+                >
+                  signing out
+                </button>
+                {' '}and logging back in.
+              </p>
             </div>
           )}
         </div>

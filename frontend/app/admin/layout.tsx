@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AdminNav } from './admin-nav'
 import { ConsentGate } from '@/components/consent-gate'
+import { SignOutButton } from '@/components/sign-out-button'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -44,6 +45,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <div className="text-sm font-semibold text-gray-900 truncate">{session.user.name ?? session.user.email}</div>
               <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Master Admin</div>
             </div>
+          </div>
+          <div className="mt-3">
+            <SignOutButton />
           </div>
         </div>
       </aside>
