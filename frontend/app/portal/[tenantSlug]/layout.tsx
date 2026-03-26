@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { sql } from '@/lib/db'
 import { PortalNav } from './portal-nav'
 import { ConsentGate } from '@/components/consent-gate'
+import { SignOutButton } from '@/components/sign-out-button'
 
 export default async function PortalLayout({
   children,
@@ -93,6 +94,9 @@ export default async function PortalLayout({
               Back to Admin
             </Link>
           )}
+          <div className="mt-3">
+            <SignOutButton />
+          </div>
         </div>
       </aside>
 
