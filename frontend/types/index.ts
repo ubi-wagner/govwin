@@ -333,6 +333,7 @@ export type OpportunityEventType =
   | 'ingest.document_added' | 'ingest.field_changed'
   | 'scoring.scored' | 'scoring.rescored' | 'scoring.llm_adjusted'
   | 'drive.archived' | 'drive.extracted' | 'drive.analyzed'
+  | 'rfp.parsed' | 'rfp.template_extracted'
 
 // Customer event types by worker namespace
 export type CustomerEventType =
@@ -343,6 +344,11 @@ export type CustomerEventType =
   | 'binder.project_created' | 'binder.upload_added' | 'binder.pwin_updated'
   | 'binder.stage_advanced'
   | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
+  | 'library.upload_ingested' | 'library.atoms_extracted' | 'library.atom_approved'
+  | 'proposal.created' | 'proposal.section_populated' | 'proposal.section_refined'
+  | 'proposal.completed' | 'proposal.exported' | 'proposal.archived'
+  | 'proposal.atoms_extracted'
+  | 'rfp.parsed' | 'rfp.template_created' | 'rfp.template_accepted' | 'rfp.template_corrected'
   | 'account.tier_upgraded' | 'account.tier_downgraded' | 'account.cap_increased'
   | 'account.user_added' | 'account.profile_updated' | 'account.drive_provisioned'
   | 'account.tenant_created' | 'account.tenant_updated'
@@ -792,6 +798,292 @@ export interface GetStartedPageContent {
   comparison: (string | boolean)[][]
   faqs: { q: string; a: string }[]
   contactCta: { title: string; description: string; email: string }
+}
+
+// ─── Grinder: Atomic Library ─────────────────────────────────
+
+export type LibraryUnitCategory =
+  | 'bio' | 'facility' | 'tech_approach' | 'past_performance'
+  | 'management' | 'commercialization' | 'budget_justification'
+  | 'equipment' | 'data_management' | 'broader_impact' | 'general'
+
+export type LibraryUnitStatus = 'draft' | 'approved' | 'archived' | 'rejected'
+export type LibraryUnitContentType = 'text' | 'table' | 'image_ref' | 'code'
+
+export interface LibraryUnit {
+  id: string
+  tenantId: string
+  content: string
+  contentType: LibraryUnitContentType
+  category: LibraryUnitCategory
+  subcategory: string | null
+  title: string | null
+  sourceUploadId: string | null
+  sourceRecordType: string | null
+  sourceRecordId: string | null
+  contextTags: Record<string, unknown>
+  confidenceScore: number | null
+  status: LibraryUnitStatus
+  wordCount: number | null
+  charCount: number | null
+  version: number
+  parentUnitId: string | null
+  approvedBy: string | null
+  approvedAt: string | null
+  lastUsedAt: string | null
+  usageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LibraryUnitImage {
+  id: string
+  unitId: string
+  tenantId: string
+  imagePath: string
+  storageBackend: string
+  mimeType: string | null
+  widthPx: number | null
+  heightPx: number | null
+  fileSizeBytes: number | null
+  altText: string | null
+  caption: string | null
+  sortOrder: number
+  createdAt: string
+}
+
+// ─── Grinder: RFP Templates ─────────────────────────────────
+
+export type RfpTemplateSource = 'library' | 'ai_extracted' | 'manual' | 'hybrid'
+export type RfpTemplateStatus = 'draft' | 'accepted' | 'locked' | 'superseded'
+
+export interface RfpTemplateSection {
+  key: string
+  title: string
+  pageLimit: number | null
+  required: boolean
+  instructions: string | null
+  subsections?: RfpTemplateSection[]
+  evaluationWeight: number | null
+}
+
+export interface RfpTemplateConstraints {
+  font?: string
+  fontSize?: string
+  margins?: string
+  totalPages?: number
+  lineSpacing?: string
+  headerFooter?: string
+}
+
+export interface RfpTemplateLibraryEntry {
+  id: string
+  agency: string
+  programType: string
+  subAgency: string | null
+  templateName: string
+  description: string | null
+  sections: RfpTemplateSection[]
+  constraints: RfpTemplateConstraints
+  submissionFormat: Record<string, unknown>
+  evaluationCriteria: Record<string, unknown>
+  commonErrors: string[]
+  version: number
+  usageCount: number
+  accuracyScore: number | null
+  createdBy: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RfpTemplate {
+  id: string
+  tenantId: string
+  opportunityId: string
+  baseTemplateId: string | null
+  templateName: string
+  sections: RfpTemplateSection[]
+  constraints: RfpTemplateConstraints
+  submissionFormat: Record<string, unknown>
+  evaluationCriteria: Record<string, unknown>
+  source: RfpTemplateSource
+  status: RfpTemplateStatus
+  userCorrections: Array<{
+    sectionKey: string
+    field: string
+    oldValue: string
+    newValue: string
+    reason?: string
+  }>
+  acceptedBy: string | null
+  acceptedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Grinder: Proposals ──────────────────────────────────────
+
+export type ProposalStatus =
+  | 'draft' | 'assembly' | 'review' | 'final_review'
+  | 'complete' | 'exported' | 'archived'
+
+export type ProposalOutcome = 'won' | 'lost' | 'no_bid' | 'pending' | 'withdrawn'
+
+export type ProposalSectionStatus =
+  | 'empty' | 'ai_populated' | 'user_edited'
+  | 'approved' | 'locked' | 'needs_revision'
+
+export type ProposalSectionPageStatus = 'under' | 'within' | 'over' | 'unknown'
+
+export type ProposalSectionChangeType =
+  | 'ai_populated' | 'user_edit' | 'ai_refined'
+  | 'swap_unit' | 'manual_paste' | 'revert'
+
+export type ProposalPersonnelRole =
+  | 'PI' | 'Co-PI' | 'Key Personnel' | 'Consultant' | 'Subcontractor Lead'
+
+export interface Proposal {
+  id: string
+  tenantId: string
+  opportunityId: string
+  rfpTemplateId: string | null
+  title: string
+  status: ProposalStatus
+  pageLimit: number | null
+  currentPageEst: number
+  sectionCount: number
+  sectionsPopulated: number
+  sectionsApproved: number
+  completionPct: number
+  createdBy: string
+  lockedBy: string | null
+  lockedAt: string | null
+  submittedAt: string | null
+  outcome: ProposalOutcome | null
+  outcomeNotes: string | null
+  scoreReceived: number | null
+  debriefNotes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProposalSection {
+  id: string
+  proposalId: string
+  sectionKey: string
+  title: string
+  sortOrder: number
+  pageLimit: number | null
+  required: boolean
+  instructions: string | null
+  contentDraft: string | null
+  contentFinal: string | null
+  status: ProposalSectionStatus
+  aiConfidence: number | null
+  aiMatchSummary: string | null
+  wordCount: number
+  charCount: number
+  estPageCount: number
+  pageStatus: ProposalSectionPageStatus
+  refinementCount: number
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProposalSectionHistory {
+  id: string
+  sectionId: string
+  proposalId: string
+  content: string
+  changeType: ProposalSectionChangeType
+  changedBy: string | null
+  changeSummary: string | null
+  wordCount: number | null
+  estPageCount: number | null
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+export interface ProposalSectionUnit {
+  id: string
+  sectionId: string
+  unitId: string
+  proposalId: string
+  sortOrder: number
+  usageType: 'primary' | 'supporting' | 'reference'
+  aiSelected: boolean
+  confidenceScore: number | null
+  createdAt: string
+}
+
+export interface ProposalPersonnel {
+  id: string
+  proposalId: string
+  personnelId: string
+  sectionId: string | null
+  roleInProposal: string
+  effortPercentage: number | null
+  sortOrder: number
+  createdAt: string
+}
+
+export interface ProposalExport {
+  id: string
+  proposalId: string
+  tenantId: string
+  format: 'pdf' | 'docx' | 'pptx' | 'markdown'
+  filePath: string | null
+  fileSizeBytes: number | null
+  storageBackend: string
+  exportedBy: string
+  versionLabel: string | null
+  createdAt: string
+}
+
+// Proposal dashboard (from proposal_dashboard view)
+export interface ProposalDashboardItem {
+  proposalId: string
+  tenantId: string
+  proposalTitle: string
+  proposalStatus: ProposalStatus
+  pageLimit: number | null
+  currentPageEst: number
+  completionPct: number
+  outcome: ProposalOutcome | null
+  proposalCreatedAt: string
+  proposalUpdatedAt: string
+  opportunityId: string
+  opportunityTitle: string
+  agency: string | null
+  solicitationNumber: string | null
+  closeDate: string | null
+  opportunityType: string | null
+  daysToClose: number | null
+  templateName: string | null
+  templateSource: RfpTemplateSource | null
+  totalSections: number
+  completedSections: number
+  personnelCount: number
+  exportCount: number
+  createdByName: string | null
+  createdByEmail: string | null
+}
+
+// Library unit summary (from library_unit_summary view)
+export interface LibraryUnitSummary {
+  tenantId: string
+  tenantName: string
+  totalUnits: number
+  approvedUnits: number
+  draftUnits: number
+  vectorizedUnits: number
+  categoryCount: number
+  unitsByCategory: Record<LibraryUnitCategory, number>
+  lastUnitCreated: string | null
+  totalUsage: number
 }
 
 // ─── API responses ────────────────────────────────────────────

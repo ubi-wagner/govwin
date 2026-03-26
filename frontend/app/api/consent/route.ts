@@ -102,8 +102,18 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ data: record }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('[POST /api/consent] Error:', error)
+
+    // FK violation on user_id means the session references a user that no longer exists
+    // (e.g., after a DB rebuild). Tell the client to re-authenticate.
+    if (error?.code === '23503' && error?.constraint_name?.includes('user_id')) {
+      return NextResponse.json(
+        { error: 'Your session is invalid. Please sign out and log in again.', code: 'SESSION_INVALID' },
+        { status: 401 }
+      )
+    }
+
     return NextResponse.json({ error: 'Failed to record consent' }, { status: 500 })
   }
 }

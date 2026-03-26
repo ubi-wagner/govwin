@@ -43,6 +43,8 @@ echo -e "${YELLOW}Dropping everything...${NC}"
 
 psql "$CONN" -q -X <<'SQL'
 -- Drop all views first (they depend on tables)
+DROP VIEW IF EXISTS proposal_dashboard CASCADE;
+DROP VIEW IF EXISTS library_unit_summary CASCADE;
 DROP VIEW IF EXISTS focus_area_content CASCADE;
 DROP VIEW IF EXISTS tenant_content_summary CASCADE;
 DROP VIEW IF EXISTS tenant_active_opps CASCADE;
@@ -66,6 +68,18 @@ DROP FUNCTION IF EXISTS dequeue_customer_events(TEXT[], TEXT, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS get_iso_week_label(TIMESTAMPTZ) CASCADE;
 DROP FUNCTION IF EXISTS check_opp_cap(UUID) CASCADE;
 DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
+
+-- Drop grinder/proposal tables (refs proposals, tenants, users, etc.)
+DROP TABLE IF EXISTS proposal_exports CASCADE;
+DROP TABLE IF EXISTS proposal_personnel CASCADE;
+DROP TABLE IF EXISTS proposal_section_units CASCADE;
+DROP TABLE IF EXISTS proposal_section_history CASCADE;
+DROP TABLE IF EXISTS proposal_sections CASCADE;
+DROP TABLE IF EXISTS proposals CASCADE;
+DROP TABLE IF EXISTS rfp_templates CASCADE;
+DROP TABLE IF EXISTS rfp_template_library CASCADE;
+DROP TABLE IF EXISTS library_unit_images CASCADE;
+DROP TABLE IF EXISTS library_units CASCADE;
 
 -- Drop junction tables
 DROP TABLE IF EXISTS boilerplate_focus_areas CASCADE;
