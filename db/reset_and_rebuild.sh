@@ -141,14 +141,23 @@ SQL
 
 echo -e "${GREEN}All tables dropped.${NC}"
 echo ""
-echo -e "${CYAN}Running baseline migration...${NC}"
+echo -e "${CYAN}Running baseline migrations (000a-000e)...${NC}"
 
-# Run the baseline
-psql "$CONN" -f "$SCRIPT_DIR/migrations/000_baseline.sql" --single-transaction -q -X
+for part in 000a_baseline_core 000b_baseline_opportunities 000c_baseline_events 000d_baseline_functions 000e_baseline_views_seeds; do
+  echo -ne "  Running ${part}.sql ... "
+  if psql "$CONN" -f "$SCRIPT_DIR/migrations/${part}.sql" --single-transaction -q -X 2>/tmp/govwin_baseline_err; then
+    echo -e "${GREEN}done${NC}"
+  else
+    echo -e "${RED}FAILED${NC}"
+    cat /tmp/govwin_baseline_err
+    echo -e "${RED}Stopped at ${part}.sql. Fix and re-run.${NC}"
+    exit 1
+  fi
+done
 
-echo -e "${GREEN}Baseline migration applied.${NC}"
+echo -e "${GREEN}All baseline migrations applied.${NC}"
 
-# Create migration history and mark baseline as applied
+# Create migration history and mark everything as applied
 psql "$CONN" -q -X <<SQL
 CREATE TABLE IF NOT EXISTS _migration_history (
     filename    TEXT PRIMARY KEY,
@@ -156,10 +165,12 @@ CREATE TABLE IF NOT EXISTS _migration_history (
     checksum    TEXT
 );
 
--- Mark baseline and all original migrations as applied
--- so the incremental runner doesn't try to re-apply them
 INSERT INTO _migration_history (filename, checksum) VALUES
-    ('000_baseline.sql', '$(sha256sum "$SCRIPT_DIR/migrations/000_baseline.sql" | cut -d' ' -f1)'),
+    ('000a_baseline_core.sql', 'baseline'),
+    ('000b_baseline_opportunities.sql', 'baseline'),
+    ('000c_baseline_events.sql', 'baseline'),
+    ('000d_baseline_functions.sql', 'baseline'),
+    ('000e_baseline_views_seeds.sql', 'baseline'),
     ('001_auth_tenants.sql', 'consolidated_into_000'),
     ('002_control_plane.sql', 'consolidated_into_000'),
     ('003_opportunities.sql', 'consolidated_into_000'),
