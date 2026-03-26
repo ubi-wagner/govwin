@@ -43,7 +43,12 @@ export function ConsentGate({
   const loadStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/consent')
-      if (!res.ok) return // Not logged in or API unavailable — don't block
+      if (res.status === 401) {
+        // Session invalid — sign out immediately
+        signOut({ callbackUrl: '/login' })
+        return
+      }
+      if (!res.ok) return // API unavailable — don't block
       const data = await res.json()
       setStatus(data.data ?? null)
     } catch {
@@ -75,6 +80,11 @@ export function ConsentGate({
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Unknown error' }))
+      // Session is stale (user doesn't exist in DB) — force sign out
+      if (res.status === 401 || err.code === 'SESSION_INVALID') {
+        signOut({ callbackUrl: '/login' })
+        throw new Error('Session expired. Signing you out...')
+      }
       throw new Error(err.error ?? `Failed to record ${documentType} consent`)
     }
   }
