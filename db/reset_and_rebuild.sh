@@ -43,6 +43,8 @@ echo -e "${YELLOW}Dropping everything...${NC}"
 
 psql "$CONN" -q -X <<'SQL'
 -- Drop all views first (they depend on tables)
+DROP VIEW IF EXISTS tenant_pipeline_with_spotlights CASCADE;
+DROP VIEW IF EXISTS spotlight_dashboard CASCADE;
 DROP VIEW IF EXISTS library_atom_effectiveness CASCADE;
 DROP VIEW IF EXISTS library_harvest_status CASCADE;
 DROP VIEW IF EXISTS library_learning_metrics CASCADE;
@@ -73,6 +75,10 @@ DROP FUNCTION IF EXISTS dequeue_customer_events(TEXT[], TEXT, INTEGER) CASCADE;
 DROP FUNCTION IF EXISTS get_iso_week_label(TIMESTAMPTZ) CASCADE;
 DROP FUNCTION IF EXISTS check_opp_cap(UUID) CASCADE;
 DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
+
+-- Drop spotlight/invite tables
+DROP TABLE IF EXISTS spotlight_scores CASCADE;
+DROP TABLE IF EXISTS team_invitations CASCADE;
 
 -- Drop library feedback loop tables
 DROP TABLE IF EXISTS library_atom_outcomes CASCADE;

@@ -257,14 +257,19 @@ export interface TenantUpload {
   fileSizeBytes: number | null
   mimeType: string | null
   uploadType: UploadType
+  uploadCategory?: UploadCategory
   description: string | null
   focusAreaId: string | null
+  spotlightId?: string | null
   linkedRecordType: LinkedRecordType | null
   linkedRecordId: string | null
   extractedText: string | null
   processed: boolean
   processedAt: string | null
   isActive: boolean
+  libraryStatus?: LibraryProcessingStatus
+  atomCount?: number
+  libraryProcessedAt?: string | null
   createdAt: string
 }
 
@@ -362,6 +367,8 @@ export type CustomerEventType =
   | 'account.user_added' | 'account.profile_updated' | 'account.drive_provisioned'
   | 'account.tenant_created' | 'account.tenant_updated'
   | 'account.login' | 'account.login_failed'
+  | 'account.invite_sent' | 'account.invite_accepted' | 'account.invite_expired'
+  | 'spotlight.created' | 'spotlight.updated' | 'spotlight.deleted'
 
 export interface OpportunityEvent {
   id: string
@@ -807,6 +814,120 @@ export interface GetStartedPageContent {
   comparison: (string | boolean)[][]
   faqs: { q: string; a: string }[]
   contactCta: { title: string; description: string; email: string }
+}
+
+// ─── SpotLight Buckets ───────────────────────────────────────
+
+export interface SpotlightBucket {
+  id: string
+  tenantId: string
+  name: string
+  description: string | null
+  naicsCodes: string[]
+  keywords: string[]
+  setAsideTypes: string[]
+  agencyPriorities: Record<string, number>
+  keywordDomains: Record<string, string[]>
+  isSmallBusiness: boolean
+  minContractValue: number | null
+  maxContractValue: number | null
+  minScoreThreshold: number
+  opportunityTypes: string[]
+  companySummary: string | null
+  technologyFocus: string | null
+  status: 'active' | 'inactive'
+  sortOrder: number
+  createdBy: string | null
+  lastScoredAt: string | null
+  matchedOppCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SpotlightScore {
+  id: string
+  tenantId: string
+  spotlightId: string
+  opportunityId: string
+  totalScore: number
+  naicsScore: number
+  keywordScore: number
+  setAsideScore: number
+  agencyScore: number
+  typeScore: number
+  timelineScore: number
+  llmAdjustment: number
+  llmRationale: string | null
+  matchedKeywords: string[]
+  matchedDomains: string[]
+  scoredAt: string
+}
+
+export interface SpotlightDashboardItem {
+  spotlightId: string
+  tenantId: string
+  spotlightName: string
+  description: string | null
+  naicsCodes: string[]
+  keywords: string[]
+  setAsideTypes: string[]
+  status: string
+  sortOrder: number
+  matchedOppCount: number
+  lastScoredAt: string | null
+  aboveThresholdCount: number
+  highPriorityCount: number
+  topScore: number | null
+  avgScore: number | null
+  uploadCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Team Invitations ────────────────────────────────────────
+
+export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked'
+
+export interface TeamInvitation {
+  id: string
+  tenantId: string
+  invitedBy: string
+  email: string
+  name: string
+  role: 'tenant_admin' | 'tenant_user'
+  company: string | null
+  phone: string | null
+  notes: string | null
+  token: string
+  status: InviteStatus
+  acceptedUserId: string | null
+  acceptedAt: string | null
+  expiresAt: string
+  reminderSentAt: string | null
+  createdAt: string
+}
+
+// ─── Tenant Upload (extended fields from 028) ───────────────
+
+export type UploadCategory =
+  | 'general' | 'capability_statement' | 'past_performance'
+  | 'personnel_resume' | 'facility_description' | 'tech_approach'
+  | 'company_overview' | 'certification' | 'financial' | 'other'
+
+export type LibraryProcessingStatus = 'pending' | 'processing' | 'atomized' | 'failed' | 'skipped'
+
+// Plan-based limits
+export interface PlanLimits {
+  maxSeats: number
+  maxSpotlights: number
+  maxActiveOpps: number
+}
+
+export const PLAN_LIMITS: Record<string, PlanLimits> = {
+  finder:   { maxSeats: 2,  maxSpotlights: 1,  maxActiveOpps: 10 },
+  reminder: { maxSeats: 5,  maxSpotlights: 3,  maxActiveOpps: 25 },
+  binder:   { maxSeats: 10, maxSpotlights: 5,  maxActiveOpps: 50 },
+  grinder:  { maxSeats: 25, maxSpotlights: 10, maxActiveOpps: 999 },
 }
 
 // ─── Grinder: Atomic Library ─────────────────────────────────
