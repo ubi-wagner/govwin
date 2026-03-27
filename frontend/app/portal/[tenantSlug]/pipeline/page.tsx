@@ -30,6 +30,16 @@ function PortalPipelineInner() {
   const [sortDir, setSortDir] = useState(searchParams.get('sortDir') ?? 'desc')
   const [pursuitFilter, setPursuitFilter] = useState('')
   const [minScore, setMinScore] = useState('')
+  const [spotlightFilter, setSpotlightFilter] = useState(searchParams.get('spotlightId') ?? '')
+
+  // Fetch spotlights for the filter dropdown
+  const [spotlights, setSpotlights] = useState<{id: string; name: string}[]>([])
+  useEffect(() => {
+    fetch(`/api/portal/${slug}/spotlights`)
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(d => setSpotlights((d.data ?? []).map((s: any) => ({ id: s.id, name: s.name }))))
+      .catch(() => {})
+  }, [slug])
 
   const loadOpps = useCallback(() => {
     setLoading(true)
@@ -44,6 +54,7 @@ function PortalPipelineInner() {
     if (search) params.set('search', search)
     if (pursuitFilter) params.set('pursuitStatus', pursuitFilter)
     if (minScore) params.set('minScore', minScore)
+    if (spotlightFilter) params.set('spotlightId', spotlightFilter)
 
     fetch(`/api/opportunities?${params}`)
       .then(r => {
@@ -56,7 +67,7 @@ function PortalPipelineInner() {
       })
       .catch(err => setError(err.message ?? 'Failed to load opportunities'))
       .finally(() => setLoading(false))
-  }, [slug, sortBy, sortDir, page, search, pursuitFilter, minScore])
+  }, [slug, sortBy, sortDir, page, search, pursuitFilter, minScore, spotlightFilter])
 
   useEffect(() => { loadOpps() }, [loadOpps])
 
@@ -104,6 +115,14 @@ function PortalPipelineInner() {
           <option value="50">50+ (Medium+)</option>
           <option value="25">25+ (Low+)</option>
         </select>
+        {spotlights.length > 0 && (
+          <select className="input w-auto" value={spotlightFilter} onChange={e => { setSpotlightFilter(e.target.value); setPage(0) }}>
+            <option value="">All SpotLights</option>
+            {spotlights.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
         <select className="input w-auto" value={sortBy} onChange={e => setSortBy(e.target.value)}>
           <option value="score">Score</option>
           <option value="close_date">Deadline</option>
@@ -193,6 +212,11 @@ function OpportunityRow({ opp, onAction }: { opp: TenantPipelineItem; onAction: 
             {opp.setAsideType && <span className="badge-blue text-[10px]">{opp.setAsideType}</span>}
             {opp.matchedDomains?.length > 0 && (
               opp.matchedDomains.slice(0, 2).map(d => <span key={d} className="badge-green text-[10px]">{d}</span>)
+            )}
+            {opp.bestSpotlightName && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {opp.bestSpotlightName}
+              </span>
             )}
           </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 
 interface Spotlight {
@@ -53,6 +53,7 @@ const emptyForm: CreateSpotlightForm = {
 
 export default function SpotlightsPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>()
+  const router = useRouter()
 
   const [spotlights, setSpotlights] = useState<Spotlight[]>([])
   const [loading, setLoading] = useState(true)
@@ -367,7 +368,8 @@ export default function SpotlightsPage() {
           {spotlights.map((spotlight) => (
             <div
               key={spotlight.id}
-              className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+              onClick={() => router.push(`/portal/${tenantSlug}/spotlights/${spotlight.id}`)}
+              className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -382,8 +384,14 @@ export default function SpotlightsPage() {
                     {spotlight.status ?? 'unknown'}
                   </span>
                 </div>
-                <button className="px-3 py-1 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
-                  Edit
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/portal/${tenantSlug}/spotlights/${spotlight.id}`)
+                  }}
+                  className="px-3 py-1 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  View
                 </button>
               </div>
 

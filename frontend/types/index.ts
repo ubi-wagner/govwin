@@ -171,6 +171,11 @@ export interface TenantPipelineItem {
   questionsForRfi: string[]
   priorityTier: PriorityTier
   scoredAt: string | null
+  // SpotLight provenance
+  matchedSpotlightIds?: string[]
+  bestSpotlightId?: string | null
+  bestSpotlightName?: string | null
+  pinnedFromSpotlightId?: string | null
   // Computed
   daysToClose: number | null
   deadlineStatus: DeadlineStatus
@@ -216,6 +221,7 @@ export interface OpportunityFilters {
   deadlineStatus?: DeadlineStatus
   setAsideType?: string
   isPinned?: boolean
+  spotlightId?: string
   sortBy?: 'score' | 'close_date' | 'posted_date' | 'value' | 'last_action'
   sortDir?: 'asc' | 'desc'
   limit?: number

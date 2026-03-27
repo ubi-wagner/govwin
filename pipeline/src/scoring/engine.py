@@ -215,7 +215,7 @@ class ScoringEngine:
 
         return scored_count
 
-    def _compute_scores(self, profile: dict, opp: dict) -> dict:
+    def _compute_scores_original(self, profile: dict, opp: dict) -> dict:
         """Compute breakdown scores for an opportunity against a tenant profile."""
         scores = {}
 
@@ -411,3 +411,227 @@ Respond in JSON with these fields:
         if profile.get("is_8a"):
             parts.append("8(a)")
         return ", ".join(parts) or "None"
+
+    # ==================================================================
+    # SPOTLIGHT (BUCKET) SCORING
+    # ==================================================================
+
+    async def score_all_spotlights(self) -> dict:
+        """Score all active opportunities against all active SpotLight buckets."""
+        result = {"buckets_scored": 0, "total_scores": 0, "errors": []}
+
+        self._anthropic_key = await _resolve_anthropic_key(self.conn)
+
+        spotlights = await self.conn.fetch(
+            """
+            SELECT fa.*, t.slug AS tenant_slug, t.status AS tenant_status
+            FROM focus_areas fa
+            JOIN tenants t ON fa.tenant_id = t.id
+            WHERE fa.status = 'active'
+              AND t.status IN ('active', 'trial')
+            """
+        )
+
+        active_opps = await self.conn.fetch(
+            "SELECT * FROM opportunities WHERE status = 'active'"
+        )
+
+        log.info(f"SpotLight scoring: {len(active_opps)} opps x {len(spotlights)} buckets")
+
+        for spotlight in spotlights:
+            try:
+                scored = await self._score_spotlight(dict(spotlight), active_opps)
+                result["buckets_scored"] += 1
+                result["total_scores"] += scored
+                log.info(f"Scored {scored} opps for SpotLight '{spotlight['name']}' (tenant {spotlight['tenant_slug']})")
+            except Exception as e:
+                log.error(f"Error scoring SpotLight {spotlight.get('name', '?')}: {e}")
+                result["errors"].append(f"SpotLight {spotlight.get('name')}: {e}")
+
+        # Update tenant_opportunities with best spotlight scores
+        await self._update_best_spotlight_scores()
+
+        return result
+
+    async def score_spotlight(self, spotlight_id: str) -> dict:
+        """Score all active opps against a single SpotLight bucket."""
+        result = {"scores": 0, "errors": []}
+
+        self._anthropic_key = await _resolve_anthropic_key(self.conn)
+
+        row = await self.conn.fetchrow(
+            "SELECT fa.*, t.slug AS tenant_slug FROM focus_areas fa JOIN tenants t ON fa.tenant_id = t.id WHERE fa.id = $1",
+            spotlight_id,
+        )
+        if not row:
+            return {"error": "SpotLight not found"}
+
+        active_opps = await self.conn.fetch(
+            "SELECT * FROM opportunities WHERE status = 'active'"
+        )
+
+        try:
+            scored = await self._score_spotlight(dict(row), active_opps)
+            result["scores"] = scored
+        except Exception as e:
+            result["errors"].append(str(e))
+
+        await self._update_best_spotlight_scores(tenant_id=str(row["tenant_id"]))
+        return result
+
+    async def _score_spotlight(self, spotlight: dict, opportunities: list) -> int:
+        """Score all opportunities against a single SpotLight bucket."""
+        spotlight_id = spotlight["id"]
+        tenant_id = spotlight["tenant_id"]
+        scored_count = 0
+
+        # Build a profile-like dict from the spotlight config
+        profile = self._spotlight_to_profile(spotlight)
+
+        for opp in opportunities:
+            opp = dict(opp)
+            scores = self._compute_scores(profile, opp)
+            total = sum(scores.values())
+
+            min_threshold = spotlight.get("min_score_threshold", 40) or 40
+            if total < min_threshold * 0.5:
+                continue  # Skip very low scores but keep moderately low ones
+
+            matched_kw, matched_domains = self._find_keyword_matches(profile, opp)
+
+            # LLM for high-scoring spotlight matches
+            llm_adj = 0.0
+            llm_rationale = None
+            if total >= LLM_TRIGGER_SCORE and self._anthropic_key:
+                try:
+                    llm_result = await self._run_llm_analysis(profile, opp, total)
+                    llm_adj = llm_result.get("adjustment", 0)
+                    llm_rationale = llm_result.get("rationale", "")
+                except Exception as e:
+                    log.warning(f"LLM analysis failed for spotlight score: {e}")
+
+            total_with_llm = max(0, min(100, total + llm_adj))
+
+            # Upsert spotlight_scores
+            await self.conn.execute(
+                """
+                INSERT INTO spotlight_scores (
+                    tenant_id, spotlight_id, opportunity_id,
+                    total_score, naics_score, keyword_score,
+                    set_aside_score, agency_score, type_score, timeline_score,
+                    llm_adjustment, llm_rationale,
+                    matched_keywords, matched_domains, scored_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                    $11, $12, $13, $14, NOW()
+                )
+                ON CONFLICT (spotlight_id, opportunity_id) DO UPDATE SET
+                    total_score = $4,
+                    naics_score = $5, keyword_score = $6,
+                    set_aside_score = $7, agency_score = $8,
+                    type_score = $9, timeline_score = $10,
+                    llm_adjustment = $11, llm_rationale = $12,
+                    matched_keywords = $13, matched_domains = $14,
+                    scored_at = NOW()
+                """,
+                tenant_id, spotlight_id, opp["id"],
+                total_with_llm,
+                scores.get("naics", 0), scores.get("keyword", 0),
+                scores.get("set_aside", 0), scores.get("agency", 0),
+                scores.get("type", 0), scores.get("timeline", 0),
+                llm_adj, llm_rationale,
+                matched_kw, matched_domains,
+            )
+            scored_count += 1
+
+        # Update spotlight metadata
+        await self.conn.execute(
+            """
+            UPDATE focus_areas
+            SET last_scored_at = NOW(),
+                matched_opp_count = (
+                    SELECT COUNT(*) FROM spotlight_scores
+                    WHERE spotlight_id = $1 AND total_score >= $2
+                )
+            WHERE id = $1
+            """,
+            spotlight_id, spotlight.get("min_score_threshold", 40) or 40,
+        )
+
+        return scored_count
+
+    async def _update_best_spotlight_scores(self, tenant_id: str = None):
+        """Update tenant_opportunities with the best score across all spotlights."""
+        where_clause = "WHERE ss.tenant_id = $1" if tenant_id else ""
+        params = [tenant_id] if tenant_id else []
+
+        # For each tenant+opp, find the best spotlight score and update tenant_opportunities
+        query = f"""
+            WITH best_scores AS (
+                SELECT DISTINCT ON (ss.tenant_id, ss.opportunity_id)
+                    ss.tenant_id, ss.opportunity_id,
+                    ss.spotlight_id AS best_spotlight_id,
+                    fa.name AS best_spotlight_name,
+                    ss.total_score,
+                    ARRAY_AGG(ss.spotlight_id) OVER (
+                        PARTITION BY ss.tenant_id, ss.opportunity_id
+                    ) AS matched_spotlight_ids
+                FROM spotlight_scores ss
+                JOIN focus_areas fa ON ss.spotlight_id = fa.id
+                {where_clause}
+                ORDER BY ss.tenant_id, ss.opportunity_id, ss.total_score DESC
+            )
+            UPDATE tenant_opportunities to2
+            SET
+                best_spotlight_id = bs.best_spotlight_id,
+                best_spotlight_name = bs.best_spotlight_name,
+                matched_spotlight_ids = bs.matched_spotlight_ids
+            FROM best_scores bs
+            WHERE to2.tenant_id = bs.tenant_id
+              AND to2.opportunity_id = bs.opportunity_id
+        """
+        await self.conn.execute(query, *params)
+
+    @staticmethod
+    def _spotlight_to_profile(spotlight: dict) -> dict:
+        """Convert a SpotLight bucket config to a profile-like dict for _compute_scores."""
+        # Map spotlight fields to the profile format used by _compute_scores
+        set_aside_types = spotlight.get("set_aside_types") or []
+        return {
+            "primary_naics": spotlight.get("naics_codes") or [],
+            "secondary_naics": [],
+            "keyword_domains": spotlight.get("keyword_domains") or {},
+            "is_small_business": spotlight.get("is_small_business", False) or ("Small Business" in set_aside_types),
+            "is_sdvosb": "SDVOSB" in set_aside_types,
+            "is_wosb": "WOSB" in set_aside_types or "EDWOSB" in set_aside_types,
+            "is_hubzone": "HUBZone" in set_aside_types,
+            "is_8a": "8(a)" in set_aside_types,
+            "agency_priorities": spotlight.get("agency_priorities") or {},
+            "min_contract_value": spotlight.get("min_contract_value"),
+            "max_contract_value": spotlight.get("max_contract_value"),
+            "min_surface_score": spotlight.get("min_score_threshold", 40),
+            "high_priority_score": 75,
+            # Use keywords as a single domain for keyword matching
+            "keywords": spotlight.get("keywords") or [],
+        }
+
+    def _compute_scores(self, profile: dict, opp: dict) -> dict:
+        """Compute breakdown scores for an opportunity against a tenant profile."""
+        scores = self._compute_scores_original(profile, opp)
+
+        # If profile has flat keywords (from SpotLight), also score those
+        flat_keywords = profile.get("keywords") or []
+        if flat_keywords and scores.get("keyword", 0) < 25:
+            text = f"{opp.get('title', '')} {opp.get('description', '')}".lower()
+            hits = sum(1 for kw in flat_keywords if kw.lower() in text)
+            if hits >= 3:
+                kw_score = 25
+            elif hits >= 2:
+                kw_score = 18
+            elif hits >= 1:
+                kw_score = 10
+            else:
+                kw_score = 0
+            scores["keyword"] = max(scores.get("keyword", 0), kw_score)
+
+        return scores
