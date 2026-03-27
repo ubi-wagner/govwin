@@ -16,6 +16,15 @@ app.add_middleware(
 )
 
 
+from routers.regions import router as regions_router
+from routers.leads import router as leads_router
+from routers.ledger import router as ledger_router
+
+app.include_router(regions_router)
+app.include_router(leads_router)
+app.include_router(ledger_router)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
