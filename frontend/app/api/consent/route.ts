@@ -161,6 +161,15 @@ export async function GET() {
       }
     }
 
+    // Validate user still exists in DB — if not, force re-auth
+    const userCheck = await sql`SELECT id FROM users WHERE id = ${userId}`
+    if (userCheck.length === 0) {
+      return NextResponse.json(
+        { error: 'Session invalid — user not found', code: 'SESSION_INVALID' },
+        { status: 401 }
+      )
+    }
+
     return NextResponse.json({ data: status })
   } catch (error) {
     console.error('[GET /api/consent] Error:', error)

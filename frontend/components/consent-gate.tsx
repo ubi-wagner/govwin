@@ -42,7 +42,7 @@ export function ConsentGate({
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/consent')
+      const res = await fetch('/api/consent', { cache: 'no-store' })
       if (res.status === 401) {
         // Session invalid — sign out immediately
         signOut({ callbackUrl: '/login' })
@@ -61,10 +61,13 @@ export function ConsentGate({
   useEffect(() => { loadStatus() }, [loadStatus])
 
   // Determine what needs acceptance
-  const needsTerms = status && !status.terms_of_service?.accepted
-  const needsPrivacy = status && !status.privacy_policy?.accepted
-  const needsAi = status && !status.ai_disclosure?.accepted
-  const needsAuthority = isRegistration && status && !status.authority_representation?.accepted
+  // Only check document types that the server actually returned (exist in legal_document_versions)
+  const needsTerms = status?.terms_of_service !== undefined && !status.terms_of_service.accepted
+  const needsPrivacy = status?.privacy_policy !== undefined && !status.privacy_policy.accepted
+  const needsAi = status?.ai_disclosure !== undefined && !status.ai_disclosure.accepted
+  const needsAuthority = isRegistration
+    && status?.authority_representation !== undefined
+    && !status.authority_representation.accepted
   const needsConsent = needsTerms || needsPrivacy || needsAi || needsAuthority
 
   // If loading or already consented, render nothing
@@ -127,9 +130,10 @@ export function ConsentGate({
       }
 
       await Promise.all(promises)
+      // All POSTs succeeded — dismiss the gate immediately.
+      // Don't re-fetch (avoids cache/timing issues causing the wall to loop).
+      setStatus(null)
       onAccepted?.()
-      // Reload status to clear the gate
-      await loadStatus()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to record consent')
     } finally {
