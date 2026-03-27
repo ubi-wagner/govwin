@@ -88,13 +88,51 @@ export async function POST(request: NextRequest) {
       VALUES (${tenant.id})
     `
 
+    // Auto-create admin user from primaryEmail if provided
+    let adminUser: { id: string; email: string; _tempPassword: string } | null = null
+    if (primaryEmail) {
+      const tempPassword = crypto.randomBytes(8).toString('base64url')
+      const passwordHash = await bcrypt.hash(tempPassword, 12)
+      try {
+        const [user] = await sql`
+          INSERT INTO users (name, email, role, tenant_id, password_hash, temp_password)
+          VALUES (${name + ' Admin'}, ${primaryEmail}, 'tenant_admin', ${tenant.id}, ${passwordHash}, true)
+          RETURNING id, name, email, role, tenant_id, created_at
+        `
+        adminUser = { id: user.id as string, email: user.email as string, _tempPassword: tempPassword }
+
+        await emitCustomerEvent({
+          tenantId: tenant.id,
+          eventType: 'account.user_added',
+          userId: session.user!.id,
+          entityType: 'user',
+          entityId: user.id,
+          description: `Admin user "${primaryEmail}" auto-created for tenant "${name}"`,
+          actor: userActor(session.user!.id, session.user!.email ?? undefined),
+          payload: {
+            new_user_id: user.id,
+            new_user_email: primaryEmail,
+            new_user_role: 'tenant_admin',
+            auto_created: true,
+          },
+        })
+      } catch (userErr: any) {
+        // Email might already exist — log but don't fail tenant creation
+        if (userErr?.code === '23505') {
+          console.error('[POST /api/tenants] Admin user email already exists:', primaryEmail)
+        } else {
+          console.error('[POST /api/tenants] Failed to auto-create admin user:', userErr)
+        }
+      }
+    }
+
     await auditLog({
       userId: session.user!.id,
       tenantId: tenant.id,
       action: 'tenant.created',
       entityType: 'tenant',
       entityId: tenant.id,
-      newValue: { name, slug, plan },
+      newValue: { name, slug, plan, adminCreated: !!adminUser },
     })
 
     await emitCustomerEvent({
@@ -105,10 +143,13 @@ export async function POST(request: NextRequest) {
       entityId: tenant.id,
       description: `Tenant "${name}" created with plan: ${plan}`,
       actor: userActor(session.user!.id, session.user!.email ?? undefined),
-      payload: { name, slug, plan, primaryEmail: primaryEmail ?? null },
+      payload: { name, slug, plan, primaryEmail: primaryEmail ?? null, adminAutoCreated: !!adminUser },
     })
 
-    return NextResponse.json({ data: tenant }, { status: 201 })
+    return NextResponse.json({
+      data: tenant,
+      adminUser: adminUser ? { id: adminUser.id, email: adminUser.email, _tempPassword: adminUser._tempPassword } : null,
+    }, { status: 201 })
 
   } catch (error: any) {
     if (error.code === '23505') {
