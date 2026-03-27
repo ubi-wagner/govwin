@@ -5,12 +5,36 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import type { TenantPipelineItem } from '@/types'
 
+interface DashboardMetrics {
+  library: {
+    totalUnits: number
+    approved: number
+    draft: number
+    embedded: number
+    topCategories: { category: string; count: number }[]
+    recentUploads: number
+  }
+  proposals: {
+    total: number
+    byStage: Record<string, number>
+    avgCompletion: number
+    deadlineSoon: number
+  }
+  activity: Array<{
+    id: string
+    eventType: string
+    description: string
+    createdAt: string
+  }>
+}
+
 export default function PortalDashboard() {
   const params = useParams()
   const slug = params.tenantSlug as string
   const [topOpps, setTopOpps] = useState<TenantPipelineItem[]>([])
   const [urgentOpps, setUrgentOpps] = useState<TenantPipelineItem[]>([])
   const [stats, setStats] = useState({ total: 0, highPriority: 0, pursuing: 0, closingSoon: 0 })
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,8 +57,12 @@ export default function PortalDashboard() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json().catch(() => ({ data: [], total: 0 }))
       }),
+      fetch(`/api/portal/${slug}/dashboard`).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json().catch(() => ({}))
+      }),
     ])
-      .then(([top, urgent, highPri, pursuing]) => {
+      .then(([top, urgent, highPri, pursuing, dashMetrics]) => {
         setTopOpps(top.data ?? [])
         setUrgentOpps(urgent.data ?? [])
         setStats({
@@ -43,6 +71,9 @@ export default function PortalDashboard() {
           pursuing: pursuing.total ?? 0,
           closingSoon: urgent.total ?? 0,
         })
+        if (dashMetrics && (dashMetrics.library || dashMetrics.proposals || dashMetrics.activity)) {
+          setMetrics(dashMetrics)
+        }
       })
       .catch(err => setError(err.message ?? 'Failed to load dashboard data'))
       .finally(() => setLoading(false))
@@ -70,6 +101,26 @@ export default function PortalDashboard() {
     )
   }
 
+  const proposalStages: { key: string; label: string; color: string }[] = [
+    { key: 'outline', label: 'Outline', color: 'bg-gray-400' },
+    { key: 'draft', label: 'Draft', color: 'bg-blue-500' },
+    { key: 'pink_team', label: 'Pink', color: 'bg-pink-500' },
+    { key: 'red_team', label: 'Red', color: 'bg-red-500' },
+    { key: 'gold_team', label: 'Gold', color: 'bg-amber-500' },
+    { key: 'final', label: 'Final', color: 'bg-emerald-500' },
+    { key: 'submitted', label: 'Submitted', color: 'bg-purple-500' },
+  ]
+
+  const byStage = metrics?.proposals?.byStage ?? {}
+  const totalByStage = proposalStages.reduce((sum, s) => sum + (byStage[s.key] ?? 0), 0)
+
+  const activityColors: Record<string, string> = {
+    library: 'bg-indigo-100 text-indigo-800',
+    proposal: 'bg-purple-100 text-purple-800',
+    account: 'bg-blue-100 text-blue-800',
+    spotlight: 'bg-amber-100 text-amber-800',
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -82,6 +133,58 @@ export default function PortalDashboard() {
         <StatCard label="Pursuing" value={stats.pursuing} color="purple" />
         <StatCard label="Closing Soon" value={stats.closingSoon} color="red" />
       </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label="Proposals Active" value={metrics?.proposals?.total ?? 0} color="purple" />
+        <StatCard label="Library Units" value={metrics?.library?.totalUnits ?? 0} color="indigo" />
+        <StatCard label="Avg Completion" value={`${metrics?.proposals?.avgCompletion ?? 0}%`} color="emerald" />
+        <StatCard label="Deadlines Soon" value={metrics?.proposals?.deadlineSoon ?? 0} color="rose" />
+      </div>
+
+      {/* Proposal Pipeline */}
+      {metrics?.proposals && (
+        <div className="mt-8 card">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Proposal Pipeline</h2>
+            <Link href={`/portal/${slug}/proposals`} className="text-sm text-brand-600 hover:text-brand-800">
+              View all &rarr;
+            </Link>
+          </div>
+          <div className="mt-4">
+            {totalByStage > 0 ? (
+              <div className="flex h-8 w-full overflow-hidden rounded-lg">
+                {proposalStages.map(stage => {
+                  const count = byStage[stage.key] ?? 0
+                  if (count === 0) return null
+                  const pct = (count / totalByStage) * 100
+                  return (
+                    <div
+                      key={stage.key}
+                      className={`${stage.color} flex items-center justify-center text-xs font-medium text-white`}
+                      style={{ width: `${pct}%`, minWidth: '2rem' }}
+                      title={`${stage.label}: ${count}`}
+                    >
+                      {count}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex h-8 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500">
+                No proposals yet
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+              {proposalStages.map(stage => (
+                <span key={stage.key} className="flex items-center gap-1">
+                  <span className={`inline-block h-2 w-2 rounded-full ${stage.color}`} />
+                  {stage.label} ({byStage[stage.key] ?? 0})
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Top Scored */}
@@ -118,8 +221,100 @@ export default function PortalDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Library Health */}
+      {metrics?.library && (
+        <div className="mt-8 card">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Library Health</h2>
+            <Link href={`/portal/${slug}/library`} className="text-sm text-brand-600 hover:text-brand-800">
+              View all &rarr;
+            </Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            <div className="flex gap-4 text-sm">
+              <span className="text-gray-600">
+                <span className="font-semibold text-gray-900">{metrics.library.approved}</span> approved of{' '}
+                <span className="font-semibold text-gray-900">{metrics.library.totalUnits}</span> total
+              </span>
+              <span className="text-gray-600">
+                <span className="font-semibold text-gray-900">{metrics.library.embedded}</span> units embedded
+                {metrics.library.totalUnits > 0 && (
+                  <span className="ml-1 text-xs text-gray-400">
+                    ({Math.round((metrics.library.embedded / metrics.library.totalUnits) * 100)}%)
+                  </span>
+                )}
+              </span>
+            </div>
+            {(metrics.library.topCategories ?? []).length > 0 && (
+              <div className="space-y-2">
+                {(metrics.library.topCategories ?? []).map(cat => {
+                  const maxCount = (metrics.library.topCategories ?? [])[0]?.count ?? 1
+                  return (
+                    <div key={cat.category} className="flex items-center gap-3">
+                      <span className="w-32 truncate text-xs text-gray-600">{cat.category}</span>
+                      <div className="flex-1">
+                        <div className="h-4 w-full overflow-hidden rounded bg-gray-100">
+                          <div
+                            className="h-full rounded bg-indigo-400"
+                            style={{ width: `${(cat.count / maxCount) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium text-gray-700">{cat.count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Activity Feed */}
+      {(metrics?.activity ?? []).length > 0 && (
+        <div className="mt-8 card">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+          <div className="mt-4 space-y-3">
+            {(metrics?.activity ?? []).slice(0, 10).map(event => {
+              const namespace = event.eventType?.split('.')[0] ?? ''
+              const badgeClass = activityColors[namespace] ?? 'bg-gray-100 text-gray-800'
+              return (
+                <div key={event.id} className="flex items-start gap-3 text-sm">
+                  <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${badgeClass}`}>
+                    {event.eventType}
+                  </span>
+                  <span className="flex-1 text-gray-700">{event.description}</span>
+                  <span className="shrink-0 text-xs text-gray-400">
+                    {relativeTime(event.createdAt)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+function relativeTime(dateStr: string): string {
+  try {
+    const now = Date.now()
+    const then = new Date(dateStr).getTime()
+    const diffMs = now - then
+    if (Number.isNaN(diffMs)) return ''
+    const minutes = Math.floor(diffMs / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days}d ago`
+    return `${Math.floor(days / 7)}w ago`
+  } catch {
+    return ''
+  }
 }
 
 function OppCard({ opp, slug }: { opp: TenantPipelineItem; slug: string }) {
@@ -167,12 +362,15 @@ function PursuitBadge({ status }: { status: string }) {
   return <span className={`text-[10px] ${styles[status] ?? 'badge-gray'}`}>{status}</span>
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
   const bg: Record<string, string> = {
     blue: 'bg-blue-50',
     green: 'bg-green-50',
     purple: 'bg-purple-50',
     red: 'bg-red-50',
+    indigo: 'bg-indigo-50',
+    emerald: 'bg-emerald-50',
+    rose: 'bg-rose-50',
   }
   return (
     <div className={`rounded-xl p-4 ${bg[color] ?? bg.blue}`}>
