@@ -345,9 +345,18 @@ export type CustomerEventType =
   | 'binder.stage_advanced'
   | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
   | 'library.upload_ingested' | 'library.atoms_extracted' | 'library.atom_approved'
+  | 'library.harvest_completed' | 'library.duplicates_found'
   | 'proposal.created' | 'proposal.section_populated' | 'proposal.section_refined'
   | 'proposal.completed' | 'proposal.exported' | 'proposal.archived'
-  | 'proposal.atoms_extracted'
+  | 'proposal.atoms_extracted' | 'proposal.section_approved'
+  | 'proposal.outcome_recorded'
+  | 'proposal.stage_changed' | 'proposal.deadline_warning'
+  | 'proposal.collaborator_added' | 'proposal.collaborator_removed'
+  | 'proposal.review_requested' | 'proposal.review_completed'
+  | 'proposal.comment_added' | 'proposal.comment_resolved'
+  | 'proposal.change_suggested' | 'proposal.change_accepted' | 'proposal.change_rejected'
+  | 'proposal.file_uploaded' | 'proposal.file_versioned'
+  | 'proposal.checklist_completed' | 'proposal.workspace_locked' | 'proposal.workspace_unlocked'
   | 'rfp.parsed' | 'rfp.template_created' | 'rfp.template_accepted' | 'rfp.template_corrected'
   | 'account.tier_upgraded' | 'account.tier_downgraded' | 'account.cap_increased'
   | 'account.user_added' | 'account.profile_updated' | 'account.drive_provisioned'
@@ -950,6 +959,14 @@ export interface Proposal {
   rfpTemplateId: string | null
   title: string
   status: ProposalStatus
+  stage: ProposalStage
+  stageColor: ProposalStageColor
+  stageEnteredAt: string
+  stageDeadline: string | null
+  submissionDeadline: string | null
+  workspaceLocked: boolean
+  workspaceLockedBy: string | null
+  workspaceLockedAt: string | null
   pageLimit: number | null
   currentPageEst: number
   sectionCount: number
@@ -1084,6 +1101,457 @@ export interface LibraryUnitSummary {
   unitsByCategory: Record<LibraryUnitCategory, number>
   lastUnitCreated: string | null
   totalUsage: number
+}
+
+// ─── Grinder: Library Feedback Loop ──────────────────────────
+
+export type HarvestTrigger =
+  | 'section_approved' | 'section_locked' | 'proposal_submitted'
+  | 'proposal_won' | 'manual' | 'scheduled'
+
+export type HarvestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+
+export type AtomOriginType =
+  | 'upload' | 'proposal_harvest' | 'manual_entry'
+  | 'import' | 'ai_generated' | 'merged'
+
+export type AtomMergeStatus =
+  | 'pending' | 'auto_merged' | 'manually_merged'
+  | 'kept_separate' | 'dismissed'
+
+export interface LibraryHarvestLog {
+  id: string
+  tenantId: string
+  proposalId: string
+  sectionId: string
+  harvestTrigger: HarvestTrigger
+  status: HarvestStatus
+  atomsExtracted: number
+  atomsNew: number
+  atomsMerged: number
+  atomsSkipped: number
+  sourceWordCount: number | null
+  sourceContentHash: string | null
+  processingModel: string | null
+  processingTimeMs: number | null
+  errorMessage: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface LibraryAtomSimilarity {
+  id: string
+  tenantId: string
+  unitAId: string
+  unitBId: string
+  cosineSimilarity: number
+  mergeStatus: AtomMergeStatus
+  mergedIntoId: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
+export interface LibraryAtomOutcome {
+  id: string
+  unitId: string
+  proposalId: string
+  sectionId: string | null
+  usageType: 'used' | 'harvested' | 'both'
+  outcome: ProposalOutcome | null
+  confidenceDelta: number
+  appliedAt: string | null
+  createdAt: string
+}
+
+// Learning metrics view
+export interface LibraryLearningMetrics {
+  tenantId: string
+  totalAtoms: number
+  approvedAtoms: number
+  atomsFromUploads: number
+  atomsFromProposals: number
+  atomsFromMerges: number
+  atomsManual: number
+  atomsWithWins: number
+  atomsWithLosses: number
+  atomsUndefeated: number
+  totalReuses: number
+  avgConfidence: number | null
+  avgConfidenceWinners: number | null
+  avgConfidenceLosers: number | null
+  lastAtomCreated: string | null
+  atomsLast30d: number
+  vectorizedAtoms: number
+}
+
+// Harvest pipeline status view
+export interface LibraryHarvestStatus {
+  tenantId: string
+  totalHarvests: number
+  completed: number
+  failed: number
+  pending: number
+  totalAtomsExtracted: number
+  totalAtomsNew: number
+  totalAtomsMerged: number
+  totalAtomsSkipped: number
+  avgProcessingMs: number | null
+  lastHarvestAt: string | null
+}
+
+// Atom effectiveness view
+export interface LibraryAtomEffectiveness {
+  unitId: string
+  tenantId: string
+  title: string | null
+  category: LibraryUnitCategory
+  contentType: LibraryUnitContentType
+  confidenceScore: number | null
+  usageCount: number
+  winCount: number
+  lossCount: number
+  winRate: number | null
+  originType: AtomOriginType
+  status: LibraryUnitStatus
+  wordCount: number | null
+  reuseEffectiveness: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Grinder: Proposal Workspace & Collaboration ─────────────
+
+// Color Team pipeline stages
+export type ProposalStage =
+  | 'outline' | 'draft' | 'pink_team' | 'red_team'
+  | 'gold_team' | 'final' | 'submitted' | 'archived'
+
+export type ProposalStageColor =
+  | 'gray' | 'blue' | 'pink' | 'red' | 'gold' | 'green' | 'purple' | 'slate'
+
+// Stage-to-color mapping
+export const STAGE_COLORS: Record<ProposalStage, ProposalStageColor> = {
+  outline: 'gray',
+  draft: 'blue',
+  pink_team: 'pink',
+  red_team: 'red',
+  gold_team: 'gold',
+  final: 'green',
+  submitted: 'purple',
+  archived: 'slate',
+}
+
+export const STAGE_LABELS: Record<ProposalStage, string> = {
+  outline: 'Outline',
+  draft: 'Draft',
+  pink_team: 'Pink Team',
+  red_team: 'Red Team',
+  gold_team: 'Gold Team',
+  final: 'Final',
+  submitted: 'Submitted',
+  archived: 'Archived',
+}
+
+// Workspace files
+export type WorkspaceFileType = 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'image' | 'other'
+
+export interface ProposalWorkspaceFile {
+  id: string
+  proposalId: string
+  sectionId: string | null
+  fileName: string
+  fileType: WorkspaceFileType
+  mimeType: string | null
+  storagePath: string
+  fileSizeBytes: number | null
+  version: number
+  parentFileId: string | null
+  uploadedBy: string
+  description: string | null
+  isSubmissionArtifact: boolean
+  isTemplate: boolean
+  tags: string[]
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Collaborators
+export type CollaboratorRole =
+  | 'owner' | 'capture_manager' | 'volume_lead' | 'writer'
+  | 'reviewer' | 'approver' | 'subject_expert' | 'viewer'
+
+export interface CollaboratorPermissions {
+  can_edit: boolean
+  can_comment: boolean
+  can_review: boolean
+  can_approve: boolean
+  can_upload: boolean
+  can_manage_team: boolean
+  can_lock: boolean
+  can_export: boolean
+}
+
+export interface CollaboratorNotificationPrefs {
+  on_mention: boolean
+  on_stage_change: boolean
+  on_review_requested: boolean
+  on_comment: boolean
+  on_deadline: boolean
+  digest_frequency: 'immediate' | 'hourly' | 'daily' | 'none'
+}
+
+export interface ProposalCollaborator {
+  id: string
+  proposalId: string
+  userId: string
+  role: CollaboratorRole
+  assignedSections: string[]
+  permissions: CollaboratorPermissions
+  invitedBy: string | null
+  invitedAt: string
+  acceptedAt: string | null
+  isActive: boolean
+  notificationPrefs: CollaboratorNotificationPrefs
+  createdAt: string
+  updatedAt: string
+}
+
+// Stage history
+export interface ProposalStageHistoryEntry {
+  id: string
+  proposalId: string
+  fromStage: ProposalStage | null
+  toStage: ProposalStage
+  fromColor: ProposalStageColor | null
+  toColor: ProposalStageColor
+  changedBy: string
+  reason: string | null
+  gateCriteria: Record<string, unknown>
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+// Change tracking
+export type ChangeType =
+  | 'edit' | 'suggestion' | 'accept' | 'reject' | 'revert'
+  | 'ai_edit' | 'ai_suggestion' | 'bulk_accept' | 'bulk_reject'
+
+export type ChangeStatus = 'pending' | 'accepted' | 'rejected' | 'superseded'
+
+export interface ProposalChange {
+  id: string
+  proposalId: string
+  sectionId: string | null
+  fileId: string | null
+  userId: string
+  changeType: ChangeType
+  fieldChanged: string | null
+  oldValue: string | null
+  newValue: string | null
+  diffHtml: string | null
+  diffSummary: string | null
+  status: ChangeStatus
+  reviewedBy: string | null
+  reviewedAt: string | null
+  reviewComment: string | null
+  batchId: string | null
+  createdAt: string
+}
+
+// Reviews (Color Team)
+export type ReviewType =
+  | 'compliance' | 'technical' | 'editorial' | 'executive'
+  | 'pink_team' | 'red_team' | 'gold_team' | 'peer' | 'final_qa'
+
+export type ReviewStage = 'pink_team' | 'red_team' | 'gold_team' | 'final' | 'ad_hoc'
+
+export type ReviewStatus =
+  | 'pending' | 'in_progress' | 'approved' | 'rejected'
+  | 'changes_requested' | 'deferred'
+
+export type ReviewVerdict = 'pass' | 'fail' | 'conditional_pass' | 'not_reviewed'
+
+export interface ReviewFinding {
+  severity: 'critical' | 'major' | 'minor' | 'suggestion'
+  section: string | null
+  description: string
+  recommendation: string | null
+}
+
+export interface ProposalReview {
+  id: string
+  proposalId: string
+  sectionId: string | null
+  reviewerId: string
+  reviewType: ReviewType
+  reviewStage: ReviewStage
+  status: ReviewStatus
+  verdict: ReviewVerdict | null
+  score: number | null
+  maxScore: number | null
+  comments: string | null
+  findings: ReviewFinding[]
+  dueDate: string | null
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// Comments
+export type CommentType =
+  | 'general' | 'suggestion' | 'question' | 'issue'
+  | 'resolution' | 'action_item' | 'praise'
+
+export interface CommentAnchor {
+  startOffset?: number
+  endOffset?: number
+  anchorText?: string
+  elementId?: string
+}
+
+export interface ProposalComment {
+  id: string
+  proposalId: string
+  sectionId: string | null
+  fileId: string | null
+  parentCommentId: string | null
+  userId: string
+  content: string
+  commentType: CommentType
+  anchorContext: CommentAnchor | null
+  mentions: string[]
+  isResolved: boolean
+  resolvedBy: string | null
+  resolvedAt: string | null
+  isPinned: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// Checklists
+export type ChecklistStage =
+  | 'outline' | 'draft' | 'pink_team' | 'red_team'
+  | 'gold_team' | 'final' | 'submission'
+
+export type ChecklistCategory =
+  | 'compliance' | 'content' | 'formatting' | 'technical'
+  | 'administrative' | 'submission' | 'general'
+
+export interface ProposalChecklist {
+  id: string
+  proposalId: string
+  stage: ChecklistStage
+  category: ChecklistCategory
+  title: string
+  description: string | null
+  isRequired: boolean
+  isChecked: boolean
+  checkedBy: string | null
+  checkedAt: string | null
+  sortOrder: number
+  autoCheckRule: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+}
+
+// Activity feed
+export type ProposalActivityType =
+  | 'stage_changed' | 'section_edited' | 'section_populated'
+  | 'section_approved' | 'section_locked'
+  | 'file_uploaded' | 'file_versioned' | 'file_deleted'
+  | 'collaborator_added' | 'collaborator_removed'
+  | 'review_requested' | 'review_completed'
+  | 'comment_added' | 'comment_resolved'
+  | 'change_suggested' | 'change_accepted' | 'change_rejected'
+  | 'checklist_checked' | 'checklist_unchecked'
+  | 'ai_populated' | 'ai_refined'
+  | 'workspace_locked' | 'workspace_unlocked'
+  | 'exported' | 'submitted'
+
+export interface ProposalActivity {
+  id: string
+  proposalId: string
+  userId: string | null
+  activityType: ProposalActivityType
+  sectionId: string | null
+  targetUserId: string | null
+  summary: string
+  detail: Record<string, unknown>
+  isSystem: boolean
+  createdAt: string
+}
+
+// Notifications
+export type ProposalNotificationType =
+  | 'mention' | 'review_request' | 'review_complete'
+  | 'stage_change' | 'deadline_warning' | 'comment_reply'
+  | 'change_accepted' | 'change_rejected' | 'assignment'
+  | 'lock_warning' | 'submission_reminder'
+
+export interface ProposalNotification {
+  id: string
+  proposalId: string
+  userId: string
+  notificationType: ProposalNotificationType
+  title: string
+  body: string | null
+  link: string | null
+  isRead: boolean
+  readAt: string | null
+  createdAt: string
+}
+
+// Workspace summary view
+export interface ProposalWorkspaceSummary {
+  tenantId: string
+  proposalId: string
+  title: string
+  stage: ProposalStage
+  stageColor: ProposalStageColor
+  stageEnteredAt: string
+  stageDeadline: string | null
+  submissionDeadline: string | null
+  status: ProposalStatus
+  workspaceLocked: boolean
+  opportunityTitle: string | null
+  closeDate: string | null
+  collaboratorCount: number
+  totalSections: number
+  completedSections: number
+  fileCount: number
+  submissionFileCount: number
+  pendingReviews: number
+  openComments: number
+  pendingChanges: number
+  uncheckedGateItems: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Section assignment view
+export interface ProposalSectionAssignment {
+  sectionId: string
+  proposalId: string
+  sectionKey: string
+  title: string
+  sectionStatus: ProposalSectionStatus
+  pageLimit: number | null
+  currentPageCount: number
+  pageStatus: ProposalSectionPageStatus
+  proposalStage: ProposalStage
+  stageColor: ProposalStageColor
+  assigneeId: string | null
+  assigneeName: string | null
+  assigneeEmail: string | null
+  assigneeRole: CollaboratorRole | null
+  openComments: number
+  pendingChanges: number
+  pendingReviews: number
+  sectionUpdatedAt: string
 }
 
 // ─── API responses ────────────────────────────────────────────
