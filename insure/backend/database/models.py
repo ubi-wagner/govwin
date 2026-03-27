@@ -40,6 +40,22 @@ class DocType(str, enum.Enum):
     SUNBIZ = "SUNBIZ"
 
 
+class LogSeverity(str, enum.Enum):
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class LogActor(str, enum.Enum):
+    SYSTEM = "SYSTEM"
+    USER = "USER"
+    HUNTER = "HUNTER"
+    ANALYZER = "ANALYZER"
+    SEED = "SEED"
+    API = "API"
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
