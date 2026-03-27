@@ -20,6 +20,16 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
   const session = req.auth
 
   // ── Public routes ──────────────────────────────────────────
+  // Invite acceptance page — must be public (invitee has no account yet)
+  if (pathname.startsWith('/invite/') || pathname.startsWith('/api/invite')) {
+    return NextResponse.next()
+  }
+
+  // Legal pages are public
+  if (pathname.startsWith('/legal/')) {
+    return NextResponse.next()
+  }
+
   if (pathname.startsWith('/login')) {
     // Already logged in → redirect to appropriate home
     if (session?.user) {

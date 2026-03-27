@@ -49,6 +49,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         status: tenant.status,
       },
       profile: profile ?? null,
+      userRole: session.user.role,
     })
   } catch (error) {
     console.error('[GET /api/portal/profile] Error:', error)

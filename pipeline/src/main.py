@@ -184,6 +184,23 @@ async def execute_job(conn, job: dict) -> dict:
             score_result = await engine.score_all_tenants()
             result["tenants_scored"] = score_result.get("tenants_scored", 0)
 
+            # Also score against SpotLight buckets
+            spotlight_result = await engine.score_all_spotlights()
+            result["spotlights_scored"] = spotlight_result.get("buckets_scored", 0)
+            result["spotlight_scores"] = spotlight_result.get("total_scores", 0)
+
+        # SpotLight-specific scoring (triggered by spotlight.created/updated automation)
+        if source == "spotlight_scoring":
+            engine = ScoringEngine(conn)
+            spotlight_id = params.get("spotlight_id")
+            if spotlight_id:
+                spotlight_result = await engine.score_spotlight(spotlight_id)
+                result["spotlight_scores"] = spotlight_result.get("scores", 0)
+            else:
+                spotlight_result = await engine.score_all_spotlights()
+                result["spotlights_scored"] = spotlight_result.get("buckets_scored", 0)
+                result["spotlight_scores"] = spotlight_result.get("total_scores", 0)
+
         # Deadline nudges — run the reminder worker's check_deadlines()
         if source == "reminder_nudges" or (source == "digest" and run_type == "notify"):
             worker = ReminderDeadlineWorker(conn)

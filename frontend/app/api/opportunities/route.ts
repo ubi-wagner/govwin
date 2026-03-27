@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     pursuitStatus:   searchParams.get('pursuitStatus') as any ?? undefined,
     deadlineStatus:  searchParams.get('deadlineStatus') as any ?? undefined,
     isPinned:        searchParams.get('isPinned') === 'true' ? true : undefined,
+    spotlightId:     searchParams.get('spotlightId') ?? undefined,
     sortBy:          (searchParams.get('sortBy') ?? 'score') as any,
     sortDir:         (searchParams.get('sortDir') ?? 'desc') as any,
     limit:           Math.min(Number(searchParams.get('limit') ?? 50), 100),
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
           AND (${filters.pursuitStatus ?? ''} = '' OR pursuit_status  = ${filters.pursuitStatus ?? ''})
           AND (${filters.deadlineStatus ?? ''} = '' OR deadline_status = ${filters.deadlineStatus ?? ''})
           AND (${filters.isPinned ?? false} = false OR is_pinned = true)
+          AND (${filters.spotlightId ?? ''} = '' OR best_spotlight_id::text = ${filters.spotlightId ?? ''})
           AND (
             ${filters.search ?? ''} = ''
             OR title ILIKE ${'%' + (filters.search ?? '') + '%'}
@@ -91,6 +93,7 @@ export async function GET(request: NextRequest) {
           AND (${filters.pursuitStatus ?? ''} = '' OR pursuit_status  = ${filters.pursuitStatus ?? ''})
           AND (${filters.deadlineStatus ?? ''} = '' OR deadline_status = ${filters.deadlineStatus ?? ''})
           AND (${filters.isPinned ?? false} = false OR is_pinned = true)
+          AND (${filters.spotlightId ?? ''} = '' OR best_spotlight_id::text = ${filters.spotlightId ?? ''})
           AND (
             ${filters.search ?? ''} = ''
             OR title ILIKE ${'%' + (filters.search ?? '') + '%'}
