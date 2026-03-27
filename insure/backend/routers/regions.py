@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ class CreateRegionRequest(BaseModel):
 def create_region(body: CreateRegionRequest, db: Session = Depends(get_db)):
     try:
         if not body.name.strip():
-            return {"error": "Region name is required"}, 400
+            raise HTTPException(status_code=400, detail="Region name is required")
 
         region = RegionOfInterest(
             name=body.name.strip(),
@@ -48,13 +48,13 @@ def create_region(body: CreateRegionRequest, db: Session = Depends(get_db)):
                 "status": region.status.value,
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        import traceback
-        traceback.print_exc()
         console_error = f"[POST /api/regions] Error: {e}"
         print(console_error)
-        return {"error": "Failed to create region"}, 500
+        raise HTTPException(status_code=500, detail="Failed to create region")
 
 
 @router.get("")
@@ -76,4 +76,4 @@ def list_regions(db: Session = Depends(get_db)):
     except Exception as e:
         console_error = f"[GET /api/regions] Error: {e}"
         print(console_error)
-        return {"error": "Failed to list regions"}, 500
+        raise HTTPException(status_code=500, detail="Failed to list regions")
