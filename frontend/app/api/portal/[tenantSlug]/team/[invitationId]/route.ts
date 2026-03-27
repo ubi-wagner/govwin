@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 
 type Params = { params: Promise<{ tenantSlug: string; invitationId: string }> }
 
@@ -64,6 +65,18 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       UPDATE team_invitations SET status = 'revoked'
       WHERE id = ${invitationId} AND tenant_id = ${tenant.id}
     `
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'account.invite_expired',
+      userId: session.user.id,
+      entityType: 'invitation',
+      entityId: invitationId,
+      description: `Invitation to ${invitation.email} revoked`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: { invitationId, email: invitation.email, action: 'revoked' },
+    }).catch(e => console.error('[DELETE /api/portal/team/[id]] Event error (non-critical):', e))
+
     return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('[DELETE /api/portal/team/[id]] Error:', error)
@@ -115,6 +128,17 @@ export async function POST(_request: NextRequest, { params }: Params) {
     } catch (e) {
       console.error('[POST /api/portal/team/[id]] Email queue error (non-critical):', e)
     }
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'account.invite_sent',
+      userId: session.user.id,
+      entityType: 'invitation',
+      entityId: invitationId,
+      description: `Invitation to ${invitation.email} resent`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: { invitationId, email: invitation.email, action: 'resent' },
+    }).catch(e => console.error('[POST /api/portal/team/[id]] Event error (non-critical):', e))
 
     return NextResponse.json({ data: { success: true, message: 'Invitation resent' } })
   } catch (error) {

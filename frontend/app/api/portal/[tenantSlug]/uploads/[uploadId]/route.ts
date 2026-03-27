@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
+import { emitCustomerEvent, userActor } from '@/lib/events'
 
 type Params = { params: Promise<{ tenantSlug: string; uploadId: string }> }
 
@@ -72,6 +73,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 library_status, is_active, created_at
     `
 
+    // Emit event for downstream automation
+    const changedFields = [
+      description !== undefined && 'description',
+      uploadCategory !== undefined && 'category',
+      spotlightId !== undefined && 'spotlight',
+    ].filter(Boolean)
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'library.upload_ingested',
+      userId: session.user.id,
+      entityType: 'upload',
+      entityId: uploadId,
+      description: `Upload "${updated.originalFilename ?? updated.filename}" metadata updated: ${changedFields.join(', ')}`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: { uploadId, changedFields, description, uploadCategory, spotlightId },
+    }).catch(e => console.error('[PATCH /api/portal/uploads/[id]] Event error (non-critical):', e))
+
     return NextResponse.json({ data: updated })
   } catch (error) {
     console.error('[PATCH /api/portal/uploads/[id]] Error:', error)
@@ -93,6 +112,18 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       UPDATE tenant_uploads SET is_active = FALSE
       WHERE id = ${uploadId} AND tenant_id = ${tenant.id}
     `
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'library.upload_ingested',
+      userId: session.user.id,
+      entityType: 'upload',
+      entityId: uploadId,
+      description: `Upload "${result.upload?.originalFilename ?? uploadId}" deleted`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: { uploadId, action: 'deleted' },
+    }).catch(e => console.error('[DELETE /api/portal/uploads/[id]] Event error (non-critical):', e))
+
     return NextResponse.json({ data: { success: true } })
   } catch (error) {
     console.error('[DELETE /api/portal/uploads/[id]] Error:', error)

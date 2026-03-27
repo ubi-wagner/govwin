@@ -18,20 +18,20 @@ export default function PortalDashboard() {
     Promise.all([
       fetch(`/api/opportunities?tenantSlug=${slug}&sortBy=score&limit=5`).then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({ data: [], total: 0 }))
       }),
       fetch(`/api/opportunities?tenantSlug=${slug}&deadlineStatus=urgent&sortBy=close_date&sortDir=asc&limit=5`).then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({ data: [], total: 0 }))
       }),
       // Separate queries for accurate stats (not derived from 5-item subsets)
       fetch(`/api/opportunities?tenantSlug=${slug}&minScore=75&limit=1`).then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({ data: [], total: 0 }))
       }),
       fetch(`/api/opportunities?tenantSlug=${slug}&pursuitStatus=pursuing&limit=1`).then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({ data: [], total: 0 }))
       }),
     ])
       .then(([top, urgent, highPri, pursuing]) => {

@@ -194,7 +194,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     try {
       await emitCustomerEvent({
         tenantId: tenant.id,
-        eventType: 'library.upload_ingested' as any,
+        eventType: 'library.upload_ingested',
         userId: session.user.id,
         entityType: 'upload',
         entityId: upload.id,

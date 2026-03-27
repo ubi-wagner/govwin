@@ -151,6 +151,12 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    // Fetch previous draft BEFORE update so we can compute an accurate diff
+    const prevRows = await sql`
+      SELECT draft_content FROM site_content WHERE page_key = ${pageKey}
+    `
+    const prevDraft = (prevRows[0]?.draftContent ?? null) as Record<string, unknown> | null
+
     const rows = await sql`
       UPDATE site_content
       SET
@@ -167,8 +173,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })
     }
 
-    // Log event with actual diff
-    const prevDraft = rows[0].draftContent as Record<string, unknown> | null
+    // Log event with actual diff (comparing PREVIOUS draft vs NEW content)
     const changedSections = content ? diffSections(prevDraft, content) : []
     const diffDesc = changedSections.length > 0
       ? `Draft saved: updated ${changedSections.join(', ')}`

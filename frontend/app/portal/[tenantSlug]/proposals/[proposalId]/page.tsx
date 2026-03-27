@@ -44,9 +44,9 @@ export default function ProposalDetailPage() {
     fetch(`/api/portal/${slug}/proposals/${proposalId}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({}))
       })
-      .then(d => setData(d.data))
+      .then(d => setData(d.data ?? null))
       .catch(err => setError(err.message ?? 'Failed to load'))
       .finally(() => setLoading(false))
   }, [slug, proposalId])

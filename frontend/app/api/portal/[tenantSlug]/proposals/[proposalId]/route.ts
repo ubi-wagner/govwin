@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db'
 import { emitCustomerEvent, userActor } from '@/lib/events'
+import type { CustomerEventType } from '@/types'
 
 type Params = { params: Promise<{ tenantSlug: string; proposalId: string }> }
 
@@ -192,6 +193,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           ${`Stage changed from ${current.stage} to ${stage}`},
           ${JSON.stringify({ from: current.stage, to: stage, reason: reason ?? null })}::jsonb)
       `
+
+      // Emit event for downstream automation
+      await emitCustomerEvent({
+        tenantId: tenant.id,
+        eventType: 'proposal.stage_changed',
+        userId: session.user.id,
+        entityType: 'proposal',
+        entityId: proposalId,
+        description: `Proposal "${current.title}" stage changed from ${current.stage} to ${stage}`,
+        actor: userActor(session.user.id, session.user.email ?? undefined),
+        payload: { proposalId, fromStage: current.stage, toStage: stage, reason: reason ?? null },
+      }).catch(e => console.error('[PATCH /api/portal/proposals/[id]] Event emission error (non-critical):', e))
     }
 
     // Update other fields
@@ -260,6 +273,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       INSERT INTO proposal_activity (proposal_id, user_id, activity_type, summary)
       VALUES (${proposalId}, ${session.user.id}, 'stage_changed', ${`Proposal "${archived.title}" archived`})
     `
+
+    await emitCustomerEvent({
+      tenantId: tenant.id,
+      eventType: 'proposal.archived',
+      userId: session.user.id,
+      entityType: 'proposal',
+      entityId: proposalId,
+      description: `Proposal "${archived.title}" archived`,
+      actor: userActor(session.user.id, session.user.email ?? undefined),
+      payload: { proposalId, title: archived.title },
+    }).catch(e => console.error('[DELETE /api/portal/proposals/[id]] Event emission error (non-critical):', e))
 
     return NextResponse.json({ data: archived, message: 'Proposal archived' })
   } catch (error) {
