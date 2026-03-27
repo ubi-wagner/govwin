@@ -356,6 +356,7 @@ export type CustomerEventType =
   | 'binder.stage_advanced'
   | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
   | 'library.upload_ingested' | 'library.atoms_extracted' | 'library.atom_approved'
+  | 'library.atom_updated' | 'library.atom_archived'
   | 'library.embeddings_generated' | 'library.harvest_completed' | 'library.duplicates_found'
   | 'proposal.created' | 'proposal.section_populated' | 'proposal.section_refined'
   | 'proposal.completed' | 'proposal.exported' | 'proposal.archived'

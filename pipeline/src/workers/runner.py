@@ -25,6 +25,7 @@ from .email_trigger import EmailTriggerWorker
 from .finder import FinderOppIngestWorker, FinderDriveArchiveWorker
 from .grinder import GrinderUploadWorker
 from .embedder import EmbedderEventWorker
+from .rfp_parser import RfpParserWorker
 from .reminder import ReminderAmendmentWorker, ReminderDeadlineWorker
 from automation.worker import AutomationCustomerWorker, AutomationOpportunityWorker
 
@@ -56,6 +57,7 @@ WORKER_REGISTRY: dict[str, list[type]] = {
     "grinder": [
         GrinderUploadWorker,
         EmbedderEventWorker,
+        RfpParserWorker,
     ],
 }
 
