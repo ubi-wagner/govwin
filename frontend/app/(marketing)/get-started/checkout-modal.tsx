@@ -1,18 +1,57 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { Modal } from '@/components/page-sections'
 
-/** Client wrapper: billing toggle + pricing cards + checkout modal */
+/** Client wrapper: billing toggle + pricing cards + waitlist modal */
 export function InteractivePricingSection({
   plans,
 }: {
   plans: { name: string; price: string; period: string; description: string; features: string[]; cta: string; popular: boolean }[]
 }) {
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [waitlistOpen, setWaitlistOpen] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
+  const [email, setEmail] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleJoinWaitlist = async () => {
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email address.')
+      return
+    }
+    setError(null)
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, plan: selectedPlan, billingPeriod }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Something went wrong. Please try again.')
+        return
+      }
+      setSubmitted(true)
+    } catch {
+      setError('Unable to connect. Please try again later.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleClose = () => {
+    setWaitlistOpen(false)
+    // Reset form state after modal animation
+    setTimeout(() => {
+      setEmail('')
+      setSubmitted(false)
+      setError(null)
+    }, 300)
+  }
 
   return (
     <>
@@ -63,124 +102,117 @@ export function InteractivePricingSection({
                 period={billingPeriod === 'annual' ? 'month, billed annually' : plan.period}
                 description={plan.description}
                 features={plan.features}
-                cta={plan.cta}
+                cta="Join Waitlist"
                 popular={plan.popular}
-                onSelect={() => { setSelectedPlan(plan.name); setCheckoutOpen(true) }}
+                onSelect={() => { setSelectedPlan(plan.name); setWaitlistOpen(true) }}
               />
             )
           })}
         </div>
       </section>
 
-      {/* Checkout Modal */}
-      <Modal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} maxWidth="max-w-md">
+      {/* Waitlist Modal */}
+      <Modal open={waitlistOpen} onClose={handleClose} maxWidth="max-w-md">
         <div className="p-8">
-          <div className="flex items-center justify-center gap-2 text-xs font-medium text-gray-400 mb-6">
-            <span className="text-brand-600 font-bold">1. Choose Plan</span>
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-            </svg>
-            <span className="font-bold text-gray-900">2. Payment</span>
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-            </svg>
-            <span>3. Setup</span>
-          </div>
-
-          <div className="text-center mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50">
-              <svg className="h-6 w-6 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-              </svg>
+          {submitted ? (
+            /* Success state */
+            <div className="text-center py-4">
+              <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 mb-5">
+                <svg className="h-7 w-7 text-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">You&apos;re on the list!</h3>
+              <p className="mt-3 text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
+                We&apos;ll notify you at <span className="font-semibold text-gray-700">{email}</span> as
+                soon as GovWin launches. Early subscribers get priority onboarding and special pricing.
+              </p>
+              <button
+                onClick={handleClose}
+                className="btn-primary mt-8 px-8 py-3 text-sm"
+              >
+                Got it
+              </button>
             </div>
-            <h3 className="mt-3 text-lg font-bold text-gray-900">Subscribe to {selectedPlan}</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {billingPeriod === 'annual' ? 'Billed annually' : 'Billed monthly'} &middot; Cancel anytime
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-gray-50 p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-900">{selectedPlan} Plan</span>
-              <span className="text-sm font-bold text-gray-900">
-                {selectedPlan && (() => {
-                  const plan = plans.find(p => p.name === selectedPlan)
-                  if (!plan) return ''
-                  const price = parseInt(plan.price.replace('$', ''), 10)
-                  return billingPeriod === 'annual'
-                    ? `$${Math.round(price * 0.8)}/mo`
-                    : `${plan.price}/mo`
-                })()}
-              </span>
-            </div>
-            {billingPeriod === 'annual' && (
-              <p className="mt-1 text-xs text-emerald-600 font-medium">You save 20% with annual billing</p>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="label">Email</label>
-              <input type="email" className="input" placeholder="you@company.com" />
-            </div>
-            <div>
-              <label className="label">Card Information</label>
-              <div className="rounded-xl border border-gray-300 bg-white p-4 text-center">
-                <div className="flex items-center justify-center gap-2 text-gray-400">
-                  <svg className="h-8 w-8" viewBox="0 0 32 32" fill="none">
-                    <rect x="1" y="6" width="30" height="20" rx="3" stroke="currentColor" strokeWidth="1.5" />
-                    <rect x="1" y="10" width="30" height="4" fill="currentColor" opacity="0.15" />
-                    <rect x="4" y="18" width="8" height="3" rx="1" fill="currentColor" opacity="0.2" />
+          ) : (
+            /* Waitlist form */
+            <>
+              <div className="text-center mb-6">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50">
+                  <svg className="h-6 w-6 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
                   </svg>
                 </div>
-                <p className="mt-2 text-xs text-gray-400">Stripe integration placeholder</p>
-                <p className="mt-1 text-[10px] text-gray-300">Payment processing will be connected here</p>
+                <h3 className="mt-4 text-xl font-bold text-gray-900">Launching Soon</h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  We&apos;re putting the finishing touches on our platform.
+                </p>
               </div>
-            </div>
 
-            {/* Legal agreement — required before checkout */}
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
-              <p className="text-xs font-semibold text-gray-700">Legal Agreement</p>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <span className="text-[11px] text-gray-600 leading-relaxed">
-                  I represent that I am authorized to act on behalf of my organization.
-                  As Account Administrator, I accept responsibility for all users I add to this account.
-                </span>
-              </label>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <span className="text-[11px] text-gray-600 leading-relaxed">
-                  I agree to the{' '}
-                  <Link href="/legal/terms" target="_blank" className="text-brand-600 underline">Terms of Service</Link>,{' '}
-                  <Link href="/legal/privacy" target="_blank" className="text-brand-600 underline">Privacy Policy</Link>, and{' '}
-                  <Link href="/legal/ai-disclosure" target="_blank" className="text-brand-600 underline">AI Disclosure</Link>.
-                </span>
-              </label>
-            </div>
+              {selectedPlan && (
+                <div className="rounded-xl bg-gray-50 p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-900">{selectedPlan} Plan</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {(() => {
+                        const plan = plans.find(p => p.name === selectedPlan)
+                        if (!plan) return ''
+                        const price = parseInt(plan.price.replace('$', ''), 10)
+                        return billingPeriod === 'annual'
+                          ? `$${Math.round(price * 0.8)}/mo`
+                          : `${plan.price}/mo`
+                      })()}
+                    </span>
+                  </div>
+                  {billingPeriod === 'annual' && (
+                    <p className="mt-1 text-xs text-emerald-600 font-medium">You save 20% with annual billing</p>
+                  )}
+                </div>
+              )}
 
-            <button className="btn-primary w-full py-3 text-base" onClick={() => setCheckoutOpen(false)}>
-              Subscribe &middot; Start 14-Day Trial
-            </button>
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                </svg>
-                Secure checkout
+              <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                Join our early access list to be the first to know when GovWin launches.
+                Early subscribers get <span className="font-semibold text-gray-900">priority onboarding</span> and{' '}
+                <span className="font-semibold text-gray-900">special pricing</span>.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="label">Email</label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(null) }}
+                  />
+                </div>
+
+                {error && (
+                  <p className="text-sm text-red-600 font-medium">{error}</p>
+                )}
+
+                <button
+                  className="btn-primary w-full py-3 text-base"
+                  onClick={handleJoinWaitlist}
+                  disabled={submitting}
+                >
+                  {submitting ? 'Joining...' : 'Join Waitlist'}
+                </button>
+
+                <p className="text-center text-xs text-gray-400 pt-2">
+                  Questions? Contact us at{' '}
+                  <a href="mailto:sales@govwin.com" className="text-brand-600 hover:underline font-medium">
+                    sales@govwin.com
+                  </a>
+                </p>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
-                </svg>
-                256-bit encryption
-              </div>
-              <span className="text-[10px] font-medium text-gray-400">Powered by Stripe</span>
-            </div>
-          </div>
-          <button onClick={() => setCheckoutOpen(false)} className="mt-4 w-full text-center text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-            &larr; Back to plans
-          </button>
+
+              <button onClick={handleClose} className="mt-4 w-full text-center text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
+                &larr; Back to plans
+              </button>
+            </>
+          )}
         </div>
       </Modal>
     </>
