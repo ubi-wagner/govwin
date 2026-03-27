@@ -345,9 +345,11 @@ export type CustomerEventType =
   | 'binder.stage_advanced'
   | 'grinder.draft_generated' | 'grinder.draft_reviewed' | 'grinder.draft_approved'
   | 'library.upload_ingested' | 'library.atoms_extracted' | 'library.atom_approved'
+  | 'library.harvest_completed' | 'library.duplicates_found'
   | 'proposal.created' | 'proposal.section_populated' | 'proposal.section_refined'
   | 'proposal.completed' | 'proposal.exported' | 'proposal.archived'
-  | 'proposal.atoms_extracted'
+  | 'proposal.atoms_extracted' | 'proposal.section_approved'
+  | 'proposal.outcome_recorded'
   | 'proposal.stage_changed' | 'proposal.deadline_warning'
   | 'proposal.collaborator_added' | 'proposal.collaborator_removed'
   | 'proposal.review_requested' | 'proposal.review_completed'
@@ -1099,6 +1101,124 @@ export interface LibraryUnitSummary {
   unitsByCategory: Record<LibraryUnitCategory, number>
   lastUnitCreated: string | null
   totalUsage: number
+}
+
+// ─── Grinder: Library Feedback Loop ──────────────────────────
+
+export type HarvestTrigger =
+  | 'section_approved' | 'section_locked' | 'proposal_submitted'
+  | 'proposal_won' | 'manual' | 'scheduled'
+
+export type HarvestStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
+
+export type AtomOriginType =
+  | 'upload' | 'proposal_harvest' | 'manual_entry'
+  | 'import' | 'ai_generated' | 'merged'
+
+export type AtomMergeStatus =
+  | 'pending' | 'auto_merged' | 'manually_merged'
+  | 'kept_separate' | 'dismissed'
+
+export interface LibraryHarvestLog {
+  id: string
+  tenantId: string
+  proposalId: string
+  sectionId: string
+  harvestTrigger: HarvestTrigger
+  status: HarvestStatus
+  atomsExtracted: number
+  atomsNew: number
+  atomsMerged: number
+  atomsSkipped: number
+  sourceWordCount: number | null
+  sourceContentHash: string | null
+  processingModel: string | null
+  processingTimeMs: number | null
+  errorMessage: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface LibraryAtomSimilarity {
+  id: string
+  tenantId: string
+  unitAId: string
+  unitBId: string
+  cosineSimilarity: number
+  mergeStatus: AtomMergeStatus
+  mergedIntoId: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
+export interface LibraryAtomOutcome {
+  id: string
+  unitId: string
+  proposalId: string
+  sectionId: string | null
+  usageType: 'used' | 'harvested' | 'both'
+  outcome: ProposalOutcome | null
+  confidenceDelta: number
+  appliedAt: string | null
+  createdAt: string
+}
+
+// Learning metrics view
+export interface LibraryLearningMetrics {
+  tenantId: string
+  totalAtoms: number
+  approvedAtoms: number
+  atomsFromUploads: number
+  atomsFromProposals: number
+  atomsFromMerges: number
+  atomsManual: number
+  atomsWithWins: number
+  atomsWithLosses: number
+  atomsUndefeated: number
+  totalReuses: number
+  avgConfidence: number | null
+  avgConfidenceWinners: number | null
+  avgConfidenceLosers: number | null
+  lastAtomCreated: string | null
+  atomsLast30d: number
+  vectorizedAtoms: number
+}
+
+// Harvest pipeline status view
+export interface LibraryHarvestStatus {
+  tenantId: string
+  totalHarvests: number
+  completed: number
+  failed: number
+  pending: number
+  totalAtomsExtracted: number
+  totalAtomsNew: number
+  totalAtomsMerged: number
+  totalAtomsSkipped: number
+  avgProcessingMs: number | null
+  lastHarvestAt: string | null
+}
+
+// Atom effectiveness view
+export interface LibraryAtomEffectiveness {
+  unitId: string
+  tenantId: string
+  title: string | null
+  category: LibraryUnitCategory
+  contentType: LibraryUnitContentType
+  confidenceScore: number | null
+  usageCount: number
+  winCount: number
+  lossCount: number
+  winRate: number | null
+  originType: AtomOriginType
+  status: LibraryUnitStatus
+  wordCount: number | null
+  reuseEffectiveness: number | null
+  createdAt: string
+  updatedAt: string
 }
 
 // ─── Grinder: Proposal Workspace & Collaboration ─────────────
