@@ -92,7 +92,7 @@ export default function ContentManagerPage() {
     fetch('/api/content')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
+        return r.json().catch(() => ({}))
       })
       .then(d => setPages(d.data ?? []))
       .catch(err => setError(err.message ?? 'Failed to load content'))

@@ -171,7 +171,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     try {
       await emitCustomerEvent({
         tenantId: tenant.id,
-        eventType: 'spotlight.updated' as any,
+        eventType: 'spotlight.updated',
         userId: session.user.id,
         entityType: 'spotlight',
         entityId: spotlightId,
@@ -217,7 +217,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     try {
       await emitCustomerEvent({
         tenantId: tenant.id,
-        eventType: 'spotlight.deleted' as any,
+        eventType: 'spotlight.deleted',
         userId: session.user.id,
         entityType: 'spotlight',
         entityId: spotlightId,

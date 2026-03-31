@@ -195,7 +195,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     try {
       await emitCustomerEvent({
         tenantId: tenant.id,
-        eventType: 'account.invite_sent' as any,
+        eventType: 'account.invite_sent',
         userId: session.user.id,
         entityType: 'invitation',
         entityId: invitation.id,

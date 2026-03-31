@@ -5,6 +5,7 @@ import { sql } from '@/lib/db'
 import { PortalNav } from './portal-nav'
 import { ConsentGate } from '@/components/consent-gate'
 import { SignOutButton } from '@/components/sign-out-button'
+import { NotificationCenter } from '@/components/notification-center'
 
 export default async function PortalLayout({
   children,
@@ -102,6 +103,10 @@ export default async function PortalLayout({
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
+        {/* Top bar with notification bell */}
+        <div className="flex h-12 items-center justify-end border-b border-gray-100 px-6">
+          <NotificationCenter tenantSlug={tenantSlug} />
+        </div>
         <div className="mx-auto max-w-7xl px-6 py-8">
           {children}
         </div>

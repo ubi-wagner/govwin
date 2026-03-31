@@ -23,6 +23,7 @@ from croniter import croniter
 from ingest.sam_gov import SamGovIngester
 from scoring.engine import ScoringEngine
 from workers.reminder import ReminderDeadlineWorker
+from workers.embedder import run_embedding_batch
 
 # ── Config ──────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -206,6 +207,15 @@ async def execute_job(conn, job: dict) -> dict:
             worker = ReminderDeadlineWorker(conn)
             nudge_result = await worker.check_deadlines()
             result["nudges_sent"] = nudge_result.get("nudges_sent", 0)
+
+        # Embedding generation — vectorize library_units missing embeddings
+        if source == "embedding_generator":
+            try:
+                embed_result = await run_embedding_batch(conn)
+                result["units_embedded"] = embed_result.get("units_embedded", 0)
+            except Exception as e:
+                log.error(f"[execute_job] Embedding generation error: {e}")
+                result["errors"].append(f"embedding_generator: {e}")
 
         # Email delivery — flush notifications_queue
         if source in ("digest", "email_delivery") or run_type == "notify":

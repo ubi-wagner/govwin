@@ -142,7 +142,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     try {
       await emitCustomerEvent({
         tenantId: tenant.id,
-        eventType: 'spotlight.created' as any,
+        eventType: 'spotlight.created',
         userId: session.user.id,
         entityType: 'spotlight',
         entityId: spotlight.id,

@@ -7,9 +7,9 @@ import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
-    eyebrow: '14-day free trial · No credit card required',
+    eyebrow: 'Launching Soon · Join the Waitlist',
     title: 'Choose the plan that fits your mission',
-    description: 'Start with a free trial on any plan. Scale as your pipeline grows.',
+    description: 'Preview our plans and join the waitlist to get early access when we launch.',
   },
   tiers: [
     {
@@ -25,7 +25,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
         'SAM.gov opportunity scanning',
         'Basic deadline alerts',
       ],
-      cta: 'Start Free Trial',
+      cta: 'Join Waitlist',
       popular: false,
     },
     {
@@ -43,7 +43,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
         'Document management',
         'Priority support',
       ],
-      cta: 'Start Free Trial',
+      cta: 'Join Waitlist',
       popular: true,
     },
     {
@@ -61,7 +61,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
         'Dedicated account manager',
         'SSO & advanced security',
       ],
-      cta: 'Contact Sales',
+      cta: 'Join Waitlist',
       popular: false,
     },
   ],
@@ -79,11 +79,11 @@ const STATIC_CONTENT: GetStartedPageContent = {
     ['Support', 'Email', 'Priority', 'Dedicated'],
   ],
   faqs: [
-    { q: 'How does the free trial work?', a: 'You get 14 days of full access to your selected plan. No credit card required to start. You can upgrade, downgrade, or cancel at any time.' },
-    { q: 'Can I change plans later?', a: 'Absolutely. Upgrade or downgrade at any time. Changes take effect at your next billing cycle. No penalties or hidden fees.' },
-    { q: 'Do you offer annual billing?', a: 'Yes — annual plans save you 20%. Contact us for a custom annual agreement with additional perks.' },
-    { q: 'What payment methods do you accept?', a: 'We accept all major credit cards (Visa, Mastercard, Amex) and ACH bank transfers for annual plans. Processed securely via Stripe.' },
-    { q: 'Is there a setup fee?', a: 'No setup fees, ever. Your workspace is provisioned instantly when you subscribe. We help you configure your scoring profile during onboarding.' },
+    { q: 'When will GovWin launch?', a: 'We are in the final stages of development and will be launching soon. Join the waitlist to be notified the moment we go live and secure early access pricing.' },
+    { q: 'What do I get by joining the waitlist?', a: 'Waitlist members receive priority onboarding, special launch pricing, and early access before the platform opens to the public.' },
+    { q: 'Can I change plans later?', a: 'Absolutely. Once we launch, you can upgrade or downgrade at any time. Changes take effect at your next billing cycle. No penalties or hidden fees.' },
+    { q: 'Do you offer annual billing?', a: 'Yes — annual plans will save you 20%. Contact us for a custom annual agreement with additional perks.' },
+    { q: 'Is there a setup fee?', a: 'No setup fees, ever. Your workspace will be provisioned instantly when you subscribe. We help you configure your scoring profile during onboarding.' },
     { q: 'Do you offer discounts for startups or nonprofits?', a: 'Yes. SBIR/STTR applicants and registered nonprofits qualify for 25% off any plan. Contact our team to apply.' },
   ],
   contactCta: {

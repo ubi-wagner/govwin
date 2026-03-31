@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     try {
       await emitCustomerEvent({
         tenantId: invitation.tenant_id,
-        eventType: 'account.invite_accepted' as any,
+        eventType: 'account.invite_accepted',
         userId,
         entityType: 'invitation',
         entityId: invitation.id,
