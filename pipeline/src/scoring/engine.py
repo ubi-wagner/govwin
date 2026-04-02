@@ -662,6 +662,14 @@ Respond in JSON with these fields:
         """Score all active opportunities against all active SpotLight buckets."""
         result = {"buckets_scored": 0, "total_scores": 0, "errors": []}
 
+        # Check if spotlight_scores table exists before proceeding
+        table_exists = await self.conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'spotlight_scores')"
+        )
+        if not table_exists:
+            log.warning("spotlight_scores table does not exist — skipping spotlight scoring (run migration 028)")
+            return result
+
         self._anthropic_key = await _resolve_anthropic_key(self.conn)
 
         spotlights = await self.conn.fetch(
@@ -698,6 +706,14 @@ Respond in JSON with these fields:
     async def score_spotlight(self, spotlight_id: str) -> dict:
         """Score all active opps against a single SpotLight bucket."""
         result = {"scores": 0, "errors": []}
+
+        # Check if spotlight_scores table exists
+        table_exists = await self.conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'spotlight_scores')"
+        )
+        if not table_exists:
+            log.warning("spotlight_scores table does not exist — skipping (run migration 028)")
+            return result
 
         self._anthropic_key = await _resolve_anthropic_key(self.conn)
 

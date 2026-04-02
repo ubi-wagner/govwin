@@ -896,7 +896,10 @@ class SamGovIngester:
     @staticmethod
     def _detect_program_type(raw: dict) -> str:
         """Detect SBIR/STTR program type from opportunity text."""
-        text = f"{raw.get('title', '')} {raw.get('description', '')}".upper()
+        desc = raw.get('description', '')
+        if isinstance(desc, dict):
+            desc = desc.get('body', '') or ''
+        text = f"{raw.get('title', '')} {desc}".upper()
 
         if 'STTR' in text and 'PHASE II' in text:
             return 'sttr_phase_2'
@@ -995,6 +998,8 @@ class SamGovIngester:
 
         # ── Place of performance ──
         pop = raw.get("placeOfPerformance") or {}
+        if not isinstance(pop, dict):
+            pop = {}
         pop_city_obj = pop.get("city") or {}
         pop_state_obj = pop.get("state") or {}
         pop_country_obj = pop.get("country") or {}
@@ -1005,6 +1010,8 @@ class SamGovIngester:
 
         # ── Office address ──
         off_addr = raw.get("officeAddress") or {}
+        if not isinstance(off_addr, dict):
+            off_addr = {}
         office_city = off_addr.get("city", "")
         office_state = off_addr.get("state", "")
         office_zip = off_addr.get("zipcode", "")
@@ -1023,6 +1030,8 @@ class SamGovIngester:
 
         # ── Award info (populated when type is "Award Notice") ──
         award = raw.get("award") or {}
+        if not isinstance(award, dict):
+            award = {}
         award_date = self._parse_date(award.get("date")) if award else None
         award_number = award.get("number", "") if award else ""
         award_amount_raw = award.get("amount") if award else None
@@ -1034,9 +1043,13 @@ class SamGovIngester:
                 award_amount = None
 
         awardee = award.get("awardee") or {} if award else {}
+        if not isinstance(awardee, dict):
+            awardee = {}
         awardee_name = awardee.get("name", "") if awardee else ""
         awardee_uei = awardee.get("ueiSAM", "") if awardee else ""
         awardee_loc = awardee.get("location") or {} if awardee else {}
+        if not isinstance(awardee_loc, dict):
+            awardee_loc = {}
         awardee_city = awardee_loc.get("city", "") if awardee_loc else ""
         awardee_state = awardee_loc.get("state", "") if awardee_loc else ""
 
