@@ -65,9 +65,9 @@ class TestDateParsing:
 # ── Stub data ──
 
 class TestStubData:
-    def test_generates_5_opportunities(self):
+    def test_generates_9_opportunities(self):
         stubs = _generate_stub_opportunities()
-        assert len(stubs) == 5
+        assert len(stubs) == 9
 
     def test_each_stub_has_required_fields(self):
         required = ["noticeId", "title", "type", "naicsCode", "active", "uiLink"]

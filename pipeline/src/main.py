@@ -21,6 +21,7 @@ import asyncpg
 from croniter import croniter
 
 from ingest.sam_gov import SamGovIngester
+from ingest.sbir_gov import SbirGovSolicitationIngester, SbirGovAwardIngester, SbirGovCompanyIngester
 from scoring.engine import ScoringEngine
 from workers.reminder import ReminderDeadlineWorker
 from workers.embedder import run_embedding_batch
@@ -177,6 +178,21 @@ async def execute_job(conn, job: dict) -> dict:
     try:
         if source == "sam_gov" and run_type in ("full", "incremental"):
             ingester = SamGovIngester(conn)
+            ingest_result = await ingester.run(params)
+            result.update(ingest_result)
+
+        if source == "sbir_gov_solicitations" and run_type in ("full", "incremental"):
+            ingester = SbirGovSolicitationIngester(conn)
+            ingest_result = await ingester.run(params)
+            result.update(ingest_result)
+
+        if source == "sbir_gov_awards" and run_type in ("full", "incremental"):
+            ingester = SbirGovAwardIngester(conn)
+            ingest_result = await ingester.run(params)
+            result.update(ingest_result)
+
+        if source == "sbir_gov_companies" and run_type in ("full", "incremental"):
+            ingester = SbirGovCompanyIngester(conn)
             ingest_result = await ingester.run(params)
             result.update(ingest_result)
 
