@@ -778,9 +778,11 @@ Respond in JSON with these fields:
                 """,
                 tenant_id, spotlight_id, opp["id"],
                 total_with_llm,
-                scores.get("naics", 0), scores.get("keyword", 0),
+                scores.get("naics", 0),
+                scores.get("technology", 0),  # technology match stored in keyword_score column
                 scores.get("set_aside", 0), scores.get("agency", 0),
-                scores.get("type", 0), scores.get("timeline", 0),
+                scores.get("program_type", 0),  # program type fit stored in type_score column
+                scores.get("timeline", 0),
                 llm_adj, llm_rationale,
                 matched_kw, matched_domains,
             )

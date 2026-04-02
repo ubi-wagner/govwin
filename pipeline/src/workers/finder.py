@@ -1,9 +1,10 @@
 """
-Finder workers — V1 Tier 1
+Finder workers — V1 Tier 1 (SBIR/STTR focused)
 
 Workers:
-  - FinderOppIngestWorker: When new opps are ingested, check which tenants
-    should see them and emit customer events
+  - FinderOppIngestWorker: When new SBIR/STTR opportunities are ingested,
+    check which tenants should see them and emit customer events with
+    program type metadata
   - FinderDriveArchiveWorker: Archive new opportunities to Drive weekly folders
 """
 
@@ -47,9 +48,11 @@ class FinderOppIngestWorker(BaseEventWorker):
             rows = await self.conn.fetch(
                 """
                 SELECT to2.tenant_id, to2.total_score, to2.pursuit_recommendation,
-                       t.max_active_opps, t.product_tier
+                       t.max_active_opps, t.product_tier,
+                       o.program_type
                 FROM tenant_opportunities to2
                 JOIN tenants t ON t.id = to2.tenant_id
+                JOIN opportunities o ON o.id = to2.opportunity_id
                 WHERE to2.opportunity_id = $1
                   AND t.status = 'active'
                 """,
@@ -57,6 +60,12 @@ class FinderOppIngestWorker(BaseEventWorker):
             )
 
             for row in rows:
+                program_type = row.get("program_type")
+                description = (
+                    f"New SBIR/STTR opportunity ({program_type}) scored at {row['total_score']}"
+                    if program_type
+                    else f"New opportunity scored at {row['total_score']}"
+                )
                 await emit_customer_event(
                     self.conn,
                     tenant_id=str(row["tenant_id"]),
@@ -64,7 +73,7 @@ class FinderOppIngestWorker(BaseEventWorker):
                     opportunity_id=str(opp_id),
                     entity_type="opportunity",
                     entity_id=str(opp_id),
-                    description=f"New opportunity scored at {row['total_score']}",
+                    description=description,
                     actor=pipeline_actor("finder_ingest"),
                     trigger=trigger_ref(str(event["id"]), "ingest.new"),
                     refs={"tenant_id": str(row["tenant_id"]), "opportunity_id": str(opp_id)},
@@ -73,6 +82,7 @@ class FinderOppIngestWorker(BaseEventWorker):
                         "recommendation": row["pursuit_recommendation"],
                         "product_tier": row["product_tier"],
                         "max_active_opps": row["max_active_opps"],
+                        "program_type": program_type,
                     },
                 )
 
