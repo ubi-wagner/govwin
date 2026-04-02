@@ -575,12 +575,9 @@ class SamGovIngester:
         # Resolve API key from DB (encrypted) or env var fallback
         sam_api_key = await _resolve_api_key(self.conn)
 
-        # ── Stub mode: return seed data when USE_STUB_DATA=true or no API key ──
-        if USE_STUB_DATA or not sam_api_key:
-            if USE_STUB_DATA:
-                log.info("USE_STUB_DATA=true — returning stub SAM.gov data")
-            else:
-                log.warning("SAM_GOV_API_KEY not configured — using stub data")
+        # ── Stub mode: ONLY when USE_STUB_DATA=true (explicit opt-in) ──
+        if USE_STUB_DATA:
+            log.info("USE_STUB_DATA=true — returning stub SAM.gov data (not real opportunities)")
             stub_opps = _generate_stub_opportunities()
             for opp in stub_opps:
                 try:
@@ -590,6 +587,16 @@ class SamGovIngester:
                 except Exception as e:
                     result["errors"].append(f"Stub upsert error for {opp.get('noticeId')}: {e}")
                     log.error("Stub upsert error: %s", e)
+            return result
+
+        if not sam_api_key:
+            msg = (
+                "SAM_GOV_API_KEY not configured — cannot fetch real opportunities. "
+                "Set SAM_GOV_API_KEY env var or add encrypted key to api_key_registry. "
+                "To use test data, set USE_STUB_DATA=true explicitly."
+            )
+            log.error(msg)
+            result["errors"].append(msg)
             return result
 
         # Check rate limit
@@ -610,19 +617,25 @@ class SamGovIngester:
         async with httpx.AsyncClient(timeout=30) as client:
             while True:
                 try:
-                    resp = await client.get(
-                        SAM_API_BASE,
-                        params={
-                            "api_key": sam_api_key,
-                            "postedFrom": posted_from,
-                            "postedTo": posted_to,
-                            "limit": PAGE_SIZE,
-                            "offset": offset,
-                            "ptype": "o,k,p",  # Opportunities, sources sought, presolicitations
-                            "typeOfSetAside": "SBR,STTR",  # SBIR/STTR set-aside filter codes
-                            "ncode": "541715,541711,541712",  # R&D NAICS codes
-                        },
-                    )
+                    # Build query params — prefer SBIR/STTR but don't exclude
+                    # everything else. SAM.gov scoring handles relevance filtering.
+                    api_params = {
+                        "api_key": sam_api_key,
+                        "postedFrom": posted_from,
+                        "postedTo": posted_to,
+                        "limit": PAGE_SIZE,
+                        "offset": offset,
+                        "ptype": "o,k,p,s",  # Solicitations, sources sought, presolicitations, special notices
+                    }
+                    # Apply optional SBIR filters from job params
+                    set_aside_filter = params.get("typeOfSetAside")
+                    naics_filter = params.get("ncode")
+                    if set_aside_filter:
+                        api_params["typeOfSetAside"] = set_aside_filter
+                    if naics_filter:
+                        api_params["ncode"] = naics_filter
+
+                    resp = await client.get(SAM_API_BASE, params=api_params)
 
                     # Track rate limit
                     await self.conn.execute(
@@ -883,7 +896,10 @@ class SamGovIngester:
     @staticmethod
     def _detect_program_type(raw: dict) -> str:
         """Detect SBIR/STTR program type from opportunity text."""
-        text = f"{raw.get('title', '')} {raw.get('description', '')}".upper()
+        desc = raw.get('description', '')
+        if isinstance(desc, dict):
+            desc = desc.get('body', '') or ''
+        text = f"{raw.get('title', '')} {desc}".upper()
 
         if 'STTR' in text and 'PHASE II' in text:
             return 'sttr_phase_2'
@@ -982,6 +998,8 @@ class SamGovIngester:
 
         # ── Place of performance ──
         pop = raw.get("placeOfPerformance") or {}
+        if not isinstance(pop, dict):
+            pop = {}
         pop_city_obj = pop.get("city") or {}
         pop_state_obj = pop.get("state") or {}
         pop_country_obj = pop.get("country") or {}
@@ -992,6 +1010,8 @@ class SamGovIngester:
 
         # ── Office address ──
         off_addr = raw.get("officeAddress") or {}
+        if not isinstance(off_addr, dict):
+            off_addr = {}
         office_city = off_addr.get("city", "")
         office_state = off_addr.get("state", "")
         office_zip = off_addr.get("zipcode", "")
@@ -1010,6 +1030,8 @@ class SamGovIngester:
 
         # ── Award info (populated when type is "Award Notice") ──
         award = raw.get("award") or {}
+        if not isinstance(award, dict):
+            award = {}
         award_date = self._parse_date(award.get("date")) if award else None
         award_number = award.get("number", "") if award else ""
         award_amount_raw = award.get("amount") if award else None
@@ -1021,9 +1043,13 @@ class SamGovIngester:
                 award_amount = None
 
         awardee = award.get("awardee") or {} if award else {}
+        if not isinstance(awardee, dict):
+            awardee = {}
         awardee_name = awardee.get("name", "") if awardee else ""
         awardee_uei = awardee.get("ueiSAM", "") if awardee else ""
         awardee_loc = awardee.get("location") or {} if awardee else {}
+        if not isinstance(awardee_loc, dict):
+            awardee_loc = {}
         awardee_city = awardee_loc.get("city", "") if awardee_loc else ""
         awardee_state = awardee_loc.get("state", "") if awardee_loc else ""
 

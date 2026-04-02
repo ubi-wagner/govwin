@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { Tenant, TenantProfile, AppUser, TenantStatus, TenantPlan } from '@/types'
@@ -27,9 +27,7 @@ export default function TenantDetailPage() {
   const [showAddUser, setShowAddUser] = useState(false)
   const [editing, setEditing] = useState(false)
 
-  useEffect(() => { loadTenant() }, [tenantId])
-
-  function loadTenant() {
+  const loadTenant = useCallback(() => {
     setLoading(true)
     setError(null)
     fetch(`/api/tenants/${tenantId}`)
@@ -41,7 +39,9 @@ export default function TenantDetailPage() {
       .then(d => { if (d) setData(d) })
       .catch(err => setError(err.message ?? 'Failed to load tenant'))
       .finally(() => setLoading(false))
-  }
+  }, [tenantId, router])
+
+  useEffect(() => { loadTenant() }, [loadTenant])
 
   if (loading) return <div className="animate-pulse"><div className="h-8 w-48 rounded bg-gray-200" /></div>
   if (error) return (

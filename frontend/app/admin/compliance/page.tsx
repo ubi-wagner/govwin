@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 interface ConsentRecord {
   id: string
@@ -36,11 +36,7 @@ export default function CompliancePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [tab])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -61,7 +57,9 @@ export default function CompliancePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [tab])
+
+  useEffect(() => { loadData() }, [loadData])
 
   const tabConfig: { key: Tab; label: string; description: string }[] = [
     { key: 'consents', label: 'Legal Consents', description: 'Terms, privacy, and authority acceptances' },
