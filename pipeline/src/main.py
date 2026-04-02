@@ -22,6 +22,7 @@ from croniter import croniter
 
 from ingest.sam_gov import SamGovIngester
 from ingest.sbir_gov import SbirGovSolicitationIngester, SbirGovAwardIngester, SbirGovCompanyIngester
+from ingest.grants_gov import GrantsGovIngester
 from scoring.engine import ScoringEngine
 from workers.reminder import ReminderDeadlineWorker
 from workers.embedder import run_embedding_batch
@@ -193,6 +194,11 @@ async def execute_job(conn, job: dict) -> dict:
 
         if source == "sbir_gov_companies" and run_type in ("full", "incremental"):
             ingester = SbirGovCompanyIngester(conn)
+            ingest_result = await ingester.run(params)
+            result.update(ingest_result)
+
+        if source == "grants_gov" and run_type in ("full", "incremental"):
+            ingester = GrantsGovIngester(conn)
             ingest_result = await ingester.run(params)
             result.update(ingest_result)
 
