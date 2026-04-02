@@ -6,49 +6,49 @@ import type { HomePageContent } from '@/types'
 
 const STATIC_CONTENT: HomePageContent = {
   hero: {
-    eyebrow: 'SBIR/STTR Intelligence',
-    title: 'Never miss an SBIR or STTR opportunity again',
-    description: '24/7 AI-powered scanning of SAM.gov, SBIR.gov, and agency portals. Every SBIR, STTR, OTA, and BAA opportunity scored against your technology focus — so you can stop searching and start winning.',
-    trustBadge: '13/13 SBIR/STTR Win Rate \u00B7 $100M+ Secured \u00B7 20+ Years',
+    eyebrow: 'AI-Enabled. Expert-Enhanced.',
+    title: 'Your technology deserves federal funding. We make it happen.',
+    description: 'RFP Pipeline monitors every SBIR, STTR, OTA, and BAA opportunity across 11 federal agencies — scores them against your technology — and helps you build winning proposals. Built by someone with a 13/13 win rate.',
+    trustBadge: '13/13 Win Rate \u00B7 $100M+ Secured \u00B7 11 Federal Agencies',
   },
   features: [
-    { icon: 'Search', title: 'SBIR/STTR Discovery', description: 'Automated scanning of SAM.gov, SBIR.gov, and agency portals for SBIR Phase I/II, STTR, OTAs, BAAs, and Challenges — across every federal agency.' },
-    { icon: 'Chart', title: 'Technology Match Scoring', description: 'AI scores each opportunity against your research areas, NAICS codes, TRL level, and agency history. Focus on the topics built for your technology.' },
-    { icon: 'Bell', title: 'Deadline Intelligence', description: 'Never miss a solicitation close date. Smart alerts tied to SBIR/STTR release cycles, pre-solicitation windows, and agency-specific timelines.' },
-    { icon: 'Shield', title: 'Proposal Build Pipeline', description: 'Expert-reviewed templates plus AI content assembly for $499 (Phase I) or $999 (Phase II). From RFP to submission-ready in a week.' },
-    { icon: 'Document', title: 'Compound Learning Library', description: 'Every proposal builds your reusable content library — team bios, past performance, technical narratives. Your 5th proposal is dramatically faster than your first.' },
-    { icon: 'Team', title: 'Partner Collaboration', description: 'Securely add research partners (STTR), subcontractors, and consultants with controlled proposal-level access. Built for how SBIR/STTR teams actually work.' },
+    { icon: 'Search', title: 'Every Opportunity, Everywhere', description: 'We scan SAM.gov, SBIR.gov, and Grants.gov daily. DoD, NIH, NSF, DOE, NASA, and every other SBIR agency. You will never miss a topic that matches your technology.' },
+    { icon: 'Chart', title: 'Scored to Your Technology', description: 'Our AI scores each opportunity against your research areas, NAICS codes, TRL level, and agency fit. Stop reading hundreds of topics. Focus on the ones built for you.' },
+    { icon: 'Bell', title: 'Deadlines That Matter', description: 'Smart alerts tied to SBIR/STTR release cycles and agency timelines. Know when topics open, when pre-solicitations drop, and when close dates are approaching.' },
+    { icon: 'Shield', title: 'Expert Proposal Templates', description: 'For $499 (Phase I) or $999 (Phase II), get an expert-reviewed proposal template tailored to your topic. Built by a team with a 100% recent win rate.' },
+    { icon: 'Document', title: 'Your Content Compounds', description: 'Every proposal builds your reusable content library — team bios, past performance, technical narratives. Your 5th proposal takes half the time of your first.' },
+    { icon: 'Team', title: 'Built for STTR Teams', description: 'Add university PIs, subcontractors, and consultants with proposal-level access controls. Real collaboration without exposing your full pipeline.' },
   ],
   stats: [
-    { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured through SBIR/STTR awards' },
-    { value: '100%', label: 'Recent Win Rate', description: '13 of 13 SBIR/STTR awards' },
-    { value: '50+', label: 'Startups Supported', description: 'Deep tech and defense companies' },
-    { value: '20+', label: 'Years Experience', description: 'SBIR/STTR and federal R&D funding' },
+    { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured for startups and small businesses' },
+    { value: '13/13', label: 'Win Rate', description: 'Most recent SBIR/STTR cohort' },
+    { value: '50+', label: 'Startups Supported', description: 'Deep tech, defense, and biotech' },
+    { value: '11', label: 'Federal Agencies', description: 'Full SBIR/STTR program coverage' },
   ],
   howItWorks: [
-    { step: '01', title: 'Profile Your Technology', description: 'Define your research areas, NAICS codes, TRL level, target agencies, and set-aside certifications. Our scoring engine learns what you build.' },
-    { step: '02', title: 'Match & Score', description: 'Every day, new SBIR/STTR topics are scored and ranked against your profile. High-match opportunities surface first with deadline context.' },
-    { step: '03', title: 'Build & Win', description: 'Purchase a proposal build ($499 Phase I / $999 Phase II), receive an expert-reviewed template within a week, and assemble your submission with AI.' },
+    { step: '01', title: 'Profile Your Technology', description: 'Tell us what you build. Define research areas, NAICS codes, target agencies, and certifications. Takes 10 minutes.' },
+    { step: '02', title: 'Get Scored Matches Daily', description: 'Every new SBIR/STTR topic is scored against your profile. High-match opportunities surface first with deadline context and agency intel.' },
+    { step: '03', title: 'Build Winning Proposals', description: 'When you find the right topic, add a proposal build. Our experts deliver a tailored template within a week. Your content library makes each one faster.' },
   ],
   partners: ['Air Force APEX', 'Parallax Advanced Research', 'Ohio State CDME', 'Converge Ventures', 'AFRL'],
   testimonial: {
-    quote: 'GovWin surfaced an Air Force SBIR topic we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first Phase I within 60 days.',
+    quote: 'RFP Pipeline surfaced an Air Force SBIR topic we would have completely missed. The scoring told us it was a 94% match for our sensor technology — and they were right. We won our first Phase I within 60 days of signing up.',
     company: 'Defense Technology Startup',
-    result: '$150K SBIR Phase I Award',
+    result: '$150K Phase I Award \u2192 $1M Phase II',
   },
   pricingTeaser: {
-    eyebrow: 'Simple, Powerful Pricing',
-    title: 'One plan. Pay per proposal.',
-    description: '$199/mo for your SBIR/STTR lookout. Add proposal builds when you need them.',
-    ctaText: 'See Pricing',
+    eyebrow: 'Straightforward Pricing',
+    title: '$199/mo. Cancel anytime.',
+    description: 'One subscription for opportunity intelligence. Add expert proposal builds only when you need them. No long-term contracts.',
+    ctaText: 'View Pricing',
     ctaLink: '/get-started',
   },
   cta: {
-    title: 'Ready to win your next SBIR?',
-    description: 'Join the companies using GovWin to find and win SBIR/STTR awards faster. Profile your technology, get matched to opportunities, and build winning proposals.',
-    primaryLabel: 'Join the Waitlist',
+    title: 'Stop searching. Start winning.',
+    description: 'Join the small businesses using RFP Pipeline to find SBIR/STTR opportunities matched to their technology — and build proposals that win.',
+    primaryLabel: 'Get Started',
     primaryHref: '/get-started',
-    secondaryLabel: 'See our wins',
+    secondaryLabel: 'See our 13/13 track record',
     secondaryHref: '/customers',
   },
 }
@@ -96,16 +96,12 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up">
-            {content.hero.title.includes('before your competitors') ? (
-              <>
-                Find and win federal contracts{' '}
-                <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
-                  before your competitors
-                </span>
-              </>
-            ) : (
-              content.hero.title
-            )}
+            Your technology deserves{' '}
+            <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-500 bg-clip-text text-transparent">
+              federal funding
+            </span>
+            <br className="hidden sm:block" />
+            <span className="text-gray-900">We make it happen.</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
@@ -182,16 +178,67 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ───── Trusted by logos placeholder ───── */}
-      <section className="bg-white px-4 py-12 sm:px-6 lg:px-8">
+      {/* ───── Trusted by ───── */}
+      <section className="bg-white px-4 py-14 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <p className="text-center text-xs font-bold uppercase tracking-widest text-gray-400">
-            Trusted by innovative companies across the defense & technology landscape
+            Built on experience trusted by
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-14 gap-y-5">
             {content.partners.map(name => (
-              <span key={name} className="text-sm font-semibold text-gray-300">{name}</span>
+              <span key={name} className="text-sm font-bold text-gray-300 hover:text-gray-500 transition-colors">{name}</span>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ───── The Problem ───── */}
+      <Section className="bg-white">
+        <SectionHeader
+          eyebrow="The Problem"
+          title="The SBIR process was not designed for small businesses"
+          description="You have the technology. You have the team. But navigating the federal procurement maze costs you the one thing you do not have: time."
+        />
+        <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { title: 'Scattered Sources', desc: 'Opportunities are spread across SAM.gov, SBIR.gov, Grants.gov, and agency-specific portals. Missing one source means missing your best-fit topic.' },
+            { title: 'Overwhelming Volume', desc: 'Hundreds of new topics every month across 11 agencies. Reading them all is a full-time job you cannot afford.' },
+            { title: 'Expensive Consultants', desc: 'SBIR consultants charge $5K-$15K per proposal. For a Phase I worth $150K, that is a painful ROI before you even win.' },
+            { title: 'Missed Deadlines', desc: 'Agency release cycles are unpredictable. By the time you find a perfect topic, the close date may be days away.' },
+            { title: 'Starting from Scratch', desc: 'Every proposal feels like the first one. No templates, no reusable content, no institutional memory.' },
+            { title: 'No Feedback Loop', desc: 'Win or lose, you get minimal feedback. Without data, you cannot improve your approach systematically.' },
+          ].map(item => (
+            <div key={item.title} className="rounded-2xl border border-red-100 bg-red-50/30 p-6 transition-all duration-300 hover:border-red-200">
+              <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* ───── Agency coverage ───── */}
+      <section className="border-y border-gray-100 bg-gray-950 px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Complete SBIR/STTR Coverage</p>
+          <p className="mt-3 text-lg font-semibold text-white">We monitor all 11 SBIR participating agencies</p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+            {['DoD', 'NIH', 'NSF', 'DOE', 'NASA', 'DHS', 'USDA', 'EPA', 'DOT', 'ED', 'DOC'].map(agency => (
+              <span key={agency} className="text-sm font-bold text-gray-400 hover:text-white transition-colors">{agency}</span>
+            ))}
+          </div>
+          <div className="mt-6 flex items-center justify-center gap-6 text-xs text-gray-600">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              SAM.gov
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              SBIR.gov
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Grants.gov
+            </span>
           </div>
         </div>
       </section>
@@ -199,9 +246,9 @@ export default async function LandingPage() {
       {/* ───── Features grid ───── */}
       <Section className="bg-surface-50">
         <SectionHeader
-          eyebrow="Platform Capabilities"
-          title="Everything you need to win government contracts"
-          description="From opportunity discovery to proposal submission, RFP Pipeline streamlines the entire federal procurement process."
+          eyebrow="The Solution"
+          title="AI finds opportunities. Experts help you win them."
+          description="RFP Pipeline combines automated intelligence with human expertise. Not another SaaS dashboard — a genuine competitive advantage."
         />
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {content.features.map(feat => {

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
 
 /* ── Section wrapper ─────────────────────────────── */
 
@@ -65,18 +66,28 @@ export function FeatureCard({
   icon,
   title,
   description,
+  index,
 }: {
   icon: React.ReactNode
   title: string
   description: string
+  index?: number
 }) {
   return (
-    <div className="group card-hover p-6">
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
-        {icon}
+    <div className="group card-hover-glow relative p-6">
+      {/* Subtle index number */}
+      {typeof index === 'number' && (
+        <span className="absolute right-5 top-4 text-4xl font-black text-gray-100 transition-colors duration-300 group-hover:text-brand-100 select-none leading-none">
+          {String(index + 1).padStart(2, '0')}
+        </span>
+      )}
+      <div className="relative">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
+          {icon}
+        </div>
+        <h3 className="text-base font-bold text-gray-900">{title}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-gray-500">{description}</p>
       </div>
-      <h3 className="text-base font-bold text-gray-900">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-500">{description}</p>
     </div>
   )
 }
@@ -93,10 +104,14 @@ export function StatHighlight({
   description?: string
 }) {
   return (
-    <div className="text-center">
-      <p className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">{value}</p>
-      <p className="mt-1.5 text-sm font-bold text-gray-900">{label}</p>
-      {description && <p className="mt-0.5 text-xs text-gray-500">{description}</p>}
+    <div className="relative text-center rounded-2xl bg-white/50 border border-gray-100 px-6 py-8 backdrop-blur-sm">
+      {/* Subtle dot pattern background */}
+      <div className="absolute inset-0 rounded-2xl bg-dots opacity-40" />
+      <div className="relative">
+        <p className="text-5xl font-extrabold tracking-tight text-gradient lg:text-6xl">{value}</p>
+        <p className="mt-2 text-sm font-bold text-gray-900">{label}</p>
+        {description && <p className="mt-1 text-xs text-gray-500">{description}</p>}
+      </div>
     </div>
   )
 }
@@ -171,6 +186,14 @@ export function TeamCard({
 
 /* ── CTA section ─────────────────────────────────── */
 
+function FloatingParticle({ className }: { className?: string }) {
+  return (
+    <div
+      className={`absolute rounded-full bg-white/5 animate-particle-float ${className ?? ''}`}
+    />
+  )
+}
+
 export function CtaSection({
   title,
   description,
@@ -186,14 +209,110 @@ export function CtaSection({
   secondaryLabel?: string
   secondaryHref?: string
 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let animationId: number
+    let width = 0
+    let height = 0
+
+    const particles: Array<{
+      x: number
+      y: number
+      vx: number
+      vy: number
+      size: number
+      opacity: number
+    }> = []
+
+    function resize() {
+      if (!canvas) return
+      width = canvas.offsetWidth
+      height = canvas.offsetHeight
+      canvas.width = width * 2
+      canvas.height = height * 2
+      if (ctx) ctx.scale(2, 2)
+    }
+
+    function initParticles() {
+      particles.length = 0
+      const count = Math.floor(width * height / 15000)
+      for (let i = 0; i < Math.min(count, 40); i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          size: Math.random() * 2 + 0.5,
+          opacity: Math.random() * 0.15 + 0.05,
+        })
+      }
+    }
+
+    function animate() {
+      if (!ctx) return
+      ctx.clearRect(0, 0, width, height)
+      for (const p of particles) {
+        p.x += p.vx
+        p.y += p.vy
+        if (p.x < 0) p.x = width
+        if (p.x > width) p.x = 0
+        if (p.y < 0) p.y = height
+        if (p.y > height) p.y = 0
+
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`
+        ctx.fill()
+      }
+      animationId = requestAnimationFrame(animate)
+    }
+
+    resize()
+    initParticles()
+    animate()
+
+    const handleResize = () => {
+      resize()
+      initParticles()
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   return (
-    <section className="relative overflow-hidden bg-cta-gradient px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-      {/* Decorative orbs */}
-      <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-brand-500/10 blur-3xl" />
-      <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-cyan-500/10 blur-3xl" />
+    <section className="relative overflow-hidden px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-cta-gradient bg-[length:200%_200%] animate-gradient-x" />
+
+      {/* Floating particles canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full"
+        aria-hidden="true"
+      />
+
+      {/* Decorative floating orbs */}
+      <FloatingParticle className="h-32 w-32 -left-10 top-10" />
+      <FloatingParticle className="h-24 w-24 right-20 top-5 [animation-delay:2s]" />
+      <FloatingParticle className="h-40 w-40 -right-10 -bottom-10 [animation-delay:4s]" />
+      <FloatingParticle className="h-20 w-20 left-1/3 bottom-10 [animation-delay:6s]" />
+
+      {/* Radial glow */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-brand-500/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-3xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{title}</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">{title}</h2>
         <p className="mt-4 text-lg leading-relaxed text-gray-300">{description}</p>
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <Link href={primaryHref} className="btn-cta bg-white text-brand-700 hover:bg-gray-100 shadow-xl">
@@ -254,6 +373,7 @@ export function PricingCard({
   features,
   cta,
   popular = false,
+  comparedTo,
   onSelect,
 }: {
   name: string
@@ -263,6 +383,7 @@ export function PricingCard({
   features: string[]
   cta: string
   popular?: boolean
+  comparedTo?: string
   onSelect?: () => void
 }) {
   return (
@@ -275,7 +396,10 @@ export function PricingCard({
     >
       {popular && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center rounded-full bg-brand-600 px-4 py-1 text-xs font-bold text-white shadow-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-1 text-xs font-bold text-white shadow-sm">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
             Most Popular
           </span>
         </div>
@@ -286,9 +410,16 @@ export function PricingCard({
         <p className="mt-1 text-sm text-gray-500">{description}</p>
       </div>
 
-      <div className="mt-6 flex items-baseline gap-1">
-        <span className="text-4xl font-extrabold tracking-tight text-gray-900">{price}</span>
-        <span className="text-sm font-medium text-gray-500">/{period}</span>
+      <div className="mt-6">
+        <div className="flex items-baseline gap-1">
+          <span className="text-5xl font-extrabold tracking-tight text-gray-900">{price}</span>
+          <span className="text-sm font-medium text-gray-500">/{period}</span>
+        </div>
+        {comparedTo && (
+          <p className="mt-1.5 text-xs font-medium text-brand-600">
+            {comparedTo}
+          </p>
+        )}
       </div>
 
       <ul className="mt-8 flex-1 space-y-3">
@@ -304,14 +435,109 @@ export function PricingCard({
 
       <button
         onClick={onSelect}
-        className={`mt-8 w-full rounded-xl py-3 text-sm font-bold transition-all duration-200 ${
+        className={`mt-8 w-full rounded-xl py-3.5 text-sm font-bold transition-all duration-200 ${
           popular
-            ? 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-md'
+            ? 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-md hover:-translate-y-px'
             : 'bg-gray-50 text-gray-900 ring-1 ring-gray-200 hover:bg-gray-100 hover:ring-gray-300'
         }`}
       >
         {cta}
       </button>
+    </div>
+  )
+}
+
+/* ── Logo cloud ──────────────────────────────────── */
+
+export function LogoCloud({
+  title,
+  logos,
+}: {
+  title?: string
+  logos: Array<{
+    name: string
+    src?: string
+    abbreviation?: string
+  }>
+}) {
+  return (
+    <div className="py-12">
+      {title && (
+        <p className="text-center text-sm font-medium text-gray-500 mb-8">{title}</p>
+      )}
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-6">
+        {logos.map((logo) => (
+          <div
+            key={logo.name}
+            className="flex items-center justify-center rounded-lg px-4 py-3 grayscale opacity-60 transition-all duration-300 hover:grayscale-0 hover:opacity-100"
+            title={logo.name}
+          >
+            {logo.src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo.src}
+                alt={logo.name}
+                className="h-8 w-auto object-contain"
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-xs font-bold text-gray-500">
+                  {logo.abbreviation ?? logo.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span className="text-sm font-semibold text-gray-700">{logo.name}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Testimonial card ────────────────────────────── */
+
+export function TestimonialCard({
+  quote,
+  name,
+  role,
+  company,
+  avatarSrc,
+}: {
+  quote: string
+  name: string
+  role: string
+  company: string
+  avatarSrc?: string
+}) {
+  return (
+    <div className="card-hover-glow relative flex flex-col p-6 sm:p-8">
+      {/* Quote mark */}
+      <svg className="absolute right-6 top-6 h-8 w-8 text-brand-100" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10H0z" />
+      </svg>
+
+      <blockquote className="flex-1 text-sm leading-relaxed text-gray-600 italic">
+        &ldquo;{quote}&rdquo;
+      </blockquote>
+
+      <div className="mt-6 flex items-center gap-3 border-t border-gray-100 pt-5">
+        {avatarSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarSrc}
+            alt={name}
+            className="h-10 w-10 rounded-full object-cover ring-2 ring-white shadow-sm"
+          />
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-50 text-sm font-bold text-brand-600 ring-2 ring-white shadow-sm">
+            {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          </div>
+        )}
+        <div>
+          <p className="text-sm font-bold text-gray-900">{name}</p>
+          <p className="text-xs text-gray-500">{role}, {company}</p>
+        </div>
+      </div>
     </div>
   )
 }
