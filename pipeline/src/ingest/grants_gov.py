@@ -254,7 +254,7 @@ class GrantsGovIngester:
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.post(
                     DETAIL_API,
-                    json={"opportunityId": int(opportunity_id)},
+                    json={"oppId": str(opportunity_id)},
                     headers={"Content-Type": "application/json"},
                 )
                 resp.raise_for_status()
