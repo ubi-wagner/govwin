@@ -5,7 +5,7 @@
  */
 
 // ─── Auth ─────────────────────────────────────────────────────
-export type UserRole = 'master_admin' | 'tenant_admin' | 'tenant_user'
+export type UserRole = 'master_admin' | 'tenant_admin' | 'tenant_user' | 'partner_user'
 
 export interface AppUser {
   id: string
@@ -187,6 +187,7 @@ export interface TenantPipelineItem {
   lastActionAt: string | null
   docCount: number
   amendmentCount: number
+  programType: string | null
 }
 
 // SAM.gov resource/attachment link
@@ -215,6 +216,7 @@ export interface OpportunityFilters {
   search?: string
   source?: string
   opportunityType?: string
+  programType?: string
   minScore?: number
   agency?: string
   pursuitStatus?: PursuitStatus
@@ -376,6 +378,9 @@ export type CustomerEventType =
   | 'account.login' | 'account.login_failed'
   | 'account.invite_sent' | 'account.invite_accepted' | 'account.invite_expired'
   | 'spotlight.created' | 'spotlight.updated' | 'spotlight.deleted'
+  | 'purchase.created' | 'purchase.cancelled' | 'purchase.template_delivered'
+  | 'partner.invited' | 'partner.accepted' | 'partner.approved'
+  | 'partner.revoked' | 'partner.rejected' | 'partner.access_requested'
 
 export interface OpportunityEvent {
   id: string
@@ -1693,4 +1698,50 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   error: string
   code?: string
+}
+
+// ─── Proposal Purchases ─────────────────────────────────────
+
+export interface ProposalPurchase {
+  id: string
+  tenantId: string
+  proposalId: string | null
+  opportunityId: string | null
+  purchaseType: 'phase_1' | 'phase_2'
+  priceCents: number
+  status: 'pending' | 'active' | 'template_delivered' | 'completed' | 'cancelled' | 'refunded'
+  purchasedAt: string
+  cancellationDeadline: string
+  templateDeliveredAt: string | null
+  cancelledAt: string | null
+  refundReason: string | null
+  proposalTitle?: string
+  templateName?: string
+}
+
+// ─── Partner Access ─────────────────────────────────────────
+
+export interface PartnerAccessGrant {
+  id: string
+  userId: string
+  tenantId: string
+  proposalId: string
+  status: 'pending_acceptance' | 'pending_approval' | 'active' | 'revoked' | 'expired' | 'rejected'
+  permissions: PartnerPermissions
+  accessScope: 'proposal_only' | 'proposal_and_files'
+  expiresAt: string | null
+  acceptedAt: string | null
+  approvedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  userName?: string
+  userEmail?: string
+}
+
+export interface PartnerPermissions {
+  default: 'none' | 'view' | 'review' | 'edit'
+  sections: Record<string, 'none' | 'view' | 'review' | 'edit'>
+  uploads: { can_upload: boolean; can_delete_own: boolean; can_view_all: boolean; can_view_shared: boolean }
+  library: { can_access: boolean }
+  proposal: { can_view_metadata: boolean; can_advance_stage: boolean; can_export: boolean }
 }

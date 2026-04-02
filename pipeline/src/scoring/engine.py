@@ -1,19 +1,21 @@
 """
-Scoring Engine — Scores opportunities against each tenant's profile.
+Scoring Engine — Scores opportunities against each tenant's SBIR/STTR profile.
 
-Score breakdown (100 total):
-  NAICS match:     0-25  (primary=25, secondary=15)
-  Keyword match:   0-25  (domain-weighted keyword matches)
-  Set-aside match: 0-15  (exact match=15, partial=8)
-  Agency priority: 0-15  (tier 1=15, tier 2=10, tier 3=5)
-  Opportunity type:0-10  (solicitation=10, sources_sought=5, presol=3)
-  Timeline:        0-10  (urgency bonus for approaching deadlines)
-  LLM adjustment:  -20 to +20  (Claude analysis for high-scoring opps)
+Score breakdown (100 total base + LLM adjustment):
+  Technology/Topic match: 0-30  (research_areas + technology_focus vs opp description/topics)
+  NAICS match:            0-15  (primary=15, secondary=10 — less critical for SBIR)
+  Agency alignment:       0-15  (target_agencies match + agency history from past_sbir_awards)
+  Program type fit:       0-15  (program type match + phase readiness)
+  Set-aside eligibility:  0-10  (still relevant but simpler for SBIR — mostly small business)
+  Timeline/urgency:       0-10  (approaching deadlines weighted higher)
+  TRL alignment:          0-5   (technology_readiness_level vs opportunity requirements)
+  LLM adjustment:        -15 to +15  (Claude analysis for high-scoring opps, narrower range)
 """
 
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 from crypto import decrypt_api_key
@@ -62,7 +64,10 @@ class ScoringEngine:
                    tp.keyword_domains, tp.is_small_business, tp.is_sdvosb,
                    tp.is_wosb, tp.is_hubzone, tp.is_8a,
                    tp.agency_priorities, tp.min_contract_value, tp.max_contract_value,
-                   tp.min_surface_score, tp.high_priority_score
+                   tp.min_surface_score, tp.high_priority_score,
+                   tp.technology_readiness_level, tp.research_areas,
+                   tp.past_sbir_awards, tp.target_agencies,
+                   tp.company_summary, tp.technology_focus
             FROM tenants t
             JOIN tenant_profiles tp ON tp.tenant_id = t.id
             WHERE t.status IN ('active', 'trial')
@@ -93,6 +98,19 @@ class ScoringEngine:
 
         for opp in opportunities:
             opp = dict(opp)
+
+            # Detect and store program_type if not already set
+            detected_type = self._detect_program_type(opp)
+            if detected_type != 'other' and not opp.get('program_type'):
+                try:
+                    await self.conn.execute(
+                        "UPDATE opportunities SET program_type = $1 WHERE id = $2",
+                        detected_type, opp['id']
+                    )
+                    opp['program_type'] = detected_type
+                except Exception as e:
+                    log.warning(f"Failed to update program_type for opp {opp['id']}: {e}")
+
             scores = self._compute_scores(profile, opp)
             total = sum(scores.values())
 
@@ -160,8 +178,12 @@ class ScoringEngine:
                     rescored_at = NOW()
                 """,
                 tenant_id, opp["id"], total_with_llm,
-                scores.get("naics", 0), scores.get("keyword", 0), scores.get("set_aside", 0),
-                scores.get("agency", 0), scores.get("type", 0), scores.get("timeline", 0),
+                scores.get("naics", 0),
+                scores.get("technology", 0),  # technology match stored in keyword_score column
+                scores.get("set_aside", 0),
+                scores.get("agency", 0),
+                scores.get("program_type", 0),  # program type fit stored in type_score column
+                scores.get("timeline", 0),
                 llm_adj, llm_rationale,
                 matched_kw, matched_domains,
                 recommendation,
@@ -179,12 +201,14 @@ class ScoringEngine:
                     "tenant_id": str(tenant_id),
                     "total_score": total_with_llm,
                     "surface_score": total,
+                    "technology_score": scores.get("technology", 0),
                     "naics_score": scores.get("naics", 0),
-                    "keyword_score": scores.get("keyword", 0),
-                    "set_aside_score": scores.get("set_aside", 0),
                     "agency_score": scores.get("agency", 0),
-                    "type_score": scores.get("type", 0),
+                    "program_type_score": scores.get("program_type", 0),
+                    "set_aside_score": scores.get("set_aside", 0),
                     "timeline_score": scores.get("timeline", 0),
+                    "trl_score": scores.get("trl", 0),
+                    "program_type": opp.get("program_type") or detected_type,
                     "recommendation": recommendation,
                     "matched_keywords": matched_kw,
                     "matched_domains": matched_domains,

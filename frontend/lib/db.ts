@@ -88,6 +88,52 @@ export async function verifyTenantAccess(
 }
 
 /**
+ * Verify a user has access to a specific proposal.
+ * Master admins: always allowed with full permissions.
+ * Tenant users/admins: must belong to tenant, proposal must belong to tenant.
+ * Partner users: must have active grant for this specific proposal.
+ * Returns { hasAccess, permissions } where null permissions = full access.
+ */
+export async function verifyProposalAccess(
+  userId: string,
+  role: string,
+  tenantId: string,
+  proposalId: string
+): Promise<{ hasAccess: boolean; permissions: Record<string, unknown> | null }> {
+  // Master admin always allowed with full permissions
+  if (role === 'master_admin') return { hasAccess: true, permissions: null }
+
+  // Regular tenant users — check tenant membership + proposal belongs to tenant
+  if (role === 'tenant_admin' || role === 'tenant_user') {
+    const [user] = await sql`
+      SELECT id FROM users WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true
+    `
+    if (!user) return { hasAccess: false, permissions: null }
+    const [proposal] = await sql`
+      SELECT id FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+    `
+    return { hasAccess: !!proposal, permissions: null } // null = full access
+  }
+
+  // Partner users — must have active grant for this specific proposal
+  if (role === 'partner_user') {
+    const [grant] = await sql`
+      SELECT pag.permissions
+      FROM partner_access_grants pag
+      WHERE pag.user_id = ${userId}
+        AND pag.proposal_id = ${proposalId}
+        AND pag.tenant_id = ${tenantId}
+        AND pag.status = 'active'
+        AND (pag.expires_at IS NULL OR pag.expires_at > NOW())
+    `
+    if (!grant) return { hasAccess: false, permissions: null }
+    return { hasAccess: true, permissions: grant.permissions }
+  }
+
+  return { hasAccess: false, permissions: null }
+}
+
+/**
  * Get tenant profile (scoring config) for the pipeline worker.
  * Returns null if no profile exists yet.
  */
