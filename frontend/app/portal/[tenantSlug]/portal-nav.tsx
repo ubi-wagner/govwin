@@ -7,7 +7,7 @@ import { clsx } from 'clsx'
 const getNavItems = (slug: string) => [
   { href: `/portal/${slug}/dashboard`, label: 'Dashboard', icon: 'home' },
   { href: `/portal/${slug}/spotlights`, label: 'SpotLights', icon: 'spotlight' },
-  { href: `/portal/${slug}/pipeline`, label: 'Pipeline', icon: 'list' },
+  { href: `/portal/${slug}/pipeline`, label: 'Opportunities', icon: 'list' },
   { href: `/portal/${slug}/proposals`, label: 'Proposals', icon: 'proposal' },
   { href: `/portal/${slug}/library`, label: 'Library', icon: 'library' },
   { href: `/portal/${slug}/documents`, label: 'Documents', icon: 'file' },

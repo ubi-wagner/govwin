@@ -30,6 +30,20 @@ interface Proposal {
   collaboratorCount: number
   openComments: number
   fileCount: number
+  purchaseId?: string | null
+}
+
+interface Purchase {
+  id: string
+  proposalId: string | null
+  opportunityId: string | null
+  purchaseType: 'phase_1' | 'phase_2'
+  priceCents: number
+  status: string
+  purchasedAt: string
+  cancellationDeadline: string
+  templateDeliveredAt: string | null
+  proposalTitle?: string
 }
 
 const STAGE_STYLES: Record<string, string> = {
@@ -60,20 +74,25 @@ export default function ProposalsPage() {
   const slug = params.tenantSlug as string
 
   const [proposals, setProposals] = useState<Proposal[]>([])
+  const [purchases, setPurchases] = useState<Purchase[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showPurchase, setShowPurchase] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
-    fetch(`/api/portal/${slug}/proposals`)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(d => setProposals(d.data ?? []))
-      .catch(err => setError(err.message ?? 'Failed to load proposals'))
+    Promise.all([
+      fetch(`/api/portal/${slug}/proposals`)
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+        .then(d => setProposals(d.data ?? [])),
+      fetch(`/api/portal/${slug}/purchases`)
+        .then(r => r.ok ? r.json() : { data: [] })
+        .then(d => setPurchases(d.data ?? []))
+        .catch(() => setPurchases([])),
+    ])
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load proposals'))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -98,10 +117,16 @@ export default function ProposalsPage() {
             {archived.length > 0 && ` · ${archived.length} archived`}
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-sm gap-2">
-          <PlusIcon />
-          New Proposal
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowPurchase(true)} className="btn-secondary text-sm gap-2">
+            <CartIcon />
+            Buy Proposal Build
+          </button>
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-sm gap-2">
+            <PlusIcon />
+            New Proposal
+          </button>
+        </div>
       </div>
 
       {/* Stage pipeline overview */}
@@ -146,6 +171,7 @@ export default function ProposalsPage() {
               <ProposalCard
                 key={p.id}
                 proposal={p}
+                purchase={purchases.find(pu => pu.proposalId === p.id)}
                 onClick={() => router.push(`/portal/${slug}/proposals/${p.id}`)}
               />
             ))}
@@ -160,6 +186,7 @@ export default function ProposalsPage() {
                   <ProposalCard
                     key={p.id}
                     proposal={p}
+                    purchase={purchases.find(pu => pu.proposalId === p.id)}
                     onClick={() => router.push(`/portal/${slug}/proposals/${p.id}`)}
                   />
                 ))}
@@ -167,6 +194,15 @@ export default function ProposalsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Purchase modal */}
+      {showPurchase && (
+        <PurchaseModal
+          slug={slug}
+          onClose={() => setShowPurchase(false)}
+          onPurchased={() => { setShowPurchase(false); load() }}
+        />
       )}
 
       {/* Create modal */}
@@ -181,10 +217,21 @@ export default function ProposalsPage() {
   )
 }
 
-function ProposalCard({ proposal: p, onClick }: { proposal: Proposal; onClick: () => void }) {
+const PURCHASE_STATUS_STYLES: Record<string, { bg: string; label: string }> = {
+  pending: { bg: 'bg-amber-100 text-amber-700', label: 'Awaiting Template' },
+  template_delivered: { bg: 'bg-emerald-100 text-emerald-700', label: 'Template Ready' },
+  active: { bg: 'bg-blue-100 text-blue-700', label: 'In Progress' },
+  cancelled: { bg: 'bg-gray-100 text-gray-500', label: 'Cancelled' },
+  completed: { bg: 'bg-green-100 text-green-700', label: 'Completed' },
+  refunded: { bg: 'bg-gray-100 text-gray-500', label: 'Refunded' },
+}
+
+function ProposalCard({ proposal: p, purchase, onClick }: { proposal: Proposal; purchase?: Purchase; onClick: () => void }) {
   const daysToDeadline = p.submissionDeadline
     ? Math.ceil((new Date(p.submissionDeadline).getTime() - Date.now()) / (86400000))
     : null
+
+  const purchaseStyle = purchase ? PURCHASE_STATUS_STYLES[purchase.status] : null
 
   return (
     <button onClick={onClick} className="card !p-4 w-full text-left hover:shadow-card-hover transition-all">
@@ -223,6 +270,13 @@ function ProposalCard({ proposal: p, onClick }: { proposal: Proposal; onClick: (
             {p.createdByName && <span>by {p.createdByName}</span>}
           </div>
         </div>
+
+        {/* Purchase status badge */}
+        {purchaseStyle && (
+          <div className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${purchaseStyle.bg}`}>
+            {purchaseStyle.label}
+          </div>
+        )}
 
         {/* Deadline */}
         <div className="shrink-0 text-right">
@@ -346,12 +400,151 @@ function CreateProposalModal({ slug, onClose, onCreated }: {
   )
 }
 
+function PurchaseModal({ slug, onClose, onPurchased }: {
+  slug: string; onClose: () => void; onPurchased: () => void
+}) {
+  const [purchaseType, setPurchaseType] = useState<'phase_1' | 'phase_2'>('phase_1')
+  const [oppId, setOppId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const priceCents = purchaseType === 'phase_1' ? 49900 : 99900
+  const priceDisplay = `$${(priceCents / 100).toFixed(0)}`
+
+  // Fetch pursuing opportunities
+  const [opps, setOpps] = useState<{ id: string; title: string; agency: string }[]>([])
+  useEffect(() => {
+    fetch(`/api/opportunities?tenantSlug=${slug}&pursuitStatus=pursuing&limit=50&sortBy=score&sortDir=desc`)
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(d => setOpps((d.data ?? []).map((o: any) => ({
+        id: o.opportunityId,
+        title: o.title,
+        agency: o.agency ?? 'Unknown',
+      }))))
+      .catch(() => {})
+  }, [slug])
+
+  async function handlePurchase() {
+    if (!oppId) {
+      setError('Please select an opportunity')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/portal/${slug}/purchases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opportunityId: oppId,
+          purchaseType,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+      onPurchased()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create purchase')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-elevated">
+        <h2 className="text-lg font-bold text-gray-900">Buy Proposal Build</h2>
+        <p className="mt-1 text-sm text-gray-500">Purchase a professionally built proposal template for your opportunity.</p>
+
+        <div className="mt-4 space-y-4">
+          {/* Phase selection */}
+          <div>
+            <label className="label">Proposal Type</label>
+            <div className="flex gap-3 mt-1">
+              <button
+                type="button"
+                onClick={() => setPurchaseType('phase_1')}
+                className={`flex-1 rounded-xl border-2 p-3 text-left transition-all ${
+                  purchaseType === 'phase_1'
+                    ? 'border-brand-500 bg-brand-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <p className="text-sm font-bold text-gray-900">Phase I</p>
+                <p className="text-xs text-gray-500 mt-0.5">SBIR/STTR Phase I proposal</p>
+                <p className="text-lg font-bold text-brand-600 mt-1">$499</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPurchaseType('phase_2')}
+                className={`flex-1 rounded-xl border-2 p-3 text-left transition-all ${
+                  purchaseType === 'phase_2'
+                    ? 'border-brand-500 bg-brand-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <p className="text-sm font-bold text-gray-900">Phase II</p>
+                <p className="text-xs text-gray-500 mt-0.5">SBIR/STTR Phase II proposal</p>
+                <p className="text-lg font-bold text-brand-600 mt-1">$999</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Opportunity selector */}
+          <div>
+            <label className="label">Opportunity</label>
+            <select className="input" value={oppId} onChange={e => setOppId(e.target.value)}>
+              <option value="">Select an opportunity...</option>
+              {opps.map(o => (
+                <option key={o.id} value={o.id}>{o.title} ({o.agency})</option>
+              ))}
+            </select>
+            {opps.length === 0 && (
+              <p className="mt-1 text-xs text-gray-400">No pursuing opportunities found.</p>
+            )}
+          </div>
+
+          {/* Total */}
+          <div className="rounded-lg bg-gray-50 p-3 flex items-center justify-between">
+            <span className="text-sm text-gray-600">Total</span>
+            <span className="text-xl font-bold text-gray-900">{priceDisplay}</span>
+          </div>
+
+          {/* Cancellation notice */}
+          <p className="text-xs text-gray-400">
+            You may cancel within 72 hours for a full refund, provided the template has not yet been delivered.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>
+        )}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={onClose} className="btn-secondary text-sm">Cancel</button>
+          <button onClick={handlePurchase} disabled={saving} className="btn-primary text-sm">
+            {saving ? 'Processing...' : `Purchase \u2014 ${priceDisplay}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Icons ─────────────────────────────────────────── */
 
 function PlusIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  )
+}
+
+function CartIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
     </svg>
   )
 }

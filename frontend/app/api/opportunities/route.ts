@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     deadlineStatus:  searchParams.get('deadlineStatus') as any ?? undefined,
     isPinned:        searchParams.get('isPinned') === 'true' ? true : undefined,
     spotlightId:     searchParams.get('spotlightId') ?? undefined,
+    programType:     searchParams.get('programType') ?? undefined,
     sortBy:          (searchParams.get('sortBy') ?? 'score') as any,
     sortDir:         (searchParams.get('sortDir') ?? 'desc') as any,
     limit:           Math.min(Number(searchParams.get('limit') ?? 50), 100),
@@ -73,6 +74,7 @@ export async function GET(request: NextRequest) {
           AND (${filters.deadlineStatus ?? ''} = '' OR deadline_status = ${filters.deadlineStatus ?? ''})
           AND (${filters.isPinned ?? false} = false OR is_pinned = true)
           AND (${filters.spotlightId ?? ''} = '' OR best_spotlight_id::text = ${filters.spotlightId ?? ''})
+          AND (${filters.programType ?? ''} = '' OR program_type = ${filters.programType ?? ''})
           AND (
             ${filters.search ?? ''} = ''
             OR title ILIKE ${'%' + (filters.search ?? '') + '%'}
@@ -94,6 +96,7 @@ export async function GET(request: NextRequest) {
           AND (${filters.deadlineStatus ?? ''} = '' OR deadline_status = ${filters.deadlineStatus ?? ''})
           AND (${filters.isPinned ?? false} = false OR is_pinned = true)
           AND (${filters.spotlightId ?? ''} = '' OR best_spotlight_id::text = ${filters.spotlightId ?? ''})
+          AND (${filters.programType ?? ''} = '' OR program_type = ${filters.programType ?? ''})
           AND (
             ${filters.search ?? ''} = ''
             OR title ILIKE ${'%' + (filters.search ?? '') + '%'}

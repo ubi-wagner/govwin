@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -49,262 +50,505 @@ async def _resolve_api_key(conn) -> str:
 
 
 def _generate_stub_opportunities() -> list[dict]:
-    """Return realistic SAM.gov API response data for testing/development.
+    """Return realistic SBIR/STTR SAM.gov API response data for testing/development.
 
     Each dict matches the exact field names from the SAM.gov GET /opportunities/v2/search
     response as documented at https://open.gsa.gov/api/get-opportunities-public-api/
 
-    Fields included:
-      noticeId, title, solicitationNumber, department, subTier, office,
-      fullParentPathName, fullParentPathCode, postedDate, type, baseType,
-      archiveType, archiveDate, typeOfSetAside, typeOfSetAsideDescription,
-      responseDeadLine, naicsCode, classificationCode, active,
-      organizationType, additionalInfoLink, uiLink, description,
-      award, pointOfContact, officeAddress, placeOfPerformance
+    Includes:
+      - 3 SBIR Phase I opportunities (Air Force, Army, Navy)
+      - 2 SBIR Phase II opportunities
+      - 2 STTR opportunities (with research institution requirements)
+      - 1 BAA (Broad Agency Announcement)
+      - 1 OTA (Other Transaction Authority)
     """
     now = datetime.now(timezone.utc)
     return [
+        # ── SBIR Phase I: Air Force ──
         {
-            "noticeId": "stub_001_cloud_migration_disa",
-            "title": "Enterprise Cloud Migration and Managed Services — DISA",
-            "solicitationNumber": "HC1028-25-R-0042",
+            "noticeId": "stub_sbir_001_af_hypersonics",
+            "title": "SBIR Phase I: Advanced Materials for Hypersonic Vehicles (AF241-001)",
+            "solicitationNumber": "FA8650-26-S-0001",
             "department": "DEPT OF DEFENSE",
-            "subTier": "DEFENSE INFORMATION SYSTEMS AGENCY",
-            "office": "DISA PL8",
-            "fullParentPathName": "DEPT OF DEFENSE.DEFENSE INFORMATION SYSTEMS AGENCY.DISA PL8",
-            "fullParentPathCode": "097.DISA.PL8",
+            "subTier": "DEPT OF THE AIR FORCE",
+            "office": "AFRL/RQ WRIGHT-PATTERSON AFB",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE.AFRL/RQ WRIGHT-PATTERSON AFB",
+            "fullParentPathCode": "097.057.AFRL_RQ",
             "postedDate": (now - timedelta(days=3)).strftime("%Y-%m-%d"),
             "type": "Solicitation",
             "baseType": "Solicitation",
             "archiveType": "autocustom",
             "archiveDate": (now + timedelta(days=60)).strftime("%Y-%m-%d"),
-            "typeOfSetAside": "SDVOSBA",
-            "typeOfSetAsideDescription": "Service-Disabled Veteran-Owned Small Business (SDVOSB) Set-Aside",
-            "responseDeadLine": (now + timedelta(days=25)).strftime("%Y-%m-%dT17:00:00-05:00"),
-            "naicsCode": "541512",
-            "classificationCode": "D302",
+            "typeOfSetAside": "SBR",
+            "typeOfSetAsideDescription": "Small Business SBIR Program",
+            "responseDeadLine": (now + timedelta(days=28)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
             "active": "Yes",
             "description": (
-                "The Department of Defense seeks a qualified SDVOSB to provide enterprise "
-                "cloud migration services including assessment, planning, and execution of "
-                "migration from on-premises infrastructure to AWS GovCloud. Scope includes "
-                "FedRAMP authorization support, continuous monitoring, and 24/7 managed cloud "
-                "infrastructure services. Requires NIST 800-53 compliance and STIG hardening."
+                "SBIR Phase I topic AF241-001: The Air Force Research Laboratory seeks innovative "
+                "solutions for advanced thermal protection materials capable of withstanding "
+                "temperatures exceeding 2000C during sustained hypersonic flight. Research areas "
+                "include ultra-high temperature ceramics (UHTC), carbon-carbon composites, and "
+                "novel ablative materials. Phase I will demonstrate material feasibility through "
+                "laboratory testing and computational modeling. TRL 1-3 expected at Phase I entry. "
+                "Maximum Phase I award: $250,000 over 6 months."
             ),
             "organizationType": "OFFICE",
             "additionalInfoLink": None,
-            "uiLink": "https://sam.gov/opp/stub_001_cloud_migration_disa/view",
+            "uiLink": "https://sam.gov/opp/stub_sbir_001_af_hypersonics/view",
             "award": None,
             "pointOfContact": [
                 {
                     "type": "primary",
-                    "fullName": "John Smith",
-                    "email": "john.smith.test@disa.mil",
-                    "phone": "571-555-0100",
+                    "fullName": "Dr. Robert Chen",
+                    "email": "robert.chen.test@us.af.mil",
+                    "phone": "937-555-0101",
                     "fax": None,
-                    "title": "Contracting Officer",
+                    "title": "SBIR/STTR Program Manager",
                 },
             ],
             "officeAddress": {
-                "zipcode": "22060",
-                "city": "Fort Belvoir",
+                "zipcode": "45433",
+                "city": "Wright-Patterson AFB",
+                "countryCode": "USA",
+                "state": "OH",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "86772", "name": "Wright-Patterson AFB"},
+                "state": {"code": "OH", "name": "Ohio"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        # ── SBIR Phase I: Army ──
+        {
+            "noticeId": "stub_sbir_002_army_autonomy",
+            "title": "SBIR Phase I: Autonomous Navigation for Unmanned Ground Vehicles (A261-003)",
+            "solicitationNumber": "W911NF-26-S-0015",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE ARMY",
+            "office": "ACC-APG ADELPHI",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.ACC-APG ADELPHI",
+            "fullParentPathCode": "012.21A1.W6QK",
+            "postedDate": (now - timedelta(days=5)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=55)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "SBR",
+            "typeOfSetAsideDescription": "Small Business SBIR Program",
+            "responseDeadLine": (now + timedelta(days=21)).strftime("%Y-%m-%dT16:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
+            "active": "Yes",
+            "description": (
+                "SBIR Phase I topic A261-003: Army Research Laboratory seeks innovative approaches "
+                "for GPS-denied autonomous navigation of unmanned ground vehicles in complex terrain. "
+                "Solutions should leverage LiDAR, computer vision, and machine learning for real-time "
+                "path planning and obstacle avoidance. Must address degraded visual environments "
+                "including dust, smoke, and low-light conditions. Phase I feasibility demonstration "
+                "required. TRL 2-4 expected. Maximum award: $250,000 over 6 months."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_sbir_002_army_autonomy/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Dr. Lisa Park",
+                    "email": "lisa.park.test@army.mil",
+                    "phone": "301-555-0202",
+                    "title": "SBIR Program Manager",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "20783",
+                "city": "Adelphi",
+                "countryCode": "USA",
+                "state": "MD",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "01600", "name": "Adelphi"},
+                "state": {"code": "MD", "name": "Maryland"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        # ── SBIR Phase I: Navy ──
+        {
+            "noticeId": "stub_sbir_003_navy_sensors",
+            "title": "SBIR Phase I: Compact Underwater Acoustic Sensor Arrays (N261-015)",
+            "solicitationNumber": "N68335-26-S-0008",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE NAVY",
+            "office": "NAVSEA WARFARE CENTERS",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE NAVY.NAVSEA WARFARE CENTERS",
+            "fullParentPathCode": "017.NAVSEA.NUWC",
+            "postedDate": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=65)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "SBR",
+            "typeOfSetAsideDescription": "Small Business SBIR Program",
+            "responseDeadLine": (now + timedelta(days=35)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541711",
+            "classificationCode": "AC12",
+            "active": "Yes",
+            "description": (
+                "SBIR Phase I topic N261-015: Naval Undersea Warfare Center seeks innovative compact "
+                "acoustic sensor array designs for submarine detection and classification. Research "
+                "should address piezoelectric materials, MEMS-based transducers, and advanced signal "
+                "processing algorithms for improved sensitivity and reduced form factor. Phase I "
+                "deliverables include sensor design, simulation results, and test plan. "
+                "TRL 1-3 at entry. Maximum Phase I award: $250,000."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_sbir_003_navy_sensors/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Cmdr. David Torres",
+                    "email": "david.torres.test@navy.mil",
+                    "phone": "401-555-0303",
+                    "title": "SBIR Topic Author",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "02841",
+                "city": "Newport",
+                "countryCode": "USA",
+                "state": "RI",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "49960", "name": "Newport"},
+                "state": {"code": "RI", "name": "Rhode Island"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        # ── SBIR Phase II: Air Force ──
+        {
+            "noticeId": "stub_sbir_004_af_phase2_ai",
+            "title": "SBIR Phase II: AI-Driven Predictive Maintenance for Aircraft Engines (AF242-010)",
+            "solicitationNumber": "FA8650-26-S-0042",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE AIR FORCE",
+            "office": "AFRL/RQ WRIGHT-PATTERSON AFB",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE.AFRL/RQ WRIGHT-PATTERSON AFB",
+            "fullParentPathCode": "097.057.AFRL_RQ",
+            "postedDate": (now - timedelta(days=4)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=90)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "SBR",
+            "typeOfSetAsideDescription": "Small Business SBIR Program",
+            "responseDeadLine": (now + timedelta(days=42)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
+            "active": "Yes",
+            "description": (
+                "SBIR Phase II topic AF242-010: Following successful Phase I demonstration, "
+                "this Phase II effort seeks to develop and validate an AI/ML-based predictive "
+                "maintenance system for military turbofan engines. The system must integrate "
+                "with existing ALIS/ODIN maintenance databases, process vibration, thermal, and "
+                "oil analysis data streams, and provide actionable maintenance predictions with "
+                ">90%% accuracy. TRL 4-6 expected. Maximum Phase II award: $1,500,000 over 24 months."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_sbir_004_af_phase2_ai/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Dr. Robert Chen",
+                    "email": "robert.chen.test@us.af.mil",
+                    "phone": "937-555-0101",
+                    "title": "SBIR/STTR Program Manager",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "45433",
+                "city": "Wright-Patterson AFB",
+                "countryCode": "USA",
+                "state": "OH",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "86772", "name": "Wright-Patterson AFB"},
+                "state": {"code": "OH", "name": "Ohio"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        # ── SBIR Phase II: Army ──
+        {
+            "noticeId": "stub_sbir_005_army_phase2_comms",
+            "title": "SBIR Phase II: Resilient Tactical Communications for Contested Environments (A252-008)",
+            "solicitationNumber": "W15QKN-26-S-0022",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE ARMY",
+            "office": "ACC-NJ PICATINNY",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.ACC-NJ PICATINNY",
+            "fullParentPathCode": "012.21A1.W15Q",
+            "postedDate": (now - timedelta(days=6)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=80)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "SBR",
+            "typeOfSetAsideDescription": "Small Business SBIR Program",
+            "responseDeadLine": (now + timedelta(days=38)).strftime("%Y-%m-%dT16:00:00-05:00"),
+            "naicsCode": "541712",
+            "classificationCode": "A014",
+            "active": "Yes",
+            "description": (
+                "SBIR Phase II topic A252-008: Develop a prototype resilient tactical "
+                "communications system for GPS-denied and spectrum-contested environments. "
+                "Must demonstrate mesh networking, frequency hopping, and low probability of "
+                "intercept/detection (LPI/LPD). Integration with existing PRC-162 radio systems "
+                "required. Phase II prototype testing in operational environment. "
+                "TRL 5-6 expected. Maximum Phase II award: $1,750,000 over 24 months."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_sbir_005_army_phase2_comms/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Col. Marcus Hall",
+                    "email": "marcus.hall.test@army.mil",
+                    "phone": "973-555-0505",
+                    "title": "SBIR Program Director",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "07806",
+                "city": "Picatinny Arsenal",
+                "countryCode": "USA",
+                "state": "NJ",
+            },
+            "placeOfPerformance": {
+                "city": {"code": "58200", "name": "Picatinny Arsenal"},
+                "state": {"code": "NJ", "name": "New Jersey"},
+                "country": {"code": "USA", "name": "UNITED STATES"},
+            },
+        },
+        # ── STTR Phase I: Navy + University ──
+        {
+            "noticeId": "stub_sttr_006_navy_quantum",
+            "title": "STTR Phase I: Quantum Sensing for Undersea Magnetic Anomaly Detection (N261-T01)",
+            "solicitationNumber": "N68335-26-T-0003",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE NAVY",
+            "office": "ONR ARLINGTON",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE NAVY.ONR ARLINGTON",
+            "fullParentPathCode": "017.ONR.ARL",
+            "postedDate": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=70)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "STTR",
+            "typeOfSetAsideDescription": "Small Business STTR Program",
+            "responseDeadLine": (now + timedelta(days=30)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "AC12",
+            "active": "Yes",
+            "description": (
+                "STTR Phase I topic N261-T01: Office of Naval Research seeks collaborative "
+                "proposals from small businesses partnered with research institutions to develop "
+                "quantum magnetometry sensors for undersea magnetic anomaly detection. Must "
+                "demonstrate nitrogen-vacancy (NV) center diamond magnetometer or equivalent "
+                "quantum sensing approach. Research institution must perform at least 30%% of work. "
+                "Phase I feasibility study and proof-of-concept required. "
+                "TRL 1-3 at entry. Maximum STTR Phase I award: $250,000."
+            ),
+            "organizationType": "OFFICE",
+            "additionalInfoLink": None,
+            "uiLink": "https://sam.gov/opp/stub_sttr_006_navy_quantum/view",
+            "award": None,
+            "pointOfContact": [
+                {
+                    "type": "primary",
+                    "fullName": "Dr. Angela Kim",
+                    "email": "angela.kim.test@navy.mil",
+                    "phone": "703-555-0606",
+                    "title": "STTR Program Manager",
+                },
+            ],
+            "officeAddress": {
+                "zipcode": "22217",
+                "city": "Arlington",
                 "countryCode": "USA",
                 "state": "VA",
             },
             "placeOfPerformance": {
-                "city": {"code": "24000", "name": "Fort Belvoir"},
+                "city": {"code": "03000", "name": "Arlington"},
                 "state": {"code": "VA", "name": "Virginia"},
                 "country": {"code": "USA", "name": "UNITED STATES"},
             },
         },
+        # ── STTR Phase I: Air Force + University ──
         {
-            "noticeId": "stub_002_cybersecurity_gsa",
-            "title": "Cybersecurity Risk Assessment and Continuous Monitoring Services",
-            "solicitationNumber": "47QTCA-25-R-0089",
-            "department": "GENERAL SERVICES ADMINISTRATION",
-            "subTier": "FEDERAL ACQUISITION SERVICE",
-            "office": "GSA/FAS OFFICE OF IT CATEGORY",
-            "fullParentPathName": "GENERAL SERVICES ADMINISTRATION.FEDERAL ACQUISITION SERVICE.GSA/FAS OFFICE OF IT CATEGORY",
-            "fullParentPathCode": "047.4732.47QTCA",
-            "postedDate": (now - timedelta(days=5)).strftime("%Y-%m-%d"),
-            "type": "Combined Synopsis/Solicitation",
-            "baseType": "Combined Synopsis/Solicitation",
-            "archiveType": "auto15",
-            "typeOfSetAside": "SBA",
-            "typeOfSetAsideDescription": "Small Business Set-Aside (FAR 19.5)",
-            "responseDeadLine": (now + timedelta(days=18)).strftime("%Y-%m-%dT14:00:00-05:00"),
-            "naicsCode": "541512",
-            "classificationCode": "D310",
+            "noticeId": "stub_sttr_007_af_directed_energy",
+            "title": "STTR Phase I: High-Energy Laser Beam Control for Airborne Platforms (AF261-T05)",
+            "solicitationNumber": "FA9451-26-T-0001",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEPT OF THE AIR FORCE",
+            "office": "AFRL/RD KIRTLAND AFB",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE.AFRL/RD KIRTLAND AFB",
+            "fullParentPathCode": "097.057.AFRL_RD",
+            "postedDate": (now - timedelta(days=3)).strftime("%Y-%m-%d"),
+            "type": "Solicitation",
+            "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=65)).strftime("%Y-%m-%d"),
+            "typeOfSetAside": "STTR",
+            "typeOfSetAsideDescription": "Small Business STTR Program",
+            "responseDeadLine": (now + timedelta(days=32)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
             "active": "Yes",
             "description": (
-                "GSA requires a contractor to perform comprehensive cybersecurity risk "
-                "assessments across multiple agency information systems. Services include "
-                "vulnerability assessment, penetration testing, NIST 800-53 Rev 5 security "
-                "control assessment, Risk Management Framework (RMF) support, and continuous "
-                "monitoring. Requires Secret clearance and CISSP or CEH certifications."
+                "STTR Phase I topic AF261-T05: AFRL Directed Energy Directorate seeks small "
+                "business/research institution teams to develop adaptive optics and beam control "
+                "solutions for airborne high-energy laser systems. Must address atmospheric "
+                "turbulence compensation, thermal blooming mitigation, and real-time wavefront "
+                "sensing. Research institution must contribute fundamental atmospheric propagation "
+                "modeling. TRL 2-4 at entry. Maximum STTR Phase I award: $250,000."
             ),
             "organizationType": "OFFICE",
             "additionalInfoLink": None,
-            "uiLink": "https://sam.gov/opp/stub_002_cybersecurity_gsa/view",
+            "uiLink": "https://sam.gov/opp/stub_sttr_007_af_directed_energy/view",
             "award": None,
             "pointOfContact": [
                 {
                     "type": "primary",
-                    "fullName": "Maria Rodriguez",
-                    "email": "maria.rodriguez.test@gsa.gov",
-                    "phone": "202-555-0200",
-                    "title": "Contract Specialist",
+                    "fullName": "Dr. James Whitfield",
+                    "email": "james.whitfield.test@us.af.mil",
+                    "phone": "505-555-0707",
+                    "title": "STTR Topic Author",
                 },
             ],
             "officeAddress": {
-                "zipcode": "20405",
-                "city": "Washington",
+                "zipcode": "87117",
+                "city": "Kirtland AFB",
                 "countryCode": "USA",
-                "state": "DC",
+                "state": "NM",
             },
             "placeOfPerformance": {
-                "city": {"code": "50000", "name": "Washington"},
-                "state": {"code": "DC", "name": "District of Columbia"},
+                "city": {"code": "02000", "name": "Albuquerque"},
+                "state": {"code": "NM", "name": "New Mexico"},
                 "country": {"code": "USA", "name": "UNITED STATES"},
             },
         },
+        # ── BAA: DARPA ──
         {
-            "noticeId": "stub_003_pmo_hhs",
-            "title": "Program Management Office (PMO) Support Services — HHS OCIO",
-            "solicitationNumber": "OS-OCIO-25-R-0015",
-            "department": "DEPARTMENT OF HEALTH AND HUMAN SERVICES",
-            "subTier": "OFFICE OF THE SECRETARY",
-            "office": "OS OFFICE OF THE CIO",
-            "fullParentPathName": "DEPARTMENT OF HEALTH AND HUMAN SERVICES.OFFICE OF THE SECRETARY.OS OFFICE OF THE CIO",
-            "fullParentPathCode": "075.OS.OCIO",
+            "noticeId": "stub_baa_008_darpa_bio",
+            "title": "Broad Agency Announcement: Biological Technologies for National Security",
+            "solicitationNumber": "HR001126-BAA-0045",
+            "department": "DEPT OF DEFENSE",
+            "subTier": "DEFENSE ADVANCED RESEARCH PROJECTS AGENCY",
+            "office": "DARPA/BTO",
+            "fullParentPathName": "DEPT OF DEFENSE.DEFENSE ADVANCED RESEARCH PROJECTS AGENCY.DARPA/BTO",
+            "fullParentPathCode": "097.DARPA.BTO",
             "postedDate": (now - timedelta(days=7)).strftime("%Y-%m-%d"),
             "type": "Solicitation",
             "baseType": "Solicitation",
+            "archiveType": "autocustom",
+            "archiveDate": (now + timedelta(days=180)).strftime("%Y-%m-%d"),
             "typeOfSetAside": "SBA",
             "typeOfSetAsideDescription": "Total Small Business Set-Aside",
-            "responseDeadLine": (now + timedelta(days=10)).strftime("%Y-%m-%dT17:00:00-05:00"),
-            "naicsCode": "541611",
-            "classificationCode": "R408",
+            "responseDeadLine": (now + timedelta(days=60)).strftime("%Y-%m-%dT17:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
             "active": "Yes",
             "description": (
-                "HHS requires program management support including EVMS, Agile program "
-                "management, risk management, stakeholder reporting, and organizational "
-                "change management for the Office of the CIO."
+                "Broad Agency Announcement (BAA): DARPA Biological Technologies Office solicits "
+                "white papers for innovative research in synthetic biology, engineered living "
+                "materials, biosensors for threat detection, and biomanufacturing for defense "
+                "applications. Multiple awards anticipated across TRL 1-4. Both small and large "
+                "businesses eligible. Proposals accepted on a rolling basis."
             ),
             "organizationType": "OFFICE",
-            "uiLink": "https://sam.gov/opp/stub_003_pmo_hhs/view",
             "additionalInfoLink": None,
-            "archiveType": "autocustom",
-            "archiveDate": (now + timedelta(days=45)).strftime("%Y-%m-%d"),
+            "uiLink": "https://sam.gov/opp/stub_baa_008_darpa_bio/view",
             "award": None,
             "pointOfContact": [
                 {
                     "type": "primary",
-                    "fullName": "James Williams",
-                    "email": "james.williams.test@hhs.gov",
-                    "phone": "202-555-0300",
-                    "title": "Contracting Officer",
+                    "fullName": "Dr. Sarah Mitchell",
+                    "email": "sarah.mitchell.test@darpa.mil",
+                    "phone": "703-555-0808",
+                    "title": "Program Manager",
                 },
             ],
             "officeAddress": {
-                "zipcode": "20201",
-                "city": "Washington",
+                "zipcode": "22203",
+                "city": "Arlington",
                 "countryCode": "USA",
-                "state": "DC",
+                "state": "VA",
             },
             "placeOfPerformance": {
-                "city": {"code": "50000", "name": "Washington"},
-                "state": {"code": "DC", "name": "District of Columbia"},
+                "city": {"code": "03000", "name": "Arlington"},
+                "state": {"code": "VA", "name": "Virginia"},
                 "country": {"code": "USA", "name": "UNITED STATES"},
             },
         },
+        # ── OTA: Army Futures Command ──
         {
-            "noticeId": "stub_004_devsecops_army",
-            "title": "DevSecOps CI/CD Pipeline Implementation and Kubernetes Platform",
-            "solicitationNumber": "W911QY-25-R-0108",
+            "noticeId": "stub_ota_009_army_ai",
+            "title": "Other Transaction Authority: AI/ML Solutions for Battlefield Decision Support",
+            "solicitationNumber": "W519TC-26-9-0005",
             "department": "DEPT OF DEFENSE",
             "subTier": "DEPT OF THE ARMY",
-            "office": "W6QK ACC-APG NATICK",
-            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.W6QK ACC-APG NATICK",
-            "fullParentPathCode": "012.21A1.W6QK",
+            "office": "ARMY FUTURES COMMAND",
+            "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.ARMY FUTURES COMMAND",
+            "fullParentPathCode": "012.21A1.AFC",
             "postedDate": (now - timedelta(days=2)).strftime("%Y-%m-%d"),
-            "type": "Solicitation",
-            "baseType": "Solicitation",
-            "typeOfSetAside": "SDVOSBA",
-            "typeOfSetAsideDescription": "Service-Disabled Veteran-Owned Small Business (SDVOSB) Set-Aside",
-            "responseDeadLine": (now + timedelta(days=30)).strftime("%Y-%m-%dT16:00:00-05:00"),
-            "naicsCode": "541512",
-            "active": "Yes",
-            "description": (
-                "U.S. Army requires a qualified small business to design, implement, and "
-                "maintain a DevSecOps CI/CD pipeline based on Kubernetes, Docker, and GitLab CI/CD. "
-                "Includes zero trust architecture, STIG hardening, and FedRAMP High authorization."
-            ),
-            "organizationType": "OFFICE",
+            "type": "Special Notice",
+            "baseType": "Special Notice",
             "archiveType": "autocustom",
-            "archiveDate": (now + timedelta(days=75)).strftime("%Y-%m-%d"),
-            "additionalInfoLink": None,
-            "uiLink": "https://sam.gov/opp/stub_004_devsecops_army/view",
-            "award": None,
-            "pointOfContact": [],
-            "officeAddress": {
-                "zipcode": "01760",
-                "city": "Natick",
-                "countryCode": "USA",
-                "state": "MA",
-            },
-            "placeOfPerformance": {
-                "city": {"code": "45000", "name": "Natick"},
-                "state": {"code": "MA", "name": "Massachusetts"},
-                "country": {"code": "USA", "name": "UNITED STATES"},
-            },
-        },
-        {
-            "noticeId": "stub_005_training_va",
-            "title": "Workforce Development and Training Program Support — VA",
-            "solicitationNumber": "VA-HRA-25-I-0033",
-            "department": "DEPARTMENT OF VETERANS AFFAIRS",
-            "subTier": "VA HUMAN RESOURCES AND ADMINISTRATION",
-            "office": None,
-            "fullParentPathName": "DEPARTMENT OF VETERANS AFFAIRS.VA HUMAN RESOURCES AND ADMINISTRATION",
-            "fullParentPathCode": "036.HRA",
-            "postedDate": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "type": "Sources Sought",
-            "baseType": "Sources Sought",
+            "archiveDate": (now + timedelta(days=120)).strftime("%Y-%m-%d"),
             "typeOfSetAside": "SBA",
             "typeOfSetAsideDescription": "Total Small Business Set-Aside",
-            "responseDeadLine": (now + timedelta(days=14)).strftime("%Y-%m-%dT12:00:00-05:00"),
-            "naicsCode": "611430",
+            "responseDeadLine": (now + timedelta(days=45)).strftime("%Y-%m-%dT16:00:00-05:00"),
+            "naicsCode": "541715",
+            "classificationCode": "A014",
             "active": "Yes",
             "description": (
-                "VA seeks information from qualified small businesses for workforce development, "
-                "instructor-led training, LMS administration, curriculum development, strategic "
-                "planning, and Lean Six Sigma process improvement support."
+                "Other Transaction Authority (OTA) prototype opportunity: Army Futures Command "
+                "seeks AI/ML solutions for real-time battlefield decision support. Solutions must "
+                "process multi-domain sensor data (satellite, UAV, ground) and provide actionable "
+                "intelligence within tactical timelines. Preference for non-traditional defense "
+                "contractors and small businesses with commercial AI/ML capabilities. "
+                "OT agreements under 10 USC 4022."
             ),
             "organizationType": "OFFICE",
-            "archiveType": "auto15",
-            "archiveDate": (now + timedelta(days=30)).strftime("%Y-%m-%d"),
             "additionalInfoLink": None,
-            "uiLink": "https://sam.gov/opp/stub_005_training_va/view",
+            "uiLink": "https://sam.gov/opp/stub_ota_009_army_ai/view",
             "award": None,
             "pointOfContact": [
                 {
                     "type": "primary",
-                    "fullName": "Sarah Johnson",
-                    "email": "sarah.johnson.test@va.gov",
-                    "phone": "202-555-0500",
-                    "title": "Contracting Specialist",
+                    "fullName": "Maj. Katherine Brooks",
+                    "email": "katherine.brooks.test@army.mil",
+                    "phone": "512-555-0909",
+                    "title": "OTA Agreements Officer",
                 },
             ],
             "officeAddress": {
-                "zipcode": "20420",
-                "city": "Washington",
+                "zipcode": "78234",
+                "city": "Austin",
                 "countryCode": "USA",
-                "state": "DC",
+                "state": "TX",
             },
             "placeOfPerformance": {
-                "city": {"code": "50000", "name": "Washington"},
-                "state": {"code": "DC", "name": "District of Columbia"},
+                "city": {"code": "05000", "name": "Austin"},
+                "state": {"code": "TX", "name": "Texas"},
                 "country": {"code": "USA", "name": "UNITED STATES"},
             },
         },
@@ -375,6 +619,8 @@ class SamGovIngester:
                             "limit": PAGE_SIZE,
                             "offset": offset,
                             "ptype": "o,k,p",  # Opportunities, sources sought, presolicitations
+                            "typeOfSetAside": "SBR,STTR",  # SBIR/STTR set-aside filter codes
+                            "ncode": "541715,541711,541712",  # R&D NAICS codes
                         },
                     )
 
@@ -487,8 +733,9 @@ class SamGovIngester:
                     is_active = $43, sam_ui_link = $44, additional_info_link = $45,
                     resource_links = $46::jsonb, document_urls = $47::jsonb,
                     estimated_value_min = $48, estimated_value_max = $49,
+                    program_type = COALESCE($50, program_type),
                     updated_at = NOW()
-                WHERE id = $50
+                WHERE id = $51
                 """,
                 fields["title"], fields["description"], fields["agency"], fields["agency_code"],
                 fields["naics_codes"], fields["set_aside"], fields["set_aside_code"],
@@ -508,6 +755,7 @@ class SamGovIngester:
                 json.dumps(fields["resource_links"], default=str),       # $47 document_urls (same data — SAM resourceLinks ARE the attachments)
                 fields["award_amount"],                                  # $48 estimated_value_min (SAM only provides award.amount, no separate estimate)
                 fields["award_amount"],                                  # $49 estimated_value_max (same — exact figure when awarded, NULL otherwise)
+                fields.get("program_type"),                              # $50 program_type (COALESCE preserves existing)
                 existing["id"],
             )
 
@@ -538,6 +786,8 @@ class SamGovIngester:
                     "agency": fields["agency"],
                     "department": fields["department"],
                     "opp_type": fields["opp_type"],
+                    "program_type": fields.get("program_type"),
+                    "topic_number": fields.get("topic_number"),
                 },
             )
             return "updated"
@@ -559,7 +809,8 @@ class SamGovIngester:
                     base_type, archive_type, archive_date,
                     is_active, sam_ui_link, additional_info_link,
                     resource_links, document_urls,
-                    estimated_value_min, estimated_value_max
+                    estimated_value_min, estimated_value_max,
+                    program_type
                 ) VALUES (
                     'sam_gov', $1, $2, $3, $4, $5,
                     $6, $7, $8, $9,
@@ -575,7 +826,8 @@ class SamGovIngester:
                     $41, $42, $43,
                     $44, $45, $46,
                     $47::jsonb, $48::jsonb,
-                    $49, $50
+                    $49, $50,
+                    $51
                 )
                 RETURNING id
                 """,
@@ -596,6 +848,7 @@ class SamGovIngester:
                 json.dumps(fields["resource_links"], default=str),       # $48 document_urls (same — SAM resourceLinks ARE the attachments)
                 fields["award_amount"],                                  # $49 estimated_value_min (SAM only provides award.amount, no separate estimate)
                 fields["award_amount"],                                  # $50 estimated_value_max (same — exact figure when awarded, NULL otherwise)
+                fields.get("program_type"),                              # $51 program_type
             )
 
             # Emit opportunity event: ingest.new
@@ -620,9 +873,47 @@ class SamGovIngester:
                         "department": fields["department"],
                         "classification_code": fields["classification_code"],
                         "pop_state": fields["pop_state"],
+                        "program_type": fields.get("program_type"),
+                        "topic_number": fields.get("topic_number"),
+                        "solicitation_agency": fields.get("solicitation_agency"),
                     },
                 )
             return "new"
+
+    @staticmethod
+    def _detect_program_type(raw: dict) -> str:
+        """Detect SBIR/STTR program type from opportunity text."""
+        text = f"{raw.get('title', '')} {raw.get('description', '')}".upper()
+
+        if 'STTR' in text and 'PHASE II' in text:
+            return 'sttr_phase_2'
+        if 'STTR' in text and 'PHASE I' in text:
+            return 'sttr_phase_1'
+        if 'STTR' in text:
+            return 'sttr_phase_1'  # default STTR to Phase I
+        if 'SBIR' in text and 'PHASE II' in text:
+            return 'sbir_phase_2'
+        if 'SBIR' in text and 'PHASE I' in text:
+            return 'sbir_phase_1'
+        if 'SBIR' in text:
+            return 'sbir_phase_1'  # default SBIR to Phase I
+        if 'BROAD AGENCY ANNOUNCEMENT' in text or 'BAA' in text:
+            return 'baa'
+        if 'OTHER TRANSACTION' in text or ' OTA' in text or 'OT AUTHORITY' in text:
+            return 'ota'
+        if 'CHALLENGE' in text and ('PRIZE' in text or 'COMPETITION' in text):
+            return 'challenge'
+        if 'REQUEST FOR INFORMATION' in text or ' RFI' in text:
+            return 'rfi'
+        if 'SOURCES SOUGHT' in text:
+            return 'sources_sought'
+        return 'other'
+
+    @staticmethod
+    def _extract_topic_number(title: str) -> str | None:
+        """Extract SBIR/STTR topic number from title (e.g., 'AF241-001', 'N261-T01')."""
+        match = re.search(r'\b([A-Z]{1,4}\d{2,3}-[A-Z]?\d{2,4})\b', title)
+        return match.group(1) if match else None
 
     def _extract_all_fields(self, raw: dict, source_id: str) -> dict:
         """Extract all metadata fields from a SAM.gov API response record."""
@@ -736,6 +1027,11 @@ class SamGovIngester:
         awardee_city = awardee_loc.get("city", "") if awardee_loc else ""
         awardee_state = awardee_loc.get("state", "") if awardee_loc else ""
 
+        # ── SBIR/STTR-specific fields ──
+        program_type = self._detect_program_type(raw)
+        topic_number = self._extract_topic_number(title)
+        solicitation_agency = sub_tier or department or agency
+
         return {
             "title": title,
             "description": description,
@@ -781,6 +1077,9 @@ class SamGovIngester:
             "sam_ui_link": sam_ui_link or None,
             "additional_info_link": additional_info_link or None,
             "resource_links": resource_links,
+            "program_type": program_type if program_type != 'other' else None,
+            "topic_number": topic_number,
+            "solicitation_agency": solicitation_agency or None,
         }
 
     @staticmethod

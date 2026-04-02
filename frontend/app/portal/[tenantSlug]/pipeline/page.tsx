@@ -4,6 +4,38 @@ import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import type { TenantPipelineItem, PursuitStatus } from '@/types'
 
+const PROGRAM_TYPE_BADGES: Record<string, { label: string; color: string }> = {
+  sbir_phase_1: { label: 'SBIR I', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  sbir_phase_2: { label: 'SBIR II', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  sttr_phase_1: { label: 'STTR I', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  sttr_phase_2: { label: 'STTR II', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+  ota: { label: 'OTA', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  baa: { label: 'BAA', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  challenge: { label: 'Challenge', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+}
+
+function ProgramTypeBadge({ programType }: { programType: string | null }) {
+  if (!programType) return null
+  const badge = PROGRAM_TYPE_BADGES[programType]
+  if (!badge) return null
+  return (
+    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+      {badge.label}
+    </span>
+  )
+}
+
+const PROGRAM_TYPE_OPTIONS = [
+  { value: '', label: 'All Programs' },
+  { value: 'sbir_phase_1', label: 'SBIR Phase I' },
+  { value: 'sbir_phase_2', label: 'SBIR Phase II' },
+  { value: 'sttr_phase_1', label: 'STTR Phase I' },
+  { value: 'sttr_phase_2', label: 'STTR Phase II' },
+  { value: 'ota', label: 'OTA' },
+  { value: 'baa', label: 'BAA' },
+  { value: 'challenge', label: 'Challenge' },
+]
+
 export default function PortalPipeline() {
   return (
     <Suspense fallback={<div className="animate-pulse"><div className="h-8 w-48 rounded bg-gray-200" /></div>}>
@@ -30,6 +62,7 @@ function PortalPipelineInner() {
   const [sortDir, setSortDir] = useState(searchParams.get('sortDir') ?? 'desc')
   const [pursuitFilter, setPursuitFilter] = useState('')
   const [minScore, setMinScore] = useState('')
+  const [programTypeFilter, setProgramTypeFilter] = useState('')
   const [spotlightFilter, setSpotlightFilter] = useState(searchParams.get('spotlightId') ?? '')
 
   // Fetch spotlights for the filter dropdown
@@ -54,6 +87,7 @@ function PortalPipelineInner() {
     if (search) params.set('search', search)
     if (pursuitFilter) params.set('pursuitStatus', pursuitFilter)
     if (minScore) params.set('minScore', minScore)
+    if (programTypeFilter) params.set('programType', programTypeFilter)
     if (spotlightFilter) params.set('spotlightId', spotlightFilter)
 
     fetch(`/api/opportunities?${params}`)
@@ -67,7 +101,7 @@ function PortalPipelineInner() {
       })
       .catch(err => setError(err.message ?? 'Failed to load opportunities'))
       .finally(() => setLoading(false))
-  }, [slug, sortBy, sortDir, page, search, pursuitFilter, minScore, spotlightFilter])
+  }, [slug, sortBy, sortDir, page, search, pursuitFilter, minScore, programTypeFilter, spotlightFilter])
 
   useEffect(() => { loadOpps() }, [loadOpps])
 
@@ -98,10 +132,15 @@ function PortalPipelineInner() {
       <div className="mt-4 flex flex-wrap gap-3">
         <input
           className="input max-w-xs"
-          placeholder="Search title, agency, sol #..."
+          placeholder="Search SBIR/STTR topics, agencies, SOL #..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(0) }}
         />
+        <select className="input w-auto" value={programTypeFilter} onChange={e => { setProgramTypeFilter(e.target.value); setPage(0) }}>
+          {PROGRAM_TYPE_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
         <select className="input w-auto" value={pursuitFilter} onChange={e => { setPursuitFilter(e.target.value); setPage(0) }}>
           <option value="">All statuses</option>
           <option value="unreviewed">Unreviewed</option>
@@ -200,6 +239,7 @@ function OpportunityRow({ opp, onAction }: { opp: TenantPipelineItem; onAction: 
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <ProgramTypeBadge programType={opp.programType} />
             <span>{opp.agency ?? 'Unknown'}</span>
             <span>&middot;</span>
             <span>{opp.opportunityType}</span>

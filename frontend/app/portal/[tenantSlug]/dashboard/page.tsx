@@ -20,12 +20,39 @@ interface DashboardMetrics {
     avgCompletion: number
     deadlineSoon: number
   }
+  purchases: {
+    activeBuilds: number
+    pendingTemplates: number
+    completedBuilds: number
+    totalPurchases: number
+  }
   activity: Array<{
     id: string
     eventType: string
     description: string
     createdAt: string
   }>
+}
+
+const PROGRAM_TYPE_BADGES: Record<string, { label: string; color: string }> = {
+  sbir_phase_1: { label: 'SBIR I', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  sbir_phase_2: { label: 'SBIR II', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  sttr_phase_1: { label: 'STTR I', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  sttr_phase_2: { label: 'STTR II', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+  ota: { label: 'OTA', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  baa: { label: 'BAA', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  challenge: { label: 'Challenge', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+}
+
+function ProgramTypeBadge({ programType }: { programType: string | null }) {
+  if (!programType) return null
+  const badge = PROGRAM_TYPE_BADGES[programType]
+  if (!badge) return null
+  return (
+    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${badge.color}`}>
+      {badge.label}
+    </span>
+  )
 }
 
 export default function PortalDashboard() {
@@ -71,8 +98,9 @@ export default function PortalDashboard() {
           pursuing: pursuing.total ?? 0,
           closingSoon: urgent.total ?? 0,
         })
-        if (dashMetrics && (dashMetrics.library || dashMetrics.proposals || dashMetrics.activity)) {
-          setMetrics(dashMetrics)
+        const metricsData = dashMetrics?.data ?? dashMetrics
+        if (metricsData && (metricsData.library || metricsData.proposals || metricsData.activity)) {
+          setMetrics(metricsData)
         }
       })
       .catch(err => setError(err.message ?? 'Failed to load dashboard data'))
@@ -124,21 +152,21 @@ export default function PortalDashboard() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-      <p className="mt-1 text-sm text-gray-500">Your opportunity intelligence at a glance</p>
+      <p className="mt-1 text-sm text-gray-500">Your SBIR/STTR opportunity intelligence at a glance</p>
 
       {/* Stats */}
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="In Pipeline" value={stats.total} color="blue" />
-        <StatCard label="High Priority" value={stats.highPriority} color="green" />
+        <StatCard label="SBIR/STTR Topics" value={stats.total} color="blue" />
+        <StatCard label="High Match" value={stats.highPriority} color="green" />
         <StatCard label="Pursuing" value={stats.pursuing} color="purple" />
         <StatCard label="Closing Soon" value={stats.closingSoon} color="red" />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Proposals Active" value={metrics?.proposals?.total ?? 0} color="purple" />
+        <StatCard label="Active Proposals" value={metrics?.proposals?.total ?? 0} color="purple" />
         <StatCard label="Library Units" value={metrics?.library?.totalUnits ?? 0} color="indigo" />
         <StatCard label="Avg Completion" value={`${metrics?.proposals?.avgCompletion ?? 0}%`} color="emerald" />
-        <StatCard label="Deadlines Soon" value={metrics?.proposals?.deadlineSoon ?? 0} color="rose" />
+        <StatCard label="Proposal Builds" value={metrics?.purchases?.activeBuilds ?? 0} color="rose" />
       </div>
 
       {/* Proposal Pipeline */}
@@ -150,47 +178,69 @@ export default function PortalDashboard() {
               View all &rarr;
             </Link>
           </div>
-          <div className="mt-4">
-            {totalByStage > 0 ? (
-              <div className="flex h-8 w-full overflow-hidden rounded-lg">
-                {proposalStages.map(stage => {
-                  const count = byStage[stage.key] ?? 0
-                  if (count === 0) return null
-                  const pct = (count / totalByStage) * 100
-                  return (
-                    <div
-                      key={stage.key}
-                      className={`${stage.color} flex items-center justify-center text-xs font-medium text-white`}
-                      style={{ width: `${pct}%`, minWidth: '2rem' }}
-                      title={`${stage.label}: ${count}`}
-                    >
-                      {count}
-                    </div>
-                  )
-                })}
+          <div className="mt-4 flex gap-6">
+            <div className="flex-1">
+              {totalByStage > 0 ? (
+                <div className="flex h-8 w-full overflow-hidden rounded-lg">
+                  {proposalStages.map(stage => {
+                    const count = byStage[stage.key] ?? 0
+                    if (count === 0) return null
+                    const pct = (count / totalByStage) * 100
+                    return (
+                      <div
+                        key={stage.key}
+                        className={`${stage.color} flex items-center justify-center text-xs font-medium text-white`}
+                        style={{ width: `${pct}%`, minWidth: '2rem' }}
+                        title={`${stage.label}: ${count}`}
+                      >
+                        {count}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-8 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500">
+                  No proposals yet
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                {proposalStages.map(stage => (
+                  <span key={stage.key} className="flex items-center gap-1">
+                    <span className={`inline-block h-2 w-2 rounded-full ${stage.color}`} />
+                    {stage.label} ({byStage[stage.key] ?? 0})
+                  </span>
+                ))}
               </div>
-            ) : (
-              <div className="flex h-8 w-full items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500">
-                No proposals yet
+            </div>
+            {/* Proposal Builds Summary */}
+            {metrics?.purchases && (metrics.purchases.totalPurchases ?? 0) > 0 && (
+              <div className="flex-shrink-0 rounded-lg border border-gray-200 bg-gray-50 p-3 text-center min-w-[140px]">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Proposal Builds</p>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Pending</span>
+                    <span className="font-medium text-amber-700">{metrics.purchases.pendingTemplates}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Active</span>
+                    <span className="font-medium text-blue-700">{metrics.purchases.activeBuilds}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Completed</span>
+                    <span className="font-medium text-green-700">{metrics.purchases.completedBuilds}</span>
+                  </div>
+                </div>
               </div>
             )}
-            <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
-              {proposalStages.map(stage => (
-                <span key={stage.key} className="flex items-center gap-1">
-                  <span className={`inline-block h-2 w-2 rounded-full ${stage.color}`} />
-                  {stage.label} ({byStage[stage.key] ?? 0})
-                </span>
-              ))}
-            </div>
           </div>
         </div>
       )}
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Top Scored */}
+        {/* Top SBIR/STTR Matches */}
         <div className="card">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Top Scored</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Top SBIR/STTR Matches</h2>
             <Link href={`/portal/${slug}/pipeline?sortBy=score`} className="text-sm text-brand-600 hover:text-brand-800">
               View all &rarr;
             </Link>
@@ -204,10 +254,10 @@ export default function PortalDashboard() {
           </div>
         </div>
 
-        {/* Closing Soon */}
+        {/* Approaching Deadlines */}
         <div className="card">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Closing Soon</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Approaching Deadlines</h2>
             <Link href={`/portal/${slug}/pipeline?sortBy=close_date&sortDir=asc`} className="text-sm text-brand-600 hover:text-brand-800">
               View all &rarr;
             </Link>
@@ -323,7 +373,8 @@ function OppCard({ opp, slug }: { opp: TenantPipelineItem; slug: string }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-gray-900 truncate">{opp.title}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+            <ProgramTypeBadge programType={opp.programType} />
             {opp.agency ?? 'Unknown agency'} &middot; {opp.opportunityType}
           </p>
         </div>
