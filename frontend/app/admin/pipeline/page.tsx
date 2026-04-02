@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { PipelineJob, PipelineSchedule } from '@/types'
 
 type Tab = 'jobs' | 'schedules' | 'runs'
@@ -15,9 +15,7 @@ export default function PipelinePage() {
   const [error, setError] = useState<string | null>(null)
   const [confirmTrigger, setConfirmTrigger] = useState<{ source: string; runType: string } | null>(null)
 
-  useEffect(() => { loadData() }, [tab])
-
-  function loadData() {
+  const loadData = useCallback(() => {
     setLoading(true)
     setError(null)
     const view = tab === 'jobs' ? 'jobs' : tab === 'schedules' ? 'schedules' : 'runs'
@@ -33,7 +31,9 @@ export default function PipelinePage() {
       })
       .catch(err => setError(err.message ?? 'Failed to load pipeline data'))
       .finally(() => setLoading(false))
-  }
+  }, [tab])
+
+  useEffect(() => { loadData() }, [loadData])
 
   async function triggerJob(source: string, runType = 'full') {
     setTriggering(true)
