@@ -7,95 +7,86 @@ import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
-    eyebrow: 'Launching Soon · Join the Waitlist',
-    title: 'Choose the plan that fits your mission',
-    description: 'Preview our plans and join the waitlist to get early access when we launch.',
+    eyebrow: 'Launching Soon \u00B7 Join the Waitlist',
+    title: 'Your 24/7 SBIR/STTR lookout, plus expert proposal builds on demand',
+    description: 'One simple plan for opportunity intelligence. Pay per proposal when you are ready to pursue. No long-term contracts, no hidden fees.',
   },
   tiers: [
     {
-      name: 'Starter',
-      price: '$49',
+      name: 'Finder + Minder',
+      price: '$199',
       period: 'month',
-      description: 'Perfect for small businesses exploring federal contracting.',
+      description: 'Your always-on SBIR/STTR opportunity scanning and pipeline management platform.',
       features: [
-        'Up to 50 scored opportunities/month',
-        '1 user workspace',
-        '3 NAICS code profiles',
-        'Weekly email digest',
-        'SAM.gov opportunity scanning',
-        'Basic deadline alerts',
+        'Unlimited SBIR/STTR opportunity scanning',
+        'AI-powered technology match scoring',
+        'Deadline alerts and reminders',
+        'Pipeline tracking and management',
+        'Up to 3 SpotLight search profiles',
+        'Team collaboration workspace',
+        'Notification center',
+        'Document storage',
       ],
       cta: 'Join Waitlist',
       popular: false,
     },
     {
-      name: 'Professional',
-      price: '$149',
-      period: 'month',
-      description: 'For active bidders who need a competitive edge.',
+      name: 'Phase I Proposal Build',
+      price: '$499',
+      period: 'proposal',
+      description: 'Expert-reviewed template and AI-assisted workspace for your SBIR/STTR Phase I submission.',
       features: [
-        'Unlimited scored opportunities',
-        'Up to 5 user workspaces',
-        'Unlimited NAICS code profiles',
-        'Daily email digest + real-time alerts',
-        'AI-powered scoring & ranking',
-        'Set-aside matching',
-        'Document management',
-        'Priority support',
+        'Expert-reviewed proposal template (delivered within 1 week)',
+        'AI-assisted content assembly',
+        'Section-by-section writing workspace',
+        'Reusable content library (grows with each proposal)',
+        'Partner collaboration portal',
+        '72-hour cancellation window',
       ],
       cta: 'Join Waitlist',
       popular: true,
     },
     {
-      name: 'Enterprise',
-      price: '$399',
-      period: 'month',
-      description: 'For teams and accelerators managing multiple pipelines.',
+      name: 'Phase II Proposal Build',
+      price: '$999',
+      period: 'proposal',
+      description: 'Full-scope proposal support for larger Phase II submissions with commercialization planning.',
       features: [
-        'Everything in Professional',
-        'Unlimited user workspaces',
-        'Multi-tenant management',
-        'Batch onboarding (accelerator cohorts)',
-        'Custom scoring profiles',
-        'API access',
-        'Dedicated account manager',
-        'SSO & advanced security',
+        'Everything in Phase I Build',
+        'Extended template for larger proposals',
+        'Phase I results integration',
+        'Transition and commercialization plan framework',
+        'Detailed budget template',
+        'Priority template delivery',
       ],
       cta: 'Join Waitlist',
       popular: false,
     },
   ],
   comparison: [
-    ['Scored Opportunities', '50/mo', 'Unlimited', 'Unlimited'],
-    ['User Workspaces', '1', '5', 'Unlimited'],
-    ['NAICS Profiles', '3', 'Unlimited', 'Unlimited'],
-    ['SAM.gov Scanning', true, true, true],
-    ['AI Scoring & Ranking', false, true, true],
-    ['Set-Aside Matching', false, true, true],
-    ['Deadline Alerts', 'Basic', 'Real-time', 'Real-time'],
-    ['Document Management', false, true, true],
-    ['Multi-Tenant', false, false, true],
-    ['API Access', false, false, true],
-    ['Support', 'Email', 'Priority', 'Dedicated'],
+    ['What is the cost of a missed SBIR opportunity?', 'A single Phase I award is worth $50K\u2013$275K in non-dilutive funding', '', ''],
+    ['How much do consultants charge?', 'SBIR consultants typically charge $3K\u2013$10K per proposal', '', ''],
+    ['How fast can you submit?', 'Expert template delivered within 1 week of purchase', '', ''],
+    ['Does it get easier over time?', 'Yes \u2014 your content library grows with every proposal you build', '', ''],
   ],
   faqs: [
-    { q: 'When will GovWin launch?', a: 'We are in the final stages of development and will be launching soon. Join the waitlist to be notified the moment we go live and secure early access pricing.' },
-    { q: 'What do I get by joining the waitlist?', a: 'Waitlist members receive priority onboarding, special launch pricing, and early access before the platform opens to the public.' },
-    { q: 'Can I change plans later?', a: 'Absolutely. Once we launch, you can upgrade or downgrade at any time. Changes take effect at your next billing cycle. No penalties or hidden fees.' },
-    { q: 'Do you offer annual billing?', a: 'Yes — annual plans will save you 20%. Contact us for a custom annual agreement with additional perks.' },
-    { q: 'Is there a setup fee?', a: 'No setup fees, ever. Your workspace will be provisioned instantly when you subscribe. We help you configure your scoring profile during onboarding.' },
-    { q: 'Do you offer discounts for startups or nonprofits?', a: 'Yes. SBIR/STTR applicants and registered nonprofits qualify for 25% off any plan. Contact our team to apply.' },
+    { q: 'What types of opportunities do you track?', a: 'SBIR Phase I and Phase II, STTR Phase I and Phase II, Other Transaction Authorities (OTAs), Broad Agency Announcements (BAAs), and Prize Challenges across all federal agencies including DoD, NIH, NSF, DOE, NASA, and DHS.' },
+    { q: 'What is included in a proposal build?', a: 'Each proposal build includes expert review of the solicitation, a custom template matched to the specific agency and program requirements, and an AI-assisted section drafting workspace that draws from your reusable content library.' },
+    { q: 'How does the content library work?', a: 'Every proposal you build adds to your reusable content library. Team bios, past performance narratives, technical capabilities, and facility descriptions are stored and indexed. The AI learns your language and writing style, making each subsequent proposal faster to assemble.' },
+    { q: 'Can I add research partners?', a: 'Yes. STTR requires a research institution partnership, and many SBIR proposals benefit from subcontractors. You can securely add partners with controlled access to specific proposals only — they see what you share, nothing more.' },
+    { q: 'What if I want to cancel a proposal build?', a: 'You have a 72-hour cancellation window from the time of purchase. If your template has not been delivered yet, you receive a full refund. Once template delivery begins, the purchase is final.' },
+    { q: 'How does pricing compare to hiring a consultant?', a: 'SBIR consultants typically charge $3,000 to $10,000 per proposal. Our Phase I builds are $499 and Phase II builds are $999. You get expert-reviewed templates plus an AI workspace that improves with every proposal you write.' },
   ],
   contactCta: {
-    title: 'Need a custom solution?',
-    description: 'For accelerator programs, government agencies, or large teams — let\'s talk about a tailored plan.',
+    title: 'Need help choosing the right approach?',
+    description: 'For accelerator programs, university tech transfer offices, or teams pursuing multiple SBIR/STTR topics — let\'s talk.',
     email: 'eric@rfppipeline.com',
   },
 }
 
 const STATIC_META = {
-  title: 'Get Started | RFP Pipeline',
-  description: 'Choose your plan and start finding federal contract opportunities today.',
+  title: 'Pricing | GovWin SBIR/STTR Intelligence',
+  description: '$199/mo for SBIR/STTR opportunity scanning and matching. Add expert proposal builds for $499 (Phase I) or $999 (Phase II).',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -140,28 +131,24 @@ export default async function GetStartedPage() {
       {/* Feature comparison */}
       <Section className="bg-surface-50">
         <SectionHeader
-          eyebrow="Compare Plans"
-          title="Everything included at a glance"
+          eyebrow="The Math"
+          title="Why this pays for itself"
         />
         <div className="mt-12 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="py-4 pr-4 text-sm font-bold text-gray-900 w-1/3">Feature</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-900">Starter</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-brand-600">Professional</th>
-                <th className="pl-4 py-4 text-center text-sm font-bold text-gray-900">Enterprise</th>
+                <th className="py-4 pr-4 text-sm font-bold text-gray-900 w-1/2">Question</th>
+                <th className="px-4 py-4 text-sm font-bold text-gray-900" colSpan={3}>Answer</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {content.comparison.map((row, i) => {
-                const [feature, starter, pro, enterprise] = row
+                const [question, answer] = row
                 return (
                   <tr key={i} className="hover:bg-white transition-colors">
-                    <td className="py-3.5 pr-4 text-sm text-gray-700">{feature as string}</td>
-                    <td className="px-4 py-3.5 text-center">{renderCell(starter)}</td>
-                    <td className="px-4 py-3.5 text-center bg-brand-50/30">{renderCell(pro)}</td>
-                    <td className="pl-4 py-3.5 text-center">{renderCell(enterprise)}</td>
+                    <td className="py-3.5 pr-4 text-sm font-medium text-gray-900">{question as string}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-600" colSpan={3}>{answer as string}</td>
                   </tr>
                 )
               })}

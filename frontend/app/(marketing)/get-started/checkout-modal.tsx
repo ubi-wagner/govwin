@@ -143,37 +143,31 @@ export function InteractivePricingSection({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
                   </svg>
                 </div>
-                <h3 className="mt-4 text-xl font-bold text-gray-900">Launching Soon</h3>
+                <h3 className="mt-4 text-xl font-bold text-gray-900">SBIR/STTR Intelligence — Launching Soon</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  We&apos;re putting the finishing touches on our platform.
+                  Your 24/7 SBIR/STTR lookout is almost ready.
                 </p>
               </div>
 
               {selectedPlan && (
                 <div className="rounded-xl bg-gray-50 p-4 mb-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-900">{selectedPlan} Plan</span>
+                    <span className="text-sm font-semibold text-gray-900">{selectedPlan}</span>
                     <span className="text-sm font-bold text-gray-900">
                       {(() => {
                         const plan = plans.find(p => p.name === selectedPlan)
                         if (!plan) return ''
-                        const price = parseInt(plan.price.replace('$', ''), 10)
-                        return billingPeriod === 'annual'
-                          ? `$${Math.round(price * 0.8)}/mo`
-                          : `${plan.price}/mo`
+                        return `${plan.price}/${plan.period}`
                       })()}
                     </span>
                   </div>
-                  {billingPeriod === 'annual' && (
-                    <p className="mt-1 text-xs text-emerald-600 font-medium">You save 20% with annual billing</p>
-                  )}
                 </div>
               )}
 
               <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                Join our early access list to be the first to know when GovWin launches.
+                Join the waitlist for early access to SBIR/STTR opportunity intelligence and proposal builds.
                 Early subscribers get <span className="font-semibold text-gray-900">priority onboarding</span> and{' '}
-                <span className="font-semibold text-gray-900">special pricing</span>.
+                <span className="font-semibold text-gray-900">launch pricing</span>.
               </p>
 
               <div className="space-y-4">

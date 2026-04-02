@@ -6,37 +6,37 @@ import type { AboutPageContent } from '@/types'
 
 const STATIC_CONTENT: AboutPageContent = {
   hero: {
-    eyebrow: 'About RFP Pipeline',
-    title: 'Built by people who know federal contracting',
-    description: 'RFP Pipeline was created by a team with over two decades of experience in government contracting, SBIR/STTR programs, and technology commercialization. We built the tool we wished we had.',
+    eyebrow: 'About GovWin',
+    title: 'Built by people who win SBIR/STTR awards',
+    description: 'GovWin was created by a team with 20+ years of SBIR/STTR experience, a 13/13 recent win rate, and over $100M in non-dilutive capital secured for small tech businesses. We built the platform we wished existed.',
   },
   mission: {
     eyebrow: 'Our Mission',
-    title: 'Level the playing field for small businesses',
+    title: 'Democratize access to federal research funding',
     paragraphs: [
-      'Federal procurement is a $700B+ market, but navigating it is overwhelming. Small businesses spend countless hours searching SAM.gov, filtering through irrelevant postings, and missing deadlines on opportunities they should have won.',
-      'RFP Pipeline changes that. Our AI-powered platform continuously scans federal procurement sources, scores every opportunity against your unique business profile, and delivers a prioritized pipeline so you can focus on what matters: writing winning proposals.',
+      'The federal government invests billions annually in small business R&D through SBIR, STTR, OTA, and BAA programs. But finding the right opportunities and writing competitive proposals requires expertise that most small businesses cannot afford. The result: great technologies never get funded.',
+      'GovWin changes that. Our platform scans every SBIR/STTR solicitation across all federal agencies, scores each topic against your technology profile, and provides expert-reviewed proposal templates with AI-assisted assembly. Every proposal you build makes the next one faster through our compound learning library. Our vision is simple: your 5th proposal should take a fraction of the effort of your first.',
     ],
   },
   features: [
-    { icon: 'AI', title: 'Scoring Engine', description: 'Multi-factor relevance scoring using NAICS, keywords, set-asides, and agency history' },
-    { icon: '24/7', title: 'Monitoring', description: 'Continuous scanning of SAM.gov and federal procurement sources' },
-    { icon: 'SaaS', title: 'Multi-Tenant', description: 'Secure, isolated workspaces for every client organization' },
-    { icon: 'Fast', title: 'Setup', description: 'Enter your profile, get scored opportunities in minutes — not weeks' },
+    { icon: '13/13', title: 'Win Rate', description: '100% recent SBIR/STTR success across Phase I and Phase II awards' },
+    { icon: '$100M', title: 'Capital Secured', description: 'Non-dilutive funding secured for clients through SBIR, STTR, and related programs' },
+    { icon: '50+', title: 'Startups', description: 'Deep tech, defense, biotech, and university spinoff companies supported' },
+    { icon: '20+', title: 'Years', description: 'Federal R&D funding, SBIR/STTR programs, and technology commercialization' },
   ],
   howItWorks: [
-    { step: '01', title: 'Information Overload', description: 'Thousands of new opportunities posted daily — most irrelevant to your business.' },
-    { step: '02', title: 'Missed Deadlines', description: 'Critical response windows close before you even discover the opportunity.' },
-    { step: '03', title: 'Manual Searching', description: 'Hours spent on SAM.gov with clunky filters that return noisy results.' },
-    { step: '04', title: 'No Prioritization', description: 'Every opportunity looks the same — no way to focus on what you can actually win.' },
-    { step: '05', title: 'Fragmented Tools', description: 'Spreadsheets, email chains, and browser bookmarks instead of a real pipeline.' },
-    { step: '06', title: 'Wasted Proposals', description: 'Time spent pursuing opportunities that were never a good fit to begin with.' },
+    { step: '01', title: 'Missed Opportunities', description: 'SBIR/STTR topics are released on unpredictable schedules across dozens of agency portals. Great-fit topics close before you find them.' },
+    { step: '02', title: 'Scattered Sources', description: 'SBIR.gov, SAM.gov, agency-specific portals, and email lists — there is no single source of truth for all federal R&D opportunities.' },
+    { step: '03', title: 'Proposal Paralysis', description: 'You found a topic, but the 30-page proposal template is intimidating. Where do you start? What does this agency actually want to see?' },
+    { step: '04', title: 'Starting From Scratch', description: 'Every proposal feels like the first. Team bios, past performance, facility descriptions — rewritten from zero each time.' },
+    { step: '05', title: 'Consultant Costs', description: 'SBIR consultants charge $3K-$10K per proposal. For a small business exploring federal R&D, that math does not work.' },
+    { step: '06', title: 'No Feedback Loop', description: 'Win or lose, there is no system to capture what worked and apply it to the next proposal. Institutional knowledge walks out the door.' },
   ],
 }
 
 const STATIC_META = {
-  title: 'About RFP Pipeline | Government Opportunity Intelligence',
-  description: 'Learn how RFP Pipeline helps companies discover, score, and win federal government contracts using AI-powered opportunity matching.',
+  title: 'About GovWin | SBIR/STTR Expertise for Small Business',
+  description: '20+ years of SBIR/STTR expertise. 13/13 recent win rate. $100M+ in non-dilutive capital secured. Learn how GovWin helps small tech businesses win federal research funding.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -132,7 +132,7 @@ export default async function AboutPage() {
         <SectionHeader
           eyebrow="Get Started"
           title="Ready to transform your federal pipeline?"
-          description="Contact us for a demo or to learn more about how RFP Pipeline can help your business win government contracts."
+          description="Contact us to learn how GovWin can help your business find and win SBIR/STTR awards."
         />
         <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-gray-200/80 bg-white p-8 shadow-card">
           <div className="space-y-5 text-center">
@@ -142,7 +142,7 @@ export default async function AboutPage() {
               </svg>
             </div>
             <p className="text-sm text-gray-600">
-              Reach out to discuss your needs and get set up with a personalized workspace.
+              Reach out to discuss your SBIR/STTR goals and how we can help you win.
             </p>
             <a
               href="mailto:eric@rfppipeline.com"
@@ -158,9 +158,9 @@ export default async function AboutPage() {
       </Section>
 
       <CtaSection
-        title="Start winning government contracts today"
-        description="Join companies already using RFP Pipeline to find their next federal opportunity."
-        primaryLabel="View Pricing"
+        title="Ready to win your next SBIR?"
+        description="Join the companies using GovWin to find and win SBIR/STTR awards faster."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Meet the founder"
         secondaryHref="/team"

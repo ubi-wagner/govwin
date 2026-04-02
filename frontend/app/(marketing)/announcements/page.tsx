@@ -7,52 +7,52 @@ import type { AnnouncementsPageContent } from '@/types'
 const STATIC_CONTENT: AnnouncementsPageContent = {
   hero: {
     eyebrow: 'News & Announcements',
-    title: "What's new at RFP Pipeline",
-    description: 'Product updates, company news, and important announcements for our customers and community.',
+    title: "What's new at GovWin",
+    description: 'Product updates, company news, and announcements about our SBIR/STTR opportunity intelligence platform.',
   },
   items: [
     {
-      date: 'March 2026',
+      date: 'April 2026',
       category: 'Product',
-      title: 'RFP Pipeline Platform Launch',
-      excerpt: 'We are excited to announce the official launch of the RFP Pipeline platform. After months of development and beta testing, our AI-powered government opportunity intelligence platform is now available to clients. The platform includes automated SAM.gov scanning, multi-factor scoring, deadline alerts, and secure multi-tenant workspaces.',
+      title: 'GovWin SBIR/STTR Intelligence Platform — Launching Soon',
+      excerpt: 'We are building the definitive platform for small businesses pursuing SBIR, STTR, OTA, and BAA opportunities. GovWin combines 24/7 opportunity scanning across SAM.gov, SBIR.gov, and agency portals with AI-powered technology matching, deadline intelligence, and expert-reviewed proposal builds. Join the waitlist for early access.',
     },
     {
       date: 'March 2026',
       category: 'Feature',
-      title: 'AI-Powered Opportunity Scoring Now Live',
-      excerpt: 'Our scoring engine now evaluates every opportunity against your business profile using NAICS codes, keyword matching, set-aside eligibility, agency history, contract type preferences, and timeline analysis. Each opportunity receives a composite score to help you prioritize your pipeline.',
+      title: 'Technology Match Scoring Engine',
+      excerpt: 'Our scoring engine evaluates every SBIR/STTR topic against your technology profile using research areas, NAICS codes, TRL level, agency history, and keyword analysis. Each opportunity receives a composite match score so you can focus on the topics built for your technology.',
     },
     {
       date: 'March 2026',
       category: 'Feature',
-      title: 'Automated Deadline Alerts and Reminders',
-      excerpt: 'Never miss a response deadline again. RFP Pipeline now sends automated email notifications when tracked opportunities approach their close dates, with configurable lead times for 30-day, 14-day, and 7-day reminders.',
+      title: 'Compound Learning Library',
+      excerpt: 'Every proposal you build with GovWin adds to your reusable content library. Team bios, past performance narratives, technical capabilities, and facility descriptions are stored and indexed. The AI learns your language, making each subsequent proposal faster to assemble.',
     },
     {
       date: 'February 2026',
       category: 'Company',
-      title: 'Eric Wagner Launches RFP Pipeline',
-      excerpt: 'After two decades of supporting startups and federal contracting, Eric Wagner has founded RFP Pipeline to bring enterprise-grade opportunity intelligence to small businesses. Drawing on his experience securing over $100M in non-dilutive capital and advising 40+ startups on SBIR/STTR programs, Eric is building the tool he wished existed.',
+      title: 'Eric Wagner Founds GovWin',
+      excerpt: 'After 20+ years helping startups win SBIR/STTR awards — including a recent 13/13 win rate and over $100M in non-dilutive capital secured — Eric Wagner has founded GovWin to bring expert-level SBIR/STTR intelligence to every small tech business. The platform combines the scanning and scoring tools with the proposal expertise that produced those results.',
     },
     {
       date: 'February 2026',
-      category: 'Partnership',
-      title: 'Accelerator Program Integration',
-      excerpt: 'RFP Pipeline is now available as a batch onboarding solution for startup accelerator programs. Cohort managers can set up workspaces for all participants, enabling centralized pipeline tracking and mentorship support across the program.',
+      category: 'Feature',
+      title: 'Proposal Build Service: $499 Phase I / $999 Phase II',
+      excerpt: 'GovWin now offers expert-reviewed proposal templates with AI-assisted content assembly. Purchase a proposal build, receive a custom template matched to your solicitation within one week, and use our section-by-section workspace to assemble your submission. SBIR consultants charge $3K-$10K. We charge $499.',
     },
     {
       date: 'January 2026',
-      category: 'Product',
-      title: 'Beta Testing Complete: Results Exceed Expectations',
-      excerpt: 'Our beta program with a select group of defense technology startups and small businesses has concluded. Beta participants reported an average 85% reduction in opportunity search time and identified 3x more relevant opportunities compared to manual SAM.gov searches.',
+      category: 'Partnership',
+      title: 'Accelerator and University Partnership Program',
+      excerpt: 'GovWin is now available for startup accelerators, university tech transfer offices, and innovation programs. Batch onboard your cohort and give every participant a scored SBIR/STTR pipeline from day one. Partners include Air Force APEX, Parallax Advanced Research, Ohio State CDME, and Converge Ventures.',
     },
   ],
 }
 
 const STATIC_META = {
-  title: 'News & Announcements | RFP Pipeline',
-  description: 'Latest news, product updates, and announcements from RFP Pipeline.',
+  title: 'News & Announcements | GovWin',
+  description: 'Latest news, product updates, and announcements from GovWin SBIR/STTR Intelligence.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -92,11 +92,11 @@ export default async function AnnouncementsPage() {
       </Section>
 
       <CtaSection
-        title="Stay informed"
-        description="Contact us to learn more about upcoming features and how RFP Pipeline can help your business."
-        primaryLabel="Get Started"
+        title="Join the waitlist"
+        description="Be the first to know when GovWin launches. Early subscribers get priority onboarding and launch pricing."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
-        secondaryLabel="See our tips & tools"
+        secondaryLabel="SBIR/STTR resources"
         secondaryHref="/tips"
       />
     </>
