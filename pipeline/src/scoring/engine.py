@@ -1,19 +1,21 @@
 """
-Scoring Engine — Scores opportunities against each tenant's profile.
+Scoring Engine — Scores opportunities against each tenant's SBIR/STTR profile.
 
-Score breakdown (100 total):
-  NAICS match:     0-25  (primary=25, secondary=15)
-  Keyword match:   0-25  (domain-weighted keyword matches)
-  Set-aside match: 0-15  (exact match=15, partial=8)
-  Agency priority: 0-15  (tier 1=15, tier 2=10, tier 3=5)
-  Opportunity type:0-10  (solicitation=10, sources_sought=5, presol=3)
-  Timeline:        0-10  (urgency bonus for approaching deadlines)
-  LLM adjustment:  -20 to +20  (Claude analysis for high-scoring opps)
+Score breakdown (100 total base + LLM adjustment):
+  Technology/Topic match: 0-30  (research_areas + technology_focus vs opp description/topics)
+  NAICS match:            0-15  (primary=15, secondary=10 — less critical for SBIR)
+  Agency alignment:       0-15  (target_agencies match + agency history from past_sbir_awards)
+  Program type fit:       0-15  (program type match + phase readiness)
+  Set-aside eligibility:  0-10  (still relevant but simpler for SBIR — mostly small business)
+  Timeline/urgency:       0-10  (approaching deadlines weighted higher)
+  TRL alignment:          0-5   (technology_readiness_level vs opportunity requirements)
+  LLM adjustment:        -15 to +15  (Claude analysis for high-scoring opps, narrower range)
 """
 
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 from crypto import decrypt_api_key
@@ -62,7 +64,10 @@ class ScoringEngine:
                    tp.keyword_domains, tp.is_small_business, tp.is_sdvosb,
                    tp.is_wosb, tp.is_hubzone, tp.is_8a,
                    tp.agency_priorities, tp.min_contract_value, tp.max_contract_value,
-                   tp.min_surface_score, tp.high_priority_score
+                   tp.min_surface_score, tp.high_priority_score,
+                   tp.technology_readiness_level, tp.research_areas,
+                   tp.past_sbir_awards, tp.target_agencies,
+                   tp.company_summary, tp.technology_focus
             FROM tenants t
             JOIN tenant_profiles tp ON tp.tenant_id = t.id
             WHERE t.status IN ('active', 'trial')
@@ -93,6 +98,19 @@ class ScoringEngine:
 
         for opp in opportunities:
             opp = dict(opp)
+
+            # Detect and store program_type if not already set
+            detected_type = self._detect_program_type(opp)
+            if detected_type != 'other' and not opp.get('program_type'):
+                try:
+                    await self.conn.execute(
+                        "UPDATE opportunities SET program_type = $1 WHERE id = $2",
+                        detected_type, opp['id']
+                    )
+                    opp['program_type'] = detected_type
+                except Exception as e:
+                    log.warning(f"Failed to update program_type for opp {opp['id']}: {e}")
+
             scores = self._compute_scores(profile, opp)
             total = sum(scores.values())
 
@@ -160,8 +178,12 @@ class ScoringEngine:
                     rescored_at = NOW()
                 """,
                 tenant_id, opp["id"], total_with_llm,
-                scores.get("naics", 0), scores.get("keyword", 0), scores.get("set_aside", 0),
-                scores.get("agency", 0), scores.get("type", 0), scores.get("timeline", 0),
+                scores.get("naics", 0),
+                scores.get("technology", 0),  # technology match stored in keyword_score column
+                scores.get("set_aside", 0),
+                scores.get("agency", 0),
+                scores.get("program_type", 0),  # program type fit stored in type_score column
+                scores.get("timeline", 0),
                 llm_adj, llm_rationale,
                 matched_kw, matched_domains,
                 recommendation,
@@ -179,12 +201,14 @@ class ScoringEngine:
                     "tenant_id": str(tenant_id),
                     "total_score": total_with_llm,
                     "surface_score": total,
+                    "technology_score": scores.get("technology", 0),
                     "naics_score": scores.get("naics", 0),
-                    "keyword_score": scores.get("keyword", 0),
-                    "set_aside_score": scores.get("set_aside", 0),
                     "agency_score": scores.get("agency", 0),
-                    "type_score": scores.get("type", 0),
+                    "program_type_score": scores.get("program_type", 0),
+                    "set_aside_score": scores.get("set_aside", 0),
                     "timeline_score": scores.get("timeline", 0),
+                    "trl_score": scores.get("trl", 0),
+                    "program_type": opp.get("program_type") or detected_type,
                     "recommendation": recommendation,
                     "matched_keywords": matched_kw,
                     "matched_domains": matched_domains,
@@ -216,22 +240,44 @@ class ScoringEngine:
         return scored_count
 
     def _compute_scores_original(self, profile: dict, opp: dict) -> dict:
-        """Compute breakdown scores for an opportunity against a tenant profile."""
+        """Compute SBIR/STTR-focused breakdown scores for an opportunity against a tenant profile.
+
+        Returns dict with keys: technology, naics, agency, program_type, set_aside, timeline, trl
+        """
         scores = {}
 
-        # NAICS match (0-25)
-        opp_naics = set(opp.get("naics_codes") or [])
-        primary = set(profile.get("primary_naics") or [])
-        secondary = set(profile.get("secondary_naics") or [])
-        if opp_naics & primary:
-            scores["naics"] = 25
-        elif opp_naics & secondary:
-            scores["naics"] = 15
-        else:
-            scores["naics"] = 0
+        scores["technology"] = self._score_technology_match(profile, opp)
+        scores["naics"] = self._score_naics_match(profile, opp)
+        scores["agency"] = self._score_agency_alignment(profile, opp)
+        scores["program_type"] = self._score_program_type_fit(profile, opp)
+        scores["set_aside"] = self._score_set_aside_match(profile, opp)
+        scores["timeline"] = self._score_timeline(profile, opp)
+        scores["trl"] = self._score_trl_alignment(profile, opp)
 
-        # Keyword match (0-25)
-        kw_score = 0
+        return scores
+
+    def _score_technology_match(self, profile: dict, opp: dict) -> int:
+        """Technology/Topic match (0-30).
+
+        Compares tenant's research_areas and technology_focus against opportunity
+        title, description, and topic information. Uses keyword overlap scoring.
+        Falls back to legacy keyword_domains if SBIR fields are not populated.
+        """
+        text = f"{opp.get('title', '')} {opp.get('description', '')}".lower()
+
+        # Collect all technology terms from the tenant profile
+        research_areas = profile.get("research_areas") or []
+        technology_focus = profile.get("technology_focus") or ""
+
+        # Build a combined set of technology terms
+        tech_terms = []
+        if research_areas:
+            tech_terms.extend(research_areas)
+        if technology_focus:
+            # Split technology_focus on common delimiters for matching
+            tech_terms.extend([t.strip() for t in re.split(r'[,;|]', technology_focus) if t.strip()])
+
+        # Also include legacy keyword_domains as fallback
         domains = profile.get("keyword_domains") or {}
         if isinstance(domains, str):
             try:
@@ -239,64 +285,182 @@ class ScoringEngine:
             except (json.JSONDecodeError, TypeError):
                 domains = {}
 
-        text = f"{opp.get('title', '')} {opp.get('description', '')}".lower()
         domain_hits = 0
         for domain, keywords in domains.items():
             if any(kw.lower() in text for kw in (keywords or [])):
                 domain_hits += 1
-        if domain_hits >= 3:
-            kw_score = 25
-        elif domain_hits >= 2:
-            kw_score = 18
-        elif domain_hits >= 1:
-            kw_score = 10
-        scores["keyword"] = kw_score
 
-        # Set-aside match (0-15)
+        # Score technology term matches
+        tech_hits = sum(1 for term in tech_terms if term.lower() in text)
+
+        # Combine: technology terms are primary, keyword domains are secondary
+        if tech_terms:
+            if tech_hits >= 4:
+                return 30
+            elif tech_hits >= 3:
+                return 25
+            elif tech_hits >= 2:
+                return 20
+            elif tech_hits >= 1:
+                # Boost if keyword domains also match
+                return 15 if domain_hits >= 1 else 12
+            elif domain_hits >= 2:
+                return 10
+            elif domain_hits >= 1:
+                return 5
+            return 0
+        else:
+            # Fallback to keyword_domains only (legacy profiles)
+            if domain_hits >= 3:
+                return 30
+            elif domain_hits >= 2:
+                return 20
+            elif domain_hits >= 1:
+                return 10
+            return 0
+
+    def _score_naics_match(self, profile: dict, opp: dict) -> int:
+        """NAICS match (0-15). Less critical for SBIR but still relevant."""
+        opp_naics = set(opp.get("naics_codes") or [])
+        primary = set(profile.get("primary_naics") or [])
+        secondary = set(profile.get("secondary_naics") or [])
+        if opp_naics & primary:
+            return 15
+        elif opp_naics & secondary:
+            return 10
+        return 0
+
+    def _score_agency_alignment(self, profile: dict, opp: dict) -> int:
+        """Agency alignment (0-15).
+
+        Combines target_agencies match and agency history from past_sbir_awards.
+        Falls back to legacy agency_priorities if new fields are not populated.
+        """
+        opp_agency = (opp.get("agency") or "").upper()
+        opp_agency_code = opp.get("agency_code") or ""
+        opp_department = (opp.get("department") or "").upper()
+        opp_sub_tier = (opp.get("sub_tier") or "").upper()
+
+        score = 0
+
+        # Check target_agencies (new SBIR field)
+        target_agencies = profile.get("target_agencies") or []
+        if target_agencies:
+            for target in target_agencies:
+                target_upper = target.upper()
+                if (target_upper in opp_agency or target_upper in opp_department
+                        or target_upper in opp_sub_tier):
+                    score = 10
+                    break
+
+        # Boost from past_sbir_awards — if tenant has won SBIR/STTR from this agency before
+        past_awards = profile.get("past_sbir_awards") or []
+        if isinstance(past_awards, str):
+            try:
+                past_awards = json.loads(past_awards)
+            except (json.JSONDecodeError, TypeError):
+                past_awards = []
+
+        if past_awards:
+            for award in past_awards:
+                if not isinstance(award, dict):
+                    continue
+                award_agency = (award.get("agency") or "").upper()
+                if award_agency and (award_agency in opp_agency or award_agency in opp_department
+                                     or award_agency in opp_sub_tier):
+                    score = min(15, score + 5)  # Boost for past relationship
+                    break
+
+        # Fallback to legacy agency_priorities if no target_agencies
+        if not target_agencies and score == 0:
+            priorities = profile.get("agency_priorities") or {}
+            if isinstance(priorities, str):
+                try:
+                    priorities = json.loads(priorities)
+                except (json.JSONDecodeError, TypeError):
+                    priorities = {}
+
+            tier = priorities.get(opp_agency_code)
+            if tier == 1:
+                score = 15
+            elif tier == 2:
+                score = 10
+            elif tier == 3:
+                score = 5
+
+        return score
+
+    def _score_program_type_fit(self, profile: dict, opp: dict) -> int:
+        """Program type fit (0-15).
+
+        Checks if opportunity's program_type matches what the tenant pursues.
+        SBIR/STTR opportunities score highest for SBIR-focused tenants.
+        Phase readiness is considered via TRL and past awards.
+        """
+        program_type = opp.get("program_type") or self._detect_program_type(opp)
+
+        # SBIR/STTR programs are the primary targets
+        sbir_sttr_types = {'sbir_phase_1', 'sbir_phase_2', 'sttr_phase_1', 'sttr_phase_2'}
+        related_types = {'baa', 'ota'}
+
+        if program_type in sbir_sttr_types:
+            score = 12
+
+            # Boost if tenant has past awards matching the phase
+            past_awards = profile.get("past_sbir_awards") or []
+            if isinstance(past_awards, str):
+                try:
+                    past_awards = json.loads(past_awards)
+                except (json.JSONDecodeError, TypeError):
+                    past_awards = []
+
+            if past_awards:
+                # Phase II requires Phase I experience
+                if program_type in ('sbir_phase_2', 'sttr_phase_2'):
+                    has_phase1 = any(
+                        isinstance(a, dict) and 'phase' in str(a.get('phase', '')).lower()
+                        for a in past_awards
+                    )
+                    if has_phase1:
+                        score = 15
+                else:
+                    # Phase I — any SBIR experience is a bonus
+                    score = 15
+
+            return score
+        elif program_type in related_types:
+            return 8
+        elif program_type == 'challenge':
+            return 5
+        elif program_type in ('rfi', 'sources_sought'):
+            return 3
+        return 2
+
+    def _score_set_aside_match(self, profile: dict, opp: dict) -> int:
+        """Set-aside eligibility match (0-10). Simpler for SBIR — mostly small business."""
         opp_set_aside = (opp.get("set_aside_type") or "").lower()
         sa_score = 0
         if opp_set_aside:
             if profile.get("is_sdvosb") and "sdvosb" in opp_set_aside:
-                sa_score = 15
+                sa_score = 10
             elif profile.get("is_wosb") and "wosb" in opp_set_aside:
-                sa_score = 15
+                sa_score = 10
             elif profile.get("is_hubzone") and "hubzone" in opp_set_aside:
-                sa_score = 15
+                sa_score = 10
             elif profile.get("is_8a") and "8(a)" in opp_set_aside:
-                sa_score = 15
+                sa_score = 10
             elif profile.get("is_small_business") and "small" in opp_set_aside:
-                sa_score = 8
-        scores["set_aside"] = sa_score
+                sa_score = 7
+            elif "sbir" in opp_set_aside or "sttr" in opp_set_aside:
+                # SBIR/STTR set-asides — all small businesses qualify
+                if profile.get("is_small_business"):
+                    sa_score = 10
+                else:
+                    sa_score = 5
+        return sa_score
 
-        # Agency priority (0-15)
-        opp_agency = opp.get("agency_code") or ""
-        priorities = profile.get("agency_priorities") or {}
-        if isinstance(priorities, str):
-            try:
-                priorities = json.loads(priorities)
-            except (json.JSONDecodeError, TypeError):
-                priorities = {}
-
-        tier = priorities.get(opp_agency)
-        if tier == 1:
-            scores["agency"] = 15
-        elif tier == 2:
-            scores["agency"] = 10
-        elif tier == 3:
-            scores["agency"] = 5
-        else:
-            scores["agency"] = 0
-
-        # Opportunity type (0-10)
-        opp_type = opp.get("opportunity_type", "")
-        type_scores = {
-            "solicitation": 10,
-            "sources_sought": 5,
-            "presolicitation": 3,
-        }
-        scores["type"] = type_scores.get(opp_type, 2)
-
-        # Timeline urgency (0-10)
+    def _score_timeline(self, profile: dict, opp: dict) -> int:
+        """Timeline/urgency (0-10). Approaching deadlines weighted higher."""
         close_date = opp.get("close_date")
         if close_date:
             now = datetime.now(timezone.utc)
@@ -305,17 +469,80 @@ class ScoringEngine:
             else:
                 days_left = 30  # Default if we can't parse
             if days_left <= 7:
-                scores["timeline"] = 10
+                return 10
             elif days_left <= 14:
-                scores["timeline"] = 7
+                return 7
             elif days_left <= 30:
-                scores["timeline"] = 4
+                return 4
             else:
-                scores["timeline"] = 1
-        else:
-            scores["timeline"] = 0
+                return 1
+        return 0
 
-        return scores
+    def _score_trl_alignment(self, profile: dict, opp: dict) -> int:
+        """TRL alignment (0-5).
+
+        Compares tenant's technology_readiness_level against opportunity requirements.
+        Phase I typically requires TRL 1-4, Phase II typically requires TRL 4-6.
+        """
+        tenant_trl = profile.get("technology_readiness_level")
+        if tenant_trl is None:
+            return 2  # Neutral default when TRL is not specified
+
+        try:
+            tenant_trl = int(tenant_trl)
+        except (ValueError, TypeError):
+            return 2
+
+        program_type = opp.get("program_type") or self._detect_program_type(opp)
+
+        # Define expected TRL ranges for each program type
+        trl_ranges = {
+            'sbir_phase_1': (1, 4),
+            'sttr_phase_1': (1, 4),
+            'sbir_phase_2': (4, 6),
+            'sttr_phase_2': (4, 6),
+            'baa': (1, 6),
+            'ota': (3, 7),
+        }
+
+        expected_range = trl_ranges.get(program_type)
+        if not expected_range:
+            return 2  # Neutral for unknown program types
+
+        low, high = expected_range
+        if low <= tenant_trl <= high:
+            return 5  # Perfect alignment
+        elif abs(tenant_trl - low) <= 1 or abs(tenant_trl - high) <= 1:
+            return 3  # Close alignment
+        return 0  # Poor alignment
+
+    def _detect_program_type(self, opp: dict) -> str:
+        """Detect SBIR/STTR program type from opportunity text."""
+        text = f"{opp.get('title', '')} {opp.get('description', '')}".upper()
+
+        if 'STTR' in text and 'PHASE II' in text:
+            return 'sttr_phase_2'
+        if 'STTR' in text and 'PHASE I' in text:
+            return 'sttr_phase_1'
+        if 'STTR' in text:
+            return 'sttr_phase_1'  # default STTR to Phase I
+        if 'SBIR' in text and 'PHASE II' in text:
+            return 'sbir_phase_2'
+        if 'SBIR' in text and 'PHASE I' in text:
+            return 'sbir_phase_1'
+        if 'SBIR' in text:
+            return 'sbir_phase_1'  # default SBIR to Phase I
+        if 'BROAD AGENCY ANNOUNCEMENT' in text or 'BAA' in text:
+            return 'baa'
+        if 'OTHER TRANSACTION' in text or ' OTA' in text or 'OT AUTHORITY' in text:
+            return 'ota'
+        if 'CHALLENGE' in text and ('PRIZE' in text or 'COMPETITION' in text):
+            return 'challenge'
+        if 'REQUEST FOR INFORMATION' in text or ' RFI' in text:
+            return 'rfi'
+        if 'SOURCES SOUGHT' in text:
+            return 'sources_sought'
+        return 'other'
 
     def _find_keyword_matches(self, profile: dict, opp: dict) -> tuple[list, list]:
         """Find which keywords and domains matched."""
@@ -347,17 +574,29 @@ class ScoringEngine:
 
         client = anthropic.Anthropic(api_key=self._anthropic_key)
 
+        research_areas = profile.get("research_areas") or []
+        technology_focus = profile.get("technology_focus") or "Not specified"
+        company_summary = profile.get("company_summary") or "Not specified"
+        target_agencies = profile.get("target_agencies") or []
+        trl = profile.get("technology_readiness_level")
+
         tenant_context = f"""
-Company profile:
+Company profile (SBIR/STTR focus):
+- Company summary: {company_summary}
+- Technology focus: {technology_focus}
+- Research areas: {', '.join(research_areas) if research_areas else 'Not specified'}
+- Target agencies: {', '.join(target_agencies) if target_agencies else 'Not specified'}
+- TRL level: {trl if trl is not None else 'Not specified'}
 - Primary NAICS: {', '.join(profile.get('primary_naics') or ['Not specified'])}
 - Set-asides: {self._format_set_asides(profile)}
-- Keyword domains: {json.dumps(profile.get('keyword_domains') or {}, indent=2)}
 """
 
+        program_type = opp.get('program_type') or self._detect_program_type(opp)
         opp_context = f"""
 Opportunity:
 - Title: {opp.get('title', 'N/A')}
 - Agency: {opp.get('agency', 'N/A')}
+- Program type: {program_type}
 - Type: {opp.get('opportunity_type', 'N/A')}
 - Set-aside: {opp.get('set_aside_type', 'None')}
 - NAICS: {', '.join(opp.get('naics_codes') or ['N/A'])}
@@ -365,7 +604,10 @@ Opportunity:
 - Description: {(opp.get('description') or 'No description')[:2000]}
 """
 
-        prompt = f"""Analyze this government contracting opportunity for the company described below.
+        prompt = f"""Analyze this SBIR/STTR opportunity for the small business described below.
+Focus on: technology alignment, research area fit, agency relationship, TRL readiness,
+and whether the company's capabilities match the solicitation topics.
+
 Surface score: {surface_score}/100.
 
 {tenant_context}
@@ -373,11 +615,11 @@ Surface score: {surface_score}/100.
 {opp_context}
 
 Respond in JSON with these fields:
-- adjustment: integer from -20 to +20 (how much to adjust the score)
-- rationale: one sentence explaining the adjustment
-- key_requirements: array of 2-4 key requirements from the description
-- competitive_risks: array of 1-3 competitive risks
-- rfi_questions: array of 1-3 questions to ask if this is an RFI/sources sought
+- adjustment: integer from -15 to +15 (how much to adjust the score)
+- rationale: one sentence explaining the adjustment, focused on SBIR/STTR fit
+- key_requirements: array of 2-4 key technical requirements or topic areas
+- competitive_risks: array of 1-3 competitive risks specific to this SBIR/STTR solicitation
+- rfi_questions: array of 1-3 questions to clarify technical scope or proposal requirements
 """
 
         try:
@@ -536,9 +778,11 @@ Respond in JSON with these fields:
                 """,
                 tenant_id, spotlight_id, opp["id"],
                 total_with_llm,
-                scores.get("naics", 0), scores.get("keyword", 0),
+                scores.get("naics", 0),
+                scores.get("technology", 0),  # technology match stored in keyword_score column
                 scores.get("set_aside", 0), scores.get("agency", 0),
-                scores.get("type", 0), scores.get("timeline", 0),
+                scores.get("program_type", 0),  # program type fit stored in type_score column
+                scores.get("timeline", 0),
                 llm_adj, llm_rationale,
                 matched_kw, matched_domains,
             )
@@ -619,19 +863,19 @@ Respond in JSON with these fields:
         """Compute breakdown scores for an opportunity against a tenant profile."""
         scores = self._compute_scores_original(profile, opp)
 
-        # If profile has flat keywords (from SpotLight), also score those
+        # If profile has flat keywords (from SpotLight), also boost technology score
         flat_keywords = profile.get("keywords") or []
-        if flat_keywords and scores.get("keyword", 0) < 25:
+        if flat_keywords and scores.get("technology", 0) < 30:
             text = f"{opp.get('title', '')} {opp.get('description', '')}".lower()
             hits = sum(1 for kw in flat_keywords if kw.lower() in text)
             if hits >= 3:
-                kw_score = 25
+                kw_score = 30
             elif hits >= 2:
-                kw_score = 18
+                kw_score = 20
             elif hits >= 1:
                 kw_score = 10
             else:
                 kw_score = 0
-            scores["keyword"] = max(scores.get("keyword", 0), kw_score)
+            scores["technology"] = max(scores.get("technology", 0), kw_score)
 
         return scores

@@ -10,6 +10,8 @@ interface Spotlight {
   naics_codes: string[]
   keywords: string[]
   set_aside_types: string[]
+  program_type_filter: string[]
+  agency_filter: string[]
   status: string
   matched_opp_count: number
   above_threshold_count: number
@@ -23,10 +25,24 @@ interface CreateSpotlightForm {
   naicsCodes: string
   keywords: string
   setAsideTypes: string[]
+  programTypeFilter: string[]
+  agencyFilter: string[]
   companySummary: string
   technologyFocus: string
   minScoreThreshold: number
 }
+
+const PROGRAM_TYPE_OPTIONS = [
+  { value: 'sbir_phase_1', label: 'SBIR Phase I' },
+  { value: 'sbir_phase_2', label: 'SBIR Phase II' },
+  { value: 'sttr_phase_1', label: 'STTR Phase I' },
+  { value: 'sttr_phase_2', label: 'STTR Phase II' },
+  { value: 'ota', label: 'OTA' },
+  { value: 'baa', label: 'BAA' },
+  { value: 'challenge', label: 'Challenge' },
+]
+
+const AGENCY_FILTER_OPTIONS = ['DoD', 'NSF', 'NIH', 'DOE', 'NASA', 'DHS', 'Other']
 
 const SET_ASIDE_OPTIONS = [
   'HUBZone',
@@ -46,6 +62,8 @@ const emptyForm: CreateSpotlightForm = {
   naicsCodes: '',
   keywords: '',
   setAsideTypes: [],
+  programTypeFilter: [],
+  agencyFilter: [],
   companySummary: '',
   technologyFocus: '',
   minScoreThreshold: 40,
@@ -112,6 +130,8 @@ export default function SpotlightsPage() {
         .map((s) => s.trim())
         .filter(Boolean),
       setAsideTypes: form.setAsideTypes,
+      programTypeFilter: form.programTypeFilter,
+      agencyFilter: form.agencyFilter,
       companySummary: form.companySummary.trim(),
       technologyFocus: form.technologyFocus.trim(),
       minScoreThreshold: form.minScoreThreshold,
@@ -296,6 +316,60 @@ export default function SpotlightsPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Program Types to Track</label>
+              <div className="flex flex-wrap gap-2">
+                {PROGRAM_TYPE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        programTypeFilter: prev.programTypeFilter.includes(option.value)
+                          ? prev.programTypeFilter.filter((v) => v !== option.value)
+                          : [...prev.programTypeFilter, option.value],
+                      }))
+                    }
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      form.programTypeFilter.includes(option.value)
+                        ? 'bg-blue-100 border-blue-300 text-blue-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Target Agencies</label>
+              <div className="flex flex-wrap gap-2">
+                {AGENCY_FILTER_OPTIONS.map((agency) => (
+                  <button
+                    key={agency}
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        agencyFilter: prev.agencyFilter.includes(agency)
+                          ? prev.agencyFilter.filter((v) => v !== agency)
+                          : [...prev.agencyFilter, agency],
+                      }))
+                    }
+                    className={`px-3 py-1 rounded-full text-sm border transition-colors ${
+                      form.agencyFilter.includes(agency)
+                        ? 'bg-blue-100 border-blue-300 text-blue-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {agency}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Company Summary</label>
               <textarea
                 value={form.companySummary}
@@ -431,6 +505,51 @@ export default function SpotlightsPage() {
                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
                       >
                         {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Program Types */}
+              {(spotlight.program_type_filter ?? []).length > 0 && (
+                <div className="mb-3">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-2">
+                    Programs
+                  </span>
+                  <div className="inline-flex flex-wrap gap-1">
+                    {spotlight.program_type_filter.map((pt) => {
+                      const labels: Record<string, string> = {
+                        sbir_phase_1: 'SBIR I', sbir_phase_2: 'SBIR II',
+                        sttr_phase_1: 'STTR I', sttr_phase_2: 'STTR II',
+                        ota: 'OTA', baa: 'BAA', challenge: 'Challenge',
+                      }
+                      return (
+                        <span
+                          key={pt}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        >
+                          {labels[pt] ?? pt}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Agencies */}
+              {(spotlight.agency_filter ?? []).length > 0 && (
+                <div className="mb-4">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mr-2">
+                    Agencies
+                  </span>
+                  <div className="inline-flex flex-wrap gap-1">
+                    {spotlight.agency_filter.map((agency) => (
+                      <span
+                        key={agency}
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200"
+                      >
+                        {agency}
                       </span>
                     ))}
                   </div>

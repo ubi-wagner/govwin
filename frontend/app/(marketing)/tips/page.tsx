@@ -5,32 +5,32 @@ import type { TipsPageContent } from '@/types'
 
 const STATIC_CONTENT: TipsPageContent = {
   hero: {
-    eyebrow: 'Tips & Tools',
-    title: 'Expert resources for federal contracting',
-    description: 'Practical guidance from a team that has helped secure over $100M in non-dilutive federal funding. Updated regularly with new strategies and tools.',
+    eyebrow: 'SBIR/STTR Resources',
+    title: 'Expert guidance for winning federal research funding',
+    description: 'Practical tips from a team with a 13/13 SBIR/STTR win rate and $100M+ in non-dilutive capital secured. Everything you need to find, pursue, and win SBIR/STTR awards.',
   },
   tips: [
-    { date: 'March 2026', category: 'SBIR/STTR', title: 'How to Write a Winning SBIR Phase I Proposal', excerpt: 'A step-by-step guide to structuring your SBIR Phase I proposal for maximum impact. Covers technical objectives, commercialization plans, and common pitfalls that reviewers flag.' },
-    { date: 'March 2026', category: 'Getting Started', title: 'SAM.gov Registration: The Complete Checklist', excerpt: 'Before you can bid on any federal contract, you need to be registered in SAM.gov. This checklist walks you through UEI, CAGE code, entity registration, and common delays to avoid.' },
-    { date: 'March 2026', category: 'Strategy', title: 'Understanding Set-Aside Categories and How to Leverage Them', excerpt: 'Small business, SDVOSB, WOSB, HUBZone, and 8(a) set-asides can dramatically improve your win probability. Learn which certifications apply to your business and how to use them strategically.' },
-    { date: 'February 2026', category: 'Tools', title: 'Building Your Capability Statement: A Template and Guide', excerpt: 'Your capability statement is your first impression with federal buyers. We break down the four essential sections and provide a template that government contracting officers actually want to see.' },
-    { date: 'February 2026', category: 'SBIR/STTR', title: 'Non-Dilutive Capital: Why SBIR/STTR Is the Best Funding for Deep Tech', excerpt: 'For technology startups, SBIR/STTR grants offer something venture capital cannot: funding without equity dilution. Learn how to build a sustainable federal R&D funding strategy.' },
-    { date: 'February 2026', category: 'Strategy', title: 'How to Read a Federal Solicitation in 15 Minutes', excerpt: 'Federal RFPs can be hundreds of pages long. Learn the key sections to focus on, how to identify evaluation criteria, and the red flags that signal an opportunity is wired for an incumbent.' },
-    { date: 'January 2026', category: 'Tools', title: 'NAICS Code Selection: Getting It Right the First Time', excerpt: 'Choosing the wrong NAICS codes means missing opportunities. This guide explains how to select primary and secondary codes that maximize your visibility in federal procurement searches.' },
-    { date: 'January 2026', category: 'Strategy', title: 'The Art of the Sources Sought Response', excerpt: 'Sources sought notices are your chance to shape a future solicitation. Learn how to write a response that positions your company as a credible contender before the RFP even drops.' },
+    { date: 'March 2026', category: 'Proposal Writing', title: 'How to Write a Winning SBIR Phase I Proposal', excerpt: 'A step-by-step guide to structuring your SBIR Phase I proposal for maximum reviewer impact. Covers technical objectives, innovation significance, commercialization strategy, and the common pitfalls that cost small businesses their first award.' },
+    { date: 'March 2026', category: 'Solicitation Cycle', title: 'Understanding the SBIR/STTR Release Calendar', excerpt: 'SBIR and STTR solicitations follow agency-specific release cycles. DoD opens annually, NIH has three receipt dates per year, and NSF accepts proposals year-round. Knowing the rhythm means you are never caught off guard.' },
+    { date: 'March 2026', category: 'Agency Guidance', title: 'DoD SBIR: What AFRL, DARPA, and Service Branches Actually Want', excerpt: 'Each DoD component evaluates SBIR proposals differently. AFRL values TRL advancement, DARPA wants breakthrough concepts, and the service branches prioritize operational relevance. Tailor your approach to the evaluator.' },
+    { date: 'February 2026', category: 'Common Mistakes', title: '7 Mistakes That Kill SBIR Proposals (and How to Avoid Them)', excerpt: 'From weak commercialization plans to ignoring evaluation criteria weighting, these are the errors we see most often. Every one of them is preventable with the right preparation.' },
+    { date: 'February 2026', category: 'Proposal Writing', title: 'STTR Proposals: Navigating the Research Institution Partnership', excerpt: 'STTR requires a formal partnership with a research institution performing at least 30% of the work. Learn how to structure the partnership agreement, divide responsibilities, and present a cohesive technical approach.' },
+    { date: 'February 2026', category: 'Strategy', title: 'Phase I to Phase II: Building Your Transition Strategy from Day One', excerpt: 'Phase II success starts during Phase I. Learn how to design your Phase I technical plan to generate the results and data that Phase II reviewers want to see. The transition is not automatic — you need to earn it.' },
+    { date: 'January 2026', category: 'Agency Guidance', title: 'NIH SBIR/STTR: Specific Aims, Study Sections, and Review Criteria', excerpt: 'NIH uses a peer review process with study sections that score on significance, approach, innovation, investigators, and environment. Understanding this system is essential for biotech and medtech applicants.' },
+    { date: 'January 2026', category: 'Strategy', title: 'Non-Dilutive Capital Strategy: Building a Multi-Agency SBIR Pipeline', excerpt: 'The most successful SBIR companies do not rely on a single agency. Learn how to identify parallel topics across DoD, NIH, NSF, DOE, and NASA to build a diversified pipeline of non-dilutive funding.' },
   ],
   tools: [
-    { name: 'SBIR/STTR Eligibility Checker', description: 'Quick assessment of whether your company qualifies for Small Business Innovation Research or Small Business Technology Transfer programs.', status: 'Available' },
-    { name: 'Capability Statement Template', description: 'Professional template following federal formatting standards. Includes sections for core competencies, past performance, differentiators, and company data.', status: 'Available' },
-    { name: 'NAICS Code Lookup', description: 'Search and identify the NAICS codes most relevant to your products and services for federal procurement matching.', status: 'Available' },
-    { name: 'Proposal Cost Volume Calculator', description: 'Spreadsheet tool for building compliant cost volumes for SBIR Phase I and Phase II proposals.', status: 'Coming Soon' },
-    { name: 'Past Performance Tracker', description: 'Template for organizing your past performance references in the format federal evaluators expect.', status: 'Coming Soon' },
+    { name: 'SBIR.gov', description: 'The official U.S. government portal for SBIR and STTR solicitations, awards, and program information across all participating agencies.', status: 'Available' },
+    { name: 'SAM.gov', description: 'System for Award Management — required registration for all federal contracting. Search active solicitations, entity registrations, and contract award data.', status: 'Available' },
+    { name: 'SBIR/STTR Eligibility Checker', description: 'Quick assessment of whether your company meets the size, ownership, and organizational requirements for SBIR and STTR programs.', status: 'Available' },
+    { name: 'Proposal Cost Volume Calculator', description: 'Spreadsheet tool for building compliant cost volumes for SBIR Phase I ($50K-$275K) and Phase II ($500K-$1.5M) proposals across agencies.', status: 'Coming Soon' },
+    { name: 'Agency SBIR Portal Directory', description: 'Direct links to SBIR/STTR portals for DoD, NIH, NSF, DOE, NASA, DHS, USDA, EPA, and all other participating agencies.', status: 'Coming Soon' },
   ],
 }
 
 const STATIC_META = {
-  title: 'Tips & Tools | RFP Pipeline',
-  description: 'Expert guidance on federal contracting, SBIR/STTR programs, proposal writing, and winning government contracts.',
+  title: 'SBIR/STTR Tips & Resources | GovWin',
+  description: 'Expert guidance on SBIR/STTR proposal writing, solicitation cycles, agency-specific strategies, and common mistakes to avoid. From a team with a 13/13 win rate.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -96,8 +96,8 @@ export default async function TipsPage() {
 
       <CtaSection
         title="Need personalized guidance?"
-        description="Our team has helped over 40 startups navigate SBIR/STTR programs with a 100% success rate in our most recent cohort."
-        primaryLabel="Start Free Trial"
+        description="Our team has helped 50+ startups navigate SBIR/STTR programs with a 100% recent win rate. Join the waitlist for expert-backed opportunity intelligence."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Meet the expert"
         secondaryHref="/team"

@@ -3,6 +3,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 
+interface PastSbirAward {
+  agency: string
+  program: 'SBIR' | 'STTR'
+  phase: 'I' | 'II'
+  awardAmount: number | null
+  year: number | null
+  topic: string
+}
+
 interface ProfileData {
   tenant: {
     name: string
@@ -24,9 +33,29 @@ interface ProfileData {
     max_contract_value: number | null
     min_surface_score: number
     high_priority_score: number
+    technology_readiness_level: number | null
+    research_areas: string[] | null
+    target_agencies: string[] | null
+    company_summary: string | null
+    technology_focus: string | null
+    past_sbir_awards: PastSbirAward[] | null
   } | null
   userRole: string
 }
+
+const TRL_LABELS: Record<number, string> = {
+  1: 'Basic principles observed',
+  2: 'Technology concept formulated',
+  3: 'Proof of concept',
+  4: 'Lab validation',
+  5: 'Relevant environment validation',
+  6: 'Relevant environment demonstration',
+  7: 'Operational environment demonstration',
+  8: 'System complete and qualified',
+  9: 'Operational',
+}
+
+const TARGET_AGENCY_OPTIONS = ['DoD', 'NSF', 'NIH', 'DOE', 'NASA', 'DHS', 'USDA', 'EPA', 'DOT', 'Other']
 
 const SET_ASIDE_OPTIONS = [
   { key: 'is_small_business', label: 'Small Business' },
@@ -64,6 +93,14 @@ export default function ProfilePage() {
   const [minSurfaceScore, setMinSurfaceScore] = useState('40')
   const [highPriorityScore, setHighPriorityScore] = useState('75')
 
+  // SBIR/STTR profile fields
+  const [trl, setTrl] = useState<string>('')
+  const [researchAreas, setResearchAreas] = useState('')
+  const [targetAgencies, setTargetAgencies] = useState<string[]>([])
+  const [companySummary, setCompanySummary] = useState('')
+  const [technologyFocus, setTechnologyFocus] = useState('')
+  const [pastSbirAwards, setPastSbirAwards] = useState<PastSbirAward[]>([])
+
   const isAdmin = data?.userRole === 'tenant_admin' || data?.userRole === 'master_admin'
 
   const fetchProfile = useCallback(async () => {
@@ -100,6 +137,13 @@ export default function ProfilePage() {
     setMaxContractValue(profile.max_contract_value != null ? String(profile.max_contract_value) : '')
     setMinSurfaceScore(String(profile.min_surface_score ?? 40))
     setHighPriorityScore(String(profile.high_priority_score ?? 75))
+    // SBIR/STTR fields
+    setTrl(profile.technology_readiness_level != null ? String(profile.technology_readiness_level) : '')
+    setResearchAreas((profile.research_areas ?? []).join(', '))
+    setTargetAgencies(profile.target_agencies ?? [])
+    setCompanySummary(profile.company_summary ?? '')
+    setTechnologyFocus(profile.technology_focus ?? '')
+    setPastSbirAwards(profile.past_sbir_awards ?? [])
   }
 
   useEffect(() => {
@@ -124,6 +168,13 @@ export default function ProfilePage() {
     }
     if (minContractValue) body.minContractValue = Number(minContractValue)
     if (maxContractValue) body.maxContractValue = Number(maxContractValue)
+    // SBIR/STTR fields
+    if (trl) body.technologyReadinessLevel = Number(trl)
+    body.researchAreas = researchAreas.split(',').map(s => s.trim()).filter(Boolean)
+    body.targetAgencies = targetAgencies
+    body.companySummary = companySummary
+    body.technologyFocus = technologyFocus
+    body.pastSbirAwards = pastSbirAwards
 
     try {
       const res = await fetch(`/api/portal/${slug}/profile`, {
@@ -418,6 +469,313 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+
+          {/* SBIR/STTR Profile */}
+          <div className="card">
+            <h2 className="text-lg font-semibold text-gray-900">SBIR/STTR Profile</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Used for SBIR/STTR opportunity scoring and proposal AI.
+            </p>
+            {editing ? (
+              <div className="mt-4 space-y-4">
+                {/* TRL */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Technology Readiness Level (TRL)
+                  </label>
+                  <select
+                    value={trl}
+                    onChange={e => setTrl(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Select TRL...</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
+                      <option key={level} value={level}>
+                        TRL {level}: {TRL_LABELS[level]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Research Areas */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Research Areas <span className="text-gray-400">(comma-separated)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={researchAreas}
+                    onChange={e => setResearchAreas(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="e.g. Machine Learning, Sensor Fusion, Cybersecurity"
+                  />
+                </div>
+
+                {/* Target Agencies */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Target Agencies
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {TARGET_AGENCY_OPTIONS.map(agency => (
+                      <button
+                        key={agency}
+                        type="button"
+                        onClick={() =>
+                          setTargetAgencies(prev =>
+                            prev.includes(agency) ? prev.filter(a => a !== agency) : [...prev, agency]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                          targetAgencies.includes(agency)
+                            ? 'bg-blue-100 border-blue-300 text-blue-800 font-medium'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {agency}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Company Summary */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Company Summary
+                  </label>
+                  <textarea
+                    value={companySummary}
+                    onChange={e => setCompanySummary(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    rows={3}
+                    placeholder="Brief summary of your company and capabilities (used in scoring and proposal AI)..."
+                  />
+                </div>
+
+                {/* Technology Focus */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Technology Focus
+                  </label>
+                  <textarea
+                    value={technologyFocus}
+                    onChange={e => setTechnologyFocus(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    rows={3}
+                    placeholder="Describe your core technology areas and innovations..."
+                  />
+                </div>
+
+                {/* Past SBIR/STTR Awards */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    Past SBIR/STTR Awards
+                  </label>
+                  {pastSbirAwards.map((award, idx) => (
+                    <div key={idx} className="mb-3 rounded-lg border border-gray-200 p-3">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <input
+                          type="text"
+                          value={award.agency}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], agency: e.target.value }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="Agency"
+                        />
+                        <select
+                          value={award.program}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], program: e.target.value as 'SBIR' | 'STTR' }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                        >
+                          <option value="SBIR">SBIR</option>
+                          <option value="STTR">STTR</option>
+                        </select>
+                        <select
+                          value={award.phase}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], phase: e.target.value as 'I' | 'II' }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                        >
+                          <option value="I">Phase I</option>
+                          <option value="II">Phase II</option>
+                        </select>
+                        <input
+                          type="number"
+                          value={award.awardAmount ?? ''}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], awardAmount: e.target.value ? Number(e.target.value) : null }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="Amount ($)"
+                        />
+                        <input
+                          type="number"
+                          value={award.year ?? ''}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], year: e.target.value ? Number(e.target.value) : null }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="Year"
+                        />
+                        <input
+                          type="text"
+                          value={award.topic}
+                          onChange={e => {
+                            const updated = [...pastSbirAwards]
+                            updated[idx] = { ...updated[idx], topic: e.target.value }
+                            setPastSbirAwards(updated)
+                          }}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm"
+                          placeholder="Topic"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPastSbirAwards(prev => prev.filter((_, i) => i !== idx))}
+                        className="mt-2 text-xs text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPastSbirAwards(prev => [
+                        ...prev,
+                        { agency: '', program: 'SBIR', phase: 'I', awardAmount: null, year: null, topic: '' },
+                      ])
+                    }
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    + Add Award
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {/* TRL display */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Technology Readiness Level</p>
+                  {profile?.technology_readiness_level ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-medium text-blue-800">
+                        TRL {profile.technology_readiness_level}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {TRL_LABELS[profile.technology_readiness_level] ?? ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">Not set</p>
+                  )}
+                </div>
+
+                {/* Research Areas */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Research Areas</p>
+                  {(profile?.research_areas ?? []).length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {(profile?.research_areas ?? []).map(area => (
+                        <span key={area} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{area}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">None configured</p>
+                  )}
+                </div>
+
+                {/* Target Agencies */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Target Agencies</p>
+                  {(profile?.target_agencies ?? []).length > 0 ? (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {(profile?.target_agencies ?? []).map(agency => (
+                        <span key={agency} className="badge-blue">{agency}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">None configured</p>
+                  )}
+                </div>
+
+                {/* Company Summary */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Company Summary</p>
+                  {profile?.company_summary ? (
+                    <p className="mt-1 text-sm text-gray-700">{profile.company_summary}</p>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">Not provided</p>
+                  )}
+                </div>
+
+                {/* Technology Focus */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Technology Focus</p>
+                  {profile?.technology_focus ? (
+                    <p className="mt-1 text-sm text-gray-700">{profile.technology_focus}</p>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">Not provided</p>
+                  )}
+                </div>
+
+                {/* Past SBIR Awards */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Past SBIR/STTR Awards</p>
+                  {(profile?.past_sbir_awards ?? []).length > 0 ? (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="min-w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-left text-gray-500">
+                            <th className="pb-1 pr-4">Agency</th>
+                            <th className="pb-1 pr-4">Program</th>
+                            <th className="pb-1 pr-4">Phase</th>
+                            <th className="pb-1 pr-4">Amount</th>
+                            <th className="pb-1 pr-4">Year</th>
+                            <th className="pb-1">Topic</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(profile?.past_sbir_awards ?? []).map((award, idx) => (
+                            <tr key={idx} className="border-b border-gray-100">
+                              <td className="py-1.5 pr-4 text-gray-700">{award.agency}</td>
+                              <td className="py-1.5 pr-4">
+                                <span className={`badge ${award.program === 'SBIR' ? 'badge-blue' : 'badge-purple'}`}>
+                                  {award.program}
+                                </span>
+                              </td>
+                              <td className="py-1.5 pr-4 text-gray-700">{award.phase}</td>
+                              <td className="py-1.5 pr-4 text-gray-700">
+                                {award.awardAmount ? `$${Number(award.awardAmount).toLocaleString()}` : '-'}
+                              </td>
+                              <td className="py-1.5 pr-4 text-gray-700">{award.year ?? '-'}</td>
+                              <td className="py-1.5 text-gray-700">{award.topic}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-400">No past awards recorded</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Save/Cancel buttons */}
           {editing && (

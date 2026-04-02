@@ -116,6 +116,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     maxContractValue: 'max_contract_value',
     minSurfaceScore: 'min_surface_score',
     highPriorityScore: 'high_priority_score',
+    technologyReadinessLevel: 'technology_readiness_level',
+    researchAreas: 'research_areas',
+    targetAgencies: 'target_agencies',
+    companySummary: 'company_summary',
+    technologyFocus: 'technology_focus',
+    pastSbirAwards: 'past_sbir_awards',
   }
 
   const fieldsChanged: string[] = []
@@ -133,7 +139,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       INSERT INTO tenant_profiles (tenant_id, updated_by, updated_at,
         primary_naics, secondary_naics, keyword_domains, agency_priorities,
         is_small_business, is_sdvosb, is_wosb, is_hubzone, is_8a,
-        min_contract_value, max_contract_value, min_surface_score, high_priority_score
+        min_contract_value, max_contract_value, min_surface_score, high_priority_score,
+        technology_readiness_level, research_areas, target_agencies,
+        company_summary, technology_focus, past_sbir_awards
       ) VALUES (
         ${tenant.id}, ${session.user.email ?? 'admin'}, NOW(),
         ${(body.primaryNaics as string[]) ?? null},
@@ -148,7 +156,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         ${(body.minContractValue as number) ?? null},
         ${(body.maxContractValue as number) ?? null},
         ${(body.minSurfaceScore as number) ?? null},
-        ${(body.highPriorityScore as number) ?? null}
+        ${(body.highPriorityScore as number) ?? null},
+        ${(body.technologyReadinessLevel as number) ?? null},
+        ${(body.researchAreas as string[]) ?? null},
+        ${(body.targetAgencies as string[]) ?? null},
+        ${(body.companySummary as string) ?? null},
+        ${(body.technologyFocus as string) ?? null},
+        ${body.pastSbirAwards ? JSON.stringify(body.pastSbirAwards) : null}::jsonb
       )
       ON CONFLICT (tenant_id) DO UPDATE SET
         primary_naics = COALESCE(${(body.primaryNaics as string[]) ?? null}, tenant_profiles.primary_naics),
@@ -164,6 +178,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         max_contract_value = COALESCE(${(body.maxContractValue as number) ?? null}, tenant_profiles.max_contract_value),
         min_surface_score = COALESCE(${(body.minSurfaceScore as number) ?? null}, tenant_profiles.min_surface_score),
         high_priority_score = COALESCE(${(body.highPriorityScore as number) ?? null}, tenant_profiles.high_priority_score),
+        technology_readiness_level = COALESCE(${(body.technologyReadinessLevel as number) ?? null}, tenant_profiles.technology_readiness_level),
+        research_areas = COALESCE(${(body.researchAreas as string[]) ?? null}, tenant_profiles.research_areas),
+        target_agencies = COALESCE(${(body.targetAgencies as string[]) ?? null}, tenant_profiles.target_agencies),
+        company_summary = COALESCE(${(body.companySummary as string) ?? null}, tenant_profiles.company_summary),
+        technology_focus = COALESCE(${(body.technologyFocus as string) ?? null}, tenant_profiles.technology_focus),
+        past_sbir_awards = COALESCE(${body.pastSbirAwards ? JSON.stringify(body.pastSbirAwards) : null}::jsonb, tenant_profiles.past_sbir_awards),
         updated_by = ${session.user.email ?? 'admin'},
         updated_at = NOW()
     `

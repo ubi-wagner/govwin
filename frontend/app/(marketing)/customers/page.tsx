@@ -5,55 +5,55 @@ import type { CustomersPageContent } from '@/types'
 
 const STATIC_CONTENT: CustomersPageContent = {
   hero: {
-    eyebrow: 'Customer Wins',
-    title: 'Real results from real companies',
-    description: 'Our clients are winning federal contracts, securing SBIR/STTR awards, and building sustainable government revenue streams.',
+    eyebrow: 'SBIR/STTR Wins',
+    title: '13 for 13. $100M+ secured.',
+    description: 'Our clients are winning SBIR and STTR awards across DoD, NIH, NSF, DOE, and NASA. Here is what that looks like in practice.',
   },
   stats: [
-    { value: '100%', label: 'Recent Win Rate', description: 'SBIR/STTR cohort' },
-    { value: '85%', label: 'Time Saved', description: 'vs. manual search' },
-    { value: '60 Days', label: 'Avg. First Win', description: 'From onboarding' },
-    { value: '$100M+', label: 'Capital Secured', description: 'Across all clients' },
+    { value: '13/13', label: 'Recent Win Rate', description: '100% SBIR/STTR success' },
+    { value: '$100M+', label: 'Capital Secured', description: 'Non-dilutive funding' },
+    { value: '50+', label: 'Startups Supported', description: 'Deep tech and defense' },
+    { value: '20+', label: 'Years Experience', description: 'Federal R&D programs' },
   ],
   stories: [
     {
       company: 'Defense Technology Startup', industry: 'Aerospace & Defense',
-      result: 'Won first SBIR Phase I award within 60 days of onboarding',
-      quote: 'RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right.',
-      metrics: ['$150K SBIR Phase I', 'First federal contract', '94 relevance score'],
+      result: 'Won SBIR Phase I within 60 days, followed by Phase II award',
+      quote: 'GovWin surfaced an Air Force SBIR topic we would have completely missed. The scoring told us it was a 94% match for our sensor technology — and they were right. We won Phase I and are now in Phase II.',
+      metrics: ['$150K Phase I Award', '$1M Phase II Award', 'Air Force / AFRL'],
     },
     {
-      company: 'Advanced Materials Company', industry: 'Manufacturing',
-      result: 'Secured $1.2M in federal contracts within first year',
-      quote: 'We used to spend 10 hours a week searching SAM.gov. Now we spend 20 minutes reviewing our scored pipeline. The ROI is incredible.',
-      metrics: ['$1.2M total awards', '85% time saved', '6 contracts won'],
+      company: 'University Spinoff — Advanced Materials', industry: 'Materials Science',
+      result: 'Secured 3 SBIR Phase I awards across DOE and NSF in first year',
+      quote: 'As a university spinoff, we had strong research but zero proposal experience. The proposal build templates gave us a framework, and the content library meant our third proposal took half the time of our first.',
+      metrics: ['3 Phase I Awards', 'DOE + NSF', 'Content library: 40+ reusable sections'],
     },
     {
-      company: 'Cybersecurity Firm', industry: 'Information Technology',
-      result: 'Identified and won a sole-source opportunity through early discovery',
-      quote: 'The deadline alert saved us. We had 5 days to respond to a sources-sought notice that turned into a sole-source award.',
-      metrics: ['$340K sole-source', '5-day response window', 'Ongoing IDIQ vehicle'],
+      company: 'Biotech Startup', industry: 'Biotech / MedTech',
+      result: 'Won NIH STTR Phase I with research institution partner',
+      quote: 'The partner collaboration feature made STTR manageable. Our university PI could contribute to the proposal without seeing our full pipeline. Clean separation, real collaboration.',
+      metrics: ['$275K STTR Phase I', 'NIH / NIDDK', 'University partnership'],
     },
     {
-      company: 'Environmental Services Startup', industry: 'Environmental & Energy',
-      result: 'Built a federal pipeline from zero to 15 active pursuits',
-      quote: 'As a small WOSB, set-aside matching is critical. RFP Pipeline automatically flags every WOSB set-aside in our NAICS codes.',
-      metrics: ['15 active pursuits', 'WOSB set-aside focus', '3 wins in 6 months'],
+      company: 'Defense Tech Company', industry: 'Cybersecurity & AI',
+      result: 'Built a pipeline of 12 SBIR/STTR topics across DoD agencies',
+      quote: 'We used to manually scan SBIR.gov and agency portals. GovWin cut our search time by 90% and surfaced topics from agencies we had never considered. Our pipeline has never been stronger.',
+      metrics: ['12 active SBIR/STTR pursuits', '90% search time reduction', '4 agencies targeted'],
     },
   ],
   clientTypes: [
-    { label: 'Small Businesses', desc: 'Leverage set-aside matching and SBIR/STTR expertise to compete effectively.', icon: '01' },
-    { label: 'SBIR/STTR Applicants', desc: 'Find topics, track deadlines, and improve win rates with data-driven scoring.', icon: '02' },
-    { label: 'Defense Contractors', desc: 'Monitor DoD opportunities and track contract vehicles across agencies.', icon: '03' },
-    { label: 'Technology Startups', desc: 'Identify non-dilutive federal funding opportunities to fuel your R&D.', icon: '04' },
-    { label: 'Accelerator Cohorts', desc: 'Batch onboarding and pipeline tracking for startup accelerator programs.', icon: '05' },
-    { label: 'University Spinouts', desc: 'Navigate federal funding for research commercialization and tech transfer.', icon: '06' },
+    { label: 'Deep Tech Startups', desc: 'AI, autonomy, sensors, advanced computing — find SBIR/STTR topics matched to your core technology and TRL level.', icon: '01' },
+    { label: 'University Spinoffs', desc: 'Translate lab research into funded STTR proposals. Add your university PI as a partner with controlled access.', icon: '02' },
+    { label: 'Defense Tech Companies', desc: 'Monitor DoD SBIR/STTR topics across AFRL, DARPA, Army, Navy, and Space Force with agency-specific scoring.', icon: '03' },
+    { label: 'Biotech & MedTech Firms', desc: 'Track NIH, NSF, and HHS SBIR/STTR opportunities for therapeutics, diagnostics, and medical devices.', icon: '04' },
+    { label: 'Clean Energy & Climate', desc: 'Find DOE, ARPA-E, and EPA SBIR/STTR topics for energy storage, grid tech, carbon capture, and sustainability.', icon: '05' },
+    { label: 'Accelerator Programs', desc: 'Batch onboard your cohort. Give every startup a scored SBIR/STTR pipeline from day one.', icon: '06' },
   ],
 }
 
 const STATIC_META = {
-  title: 'Customer Wins | RFP Pipeline',
-  description: 'See how companies are using RFP Pipeline to discover and win government contracts.',
+  title: 'SBIR/STTR Wins | GovWin',
+  description: '13/13 recent SBIR/STTR win rate. $100M+ in non-dilutive capital secured. See how small tech businesses are winning federal research funding with GovWin.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -64,30 +64,30 @@ const successStories = [
   {
     company: 'Defense Technology Startup',
     industry: 'Aerospace & Defense',
-    result: 'Won first SBIR Phase I award within 60 days of onboarding',
-    quote: 'RFP Pipeline surfaced an Air Force opportunity we would have completely missed. The scoring told us it was a 94% match — and they were right.',
-    metrics: ['$150K SBIR Phase I', 'First federal contract', '94 relevance score'],
+    result: 'Won SBIR Phase I within 60 days, followed by Phase II award',
+    quote: 'GovWin surfaced an Air Force SBIR topic we would have completely missed. The scoring told us it was a 94% match for our sensor technology — and they were right.',
+    metrics: ['$150K Phase I Award', '$1M Phase II Award', 'Air Force / AFRL'],
   },
   {
-    company: 'Advanced Materials Company',
-    industry: 'Manufacturing',
-    result: 'Secured $1.2M in federal contracts within first year',
-    quote: 'We used to spend 10 hours a week searching SAM.gov. Now we spend 20 minutes reviewing our scored pipeline. The ROI is incredible.',
-    metrics: ['$1.2M total awards', '85% time saved', '6 contracts won'],
+    company: 'University Spinoff — Advanced Materials',
+    industry: 'Materials Science',
+    result: 'Secured 3 SBIR Phase I awards across DOE and NSF in first year',
+    quote: 'As a university spinoff, we had strong research but zero proposal experience. The proposal build templates gave us a framework that worked.',
+    metrics: ['3 Phase I Awards', 'DOE + NSF', 'Content library: 40+ reusable sections'],
   },
   {
-    company: 'Cybersecurity Firm',
-    industry: 'Information Technology',
-    result: 'Identified and won a sole-source opportunity through early discovery',
-    quote: 'The deadline alert saved us. We had 5 days to respond to a sources-sought notice that turned into a sole-source award.',
-    metrics: ['$340K sole-source', '5-day response window', 'Ongoing IDIQ vehicle'],
+    company: 'Biotech Startup',
+    industry: 'Biotech / MedTech',
+    result: 'Won NIH STTR Phase I with research institution partner',
+    quote: 'The partner collaboration feature made STTR manageable. Our university PI could contribute to the proposal without seeing our full pipeline.',
+    metrics: ['$275K STTR Phase I', 'NIH / NIDDK', 'University partnership'],
   },
   {
-    company: 'Environmental Services Startup',
-    industry: 'Environmental & Energy',
-    result: 'Built a federal pipeline from zero to 15 active pursuits',
-    quote: 'As a small WOSB, set-aside matching is critical. RFP Pipeline automatically flags every WOSB set-aside in our NAICS codes.',
-    metrics: ['15 active pursuits', 'WOSB set-aside focus', '3 wins in 6 months'],
+    company: 'Defense Tech Company',
+    industry: 'Cybersecurity & AI',
+    result: 'Built a pipeline of 12 SBIR/STTR topics across DoD agencies',
+    quote: 'We used to manually scan SBIR.gov and agency portals. GovWin cut our search time by 90% and surfaced topics from agencies we had never considered.',
+    metrics: ['12 active SBIR/STTR pursuits', '90% search time reduction', '4 agencies targeted'],
   },
 ]
 
@@ -165,9 +165,9 @@ export default async function CustomersPage() {
       </Section>
 
       <CtaSection
-        title="Join our growing list of winners"
-        description="Find out how RFP Pipeline can help your company win federal contracts."
-        primaryLabel="Start Free Trial"
+        title="Ready to win your next SBIR?"
+        description="Join the companies using GovWin to find and win SBIR/STTR awards faster."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Meet the founder"
         secondaryHref="/team"

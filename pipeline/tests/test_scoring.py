@@ -3,15 +3,25 @@ Tests for the scoring engine — all pure computation, no DB needed.
 
 Covers:
   - NAICS matching (primary vs secondary vs none)
-  - Keyword domain matching and scoring tiers
+  - Technology/keyword matching and scoring tiers
   - Set-aside matching (exact + partial)
-  - Agency priority tiers
-  - Opportunity type scoring
+  - Agency alignment tiers
+  - Program type fit scoring
   - Timeline urgency buckets
+  - TRL alignment
   - Keyword match extraction
   - Pursuit recommendation thresholds
   - LLM JSON extraction
   - _format_set_asides helper
+
+Score breakdown (100 total base):
+  Technology/Topic match: 0-30
+  NAICS match:            0-15  (primary=15, secondary=10)
+  Agency alignment:       0-15
+  Program type fit:       0-15
+  Set-aside eligibility:  0-10  (exact=10, partial=7)
+  Timeline/urgency:       0-10
+  TRL alignment:          0-5
 """
 
 import json
@@ -37,21 +47,21 @@ engine = FakeScoringEngine()
 # ── NAICS matching ──
 
 class TestNAICSScoring:
-    def test_primary_naics_match_gives_25(self):
+    def test_primary_naics_match_gives_15(self):
         profile = {"primary_naics": ["541512"], "secondary_naics": []}
         opp = {"naics_codes": ["541512"], "title": "", "description": "",
                "set_aside_type": "", "agency_code": "", "opportunity_type": "solicitation",
                "close_date": None}
         scores = engine._compute_scores(profile, opp)
-        assert scores["naics"] == 25
+        assert scores["naics"] == 15
 
-    def test_secondary_naics_match_gives_15(self):
+    def test_secondary_naics_match_gives_10(self):
         profile = {"primary_naics": ["541611"], "secondary_naics": ["541512"]}
         opp = {"naics_codes": ["541512"], "title": "", "description": "",
                "set_aside_type": "", "agency_code": "", "opportunity_type": "solicitation",
                "close_date": None}
         scores = engine._compute_scores(profile, opp)
-        assert scores["naics"] == 15
+        assert scores["naics"] == 10
 
     def test_no_naics_match_gives_0(self):
         profile = {"primary_naics": ["541611"], "secondary_naics": ["541519"]}
@@ -78,15 +88,20 @@ class TestNAICSScoring:
         assert scores["naics"] == 0
 
 
-# ── Keyword matching ──
+# ── Technology/Keyword matching ──
 
-class TestKeywordScoring:
+class TestTechnologyScoring:
+    """Tests for technology match scoring (0-30).
+
+    The engine uses research_areas + technology_focus first, falling back
+    to keyword_domains for legacy profiles.
+    """
     base_opp = {
         "naics_codes": [], "set_aside_type": "", "agency_code": "",
         "opportunity_type": "solicitation", "close_date": None,
     }
 
-    def test_three_domain_hits_gives_25(self):
+    def test_three_domain_hits_gives_30(self):
         profile = {
             "primary_naics": [], "secondary_naics": [],
             "keyword_domains": {
@@ -99,9 +114,9 @@ class TestKeywordScoring:
                "title": "AWS Cloud Migration with NIST Compliance",
                "description": "Requires CI/CD pipeline and Kubernetes deployment"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 25
+        assert scores["technology"] == 30
 
-    def test_two_domain_hits_gives_18(self):
+    def test_two_domain_hits_gives_20(self):
         profile = {
             "primary_naics": [], "secondary_naics": [],
             "keyword_domains": {
@@ -114,7 +129,7 @@ class TestKeywordScoring:
                "title": "AWS cybersecurity assessment",
                "description": "No devops here"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 18
+        assert scores["technology"] == 20
 
     def test_one_domain_hit_gives_10(self):
         profile = {
@@ -128,7 +143,7 @@ class TestKeywordScoring:
                "title": "AWS cloud services",
                "description": "General IT support"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 10
+        assert scores["technology"] == 10
 
     def test_no_domain_hits_gives_0(self):
         profile = {
@@ -142,7 +157,7 @@ class TestKeywordScoring:
                "title": "Office furniture procurement",
                "description": "Desks and chairs"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 0
+        assert scores["technology"] == 0
 
     def test_keyword_domains_as_json_string(self):
         """keyword_domains may come from DB as JSON string."""
@@ -154,7 +169,7 @@ class TestKeywordScoring:
                "title": "AWS migration",
                "description": ""}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 10
+        assert scores["technology"] == 10
 
     def test_empty_keyword_domains_gives_0(self):
         profile = {
@@ -163,7 +178,20 @@ class TestKeywordScoring:
         }
         opp = {**self.base_opp, "title": "anything", "description": ""}
         scores = engine._compute_scores(profile, opp)
-        assert scores["keyword"] == 0
+        assert scores["technology"] == 0
+
+    def test_research_areas_match(self):
+        """research_areas is the primary SBIR scoring signal."""
+        profile = {
+            "primary_naics": [], "secondary_naics": [],
+            "research_areas": ["machine learning", "computer vision", "natural language processing"],
+            "technology_focus": "",
+        }
+        opp = {**self.base_opp,
+               "title": "Machine Learning for Computer Vision Applications",
+               "description": "Natural Language Processing capabilities required"}
+        scores = engine._compute_scores(profile, opp)
+        assert scores["technology"] >= 25  # 3+ tech term hits
 
 
 # ── Set-aside matching ──
@@ -179,35 +207,35 @@ class TestSetAsideScoring:
         "title": "", "description": "",
     }
 
-    def test_sdvosb_exact_match_gives_15(self):
+    def test_sdvosb_exact_match_gives_10(self):
         profile = {**self.base_profile, "is_sdvosb": True}
         opp = {**self.base_opp, "set_aside_type": "Service-Disabled Veteran-Owned Small Business (SDVOSB)"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["set_aside"] == 15
+        assert scores["set_aside"] == 10
 
-    def test_wosb_match_gives_15(self):
+    def test_wosb_match_gives_10(self):
         profile = {**self.base_profile, "is_wosb": True}
         opp = {**self.base_opp, "set_aside_type": "Women-Owned Small Business (WOSB)"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["set_aside"] == 15
+        assert scores["set_aside"] == 10
 
-    def test_hubzone_match_gives_15(self):
+    def test_hubzone_match_gives_10(self):
         profile = {**self.base_profile, "is_hubzone": True}
         opp = {**self.base_opp, "set_aside_type": "HUBZone Set-Aside"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["set_aside"] == 15
+        assert scores["set_aside"] == 10
 
-    def test_8a_match_gives_15(self):
+    def test_8a_match_gives_10(self):
         profile = {**self.base_profile, "is_8a": True}
         opp = {**self.base_opp, "set_aside_type": "8(a) Sole Source"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["set_aside"] == 15
+        assert scores["set_aside"] == 10
 
-    def test_small_business_partial_gives_8(self):
+    def test_small_business_partial_gives_7(self):
         profile = {**self.base_profile, "is_small_business": True}
         opp = {**self.base_opp, "set_aside_type": "Total Small Business Set-Aside"}
         scores = engine._compute_scores(profile, opp)
-        assert scores["set_aside"] == 8
+        assert scores["set_aside"] == 7
 
     def test_no_set_aside_match_gives_0(self):
         profile = {**self.base_profile, "is_sdvosb": False, "is_small_business": False}
@@ -266,9 +294,9 @@ class TestAgencyScoring:
         assert scores["agency"] == 15
 
 
-# ── Opportunity type ──
+# ── Program type fit ──
 
-class TestTypeScoring:
+class TestProgramTypeScoring:
     base = {
         "primary_naics": [], "secondary_naics": [],
         "keyword_domains": {}, "agency_priorities": {},
@@ -278,25 +306,45 @@ class TestTypeScoring:
         "close_date": None, "title": "", "description": "",
     }
 
-    def test_solicitation_gives_10(self):
-        opp = {**self.base_opp, "opportunity_type": "solicitation"}
+    def test_sbir_phase_1_gives_12(self):
+        opp = {**self.base_opp, "program_type": "sbir_phase_1"}
         scores = engine._compute_scores(self.base, opp)
-        assert scores["type"] == 10
+        assert scores["program_type"] == 12
 
-    def test_sources_sought_gives_5(self):
-        opp = {**self.base_opp, "opportunity_type": "sources_sought"}
+    def test_sttr_phase_1_gives_12(self):
+        opp = {**self.base_opp, "program_type": "sttr_phase_1"}
         scores = engine._compute_scores(self.base, opp)
-        assert scores["type"] == 5
+        assert scores["program_type"] == 12
 
-    def test_presolicitation_gives_3(self):
-        opp = {**self.base_opp, "opportunity_type": "presolicitation"}
+    def test_baa_gives_8(self):
+        opp = {**self.base_opp, "program_type": "baa"}
         scores = engine._compute_scores(self.base, opp)
-        assert scores["type"] == 3
+        assert scores["program_type"] == 8
+
+    def test_ota_gives_8(self):
+        opp = {**self.base_opp, "program_type": "ota"}
+        scores = engine._compute_scores(self.base, opp)
+        assert scores["program_type"] == 8
+
+    def test_challenge_gives_5(self):
+        opp = {**self.base_opp, "program_type": "challenge"}
+        scores = engine._compute_scores(self.base, opp)
+        assert scores["program_type"] == 5
+
+    def test_rfi_gives_3(self):
+        opp = {**self.base_opp, "program_type": "rfi"}
+        scores = engine._compute_scores(self.base, opp)
+        assert scores["program_type"] == 3
+
+    def test_sources_sought_gives_3(self):
+        opp = {**self.base_opp, "program_type": "sources_sought"}
+        scores = engine._compute_scores(self.base, opp)
+        assert scores["program_type"] == 3
 
     def test_unknown_type_gives_2(self):
-        opp = {**self.base_opp, "opportunity_type": "special_notice"}
+        opp = {**self.base_opp, "program_type": "other"}
         scores = engine._compute_scores(self.base, opp)
-        assert scores["type"] == 2
+        assert scores["program_type"] == 2
 
 
 # ── Timeline urgency ──
@@ -339,6 +387,48 @@ class TestTimelineScoring:
         opp = {**self.base_opp, "close_date": None}
         scores = engine._compute_scores(self.base_profile, opp)
         assert scores["timeline"] == 0
+
+
+# ── TRL alignment ──
+
+class TestTRLScoring:
+    base_profile = {
+        "primary_naics": [], "secondary_naics": [],
+        "keyword_domains": {}, "agency_priorities": {},
+    }
+    base_opp = {
+        "naics_codes": [], "set_aside_type": "", "agency_code": "",
+        "opportunity_type": "solicitation", "title": "", "description": "",
+        "close_date": None,
+    }
+
+    def test_trl_2_phase_1_gives_5(self):
+        """TRL 2 is in range for Phase I (1-4)."""
+        profile = {**self.base_profile, "technology_readiness_level": 2}
+        opp = {**self.base_opp, "program_type": "sbir_phase_1"}
+        scores = engine._compute_scores(profile, opp)
+        assert scores["trl"] == 5
+
+    def test_trl_5_phase_2_gives_5(self):
+        """TRL 5 is in range for Phase II (4-6)."""
+        profile = {**self.base_profile, "technology_readiness_level": 5}
+        opp = {**self.base_opp, "program_type": "sbir_phase_2"}
+        scores = engine._compute_scores(profile, opp)
+        assert scores["trl"] == 5
+
+    def test_trl_8_phase_1_gives_0(self):
+        """TRL 8 is too high for Phase I."""
+        profile = {**self.base_profile, "technology_readiness_level": 8}
+        opp = {**self.base_opp, "program_type": "sbir_phase_1"}
+        scores = engine._compute_scores(profile, opp)
+        assert scores["trl"] == 0
+
+    def test_no_trl_gives_2(self):
+        """No TRL specified gives neutral default."""
+        profile = {**self.base_profile}
+        opp = {**self.base_opp, "program_type": "sbir_phase_1"}
+        scores = engine._compute_scores(profile, opp)
+        assert scores["trl"] == 2
 
 
 # ── Keyword match extraction ──

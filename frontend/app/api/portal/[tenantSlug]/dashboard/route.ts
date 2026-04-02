@@ -54,6 +54,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       proposalStats,
       deadlineSoon,
       activity,
+      purchaseStats,
     ] = await Promise.all([
       // 1. Library unit counts
       sql`
@@ -120,10 +121,22 @@ export async function GET(_request: NextRequest, { params }: Params) {
         ORDER BY created_at DESC
         LIMIT 10
       `,
+
+      // 7. Proposal purchase stats
+      sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status IN ('pending', 'active', 'template_delivered'))::int AS active_builds,
+          COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_templates,
+          COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_builds,
+          COUNT(*)::int AS total_purchases
+        FROM proposal_purchases
+        WHERE tenant_id = ${tenant.id}
+      `,
     ])
 
     const libRow = libraryStats[0]
     const propRow = proposalStats[0]
+    const purchRow = purchaseStats[0]
 
     return NextResponse.json({
       data: {
@@ -159,6 +172,12 @@ export async function GET(_request: NextRequest, { params }: Params) {
           description: e.description,
           createdAt: e.createdAt,
         })),
+        purchases: {
+          activeBuilds: purchRow?.activeBuilds ?? 0,
+          pendingTemplates: purchRow?.pendingTemplates ?? 0,
+          completedBuilds: purchRow?.completedBuilds ?? 0,
+          totalPurchases: purchRow?.totalPurchases ?? 0,
+        },
       },
     })
   } catch (error) {
