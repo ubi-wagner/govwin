@@ -38,7 +38,7 @@ async function emitPipelineEvent(
 /** Create a content_reviews record — accepts transaction or top-level sql */
 async function createReviewRecord(
   // postgres.js TransactionSql type omits call signatures; use any for tx parameter
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   querySql: any,
   params: {
     postId: string
@@ -463,7 +463,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -516,7 +516,7 @@ export async function PATCH(request: Request) {
 
       const notes = (body.notes as string) ?? null
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -573,7 +573,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -626,7 +626,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -678,7 +678,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -734,7 +734,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
@@ -794,7 +794,7 @@ export async function PATCH(request: Request) {
       }
 
       const updated = await sql.begin(async (_tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const tx = _tx as any;
         const [row] = await tx`
           UPDATE content_posts
