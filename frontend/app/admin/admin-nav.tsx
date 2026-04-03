@@ -16,6 +16,7 @@ const navItems = [
   { href: '/admin/purchases', label: 'Purchases', icon: 'ShoppingCart' },
   { href: '/admin/content-pipeline', label: 'Content Pipeline', icon: 'Pencil' },
   { href: '/admin/compliance', label: 'Compliance', icon: 'Shield' },
+  { href: '/admin/waitlist', label: 'Waitlist', icon: 'UserPlus' },
 ]
 
 const sitePages = [
@@ -161,6 +162,11 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
     Shield: (
       <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+      </svg>
+    ),
+    UserPlus: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
       </svg>
     ),
   }
