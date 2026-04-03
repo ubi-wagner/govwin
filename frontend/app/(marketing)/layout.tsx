@@ -1,6 +1,7 @@
 import { SiteHeader } from '@/components/site-header'
 import { SiteFooter } from '@/components/site-footer'
 import { AnalyticsTracker } from '@/components/analytics-tracker'
+import { WaitlistModal } from '@/components/waitlist-modal'
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <main className="flex-1">{children}</main>
       <SiteFooter />
       <AnalyticsTracker />
+      <WaitlistModal />
     </div>
   )
 }
