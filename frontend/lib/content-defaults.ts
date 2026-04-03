@@ -56,7 +56,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
           bio: [
             'Eric Wagner is a C-Suite executive, inventor, entrepreneur, and investor with more than 20 years of technology commercialization experience.',
             'He is the co-founder, CSO and EVP of Business Development at Converge Technologies, and co-founder and CEO of Converge Ventures, an $11 million startup studio.',
-            'Eric served as President of D&S Consultants, an aerospace and defense company with annual revenues exceeding $270 million and more than 800 employees.',
+            'Eric served as President of D&S Consultants, an aerospace and defense company with annual revenues exceeding $300 million and more than 800 employees, with a core mission of innovation development and successful transition of that innovation into high-tech fieldable hardware and software solutions for the DoD.',
             'He is considered an expert in non-dilutive capital — his most recent cohort submitted 13 SBIR/STTR proposals and received 13 awards, a 100% success rate.',
           ],
           credentials: [
@@ -69,11 +69,11 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
       ],
       stats: [
         { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured through SBIR/STTR and federal research funding' },
-        { value: '13/13', label: 'SBIR/STTR Awards', description: '100% success rate in most recent cohort' },
+        { value: 'Dozens', label: 'Phase I, II & III Awards', description: 'Over the last decade' },
         { value: '40+', label: 'Startups Advised', description: 'On Air Force APEX program' },
         { value: '50+', label: 'Companies Supported', description: 'Early-stage technology ventures' },
         { value: '20+', label: 'Startups Launched', description: 'From Ohio State University' },
-        { value: '$270M+', label: 'Annual Revenue', description: 'Led as President of D&S Consultants' },
+        { value: '$300M+', label: 'Annual Revenue', description: 'Led as President of D&S Consultants' },
         { value: '800+', label: 'Employees Managed', description: 'Aerospace & defense operations' },
         { value: '$11M', label: 'Startup Studio', description: 'Converge Ventures fund' },
       ],
@@ -89,7 +89,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
       hero: {
         eyebrow: 'Tips & Tools',
         title: 'Expert resources for SBIR/STTR success',
-        description: 'Practical guidance from a team with a 13/13 SBIR/STTR win rate and $100M+ in non-dilutive federal funding secured. Updated regularly with new strategies and tools.',
+        description: 'Practical guidance from a team with dozens of SBIR/STTR awards and hundreds of millions in non-dilutive federal funding secured. Updated regularly with new strategies and tools.',
       },
       tips: [
         { date: 'March 2026', category: 'SBIR/STTR', title: 'How to Write a Winning SBIR Phase I Proposal', excerpt: 'A step-by-step guide to structuring your SBIR Phase I proposal for maximum impact.' },
@@ -123,7 +123,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
         description: 'Our clients are winning SBIR/STTR awards, securing federal research funding, and building sustainable non-dilutive revenue streams.',
       },
       stats: [
-        { value: '13/13', label: 'SBIR/STTR Win Rate', description: 'Most recent cohort' },
+        { value: 'Dozens', label: 'SBIR/STTR Awards', description: 'Phase I, II & III over the last decade' },
         { value: '85%', label: 'Time Saved', description: 'vs. manual search' },
         { value: '60 Days', label: 'Avg. First Win', description: 'From onboarding' },
         { value: '$100M+', label: 'Capital Secured', description: 'Across all clients' },
@@ -194,7 +194,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
             'Up to 5 user workspaces',
             'Priority support'
           ],
-          cta: 'Start Free Trial',
+          cta: 'Join the Waitlist',
           popular: true
         },
       ],
@@ -203,12 +203,12 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
         { name: 'Phase II Proposal Build', price: '$999', description: 'Comprehensive proposal support for SBIR/STTR Phase II submissions. Includes commercialization plan, technical volume review, budget narrative, and full compliance review.' },
       ],
       faqs: [
-        { q: 'How does the free trial work?', a: 'You get 14 days of full access to GovWin Pro. No credit card required to start.' },
+        { q: 'What do beta testers get?', a: 'Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders. Launching May 15, 2026.' },
         { q: 'What are the per-proposal builds?', a: 'Our Phase I ($499) and Phase II ($999) proposal builds pair you with SBIR/STTR experts who review, refine, and help you submit a competitive proposal. These are one-time fees per proposal.' },
         { q: 'Do you offer annual billing?', a: 'Yes — annual plans save you 20%. Contact us for a custom annual agreement.' },
         { q: 'What payment methods do you accept?', a: 'We accept all major credit cards and ACH bank transfers for annual plans. Processed securely via Stripe.' },
         { q: 'Is there a setup fee?', a: 'No setup fees, ever. Your workspace is provisioned instantly when you subscribe.' },
-        { q: 'What is your win rate?', a: 'Our most recent SBIR/STTR cohort achieved a 13/13 (100%) win rate. We have helped secure over $100M in non-dilutive capital across 50+ companies.' },
+        { q: 'What is your track record?', a: 'Over the last decade, our founder has won dozens of Phase I, II, and III awards for his own startups and mentored hundreds of additional wins across hundreds of millions in non-dilutive funding.' },
       ],
       contactCta: {
         title: 'Need a custom solution?',
@@ -228,7 +228,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
         eyebrow: 'SBIR/STTR Intelligence',
         title: 'Never miss an SBIR or STTR opportunity again',
         description: 'AI-powered scanning of SAM.gov and agency portals scores every SBIR, STTR, OTA, and BAA opportunity against your technology focus.',
-        trustBadge: '13/13 SBIR/STTR Win Rate · $100M+ Secured',
+        trustBadge: 'Dozens of Phase I, II & III Awards · Hundreds of Millions Secured',
       },
       features: [
         { icon: 'Search', title: 'Smart Opportunity Discovery', description: 'Automated scanning of SAM.gov, SBIR.gov, and agency-specific portals for SBIR/STTR topics.' },
@@ -240,7 +240,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
       ],
       stats: [
         { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured through SBIR/STTR awards' },
-        { value: '13/13', label: 'SBIR/STTR Win Rate', description: '100% success rate in most recent cohort' },
+        { value: 'Dozens', label: 'Phase I, II & III Awards', description: 'Over the last decade' },
         { value: '50+', label: 'Startups Supported', description: 'Early-stage technology companies' },
         { value: '20+', label: 'Years Experience', description: 'SBIR/STTR and federal research funding' },
       ],
@@ -265,7 +265,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
       cta: {
         title: 'Ready to win your next SBIR/STTR award?',
         description: 'Join 50+ startups already using GovWin to discover and win federal research funding faster.',
-        primaryLabel: 'Start Free Trial',
+        primaryLabel: 'Join the Waitlist',
         primaryHref: '/get-started',
         secondaryLabel: 'See customer wins',
         secondaryHref: '/customers',

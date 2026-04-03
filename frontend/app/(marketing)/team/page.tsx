@@ -17,10 +17,10 @@ const STATIC_CONTENT: TeamPageContent = {
       linkedIn: 'https://www.linkedin.com/in/eric-wagner-7480385/',
       bio: [
         'We always wanted this system but did not have the team to build it. Every startup I worked with — whether through APEX, Converge, or Ohio State — faced the same problem: the technology was strong, but the proposal process broke them. Hiring a full BD team or paying $15-25K per proposal is not viable for a 10-person company chasing a $150K Phase I. So we built RFP Pipeline — decades of expert knowledge distilled into AI agents that deliver high-impact, low-friction, cost-effective opp-to-prop-to-win capabilities without the cost of a team or external consultants.',
-        'As President of D&S Consultants, I led an aerospace and defense company with $270M in annual revenue and over 800 employees. I saw the full lifecycle of federal contracting at scale — from opportunity identification through contract execution. That operational knowledge is embedded in every workflow RFP Pipeline delivers.',
-        'I co-founded Converge Technologies, commercializing emerging technology across defense and civilian markets. I co-founded Lighthouse Avionics, bringing next-gen avionics solutions to market. And I founded Ohio Gateway Tech Fund — a $10M pre-seed fund and support studio where I serve as GP and LP — backing the earliest-stage deep tech companies that most investors won\'t touch. Building companies from breakthrough innovation is what I do.',
-        'As a senior advisory consultant to the Air Force APEX commercialization program, I advised 40+ startups on SBIR/STTR participation. My most recent cohort submitted 13 proposals and received 13 awards — a 100% success rate. That methodology — the scoring, the structure, the review cadence — is what powers the SBIR Engine.',
-        'I created and program-managed the Manufacturing Extension Partnership (MEP) program at Ohio State University CDME, supporting small businesses across 35+ counties and directly launching 20+ technology-focused startups from university and federal lab innovation. I also serve as an Ohio TechAngels member and founding instructor for I-Corps@Ohio in Engineering and Physical Sciences.',
+        'As President of D&S Consultants, I led an aerospace and defense company with over $300M in annual revenue and over 800 employees. Our core mission was innovation development and the successful transition of that innovation into high-tech fieldable hardware and software solutions for the DoD. I saw the full lifecycle of federal contracting at scale — from opportunity identification through contract execution. That operational knowledge is embedded in every workflow RFP Pipeline delivers.',
+        'I co-founded Converge Technologies, commercializing emerging technology across defense and civilian markets. I co-founded Lighthouse Avionics, bringing next-gen avionics solutions to market. And I founded Ohio Gateway Tech Fund — a $10M pre-seed fund and support studio where I served as GP and LP — backing the earliest-stage deep tech companies that most investors wouldn\'t touch. Building companies from breakthrough innovation is what drove every chapter of my career before RFP Pipeline.',
+        'As a senior advisory consultant to the Air Force APEX commercialization program, I advised 40+ startups on SBIR/STTR participation. Over the last decade I won dozens of Phase I, II, and III awards for my own startups and mentored hundreds of additional wins that drove hundreds of millions in non-dilutive funding into the startups I advised. That methodology — the scoring, the structure, the review cadence — is what powers the SBIR Engine.',
+        'I created and program-managed the Manufacturing Extension Partnership (MEP) program at Ohio State University CDME, supporting small businesses across 35+ counties and directly launching 20+ technology-focused startups from university and federal lab innovation. I also served as an Ohio TechAngels member and founding instructor for I-Corps@Ohio in Engineering and Physical Sciences.',
       ],
       credentials: [
         'BS in Computer Science (cum laude) — The Ohio State University',
@@ -31,7 +31,7 @@ const STATIC_CONTENT: TeamPageContent = {
     },
   ],
   stats: [
-    { value: '13/13', label: 'SBIR/STTR Awards', description: '100% win rate in most recent cohort' },
+    { value: 'Dozens', label: 'Phase I, II & III Awards', description: 'Over the last decade for his startups' },
     { value: '40+', label: 'Startups Advised', description: 'Through Air Force APEX program' },
     { value: '20+', label: 'Startups Launched', description: 'From university & federal lab innovation' },
     { value: '$10M', label: 'Pre-Seed Fund', description: 'Ohio Gateway Tech Fund (GP & LP)' },
@@ -40,7 +40,7 @@ const STATIC_CONTENT: TeamPageContent = {
 
 const STATIC_META = {
   title: 'Meet the Founder | RFP Pipeline',
-  description: 'Eric Wagner — Founder & CEO of RFP Pipeline. 13/13 SBIR/STTR win rate, 40+ startups advised, 20+ startups launched. Built by someone who has done it.',
+  description: 'Eric Wagner — Founder & CEO of RFP Pipeline. Dozens of Phase I, II & III awards, hundreds of wins mentored, 40+ startups advised. Built by someone who has done it.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -63,22 +63,22 @@ export default async function TeamPage() {
     },
     {
       tag: 'The Executive',
-      headline: 'Leading at scale in aerospace & defense',
+      headline: 'Led at scale in aerospace & defense',
       paragraph: member.bio[1] ?? '',
     },
     {
       tag: 'The Entrepreneur',
-      headline: 'Co-founding companies and funding what others won\'t',
+      headline: 'Co-founded companies and funded what others wouldn\'t',
       paragraph: member.bio[2] ?? '',
     },
     {
       tag: 'The Mentor',
-      headline: '13/13 — an unheard-of 100% SBIR win rate',
+      headline: 'Dozens of awards. Hundreds of wins mentored.',
       paragraph: member.bio[3] ?? '',
     },
     {
       tag: 'The Builder',
-      headline: 'Launching startups from universities and federal labs',
+      headline: 'Launched startups from universities and federal labs',
       paragraph: member.bio[4] ?? '',
     },
   ]
@@ -280,7 +280,7 @@ export default async function TeamPage() {
           </h2>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link href="/get-started" className="btn-cta px-8 py-3.5 text-base">
-              Start Free Trial
+              Join the Waitlist
               <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
               </svg>

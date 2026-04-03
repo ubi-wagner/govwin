@@ -91,10 +91,10 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2 text-center text-xs font-medium sm:px-6 lg:px-8">
           <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-subtle" />
           <span className="text-gray-300">
-            We built it so you don&apos;t have to — start your free trial
+            Launching May 15, 2026 — Join the waitlist for early access
           </span>
           <Link href="/get-started" className="ml-1 inline-flex items-center gap-0.5 font-semibold text-brand-400 hover:text-brand-300 transition-colors">
-            Get started
+            Join Waitlist
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
             </svg>
@@ -215,7 +215,7 @@ export function SiteHeader() {
             >
               <span className="absolute inset-0 bg-gradient-to-r from-brand-600 via-brand-500 to-brand-600 bg-[length:200%_100%] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-hover:animate-gradient-x" />
               <span className="relative flex items-center">
-                Start Free
+                Join Waitlist
                 <svg
                   className="ml-1.5 h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
                   fill="none"
@@ -318,7 +318,7 @@ export function SiteHeader() {
                   Sign in
                 </Link>
                 <Link href="/get-started" className="btn-primary text-center text-sm font-bold">
-                  Start Free
+                  Join Waitlist
                   <svg className="ml-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                   </svg>

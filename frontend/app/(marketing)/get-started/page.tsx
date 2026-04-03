@@ -15,7 +15,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
       name: 'Pipeline Engine',
       price: '$199',
       period: 'month',
-      description: 'Includes 14-day trial',
+      description: 'Launching May 15, 2026',
       features: [
         'Unlimited opportunity scanning',
         'AI fit scoring',
@@ -26,7 +26,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
         'Document storage',
         'Notifications',
       ],
-      cta: 'Start 14-Day Trial',
+      cta: 'Join the Waitlist',
       popular: false,
     },
     {
@@ -66,8 +66,8 @@ const STATIC_CONTENT: GetStartedPageContent = {
   ],
   faqs: [
     {
-      q: 'What\'s included in the 14-day trial?',
-      a: 'Full access to the Pipeline Engine. No credit card required.',
+      q: 'What do beta testers get?',
+      a: 'Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders.',
     },
     {
       q: 'How is a build different from a consultant?',
@@ -290,7 +290,7 @@ export default async function GetStartedPage() {
       <CtaSection
         title="Start Your SBIR Pipeline Today"
         description="Find opportunities, build proposals, and win awards with the platform built for SBIR/STTR teams."
-        primaryLabel="Start 14-Day Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Talk to Us"
         secondaryHref="/about"

@@ -179,7 +179,7 @@ export default async function AboutPage() {
                 href="/get-started"
                 className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 transition-colors"
               >
-                Start Free Trial
+                Join the Waitlist
               </Link>
               <Link
                 href="/team"

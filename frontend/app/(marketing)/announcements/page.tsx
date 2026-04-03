@@ -15,7 +15,7 @@ const STATIC_CONTENT: AnnouncementsPageContent = {
       date: 'April 2026',
       category: 'Product',
       title: 'RFP Pipeline SBIR/STTR Intelligence Platform — Now Live',
-      excerpt: 'We have built the definitive platform for small businesses pursuing SBIR, STTR, OTA, and BAA opportunities. RFP Pipeline combines 24/7 opportunity scanning across SAM.gov, SBIR.gov, and agency portals with AI-powered technology matching, deadline intelligence, and expert-reviewed proposal builds. Sign up for a free trial today.',
+      excerpt: 'We have built the definitive platform for small businesses pursuing SBIR, STTR, OTA, and BAA opportunities. RFP Pipeline combines 24/7 opportunity scanning across SAM.gov, SBIR.gov, and agency portals with AI-powered technology matching, deadline intelligence, and expert-reviewed proposal builds. Join the waitlist for early access — launching May 15, 2026.',
     },
     {
       date: 'March 2026',
@@ -33,7 +33,7 @@ const STATIC_CONTENT: AnnouncementsPageContent = {
       date: 'February 2026',
       category: 'Company',
       title: 'Eric Wagner Founds RFP Pipeline',
-      excerpt: 'After 20+ years helping startups win SBIR/STTR awards — including a recent 13/13 win rate and over $100M in non-dilutive capital secured — Eric Wagner has founded RFP Pipeline to bring expert-level SBIR/STTR intelligence to every small tech business. The platform combines the scanning and scoring tools with the proposal expertise that produced those results.',
+      excerpt: 'After 20+ years helping startups win SBIR/STTR awards — with dozens of Phase I, II, and III awards for his own startups and hundreds of additional wins mentored across hundreds of millions in non-dilutive funding — Eric Wagner has founded RFP Pipeline to bring expert-level SBIR/STTR intelligence to every small tech business. The platform combines the scanning and scoring tools with the proposal expertise that produced those results.',
     },
     {
       date: 'February 2026',
@@ -94,7 +94,7 @@ export default async function AnnouncementsPage() {
       <CtaSection
         title="Start Your SBIR Pipeline Today"
         description="Start discovering and winning SBIR/STTR funding with the platform built by experts."
-        primaryLabel="Start Free Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="SBIR/STTR resources"
         secondaryHref="/tips"
