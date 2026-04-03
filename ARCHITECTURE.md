@@ -1,825 +1,306 @@
-# GovWin Platform — System Architecture
+# RFP Pipeline — Architecture & Capabilities Document
 
-> Complete data flow map of every component, external service, event channel, and scheduled job.
-> Updated: 2026-03-25 — reflects automation framework, event system overhaul, CMS fixes.
+**Last updated:** April 3, 2026
+**Branch:** `claude/fix-crash-issue-Oj6Td` (commit `5c64d2d`)
 
 ---
 
-## High-Level System Overview
+## 1. System Overview
 
-```mermaid
-graph TB
-    subgraph INTERNET["Internet"]
-        USER["Tenant Users<br/><small>tenant_admin / tenant_user</small>"]
-        ADMIN["Master Admin"]
-        PUBLIC["Public Visitors"]
-    end
+RFP Pipeline is a full-stack SaaS platform for small businesses pursuing SBIR/STTR and federal R&D funding. The platform has three major subsystems:
 
-    subgraph EDGE["Edge / Middleware"]
-        MW["Next.js Middleware<br/><small>Auth gate + tenant isolation</small>"]
-    end
+| Layer | Stack | Hosting |
+|-------|-------|---------|
+| **Frontend** | Next.js 15.5, React 19, Tailwind CSS 3.4, TypeScript 5.9 | Railway |
+| **Pipeline** | Python 3, asyncpg, asyncio, LISTEN/NOTIFY | Railway (worker) |
+| **Database** | PostgreSQL with pgvector, 34 migrations, 52+ tables | Railway (managed) |
 
-    subgraph NEXTJS["Next.js Application — Port 3000"]
-        direction TB
-        subgraph PAGES_PUBLIC["Public Pages (marketing)"]
-            HOME["/ Homepage"]
-            ABOUT["/about"]
-            TEAM["/team"]
-            GETSTARTED["/get-started<br/><small>+ Checkout Modal</small>"]
-            CUSTOMERS["/customers"]
-            TIPS["/tips"]
-            ANNOUNCE["/announcements"]
-        end
+**Positioning:** "The Operating System for Non-Dilutive Funding" — powered by the SBIR Engine.
 
-        subgraph PAGES_AUTH["Auth"]
-            LOGIN["/login<br/><small>NextAuth.js v5 / JWT</small>"]
-        end
+**Pricing:** $199/mo Pipeline Engine + $999/Phase I Build + $2,500/Phase II Build.
 
-        subgraph PAGES_ADMIN["Admin Dashboard — master_admin only"]
-            AD_DASH["/admin/dashboard"]
-            AD_TENANTS["/admin/tenants<br/><small>+ /[tenantId] detail</small>"]
-            AD_PIPELINE["/admin/pipeline"]
-            AD_SOURCES["/admin/sources"]
-            AD_EVENTS["/admin/events<br/><small>3 stream tabs</small>"]
-            AD_AUTO["/admin/automation<br/><small>Rules + Exec Log</small>"]
-            AD_CMS["/admin/content<br/><small>CMS Editor</small>"]
-        end
+---
 
-        subgraph PAGES_PORTAL["Tenant Portal — tenant-scoped"]
-            TP_DASH["/portal/[slug]/dashboard"]
-            TP_PIPE["/portal/[slug]/pipeline<br/><small>Scored opportunities</small>"]
-            TP_DOCS["/portal/[slug]/documents"]
-            TP_PROF["/portal/[slug]/profile<br/><small>Search parameters</small>"]
-        end
+## 2. Frontend Architecture
 
-        subgraph API["API Routes — /api/*"]
-            direction TB
-            API_AUTH["/api/auth/*<br/><small>NextAuth handlers</small>"]
-            API_TENANTS["/api/tenants<br/><small>CRUD + users</small>"]
-            API_OPPS["/api/opportunities<br/><small>+ /[id]/actions</small>"]
-            API_CONTENT["/api/content<br/><small>CMS draft/publish/rollback</small>"]
-            API_EVENTS["/api/events<br/><small>3 streams + filters</small>"]
-            API_AUTO["/api/automation<br/><small>Rules + log + toggle</small>"]
-            API_PORTAL["/api/portal/[slug]/*<br/><small>profile, drive, docs</small>"]
-            API_PIPE["/api/pipeline<br/><small>Jobs + schedules</small>"]
-            API_SYSTEM["/api/system<br/><small>Config + health</small>"]
-            API_ADMIN["/api/admin<br/><small>Stats + metrics</small>"]
-        end
+### 2.1 Routing & Layouts
 
-        subgraph LIB["Shared Libraries — /lib"]
-            LIB_AUTH["auth.ts<br/><small>NextAuth config + JWT callbacks</small>"]
-            LIB_DB["db.ts<br/><small>sql + pool + helpers</small>"]
-            LIB_EVENTS["events.ts<br/><small>emitCustomerEvent<br/>emitOpportunityEvent<br/>emitContentEvent</small>"]
-            LIB_CONTENT["content.ts<br/><small>mergeContent deep merge</small>"]
-        end
-    end
-
-    subgraph PIPELINE["Python Pipeline — Worker Process"]
-        direction TB
-        subgraph MAIN_LOOP["main.py — Job Executor"]
-            CRON["Cron Ticker<br/><small>60s interval</small>"]
-            JOB_EXEC["Job Executor<br/><small>dequeue_job → execute</small>"]
-        end
-
-        subgraph INGEST["Ingest Layer"]
-            SAM_INGEST["SamGovIngester<br/><small>Full + incremental<br/>50 fields extracted</small>"]
-        end
-
-        subgraph SCORING["Scoring Layer"]
-            SCORE_ENG["ScoringEngine<br/><small>6 dimensions + LLM adj<br/>100-point scale</small>"]
-        end
-
-        subgraph WORKERS["Event Workers — runner.py"]
-            W_FINDER_I["FinderOppIngestWorker<br/><small>→ opp_presented events</small>"]
-            W_FINDER_D["FinderDriveArchiveWorker<br/><small>→ drive sync jobs</small>"]
-            W_DOC["DocumentFetcherWorker<br/><small>→ download attachments</small>"]
-            W_REMIND_D["ReminderDeadlineWorker<br/><small>→ 7d/3d/1d nudges</small>"]
-            W_REMIND_A["ReminderAmendmentWorker<br/><small>→ amendment alerts</small>"]
-            W_EMAIL["EmailTriggerWorker<br/><small>→ immediate send</small>"]
-            W_AUTO_C["AutomationCustomerWorker<br/><small>→ rule engine</small>"]
-            W_AUTO_O["AutomationOpportunityWorker<br/><small>→ rule engine</small>"]
-        end
-
-        subgraph AUTO["Automation Engine"]
-            A_ENGINE["engine.py<br/><small>Load rules → match → conditions<br/>→ cooldown → rate limit</small>"]
-            A_ACTIONS["actions.py<br/><small>emit_event | queue_notification<br/>queue_job | log_only</small>"]
-        end
-
-        subgraph EMAIL["Email Service"]
-            EMAILER["emailer.py<br/><small>Gmail API via service account<br/>HTML templates</small>"]
-        end
-
-        EVENTS_PY["events.py<br/><small>Shared emitters<br/>pipeline_actor / system_actor</small>"]
-        CRYPTO["crypto.py<br/><small>AES-256-GCM<br/>API key encrypt/decrypt</small>"]
-    end
-
-    subgraph EXTERNAL["External Services"]
-        SAM_API["SAM.gov API<br/><small>Federal opportunities</small>"]
-        CLAUDE_API["Anthropic Claude API<br/><small>LLM scoring analysis</small>"]
-        GMAIL_API["Gmail API<br/><small>Domain-wide delegation<br/>admin@rfppipeline.com</small>"]
-        GDRIVE_API["Google Drive API<br/><small>Service account<br/>Opportunity archival</small>"]
-    end
-
-    subgraph DB["PostgreSQL 16 + pgvector"]
-        direction TB
-        DB_CORE[("Core Tables<br/><small>users • tenants • tenant_profiles<br/>accounts • sessions</small>")]
-        DB_OPP[("Opportunity Tables<br/><small>opportunities • tenant_opportunities<br/>documents • amendments</small>")]
-        DB_EVENTS[("Event Tables<br/><small>opportunity_events<br/>customer_events<br/>content_events</small>")]
-        DB_CONTROL[("Control Plane<br/><small>pipeline_jobs • pipeline_schedules<br/>pipeline_runs • source_health<br/>notifications_queue</small>")]
-        DB_AUTO[("Automation<br/><small>automation_rules<br/>automation_log</small>")]
-        DB_CONTENT[("Content<br/><small>site_content • content_events<br/>drive_files • email_log</small>")]
-    end
-
-    %% User flows
-    PUBLIC --> MW
-    USER --> MW
-    ADMIN --> MW
-    MW --> PAGES_PUBLIC
-    MW --> PAGES_AUTH
-    MW --> PAGES_ADMIN
-    MW --> PAGES_PORTAL
-
-    %% Page → API
-    PAGES_ADMIN --> API
-    PAGES_PORTAL --> API
-    PAGES_AUTH --> API_AUTH
-
-    %% API → Libraries
-    API --> LIB_AUTH
-    API --> LIB_DB
-    API --> LIB_EVENTS
-    API_CONTENT --> LIB_CONTENT
-
-    %% Libraries → DB
-    LIB_DB --> DB
-    LIB_EVENTS --> DB_EVENTS
-    LIB_AUTH --> DB_CORE
-
-    %% Pipeline → DB
-    MAIN_LOOP --> DB_CONTROL
-    SAM_INGEST --> DB_OPP
-    SCORE_ENG --> DB_OPP
-    WORKERS --> DB_EVENTS
-    AUTO --> DB_AUTO
-    EMAILER --> DB_CONTROL
-
-    %% Pipeline → External
-    SAM_INGEST --> SAM_API
-    SCORE_ENG --> CLAUDE_API
-    EMAILER --> GMAIL_API
-    W_FINDER_D --> GDRIVE_API
-
-    %% Event emission → Workers
-    SAM_INGEST --> EVENTS_PY
-    SCORE_ENG --> EVENTS_PY
-    EVENTS_PY --> DB_EVENTS
-
-    %% Automation flow
-    W_AUTO_C --> A_ENGINE
-    W_AUTO_O --> A_ENGINE
-    A_ENGINE --> A_ACTIONS
-
-    %% Cron → Jobs
-    CRON --> JOB_EXEC
-    JOB_EXEC --> SAM_INGEST
-    JOB_EXEC --> SCORE_ENG
-    JOB_EXEC --> EMAILER
-
-    %% Crypto
-    SCORE_ENG --> CRYPTO
-
-    classDef external fill:#fef3c7,stroke:#d97706,color:#92400e
-    classDef db fill:#dbeafe,stroke:#2563eb,color:#1e40af
-    classDef api fill:#f0fdf4,stroke:#16a34a,color:#166534
-    classDef worker fill:#faf5ff,stroke:#7c3aed,color:#5b21b6
-    classDef auto fill:#fff1f2,stroke:#e11d48,color:#9f1239
-    classDef page fill:#f8fafc,stroke:#64748b,color:#334155
-
-    class SAM_API,CLAUDE_API,GMAIL_API,GDRIVE_API external
-    class DB_CORE,DB_OPP,DB_EVENTS,DB_CONTROL,DB_AUTO,DB_CONTENT db
-    class API_AUTH,API_TENANTS,API_OPPS,API_CONTENT,API_EVENTS,API_AUTO,API_PORTAL,API_PIPE,API_SYSTEM,API_ADMIN api
-    class W_FINDER_I,W_FINDER_D,W_DOC,W_REMIND_D,W_REMIND_A,W_EMAIL,W_AUTO_C,W_AUTO_O worker
-    class A_ENGINE,A_ACTIONS auto
+```
+app/
+├── layout.tsx                    # Root layout (Inter font, base meta)
+├── (marketing)/                  # Route group — no path prefix
+│   ├── layout.tsx                # SiteHeader + SiteFooter wrapper
+│   ├── page.tsx                  # / — Landing page (server)
+│   ├── about/page.tsx            # /about (server)
+│   ├── engine/page.tsx           # /engine — SBIR Engine product page (server)
+│   ├── features/page.tsx         # /features — Feature grid (server)
+│   ├── pricing/page.tsx          # /pricing — Redirects to /get-started (server)
+│   ├── get-started/page.tsx      # /get-started — Pricing & onboarding (server)
+│   ├── customers/page.tsx        # /customers — Customer stories (server)
+│   ├── team/page.tsx             # /team (server)
+│   ├── happenings/page.tsx       # /happenings — Content hub (server)
+│   ├── tips/page.tsx             # /tips (server)
+│   ├── announcements/page.tsx    # /announcements (server)
+│   └── legal/                    # /legal/* — Terms, privacy, etc. (server)
+├── (auth)/
+│   ├── login/page.tsx            # /login (client)
+│   └── change-password/page.tsx  # /change-password (client)
+├── admin/                        # /admin/* — Master admin (client components)
+│   ├── layout.tsx                # AdminNav sidebar, role gate
+│   ├── dashboard/                # Overview stats + charts
+│   ├── tenants/                  # CRUD tenants & users
+│   ├── pipeline/                 # Pipeline run management
+│   ├── events/                   # Event log viewer
+│   ├── sources/                  # Data source config
+│   ├── automation/               # Automation rule editor
+│   ├── content/                  # CMS editor + preview
+│   ├── templates/                # SBIR proposal template management
+│   ├── purchases/                # Purchase tracking
+│   └── compliance/               # Legal doc management
+├── portal/[tenantSlug]/          # /portal/:slug/* — Tenant portal (client)
+│   ├── layout.tsx                # PortalNav sidebar, tenant resolution
+│   ├── dashboard/                # Tenant dashboard
+│   ├── pipeline/                 # Opportunity pipeline
+│   ├── proposals/                # Proposal list + detail + editor
+│   ├── spotlights/               # SpotLight saved searches
+│   ├── library/                  # Content library
+│   ├── documents/                # Document management
+│   ├── team/                     # Team + invitations
+│   └── profile/                  # Scoring profile config
+└── api/                          # ~50+ API routes (all server-side)
 ```
 
----
+### 2.2 Auth System
 
-## Event Flow — Complete Data Pipeline
+- **NextAuth v5** (beta.30) with JWT strategy, credentials provider only
+- **Roles:** `master_admin`, `tenant_admin`, `tenant_user`, `partner_user`
+- **Session:** `{ user: { id, name, email, role, tenantId, tempPassword }, expires }`
+- **Middleware** gates all routes: marketing pages are public; `/admin/*` requires `master_admin`; `/portal/[slug]/*` requires matching tenant; unauthenticated users redirect to `/login`
 
-```mermaid
-flowchart LR
-    subgraph SOURCES["Data Sources"]
-        SAM["SAM.gov API"]
-    end
+### 2.3 Shared Components
 
-    subgraph INGEST["Ingest"]
-        SAM_ING["SamGovIngester<br/><small>Extract 50 fields<br/>Content hash dedup</small>"]
-    end
+| Component | Type | Purpose |
+|-----------|------|---------|
+| `site-header.tsx` | Client | Marketing nav — SBIR Engine, Features, Pricing, About + Resources dropdown |
+| `site-footer.tsx` | Server | Footer with Product/Company/Resources links, mini CTA, trust badges |
+| `page-sections.tsx` | Client | Reusable blocks: Section, SectionHeader, FeatureCard, StatHighlight, CtaSection, LogoCloud, TestimonialCard, PricingCard |
+| `consent-gate.tsx` | Client | Blocking modal for legal consent (terms, privacy, AI, authority) |
+| `notification-center.tsx` | Client | Bell icon with unread count, polls every 60s |
+| `proposal/section-editor.tsx` | Client | Tiptap rich text editor with auto-save, word count, status badges |
+| `proposal/dissector-view.tsx` | Client | Drag-and-drop (dnd-kit) library-to-proposal section mapping |
 
-    subgraph OPP_EVENTS["opportunity_events"]
-        direction TB
-        E_NEW["ingest.new"]
-        E_UPD["ingest.updated"]
-        E_SCORED["scoring.scored"]
-        E_LLM["scoring.llm_adjusted"]
-        E_RESCORE["scoring.rescored"]
-        E_DRIVE["drive.archived"]
-    end
+### 2.4 Key Dependencies
 
-    subgraph CUST_EVENTS["customer_events"]
-        direction TB
-        E_PRESENTED["finder.opp_presented"]
-        E_NUDGE["reminder.nudge_sent"]
-        E_AMEND["reminder.amendment_alert"]
-        E_LOGIN["account.login"]
-        E_TENANT["account.tenant_created"]
-        E_PROFILE["account.profile_updated"]
-        E_USER["account.user_added"]
-        E_PIN["opportunity.pinned"]
-        E_STATUS["opportunity.status_changed"]
-    end
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `next` | 15.5.14 | App Router framework |
+| `react` / `react-dom` | 19.2.4 | UI |
+| `next-auth` | 5.0.0-beta.30 | Authentication |
+| `postgres` (postgres.js) | 3.4.3 | Primary DB client (camelCase transform) |
+| `pg` (node-postgres) | 8.11.3 | Auth.js adapter pool |
+| `@tiptap/*` | 3.20.6 | Rich text editing |
+| `@dnd-kit/*` | 6.3/10.0 | Drag & drop |
+| `recharts` | 2.15.4 | Dashboard charts |
+| `googleapis` | 171.4.0 | Google Drive integration |
+| `lucide-react` | 0.577.0 | Icons |
 
-    subgraph SCORING["Scoring"]
-        SCORE["ScoringEngine<br/><small>NAICS 0-25<br/>Keyword 0-25<br/>Set-aside 0-15<br/>Agency 0-15<br/>Type 0-10<br/>Timeline 0-10<br/>LLM -20 to +20</small>"]
-    end
+### 2.5 Styling
 
-    subgraph REACT["Downstream Workers"]
-        FINDER["FinderOppIngestWorker"]
-        DRIVE_W["FinderDriveArchiveWorker"]
-        DOC_W["DocumentFetcherWorker"]
-        REMIND_D["ReminderDeadlineWorker"]
-        REMIND_A["ReminderAmendmentWorker"]
-        EMAIL_T["EmailTriggerWorker"]
-    end
-
-    subgraph AUTOMATION["Automation Engine"]
-        RULES["12 Rules<br/><small>Condition matching<br/>Cooldown + rate limit</small>"]
-        ACT_EMIT["emit_event"]
-        ACT_NOTIF["queue_notification"]
-        ACT_JOB["queue_job"]
-        ACT_LOG["log_only"]
-    end
-
-    subgraph DELIVERY["Delivery"]
-        NOTIF_Q["notifications_queue"]
-        GMAIL["Gmail API<br/><small>admin@rfppipeline.com</small>"]
-        JOB_Q["pipeline_jobs"]
-    end
-
-    SAM --> SAM_ING
-
-    SAM_ING -->|"new opp"| E_NEW
-    SAM_ING -->|"changed opp"| E_UPD
-
-    E_NEW --> FINDER
-    E_NEW --> DRIVE_W
-    E_UPD --> FINDER
-    E_UPD --> REMIND_A
-
-    FINDER -->|"new"| E_PRESENTED
-    FINDER -->|"updated"| E_RESCORE
-
-    DRIVE_W --> E_DRIVE
-
-    SCORE --> E_SCORED
-    SCORE -->|"LLM adjusted"| E_LLM
-
-    REMIND_D --> E_NUDGE
-    REMIND_A --> E_AMEND
-
-    E_NUDGE --> EMAIL_T
-    E_AMEND --> EMAIL_T
-    EMAIL_T --> NOTIF_Q
-
-    %% Automation
-    E_NEW --> RULES
-    E_SCORED --> RULES
-    E_LLM --> RULES
-    E_DRIVE --> RULES
-    E_LOGIN --> RULES
-    E_TENANT --> RULES
-    E_PROFILE --> RULES
-    E_USER --> RULES
-    E_NUDGE --> RULES
-    E_AMEND --> RULES
-
-    RULES --> ACT_EMIT
-    RULES --> ACT_NOTIF
-    RULES --> ACT_JOB
-    RULES --> ACT_LOG
-
-    ACT_NOTIF --> NOTIF_Q
-    ACT_JOB --> JOB_Q
-    ACT_EMIT --> CUST_EVENTS
-
-    NOTIF_Q --> GMAIL
-    JOB_Q -->|"re-score"| SCORE
-
-    E_PIN --> DOC_W
-
-    classDef event fill:#ede9fe,stroke:#7c3aed,color:#5b21b6
-    classDef action fill:#fef3c7,stroke:#d97706,color:#92400e
-    classDef delivery fill:#dcfce7,stroke:#16a34a,color:#166534
-
-    class E_NEW,E_UPD,E_SCORED,E_LLM,E_RESCORE,E_DRIVE event
-    class E_PRESENTED,E_NUDGE,E_AMEND,E_LOGIN,E_TENANT,E_PROFILE,E_USER,E_PIN,E_STATUS event
-    class ACT_EMIT,ACT_NOTIF,ACT_JOB,ACT_LOG action
-    class NOTIF_Q,GMAIL,JOB_Q delivery
-```
+- **Tailwind CSS 3.4** with custom `brand` (blue), `navy` (dark blue), `surface` (gray), `accent` color scales
+- **11 custom animations** (fade-in, slide-up, shimmer, gradient-x, particle-float, etc.)
+- **Custom shadows** (glow, card, elevated) and background patterns (hero-mesh, grid, dot)
+- **Font:** Inter via `next/font/google`
 
 ---
 
-## Database Schema — Entity Relationships
+## 3. Pipeline Architecture
 
-```mermaid
-erDiagram
-    users {
-        text id PK
-        text email UK
-        text role "master_admin | tenant_admin | tenant_user"
-        uuid tenant_id FK
-        text password_hash
-        boolean temp_password
-        boolean is_active
-    }
+### 3.1 How It Runs
 
-    tenants {
-        uuid id PK
-        text slug UK
-        text name
-        text plan "starter | professional | enterprise"
-        text status "active | trial | suspended | churned"
-        text product_tier "finder | reminder | binder | grinder"
-        int max_active_opps
-        text uei_number
-        text cage_code
-        jsonb features
-    }
+The pipeline is a **long-running async Python process** with two entry points:
 
-    tenant_profiles {
-        uuid id PK
-        uuid tenant_id FK "UNIQUE"
-        text_arr primary_naics
-        text_arr secondary_naics
-        jsonb keyword_domains
-        jsonb agency_priorities
-        boolean is_small_business
-        boolean is_sdvosb
-        boolean is_wosb
-        boolean is_hubzone
-        boolean is_8a
-        int min_surface_score
-        int high_priority_score
-    }
+1. **`main.py`** — Cron ticker + job dequeue loop
+   - Reads `pipeline_schedules` every 60s, inserts due `pipeline_jobs`
+   - Dequeues jobs via atomic `dequeue_job()` Postgres function
+   - Listens on Postgres `NOTIFY pipeline_worker` for immediate dispatch
 
-    opportunities {
-        uuid id PK
-        text source "sam_gov"
-        text source_id
-        text title
-        text description
-        text agency
-        text agency_code
-        text_arr naics_codes
-        text set_aside_type
-        text opportunity_type
-        timestamptz posted_date
-        timestamptz close_date
-        text solicitation_number
-        text content_hash
-        text status
-        jsonb document_urls
-        jsonb raw_data
-    }
+2. **`workers/runner.py`** — Event-driven worker process
+   - Listens on `opportunity_events` and `customer_events` NOTIFY channels
+   - Dispatches to registered `BaseEventWorker` subclasses by namespace
 
-    tenant_opportunities {
-        uuid id PK
-        uuid tenant_id FK
-        uuid opportunity_id FK
-        numeric total_score "0-100"
-        numeric naics_score "0-25"
-        numeric keyword_score "0-25"
-        numeric set_aside_score "0-15"
-        numeric agency_score "0-15"
-        numeric type_score "0-10"
-        numeric timeline_score "0-10"
-        numeric llm_adjustment "-20 to +20"
-        text pursuit_status "unreviewed | pursuing | monitoring | passed"
-        text pursuit_recommendation "pursue | monitor | pass"
-        text priority_tier "GENERATED: high | medium | low"
-    }
+### 3.2 Data Ingesters
 
-    documents {
-        uuid id PK
-        uuid opportunity_id FK
-        text filename
-        text original_url
-        text local_path
-        text file_hash
-        text download_status "pending | downloaded | error"
-    }
+| Ingester | Source | Auth | Schedule | Coverage |
+|----------|--------|------|----------|----------|
+| `SamGovIngester` | SAM.gov Opportunities API v2 | API key | Daily 5 AM UTC | DoD SBIR/STTR, BAAs, OTAs, contracts |
+| `SbirGovSolicitationIngester` | SBIR.gov API | None | Daily 6 AM UTC | All SBIR/STTR solicitations per-topic |
+| `SbirGovAwardIngester` | SBIR.gov API | None | Daily 6:30 AM UTC | Historical award data for competitive intel |
+| `SbirGovCompanyIngester` | SBIR.gov API | None | Daily 7 AM UTC | SBIR company profiles for teaming |
+| `GrantsGovIngester` | Grants.gov REST API | None | Daily 6 AM UTC | HHS/NIH, DOE, NSF, USDA, NASA, DOC grants |
 
-    opportunity_events {
-        uuid id PK
-        uuid opportunity_id FK
-        text event_type "ingest._star_ | scoring._star_ | drive._star_"
-        text source
-        text field_changed
-        uuid correlation_id
-        jsonb metadata "actor + trigger + refs + payload"
-        boolean processed
-    }
+All ingesters use **SHA-256 content hashing** (16 chars) for change detection and deduplication.
 
-    customer_events {
-        uuid id PK
-        uuid tenant_id FK
-        text user_id FK
-        text event_type "account._star_ | finder._star_ | reminder._star_"
-        uuid opportunity_id
-        text entity_type
-        uuid correlation_id
-        jsonb metadata "actor + trigger + refs + payload"
-        boolean processed
-    }
+### 3.3 Scoring Engine
 
-    content_events {
-        uuid id PK
-        text page_key
-        text event_type "content._star_"
-        text user_id
-        jsonb content_snapshot
-        text diff_summary
-        uuid correlation_id
-        jsonb metadata
-    }
+Scores every active opportunity against every active tenant profile. **100-point base + LLM adjustment:**
 
-    automation_rules {
-        uuid id PK
-        text name UK
-        text trigger_bus
-        text_arr trigger_events
-        jsonb conditions
-        text action_type "emit_event | queue_notification | queue_job | log_only"
-        jsonb action_config
-        boolean enabled
-        int cooldown_seconds
-        int max_fires_per_hour
-    }
+| Component | Max | Logic |
+|-----------|-----|-------|
+| Technology/Topic match | 30 | research_areas + technology_focus vs opp content |
+| NAICS match | 15 | Primary NAICS = 15, secondary = 10 |
+| Agency alignment | 15 | target_agencies + past SBIR award history |
+| Program type fit | 15 | SBIR/STTR = 12-15, BAA/OTA = 8, challenge = 5 |
+| Set-aside eligibility | 10 | Exact match (SDVOSB, WOSB, HUBZone, 8a) |
+| Timeline urgency | 10 | <=7 days = 10, <=14 = 7, <=30 = 4 |
+| TRL alignment | 5 | Tenant TRL vs expected for program phase |
+| LLM adjustment | +/-15 | Claude analysis for scores >= 50 |
 
-    automation_log {
-        uuid id PK
-        uuid rule_id FK
-        uuid trigger_event_id
-        text trigger_event_type
-        boolean fired
-        text skip_reason
-        jsonb action_result
-        jsonb event_metadata
-    }
+Also scores **SpotLight buckets** (saved searches per tenant) via the `spotlight_scores` table.
 
-    pipeline_jobs {
-        uuid id PK
-        text source
-        text run_type "full | incremental | score | notify"
-        text status "pending | running | completed | failed"
-        text triggered_by
-        jsonb parameters
-        jsonb result
-    }
+### 3.4 Event-Driven Workers
 
-    pipeline_schedules {
-        uuid id PK
-        text source UK
-        text cron_expression
-        boolean enabled
-        timestamptz next_run_at
-    }
+| Namespace | Worker | Trigger | Action |
+|-----------|--------|---------|--------|
+| `finder.ingest` | FinderOppIngestWorker | ingest.new/updated | Emit customer events for scored tenants |
+| `finder.drive_archive` | FinderDriveArchiveWorker | ingest.new | Queue Drive sync for new opps |
+| `finder.document_fetch` | DocumentFetcherWorker | ingest.document_added | Download pending documents |
+| `reminder.deadline` | ReminderDeadlineWorker | deadline_acknowledged | 1/3/7 day deadline nudges |
+| `reminder.amendment` | ReminderAmendmentWorker | ingest.updated | Alert tenants on amended opps |
+| `email.trigger` | EmailTriggerWorker | reminder events | Immediate email delivery |
+| `grinder.upload` | GrinderUploadWorker | library.upload_ingested | Decompose docs into library units via Claude |
+| `embedder` | EmbedderEventWorker | library.atoms_extracted | Generate OpenAI embeddings |
+| `rfp.parser` | RfpParserWorker | rfp.parsed | Extract structured RFP templates via Claude |
+| `automation.*` | AutomationWorkers | 20+ event types | Evaluate rules, trigger actions |
 
-    notifications_queue {
-        uuid id PK
-        uuid tenant_id FK
-        text notification_type
-        text subject
-        text status "pending | sent | failed"
-        int priority "1 urgent - 5 low"
-        int attempt
-    }
+### 3.5 Automation Engine
 
-    site_content {
-        uuid id PK
-        text page_key UK
-        jsonb draft_content
-        jsonb published_content
-        jsonb seo_metadata
-        boolean auto_publish
-    }
+- 40+ seeded rules in `automation_rules` table (60s cache)
+- Condition operators: `$gte`, `$lte`, `$gt`, `$lt`, `$eq`, `$ne`, `$contains_any`, `$first_occurrence`
+- Actions: `emit_event`, `queue_notification`, `queue_job`, `log_only`
+- Supports cooldown and rate limiting per rule
 
-    drive_files {
-        text id PK
-        text gid UK "Google Drive file ID"
-        text name
-        text type "FOLDER | DOCUMENT | SPREADSHEET"
-        uuid tenant_id FK
-        text parent_gid
-    }
+### 3.6 Tests
 
-    audit_log {
-        uuid id PK
-        text user_id FK
-        uuid tenant_id FK
-        text action
-        text entity_type
-        jsonb old_value
-        jsonb new_value
-    }
-
-    users ||--o{ tenants : "belongs_to"
-    tenants ||--|| tenant_profiles : "has_one"
-    tenants ||--o{ tenant_opportunities : "scored_opps"
-    tenants ||--o{ customer_events : "activity"
-    tenants ||--o{ notifications_queue : "emails"
-    tenants ||--o{ drive_files : "files"
-    tenants ||--o{ audit_log : "audit"
-    opportunities ||--o{ tenant_opportunities : "scored_for"
-    opportunities ||--o{ opportunity_events : "lifecycle"
-    opportunities ||--o{ documents : "attachments"
-    automation_rules ||--o{ automation_log : "evaluations"
-    pipeline_schedules ||--o{ pipeline_jobs : "triggers"
-```
+**153 tests across 4 files** — all pure-logic unit tests (no DB/HTTP mocking):
+- `test_scoring.py` (~60) — All 7 scoring dimensions
+- `test_sam_gov.py` (~20) — Date parsing, stub validation, content hashing
+- `test_grants_gov.py` (~25) — Date/program type parsing, agency config
+- `test_automation.py` (~48) — All condition operators, rule matching
 
 ---
 
-## Deployment Architecture
+## 4. Database Schema
 
-```mermaid
-graph TB
-    subgraph DOCKER["Docker Compose / Railway"]
-        subgraph FE["Frontend Container"]
-            NEXT["Next.js 15<br/><small>Node 20 Alpine<br/>Standalone output<br/>Port 3000</small>"]
-        end
+### 4.1 Overview
 
-        subgraph PY["Pipeline Container"]
-            direction TB
-            PY_MAIN["main.py<br/><small>Cron ticker + Job executor<br/>LISTEN pipeline_worker</small>"]
-            PY_RUNNER["runner.py<br/><small>Event workers (8 workers)<br/>LISTEN opportunity_events<br/>LISTEN customer_events</small>"]
-        end
+- **34 migrations** (000a-000e baseline + 023-034 feature migrations)
+- **52+ tables** with comprehensive FK relationships
+- **pgvector** for semantic search on library content (1536-dim, HNSW index)
+- **Full-text search** GIN index on opportunities
+- **GIN indexes** on NAICS arrays and JSONB columns
+- **Partial indexes** for hot queries (active opps, pending jobs, stale runs)
 
-        subgraph PG["Database Container"]
-            POSTGRES["PostgreSQL 16 + pgvector<br/><small>17 migrations<br/>~25 tables<br/>3 event buses with NOTIFY<br/>4 dequeue functions</small>"]
-        end
-    end
+### 4.2 Core Table Groups
 
-    subgraph STORAGE["Persistent Storage"]
-        VOL["/data volume<br/><small>Downloaded documents<br/>ISO week folder structure<br/>/data/opportunities/YYYY-WNN/</small>"]
-    end
+**Multi-Tenancy** — `tenants`, `tenant_profiles`, `team_invitations`, `users`
 
-    subgraph ENV["Environment"]
-        direction LR
-        DB_URL["DATABASE_URL"]
-        AUTH["AUTH_SECRET<br/>AUTH_URL"]
-        KEYS["SAM_GOV_API_KEY<br/>ANTHROPIC_API_KEY<br/>API_KEY_ENCRYPTION_SECRET"]
-        GOOGLE["GOOGLE_SERVICE_ACCOUNT_KEY<br/>GOOGLE_DELEGATED_ADMIN"]
-    end
+**Opportunities** — `opportunities`, `tenant_opportunities` (per-tenant scoring), `tenant_actions`, `documents`, `amendments`, `spotlight_scores`
 
-    NEXT --> POSTGRES
-    PY_MAIN --> POSTGRES
-    PY_RUNNER --> POSTGRES
-    PY_MAIN --> VOL
-    PY_RUNNER --> VOL
+**SBIR Intelligence** — `sbir_awards`, `sbir_companies`
 
-    ENV -.-> NEXT
-    ENV -.-> PY_MAIN
-    ENV -.-> PY_RUNNER
-```
+**Proposal System (14 tables)** — `proposals` (Color Team stages: outline → pink → red → gold → submitted), `proposal_sections`, `proposal_section_history`, `proposal_section_units`, `proposal_personnel`, `proposal_exports`, `proposal_workspace_files`, `proposal_collaborators`, `proposal_stage_history`, `proposal_changes`, `proposal_reviews`, `proposal_comments`, `proposal_checklists`, `proposal_activity`, `proposal_notifications`, `proposal_purchases`
+
+**Content Library** — `library_units` (vector embeddings), `library_unit_images`, `library_harvest_log`, `library_atom_outcomes`
+
+**Knowledge Base** — `teaming_partners`, `past_performance`, `capabilities`, `key_personnel`, `boilerplate_sections`, `focus_areas` (SpotLight buckets)
+
+**Templates** — `rfp_template_library`, `rfp_templates`, `master_templates` (6 agency templates seeded: DoD, NSF, NIH, DOE, NASA)
+
+**Event Bus** — `opportunity_events`, `customer_events`, `content_events`
+
+**Control Plane** — `system_config` (50+ keys), `api_key_registry` (AES-256-GCM), `pipeline_schedules` (15+), `pipeline_jobs`, `pipeline_runs`, `rate_limit_state`, `source_health`, `automation_rules` (40+), `automation_log`
+
+**CMS & Legal** — `site_content`, `consent_records`, `legal_document_versions`
 
 ---
 
-## Automation Rule Evaluation Flow
+## 5. Environment Variables
 
-```mermaid
-flowchart TD
-    EVENT["Event fires<br/><small>INSERT + pg_notify</small>"]
-    DEQUEUE["Worker dequeues event<br/><small>FOR UPDATE SKIP LOCKED</small>"]
-    LOAD["Load rules from DB<br/><small>60s cache TTL</small>"]
-    MATCH{"trigger_bus<br/>matches?"}
-    TYPE{"event_type in<br/>trigger_events?"}
-    COND{"Conditions<br/>pass?"}
-    FIRST{"$first_occurrence<br/>check?"}
-    COOL{"Cooldown<br/>elapsed?"}
-    RATE{"Rate limit<br/>ok?"}
-    EXEC["Execute Action"]
-    LOG_FIRE["Log: FIRED<br/><small>→ automation_log</small>"]
-    LOG_SKIP["Log: SKIPPED<br/><small>+ skip_reason</small>"]
-    NEXT["Next rule"]
-
-    EVENT --> DEQUEUE --> LOAD --> MATCH
-    MATCH -->|No| NEXT
-    MATCH -->|Yes| TYPE
-    TYPE -->|No| NEXT
-    TYPE -->|Yes| COND
-    COND -->|Fail| LOG_SKIP --> NEXT
-    COND -->|Pass| FIRST
-    FIRST -->|Already fired| LOG_SKIP
-    FIRST -->|OK| COOL
-    COOL -->|Too soon| LOG_SKIP
-    COOL -->|OK| RATE
-    RATE -->|Over limit| LOG_SKIP
-    RATE -->|OK| EXEC --> LOG_FIRE --> NEXT
-```
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | Yes | JWT signing secret |
+| `NEXTAUTH_URL` | Yes | App base URL |
+| `SAM_GOV_API_KEY` | Yes | SAM.gov API (fallback; prefers encrypted DB value) |
+| `ANTHROPIC_API_KEY` | Yes | Claude API for scoring + grinder |
+| `API_KEY_ENCRYPTION_SECRET` | Yes | AES-256-GCM master key for DB-stored keys |
+| `OPENAI_API_KEY` | Yes | OpenAI embeddings for library |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | For email | Base64 Google service account JSON |
+| `GOOGLE_DELEGATED_ADMIN` | For email | Send-as email address |
+| `STORAGE_ROOT` | No | Local file storage (default: `/data`) |
+| `CLAUDE_MODEL` | No | Scoring model (default: `claude-sonnet-4-20250514`) |
+| `USE_STUB_DATA` | No | Enable stub SAM.gov data for dev |
 
 ---
 
-## Tenant Lifecycle — End-to-End Sequence
+## 6. Known Issues & Technical Debt
 
-```mermaid
-sequenceDiagram
-    participant Admin as Master Admin
-    participant API as Next.js API
-    participant DB as PostgreSQL
-    participant Auto as Automation Engine
-    participant Gmail as Gmail API
-    participant SAM as SAM.gov
-    participant Score as Scoring Engine
-    participant Portal as Tenant Portal
+### Database
+1. **Missing `display_name` column on `source_health`** — Migrations 033/034 insert `display_name` but no migration adds the column
+2. **Wrong column names in migration 027** — INSERT into `pipeline_schedules` uses non-existent columns
+3. **Undefined `current_page_count` in view** — Migration 025 references column that doesn't exist
+4. **Migration 028 not run in production** — SpotLight scoring gracefully skips but feature is disabled
 
-    Note over Admin,Portal: 1. ONBOARDING
-    Admin->>API: POST /api/tenants
-    API->>DB: INSERT tenants + tenant_profiles
-    API->>DB: INSERT customer_events (account.tenant_created)
-    DB-->>Auto: NOTIFY customer_events
-    Auto->>Auto: Rule: tenant_created_onboarding
-    Auto->>DB: INSERT notifications_queue
-    DB-->>Gmail: Send onboarding email
+### Pipeline
+5. **Single DB connection** — `main.py` and event workers use one `asyncpg.Connection` (not a pool)
+6. **No integration tests** — All 153 tests are pure-logic unit tests
+7. **Hardcoded model in Grinder** — Uses `claude-haiku-4-5-20251001` while scoring uses configurable `CLAUDE_MODEL`
+8. **Large inline stub data** — 9 SAM.gov stubs embedded in ingester could be externalized
 
-    Note over Admin,Portal: 2. PROFILE SETUP
-    Admin->>API: PATCH /api/portal/[slug]/profile
-    API->>DB: UPSERT tenant_profiles (NAICS, keywords, set-asides)
-    API->>DB: INSERT customer_events (account.profile_updated)
-    DB-->>Auto: NOTIFY customer_events
-    Auto->>Auto: Rule: profile_update_rescore
-    Auto->>DB: INSERT pipeline_jobs (scoring)
-    DB-->>Score: NOTIFY pipeline_worker
-
-    Note over Admin,Portal: 3. SCORING RUN
-    Score->>DB: SELECT opportunities WHERE status = active
-    Score->>DB: UPSERT tenant_opportunities (6 dimensions + LLM)
-    Score->>DB: INSERT opportunity_events (scoring.scored)
-    DB-->>Auto: NOTIFY opportunity_events
-    Auto->>Auto: Rule: high_score_notify (score >= 75)
-    Auto->>DB: INSERT customer_events (finder.high_score_alert)
-
-    Note over Admin,Portal: 4. DAILY INGESTION
-    SAM->>Score: Cron: sam_gov/incremental
-    Score->>DB: INSERT opportunities (new + updated)
-    Score->>DB: INSERT opportunity_events (ingest.new)
-    DB-->>Auto: NOTIFY opportunity_events
-    Note right of Auto: FinderOppIngestWorker
-    Auto->>DB: INSERT customer_events (finder.opp_presented)
-
-    Note over Admin,Portal: 5. DEADLINE REMINDERS
-    Score->>DB: Check close_dates (7d, 3d, 1d)
-    Score->>DB: INSERT customer_events (reminder.nudge_sent)
-    Score->>DB: INSERT notifications_queue (priority 1-5)
-    DB-->>Gmail: EmailTriggerWorker → immediate send
-
-    Note over Admin,Portal: 6. TENANT LOGIN
-    Portal->>API: POST /api/auth/callback/credentials
-    API->>DB: Verify password + last_login_at
-    API->>DB: INSERT customer_events (account.login)
-    DB-->>Auto: NOTIFY customer_events
-    Auto->>Auto: first_login_welcome (once) + login_activity_log (always)
-    Portal->>API: GET /api/portal/[slug]/pipeline
-    API->>DB: SELECT tenant_opportunities ORDER BY total_score DESC
-    API-->>Portal: Scored opportunities + recommendations
-```
+### Frontend
+9. **Unused dependency** — `@tanstack/react-query` in package.json but never imported
+10. **No `loading.tsx` boundaries** — No Suspense loading states for server component navigation
+11. **Duplicate DB pool** — `lib/auth.ts` and `lib/db.ts` both create connection pools (10 + 5 = 15 max)
+12. **`db.ts` helpers lack internal try-catch** — `getTenantBySlug`, `verifyTenantAccess` let errors propagate
 
 ---
 
-## Scoring Breakdown
+## 7. Immediate Path Forward
 
-```mermaid
-pie title "Opportunity Score (100 points)"
-    "NAICS Match" : 25
-    "Keyword Match" : 25
-    "Set-Aside Match" : 15
-    "Agency Priority" : 15
-    "Opportunity Type" : 10
-    "Timeline Urgency" : 10
-```
+### P0: Production Readiness (blocking launch)
 
-LLM adjustment: -20 to +20 applied on top for opportunities scoring above 50.
+- [ ] **Run migration 028** in production — Enables SpotLight scoring, team invitations, seat limits
+- [ ] **Fix migration column mismatches** (#1, #2, #3) — Create migration 035
+- [ ] **Verify pipeline cron runs** — Confirm all 5 ingesters succeed and events flow after bug fixes
+- [ ] **Configure production API keys** — SAM.gov, Anthropic, OpenAI, Google service account
 
----
+### P1: Core Product (needed for $199/mo value)
 
-## Component Inventory
+- [ ] **Portal onboarding flow** — Guided profile setup (NAICS, research areas, target agencies, TRL)
+- [ ] **SpotLight creation UX** — Create/manage saved search buckets from portal
+- [ ] **Email notifications** — Deadline nudges, new high-match alerts, weekly digest
+- [ ] **Stripe integration** — $199/mo subscription + per-proposal purchases ($999/$2,500)
+- [ ] **Waitlist to trial conversion** — Self-service signup with 14-day trial
 
-### Frontend — 22 Pages
+### P2: Proposal System (needed for $999/$2,500 builds)
 
-| Route | Access | Description |
-|-------|--------|-------------|
-| `/` | Public | Homepage (CMS-driven) |
-| `/about` | Public | About page |
-| `/team` | Public | Team page |
-| `/get-started` | Public | Pricing + checkout modal |
-| `/customers` | Public | Customer stories |
-| `/tips` | Public | Tips & resources |
-| `/announcements` | Public | Platform announcements |
-| `/login` | Public | NextAuth.js credentials + magic link |
-| `/dashboard` | Auth | Redirect hub |
-| `/admin/dashboard` | master_admin | System metrics |
-| `/admin/tenants` | master_admin | Tenant management |
-| `/admin/tenants/[id]` | master_admin | Tenant detail + users |
-| `/admin/pipeline` | master_admin | Pipeline jobs + schedules |
-| `/admin/sources` | master_admin | Data source health |
-| `/admin/events` | master_admin | 3-stream event viewer |
-| `/admin/automation` | master_admin | Automation rules + exec log |
-| `/admin/content` | master_admin | CMS editor |
-| `/portal/[slug]/dashboard` | tenant | Tenant dashboard |
-| `/portal/[slug]/pipeline` | tenant | Scored opportunities |
-| `/portal/[slug]/documents` | tenant | Document library |
-| `/portal/[slug]/profile` | tenant_admin | Search parameter config |
+- [ ] **Proposal creation flow** — Opportunity → template → proposal with section scaffolding
+- [ ] **Library atomization** — Upload docs → Claude decomposition → embeddings → searchable library
+- [ ] **Template delivery** — Admin creates from master_templates, delivers to tenant
+- [ ] **Color Team review** — Stage gates (pink → red → gold → submitted) with checklists
 
-### API — 12 Route Groups
+### P3: Growth & Polish
 
-| Route | Methods | Purpose |
-|-------|---------|---------|
-| `/api/auth/*` | GET, POST | NextAuth.js handlers |
-| `/api/tenants` | GET, POST | Tenant CRUD |
-| `/api/tenants/[id]` | GET, PATCH | Tenant detail + update |
-| `/api/tenants/[id]/users` | GET, POST | User management |
-| `/api/opportunities` | GET | Opportunity listing |
-| `/api/opportunities/[id]/actions` | POST | Pin, status change |
-| `/api/content` | GET, POST, PATCH, DELETE | CMS operations |
-| `/api/events` | GET | Event streams (3 tabs) |
-| `/api/automation` | GET, PATCH | Rules + log + toggle |
-| `/api/portal/[slug]/profile` | GET, PATCH | Tenant profile |
-| `/api/portal/[slug]/drive` | POST | Drive provisioning |
-| `/api/pipeline` | GET, POST | Jobs + schedules |
+- [ ] **`loading.tsx` boundaries** — Suspense states for all server routes
+- [ ] **Adopt or remove TanStack Query** — Currently unused
+- [ ] **Connection pooling** — Move pipeline to asyncpg Pool
+- [ ] **Integration tests** — DB-backed tests for ingesters, scoring, workers
+- [ ] **SEO** — Happenings content, sitemap.xml, structured data
+- [ ] **Analytics** — Conversion tracking on marketing pages
 
-### Python Pipeline — 20 Files, 8 Event Workers
+### P4: Competitive Moat
 
-| Worker | Bus | Events | Action |
-|--------|-----|--------|--------|
-| FinderOppIngestWorker | opportunity | ingest.new, ingest.updated | Present opps to tenants |
-| FinderDriveArchiveWorker | opportunity | ingest.new | Queue Drive sync |
-| DocumentFetcherWorker | opportunity | ingest.document_added | Download attachments |
-| ReminderDeadlineWorker | customer | (scheduled) | 7d/3d/1d deadline nudges |
-| ReminderAmendmentWorker | opportunity | ingest.updated | Alert tenants of changes |
-| EmailTriggerWorker | customer | reminder.* | Flush notification queue |
-| AutomationCustomerWorker | customer | all account/finder/reminder/* | Rule engine evaluation |
-| AutomationOpportunityWorker | opportunity | all ingest/scoring/drive/* | Rule engine evaluation |
-
-### Database — 17 Migrations, ~25 Tables
-
-| Migration | Tables Added |
-|-----------|-------------|
-| 001 | users, tenants, tenant_profiles, accounts, sessions, verification_tokens, download_links, tenant_uploads, audit_log |
-| 002 | system_config, api_key_registry, pipeline_schedules, rate_limit_state, pipeline_jobs, pipeline_runs, source_health, notifications_queue |
-| 003 | opportunities, tenant_opportunities, documents, amendments |
-| 006 | drive_files, email_log, integration_executions |
-| 007 | opportunity_events, customer_events + dequeue functions + NOTIFY triggers |
-| 012 | site_content, content_events |
-| 016 | correlation_id columns + enhanced NOTIFY payloads |
-| 017 | automation_rules, automation_log + 12 seeded rules |
-
-### External Integrations
-
-| Service | Purpose | Auth |
-|---------|---------|------|
-| SAM.gov API | Federal opportunity data | API key |
-| Anthropic Claude | LLM scoring analysis | API key (AES-256-GCM encrypted in DB) |
-| Gmail API | Notification delivery | Service account + domain-wide delegation |
-| Google Drive API | Opportunity document archival | Service account |
-
----
-
-## V1 Status Assessment
-
-### Complete and Operational
-
-- Multi-tenant auth with role-based access (master_admin, tenant_admin, tenant_user)
-- Tenant isolation at middleware, API, and SQL levels
-- SAM.gov ingestion with 50-field extraction and content hash dedup
-- 6-dimension scoring engine with LLM adjustment
-- 3 event buses with LISTEN/NOTIFY, standardized metadata, correlation chains
-- 8 event-driven workers with atomic dequeue (FOR UPDATE SKIP LOCKED)
-- Automation framework with 12 rules, condition engine, 4 action types
-- Gmail notification delivery with HTML templates
-- CMS with draft/publish/rollback and deep merge
-- Admin dashboard: tenants, pipeline, sources, events, automation, content
-- Tenant portal: dashboard, pipeline viewer, documents, profile editor
-- 7 public marketing pages (CMS-driven content)
-- Error boundaries (global + page-level)
-- Audit logging across all mutation endpoints
-- Docker Compose + standalone Dockerfiles for Railway deployment
-
-### Needed for V1 Launch
-
-- End-to-end smoke test with live SAM.gov API key
-- Gmail service account configuration + domain verification
-- Google Drive service account + shared drive setup
-- Production DATABASE_URL + connection pooling (PgBouncer)
-- Rate limiting on public API endpoints
-- HTTPS/TLS termination (Railway handles this)
-- Monitoring/alerting on source_health + pipeline_jobs failures
-- Backup strategy for PostgreSQL
+- [ ] **Win/loss feedback loop** — Library atom outcomes (schema ready in migration 027)
+- [ ] **Semantic search** — Vector similarity for library (pgvector + HNSW ready)
+- [ ] **Multi-tenant benchmarking** — Aggregate win rates by agency/program
+- [ ] **STTR partner matching** — sbir_companies data for teaming suggestions
