@@ -30,6 +30,19 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
     return NextResponse.next()
   }
 
+  // Public marketing pages — accessible without authentication
+  const publicPaths = [
+    '/', '/about', '/engine', '/features', '/pricing', '/get-started',
+    '/customers', '/team', '/happenings', '/tips', '/announcements',
+  ]
+  if (publicPaths.includes(pathname)) {
+    // If logged in and hitting /, redirect to their app home
+    if (pathname === '/' && session?.user) {
+      return NextResponse.redirect(new URL(getHomeUrl(session.user), req.url))
+    }
+    return NextResponse.next()
+  }
+
   if (pathname.startsWith('/login')) {
     // Already logged in → redirect to appropriate home
     if (session?.user) {
@@ -89,11 +102,6 @@ export default auth(async function middleware(req: NextRequest & { auth: any }) 
     response.headers.set('x-user-role', role)
     if (tenantId) response.headers.set('x-tenant-id', tenantId)
     return response
-  }
-
-  // ── Root redirect ──────────────────────────────────────────
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL(getHomeUrl(session.user), req.url))
   }
 
   return NextResponse.next()
