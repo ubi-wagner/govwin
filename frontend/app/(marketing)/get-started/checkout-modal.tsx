@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Modal } from '@/components/page-sections'
+import { getStoredVisitorId } from '@/components/analytics-tracker'
 
 /** Client wrapper: billing toggle + pricing cards + waitlist modal */
 export function InteractivePricingSection({
@@ -51,6 +52,7 @@ export function InteractivePricingSection({
           notes: notes.trim() || undefined,
           plan: selectedPlan,
           billingPeriod,
+          visitorId: getStoredVisitorId() ?? undefined,
         }),
       })
       if (!res.ok) {

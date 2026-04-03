@@ -15,6 +15,7 @@ interface WaitlistBody {
   notes?: string
   plan?: string
   billingPeriod?: string
+  visitorId?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
   const notes = body.notes?.trim() || null
   const plan = body.plan ?? null
   const billingPeriod = body.billingPeriod ?? null
+  const visitorId = body.visitorId?.trim() || null
 
   // Capture connection metadata
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
         notes TEXT,
         plan TEXT,
         billing_period TEXT,
+        visitor_id TEXT,
         ip_address TEXT,
         user_agent TEXT,
         referer TEXT,
@@ -80,14 +83,14 @@ export async function POST(request: NextRequest) {
     `
 
     // Upsert — if they re-submit, update their info
-    await sql`
+    const rows = await sql`
       INSERT INTO waitlist (
         email, full_name, phone, company, company_size, technology, notes,
-        plan, billing_period, ip_address, user_agent, referer, country, region, city
+        plan, billing_period, visitor_id, ip_address, user_agent, referer, country, region, city
       )
       VALUES (
         ${email}, ${fullName}, ${phone}, ${company}, ${companySize}, ${technology}, ${notes},
-        ${plan}, ${billingPeriod}, ${ipAddress}, ${userAgent}, ${referer}, ${country}, ${region}, ${city}
+        ${plan}, ${billingPeriod}, ${visitorId}, ${ipAddress}, ${userAgent}, ${referer}, ${country}, ${region}, ${city}
       )
       ON CONFLICT (email) DO UPDATE SET
         full_name = EXCLUDED.full_name,
@@ -98,13 +101,24 @@ export async function POST(request: NextRequest) {
         notes = EXCLUDED.notes,
         plan = EXCLUDED.plan,
         billing_period = EXCLUDED.billing_period,
+        visitor_id = COALESCE(EXCLUDED.visitor_id, waitlist.visitor_id),
         ip_address = EXCLUDED.ip_address,
         user_agent = EXCLUDED.user_agent,
         referer = EXCLUDED.referer,
         country = EXCLUDED.country,
         region = EXCLUDED.region,
         city = EXCLUDED.city
+      RETURNING id
     `
+
+    // Link visitor session to waitlist signup
+    if (visitorId && rows.length > 0) {
+      const waitlistId = (rows[0] as { id: number }).id
+      await sql`
+        UPDATE visitor_sessions SET waitlist_id = ${waitlistId}
+        WHERE visitor_id = ${visitorId}
+      `.catch(() => { /* table may not exist yet — non-critical */ })
+    }
 
     return NextResponse.json({ data: { success: true } })
   } catch (error: unknown) {
