@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { ContentPost, ContentReview, ContentCategory } from '@/types'
 import { CATEGORIES, CATEGORY_LABELS } from './constants'
 import { StatusBadge, ReviewActionBadge } from './status-badge'
@@ -11,6 +12,7 @@ interface PostDetailProps {
   editMode: boolean
   editForm: EditForm
   saving: boolean
+  actionInProgress: boolean
   onClose: () => void
   onStartEdit: (post: ContentPost) => void
   onCancelEdit: () => void
@@ -20,7 +22,7 @@ interface PostDetailProps {
 }
 
 export function PostDetail({
-  post, reviews, editMode, editForm, saving,
+  post, reviews, editMode, editForm, saving, actionInProgress,
   onClose, onStartEdit, onCancelEdit, onEditFormChange, onSave, onAction,
 }: PostDetailProps) {
   return (
@@ -44,6 +46,7 @@ export function PostDetail({
         <ActionBar
           post={post}
           editMode={editMode}
+          actionInProgress={actionInProgress}
           onStartEdit={() => onStartEdit(post)}
           onAction={onAction}
         />
@@ -68,52 +71,82 @@ export function PostDetail({
 }
 
 function ActionBar({
-  post, editMode, onStartEdit, onAction,
+  post, editMode, actionInProgress, onStartEdit, onAction,
 }: {
   post: ContentPost
   editMode: boolean
+  actionInProgress: boolean
   onStartEdit: () => void
   onAction: (action: string, postId: string, extra?: Record<string, unknown>) => void
 }) {
+  const [showRejectInput, setShowRejectInput] = useState(false)
+  const [rejectNotes, setRejectNotes] = useState('')
+
+  function handleReject() {
+    if (!rejectNotes.trim()) return
+    onAction('reject', post.id, { notes: rejectNotes })
+    setShowRejectInput(false)
+    setRejectNotes('')
+  }
+
   return (
     <div className="flex flex-wrap gap-2 mb-4 pb-4 border-b border-gray-100">
       {!editMode && (
-        <button onClick={onStartEdit} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
+        <button onClick={onStartEdit} disabled={actionInProgress} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 disabled:opacity-50">
           Edit
         </button>
       )}
       {post.status === 'draft' && (
-        <button onClick={() => onAction('submit_review', post.id)} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200">
-          Submit for Review
+        <button onClick={() => onAction('submit_review', post.id)} disabled={actionInProgress} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200 disabled:opacity-50">
+          {actionInProgress ? 'Submitting...' : 'Submit for Review'}
         </button>
       )}
       {post.status === 'in_review' && (
         <>
-          <button onClick={() => onAction('approve', post.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
-            Approve
+          <button onClick={() => onAction('approve', post.id)} disabled={actionInProgress} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+            {actionInProgress ? 'Approving...' : 'Approve'}
           </button>
-          <button onClick={() => onAction('reject', post.id, { notes: 'Rejected from detail view' })} className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-200">
-            Reject
-          </button>
+          {showRejectInput ? (
+            <div className="flex-1 flex gap-2">
+              <input
+                value={rejectNotes}
+                onChange={e => setRejectNotes(e.target.value)}
+                placeholder="Rejection reason (required)"
+                className="flex-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleReject()}
+              />
+              <button onClick={handleReject} disabled={!rejectNotes.trim() || actionInProgress} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                Reject
+              </button>
+              <button onClick={() => { setShowRejectInput(false); setRejectNotes('') }} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-200">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowRejectInput(true)} disabled={actionInProgress} className="rounded-lg bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-200 disabled:opacity-50">
+              Reject
+            </button>
+          )}
         </>
       )}
       {post.status === 'approved' && (
-        <button onClick={() => onAction('publish', post.id)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">
-          Publish
+        <button onClick={() => onAction('publish', post.id)} disabled={actionInProgress} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+          {actionInProgress ? 'Publishing...' : 'Publish'}
         </button>
       )}
       {post.status === 'published' && (
-        <button onClick={() => onAction('unpublish', post.id)} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200">
+        <button onClick={() => onAction('unpublish', post.id)} disabled={actionInProgress} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-200 disabled:opacity-50">
           Unpublish
         </button>
       )}
       {post.version > 1 && (
-        <button onClick={() => onAction('revert', post.id)} className="rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-200">
+        <button onClick={() => onAction('revert', post.id)} disabled={actionInProgress} className="rounded-lg bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-200 disabled:opacity-50">
           Revert
         </button>
       )}
       {!['published', 'archived'].includes(post.status) && (
-        <button onClick={() => onAction('archive', post.id)} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100">
+        <button onClick={() => onAction('archive', post.id)} disabled={actionInProgress} className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 disabled:opacity-50">
           Archive
         </button>
       )}

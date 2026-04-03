@@ -11,6 +11,7 @@ interface GenerationPanelProps {
   genModel: string
   genTemp: number
   generating: boolean
+  actionInProgress: boolean
   onPromptChange: (v: string) => void
   onCategoryChange: (v: ContentCategory) => void
   onModelChange: (v: string) => void
@@ -22,7 +23,7 @@ interface GenerationPanelProps {
 }
 
 export function GenerationPanel({
-  generations, genPrompt, genCategory, genModel, genTemp, generating,
+  generations, genPrompt, genCategory, genModel, genTemp, generating, actionInProgress,
   onPromptChange, onCategoryChange, onModelChange, onTempChange,
   onSubmit, onAccept, onReject, onRetry,
 }: GenerationPanelProps) {
@@ -58,7 +59,7 @@ export function GenerationPanel({
       ) : (
         <div className="space-y-3">
           {generations.map(g => (
-            <GenerationCard key={g.id} generation={g} onAccept={onAccept} onReject={onReject} onRetry={onRetry} />
+            <GenerationCard key={g.id} generation={g} actionInProgress={actionInProgress} onAccept={onAccept} onReject={onReject} onRetry={onRetry} />
           ))}
         </div>
       )}
@@ -67,9 +68,10 @@ export function GenerationPanel({
 }
 
 function GenerationCard({
-  generation: g, onAccept, onReject, onRetry,
+  generation: g, actionInProgress, onAccept, onReject, onRetry,
 }: {
   generation: ContentGeneration
+  actionInProgress: boolean
   onAccept: (id: string) => void
   onReject: (id: string) => void
   onRetry: (id: string) => void
@@ -85,17 +87,17 @@ function GenerationCard({
       {g.errorMessage && <p className="text-xs text-red-500 mt-1">{g.errorMessage}</p>}
       {g.status === 'completed' && (
         <div className="flex gap-2 mt-3">
-          <button onClick={() => onAccept(g.id)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
-            Accept → Draft
+          <button onClick={() => onAccept(g.id)} disabled={actionInProgress} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+            {actionInProgress ? 'Accepting...' : 'Accept → Draft'}
           </button>
-          <button onClick={() => onReject(g.id)} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-200">
+          <button onClick={() => onReject(g.id)} disabled={actionInProgress} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-200 disabled:opacity-50">
             Reject
           </button>
         </div>
       )}
       {g.status === 'failed' && (
-        <button onClick={() => onRetry(g.id)} className="mt-2 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200">
-          Retry
+        <button onClick={() => onRetry(g.id)} disabled={actionInProgress} className="mt-2 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200 disabled:opacity-50">
+          {actionInProgress ? 'Retrying...' : 'Retry'}
         </button>
       )}
     </div>

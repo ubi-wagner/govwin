@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth'
 import { sql } from '@/lib/db'
 import { emitContentEvent, userActor } from '@/lib/events'
 import type { ContentEventType } from '@/types'
-
 // ── Helpers ─────────────────────────────────────────────────────
 
 /** Generate a URL-safe slug from a title, with random suffix for uniqueness */
@@ -36,17 +35,22 @@ async function emitPipelineEvent(
   })
 }
 
-/** Create a content_reviews record */
-async function createReviewRecord(params: {
-  postId: string
-  action: string
-  reviewerId: string
-  notes?: string | null
-  titleSnapshot?: string | null
-  bodySnapshot?: string | null
-  version: number
-}) {
-  await sql`
+/** Create a content_reviews record — accepts transaction or top-level sql */
+async function createReviewRecord(
+  // postgres.js TransactionSql type omits call signatures; use any for tx parameter
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  querySql: any,
+  params: {
+    postId: string
+    action: string
+    reviewerId: string
+    notes?: string | null
+    titleSnapshot?: string | null
+    bodySnapshot?: string | null
+    version: number
+  },
+) {
+  await querySql`
     INSERT INTO content_reviews (post_id, action, reviewer_id, notes, title_snapshot, body_snapshot, version_at_review)
     VALUES (
       ${params.postId},
@@ -206,13 +210,13 @@ export async function POST(request: Request) {
         RETURNING *
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.created',
         userId,
         userEmail,
         `Draft post created: "${title}"`,
         { postId: rows[0].id, slug, category },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: rows[0] }, { status: 201 })
 
@@ -242,13 +246,13 @@ export async function POST(request: Request) {
         RETURNING *
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.generation.requested',
         userId,
         userEmail,
         `AI generation requested: model=${model}, category=${category}`,
         { generationId: rows[0].id, model, category },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: rows[0] }, { status: 201 })
 
@@ -303,13 +307,13 @@ export async function POST(request: Request) {
         WHERE id = ${generationId}
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.generation.accepted',
         userId,
         userEmail,
         `Generation accepted and draft post created: "${title}"`,
         { generationId, postId: post.id, slug },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: post }, { status: 201 })
 
@@ -338,13 +342,13 @@ export async function POST(request: Request) {
         RETURNING *
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.generation.rejected',
         userId,
         userEmail,
         `Generation rejected${notes ? `: ${notes}` : ''}`,
         { generationId, notes },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -426,13 +430,13 @@ export async function PATCH(request: Request) {
         RETURNING *
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.updated',
         userId,
         userEmail,
         `Post updated: "${title}" (v${updated.version})`,
         { postId, version: updated.version },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -458,29 +462,33 @@ export async function PATCH(request: Request) {
         )
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'submit_review',
-        reviewerId: userId,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'submit_review',
+          reviewerId: userId,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.submitted_for_review',
         userId,
         userEmail,
         `Post submitted for review: "${post.title}"`,
         { postId, previousStatus: post.status },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -507,30 +515,34 @@ export async function PATCH(request: Request) {
       }
 
       const notes = (body.notes as string) ?? null
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, reviewed_by = ${userId}, reviewed_at = NOW(), review_notes = ${notes}, updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'approve',
-        reviewerId: userId,
-        notes,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, reviewed_by = ${userId}, reviewed_at = NOW(), review_notes = ${notes}, updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'approve',
+          reviewerId: userId,
+          notes,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.approved',
         userId,
         userEmail,
         `Post approved: "${post.title}"${notes ? ` — ${notes}` : ''}`,
         { postId, notes },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -560,30 +572,34 @@ export async function PATCH(request: Request) {
         )
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, reviewed_by = ${userId}, reviewed_at = NOW(), review_notes = ${notes}, updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'reject',
-        reviewerId: userId,
-        notes,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, reviewed_by = ${userId}, reviewed_at = NOW(), review_notes = ${notes}, updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'reject',
+          reviewerId: userId,
+          notes,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.rejected',
         userId,
         userEmail,
         `Post rejected: "${post.title}" — ${notes}`,
         { postId, notes },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -609,29 +625,33 @@ export async function PATCH(request: Request) {
         )
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, published_at = NOW(), published_by = ${userId}, updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'publish',
-        reviewerId: userId,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, published_at = NOW(), published_by = ${userId}, updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'publish',
+          reviewerId: userId,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.published',
         userId,
         userEmail,
         `Post published: "${post.title}"`,
         { postId, publishedAt: updated.publishedAt },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -657,29 +677,33 @@ export async function PATCH(request: Request) {
         )
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, unpublished_at = NOW(), updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'unpublish',
-        reviewerId: userId,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, unpublished_at = NOW(), updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'unpublish',
+          reviewerId: userId,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.unpublished',
         userId,
         userEmail,
         `Post unpublished: "${post.title}"`,
         { postId, unpublishedAt: updated.unpublishedAt },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -709,37 +733,41 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'No previous version to revert to' }, { status: 400 })
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET
-          title = COALESCE(previous_title, title),
-          body = COALESCE(previous_body, body),
-          previous_title = NULL,
-          previous_body = NULL,
-          status = ${transition.to},
-          version = version + 1,
-          updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'revert',
-        reviewerId: userId,
-        notes: 'Reverted to previous version',
-        titleSnapshot: updated.title as string,
-        bodySnapshot: updated.body as string,
-        version: updated.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET
+            title = COALESCE(previous_title, title),
+            body = COALESCE(previous_body, body),
+            previous_title = NULL,
+            previous_body = NULL,
+            status = ${transition.to},
+            version = version + 1,
+            updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'revert',
+          reviewerId: userId,
+          notes: 'Reverted to previous version',
+          titleSnapshot: row.title as string,
+          bodySnapshot: row.body as string,
+          version: row.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.reverted',
         userId,
         userEmail,
         `Post reverted to previous version: "${updated.title}" (v${updated.version})`,
         { postId, version: updated.version },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -765,29 +793,33 @@ export async function PATCH(request: Request) {
         )
       }
 
-      const [updated] = await sql`
-        UPDATE content_posts
-        SET status = ${transition.to}, updated_at = NOW()
-        WHERE id = ${postId}
-        RETURNING *
-      `
-
-      await createReviewRecord({
-        postId,
-        action: 'archive',
-        reviewerId: userId,
-        titleSnapshot: post.title as string,
-        bodySnapshot: post.body as string,
-        version: post.version as number,
+      const updated = await sql.begin(async (_tx) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = _tx as any;
+        const [row] = await tx`
+          UPDATE content_posts
+          SET status = ${transition.to}, updated_at = NOW()
+          WHERE id = ${postId}
+          RETURNING *
+        `
+        await createReviewRecord(tx, {
+          postId,
+          action: 'archive',
+          reviewerId: userId,
+          titleSnapshot: post.title as string,
+          bodySnapshot: post.body as string,
+          version: post.version as number,
+        })
+        return row
       })
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.post.archived',
         userId,
         userEmail,
         `Post archived: "${post.title}"`,
         { postId },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: updated })
 
@@ -827,13 +859,13 @@ export async function PATCH(request: Request) {
         RETURNING *
       `
 
-      await emitPipelineEvent(
+      emitPipelineEvent(
         'content_pipeline.generation.retry_requested',
         userId,
         userEmail,
         `Generation retry requested (attempt ${newGen.retryCount + 1})`,
         { originalGenerationId: generationId, newGenerationId: newGen.id },
-      )
+      ).catch(() => {})
 
       return NextResponse.json({ data: newGen }, { status: 201 })
 

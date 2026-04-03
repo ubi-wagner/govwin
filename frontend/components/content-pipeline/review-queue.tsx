@@ -7,6 +7,7 @@ interface ReviewQueueProps {
   queue: ContentPost[]
   rejectNotes: string
   showRejectFor: string | null
+  actionInProgress: boolean
   onRejectNotesChange: (v: string) => void
   onShowRejectFor: (id: string | null) => void
   onApprove: (postId: string) => void
@@ -15,7 +16,7 @@ interface ReviewQueueProps {
 }
 
 export function ReviewQueue({
-  queue, rejectNotes, showRejectFor,
+  queue, rejectNotes, showRejectFor, actionInProgress,
   onRejectNotesChange, onShowRejectFor,
   onApprove, onReject, onViewPost,
 }: ReviewQueueProps) {
@@ -35,8 +36,8 @@ export function ReviewQueue({
                 {p.body?.slice(0, 300)}{(p.body?.length ?? 0) > 300 ? '...' : ''}
               </p>
               <div className="flex gap-2 mt-3">
-                <button onClick={() => onApprove(p.id)} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">
-                  Approve
+                <button onClick={() => onApprove(p.id)} disabled={actionInProgress} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+                  {actionInProgress ? 'Approving...' : 'Approve'}
                 </button>
                 {showRejectFor === p.id ? (
                   <div className="flex-1 flex gap-2">
@@ -48,7 +49,7 @@ export function ReviewQueue({
                     />
                     <button
                       onClick={() => rejectNotes.trim() && onReject(p.id, rejectNotes)}
-                      disabled={!rejectNotes.trim()}
+                      disabled={!rejectNotes.trim() || actionInProgress}
                       className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
                     >
                       Reject

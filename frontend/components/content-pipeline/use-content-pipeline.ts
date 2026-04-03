@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { ContentPost, ContentGeneration, ContentReview, ContentCategory } from '@/types'
 
 export type Tab = 'posts' | 'generate' | 'review'
@@ -32,6 +32,15 @@ async function apiCall(body: Record<string, unknown>, method = 'POST') {
   return data
 }
 
+/** Fetch a single post by ID */
+async function fetchPost(postId: string): Promise<ContentPost | null> {
+  const res = await fetch(`/api/content-pipeline?view=posts`)
+  if (!res.ok) return null
+  const d = await res.json().catch(() => ({}))
+  const posts: ContentPost[] = d.data ?? []
+  return posts.find(p => p.id === postId) ?? null
+}
+
 export function useContentPipeline() {
   const [tab, setTab] = useState<Tab>('posts')
   const [posts, setPosts] = useState<ContentPost[]>([])
@@ -42,6 +51,7 @@ export function useContentPipeline() {
   const [detail, setDetail] = useState<DetailView>(null)
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const [actionInProgress, setActionInProgress] = useState(false)
 
   // Editor state
   const [editMode, setEditMode] = useState(false)
@@ -59,13 +69,28 @@ export function useContentPipeline() {
   const [genTemp, setGenTemp] = useState(0.7)
   const [generating, setGenerating] = useState(false)
 
+  // Auto-dismiss flash messages
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function showMsg(type: 'success' | 'error', text: string) {
+    setMsg({ type, text })
+    if (msgTimer.current) clearTimeout(msgTimer.current)
+    msgTimer.current = setTimeout(() => setMsg(null), type === 'success' ? 4000 : 8000)
+  }
+
+  useEffect(() => {
+    return () => { if (msgTimer.current) clearTimeout(msgTimer.current) }
+  }, [])
+
   const loadPosts = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       let url = '/api/content-pipeline?view=posts'
       if (filterStatus) url += `&status=${filterStatus}`
       if (filterCategory) url += `&category=${filterCategory}`
       const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const d = await res.json().catch(() => ({}))
       setPosts(d.data ?? [])
     } catch (e) {
@@ -78,9 +103,10 @@ export function useContentPipeline() {
   const loadGenerations = useCallback(async () => {
     try {
       const res = await fetch('/api/content-pipeline?view=generations')
+      if (!res.ok) return
       const d = await res.json().catch(() => ({}))
       setGenerations(d.data ?? [])
-    } catch { /* ignore */ }
+    } catch { /* non-critical */ }
   }, [])
 
   useEffect(() => { loadPosts() }, [loadPosts])
@@ -89,6 +115,7 @@ export function useContentPipeline() {
   async function loadReviews(postId: string): Promise<ContentReview[]> {
     try {
       const res = await fetch(`/api/content-pipeline?view=reviews&postId=${postId}`)
+      if (!res.ok) return []
       const d = await res.json().catch(() => ({}))
       return d.data ?? []
     } catch { return [] }
@@ -115,26 +142,34 @@ export function useContentPipeline() {
   }
 
   async function doAction(action: string, postId: string, extra: Record<string, unknown> = {}) {
-    setMsg(null)
+    setActionInProgress(true)
     try {
       await apiCall({ action, postId, ...extra }, 'PATCH')
-      setMsg({ type: 'success', text: `${action.replace('_', ' ')} successful` })
+      showMsg('success', `${action.replaceAll('_', ' ')} successful`)
+      // Refresh the post list
       await loadPosts()
+      // If we had a detail open for this post, re-fetch it fresh from the server
       if (detail?.post.id === postId) {
-        const updated = posts.find(p => p.id === postId)
-        if (updated) openDetail(updated)
+        const fresh = await fetchPost(postId)
+        if (fresh) {
+          await openDetail(fresh)
+        } else {
+          // Post may have been archived or status changed out of current filter
+          setDetail(null)
+        }
       }
       setShowRejectFor(null)
       setRejectNotes('')
     } catch (e) {
-      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Action failed' })
+      showMsg('error', e instanceof Error ? e.message : 'Action failed')
+    } finally {
+      setActionInProgress(false)
     }
   }
 
   async function savePost() {
     if (!detail) return
     setSaving(true)
-    setMsg(null)
     try {
       await apiCall({
         action: 'update_post', postId: detail.post.id,
@@ -142,11 +177,14 @@ export function useContentPipeline() {
         category: editForm.category, tags: editForm.tags.split(',').map(t => t.trim()).filter(Boolean),
         metaTitle: editForm.metaTitle || undefined, metaDescription: editForm.metaDescription || undefined,
       }, 'PATCH')
-      setMsg({ type: 'success', text: 'Draft saved' })
+      showMsg('success', 'Draft saved')
       setEditMode(false)
       await loadPosts()
+      // Refresh detail with saved data
+      const fresh = await fetchPost(detail.post.id)
+      if (fresh) await openDetail(fresh)
     } catch (e) {
-      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Save failed' })
+      showMsg('error', e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -155,54 +193,69 @@ export function useContentPipeline() {
   async function submitGeneration() {
     if (!genPrompt.trim()) return
     setGenerating(true)
-    setMsg(null)
     try {
       await apiCall({ action: 'generate', prompt: genPrompt, category: genCategory, model: genModel, temperature: genTemp })
-      setMsg({ type: 'success', text: 'Generation request created' })
+      showMsg('success', 'Generation request created')
       setGenPrompt('')
       await loadGenerations()
     } catch (e) {
-      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Generation failed' })
+      showMsg('error', e instanceof Error ? e.message : 'Generation failed')
     } finally {
       setGenerating(false)
     }
   }
 
   async function acceptGeneration(genId: string) {
-    setMsg(null)
+    setActionInProgress(true)
     try {
       await apiCall({ action: 'accept_generation', generationId: genId })
-      setMsg({ type: 'success', text: 'Generation accepted — draft post created' })
+      showMsg('success', 'Generation accepted — draft post created')
       await loadGenerations()
       await loadPosts()
     } catch (e) {
-      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Accept failed' })
+      showMsg('error', e instanceof Error ? e.message : 'Accept failed')
+    } finally {
+      setActionInProgress(false)
     }
   }
 
   async function rejectGeneration(genId: string) {
+    setActionInProgress(true)
     try {
       await apiCall({ action: 'reject_generation', generationId: genId })
+      showMsg('success', 'Generation rejected')
       await loadGenerations()
-    } catch { /* ignore */ }
+    } catch (e) {
+      showMsg('error', e instanceof Error ? e.message : 'Reject failed')
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   async function retryGeneration(genId: string) {
+    setActionInProgress(true)
     try {
       await apiCall({ action: 'retry_generation', generationId: genId }, 'PATCH')
+      showMsg('success', 'Generation retry queued')
       await loadGenerations()
-    } catch { /* ignore */ }
+    } catch (e) {
+      showMsg('error', e instanceof Error ? e.message : 'Retry failed')
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   async function createManualPost() {
-    setMsg(null)
+    setActionInProgress(true)
     try {
       const result = await apiCall({ action: 'create_post', title: 'New Post', body: '', category: 'tip' })
-      setMsg({ type: 'success', text: 'Draft created' })
+      showMsg('success', 'Draft created')
       await loadPosts()
       if (result.data) openDetail(result.data)
     } catch (e) {
-      setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Create failed' })
+      showMsg('error', e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setActionInProgress(false)
     }
   }
 
@@ -220,7 +273,7 @@ export function useContentPipeline() {
     // Editor
     editMode, editForm, setEditForm, saving, startEdit, savePost, setEditMode,
     // Actions
-    doAction, createManualPost,
+    doAction, createManualPost, actionInProgress,
     // Generation
     genPrompt, setGenPrompt, genCategory, setGenCategory, genModel, setGenModel,
     genTemp, setGenTemp, generating, submitGeneration,

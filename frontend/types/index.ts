@@ -715,6 +715,7 @@ export type ContentPageKey =
   | 'home' | 'about' | 'team' | 'tips'
   | 'customers' | 'announcements' | 'get_started' | 'happenings'
   | 'features' | 'engine'
+  | 'content_pipeline'
 
 export type ContentSource = 'manual' | 'generated' | 'hybrid'
 
@@ -736,9 +737,12 @@ export type ContentEventType =
   | 'content_pipeline.post.reverted'
   | 'content_pipeline.post.archived'
   | 'content_pipeline.generation.requested'
+  | 'content_pipeline.generation.completed'
+  | 'content_pipeline.generation.failed'
   | 'content_pipeline.generation.accepted'
   | 'content_pipeline.generation.rejected'
   | 'content_pipeline.generation.retry_requested'
+  | 'content_pipeline.post.draft_created'
 
 export interface SiteContent {
   id: string
@@ -887,6 +891,8 @@ export interface ContentPost {
   metaTitle: string | null
   metaDescription: string | null
   version: number
+  previousBody: string | null
+  previousTitle: string | null
   createdAt: string
   updatedAt: string
 }

@@ -14,8 +14,8 @@ export default function ContentPipelinePage() {
           <h1 className="text-2xl font-bold text-gray-900">Content Pipeline</h1>
           <p className="text-sm text-gray-500 mt-1">Generate, review, approve, and publish content</p>
         </div>
-        <button onClick={cp.createManualPost} className="btn-primary text-sm px-4 py-2">
-          + New Post
+        <button onClick={cp.createManualPost} disabled={cp.actionInProgress} className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
+          {cp.actionInProgress ? 'Working...' : '+ New Post'}
         </button>
       </div>
 
@@ -71,6 +71,7 @@ export default function ContentPipelinePage() {
               genModel={cp.genModel}
               genTemp={cp.genTemp}
               generating={cp.generating}
+              actionInProgress={cp.actionInProgress}
               onPromptChange={cp.setGenPrompt}
               onCategoryChange={cp.setGenCategory}
               onModelChange={cp.setGenModel}
@@ -87,6 +88,7 @@ export default function ContentPipelinePage() {
               queue={cp.reviewQueue}
               rejectNotes={cp.rejectNotes}
               showRejectFor={cp.showRejectFor}
+              actionInProgress={cp.actionInProgress}
               onRejectNotesChange={cp.setRejectNotes}
               onShowRejectFor={cp.setShowRejectFor}
               onApprove={(postId) => cp.doAction('approve', postId)}
@@ -103,6 +105,7 @@ export default function ContentPipelinePage() {
             editMode={cp.editMode}
             editForm={cp.editForm}
             saving={cp.saving}
+            actionInProgress={cp.actionInProgress}
             onClose={cp.closeDetail}
             onStartEdit={cp.startEdit}
             onCancelEdit={() => cp.setEditMode(false)}
