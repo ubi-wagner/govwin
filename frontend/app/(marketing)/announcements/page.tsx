@@ -7,15 +7,15 @@ import type { AnnouncementsPageContent } from '@/types'
 const STATIC_CONTENT: AnnouncementsPageContent = {
   hero: {
     eyebrow: 'News & Announcements',
-    title: "What's new at GovWin",
+    title: "What's New at RFP Pipeline",
     description: 'Product updates, company news, and announcements about our SBIR/STTR opportunity intelligence platform.',
   },
   items: [
     {
       date: 'April 2026',
       category: 'Product',
-      title: 'GovWin SBIR/STTR Intelligence Platform — Launching Soon',
-      excerpt: 'We are building the definitive platform for small businesses pursuing SBIR, STTR, OTA, and BAA opportunities. GovWin combines 24/7 opportunity scanning across SAM.gov, SBIR.gov, and agency portals with AI-powered technology matching, deadline intelligence, and expert-reviewed proposal builds. Join the waitlist for early access.',
+      title: 'RFP Pipeline SBIR/STTR Intelligence Platform — Now Live',
+      excerpt: 'We have built the definitive platform for small businesses pursuing SBIR, STTR, OTA, and BAA opportunities. RFP Pipeline combines 24/7 opportunity scanning across SAM.gov, SBIR.gov, and agency portals with AI-powered technology matching, deadline intelligence, and expert-reviewed proposal builds. Sign up for a free trial today.',
     },
     {
       date: 'March 2026',
@@ -27,32 +27,32 @@ const STATIC_CONTENT: AnnouncementsPageContent = {
       date: 'March 2026',
       category: 'Feature',
       title: 'Compound Learning Library',
-      excerpt: 'Every proposal you build with GovWin adds to your reusable content library. Team bios, past performance narratives, technical capabilities, and facility descriptions are stored and indexed. The AI learns your language, making each subsequent proposal faster to assemble.',
+      excerpt: 'Every proposal you build with RFP Pipeline adds to your reusable content library. Team bios, past performance narratives, technical capabilities, and facility descriptions are stored and indexed. The AI learns your language, making each subsequent proposal faster to assemble.',
     },
     {
       date: 'February 2026',
       category: 'Company',
-      title: 'Eric Wagner Founds GovWin',
-      excerpt: 'After 20+ years helping startups win SBIR/STTR awards — including a recent 13/13 win rate and over $100M in non-dilutive capital secured — Eric Wagner has founded GovWin to bring expert-level SBIR/STTR intelligence to every small tech business. The platform combines the scanning and scoring tools with the proposal expertise that produced those results.',
+      title: 'Eric Wagner Founds RFP Pipeline',
+      excerpt: 'After 20+ years helping startups win SBIR/STTR awards — including a recent 13/13 win rate and over $100M in non-dilutive capital secured — Eric Wagner has founded RFP Pipeline to bring expert-level SBIR/STTR intelligence to every small tech business. The platform combines the scanning and scoring tools with the proposal expertise that produced those results.',
     },
     {
       date: 'February 2026',
       category: 'Feature',
-      title: 'Proposal Build Service: $499 Phase I / $999 Phase II',
-      excerpt: 'GovWin now offers expert-reviewed proposal templates with AI-assisted content assembly. Purchase a proposal build, receive a custom template matched to your solicitation within one week, and use our section-by-section workspace to assemble your submission. SBIR consultants charge $3K-$10K. We charge $499.',
+      title: 'Proposal Build Service: $999 Phase I / $2,500 Phase II',
+      excerpt: 'RFP Pipeline now offers expert-reviewed proposal templates with AI-assisted content assembly. Purchase a proposal build, receive a custom template matched to your solicitation within one week, and use our section-by-section workspace to assemble your submission. SBIR consultants charge $3K-$10K. We charge $999.',
     },
     {
       date: 'January 2026',
       category: 'Partnership',
       title: 'Accelerator and University Partnership Program',
-      excerpt: 'GovWin is now available for startup accelerators, university tech transfer offices, and innovation programs. Batch onboard your cohort and give every participant a scored SBIR/STTR pipeline from day one. Partners include Air Force APEX, Parallax Advanced Research, Ohio State CDME, and Converge Ventures.',
+      excerpt: 'RFP Pipeline is now available for startup accelerators, university tech transfer offices, and innovation programs. Batch onboard your cohort and give every participant a scored SBIR/STTR pipeline from day one. Partners include Air Force APEX, Parallax Advanced Research, Ohio State CDME, and Converge Ventures.',
     },
   ],
 }
 
 const STATIC_META = {
-  title: 'News & Announcements | GovWin',
-  description: 'Latest news, product updates, and announcements from GovWin SBIR/STTR Intelligence.',
+  title: 'News & Announcements | RFP Pipeline',
+  description: 'Latest news, product updates, and announcements from RFP Pipeline.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -92,9 +92,9 @@ export default async function AnnouncementsPage() {
       </Section>
 
       <CtaSection
-        title="Join the waitlist"
-        description="Be the first to know when GovWin launches. Early subscribers get priority onboarding and launch pricing."
-        primaryLabel="Join the Waitlist"
+        title="Start Your SBIR Pipeline Today"
+        description="Start discovering and winning SBIR/STTR funding with the platform built by experts."
+        primaryLabel="Start Free Trial"
         primaryHref="/get-started"
         secondaryLabel="SBIR/STTR resources"
         secondaryHref="/tips"

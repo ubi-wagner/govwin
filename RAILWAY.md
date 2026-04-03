@@ -8,12 +8,16 @@ Complete step-by-step to get govtech-intel-v3 live on Railway.
 
 ```
 Railway Project: govtech-intel
-├── Postgres plugin     ← pgvector-enabled, Railway manages it
+├── Postgres (main)     ← pgvector-enabled, Railway manages it (customer + pipeline data)
+├── Postgres (cms)      ← Separate DB for CMS service (content + media metadata)
 ├── govtech-frontend    ← Next.js, built from /frontend/Dockerfile
-└── govtech-pipeline    ← Python worker, built from /pipeline/Dockerfile
+├── govtech-pipeline    ← Python worker, built from /pipeline/Dockerfile
+└── govtech-cms         ← FastAPI CMS service, built from /services/cms/Dockerfile
+    └── Volume: /data/cms  ← Persistent volume for media files
 ```
 
-One GitHub repo → two services. One push deploys both.
+One GitHub repo → three services. One push deploys all.
+Changes in `services/cms/` only rebuild the CMS service.
 
 ---
 
@@ -109,6 +113,54 @@ Rename it to `govtech-frontend`.
 | `DOCUMENT_STORE_PATH` | `/app/docs` |
 | `UPLOAD_STORE_PATH` | `/app/uploads` |
 | `LOG_LEVEL` | `INFO` |
+
+---
+
+## Step 5b — Add CMS Service
+
+1. In your Railway project → **+ New** → **GitHub Repo** → same repo
+2. Rename service to `govtech-cms`
+
+**Settings → Build:**
+- Builder: `Dockerfile`
+- Dockerfile path: `services/cms/Dockerfile`
+- Build context: `services/cms`
+
+**Settings → Deploy:**
+- Health check path: `/health`
+
+**Add a separate PostgreSQL plugin:**
+1. **+ New** → **Database** → **PostgreSQL**
+2. Rename to `Postgres (CMS)`
+3. Run `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";` in the CMS database
+
+**Add a persistent volume:**
+1. Settings → **Volumes** → **+ New Volume**
+2. Mount path: `/data/cms`
+3. Size: start with 1GB, expand as needed
+
+**Variables tab:**
+
+| Variable | Value |
+|---|---|
+| `CMS_DATABASE_URL` | **+ Reference** → CMS Postgres plugin |
+| `SHARED_DATABASE_URL` | **+ Reference** → Main Postgres plugin (for event bridge) |
+| `ANTHROPIC_API_KEY` | Same key as pipeline service |
+| `CMS_STORAGE_ROOT` | `/data/cms` |
+| `ALLOWED_ORIGINS` | `https://YOUR-FRONTEND.up.railway.app` |
+| `LOG_LEVEL` | `INFO` |
+
+**Run CMS database migration:**
+```bash
+railway run --service govtech-cms \
+  psql "$CMS_DATABASE_URL" -f services/cms/db/001_cms_schema.sql
+```
+
+**Add CMS_SERVICE_URL to frontend:**
+
+| Variable | Value |
+|---|---|
+| `CMS_SERVICE_URL` | `http://govtech-cms.railway.internal:8000` (Railway internal networking) |
 
 ---
 

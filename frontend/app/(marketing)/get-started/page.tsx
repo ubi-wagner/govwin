@@ -7,8 +7,8 @@ import type { GetStartedPageContent } from '@/types'
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
     eyebrow: 'Pricing & Packages',
-    title: 'Simple Pricing. Massive Upside.',
-    description: 'One platform. Clear pricing. No surprises.',
+    title: 'Less Than a Consultant Meeting. More Than a BD Team.',
+    description: 'Everything you need to find, decide, and build winning SBIR proposals. No contracts, no lock-in, no surprise fees.',
   },
   tiers: [
     {

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import { clsx } from 'clsx'
 
 const navItems = [
@@ -13,15 +14,43 @@ const navItems = [
   { href: '/admin/automation', label: 'Automation', icon: 'Zap' },
   { href: '/admin/templates', label: 'Templates', icon: 'FileText' },
   { href: '/admin/purchases', label: 'Purchases', icon: 'ShoppingCart' },
-  { href: '/admin/content', label: 'Content', icon: 'FileText2' },
+  { href: '/admin/content-pipeline', label: 'Content Pipeline', icon: 'Pencil' },
   { href: '/admin/compliance', label: 'Compliance', icon: 'Shield' },
+]
+
+const sitePages = [
+  { group: 'Marketing', links: [
+    { href: '/', label: 'Homepage' },
+    { href: '/engine', label: 'SBIR Engine' },
+    { href: '/features', label: 'Features' },
+    { href: '/get-started', label: 'Pricing' },
+    { href: '/about', label: 'About' },
+  ]},
+  { group: 'Content', links: [
+    { href: '/customers', label: 'Customer Stories' },
+    { href: '/happenings', label: 'Happenings' },
+    { href: '/tips', label: 'Tips & Tools' },
+    { href: '/announcements', label: 'Announcements' },
+    { href: '/team', label: 'Team' },
+  ]},
+  { group: 'Legal', links: [
+    { href: '/legal/terms', label: 'Terms' },
+    { href: '/legal/privacy', label: 'Privacy' },
+    { href: '/legal/acceptable-use', label: 'Acceptable Use' },
+    { href: '/legal/ai-disclosure', label: 'AI Disclosure' },
+  ]},
+  { group: 'Auth', links: [
+    { href: '/login', label: 'Login' },
+    { href: '/get-started', label: 'Get Started' },
+  ]},
 ]
 
 export function AdminNav() {
   const pathname = usePathname()
+  const [sitePagesOpen, setSitePagesOpen] = useState(false)
 
   return (
-    <nav className="flex-1 space-y-1 px-3 py-5">
+    <nav className="flex-1 space-y-1 px-3 py-5 overflow-y-auto">
       <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Management</p>
       {navItems.map(item => {
         const active = pathname.startsWith(item.href)
@@ -39,6 +68,45 @@ export function AdminNav() {
           </Link>
         )
       })}
+
+      {/* Site Pages quick-links */}
+      <div className="pt-4">
+        <button
+          onClick={() => setSitePagesOpen(!sitePagesOpen)}
+          className="flex w-full items-center justify-between px-3 pb-2"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Site Pages</span>
+          <svg
+            className={clsx('h-3 w-3 text-gray-400 transition-transform duration-200', sitePagesOpen && 'rotate-180')}
+            fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        {sitePagesOpen && (
+          <div className="space-y-3 animate-fade-in">
+            {sitePages.map(section => (
+              <div key={section.group}>
+                <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-wider text-gray-300">{section.group}</p>
+                {section.links.map(link => (
+                  <a
+                    key={link.href + link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-gray-500 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    <svg className="h-3 w-3 flex-shrink-0 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </nav>
   )
 }
@@ -85,9 +153,9 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
       </svg>
     ),
-    FileText2: (
+    Pencil: (
       <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
       </svg>
     ),
     Shield: (

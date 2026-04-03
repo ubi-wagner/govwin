@@ -23,13 +23,13 @@ const STATIC_CONTENT: TipsPageContent = {
     { name: 'SBIR.gov', description: 'The official U.S. government portal for SBIR and STTR solicitations, awards, and program information across all participating agencies.', status: 'Available' },
     { name: 'SAM.gov', description: 'System for Award Management — required registration for all federal contracting. Search active solicitations, entity registrations, and contract award data.', status: 'Available' },
     { name: 'SBIR/STTR Eligibility Checker', description: 'Quick assessment of whether your company meets the size, ownership, and organizational requirements for SBIR and STTR programs.', status: 'Available' },
-    { name: 'Proposal Cost Volume Calculator', description: 'Spreadsheet tool for building compliant cost volumes for SBIR Phase I ($50K-$275K) and Phase II ($500K-$1.5M) proposals across agencies.', status: 'Coming Soon' },
-    { name: 'Agency SBIR Portal Directory', description: 'Direct links to SBIR/STTR portals for DoD, NIH, NSF, DOE, NASA, DHS, USDA, EPA, and all other participating agencies.', status: 'Coming Soon' },
+    { name: 'Proposal Cost Volume Calculator', description: 'Spreadsheet tool for building compliant cost volumes for SBIR Phase I ($50K-$275K) and Phase II ($500K-$1.5M) proposals across agencies.', status: 'Available' },
+    { name: 'Agency SBIR Portal Directory', description: 'Direct links to SBIR/STTR portals for DoD, NIH, NSF, DOE, NASA, DHS, USDA, EPA, and all other participating agencies.', status: 'Available' },
   ],
 }
 
 const STATIC_META = {
-  title: 'SBIR/STTR Tips & Resources | GovWin',
+  title: 'SBIR/STTR Tips & Resources | RFP Pipeline',
   description: 'Expert guidance on SBIR/STTR proposal writing, solicitation cycles, agency-specific strategies, and common mistakes to avoid. From a team with a 13/13 win rate.',
 }
 
@@ -96,10 +96,10 @@ export default async function TipsPage() {
 
       <CtaSection
         title="Need personalized guidance?"
-        description="Our team has helped 50+ startups navigate SBIR/STTR programs with a 100% recent win rate. Join the waitlist for expert-backed opportunity intelligence."
-        primaryLabel="Join the Waitlist"
+        description="Our team has helped 50+ startups navigate SBIR/STTR programs with a 100% recent win rate. Start your free trial and get expert-backed opportunity intelligence."
+        primaryLabel="Start Free Trial"
         primaryHref="/get-started"
-        secondaryLabel="Meet the expert"
+        secondaryLabel="Meet the Founder"
         secondaryHref="/team"
       />
     </>

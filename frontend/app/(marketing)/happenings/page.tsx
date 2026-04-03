@@ -32,7 +32,7 @@ const STATIC_CONTENT: HappeningsPageContent = {
       date: 'March 2026',
       category: 'Product',
       title: 'Grants.gov Integration Live',
-      excerpt: 'GovWin now ingests and indexes grants from Grants.gov alongside SBIR.gov and SAM.gov sources, giving you a single pane of glass for federal R&D funding.',
+      excerpt: 'RFP Pipeline now ingests and indexes grants from Grants.gov alongside SBIR.gov and SAM.gov sources, giving you a single pane of glass for federal R&D funding.',
     },
     {
       date: 'February 2026',
@@ -91,7 +91,7 @@ const STATIC_CONTENT: HappeningsPageContent = {
 
 const STATIC_META = {
   title: 'Happenings | RFP Pipeline',
-  description: 'Product updates, SBIR tips, and resources to sharpen your federal R&D strategy. Stay current with GovWin insights.',
+  description: 'Product updates, SBIR tips, and resources to sharpen your federal R&D strategy. Stay current with RFP Pipeline insights.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -219,8 +219,8 @@ export default async function HappeningsPage() {
 
       <CtaSection
         title="Ready to find your next SBIR opportunity?"
-        description="GovWin scans every solicitation, scores it against your tech profile, and helps you build winning proposals."
-        primaryLabel="Join the Waitlist"
+        description="RFP Pipeline scans every solicitation, scores it against your tech profile, and helps you build winning proposals."
+        primaryLabel="Start Free Trial"
         primaryHref="/get-started"
         secondaryLabel="See how it works"
         secondaryHref="/about"

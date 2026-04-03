@@ -7,9 +7,9 @@ import type { HomePageContent } from '@/types'
 const STATIC_CONTENT: HomePageContent = {
   hero: {
     eyebrow: 'The SBIR Engine',
-    title: 'Win SBIR & Federal R&D Funding Without Consultants',
-    description: 'RFP Pipeline helps you find, decide, and build winning proposals using the SBIR Engine — based on decades of real-world funding success.',
-    trustBadge: '$100M+ non-dilutive capital supported | Dozens of Phase I, II & III awards | 100+ additional wins supported',
+    title: 'We Built It So You Don\'t Have To',
+    description: 'You needed a BD team, proposal writers, and consultants to win SBIR funding. Not anymore. RFP Pipeline delivers high-impact, low-friction, opp-to-prop-to-win capabilities \u2014 built on decades of expert knowledge, powered by AI agents trained by the best.',
+    trustBadge: '$100M+ non-dilutive capital supported | 13/13 recent SBIR win rate | 100+ additional wins supported',
   },
   features: [
     { icon: 'Search', title: 'Find the Right Opportunities', description: 'The SBIR Engine aggregates SBIR/STTR, OTA, and BAA solicitations from every federal agency. Filters by your technology. Alerts you in real time.' },
@@ -21,9 +21,9 @@ const STATIC_CONTENT: HomePageContent = {
   ],
   stats: [
     { value: '$100M+', label: 'Capital Supported', description: 'Non-dilutive SBIR/STTR funding' },
-    { value: 'Dozens', label: 'Awards Won', description: 'Phase I, II & III across agencies' },
-    { value: '100+', label: 'Additional Wins', description: 'Supported through advisory & programs' },
-    { value: '20+ yrs', label: 'Domain Expertise', description: 'Federal R&D procurement' },
+    { value: '13/13', label: 'Recent Win Rate', description: '100% success in latest cohort' },
+    { value: '11', label: 'Federal Agencies', description: 'Full SBIR/STTR coverage' },
+    { value: '5-7 days', label: 'Proposal Build', description: 'From template to submission-ready' },
   ],
   howItWorks: [
     { step: '01', title: 'Find', description: 'The SBIR Engine scans every federal agency for opportunities that match your technology.' },
@@ -45,18 +45,18 @@ const STATIC_CONTENT: HomePageContent = {
     ctaLink: '/pricing',
   },
   cta: {
-    title: 'Start your SBIR pipeline in minutes.',
-    description: 'Federal agencies release billions in SBIR/STTR funding every year. The companies that win have systems. Get yours running today.',
-    primaryLabel: 'Start 14-Day Trial',
+    title: 'Stop hiring. Start winning.',
+    description: 'You don\'t need a BD team, a proposal shop, or a $15K consultant. You need a system built by someone who has done it 100+ times. Start your pipeline in minutes.',
+    primaryLabel: 'Start Free Trial',
     primaryHref: '/get-started',
-    secondaryLabel: 'See a Demo',
+    secondaryLabel: 'See the SBIR Engine',
     secondaryHref: '/engine',
   },
 }
 
 const STATIC_META = {
-  title: 'RFP Pipeline | The Operating System for Non-Dilutive Funding',
-  description: 'Win SBIR & federal R&D funding without consultants. Find, decide, and build winning proposals using the SBIR Engine. $199/mo. Start free.',
+  title: 'RFP Pipeline | We Built It So You Don\'t Have To',
+  description: 'Stop hiring BD teams and consultants. RFP Pipeline delivers SBIR/STTR opp-to-prop-to-win capabilities built on decades of expert knowledge. AI agents trained by the best. $199/mo. Start free.',
 }
 
 const ICON_MAP: Record<string, () => React.JSX.Element> = {
@@ -110,12 +110,13 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up">
-            Win{' '}
+            We{' '}
             <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
-              SBIR & Federal R&D Funding
+              Built It
             </span>
+            {' '}So You{' '}
             <br className="hidden sm:block" />
-            <span className="text-gray-900">Without Consultants</span>
+            <span className="text-gray-900">Don&apos;t Have To</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
@@ -130,8 +131,8 @@ export default async function LandingPage() {
             </div>
             <div className="h-6 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">Dozens</span>
-              <span className="text-sm font-medium text-gray-500">of Phase I, II & III awards</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">13/13</span>
+              <span className="text-sm font-medium text-gray-500">recent SBIR win rate</span>
             </div>
             <div className="h-6 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
@@ -389,8 +390,8 @@ export default async function LandingPage() {
       <Section className="bg-white border-b border-gray-100">
         <SectionHeader
           eyebrow="Why Us"
-          title="Built by People Who Have Actually Won SBIR Funding"
-          description="Not another generic proposal tool. RFP Pipeline was built from decades of hands-on SBIR/STTR experience — writing proposals, advising startups, and helping companies secure non-dilutive capital."
+          title="AI Agents Trained by the Best to Be the Best"
+          description="Not another generic AI tool. Every score, template, and recommendation in RFP Pipeline comes from someone who has actually won. The AI doesn't guess — it learned from decades of wins, 40+ startups mentored, and a 100% recent SBIR success rate."
         />
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
           {content.partners.map(name => (

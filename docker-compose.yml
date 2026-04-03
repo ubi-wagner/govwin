@@ -43,7 +43,50 @@ services:
       db:
         condition: service_healthy
     env_file: .env
+    environment:
+      CMS_SERVICE_URL: http://cms:8000
     ports: ["3000:3000"]
+
+  cms-db:
+    image: pgvector/pgvector:pg16
+    container_name: govtech_cms_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${CMS_POSTGRES_DB:-govtech_cms}
+      POSTGRES_USER: ${CMS_POSTGRES_USER:-govtech_cms}
+      POSTGRES_PASSWORD: ${CMS_POSTGRES_PASSWORD:-cms_dev_password}
+    ports: ["5433:5432"]
+    volumes:
+      - cms_postgres_data:/var/lib/postgresql/data
+      - ./services/cms/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CMS_POSTGRES_USER:-govtech_cms}"]
+      interval: 10s; timeout: 5s; retries: 5
+
+  cms:
+    build:
+      context: ./services/cms
+      dockerfile: Dockerfile
+    container_name: govtech_cms
+    restart: unless-stopped
+    depends_on:
+      cms-db:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      CMS_DATABASE_URL: postgresql://${CMS_POSTGRES_USER:-govtech_cms}:${CMS_POSTGRES_PASSWORD:-cms_dev_password}@cms-db:5432/${CMS_POSTGRES_DB:-govtech_cms}
+      SHARED_DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-govtech_intel}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CMS_STORAGE_ROOT: /data/cms
+      ALLOWED_ORIGINS: http://localhost:3000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+    volumes:
+      - cms_media:/data/cms
+    ports: ["8000:8000"]
 
 volumes:
   postgres_data:
+  cms_postgres_data:
+  cms_media:

@@ -118,39 +118,48 @@ export default async function SbirEnginePage() {
         </div>
       </section>
 
-      {/* ───── Feature Sections ───── */}
+      {/* ───── Feature Sections with Mock Previews ───── */}
       {content.sections.map((section, i) => {
         const isDecisionEngine = section.id === 'decision'
         const bgClass = i % 2 === 0 ? 'bg-white' : 'bg-surface-50'
 
         return (
           <Section key={section.id} className={bgClass}>
-            <SectionHeader
-              eyebrow={section.eyebrow}
-              title={section.title}
-              description={section.description}
-            />
-            <div className="mx-auto mt-10 max-w-3xl">
-              <div className={`rounded-2xl border p-6 sm:p-8 ${
-                isDecisionEngine
-                  ? 'border-brand-200 bg-brand-50/40 ring-1 ring-brand-500/10'
-                  : 'border-gray-200/80 bg-white shadow-card'
-              }`}>
-                {isDecisionEngine && (
-                  <p className="mb-4 text-xs font-bold uppercase tracking-wider text-brand-600">
-                    Key Differentiator
-                  </p>
-                )}
-                <ul className="space-y-3">
-                  {section.features.map(feature => (
-                    <li key={feature} className="flex items-center gap-3">
-                      <svg className={`h-5 w-5 flex-shrink-0 ${isDecisionEngine ? 'text-brand-600' : 'text-emerald-500'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                      </svg>
-                      <span className="text-sm font-semibold text-gray-800">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="mx-auto max-w-6xl">
+              <div className={`grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center ${i % 2 === 1 ? 'lg:grid-flow-dense' : ''}`}>
+                {/* Text side */}
+                <div className={i % 2 === 1 ? 'lg:col-start-2' : ''}>
+                  <div className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-600 ring-1 ring-brand-600/10">
+                    Step {i + 1}: {section.eyebrow}
+                  </div>
+                  <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{section.title}</h2>
+                  <p className="mt-4 text-base leading-relaxed text-gray-600">{section.description}</p>
+                  <ul className="mt-6 space-y-3">
+                    {section.features.map(feature => (
+                      <li key={feature} className="flex items-center gap-3">
+                        <svg className={`h-5 w-5 flex-shrink-0 ${isDecisionEngine ? 'text-brand-600' : 'text-emerald-500'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                        <span className="text-sm font-semibold text-gray-800">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Mock preview side */}
+                <div className={i % 2 === 1 ? 'lg:col-start-1' : ''}>
+                  <div className="rounded-2xl border border-gray-200/60 bg-white p-1.5 shadow-elevated">
+                    <div className="flex items-center gap-1.5 rounded-t-xl bg-gray-100 px-3 py-2">
+                      <div className="h-2 w-2 rounded-full bg-red-400" />
+                      <div className="h-2 w-2 rounded-full bg-amber-400" />
+                      <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                      <div className="ml-2 text-[10px] text-gray-400">rfppipeline.com/portal/{section.id}</div>
+                    </div>
+                    <div className="rounded-b-xl bg-gray-50 p-4">
+                      <EngineStepPreview stepId={section.id} />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </Section>
@@ -159,13 +168,135 @@ export default async function SbirEnginePage() {
 
       {/* ───── CTA ───── */}
       <CtaSection
-        title={content.cta.title}
-        description={content.cta.description}
-        primaryLabel={content.cta.primaryLabel}
-        primaryHref={content.cta.primaryHref}
+        title="Stop searching. Start winning."
+        description="The SBIR Engine replaces a BD team, a proposal shop, and a pipeline manager. Built by someone who has done it 100+ times. Powered by AI that learns from every win."
+        primaryLabel="Start Free Trial"
+        primaryHref="/get-started"
         secondaryLabel="See Pricing"
         secondaryHref="/pricing"
       />
     </>
   )
+}
+
+/* ── Mock preview components for each engine step ── */
+
+function EngineStepPreview({ stepId }: { stepId: string }) {
+  switch (stepId) {
+    case 'discovery':
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-gray-700">Opportunity Scanner</div>
+            <div className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Live</div>
+          </div>
+          {[
+            { agency: 'AFRL', title: 'Autonomous Cyber Defense Platform', match: 96 },
+            { agency: 'NASA', title: 'ML-Based Telemetry Analysis', match: 94 },
+            { agency: 'DEVCOM', title: 'Next-Gen Comm Systems', match: 91 },
+            { agency: 'NCI', title: 'AI Diagnostic Imaging Tools', match: 88 },
+            { agency: 'NSF', title: 'Quantum Computing R&D', match: 82 },
+          ].map(opp => (
+            <div key={opp.title} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 border border-gray-100">
+              <div className="flex-1 min-w-0 mr-2">
+                <span className="text-[10px] font-bold text-gray-400">{opp.agency}</span>
+                <span className="text-[11px] font-medium text-gray-800 block truncate">{opp.title}</span>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${opp.match >= 90 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{opp.match}%</span>
+            </div>
+          ))}
+        </div>
+      )
+    case 'decision':
+      return (
+        <div>
+          <div className="text-xs font-bold text-gray-700 mb-3">Fit Analysis</div>
+          <div className="rounded-lg bg-white border border-brand-200 p-3 mb-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-900">AFRL | Autonomous Cyber Defense</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">96% Match</span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Tech Fit', score: 98, color: 'bg-emerald-500' },
+                { label: 'Agency Hist.', score: 85, color: 'bg-brand-500' },
+                { label: 'Competition', score: 72, color: 'bg-amber-500' },
+              ].map(s => (
+                <div key={s.label} className="text-center">
+                  <div className="text-[9px] text-gray-400">{s.label}</div>
+                  <div className="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div className={`h-full rounded-full ${s.color}`} style={{ width: `${s.score}%` }} />
+                  </div>
+                  <div className="text-[9px] font-bold text-gray-600 mt-0.5">{s.score}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
+              <div className="text-[9px] text-emerald-600 font-bold">Pursue</div>
+            </div>
+            <div className="flex-1 rounded-lg bg-gray-50 px-2 py-1.5 text-center">
+              <div className="text-[9px] text-gray-500 font-bold">Monitor</div>
+            </div>
+            <div className="flex-1 rounded-lg bg-gray-50 px-2 py-1.5 text-center">
+              <div className="text-[9px] text-gray-500 font-bold">Pass</div>
+            </div>
+          </div>
+        </div>
+      )
+    case 'build':
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-gray-700">Proposal Builder</div>
+            <div className="text-[10px] text-gray-400">Phase I | AFRL</div>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { section: 'Technical Objectives', status: 'complete', pct: 100 },
+              { section: 'Innovation & Impact', status: 'drafting', pct: 65 },
+              { section: 'Phase I Work Plan', status: 'pending', pct: 0 },
+              { section: 'Key Personnel', status: 'auto-filled', pct: 100 },
+              { section: 'Commercialization', status: 'pending', pct: 0 },
+            ].map(s => (
+              <div key={s.section} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 border border-gray-100">
+                <div className="flex-1 min-w-0">
+                  <span className="text-[11px] font-medium text-gray-800 block">{s.section}</span>
+                </div>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                  s.status === 'complete' || s.status === 'auto-filled' ? 'bg-emerald-100 text-emerald-700' :
+                  s.status === 'drafting' ? 'bg-brand-100 text-brand-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>{s.status === 'auto-filled' ? 'Auto-filled' : s.status === 'complete' ? 'Done' : s.status === 'drafting' ? '65%' : 'To do'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    case 'learn':
+      return (
+        <div>
+          <div className="text-xs font-bold text-gray-700 mb-3">Content Library</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'Team Bios', count: 8, icon: 'person' },
+              { label: 'Past Performance', count: 12, icon: 'trophy' },
+              { label: 'Tech Narratives', count: 15, icon: 'doc' },
+              { label: 'Facility Desc.', count: 3, icon: 'building' },
+            ].map(item => (
+              <div key={item.label} className="rounded-lg bg-white px-3 py-2.5 border border-gray-100 text-center">
+                <div className="text-lg font-bold text-brand-600">{item.count}</div>
+                <div className="text-[10px] text-gray-500">{item.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-center">
+            <div className="text-[10px] font-bold text-emerald-700">Proposal #5 builds 48% faster than #1</div>
+          </div>
+        </div>
+      )
+    default:
+      return null
+  }
 }
