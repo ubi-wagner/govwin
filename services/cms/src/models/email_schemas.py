@@ -223,3 +223,60 @@ class ThreadOut(BaseModel):
     campaign_id: str | None
     tags: list[str]
     created_at: datetime
+
+
+# ── Outbox (HITL Approval Queue) ───────────────────────────────
+
+class OutboxItem(BaseModel):
+    """An item in the human review queue."""
+    id: str
+    send_id: str
+    status: str
+    priority: int
+    category: str | None
+    recipient_preview: str | None
+    subject_preview: str | None
+    claimed_by: str | None
+    claimed_by_name: str | None
+    claimed_at: datetime | None
+    reviewed_by: str | None
+    reviewed_at: datetime | None
+    review_notes: str | None
+    created_at: datetime
+    updated_at: datetime
+    # Joined send data (populated by API)
+    send: dict | None = None
+
+
+class OutboxClaim(BaseModel):
+    """Claim an outbox item — it sends as YOUR account."""
+    claimed_by: str               # admin user ID or email
+    claimed_by_name: str          # display name
+    account_id: str | None = None # their email account ID (if different from default)
+
+
+class OutboxModify(BaseModel):
+    """Modify the email content before approval."""
+    subject: str | None = None
+    body_html: str | None = None
+    body_text: str | None = None
+    review_notes: str | None = None
+
+
+class OutboxApprove(BaseModel):
+    """Approve one or more outbox items for sending."""
+    approved_by: str              # admin user ID or email
+    review_notes: str | None = None
+
+
+class OutboxBulkApprove(BaseModel):
+    """Bulk approve multiple outbox items."""
+    outbox_ids: list[str]
+    approved_by: str
+    review_notes: str | None = None
+
+
+class OutboxReject(BaseModel):
+    """Reject an outbox item — it will NOT be sent."""
+    rejected_by: str
+    reason: str

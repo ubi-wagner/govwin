@@ -71,6 +71,12 @@ async def process_queue_batch() -> int:
                 await pool.execute('DELETE FROM email_queue WHERE id = $1', queue_item['id'])
                 continue
 
+            # HITL gate: only send approved (queued) items
+            if send['status'] != 'queued':
+                logger.warning(f'Send {send_id} status is "{send["status"]}" (not queued), skipping')
+                await pool.execute('DELETE FROM email_queue WHERE id = $1', queue_item['id'])
+                continue
+
             delegate_email = send['delegate_email']
             if not delegate_email:
                 # Use default account

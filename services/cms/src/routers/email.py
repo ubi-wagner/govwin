@@ -4,6 +4,7 @@ Email automation engine API routes.
 CRUD for accounts, templates, campaigns, sends.
 AI-powered template drafting and reply interpretation.
 Engagement tracking and thread management.
+HITL outbox: all outgoing mail requires human review and approval.
 """
 import asyncio
 import logging
@@ -24,6 +25,7 @@ from ..models.email_schemas import (
     CampaignCreate, CampaignUpdate, CampaignAction, CampaignOut,
     SendCreate, SendOut,
     EngagementOut, ThreadOut,
+    OutboxClaim, OutboxModify, OutboxApprove, OutboxBulkApprove, OutboxReject,
 )
 
 logger = logging.getLogger('cms.email')
@@ -514,7 +516,7 @@ async def campaign_stats(campaign_id: str):
 
 @router.post('/sends', status_code=201)
 async def create_send(body: SendCreate):
-    """Create a send record and enqueue it for delivery."""
+    """Create a send record → goes to HITL outbox for human approval before sending."""
     pool = get_pool()
     try:
         import json
@@ -546,16 +548,29 @@ async def create_send(body: SendCreate):
         if not subject:
             raise HTTPException(400, 'Subject is required (provide directly or via template)')
 
-        # Create send record
+        account_id = uuid.UUID(body.account_id) if body.account_id else None
+
+        # Resolve default account if none specified
+        default_account_id = account_id
+        if not default_account_id:
+            default_acct = await pool.fetchrow(
+                "SELECT id FROM email_accounts WHERE is_active = TRUE ORDER BY created_at LIMIT 1"
+            )
+            if default_acct:
+                default_account_id = default_acct['id']
+
+        # Create send record with pending_approval status (HITL gate)
         send_row = await pool.fetchrow(
             '''INSERT INTO email_sends (campaign_id, template_id, account_id,
                    recipient_email, recipient_name, tenant_id, user_id,
-                   subject, body_html, body_text, template_variables, in_reply_to)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
+                   subject, body_html, body_text, template_variables, in_reply_to,
+                   status, original_subject, original_body_html, original_body_text)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12,
+                       'pending_approval', $8, $9, $10)
                RETURNING *''',
             uuid.UUID(body.campaign_id) if body.campaign_id else None,
             uuid.UUID(body.template_id) if body.template_id else None,
-            uuid.UUID(body.account_id) if body.account_id else None,
+            account_id,
             body.recipient_email, body.recipient_name,
             body.tenant_id, body.user_id,
             subject, body_html, body_text,
@@ -563,14 +578,28 @@ async def create_send(body: SendCreate):
             body.in_reply_to,
         )
 
-        # Enqueue for delivery
+        # Determine category for outbox display
+        category = 'ad_hoc'
+        if body.campaign_id:
+            campaign = await pool.fetchrow(
+                'SELECT campaign_type FROM email_campaigns WHERE id = $1',
+                uuid.UUID(body.campaign_id),
+            )
+            if campaign:
+                category = campaign['campaign_type']
+
+        # Create outbox entry for human review
         await pool.execute(
-            '''INSERT INTO email_queue (send_id, priority)
-               VALUES ($1, $2)''',
-            send_row['id'], body.priority,
+            '''INSERT INTO email_outbox (send_id, priority, category,
+                   recipient_preview, subject_preview, default_account_id)
+               VALUES ($1, $2, $3, $4, $5, $6)''',
+            send_row['id'], body.priority, category,
+            f'{body.recipient_name or ""} <{body.recipient_email}>',
+            subject[:120],
+            default_account_id,
         )
 
-        logger.info(f'Send queued: {send_row["id"]} to {body.recipient_email}')
+        logger.info(f'Send created (pending approval): {send_row["id"]} to {body.recipient_email}')
         return {'data': dict(send_row)}
 
     except HTTPException:
@@ -744,3 +773,498 @@ async def get_thread(thread_id: str):
     except Exception as e:
         logger.error(f'[GET /threads/{{id}}] Error: {e}')
         raise HTTPException(500, 'Failed to fetch thread')
+
+
+# ── Outbox (HITL Approval Queue) ───────────────────────────────
+#
+# All outgoing email lands here first. Admins review, optionally claim
+# (sends as their account), modify content, then approve or reject.
+# Default sender: admin@rfppipeline.com (the service account).
+# When claimed: sends as the claimer's account, fully traceable.
+# ────────────────────────────────────────────────────────────────
+
+@router.get('/outbox')
+async def list_outbox(
+    status: str | None = Query(None, description='pending, claimed, approved, rejected'),
+    claimed_by: str | None = Query(None, description='Filter by claimer'),
+    category: str | None = Query(None),
+    limit: int = Query(50, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """List outbox items with their associated send data for review."""
+    pool = get_pool()
+    try:
+        conditions = []
+        params = []
+        idx = 1
+
+        if status:
+            conditions.append(f'o.status = ${idx}')
+            params.append(status)
+            idx += 1
+        if claimed_by:
+            conditions.append(f'o.claimed_by = ${idx}')
+            params.append(claimed_by)
+            idx += 1
+        if category:
+            conditions.append(f'o.category = ${idx}')
+            params.append(category)
+            idx += 1
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ''
+        params.extend([limit, offset])
+
+        rows = await pool.fetch(
+            f'''SELECT o.*,
+                       s.recipient_email, s.recipient_name, s.subject, s.body_html, s.body_text,
+                       s.template_id, s.campaign_id, s.tenant_id, s.user_id,
+                       s.status as send_status, s.original_subject, s.was_modified,
+                       s.account_id as send_account_id
+                FROM email_outbox o
+                JOIN email_sends s ON o.send_id = s.id
+                {where}
+                ORDER BY o.priority ASC, o.created_at ASC
+                LIMIT ${idx} OFFSET ${idx + 1}''',
+            *params,
+        )
+
+        items = []
+        for r in rows:
+            item = dict(r)
+            # Nest send data for cleaner response
+            item['send'] = {
+                'recipient_email': r['recipient_email'],
+                'recipient_name': r['recipient_name'],
+                'subject': r['subject'],
+                'body_html': r['body_html'],
+                'body_text': r['body_text'],
+                'template_id': r['template_id'],
+                'campaign_id': r['campaign_id'],
+                'tenant_id': r['tenant_id'],
+                'user_id': r['user_id'],
+                'send_status': r['send_status'],
+                'original_subject': r['original_subject'],
+                'was_modified': r['was_modified'],
+                'account_id': r['send_account_id'],
+            }
+            items.append(item)
+
+        return {'data': items, 'count': len(items)}
+    except Exception as e:
+        logger.error(f'[GET /outbox] Error: {e}')
+        raise HTTPException(500, 'Failed to fetch outbox')
+
+
+@router.get('/outbox/stats')
+async def outbox_stats():
+    """Quick counts for outbox dashboard."""
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            '''SELECT
+                   COUNT(*) FILTER (WHERE status = 'pending') as pending,
+                   COUNT(*) FILTER (WHERE status = 'claimed') as claimed,
+                   COUNT(*) FILTER (WHERE status = 'approved') as approved_today,
+                   COUNT(*) FILTER (WHERE status = 'rejected') as rejected_today
+               FROM email_outbox
+               WHERE created_at >= CURRENT_DATE'''
+        )
+        return {'data': dict(row)}
+    except Exception as e:
+        logger.error(f'[GET /outbox/stats] Error: {e}')
+        raise HTTPException(500, 'Failed to fetch outbox stats')
+
+
+@router.get('/outbox/{outbox_id}')
+async def get_outbox_item(outbox_id: str):
+    """Get a single outbox item with full send details."""
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            '''SELECT o.*, s.*
+               FROM email_outbox o
+               JOIN email_sends s ON o.send_id = s.id
+               WHERE o.id = $1''',
+            uuid.UUID(outbox_id),
+        )
+        if not row:
+            raise HTTPException(404, 'Outbox item not found')
+        return {'data': dict(row)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[GET /outbox/{{id}}] Error: {e}')
+        raise HTTPException(500, 'Failed to fetch outbox item')
+
+
+@router.post('/outbox/{outbox_id}/claim')
+async def claim_outbox_item(outbox_id: str, body: OutboxClaim):
+    """
+    Claim an outbox item. The email will send as YOUR account instead of the default.
+    Once claimed, other admins see it's yours but can still unclaim if needed.
+    """
+    pool = get_pool()
+    try:
+        now = datetime.now(timezone.utc)
+
+        # Get current outbox item
+        outbox = await pool.fetchrow(
+            'SELECT id, status, send_id FROM email_outbox WHERE id = $1',
+            uuid.UUID(outbox_id),
+        )
+        if not outbox:
+            raise HTTPException(404, 'Outbox item not found')
+        if outbox['status'] not in ('pending', 'claimed'):
+            raise HTTPException(409, f'Cannot claim item in "{outbox["status"]}" status')
+
+        # Resolve claimer's email account
+        claimed_account_id = None
+        if body.account_id:
+            claimed_account_id = uuid.UUID(body.account_id)
+        else:
+            # Look up account by claimer's email/ID
+            acct = await pool.fetchrow(
+                'SELECT id FROM email_accounts WHERE email_address = $1 AND is_active = TRUE',
+                body.claimed_by,
+            )
+            if acct:
+                claimed_account_id = acct['id']
+
+        # Update outbox claim
+        await pool.execute(
+            '''UPDATE email_outbox
+               SET status = 'claimed', claimed_by = $1, claimed_by_name = $2,
+                   claimed_by_account_id = $3, claimed_at = $4, updated_at = $4
+               WHERE id = $5''',
+            body.claimed_by, body.claimed_by_name, claimed_account_id, now,
+            uuid.UUID(outbox_id),
+        )
+
+        # If claimer has their own account, update the send to use it
+        if claimed_account_id:
+            await pool.execute(
+                'UPDATE email_sends SET account_id = $1 WHERE id = $2',
+                claimed_account_id, outbox['send_id'],
+            )
+
+        logger.info(f'Outbox {outbox_id} claimed by {body.claimed_by_name} ({body.claimed_by})')
+        return {'data': {'status': 'claimed', 'claimed_by': body.claimed_by}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /outbox/{{id}}/claim] Error: {e}')
+        raise HTTPException(500, 'Failed to claim outbox item')
+
+
+@router.post('/outbox/{outbox_id}/unclaim')
+async def unclaim_outbox_item(outbox_id: str):
+    """Release a claimed item back to the shared queue."""
+    pool = get_pool()
+    try:
+        now = datetime.now(timezone.utc)
+        outbox = await pool.fetchrow(
+            'SELECT id, status, send_id, default_account_id FROM email_outbox WHERE id = $1',
+            uuid.UUID(outbox_id),
+        )
+        if not outbox:
+            raise HTTPException(404, 'Outbox item not found')
+        if outbox['status'] != 'claimed':
+            raise HTTPException(409, 'Item is not claimed')
+
+        # Reset to pending and revert account to default
+        await pool.execute(
+            '''UPDATE email_outbox
+               SET status = 'pending', claimed_by = NULL, claimed_by_name = NULL,
+                   claimed_by_account_id = NULL, claimed_at = NULL, updated_at = $1
+               WHERE id = $2''',
+            now, uuid.UUID(outbox_id),
+        )
+
+        # Revert send account to default
+        await pool.execute(
+            'UPDATE email_sends SET account_id = $1 WHERE id = $2',
+            outbox['default_account_id'], outbox['send_id'],
+        )
+
+        return {'data': {'status': 'pending'}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /outbox/{{id}}/unclaim] Error: {e}')
+        raise HTTPException(500, 'Failed to unclaim outbox item')
+
+
+@router.patch('/outbox/{outbox_id}/modify')
+async def modify_outbox_item(outbox_id: str, body: OutboxModify):
+    """
+    Modify the email content before approval. Records the change as was_modified
+    and preserves the original content for audit trail.
+    """
+    pool = get_pool()
+    try:
+        now = datetime.now(timezone.utc)
+
+        outbox = await pool.fetchrow(
+            'SELECT id, status, send_id FROM email_outbox WHERE id = $1',
+            uuid.UUID(outbox_id),
+        )
+        if not outbox:
+            raise HTTPException(404, 'Outbox item not found')
+        if outbox['status'] in ('approved', 'rejected'):
+            raise HTTPException(409, f'Cannot modify item in "{outbox["status"]}" status')
+
+        # Update send content
+        updates = []
+        params = []
+        idx = 1
+
+        if body.subject is not None:
+            updates.append(f'subject = ${idx}')
+            params.append(body.subject)
+            idx += 1
+        if body.body_html is not None:
+            updates.append(f'body_html = ${idx}')
+            params.append(body.body_html)
+            idx += 1
+        if body.body_text is not None:
+            updates.append(f'body_text = ${idx}')
+            params.append(body.body_text)
+            idx += 1
+
+        if updates:
+            updates.append('was_modified = TRUE')
+            params.append(outbox['send_id'])
+            await pool.execute(
+                f"UPDATE email_sends SET {', '.join(updates)} WHERE id = ${idx}",
+                *params,
+            )
+
+        # Update outbox preview and notes
+        outbox_updates = [f'updated_at = ${1}']
+        outbox_params = [now]
+        oidx = 2
+
+        if body.subject is not None:
+            outbox_updates.append(f'subject_preview = ${oidx}')
+            outbox_params.append(body.subject[:120])
+            oidx += 1
+        if body.review_notes is not None:
+            outbox_updates.append(f'review_notes = ${oidx}')
+            outbox_params.append(body.review_notes)
+            oidx += 1
+
+        outbox_params.append(uuid.UUID(outbox_id))
+        await pool.execute(
+            f"UPDATE email_outbox SET {', '.join(outbox_updates)} WHERE id = ${oidx}",
+            *outbox_params,
+        )
+
+        logger.info(f'Outbox {outbox_id} content modified')
+        return {'data': {'status': 'modified', 'was_modified': True}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[PATCH /outbox/{{id}}/modify] Error: {e}')
+        raise HTTPException(500, 'Failed to modify outbox item')
+
+
+@router.post('/outbox/{outbox_id}/approve')
+async def approve_outbox_item(outbox_id: str, body: OutboxApprove):
+    """
+    Approve an outbox item → moves send to 'queued' status → queue worker picks it up.
+    Uses the claimer's account if claimed, otherwise the default service account.
+    """
+    pool = get_pool()
+    try:
+        now = datetime.now(timezone.utc)
+
+        outbox = await pool.fetchrow(
+            'SELECT id, status, send_id, claimed_by, claimed_by_account_id, default_account_id FROM email_outbox WHERE id = $1',
+            uuid.UUID(outbox_id),
+        )
+        if not outbox:
+            raise HTTPException(404, 'Outbox item not found')
+        if outbox['status'] in ('approved', 'rejected'):
+            raise HTTPException(409, f'Item already {outbox["status"]}')
+
+        # Determine which account sends — claimer's or default
+        sending_account_id = outbox['claimed_by_account_id'] or outbox['default_account_id']
+
+        # Approve the send — transition to 'queued'
+        await pool.execute(
+            '''UPDATE email_sends
+               SET status = 'queued', approved_by = $1, approved_at = $2,
+                   approved_by_account_id = $3, account_id = COALESCE($3, account_id)
+               WHERE id = $4''',
+            body.approved_by, now, sending_account_id, outbox['send_id'],
+        )
+
+        # Update outbox
+        await pool.execute(
+            '''UPDATE email_outbox
+               SET status = 'approved', reviewed_by = $1, reviewed_at = $2,
+                   review_notes = COALESCE($3, review_notes), updated_at = $2
+               WHERE id = $4''',
+            body.approved_by, now, body.review_notes, uuid.UUID(outbox_id),
+        )
+
+        # Enqueue for the queue worker to pick up
+        await pool.execute(
+            '''INSERT INTO email_queue (send_id, priority)
+               SELECT send_id, priority FROM email_outbox WHERE id = $1''',
+            uuid.UUID(outbox_id),
+        )
+
+        _fire_event(
+            'email.outbox.approved',
+            entity_id=str(outbox['send_id']),
+            user_id=body.approved_by,
+            diff_summary=f'Email approved by {body.approved_by}',
+            payload={
+                'outbox_id': outbox_id,
+                'claimed_by': outbox.get('claimed_by'),
+                'sending_account': str(sending_account_id) if sending_account_id else None,
+            },
+        )
+
+        logger.info(f'Outbox {outbox_id} approved by {body.approved_by}')
+        return {'data': {'status': 'approved', 'send_status': 'queued'}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /outbox/{{id}}/approve] Error: {e}')
+        raise HTTPException(500, 'Failed to approve outbox item')
+
+
+@router.post('/outbox/bulk-approve')
+async def bulk_approve_outbox(body: OutboxBulkApprove):
+    """
+    Approve multiple outbox items at once. Max 50 per request.
+    Each item uses its own sending account (claimer's or default).
+    """
+    pool = get_pool()
+    try:
+        if len(body.outbox_ids) > 50:
+            raise HTTPException(400, 'Maximum 50 items per bulk approval')
+
+        now = datetime.now(timezone.utc)
+        approved = []
+        errors = []
+
+        for oid in body.outbox_ids:
+            try:
+                outbox = await pool.fetchrow(
+                    'SELECT id, status, send_id, claimed_by_account_id, default_account_id, priority FROM email_outbox WHERE id = $1',
+                    uuid.UUID(oid),
+                )
+                if not outbox:
+                    errors.append({'id': oid, 'error': 'Not found'})
+                    continue
+                if outbox['status'] in ('approved', 'rejected'):
+                    errors.append({'id': oid, 'error': f'Already {outbox["status"]}'})
+                    continue
+
+                sending_account_id = outbox['claimed_by_account_id'] or outbox['default_account_id']
+
+                await pool.execute(
+                    '''UPDATE email_sends
+                       SET status = 'queued', approved_by = $1, approved_at = $2,
+                           approved_by_account_id = $3, account_id = COALESCE($3, account_id)
+                       WHERE id = $4''',
+                    body.approved_by, now, sending_account_id, outbox['send_id'],
+                )
+
+                await pool.execute(
+                    '''UPDATE email_outbox
+                       SET status = 'approved', reviewed_by = $1, reviewed_at = $2,
+                           review_notes = COALESCE($3, review_notes), updated_at = $2
+                       WHERE id = $4''',
+                    body.approved_by, now, body.review_notes, uuid.UUID(oid),
+                )
+
+                await pool.execute(
+                    'INSERT INTO email_queue (send_id, priority) VALUES ($1, $2)',
+                    outbox['send_id'], outbox['priority'],
+                )
+
+                approved.append(oid)
+
+            except Exception as item_err:
+                errors.append({'id': oid, 'error': str(item_err)})
+
+        _fire_event(
+            'email.outbox.bulk_approved',
+            user_id=body.approved_by,
+            diff_summary=f'{len(approved)} emails bulk-approved by {body.approved_by}',
+            payload={'approved_count': len(approved), 'error_count': len(errors)},
+        )
+
+        logger.info(f'Bulk approve: {len(approved)} approved, {len(errors)} errors')
+        return {
+            'data': {
+                'approved': approved,
+                'errors': errors,
+                'approved_count': len(approved),
+                'error_count': len(errors),
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /outbox/bulk-approve] Error: {e}')
+        raise HTTPException(500, 'Failed to bulk approve')
+
+
+@router.post('/outbox/{outbox_id}/reject')
+async def reject_outbox_item(outbox_id: str, body: OutboxReject):
+    """Reject an outbox item — the email will NOT be sent."""
+    pool = get_pool()
+    try:
+        now = datetime.now(timezone.utc)
+
+        outbox = await pool.fetchrow(
+            'SELECT id, status, send_id FROM email_outbox WHERE id = $1',
+            uuid.UUID(outbox_id),
+        )
+        if not outbox:
+            raise HTTPException(404, 'Outbox item not found')
+        if outbox['status'] in ('approved', 'rejected'):
+            raise HTTPException(409, f'Item already {outbox["status"]}')
+
+        # Mark send as rejected
+        await pool.execute(
+            '''UPDATE email_sends
+               SET status = 'rejected', rejected_by = $1, rejected_at = $2, rejection_reason = $3
+               WHERE id = $4''',
+            body.rejected_by, now, body.reason, outbox['send_id'],
+        )
+
+        # Update outbox
+        await pool.execute(
+            '''UPDATE email_outbox
+               SET status = 'rejected', reviewed_by = $1, reviewed_at = $2,
+                   review_notes = $3, updated_at = $2
+               WHERE id = $4''',
+            body.rejected_by, now, body.reason, uuid.UUID(outbox_id),
+        )
+
+        _fire_event(
+            'email.outbox.rejected',
+            entity_id=str(outbox['send_id']),
+            user_id=body.rejected_by,
+            diff_summary=f'Email rejected by {body.rejected_by}: {body.reason}',
+        )
+
+        logger.info(f'Outbox {outbox_id} rejected by {body.rejected_by}: {body.reason}')
+        return {'data': {'status': 'rejected'}}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /outbox/{{id}}/reject] Error: {e}')
+        raise HTTPException(500, 'Failed to reject outbox item')
