@@ -8,7 +8,7 @@ const STATIC_CONTENT: HomePageContent = {
   hero: {
     eyebrow: 'The SBIR Engine',
     title: 'We Built It So You Don\'t Have To',
-    description: 'You needed a BD team, proposal writers, and consultants to win SBIR funding. Not anymore. RFP Pipeline delivers high-impact, low-friction, opp-to-prop-to-win capabilities — built on decades of expert knowledge, powered by AI agents trained by the best.',
+    description: 'You needed a BD team, proposal writers, and consultants to win SBIR funding. Not anymore. RFP Pipeline delivers high-impact, low-friction, opp-to-prop-to-win capabilities — built on decades of expert knowledge. Powered by AI agents trained by the best.',
     trustBadge: 'Hundreds of millions in non-dilutive funding | Dozens of Phase I, II & III awards | Hundreds of wins supported',
   },
   features: [
