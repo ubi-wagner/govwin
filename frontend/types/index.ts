@@ -817,9 +817,9 @@ export interface HappeningsPageContent {
 
 export interface AboutPageContent {
   hero: { eyebrow: string; title: string; description: string }
-  mission: { eyebrow: string; title: string; paragraphs: string[] }
-  features: { icon: string; title: string; description: string }[]
-  howItWorks: { step: string; title: string; description: string }[]
+  problem: { eyebrow: string; title: string; paragraphs: string[] }
+  flow: { step: string; label: string; description: string }[]
+  approach: { eyebrow: string; title: string; paragraphs: string[] }
 }
 
 export interface TeamPageContent {
