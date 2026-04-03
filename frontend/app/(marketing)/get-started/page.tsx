@@ -3,9 +3,6 @@ import Link from 'next/link'
 import { Section, SectionHeader, CtaSection } from '@/components/page-sections'
 import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
 import type { GetStartedPageContent } from '@/types'
-// Keep import to avoid breaking the existing checkout modal code
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
