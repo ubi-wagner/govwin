@@ -81,6 +81,7 @@ services:
       CMS_STORAGE_ROOT: /data/cms
       ALLOWED_ORIGINS: http://localhost:3000
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
     volumes:
       - cms_media:/data/cms
     ports: ["8000:8000"]

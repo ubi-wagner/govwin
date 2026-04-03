@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import content, media, health
+from .routers import content, media, health, email
 from .models.database import init_db, close_db, init_event_bridge, close_event_bridge
 from .storage.volume import ensure_dirs
 
@@ -30,12 +30,14 @@ logging.basicConfig(
 logger = logging.getLogger('cms')
 
 _generation_task: asyncio.Task | None = None
+_email_queue_task: asyncio.Task | None = None
+_email_sweep_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle."""
-    global _generation_task
+    global _generation_task, _email_queue_task, _email_sweep_task
     logger.info('CMS service starting...')
 
     # Initialize databases
@@ -55,16 +57,27 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning('ANTHROPIC_API_KEY not set — content generation worker disabled')
 
+    # Start email workers if Google service account is configured
+    if os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON') or os.getenv('GOOGLE_SERVICE_ACCOUNT_PATH'):
+        from .workers.email_queue import queue_loop
+        from .workers.email_sweep import sweep_loop
+        _email_queue_task = asyncio.create_task(queue_loop())
+        _email_sweep_task = asyncio.create_task(sweep_loop())
+        logger.info('Email queue and sweep workers started')
+    else:
+        logger.warning('Google service account not configured — email workers disabled')
+
     yield
 
     # Shutdown
     logger.info('CMS service shutting down...')
-    if _generation_task:
-        _generation_task.cancel()
-        try:
-            await _generation_task
-        except asyncio.CancelledError:
-            pass
+    for task in (_generation_task, _email_queue_task, _email_sweep_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
     await close_event_bridge()
     await close_db()
 
@@ -90,3 +103,4 @@ app.add_middleware(
 app.include_router(health.router, tags=['health'])
 app.include_router(content.router, prefix='/api/content', tags=['content'])
 app.include_router(media.router, prefix='/api/media', tags=['media'])
+app.include_router(email.router, prefix='/api/email', tags=['email'])
