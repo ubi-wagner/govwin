@@ -1,97 +1,130 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Section, SectionHeader } from '@/components/page-sections'
+import { Section, SectionHeader, CtaSection } from '@/components/page-sections'
 import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
 import type { GetStartedPageContent } from '@/types'
+// Keep import to avoid breaking the existing checkout modal code
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
-    eyebrow: 'Launching Soon \u00B7 Join the Waitlist',
-    title: 'Your 24/7 SBIR/STTR lookout, plus expert proposal builds on demand',
-    description: 'One simple plan for opportunity intelligence. Pay per proposal when you are ready to pursue. No long-term contracts, no hidden fees.',
+    eyebrow: 'Pricing & Packages',
+    title: 'Simple Pricing. Massive Upside.',
+    description: 'One platform. Clear pricing. No surprises.',
   },
   tiers: [
     {
-      name: 'Finder + Minder',
+      name: 'Pipeline Engine',
       price: '$199',
       period: 'month',
-      description: 'Your always-on SBIR/STTR opportunity scanning and pipeline management platform.',
+      description: 'Includes 14-day trial',
       features: [
-        'Unlimited SBIR/STTR opportunity scanning',
-        'AI-powered technology match scoring',
-        'Deadline alerts and reminders',
-        'Pipeline tracking and management',
-        'Up to 3 SpotLight search profiles',
-        'Team collaboration workspace',
-        'Notification center',
+        'Unlimited opportunity scanning',
+        'AI fit scoring',
+        'Deadline alerts',
+        'Pipeline tracking',
+        'Up to 3 SpotLight profiles',
+        'Team workspace',
         'Document storage',
+        'Notifications',
       ],
-      cta: 'Join Waitlist',
+      cta: 'Start 14-Day Trial',
       popular: false,
     },
     {
-      name: 'Phase I Proposal Build',
-      price: '$499',
+      name: 'Phase I Build',
+      price: '$999',
       period: 'proposal',
-      description: 'Expert-reviewed template and AI-assisted workspace for your SBIR/STTR Phase I submission.',
+      description: 'Per proposal',
       features: [
-        'Expert-reviewed proposal template (delivered within 1 week)',
-        'AI-assisted content assembly',
-        'Section-by-section writing workspace',
-        'Reusable content library (grows with each proposal)',
-        'Partner collaboration portal',
-        '72-hour cancellation window',
+        'Expert-reviewed framework',
+        'Agency-aligned template',
+        'Section-by-section structure',
+        'AI-assisted drafting',
+        'Content library seeding',
       ],
-      cta: 'Join Waitlist',
+      cta: 'Get Started',
       popular: true,
     },
     {
-      name: 'Phase II Proposal Build',
-      price: '$999',
+      name: 'Phase II Build',
+      price: '$2,500',
       period: 'proposal',
-      description: 'Full-scope proposal support for larger Phase II submissions with commercialization planning.',
+      description: 'Per proposal',
       features: [
         'Everything in Phase I Build',
-        'Extended template for larger proposals',
-        'Phase I results integration',
-        'Transition and commercialization plan framework',
-        'Detailed budget template',
-        'Priority template delivery',
+        'Extended technical volume',
+        'Commercialization plan',
+        'Budget justification',
+        'Past performance narrative',
       ],
-      cta: 'Join Waitlist',
+      cta: 'Get Started',
       popular: false,
     },
   ],
   comparison: [
-    ['What is the cost of a missed SBIR opportunity?', 'A single Phase I award is worth $50K\u2013$275K in non-dilutive funding', '', ''],
-    ['How much do consultants charge?', 'SBIR consultants typically charge $3K\u2013$10K per proposal', '', ''],
-    ['How fast can you submit?', 'Expert template delivered within 1 week of purchase', '', ''],
-    ['Does it get easier over time?', 'Yes \u2014 your content library grows with every proposal you build', '', ''],
+    ['$999', 'Phase I Build', '$150K+', 'Potential Phase I award'],
+    ['$2,500', 'Phase II Build', '$1M+', 'Potential Phase II award'],
   ],
   faqs: [
-    { q: 'What types of opportunities do you track?', a: 'SBIR Phase I and Phase II, STTR Phase I and Phase II, Other Transaction Authorities (OTAs), Broad Agency Announcements (BAAs), and Prize Challenges across all federal agencies including DoD, NIH, NSF, DOE, NASA, and DHS.' },
-    { q: 'What is included in a proposal build?', a: 'Each proposal build includes expert review of the solicitation, a custom template matched to the specific agency and program requirements, and an AI-assisted section drafting workspace that draws from your reusable content library.' },
-    { q: 'How does the content library work?', a: 'Every proposal you build adds to your reusable content library. Team bios, past performance narratives, technical capabilities, and facility descriptions are stored and indexed. The AI learns your language and writing style, making each subsequent proposal faster to assemble.' },
-    { q: 'Can I add research partners?', a: 'Yes. STTR requires a research institution partnership, and many SBIR proposals benefit from subcontractors. You can securely add partners with controlled access to specific proposals only — they see what you share, nothing more.' },
-    { q: 'What if I want to cancel a proposal build?', a: 'You have a 72-hour cancellation window from the time of purchase. If your template has not been delivered yet, you receive a full refund. Once template delivery begins, the purchase is final.' },
-    { q: 'How does pricing compare to hiring a consultant?', a: 'SBIR consultants typically charge $3,000 to $10,000 per proposal. Our Phase I builds are $499 and Phase II builds are $999. You get expert-reviewed templates plus an AI workspace that improves with every proposal you write.' },
+    {
+      q: 'What\'s included in the 14-day trial?',
+      a: 'Full access to the Pipeline Engine. No credit card required.',
+    },
+    {
+      q: 'How is a build different from a consultant?',
+      a: 'Consultants charge $5K-$15K per proposal. A build gives you expert-reviewed, AI-assembled frameworks for a fraction of the cost.',
+    },
+    {
+      q: 'What agencies do you cover?',
+      a: 'All 11 SBIR/STTR participating agencies including DoD, NIH, NSF, DOE, NASA, DHS, USDA, DOT, EPA, DoC, and ED.',
+    },
+    {
+      q: 'Can I cancel anytime?',
+      a: 'Yes. No contracts. No lock-in.',
+    },
+    {
+      q: 'Do you offer volume discounts?',
+      a: 'Yes. Contact us for multi-proposal pricing.',
+    },
+    {
+      q: 'Is there an annual plan?',
+      a: 'Coming soon. Early adopters lock in the best rate.',
+    },
+    {
+      q: 'What\'s a SpotLight profile?',
+      a: 'A saved search that continuously matches new opportunities to your technology focus areas.',
+    },
+    {
+      q: 'How fast is a proposal build?',
+      a: 'Most Phase I builds are delivered within 5-7 business days.',
+    },
   ],
   contactCta: {
-    title: 'Need help choosing the right approach?',
-    description: 'For accelerator programs, university tech transfer offices, or teams pursuing multiple SBIR/STTR topics — let\'s talk.',
+    title: 'Start Your SBIR Pipeline Today',
+    description: 'Find opportunities, build proposals, and win awards with the platform built for SBIR/STTR teams.',
     email: 'eric@rfppipeline.com',
   },
 }
 
 const STATIC_META = {
-  title: 'Pricing | GovWin SBIR/STTR Intelligence',
-  description: '$199/mo for SBIR/STTR opportunity scanning and matching. Add expert proposal builds for $499 (Phase I) or $999 (Phase II).',
+  title: 'Pricing | RFP Pipeline',
+  description: 'Simple pricing for SBIR/STTR opportunity scanning, AI fit scoring, and expert proposal builds. Pipeline Engine at $199/mo. Phase I builds from $999. Phase II builds from $2,500.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
   const published = await getPageContent('get_started')
   return mergeMetadata(published?.metadata ?? null, STATIC_META)
+}
+
+/** Checkmark icon used across pricing cards */
+function Check() {
+  return (
+    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+  )
 }
 
 export default async function GetStartedPage() {
@@ -107,114 +140,164 @@ export default async function GetStartedPage() {
           <div className="inline-flex items-center rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10">
             {content.hero.eyebrow}
           </div>
-          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-            {content.hero.title.includes('mission') ? (
-              <>
-                Choose the plan that fits your{' '}
-                <span className="bg-gradient-to-r from-brand-600 to-cyan-500 bg-clip-text text-transparent">
-                  mission
-                </span>
-              </>
-            ) : (
-              content.hero.title
-            )}
+          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
+            {content.hero.title}
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600">
             {content.hero.description}
           </p>
         </div>
       </section>
 
-      {/* Interactive pricing section (client component: billing toggle + cards + checkout modal) */}
-      <InteractivePricingSection plans={content.tiers} />
-
-      {/* Feature comparison */}
+      {/* Pricing Cards */}
       <Section className="bg-surface-50">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid gap-8 lg:grid-cols-3">
+            {content.tiers.map((tier) => {
+              const isPopular = tier.popular
+              return (
+                <div
+                  key={tier.name}
+                  className={`relative flex flex-col rounded-2xl border bg-white p-8 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 ${
+                    isPopular
+                      ? 'border-brand-500 ring-2 ring-brand-500/20'
+                      : 'border-gray-200/80'
+                  }`}
+                >
+                  {/* Popular badge */}
+                  {isPopular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <span className="inline-flex items-center rounded-full bg-brand-600 px-4 py-1 text-xs font-bold text-white shadow-sm">
+                        Popular
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Tier header */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{tier.name}</h3>
+                    <div className="mt-4 flex items-baseline gap-1">
+                      <span className="text-4xl font-extrabold tracking-tight text-gray-900">
+                        {tier.price}
+                      </span>
+                      <span className="text-sm font-medium text-gray-500">
+                        /{tier.period}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">{tier.description}</p>
+                  </div>
+
+                  {/* Features */}
+                  <ul className="mt-8 flex-1 space-y-3">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-600">
+                        <Check />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <div className="mt-8">
+                    <Link
+                      href="/get-started"
+                      className={`block w-full rounded-lg px-4 py-3 text-center text-sm font-bold transition-colors ${
+                        isPopular
+                          ? 'bg-brand-600 text-white hover:bg-brand-700 shadow-md'
+                          : 'bg-gray-900 text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {tier.cta}
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </Section>
+
+      {/* ROI Section */}
+      <Section className="bg-white">
         <SectionHeader
-          eyebrow="The Math"
-          title="Why this pays for itself"
+          eyebrow="The ROI"
+          title="Small investment. Outsized returns."
+          description="See what your proposal investment can unlock in non-dilutive funding."
         />
-        <div className="mt-12 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="py-4 pr-4 text-sm font-bold text-gray-900 w-1/2">Question</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-900" colSpan={3}>Answer</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {content.comparison.map((row, i) => {
-                const [question, answer] = row
-                return (
-                  <tr key={i} className="hover:bg-white transition-colors">
-                    <td className="py-3.5 pr-4 text-sm font-medium text-gray-900">{question as string}</td>
-                    <td className="px-4 py-3.5 text-sm text-gray-600" colSpan={3}>{answer as string}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="mx-auto mt-12 max-w-3xl grid gap-8 sm:grid-cols-2">
+          {/* Phase I ROI card */}
+          <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-br from-brand-50 to-white p-8 shadow-card">
+            <div className="text-center">
+              <p className="text-sm font-bold uppercase tracking-wider text-brand-600">Phase I Build</p>
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <div>
+                  <p className="text-3xl font-extrabold text-gray-900">$999</p>
+                  <p className="mt-1 text-xs text-gray-500">Your investment</p>
+                </div>
+                <svg className="h-6 w-6 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+                <div>
+                  <p className="text-3xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$150K+</p>
+                  <p className="mt-1 text-xs text-gray-500">Potential award</p>
+                </div>
+              </div>
+              <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-2">
+                <p className="text-sm font-bold text-emerald-700">150x potential return</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Phase II ROI card */}
+          <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-br from-cyan-50 to-white p-8 shadow-card">
+            <div className="text-center">
+              <p className="text-sm font-bold uppercase tracking-wider text-cyan-600">Phase II Build</p>
+              <div className="mt-4 flex items-center justify-center gap-4">
+                <div>
+                  <p className="text-3xl font-extrabold text-gray-900">$2,500</p>
+                  <p className="mt-1 text-xs text-gray-500">Your investment</p>
+                </div>
+                <svg className="h-6 w-6 text-cyan-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+                <div>
+                  <p className="text-3xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$1M+</p>
+                  <p className="mt-1 text-xs text-gray-500">Potential award</p>
+                </div>
+              </div>
+              <div className="mt-6 rounded-lg bg-emerald-50 px-4 py-2">
+                <p className="text-sm font-bold text-emerald-700">400x potential return</p>
+              </div>
+            </div>
+          </div>
         </div>
       </Section>
 
       {/* FAQ */}
-      <Section className="bg-white">
+      <Section className="bg-surface-50">
         <SectionHeader
           eyebrow="FAQ"
           title="Common questions"
         />
         <div className="mx-auto mt-12 max-w-3xl divide-y divide-gray-100">
           {content.faqs.map((faq, i) => (
-            <div key={i} className="py-5">
+            <div key={i} className="py-6">
               <h3 className="text-sm font-bold text-gray-900">{faq.q}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-500">{faq.a}</p>
+              <p className="mt-2.5 text-sm leading-relaxed text-gray-500">{faq.a}</p>
             </div>
           ))}
         </div>
       </Section>
 
-      {/* Contact CTA */}
-      <section className="relative overflow-hidden bg-cta-gradient px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-        <div className="absolute -left-20 -top-20 h-60 w-60 rounded-full bg-brand-500/10 blur-3xl" />
-        <div className="absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-cyan-500/10 blur-3xl" />
-        <div className="relative mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            {content.contactCta.title}
-          </h2>
-          <p className="mt-4 text-lg text-gray-300">
-            {content.contactCta.description}
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <a
-              href={`mailto:${content.contactCta.email}`}
-              className="btn-cta bg-white text-brand-700 hover:bg-gray-100 shadow-xl"
-            >
-              Contact Sales
-              <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-              </svg>
-            </a>
-            <Link href="/about" className="group text-sm font-semibold text-gray-300 hover:text-white transition-colors">
-              Learn more about us
-              <span className="ml-1 inline-block transition-transform group-hover:translate-x-0.5">&rarr;</span>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Bottom CTA */}
+      <CtaSection
+        title="Start Your SBIR Pipeline Today"
+        description="Find opportunities, build proposals, and win awards with the platform built for SBIR/STTR teams."
+        primaryLabel="Start 14-Day Trial"
+        primaryHref="/get-started"
+        secondaryLabel="Talk to Us"
+        secondaryHref="/about"
+      />
     </>
   )
-}
-
-function renderCell(value: boolean | string | undefined) {
-  if (value === true) {
-    return (
-      <svg className="mx-auto h-5 w-5 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-      </svg>
-    )
-  }
-  if (value === false) {
-    return <span className="text-gray-300">&mdash;</span>
-  }
-  return <span className="text-sm text-gray-700 font-medium">{value}</span>
 }

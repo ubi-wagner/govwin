@@ -713,7 +713,8 @@ export interface AuditEntry {
 
 export type ContentPageKey =
   | 'home' | 'about' | 'team' | 'tips'
-  | 'customers' | 'announcements' | 'get_started'
+  | 'customers' | 'announcements' | 'get_started' | 'happenings'
+  | 'features' | 'engine'
 
 export type ContentSource = 'manual' | 'generated' | 'hybrid'
 
@@ -779,6 +780,24 @@ export interface HomePageContent {
   cta: { title: string; description: string; primaryLabel: string; primaryHref: string; secondaryLabel: string; secondaryHref: string }
 }
 
+export interface SbirEnginePageContent {
+  hero: { title: string; description: string }
+  sections: { id: string; eyebrow: string; title: string; description: string; features: string[] }[]
+  cta: { title: string; description: string; primaryLabel: string; primaryHref: string }
+}
+
+export interface FeaturesPageContent {
+  hero: { title: string; description: string }
+  features: { title: string; description: string; icon: string }[]
+}
+
+export interface HappeningsPageContent {
+  hero: { title: string; description: string }
+  categories: { slug: string; label: string }[]
+  items: { date: string; category: string; title: string; excerpt: string }[]
+  resources: { title: string; description: string; type: string }[]
+}
+
 export interface AboutPageContent {
   hero: { eyebrow: string; title: string; description: string }
   mission: { eyebrow: string; title: string; paragraphs: string[] }
@@ -803,12 +822,10 @@ export interface TipsPageContent {
 
 export interface CustomersPageContent {
   hero: { eyebrow: string; title: string; description: string }
-  stats: { value: string; label: string; description: string }[]
   stories: {
-    company: string; industry: string; result: string
-    quote: string; metrics: string[]
+    company: string; description: string; quote: string; result: string
   }[]
-  clientTypes: { label: string; desc: string; icon: string }[]
+  caseStudy: { before: string; after: string; result: string }
 }
 
 export interface AnnouncementsPageContent {

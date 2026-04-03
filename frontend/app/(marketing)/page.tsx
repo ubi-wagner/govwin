@@ -1,61 +1,62 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Section, SectionHeader, FeatureCard, StatHighlight, CtaSection } from '@/components/page-sections'
+import { Section, SectionHeader, FeatureCard, CtaSection } from '@/components/page-sections'
 import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
 import type { HomePageContent } from '@/types'
 
 const STATIC_CONTENT: HomePageContent = {
   hero: {
-    eyebrow: 'SBIR/STTR Intelligence',
-    title: 'Never miss an SBIR or STTR opportunity again',
-    description: '24/7 AI-powered scanning of SAM.gov, SBIR.gov, and agency portals. Every SBIR, STTR, OTA, and BAA opportunity scored against your technology focus — so you can stop searching and start winning.',
-    trustBadge: '13/13 SBIR/STTR Win Rate \u00B7 $100M+ Secured \u00B7 20+ Years',
+    eyebrow: 'The SBIR Engine',
+    title: 'Win SBIR & Federal R&D Funding Without Consultants',
+    description: 'RFP Pipeline helps you find, decide, and build winning proposals using the SBIR Engine — based on decades of real-world funding success.',
+    trustBadge: '$100M+ non-dilutive capital supported | Dozens of Phase I, II & III awards | 100+ additional wins supported',
   },
   features: [
-    { icon: 'Search', title: 'SBIR/STTR Discovery', description: 'Automated scanning of SAM.gov, SBIR.gov, and agency portals for SBIR Phase I/II, STTR, OTAs, BAAs, and Challenges — across every federal agency.' },
-    { icon: 'Chart', title: 'Technology Match Scoring', description: 'AI scores each opportunity against your research areas, NAICS codes, TRL level, and agency history. Focus on the topics built for your technology.' },
-    { icon: 'Bell', title: 'Deadline Intelligence', description: 'Never miss a solicitation close date. Smart alerts tied to SBIR/STTR release cycles, pre-solicitation windows, and agency-specific timelines.' },
-    { icon: 'Shield', title: 'Proposal Build Pipeline', description: 'Expert-reviewed templates plus AI content assembly for $499 (Phase I) or $999 (Phase II). From RFP to submission-ready in a week.' },
-    { icon: 'Document', title: 'Compound Learning Library', description: 'Every proposal builds your reusable content library — team bios, past performance, technical narratives. Your 5th proposal is dramatically faster than your first.' },
-    { icon: 'Team', title: 'Partner Collaboration', description: 'Securely add research partners (STTR), subcontractors, and consultants with controlled proposal-level access. Built for how SBIR/STTR teams actually work.' },
+    { icon: 'Search', title: 'Find the Right Opportunities', description: 'The SBIR Engine aggregates SBIR/STTR, OTA, and BAA solicitations from every federal agency. Filters by your technology. Alerts you in real time.' },
+    { icon: 'Chart', title: 'Decide What to Pursue', description: 'Fit scoring, risk flags, and strategic alignment — so you invest proposal time only on opportunities worth winning.' },
+    { icon: 'Bell', title: 'Never Miss a Deadline', description: 'SBIR release cycles, pre-solicitation windows, and agency timelines — all tracked. Get notified at exactly the right time.' },
+    { icon: 'Shield', title: 'Build with Proven Structure', description: 'Expert-derived templates and AI-assisted drafting. Start with structure — not a blank page. Submission-ready in days, not months.' },
+    { icon: 'Document', title: 'Improve with Every Submission', description: 'Your content library grows with each proposal — team bios, past performance, technical narratives. Every submission makes the next one faster.' },
+    { icon: 'Team', title: 'Collaborate as a Team', description: 'Invite STTR research partners, subcontractors, and consultants with proposal-level access controls.' },
   ],
   stats: [
-    { value: '$100M+', label: 'Non-Dilutive Capital', description: 'Secured through SBIR/STTR awards' },
-    { value: '100%', label: 'Recent Win Rate', description: '13 of 13 SBIR/STTR awards' },
-    { value: '50+', label: 'Startups Supported', description: 'Deep tech and defense companies' },
-    { value: '20+', label: 'Years Experience', description: 'SBIR/STTR and federal R&D funding' },
+    { value: '$100M+', label: 'Capital Supported', description: 'Non-dilutive SBIR/STTR funding' },
+    { value: 'Dozens', label: 'Awards Won', description: 'Phase I, II & III across agencies' },
+    { value: '100+', label: 'Additional Wins', description: 'Supported through advisory & programs' },
+    { value: '20+ yrs', label: 'Domain Expertise', description: 'Federal R&D procurement' },
   ],
   howItWorks: [
-    { step: '01', title: 'Profile Your Technology', description: 'Define your research areas, NAICS codes, TRL level, target agencies, and set-aside certifications. Our scoring engine learns what you build.' },
-    { step: '02', title: 'Match & Score', description: 'Every day, new SBIR/STTR topics are scored and ranked against your profile. High-match opportunities surface first with deadline context.' },
-    { step: '03', title: 'Build & Win', description: 'Purchase a proposal build ($499 Phase I / $999 Phase II), receive an expert-reviewed template within a week, and assemble your submission with AI.' },
+    { step: '01', title: 'Find', description: 'The SBIR Engine scans every federal agency for opportunities that match your technology.' },
+    { step: '02', title: 'Decide', description: 'Fit scoring and strategic alignment help you pick the right opportunities to pursue.' },
+    { step: '03', title: 'Build', description: 'Expert templates and AI-assisted drafting get your proposal submission-ready fast.' },
+    { step: '04', title: 'Improve', description: 'Every proposal builds your content library. Your 5th submission takes half the effort of your 1st.' },
   ],
   partners: ['Air Force APEX', 'Parallax Advanced Research', 'Ohio State CDME', 'Converge Ventures', 'AFRL'],
   testimonial: {
-    quote: 'GovWin surfaced an Air Force SBIR topic we would have completely missed. The scoring told us it was a 94% match — and they were right. We won our first Phase I within 60 days.',
-    company: 'Defense Technology Startup',
-    result: '$150K SBIR Phase I Award',
+    quote: 'RFP Pipeline cut our proposal time in half and helped us focus on the right opportunities. We won our first Phase I within 60 days of signing up.',
+    company: 'CEO, Defense Technology Startup',
+    result: '$150K Phase I Award',
   },
   pricingTeaser: {
-    eyebrow: 'Simple, Powerful Pricing',
-    title: 'One plan. Pay per proposal.',
-    description: '$199/mo for your SBIR/STTR lookout. Add proposal builds when you need them.',
+    eyebrow: 'Simple Pricing. Massive Upside.',
+    title: '$199/mo for your SBIR Engine. Pay per proposal build.',
+    description: 'The Pipeline Engine runs 24/7 for $199/month with a 14-day free trial. When you find the right opportunity, add a Phase I Build ($999) or Phase II Build ($2,500).',
     ctaText: 'See Pricing',
-    ctaLink: '/get-started',
+    ctaLink: '/pricing',
   },
   cta: {
-    title: 'Ready to win your next SBIR?',
-    description: 'Join the companies using GovWin to find and win SBIR/STTR awards faster. Profile your technology, get matched to opportunities, and build winning proposals.',
-    primaryLabel: 'Join the Waitlist',
+    title: 'Start your SBIR pipeline in minutes.',
+    description: 'Federal agencies release billions in SBIR/STTR funding every year. The companies that win have systems. Get yours running today.',
+    primaryLabel: 'Start 14-Day Trial',
     primaryHref: '/get-started',
-    secondaryLabel: 'See our wins',
-    secondaryHref: '/customers',
+    secondaryLabel: 'See a Demo',
+    secondaryHref: '/engine',
   },
 }
 
 const STATIC_META = {
-  title: 'GovWin | SBIR/STTR Opportunity Intelligence for Small Business',
-  description: 'AI-powered SBIR/STTR, OTA, and BAA opportunity matching and proposal building for small tech businesses. 13/13 recent win rate. $100M+ secured.',
+  title: 'RFP Pipeline | The Operating System for Non-Dilutive Funding',
+  description: 'Win SBIR & federal R&D funding without consultants. Find, decide, and build winning proposals using the SBIR Engine. $199/mo. Start free.',
 }
 
 const ICON_MAP: Record<string, () => React.JSX.Element> = {
@@ -64,8 +65,21 @@ const ICON_MAP: Record<string, () => React.JSX.Element> = {
 }
 
 const STEP_ICON_MAP: Record<string, () => React.JSX.Element> = {
-  '01': UserProfileIcon, '02': ScoreIcon, '03': TrophyIcon,
+  '01': SearchIcon, '02': ScoreIcon, '03': DocumentIcon, '04': ChartIcon,
 }
+
+const FEDERAL_AGENCIES = [
+  { abbr: 'DoD', name: 'Department of Defense' },
+  { abbr: 'NIH', name: 'National Institutes of Health' },
+  { abbr: 'NSF', name: 'National Science Foundation' },
+  { abbr: 'DOE', name: 'Department of Energy' },
+  { abbr: 'NASA', name: 'Natl Aeronautics & Space Admin' },
+  { abbr: 'DHS', name: 'Dept of Homeland Security' },
+  { abbr: 'USDA', name: 'Dept of Agriculture' },
+  { abbr: 'DOT', name: 'Dept of Transportation' },
+  { abbr: 'EPA', name: 'Environmental Protection Agency' },
+  { abbr: 'DoC', name: 'Department of Commerce' },
+]
 
 export async function generateMetadata(): Promise<Metadata> {
   const published = await getPageContent('home')
@@ -79,59 +93,66 @@ export default async function LandingPage() {
   return (
     <>
       {/* ───── Hero ───── */}
-      <section className="relative overflow-hidden bg-white px-4 pb-20 pt-16 sm:px-6 sm:pb-28 sm:pt-24 lg:px-8">
+      <section className="relative overflow-hidden bg-white px-4 pb-24 pt-16 sm:px-6 sm:pb-32 sm:pt-24 lg:px-8">
         {/* Background decoration */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-hero-mesh" />
-          <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-brand-500/5 blur-3xl" />
-          <div className="absolute right-0 top-1/3 h-[400px] w-[400px] rounded-full bg-violet-500/5 blur-3xl" />
-          <div className="absolute left-0 bottom-0 h-[400px] w-[400px] rounded-full bg-cyan-500/5 blur-3xl" />
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/3 h-[800px] w-[800px] rounded-full bg-brand-500/5 blur-3xl" />
+          <div className="absolute right-0 top-1/4 h-[500px] w-[500px] rounded-full bg-violet-500/5 blur-3xl" />
+          <div className="absolute left-0 bottom-0 h-[500px] w-[500px] rounded-full bg-cyan-500/5 blur-3xl" />
         </div>
 
         <div className="mx-auto max-w-5xl text-center">
-          {/* Trust badge */}
+          {/* Eyebrow badge */}
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10 animate-fade-in">
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse-subtle" />
-            {content.hero.trustBadge}
+            {content.hero.eyebrow}
           </div>
 
           <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up">
-            {content.hero.title.includes('before your competitors') ? (
-              <>
-                Find and win federal contracts{' '}
-                <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
-                  before your competitors
-                </span>
-              </>
-            ) : (
-              content.hero.title
-            )}
+            Win{' '}
+            <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
+              SBIR & Federal R&D Funding
+            </span>
+            <br className="hidden sm:block" />
+            <span className="text-gray-900">Without Consultants</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
             {content.hero.description}
           </p>
 
+          {/* Proof strip */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-6 animate-fade-in-up">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$100M+</span>
+              <span className="text-sm font-medium text-gray-500">non-dilutive capital supported</span>
+            </div>
+            <div className="h-6 w-px bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">Dozens</span>
+              <span className="text-sm font-medium text-gray-500">of Phase I, II & III awards</span>
+            </div>
+            <div className="h-6 w-px bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">100+</span>
+              <span className="text-sm font-medium text-gray-500">additional wins supported</span>
+            </div>
+          </div>
+
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center animate-fade-in-up">
             <Link href="/get-started" className="btn-cta px-8 py-3.5 text-base">
-              Start Free Trial
+              Start 14-Day Trial
               <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
               </svg>
             </Link>
-            <Link href="/about" className="group flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-brand-600 transition-colors">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 transition-all group-hover:border-brand-300 group-hover:bg-brand-50">
-                <svg className="h-4 w-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </span>
-              See how it works
-            </Link>
+            <p className="text-xs text-gray-400">Full access. No charge today.</p>
           </div>
         </div>
 
         {/* Platform preview mockup */}
-        <div className="mx-auto mt-16 max-w-5xl animate-fade-in-up">
+        <div className="mx-auto mt-20 max-w-5xl animate-fade-in-up">
           <div className="relative rounded-2xl border border-gray-200/60 bg-white p-1.5 shadow-elevated">
             {/* Browser chrome */}
             <div className="flex items-center gap-1.5 rounded-t-xl bg-gray-100 px-4 py-2.5">
@@ -143,30 +164,107 @@ export default async function LandingPage() {
               </div>
             </div>
             {/* Mock dashboard content */}
-            <div className="rounded-b-xl bg-gray-50 p-6">
-              <div className="grid grid-cols-4 gap-3">
-                <MockStatCard label="In Pipeline" value="147" color="bg-blue-50" />
-                <MockStatCard label="High Priority" value="23" color="bg-emerald-50" />
-                <MockStatCard label="Pursuing" value="8" color="bg-violet-50" />
-                <MockStatCard label="Closing Soon" value="5" color="bg-red-50" />
+            <div className="rounded-b-xl bg-gray-50 p-4 sm:p-6">
+              {/* Dashboard header */}
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Pipeline Overview</div>
+                  <div className="text-sm font-bold text-gray-900 mt-0.5">FY2026 SBIR/STTR Opportunities</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-md bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-600/10">Live Scanning</div>
+                  <div className="rounded-md bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">Last sync: 2m ago</div>
+                </div>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-white p-4 shadow-sm border border-gray-100">
-                  <div className="text-xs font-bold text-gray-700">Top Scored Opportunities</div>
+              <div className="grid grid-cols-4 gap-3">
+                <MockStatCard label="In Pipeline" value="147" subtext="across 11 agencies" color="bg-blue-50" accent="text-blue-600" />
+                <MockStatCard label="High Match (90%+)" value="23" subtext="action recommended" color="bg-emerald-50" accent="text-emerald-600" />
+                <MockStatCard label="Actively Pursuing" value="8" subtext="proposals in progress" color="bg-violet-50" accent="text-violet-600" />
+                <MockStatCard label="Closing This Week" value="5" subtext="deadlines approaching" color="bg-red-50" accent="text-red-600" />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="col-span-2 rounded-xl bg-white p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold text-gray-700">Highest-Match Opportunities</div>
+                    <div className="text-[10px] text-gray-400">Match Score</div>
+                  </div>
                   <div className="mt-3 space-y-2">
-                    <MockOppRow title="USAF Cyber Defense Platform" score={96} />
-                    <MockOppRow title="NASA Research Data Analysis" score={92} />
-                    <MockOppRow title="Army Communication Systems" score={88} />
+                    <MockOppRow title="USAF | Autonomous Cyber Defense Platform" agency="AFRL" score={96} phase="Phase I" amount="$150K" />
+                    <MockOppRow title="NASA | ML-Based Telemetry Analysis" agency="STMD" score={94} phase="Phase II" amount="$1M" />
+                    <MockOppRow title="Army | Next-Gen Comm Systems" agency="DEVCOM" score={91} phase="Phase I" amount="$150K" />
+                    <MockOppRow title="NIH | AI Diagnostic Imaging Tools" agency="NCI" score={88} phase="Phase I" amount="$275K" />
                   </div>
                 </div>
                 <div className="rounded-xl bg-white p-4 shadow-sm border border-gray-100">
                   <div className="text-xs font-bold text-gray-700">Closing Soon</div>
                   <div className="mt-3 space-y-2">
-                    <MockOppRow title="DHS Border Security Tech" score={85} days={3} />
-                    <MockOppRow title="VA Telehealth Expansion" score={79} days={5} />
-                    <MockOppRow title="DOE Clean Energy R&D" score={74} days={7} />
+                    <MockDeadlineRow title="DHS Border Security" days={2} score={85} />
+                    <MockDeadlineRow title="VA Telehealth Platform" days={4} score={82} />
+                    <MockDeadlineRow title="DOE Clean Energy R&D" days={6} score={79} />
+                    <MockDeadlineRow title="NSF Quantum Computing" days={8} score={74} />
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+          {/* Subtle glow under mockup */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 h-40 w-3/4 bg-gradient-to-t from-brand-500/5 to-transparent blur-2xl -z-10" />
+        </div>
+      </section>
+
+      {/* ───── Federal Agency Coverage ───── */}
+      <section className="border-y border-gray-100 bg-slate-900 px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-8">
+            Scanning every major SBIR/STTR-issuing federal agency
+          </p>
+          <div className="grid grid-cols-5 gap-4 sm:grid-cols-10">
+            {FEDERAL_AGENCIES.map(agency => (
+              <div key={agency.abbr} className="group flex flex-col items-center gap-1.5">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800 text-xs font-black text-slate-300 ring-1 ring-slate-700 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:ring-brand-500">
+                  {agency.abbr}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ───── Problem / Solution ───── */}
+      <section className="bg-white px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid grid-cols-1 gap-16 lg:grid-cols-2 lg:items-center">
+            {/* The Problem */}
+            <div>
+              <div className="inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-red-600 ring-1 ring-red-600/10">
+                The Problem
+              </div>
+              <h2 className="mt-4 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+                Brilliant technology.<br />
+                <span className="text-gray-400">Buried in procurement paperwork.</span>
+              </h2>
+              <div className="mt-8 space-y-4">
+                <ProblemItem text="You spend 40+ hours/month scanning SAM.gov, SBIR.gov, and agency portals for relevant topics" />
+                <ProblemItem text="By the time you find a match, the deadline is next week and your competitor already started" />
+                <ProblemItem text="You read 200-page solicitations only to discover they don't fit your technology" />
+                <ProblemItem text="Writing your first proposal from scratch takes months and costs $15-25K with a consultant" />
+                <ProblemItem text="You know your tech can win, but you are competing against companies with full-time BD teams" />
+              </div>
+            </div>
+            {/* The Solution */}
+            <div className="rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white p-8 sm:p-10">
+              <div className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-600 ring-1 ring-brand-600/10">
+                The SBIR Engine
+              </div>
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+                Find. Decide. Build. Win.
+              </h2>
+              <div className="mt-8 space-y-4">
+                <SolutionItem text="AI scans every federal agency for opportunities matching your technology" />
+                <SolutionItem text="Fit scoring tells you what to pursue before you invest time reading" />
+                <SolutionItem text="Expert-derived templates get you to submission-ready in days, not months" />
+                <SolutionItem text="Every proposal builds your reusable content library — compounding efficiency" />
+                <SolutionItem text="Deadline tracking tied to SBIR release cycles, not just due dates" />
               </div>
             </div>
           </div>
@@ -174,23 +272,22 @@ export default async function LandingPage() {
       </section>
 
       {/* ───── Social proof stats ───── */}
-      <section className="relative border-y border-gray-100 bg-white px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 sm:grid-cols-4">
-          {content.stats.map(stat => (
-            <StatHighlight key={stat.label} value={stat.value} label={stat.label} description={stat.description} />
-          ))}
+      <section className="relative border-y border-gray-100 bg-slate-900 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="absolute inset-0 -z-0">
+          <div className="absolute left-1/4 top-0 h-40 w-40 rounded-full bg-brand-500/10 blur-3xl" />
+          <div className="absolute right-1/4 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl" />
         </div>
-      </section>
-
-      {/* ───── Trusted by logos placeholder ───── */}
-      <section className="bg-white px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-center text-xs font-bold uppercase tracking-widest text-gray-400">
-            Trusted by innovative companies across the defense & technology landscape
+        <div className="relative mx-auto max-w-5xl">
+          <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-12">
+            The numbers behind the platform
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
-            {content.partners.map(name => (
-              <span key={name} className="text-sm font-semibold text-gray-300">{name}</span>
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+            {content.stats.map(stat => (
+              <div key={stat.label} className="text-center">
+                <p className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-brand-400 to-cyan-400 bg-clip-text text-transparent sm:text-5xl">{stat.value}</p>
+                <p className="mt-2 text-sm font-bold text-white">{stat.label}</p>
+                <p className="mt-0.5 text-xs text-slate-400">{stat.description}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -199,9 +296,9 @@ export default async function LandingPage() {
       {/* ───── Features grid ───── */}
       <Section className="bg-surface-50">
         <SectionHeader
-          eyebrow="Platform Capabilities"
-          title="Everything you need to win government contracts"
-          description="From opportunity discovery to proposal submission, RFP Pipeline streamlines the entire federal procurement process."
+          eyebrow="Inside the SBIR Engine"
+          title="Everything you need to find, decide, and build"
+          description="Each capability addresses a specific pain point that small businesses face when competing for federal R&D contracts."
         />
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {content.features.map(feat => {
@@ -221,54 +318,115 @@ export default async function LandingPage() {
       {/* ───── How it works ───── */}
       <Section className="bg-white">
         <SectionHeader
-          eyebrow="How It Works"
-          title="From search to submission in three steps"
+          eyebrow="The SBIR Engine"
+          title="From Opportunity to Award — In One System"
+          description="Find the right opportunities. Decide what to pursue. Build faster with proven structure. Improve with every submission."
         />
-        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {content.howItWorks.map(item => {
-            const StepIcon = STEP_ICON_MAP[item.step] ?? UserProfileIcon
-            return (
-              <div key={item.step} className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-7 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
-                <span className="absolute -right-2 -top-4 text-8xl font-black text-gray-50 transition-colors duration-300 group-hover:text-brand-50">
-                  {item.step}
-                </span>
-                <div className="relative">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
-                    <StepIcon />
+        <div className="relative mt-14">
+          {/* Connector line between steps */}
+          <div className="absolute top-24 left-0 right-0 hidden md:block">
+            <div className="mx-auto max-w-2xl">
+              <div className="h-0.5 w-full bg-gradient-to-r from-brand-200 via-brand-400 to-brand-200 rounded-full" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {content.howItWorks.map((item, idx) => {
+              const StepIcon = STEP_ICON_MAP[item.step] ?? SearchIcon
+              return (
+                <div key={item.step} className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-7 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
+                  <span className="absolute -right-2 -top-4 text-8xl font-black text-gray-50 transition-colors duration-300 group-hover:text-brand-50">
+                    {item.step}
+                  </span>
+                  <div className="relative">
+                    {/* Step number badge */}
+                    <div className="mb-4 flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 transition-all duration-300 group-hover:bg-brand-600 group-hover:text-white group-hover:shadow-glow">
+                        <StepIcon />
+                      </div>
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
+                        {idx + 1}
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
                   </div>
-                  <h3 className="mt-5 text-lg font-bold text-gray-900">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </Section>
 
       {/* ───── Testimonial highlight ───── */}
-      <section className="bg-surface-50 px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          <svg className="mx-auto h-10 w-10 text-brand-200" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H14.017zM0 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10H0z" />
-          </svg>
-          <blockquote className="mt-6 text-xl font-medium leading-relaxed text-gray-900 sm:text-2xl">
+      <section className="bg-slate-900 px-4 py-20 sm:px-6 sm:py-28 lg:px-8 relative overflow-hidden">
+        <div className="absolute left-0 top-0 h-60 w-60 rounded-full bg-brand-500/10 blur-3xl" />
+        <div className="absolute right-0 bottom-0 h-60 w-60 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative mx-auto max-w-4xl text-center">
+          {/* Five stars */}
+          <div className="flex items-center justify-center gap-1 mb-6">
+            {[1,2,3,4,5].map(i => (
+              <svg key={i} className="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            ))}
+          </div>
+          <blockquote className="text-xl font-medium leading-relaxed text-white sm:text-2xl lg:text-3xl">
             &ldquo;{content.testimonial.quote}&rdquo;
           </blockquote>
-          <div className="mt-6">
-            <p className="text-sm font-bold text-gray-900">{content.testimonial.company}</p>
-            <p className="text-sm text-gray-500">{content.testimonial.result}</p>
+          <div className="mt-8">
+            <p className="text-sm font-bold text-white">{content.testimonial.company}</p>
+            <p className="mt-1 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-4 py-1.5 text-sm font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+              {content.testimonial.result}
+            </p>
           </div>
         </div>
       </section>
 
+      {/* ───── Authority ───── */}
+      <Section className="bg-white border-b border-gray-100">
+        <SectionHeader
+          eyebrow="Why Us"
+          title="Built by People Who Have Actually Won SBIR Funding"
+          description="Not another generic proposal tool. RFP Pipeline was built from decades of hands-on SBIR/STTR experience — writing proposals, advising startups, and helping companies secure non-dilutive capital."
+        />
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
+          {content.partners.map(name => (
+            <span key={name} className="text-sm font-bold text-gray-300 tracking-wide">{name}</span>
+          ))}
+        </div>
+      </Section>
+
       {/* ───── Pricing teaser ───── */}
-      <Section className="bg-white">
+      <Section className="bg-surface-50">
         <SectionHeader
           eyebrow={content.pricingTeaser.eyebrow}
           title={content.pricingTeaser.title}
           description={content.pricingTeaser.description}
         />
-        <div className="mt-10 flex justify-center">
+        <div className="mt-10 flex flex-col items-center gap-6">
+          {/* Price breakdown + ROI visual */}
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <div className="rounded-xl border border-gray-200 bg-white px-6 py-4 text-center shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Pipeline Engine</div>
+              <div className="mt-1 text-2xl font-extrabold text-gray-900">$199<span className="text-sm font-medium text-gray-400">/mo</span></div>
+              <div className="mt-1 text-[10px] text-gray-400">Includes 14-day trial</div>
+            </div>
+            <div className="text-lg font-bold text-gray-300">+</div>
+            <div className="rounded-xl border border-gray-200 bg-white px-6 py-4 text-center shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Phase I Build</div>
+              <div className="mt-1 text-2xl font-extrabold text-gray-900">$999</div>
+              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Win $150K+</div>
+            </div>
+            <div className="text-lg font-bold text-gray-300">or</div>
+            <div className="rounded-xl border border-brand-200 bg-brand-50 px-6 py-4 text-center shadow-sm ring-1 ring-brand-600/10">
+              <div className="text-xs font-bold uppercase tracking-wider text-brand-600">Phase II Build</div>
+              <div className="mt-1 text-2xl font-extrabold text-gray-900">$2,500</div>
+              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Win $1M+</div>
+            </div>
+          </div>
           <Link
             href={content.pricingTeaser.ctaLink}
             className="group inline-flex items-center gap-2 rounded-xl bg-brand-50 px-6 py-3 text-sm font-bold text-brand-700 ring-1 ring-brand-600/10 transition-all hover:bg-brand-100 hover:ring-brand-600/20"
@@ -294,23 +452,75 @@ export default async function LandingPage() {
   )
 }
 
-/* ── Mock dashboard components (for hero preview) ── */
+/* ── Problem/Solution helper components ── */
 
-function MockStatCard({ label, value, color }: { label: string; value: string; color: string }) {
+function ProblemItem({ text }: { text: string }) {
   return (
-    <div className={`rounded-lg ${color} p-3`}>
-      <div className="text-[10px] font-medium text-gray-500">{label}</div>
-      <div className="mt-0.5 text-lg font-bold text-gray-900">{value}</div>
+    <div className="flex items-start gap-3">
+      <div className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+        <svg className="h-3 w-3 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </div>
+      <p className="text-sm leading-relaxed text-gray-600">{text}</p>
     </div>
   )
 }
 
-function MockOppRow({ title, score, days }: { title: string; score: number; days?: number }) {
+function SolutionItem({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand-100">
+        <svg className="h-3 w-3 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+        </svg>
+      </div>
+      <p className="text-sm leading-relaxed text-gray-600">{text}</p>
+    </div>
+  )
+}
+
+/* ── Mock dashboard components (for hero preview) ── */
+
+function MockStatCard({ label, value, subtext, color, accent }: { label: string; value: string; subtext?: string; color: string; accent?: string }) {
+  return (
+    <div className={`rounded-lg ${color} p-3`}>
+      <div className="text-[10px] font-medium text-gray-500">{label}</div>
+      <div className={`mt-0.5 text-lg font-bold ${accent ?? 'text-gray-900'}`}>{value}</div>
+      {subtext && <div className="text-[9px] text-gray-400 mt-0.5">{subtext}</div>}
+    </div>
+  )
+}
+
+function MockOppRow({ title, agency, score, phase, amount }: { title: string; agency?: string; score: number; phase?: string; amount?: string; days?: number }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2.5 transition-colors hover:bg-gray-100">
+      <div className="flex-1 min-w-0 mr-3">
+        <span className="text-[11px] font-semibold text-gray-800 truncate block">{title}</span>
+        <div className="flex items-center gap-2 mt-0.5">
+          {agency && <span className="text-[9px] font-medium text-gray-400">{agency}</span>}
+          {phase && <span className="text-[9px] font-medium text-brand-500">{phase}</span>}
+          {amount && <span className="text-[9px] font-bold text-emerald-600">{amount}</span>}
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className="w-12 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+          <div className={`h-full rounded-full ${score >= 90 ? 'bg-emerald-500' : score >= 80 ? 'bg-amber-500' : 'bg-gray-400'}`} style={{ width: `${score}%` }} />
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${score >= 90 ? 'bg-emerald-100 text-emerald-700' : score >= 80 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+          {score}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function MockDeadlineRow({ title, days, score }: { title: string; days: number; score: number }) {
   return (
     <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
       <span className="text-[11px] font-medium text-gray-700 truncate mr-2">{title}</span>
       <div className="flex items-center gap-2">
-        {days != null && <span className="text-[10px] text-red-500 font-semibold">{days}d</span>}
+        <span className={`text-[10px] font-bold ${days <= 3 ? 'text-red-500' : 'text-amber-500'}`}>{days}d</span>
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${score >= 90 ? 'bg-emerald-100 text-emerald-700' : score >= 80 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
           {score}
         </span>
@@ -365,14 +575,6 @@ function TeamIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-    </svg>
-  )
-}
-
-function UserProfileIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
     </svg>
   )
 }

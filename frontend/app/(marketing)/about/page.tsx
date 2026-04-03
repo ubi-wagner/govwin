@@ -6,37 +6,31 @@ import type { AboutPageContent } from '@/types'
 
 const STATIC_CONTENT: AboutPageContent = {
   hero: {
-    eyebrow: 'About GovWin',
-    title: 'Built by people who win SBIR/STTR awards',
-    description: 'GovWin was created by a team with 20+ years of SBIR/STTR experience, a 13/13 recent win rate, and over $100M in non-dilutive capital secured for small tech businesses. We built the platform we wished existed.',
+    eyebrow: 'Our Story',
+    title: 'We Built the System We Needed — Now You Can Use It',
+    description: 'After decades of winning and supporting SBIR/STTR funding, we built the platform we wish existed.',
   },
   mission: {
-    eyebrow: 'Our Mission',
-    title: 'Democratize access to federal research funding',
+    eyebrow: 'Why RFP Pipeline Exists',
+    title: 'The funding exists. The talent exists. The system was broken.',
     paragraphs: [
-      'The federal government invests billions annually in small business R&D through SBIR, STTR, OTA, and BAA programs. But finding the right opportunities and writing competitive proposals requires expertise that most small businesses cannot afford. The result: great technologies never get funded.',
-      'GovWin changes that. Our platform scans every SBIR/STTR solicitation across all federal agencies, scores each topic against your technology profile, and provides expert-reviewed proposal templates with AI-assisted assembly. Every proposal you build makes the next one faster through our compound learning library. Our vision is simple: your 5th proposal should take a fraction of the effort of your first.',
+      'We have spent years inside the SBIR/STTR process — writing proposals, advising startups, supporting accelerators, and helping companies secure non-dilutive funding.',
+      'The problem was always the same: Opportunities were scattered. Decisions were unclear. Proposals took too long. Knowledge did not carry forward.',
+      'So we built the system ourselves. Now you can use it.',
     ],
   },
   features: [
-    { icon: '13/13', title: 'Win Rate', description: '100% recent SBIR/STTR success across Phase I and Phase II awards' },
-    { icon: '$100M', title: 'Capital Secured', description: 'Non-dilutive funding secured for clients through SBIR, STTR, and related programs' },
-    { icon: '50+', title: 'Startups', description: 'Deep tech, defense, biotech, and university spinoff companies supported' },
-    { icon: '20+', title: 'Years', description: 'Federal R&D funding, SBIR/STTR programs, and technology commercialization' },
+    { icon: '$100M+', title: 'Capital Supported', description: 'Non-dilutive funding supported through SBIR, STTR, OTAs, BAAs, and related federal R&D programs' },
+    { icon: 'Dozens', title: 'Awards Won', description: 'Phase I, II & III SBIR/STTR awards across companies led and supported' },
+    { icon: '100+', title: 'Additional Wins', description: 'Awards supported through advisory roles, accelerators, and federal programs' },
+    { icon: '20+', title: 'Years Experience', description: 'Technology commercialization, SBIR/STTR proposal development, and federal R&D strategy' },
   ],
-  howItWorks: [
-    { step: '01', title: 'Missed Opportunities', description: 'SBIR/STTR topics are released on unpredictable schedules across dozens of agency portals. Great-fit topics close before you find them.' },
-    { step: '02', title: 'Scattered Sources', description: 'SBIR.gov, SAM.gov, agency-specific portals, and email lists — there is no single source of truth for all federal R&D opportunities.' },
-    { step: '03', title: 'Proposal Paralysis', description: 'You found a topic, but the 30-page proposal template is intimidating. Where do you start? What does this agency actually want to see?' },
-    { step: '04', title: 'Starting From Scratch', description: 'Every proposal feels like the first. Team bios, past performance, facility descriptions — rewritten from zero each time.' },
-    { step: '05', title: 'Consultant Costs', description: 'SBIR consultants charge $3K-$10K per proposal. For a small business exploring federal R&D, that math does not work.' },
-    { step: '06', title: 'No Feedback Loop', description: 'Win or lose, there is no system to capture what worked and apply it to the next proposal. Institutional knowledge walks out the door.' },
-  ],
+  howItWorks: [],
 }
 
 const STATIC_META = {
-  title: 'About GovWin | SBIR/STTR Expertise for Small Business',
-  description: '20+ years of SBIR/STTR expertise. 13/13 recent win rate. $100M+ in non-dilutive capital secured. Learn how GovWin helps small tech businesses win federal research funding.',
+  title: 'About | RFP Pipeline',
+  description: 'We built the SBIR/STTR system we needed. $100M+ in non-dilutive capital supported. Decades of federal R&D expertise. Now you can use it.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -53,117 +47,101 @@ export default async function AboutPage() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-white px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
         <div className="absolute inset-0 -z-10 bg-hero-mesh" />
-        <div className="mx-auto max-w-3xl text-center">
+        <div className="mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold text-brand-700 ring-1 ring-brand-600/10">
             {content.hero.eyebrow}
           </div>
-          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl">
-            {content.hero.title.includes('federal contracting') ? (
-              <>
-                Built by people who know{' '}
-                <span className="bg-gradient-to-r from-brand-600 to-cyan-500 bg-clip-text text-transparent">
-                  federal contracting
-                </span>
-              </>
-            ) : (
-              content.hero.title
-            )}
+          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
+            We Built the System We Needed —{' '}
+            <span className="bg-gradient-to-r from-brand-600 to-cyan-500 bg-clip-text text-transparent">
+              Now You Can Use It
+            </span>
           </h1>
-          <p className="mt-6 text-lg leading-relaxed text-gray-600">
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600">
             {content.hero.description}
           </p>
         </div>
       </section>
 
-      {/* Mission */}
-      <Section className="bg-surface-50">
-        <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <SectionHeader
-              eyebrow={content.mission.eyebrow}
-              title={content.mission.title}
-              center={false}
-            />
-            {content.mission.paragraphs.map((p, i) => (
-              <p key={i} className={`${i === 0 ? 'mt-6' : 'mt-4'} text-sm leading-relaxed text-gray-600`}>
-                {p}
-              </p>
-            ))}
-            <div className="mt-8">
-              <Link href="/get-started" className="btn-primary">
-                Start Free Trial
-                <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                </svg>
-              </Link>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+      {/* Credibility stats */}
+      <section className="bg-slate-900 px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             {content.features.map(item => (
-              <div key={item.icon} className="group rounded-2xl bg-white p-5 shadow-card border border-gray-200/60 transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5">
-                <p className="text-3xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">{item.icon}</p>
-                <p className="mt-2 text-sm font-bold text-gray-900">{item.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.description}</p>
+              <div key={item.icon} className="text-center">
+                <p className="text-3xl font-extrabold bg-gradient-to-r from-brand-400 to-cyan-400 bg-clip-text text-transparent sm:text-4xl">{item.icon}</p>
+                <p className="mt-2 text-sm font-bold text-white">{item.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
-      </Section>
+      </section>
 
-      {/* What we solve */}
+      {/* Why RFP Pipeline Exists */}
       <Section className="bg-white">
-        <SectionHeader
-          eyebrow="The Problem We Solve"
-          title="Federal contracting is broken for small businesses"
-        />
-        <div className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200/60 sm:grid-cols-2 lg:grid-cols-3">
-          {content.howItWorks.map(item => (
-            <div key={item.step} className="relative bg-white p-6 group hover:bg-brand-50/30 transition-colors">
-              <span className="absolute right-4 top-4 text-3xl font-black text-gray-100 group-hover:text-brand-100 transition-colors">{item.step}</span>
-              <h3 className="text-sm font-bold text-gray-900">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-500">{item.description}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Contact / Get Started */}
-      <Section className="bg-surface-50" id="contact">
-        <SectionHeader
-          eyebrow="Get Started"
-          title="Ready to transform your federal pipeline?"
-          description="Contact us to learn how GovWin can help your business find and win SBIR/STTR awards."
-        />
-        <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-gray-200/80 bg-white p-8 shadow-card">
-          <div className="space-y-5 text-center">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50">
-              <svg className="h-7 w-7 text-brand-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">
-              Reach out to discuss your SBIR/STTR goals and how we can help you win.
-            </p>
-            <a
-              href="mailto:eric@rfppipeline.com"
-              className="block rounded-xl bg-brand-50 px-4 py-3.5 text-sm font-bold text-brand-700 hover:bg-brand-100 transition-all ring-1 ring-brand-600/10"
-            >
-              eric@rfppipeline.com
-            </a>
-            <p className="text-xs text-gray-400">
-              We typically respond within one business day.
-            </p>
+        <div className="mx-auto max-w-3xl">
+          <SectionHeader
+            eyebrow={content.mission.eyebrow}
+            title={content.mission.title}
+            center={false}
+          />
+          <div className="mt-8 space-y-5 text-base leading-relaxed text-gray-600">
+            {content.mission.paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
           </div>
         </div>
       </Section>
 
+      {/* Philosophy */}
+      <section className="bg-surface-50 px-4 py-20 sm:px-6 sm:py-24 lg:px-8 border-y border-gray-200/60">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            SBIR Should Not Be an Insider&apos;s Game
+          </h2>
+          <div className="mt-6 space-y-4 text-base leading-relaxed text-gray-600">
+            <p>The funding exists. The talent exists.</p>
+            <p>But the system has been too fragmented and too complex for most companies to access efficiently.</p>
+            <p className="font-semibold text-gray-900">RFP Pipeline changes that.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Founder */}
+      <Section className="bg-white">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-2xl border border-gray-200/80 bg-white p-8 shadow-card sm:p-10">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+              {/* Avatar placeholder */}
+              <div className="hidden h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50 text-brand-600 sm:flex">
+                <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Eric Wagner</h3>
+                <p className="text-sm font-semibold text-brand-600">Founder & CEO</p>
+                <ul className="mt-4 space-y-1.5 text-sm text-gray-600">
+                  <li>20+ years in technology commercialization</li>
+                  <li>Dozens of Phase I, II, and III SBIR/STTR awards across companies led and supported</li>
+                  <li>Supported the capture of 100+ additional awards through advisory roles, accelerators, and federal programs</li>
+                  <li>$100M+ in non-dilutive capital supported</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* CTA */}
       <CtaSection
-        title="Ready to win your next SBIR?"
-        description="Join the companies using GovWin to find and win SBIR/STTR awards faster."
-        primaryLabel="Join the Waitlist"
+        title="Join early users. Start your trial."
+        description="See how the SBIR Engine finds, evaluates, and helps you build winning proposals. 14-day free trial. No credit card required."
+        primaryLabel="Start 14-Day Trial"
         primaryHref="/get-started"
-        secondaryLabel="Meet the founder"
-        secondaryHref="/team"
+        secondaryLabel="See Pricing"
+        secondaryHref="/pricing"
       />
     </>
   )
