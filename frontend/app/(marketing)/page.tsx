@@ -1,61 +1,62 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Section, SectionHeader, FeatureCard, StatHighlight, CtaSection } from '@/components/page-sections'
+import { Section, SectionHeader, FeatureCard, CtaSection } from '@/components/page-sections'
 import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
 import type { HomePageContent } from '@/types'
 
 const STATIC_CONTENT: HomePageContent = {
   hero: {
-    eyebrow: 'AI-Enabled, Expert-Enhanced SBIR/STTR Intelligence',
-    title: 'Your technology deserves federal funding. We make it happen.',
-    description: 'RFP Pipeline combines 24/7 AI scanning with 20+ years of SBIR/STTR expertise to find your highest-match opportunities and build winning proposals. Stop leaving non-dilutive capital on the table.',
-    trustBadge: '13 for 13 Win Rate | $100M+ Secured | 50+ Startups Funded',
+    eyebrow: 'The SBIR Engine',
+    title: 'Win SBIR & Federal R&D Funding Without Consultants',
+    description: 'RFP Pipeline helps you find, decide, and build winning proposals using the SBIR Engine — based on decades of real-world funding success.',
+    trustBadge: '$100M+ non-dilutive capital supported | Dozens of Phase I, II & III awards | 100+ additional wins supported',
   },
   features: [
-    { icon: 'Search', title: 'Every Opportunity. Zero Blind Spots.', description: 'AI scans SAM.gov, SBIR.gov, Grants.gov, and agency portals around the clock. SBIR Phase I/II, STTR, OTAs, BAAs, and Challenges from every federal agency — delivered to your dashboard before your competitors find them.' },
-    { icon: 'Chart', title: 'Know Your Match Before You Invest Time', description: 'Our scoring engine maps each solicitation against your NAICS codes, technology readiness level, research areas, and past performance. Stop reading 200-page RFPs that were never a fit.' },
-    { icon: 'Bell', title: 'Deadline-Aware. Cycle-Aware. Agency-Aware.', description: 'SBIR release cycles, pre-solicitation windows, and agency-specific timelines — all tracked. Get notified at exactly the right time, not when it is too late.' },
-    { icon: 'Shield', title: 'Proposals Built by Experts, Accelerated by AI', description: 'Our team has written proposals that won $100M+ in awards. For $499 (Phase I) or $999 (Phase II), get an expert-reviewed, AI-assembled proposal framework — submission-ready in days, not months.' },
-    { icon: 'Document', title: 'Every Proposal Makes the Next One Easier', description: 'Your compound learning library grows with each submission — team bios, past performance, technical narratives, and boilerplate. By your fifth proposal, you are moving at twice the speed.' },
-    { icon: 'Team', title: 'Built for How SBIR/STTR Teams Actually Work', description: 'Add STTR research partners, subcontractors, and consultants with controlled, proposal-level access. Because winning federal R&D contracts is a team sport.' },
+    { icon: 'Search', title: 'Find the Right Opportunities', description: 'The SBIR Engine aggregates SBIR/STTR, OTA, and BAA solicitations from every federal agency. Filters by your technology. Alerts you in real time.' },
+    { icon: 'Chart', title: 'Decide What to Pursue', description: 'Fit scoring, risk flags, and strategic alignment — so you invest proposal time only on opportunities worth winning.' },
+    { icon: 'Bell', title: 'Never Miss a Deadline', description: 'SBIR release cycles, pre-solicitation windows, and agency timelines — all tracked. Get notified at exactly the right time.' },
+    { icon: 'Shield', title: 'Build with Proven Structure', description: 'Expert-derived templates and AI-assisted drafting. Start with structure — not a blank page. Submission-ready in days, not months.' },
+    { icon: 'Document', title: 'Improve with Every Submission', description: 'Your content library grows with each proposal — team bios, past performance, technical narratives. Every submission makes the next one faster.' },
+    { icon: 'Team', title: 'Collaborate as a Team', description: 'Invite STTR research partners, subcontractors, and consultants with proposal-level access controls.' },
   ],
   stats: [
-    { value: '13/13', label: 'Win Rate', description: 'Exposed proposals that convert' },
-    { value: '$100M+', label: 'Capital Secured', description: 'Non-dilutive SBIR/STTR funding' },
-    { value: '50+', label: 'Startups Funded', description: 'Deep tech and defense innovators' },
+    { value: '$100M+', label: 'Capital Supported', description: 'Non-dilutive SBIR/STTR funding' },
+    { value: 'Dozens', label: 'Awards Won', description: 'Phase I, II & III across agencies' },
+    { value: '100+', label: 'Additional Wins', description: 'Supported through advisory & programs' },
     { value: '20+ yrs', label: 'Domain Expertise', description: 'Federal R&D procurement' },
   ],
   howItWorks: [
-    { step: '01', title: 'Tell Us What You Build', description: 'Define your technology focus, target agencies, NAICS codes, and TRL. Takes 15 minutes. Our engine learns exactly what you are working on.' },
-    { step: '02', title: 'Get Matched Daily', description: 'Every morning, scored and ranked SBIR/STTR opportunities land in your dashboard. High-match topics surface first with deadline context and agency intelligence.' },
-    { step: '03', title: 'Win with Expert Backing', description: 'When you find your opportunity, activate a proposal build. Our experts and AI build your submission framework. You focus on the technical innovation — we handle the procurement maze.' },
+    { step: '01', title: 'Find', description: 'The SBIR Engine scans every federal agency for opportunities that match your technology.' },
+    { step: '02', title: 'Decide', description: 'Fit scoring and strategic alignment help you pick the right opportunities to pursue.' },
+    { step: '03', title: 'Build', description: 'Expert templates and AI-assisted drafting get your proposal submission-ready fast.' },
+    { step: '04', title: 'Improve', description: 'Every proposal builds your content library. Your 5th submission takes half the effort of your 1st.' },
   ],
   partners: ['Air Force APEX', 'Parallax Advanced Research', 'Ohio State CDME', 'Converge Ventures', 'AFRL'],
   testimonial: {
-    quote: 'We were spending 40 hours a month just searching for SBIR topics across agency sites. GovWin surfaced an Air Force cyber defense topic we had completely missed — scored it at 94% match. We won that Phase I in 58 days. That single $150K award funded our next 6 months of R&D.',
-    company: 'CEO, Defense Cybersecurity Startup (Series Seed)',
-    result: '$150K SBIR Phase I → $1M Phase II in progress',
+    quote: 'RFP Pipeline cut our proposal time in half and helped us focus on the right opportunities. We won our first Phase I within 60 days of signing up.',
+    company: 'CEO, Defense Technology Startup',
+    result: '$150K Phase I Award',
   },
   pricingTeaser: {
-    eyebrow: 'Transparent Pricing',
-    title: 'Start at $199/mo. Pay per proposal.',
-    description: 'Your SBIR/STTR lookout runs 24/7 for $199/month. When you find the right opportunity, add a proposal build: $499 for Phase I, $999 for Phase II. No lock-in. No surprises.',
-    ctaText: 'See Full Pricing',
-    ctaLink: '/get-started',
+    eyebrow: 'Simple Pricing. Massive Upside.',
+    title: '$199/mo for your SBIR Engine. Pay per proposal build.',
+    description: 'The Pipeline Engine runs 24/7 for $199/month with a 14-day free trial. When you find the right opportunity, add a Phase I Build ($999) or Phase II Build ($2,500).',
+    ctaText: 'See Pricing',
+    ctaLink: '/pricing',
   },
   cta: {
-    title: 'The next SBIR cycle will not wait for you.',
-    description: 'Federal agencies release billions in SBIR/STTR funding every year. The companies that win are the ones with systems — not the ones refreshing SAM.gov at midnight. Get your pipeline running today.',
-    primaryLabel: 'Join the Waitlist',
+    title: 'Start your SBIR pipeline in minutes.',
+    description: 'Federal agencies release billions in SBIR/STTR funding every year. The companies that win have systems. Get yours running today.',
+    primaryLabel: 'Start 14-Day Trial',
     primaryHref: '/get-started',
-    secondaryLabel: 'Talk to our team',
-    secondaryHref: '/about',
+    secondaryLabel: 'See a Demo',
+    secondaryHref: '/engine',
   },
 }
 
 const STATIC_META = {
-  title: 'RFP Pipeline by GovWin | Win SBIR/STTR Awards with AI + Expert Intelligence',
-  description: 'AI-powered SBIR/STTR opportunity matching and expert-enhanced proposal building. 13/13 win rate. $100M+ secured for 50+ startups. Start at $199/mo.',
+  title: 'RFP Pipeline | The Operating System for Non-Dilutive Funding',
+  description: 'Win SBIR & federal R&D funding without consultants. Find, decide, and build winning proposals using the SBIR Engine. $199/mo. Start free.',
 }
 
 const ICON_MAP: Record<string, () => React.JSX.Element> = {
@@ -64,7 +65,7 @@ const ICON_MAP: Record<string, () => React.JSX.Element> = {
 }
 
 const STEP_ICON_MAP: Record<string, () => React.JSX.Element> = {
-  '01': UserProfileIcon, '02': ScoreIcon, '03': TrophyIcon,
+  '01': SearchIcon, '02': ScoreIcon, '03': DocumentIcon, '04': ChartIcon,
 }
 
 const FEDERAL_AGENCIES = [
@@ -109,51 +110,44 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="mt-8 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up">
-            Your technology deserves{' '}
+            Win{' '}
             <span className="bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 bg-clip-text text-transparent">
-              federal funding
+              SBIR & Federal R&D Funding
             </span>
             <br className="hidden sm:block" />
-            <span className="text-gray-900">We make it happen.</span>
+            <span className="text-gray-900">Without Consultants</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600 sm:text-xl animate-fade-in-up">
             {content.hero.description}
           </p>
 
-          {/* Inline social proof - the 13/13 stat front and center */}
+          {/* Proof strip */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6 animate-fade-in-up">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">13/13</span>
-              <span className="text-sm font-medium text-gray-500">Win Rate</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$100M+</span>
+              <span className="text-sm font-medium text-gray-500">non-dilutive capital supported</span>
             </div>
             <div className="h-6 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">$100M+</span>
-              <span className="text-sm font-medium text-gray-500">Secured</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-brand-600 to-brand-500 bg-clip-text text-transparent">Dozens</span>
+              <span className="text-sm font-medium text-gray-500">of Phase I, II & III awards</span>
             </div>
             <div className="h-6 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">50+</span>
-              <span className="text-sm font-medium text-gray-500">Startups</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">100+</span>
+              <span className="text-sm font-medium text-gray-500">additional wins supported</span>
             </div>
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center animate-fade-in-up">
             <Link href="/get-started" className="btn-cta px-8 py-3.5 text-base">
-              Get Early Access
+              Start 14-Day Trial
               <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
               </svg>
             </Link>
-            <Link href="/about" className="group flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-brand-600 transition-colors">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 transition-all group-hover:border-brand-300 group-hover:bg-brand-50">
-                <svg className="h-4 w-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </span>
-              Meet the team behind the wins
-            </Link>
+            <p className="text-xs text-gray-400">Full access. No charge today.</p>
           </div>
         </div>
 
@@ -260,18 +254,17 @@ export default async function LandingPage() {
             {/* The Solution */}
             <div className="rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50 to-white p-8 sm:p-10">
               <div className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-600 ring-1 ring-brand-600/10">
-                The RFP Pipeline Solution
+                The SBIR Engine
               </div>
               <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-                AI finds your opportunities.<br />
-                Experts help you win them.
+                Find. Decide. Build. Win.
               </h2>
               <div className="mt-8 space-y-4">
-                <SolutionItem text="24/7 AI scanning across every federal agency portal, so you never miss a relevant topic" />
-                <SolutionItem text="Technology match scoring ranks every opportunity against your profile before you read a single page" />
-                <SolutionItem text="Deadline intelligence tied to SBIR release cycles, not just due dates" />
-                <SolutionItem text="Expert-reviewed proposal frameworks for $499 (Phase I) or $999 (Phase II) — not $25K" />
-                <SolutionItem text="A compound learning library that makes every proposal faster than the last" />
+                <SolutionItem text="AI scans every federal agency for opportunities matching your technology" />
+                <SolutionItem text="Fit scoring tells you what to pursue before you invest time reading" />
+                <SolutionItem text="Expert-derived templates get you to submission-ready in days, not months" />
+                <SolutionItem text="Every proposal builds your reusable content library — compounding efficiency" />
+                <SolutionItem text="Deadline tracking tied to SBIR release cycles, not just due dates" />
               </div>
             </div>
           </div>
@@ -303,9 +296,9 @@ export default async function LandingPage() {
       {/* ───── Features grid ───── */}
       <Section className="bg-surface-50">
         <SectionHeader
-          eyebrow="Platform Capabilities"
-          title="Built for the SBIR/STTR grind so you can focus on the science"
-          description="Every feature addresses a specific pain point that small businesses face when competing for federal R&D contracts."
+          eyebrow="Inside the SBIR Engine"
+          title="Everything you need to find, decide, and build"
+          description="Each capability addresses a specific pain point that small businesses face when competing for federal R&D contracts."
         />
         <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {content.features.map(feat => {
@@ -325,8 +318,9 @@ export default async function LandingPage() {
       {/* ───── How it works ───── */}
       <Section className="bg-white">
         <SectionHeader
-          eyebrow="How It Works"
-          title="From technology profile to winning proposal in three steps"
+          eyebrow="The SBIR Engine"
+          title="From Opportunity to Award — In One System"
+          description="Find the right opportunities. Decide what to pursue. Build faster with proven structure. Improve with every submission."
         />
         <div className="relative mt-14">
           {/* Connector line between steps */}
@@ -335,9 +329,9 @@ export default async function LandingPage() {
               <div className="h-0.5 w-full bg-gradient-to-r from-brand-200 via-brand-400 to-brand-200 rounded-full" />
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {content.howItWorks.map((item, idx) => {
-              const StepIcon = STEP_ICON_MAP[item.step] ?? UserProfileIcon
+              const StepIcon = STEP_ICON_MAP[item.step] ?? SearchIcon
               return (
                 <div key={item.step} className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-7 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
                   <span className="absolute -right-2 -top-4 text-8xl font-black text-gray-50 transition-colors duration-300 group-hover:text-brand-50">
@@ -391,19 +385,19 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ───── Trusted by logos ───── */}
-      <section className="bg-white px-4 py-12 sm:px-6 lg:px-8 border-b border-gray-100">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-            Trusted by innovative companies across defense and deep tech
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
-            {content.partners.map(name => (
-              <span key={name} className="text-sm font-bold text-gray-300 tracking-wide">{name}</span>
-            ))}
-          </div>
+      {/* ───── Authority ───── */}
+      <Section className="bg-white border-b border-gray-100">
+        <SectionHeader
+          eyebrow="Why Us"
+          title="Built by People Who Have Actually Won SBIR Funding"
+          description="Not another generic proposal tool. RFP Pipeline was built from decades of hands-on SBIR/STTR experience — writing proposals, advising startups, and helping companies secure non-dilutive capital."
+        />
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-14 gap-y-4">
+          {content.partners.map(name => (
+            <span key={name} className="text-sm font-bold text-gray-300 tracking-wide">{name}</span>
+          ))}
         </div>
-      </section>
+      </Section>
 
       {/* ───── Pricing teaser ───── */}
       <Section className="bg-surface-50">
@@ -413,21 +407,24 @@ export default async function LandingPage() {
           description={content.pricingTeaser.description}
         />
         <div className="mt-10 flex flex-col items-center gap-6">
-          {/* Price breakdown */}
+          {/* Price breakdown + ROI visual */}
           <div className="flex flex-wrap items-center justify-center gap-4">
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-4 text-center shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Platform</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Pipeline Engine</div>
               <div className="mt-1 text-2xl font-extrabold text-gray-900">$199<span className="text-sm font-medium text-gray-400">/mo</span></div>
+              <div className="mt-1 text-[10px] text-gray-400">Includes 14-day trial</div>
             </div>
             <div className="text-lg font-bold text-gray-300">+</div>
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-4 text-center shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Phase I Proposal</div>
-              <div className="mt-1 text-2xl font-extrabold text-gray-900">$499<span className="text-sm font-medium text-gray-400">/each</span></div>
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-400">Phase I Build</div>
+              <div className="mt-1 text-2xl font-extrabold text-gray-900">$999</div>
+              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Win $150K+</div>
             </div>
             <div className="text-lg font-bold text-gray-300">or</div>
             <div className="rounded-xl border border-brand-200 bg-brand-50 px-6 py-4 text-center shadow-sm ring-1 ring-brand-600/10">
-              <div className="text-xs font-bold uppercase tracking-wider text-brand-600">Phase II Proposal</div>
-              <div className="mt-1 text-2xl font-extrabold text-gray-900">$999<span className="text-sm font-medium text-gray-400">/each</span></div>
+              <div className="text-xs font-bold uppercase tracking-wider text-brand-600">Phase II Build</div>
+              <div className="mt-1 text-2xl font-extrabold text-gray-900">$2,500</div>
+              <div className="mt-1 text-[10px] text-emerald-600 font-medium">Win $1M+</div>
             </div>
           </div>
           <Link
@@ -578,14 +575,6 @@ function TeamIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-    </svg>
-  )
-}
-
-function UserProfileIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
     </svg>
   )
 }

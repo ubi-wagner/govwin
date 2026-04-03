@@ -6,16 +6,17 @@ import { useState, useEffect, useRef } from 'react'
 import { clsx } from 'clsx'
 
 const navLinks = [
-  { href: '/platform', label: 'Platform' },
+  { href: '/engine', label: 'SBIR Engine' },
+  { href: '/features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/about', label: 'About' },
 ]
 
 const resourceLinks = [
+  { href: '/happenings', label: 'Happenings', description: 'Updates, tips, and SBIR strategy', icon: 'megaphone' },
+  { href: '/customers', label: 'Customer Stories', description: 'Teams using RFP Pipeline to win', icon: 'trophy' },
+  { href: '/team', label: 'Our Team', description: 'Meet the people behind the SBIR Engine', icon: 'people' },
   { href: '/tips', label: 'Tips & Tools', description: 'SBIR guides and checklists', icon: 'book' },
-  { href: '/customers', label: 'Customer Wins', description: 'Success stories from our users', icon: 'trophy' },
-  { href: '/announcements', label: 'News', description: 'Product updates and SBIR news', icon: 'megaphone' },
-  { href: '/team', label: 'Our Team', description: 'Meet the people behind RFP Pipeline', icon: 'people' },
 ]
 
 const resourceIcons: Record<string, React.ReactNode> = {
@@ -90,9 +91,9 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2 text-center text-xs font-medium sm:px-6 lg:px-8">
           <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-subtle" />
           <span className="text-gray-300">
-            Now covering all 11 SBIR agencies
+            The SBIR Engine is live — 14-day free trial
           </span>
-          <Link href="/platform" className="ml-1 inline-flex items-center gap-0.5 font-semibold text-brand-400 hover:text-brand-300 transition-colors">
+          <Link href="/get-started" className="ml-1 inline-flex items-center gap-0.5 font-semibold text-brand-400 hover:text-brand-300 transition-colors">
             Learn more
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />

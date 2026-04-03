@@ -1,22 +1,22 @@
 import Link from 'next/link'
 
 const footerLinks = {
-  Platform: [
-    { label: 'How It Works', href: '/about' },
+  Product: [
+    { label: 'SBIR Engine', href: '/engine' },
+    { label: 'Features', href: '/features' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'Customer Wins', href: '/customers' },
-    { label: 'Tips & Tools', href: '/tips' },
+    { label: 'Customer Stories', href: '/customers' },
   ],
   Company: [
     { label: 'About', href: '/about' },
     { label: 'Our Team', href: '/team' },
-    { label: 'News', href: '/announcements' },
+    { label: 'Happenings', href: '/happenings' },
     { label: 'Contact', href: '/about#contact' },
   ],
   Resources: [
-    { label: 'SBIR/STTR Guide', href: '/tips' },
-    { label: 'SAM.gov Checklist', href: '/tips' },
-    { label: 'Capability Statement', href: '/tips' },
+    { label: 'SBIR Tips', href: '/tips' },
+    { label: 'Tools & Templates', href: '/happenings' },
+    { label: 'Get Started', href: '/get-started' },
     { label: 'Sign In', href: '/login' },
   ],
 }
@@ -57,10 +57,10 @@ export function SiteFooter() {
                 </svg>
               </Link>
               <Link
-                href="/platform"
+                href="/engine"
                 className="inline-flex items-center justify-center rounded-xl border border-gray-600 px-6 py-3 text-sm font-semibold text-gray-300 transition-all duration-200 hover:border-gray-500 hover:text-white whitespace-nowrap"
               >
-                See the Platform
+                See the SBIR Engine
               </Link>
             </div>
           </div>
@@ -86,10 +86,10 @@ export function SiteFooter() {
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-gray-500">
-              AI-powered government opportunity intelligence. Find, score, and win federal contracts with confidence.
+              The Operating System for Non-Dilutive Funding. Find, decide, and build winning SBIR/STTR proposals.
             </p>
             <p className="mt-3 text-xs font-medium text-brand-600">
-              Backed by 20+ years of SBIR expertise
+              Powered by the SBIR Engine
             </p>
             <div className="mt-5 flex items-center gap-4">
               <a href="mailto:eric@rfppipeline.com" className="group flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-brand-50 hover:text-brand-700">
