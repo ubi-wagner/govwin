@@ -125,7 +125,7 @@ export function InteractivePricingSection({
               <h3 className="text-xl font-bold text-gray-900">You&apos;re on the list!</h3>
               <p className="mt-3 text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
                 We&apos;ll notify you at <span className="font-semibold text-gray-700">{email}</span> as
-                soon as GovWin launches. Early subscribers get priority onboarding and special pricing.
+                soon as RFP Pipeline launches on May 15, 2026. Beta testers get the first 3 months of Pipeline Engine free and priority access to our Builders.
               </p>
               <button
                 onClick={handleClose}
@@ -165,9 +165,8 @@ export function InteractivePricingSection({
               )}
 
               <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                Join the waitlist for early access to SBIR/STTR opportunity intelligence and proposal builds.
-                Early subscribers get <span className="font-semibold text-gray-900">priority onboarding</span> and{' '}
-                <span className="font-semibold text-gray-900">launch pricing</span>.
+                Join the waitlist as a Beta Tester and get the <span className="font-semibold text-gray-900">first 3 months of Pipeline Engine free</span> and{' '}
+                <span className="font-semibold text-gray-900">priority access to our Builders</span>. Launching May 15, 2026.
               </p>
 
               <div className="space-y-4">
@@ -196,8 +195,8 @@ export function InteractivePricingSection({
 
                 <p className="text-center text-xs text-gray-400 pt-2">
                   Questions? Contact us at{' '}
-                  <a href="mailto:sales@govwin.com" className="text-brand-600 hover:underline font-medium">
-                    sales@govwin.com
+                  <a href="mailto:eric@rfppipeline.com" className="text-brand-600 hover:underline font-medium">
+                    eric@rfppipeline.com
                   </a>
                 </p>
               </div>

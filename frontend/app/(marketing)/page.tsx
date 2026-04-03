@@ -20,7 +20,7 @@ const STATIC_CONTENT: HomePageContent = {
     { icon: 'Team', title: 'Collaborate as a Team', description: 'Invite STTR research partners, subcontractors, and consultants with proposal-level access controls.' },
   ],
   stats: [
-    { value: '$100Ms', label: 'Capital Secured', description: 'Non-dilutive funding into startups' },
+    { value: '$100M+', label: 'Capital Secured', description: 'Non-dilutive funding into startups' },
     { value: 'Dozens', label: 'Phase I, II & III Awards', description: 'Over the last decade' },
     { value: '11', label: 'Federal Agencies', description: 'Full SBIR/STTR coverage' },
     { value: '5-7 days', label: 'Proposal Build', description: 'From template to submission-ready' },
@@ -126,7 +126,7 @@ export default async function LandingPage() {
           {/* Proof strip */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6 animate-fade-in-up">
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$100Ms</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-emerald-500 bg-clip-text text-transparent">$100M+</span>
               <span className="text-sm font-medium text-gray-500">non-dilutive funding secured</span>
             </div>
             <div className="h-6 w-px bg-gray-200" />
@@ -136,7 +136,7 @@ export default async function LandingPage() {
             </div>
             <div className="h-6 w-px bg-gray-200" />
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">100s</span>
+              <span className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-violet-500 bg-clip-text text-transparent">Hundreds</span>
               <span className="text-sm font-medium text-gray-500">of wins advised & mentored</span>
             </div>
           </div>

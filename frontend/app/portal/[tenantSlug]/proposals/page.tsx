@@ -472,7 +472,7 @@ function PurchaseModal({ slug, onClose, onPurchased }: {
               >
                 <p className="text-sm font-bold text-gray-900">Phase I</p>
                 <p className="text-xs text-gray-500 mt-0.5">SBIR/STTR Phase I proposal</p>
-                <p className="text-lg font-bold text-brand-600 mt-1">$499</p>
+                <p className="text-lg font-bold text-brand-600 mt-1">$999</p>
               </button>
               <button
                 type="button"
@@ -485,7 +485,7 @@ function PurchaseModal({ slug, onClose, onPurchased }: {
               >
                 <p className="text-sm font-bold text-gray-900">Phase II</p>
                 <p className="text-xs text-gray-500 mt-0.5">SBIR/STTR Phase II proposal</p>
-                <p className="text-lg font-bold text-brand-600 mt-1">$999</p>
+                <p className="text-lg font-bold text-brand-600 mt-1">$2,500</p>
               </button>
             </div>
           </div>
