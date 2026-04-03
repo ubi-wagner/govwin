@@ -7,7 +7,7 @@ const STATIC_CONTENT: TipsPageContent = {
   hero: {
     eyebrow: 'SBIR/STTR Resources',
     title: 'Expert guidance for winning federal research funding',
-    description: 'Practical tips from a team with a 13/13 SBIR/STTR win rate and $100M+ in non-dilutive capital secured. Everything you need to find, pursue, and win SBIR/STTR awards.',
+    description: 'Practical tips from a team with dozens of SBIR/STTR awards and hundreds of millions in non-dilutive capital secured. Everything you need to find, pursue, and win SBIR/STTR awards.',
   },
   tips: [
     { date: 'March 2026', category: 'Proposal Writing', title: 'How to Write a Winning SBIR Phase I Proposal', excerpt: 'A step-by-step guide to structuring your SBIR Phase I proposal for maximum reviewer impact. Covers technical objectives, innovation significance, commercialization strategy, and the common pitfalls that cost small businesses their first award.' },
@@ -30,7 +30,7 @@ const STATIC_CONTENT: TipsPageContent = {
 
 const STATIC_META = {
   title: 'SBIR/STTR Tips & Resources | RFP Pipeline',
-  description: 'Expert guidance on SBIR/STTR proposal writing, solicitation cycles, agency-specific strategies, and common mistakes to avoid. From a team with a 13/13 win rate.',
+  description: 'Expert guidance on SBIR/STTR proposal writing, solicitation cycles, agency-specific strategies, and common mistakes to avoid. From a team with decades of winning experience.',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -96,8 +96,8 @@ export default async function TipsPage() {
 
       <CtaSection
         title="Need personalized guidance?"
-        description="Our team has helped 50+ startups navigate SBIR/STTR programs with a 100% recent win rate. Start your free trial and get expert-backed opportunity intelligence."
-        primaryLabel="Start Free Trial"
+        description="Our team has helped 50+ startups navigate SBIR/STTR programs with a 100% recent win rate. Join the waitlist for expert-backed opportunity intelligence — launching May 15, 2026."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Meet the Founder"
         secondaryHref="/team"

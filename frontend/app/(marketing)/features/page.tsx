@@ -7,15 +7,15 @@ import type { FeaturesPageContent } from '@/types'
 const STATIC_CONTENT: FeaturesPageContent = {
   hero: {
     title: 'Your Entire BD Team in One Platform',
-    description: 'Every capability you would need to hire for \u2014 opportunity scanning, fit analysis, proposal structure, AI drafting, content management, and team collaboration \u2014 built into one system that costs less than a single consultant meeting.',
+    description: 'Every capability you would need to hire for — opportunity scanning, fit analysis, proposal structure, AI drafting, content management, and team collaboration — built into one system that costs less than a single consultant meeting.',
   },
   features: [
     { title: 'Opportunity Matching', description: 'AI scans SBIR.gov, SAM.gov, and Grants.gov across all 11 agencies daily. Topics are matched to your technology profile before you log in.', icon: 'search' },
     { title: 'Fit Scoring', description: 'Every opportunity is scored against your capabilities using NAICS codes, research keywords, TRL level, and agency history. Know what to pursue before investing time.', icon: 'chart' },
-    { title: 'Deadline Intelligence', description: 'SBIR release cycles, pre-solicitation windows, and agency timelines \u2014 all mapped. Get notified at exactly the right time, not the last minute.', icon: 'clock' },
+    { title: 'Deadline Intelligence', description: 'SBIR release cycles, pre-solicitation windows, and agency timelines — all mapped. Get notified at exactly the right time, not the last minute.', icon: 'clock' },
     { title: 'Expert-Derived Templates', description: 'Proposal structures built from real winning submissions. Agency-aligned, section-by-section, with evaluation criteria baked in.', icon: 'document' },
-    { title: 'AI Writing Workspace', description: 'Guided drafting that pulls from your content library. The AI learned from decades of winning proposals \u2014 it doesn\'t guess, it builds on what works.', icon: 'pencil' },
-    { title: 'Compound Learning Library', description: 'Team bios, past performance, technical narratives \u2014 stored and indexed. Every proposal makes the next one faster. Your 5th takes half the effort of your 1st.', icon: 'library' },
+    { title: 'AI Writing Workspace', description: 'Guided drafting that pulls from your content library. The AI learns from decades of winning proposals — it doesn\'t guess, it builds on what works.', icon: 'pencil' },
+    { title: 'Compound Learning Library', description: 'Team bios, past performance, technical narratives — stored and indexed. Every proposal makes the next one faster. Your 5th takes half the effort of your 1st.', icon: 'library' },
     { title: 'Partner Collaboration', description: 'Invite STTR research partners, subcontractors, and consultants with proposal-level access controls. Everyone works in one place.', icon: 'users' },
     { title: 'Pipeline Management', description: 'Track every opportunity from discovery through submission in a single dashboard. See what\'s closing, what\'s in progress, and where to focus.', icon: 'pipeline' },
     { title: 'Smart Notifications', description: 'Deadline alerts tied to SBIR release cycles, not just due dates. New high-match opportunities, pipeline updates, and team activity.', icon: 'bell' },
@@ -135,7 +135,7 @@ export default async function FeaturesPage() {
       <Section className="bg-surface-50">
         <SectionHeader
           eyebrow="Core Capabilities"
-          title="Everything a BD team does \u2014 without the team"
+          title="Everything a BD team does — without the team"
           description="We built every capability you would need to hire for. From opportunity scanning to proposal submission, nothing falls through the cracks."
         />
         <div className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200/60 sm:grid-cols-2 lg:grid-cols-3">
@@ -154,8 +154,8 @@ export default async function FeaturesPage() {
       {/* CTA */}
       <CtaSection
         title="Ready to see it in action?"
-        description="Start your 14-day free trial and explore every feature — no credit card required."
-        primaryLabel="Start 14-Day Trial"
+        description="Launching May 15, 2026. Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders."
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See Pricing"
         secondaryHref="/pricing"

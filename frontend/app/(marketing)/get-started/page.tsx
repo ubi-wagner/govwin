@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Section, SectionHeader, CtaSection } from '@/components/page-sections'
 import { getPageContent, mergeContent, mergeMetadata } from '@/lib/content'
 import type { GetStartedPageContent } from '@/types'
+import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
@@ -15,7 +15,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
       name: 'Pipeline Engine',
       price: '$199',
       period: 'month',
-      description: 'Includes 14-day trial',
+      description: 'Launching May 15, 2026',
       features: [
         'Unlimited opportunity scanning',
         'AI fit scoring',
@@ -26,7 +26,7 @@ const STATIC_CONTENT: GetStartedPageContent = {
         'Document storage',
         'Notifications',
       ],
-      cta: 'Start 14-Day Trial',
+      cta: 'Join the Waitlist',
       popular: false,
     },
     {
@@ -66,8 +66,8 @@ const STATIC_CONTENT: GetStartedPageContent = {
   ],
   faqs: [
     {
-      q: 'What\'s included in the 14-day trial?',
-      a: 'Full access to the Pipeline Engine. No credit card required.',
+      q: 'What do beta testers get?',
+      a: 'Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders.',
     },
     {
       q: 'How is a build different from a consultant?',
@@ -115,15 +115,6 @@ export async function generateMetadata(): Promise<Metadata> {
   return mergeMetadata(published?.metadata ?? null, STATIC_META)
 }
 
-/** Checkmark icon used across pricing cards */
-function Check() {
-  return (
-    <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-    </svg>
-  )
-}
-
 export default async function GetStartedPage() {
   const published = await getPageContent('get_started')
   const content = mergeContent(published?.content ?? null, STATIC_CONTENT)
@@ -146,73 +137,8 @@ export default async function GetStartedPage() {
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <Section className="bg-surface-50">
-        <div className="mx-auto max-w-5xl">
-          <div className="grid gap-8 lg:grid-cols-3">
-            {content.tiers.map((tier) => {
-              const isPopular = tier.popular
-              return (
-                <div
-                  key={tier.name}
-                  className={`relative flex flex-col rounded-2xl border bg-white p-8 shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5 ${
-                    isPopular
-                      ? 'border-brand-500 ring-2 ring-brand-500/20'
-                      : 'border-gray-200/80'
-                  }`}
-                >
-                  {/* Popular badge */}
-                  {isPopular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <span className="inline-flex items-center rounded-full bg-brand-600 px-4 py-1 text-xs font-bold text-white shadow-sm">
-                        Popular
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Tier header */}
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{tier.name}</h3>
-                    <div className="mt-4 flex items-baseline gap-1">
-                      <span className="text-4xl font-extrabold tracking-tight text-gray-900">
-                        {tier.price}
-                      </span>
-                      <span className="text-sm font-medium text-gray-500">
-                        /{tier.period}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-gray-500">{tier.description}</p>
-                  </div>
-
-                  {/* Features */}
-                  <ul className="mt-8 flex-1 space-y-3">
-                    {tier.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-600">
-                        <Check />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* CTA */}
-                  <div className="mt-8">
-                    <Link
-                      href="/get-started"
-                      className={`block w-full rounded-lg px-4 py-3 text-center text-sm font-bold transition-colors ${
-                        isPopular
-                          ? 'bg-brand-600 text-white hover:bg-brand-700 shadow-md'
-                          : 'bg-gray-900 text-white hover:bg-gray-800'
-                      }`}
-                    >
-                      {tier.cta}
-                    </Link>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </Section>
+      {/* Pricing Cards + Waitlist Modal (client component) */}
+      <InteractivePricingSection plans={content.tiers} />
 
       {/* ROI Section */}
       <Section className="bg-white">
@@ -290,7 +216,7 @@ export default async function GetStartedPage() {
       <CtaSection
         title="Start Your SBIR Pipeline Today"
         description="Find opportunities, build proposals, and win awards with the platform built for SBIR/STTR teams."
-        primaryLabel="Start 14-Day Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="Talk to Us"
         secondaryHref="/about"

@@ -41,8 +41,8 @@ const STATIC_CONTENT: SbirEnginePageContent = {
   ],
   cta: {
     title: 'See It in Action',
-    description: 'Start your free trial and see how the SBIR Engine transforms your federal R&D pipeline.',
-    primaryLabel: 'Start Trial',
+    description: 'Launching May 15, 2026. Join the waitlist for early access and see how the SBIR Engine transforms your federal R&D pipeline.',
+    primaryLabel: 'Join the Waitlist',
     primaryHref: '/get-started',
   },
 }
@@ -170,7 +170,7 @@ export default async function SbirEnginePage() {
       <CtaSection
         title="Stop searching. Start winning."
         description="The SBIR Engine replaces a BD team, a proposal shop, and a pipeline manager. Built by someone who has done it 100+ times. Powered by AI that learns from every win."
-        primaryLabel="Start Free Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See Pricing"
         secondaryHref="/pricing"

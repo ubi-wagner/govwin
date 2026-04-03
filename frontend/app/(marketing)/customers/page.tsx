@@ -173,7 +173,7 @@ export default async function CustomersPage() {
       <CtaSection
         title="Join them."
         description="Start finding and winning federal R&D funding with the platform built for small teams."
-        primaryLabel="Start 14-Day Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See Pricing"
         secondaryHref="/pricing"

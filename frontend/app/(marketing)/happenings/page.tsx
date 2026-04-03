@@ -220,7 +220,7 @@ export default async function HappeningsPage() {
       <CtaSection
         title="Ready to find your next SBIR opportunity?"
         description="RFP Pipeline scans every solicitation, scores it against your tech profile, and helps you build winning proposals."
-        primaryLabel="Start Free Trial"
+        primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See how it works"
         secondaryHref="/about"

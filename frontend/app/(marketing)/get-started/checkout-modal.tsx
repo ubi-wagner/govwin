@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Modal } from '@/components/page-sections'
+import { getStoredVisitorId } from '@/components/analytics-tracker'
 
 /** Client wrapper: billing toggle + pricing cards + waitlist modal */
 export function InteractivePricingSection({
@@ -12,12 +13,25 @@ export function InteractivePricingSection({
   const [waitlistOpen, setWaitlistOpen] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
+
+  // Form fields
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [company, setCompany] = useState('')
+  const [companySize, setCompanySize] = useState('')
+  const [technology, setTechnology] = useState('')
+  const [notes, setNotes] = useState('')
+
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleJoinWaitlist = async () => {
+    if (!fullName.trim()) {
+      setError('Full name is required.')
+      return
+    }
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.')
       return
@@ -28,7 +42,18 @@ export function InteractivePricingSection({
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, plan: selectedPlan, billingPeriod }),
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          company: company.trim() || undefined,
+          companySize: companySize || undefined,
+          technology: technology.trim() || undefined,
+          notes: notes.trim() || undefined,
+          plan: selectedPlan,
+          billingPeriod,
+          visitorId: getStoredVisitorId() ?? undefined,
+        }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -45,9 +70,14 @@ export function InteractivePricingSection({
 
   const handleClose = () => {
     setWaitlistOpen(false)
-    // Reset form state after modal animation
     setTimeout(() => {
+      setFullName('')
       setEmail('')
+      setPhone('')
+      setCompany('')
+      setCompanySize('')
+      setTechnology('')
+      setNotes('')
       setSubmitted(false)
       setError(null)
     }, 300)
@@ -102,7 +132,7 @@ export function InteractivePricingSection({
                 period={billingPeriod === 'annual' ? 'month, billed annually' : plan.period}
                 description={plan.description}
                 features={plan.features}
-                cta="Join Waitlist"
+                cta="Join the Waitlist"
                 popular={plan.popular}
                 onSelect={() => { setSelectedPlan(plan.name); setWaitlistOpen(true) }}
               />
@@ -112,8 +142,19 @@ export function InteractivePricingSection({
       </section>
 
       {/* Waitlist Modal */}
-      <Modal open={waitlistOpen} onClose={handleClose} maxWidth="max-w-md">
-        <div className="p-8">
+      <Modal open={waitlistOpen} onClose={handleClose} maxWidth="max-w-lg">
+        <div className="relative p-8">
+          {/* X close button — top right */}
+          <button
+            onClick={handleClose}
+            className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            aria-label="Close"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+
           {submitted ? (
             /* Success state */
             <div className="text-center py-4">
@@ -125,7 +166,7 @@ export function InteractivePricingSection({
               <h3 className="text-xl font-bold text-gray-900">You&apos;re on the list!</h3>
               <p className="mt-3 text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
                 We&apos;ll notify you at <span className="font-semibold text-gray-700">{email}</span> as
-                soon as GovWin launches. Early subscribers get priority onboarding and special pricing.
+                soon as RFP Pipeline launches on May 15, 2026. Beta testers get the first 3 months of Pipeline Engine free and priority access to our Builders.
               </p>
               <button
                 onClick={handleClose}
@@ -143,9 +184,9 @@ export function InteractivePricingSection({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" />
                   </svg>
                 </div>
-                <h3 className="mt-4 text-xl font-bold text-gray-900">SBIR/STTR Intelligence — Launching Soon</h3>
+                <h3 className="mt-4 text-xl font-bold text-gray-900">Join the Waitlist</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  Your 24/7 SBIR/STTR lookout is almost ready.
+                  Launching May 15, 2026. Beta testers get the first 3 months free.
                 </p>
               </div>
 
@@ -164,21 +205,93 @@ export function InteractivePricingSection({
                 </div>
               )}
 
-              <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                Join the waitlist for early access to SBIR/STTR opportunity intelligence and proposal builds.
-                Early subscribers get <span className="font-semibold text-gray-900">priority onboarding</span> and{' '}
-                <span className="font-semibold text-gray-900">launch pricing</span>.
-              </p>
-
               <div className="space-y-4">
+                {/* Name & Email — required */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Full Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Jane Smith"
+                      value={fullName}
+                      onChange={e => { setFullName(e.target.value); setError(null) }}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Email <span className="text-red-500">*</span></label>
+                    <input
+                      type="email"
+                      className="input"
+                      placeholder="jane@company.com"
+                      value={email}
+                      onChange={e => { setEmail(e.target.value); setError(null) }}
+                    />
+                  </div>
+                </div>
+
+                {/* Phone & Company — optional */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Phone</label>
+                    <input
+                      type="tel"
+                      className="input"
+                      placeholder="(555) 123-4567"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Company</label>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder="Acme Technologies"
+                      value={company}
+                      onChange={e => setCompany(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Company Size — optional */}
                 <div>
-                  <label className="label">Email</label>
-                  <input
-                    type="email"
+                  <label className="label">Company Size</label>
+                  <select
                     className="input"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={e => { setEmail(e.target.value); setError(null) }}
+                    value={companySize}
+                    onChange={e => setCompanySize(e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    <option value="1-5">1-5 employees</option>
+                    <option value="6-25">6-25 employees</option>
+                    <option value="26-100">26-100 employees</option>
+                    <option value="101-500">101-500 employees</option>
+                    <option value="500+">500+ employees</option>
+                  </select>
+                </div>
+
+                {/* Technology focus — optional */}
+                <div>
+                  <label className="label">Technology Focus</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="e.g. AI/ML, cybersecurity, advanced materials..."
+                    value={technology}
+                    onChange={e => setTechnology(e.target.value)}
+                  />
+                </div>
+
+                {/* Notes — optional */}
+                <div>
+                  <label className="label">Notes for the RFP Pipeline Team</label>
+                  <textarea
+                    className="input min-h-[72px] resize-y"
+                    placeholder="Anything you'd like us to know..."
+                    rows={3}
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
                   />
                 </div>
 
@@ -187,24 +300,20 @@ export function InteractivePricingSection({
                 )}
 
                 <button
-                  className="btn-primary w-full py-3 text-base"
+                  className="btn-primary w-full py-3 text-base font-bold"
                   onClick={handleJoinWaitlist}
                   disabled={submitting}
                 >
-                  {submitting ? 'Joining...' : 'Join Waitlist'}
+                  {submitting ? 'Joining...' : 'Join the Waitlist'}
                 </button>
 
-                <p className="text-center text-xs text-gray-400 pt-2">
+                <p className="text-center text-xs text-gray-400 pt-1">
                   Questions? Contact us at{' '}
-                  <a href="mailto:sales@govwin.com" className="text-brand-600 hover:underline font-medium">
-                    sales@govwin.com
+                  <a href="mailto:eric@rfppipeline.com" className="text-brand-600 hover:underline font-medium">
+                    eric@rfppipeline.com
                   </a>
                 </p>
               </div>
-
-              <button onClick={handleClose} className="mt-4 w-full text-center text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-                &larr; Back to plans
-              </button>
             </>
           )}
         </div>
