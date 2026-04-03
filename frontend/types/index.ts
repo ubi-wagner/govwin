@@ -726,6 +726,19 @@ export type ContentEventType =
   | 'content.auto_published'
   | 'content.unpublished'
   | 'content.configured'
+  | 'content_pipeline.post.created'
+  | 'content_pipeline.post.updated'
+  | 'content_pipeline.post.submitted_for_review'
+  | 'content_pipeline.post.approved'
+  | 'content_pipeline.post.rejected'
+  | 'content_pipeline.post.published'
+  | 'content_pipeline.post.unpublished'
+  | 'content_pipeline.post.reverted'
+  | 'content_pipeline.post.archived'
+  | 'content_pipeline.generation.requested'
+  | 'content_pipeline.generation.accepted'
+  | 'content_pipeline.generation.rejected'
+  | 'content_pipeline.generation.retry_requested'
 
 export interface SiteContent {
   id: string
@@ -843,6 +856,73 @@ export interface GetStartedPageContent {
   comparison: (string | boolean)[][]
   faqs: { q: string; a: string }[]
   contactCta: { title: string; description: string; email: string }
+}
+
+// ─── Content Pipeline ────────────────────────────────────────
+
+export type ContentPostStatus = 'draft' | 'in_review' | 'approved' | 'rejected' | 'published' | 'reverted' | 'archived'
+export type ContentCategory = 'tip' | 'announcement' | 'product_update' | 'guide' | 'resource' | 'case_study'
+export type ContentReviewAction = 'submit_review' | 'approve' | 'reject' | 'request_changes' | 'publish' | 'unpublish' | 'revert' | 'archive'
+
+export interface ContentPost {
+  id: string
+  slug: string
+  title: string
+  excerpt: string | null
+  body: string
+  category: ContentCategory
+  tags: string[]
+  status: ContentPostStatus
+  authorId: string | null
+  authorName: string | null
+  generationId: string | null
+  generatedByModel: string | null
+  generationPrompt: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  reviewNotes: string | null
+  publishedAt: string | null
+  publishedBy: string | null
+  unpublishedAt: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ContentGeneration {
+  id: string
+  prompt: string
+  category: ContentCategory
+  model: string
+  systemPrompt: string | null
+  temperature: number
+  status: 'pending' | 'generating' | 'completed' | 'failed' | 'accepted' | 'rejected'
+  generatedTitle: string | null
+  generatedExcerpt: string | null
+  generatedBody: string | null
+  generatedTags: string[]
+  postId: string | null
+  requestedBy: string | null
+  tokensUsed: number | null
+  durationMs: number | null
+  errorMessage: string | null
+  retryCount: number
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface ContentReview {
+  id: string
+  postId: string
+  action: ContentReviewAction
+  reviewerId: string
+  notes: string | null
+  titleSnapshot: string | null
+  bodySnapshot: string | null
+  versionAtReview: number
+  createdAt: string
 }
 
 // ─── SpotLight Buckets ───────────────────────────────────────
