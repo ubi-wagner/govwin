@@ -87,13 +87,17 @@ export async function POST(
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })
     }
 
+    // JSONB contents are NOT transformed by postgres.toCamel — keys may be
+    // snake_case (seed data) or camelCase (API-created). Handle both.
     const sections = (template.sections ?? []) as Array<{
       key: string
       title: string
       instructions?: string
+      page_limit?: number
       pageLimit?: number
       required?: boolean
-      evalWeight?: number
+      sort_order?: number
+      sortOrder?: number
     }>
 
     if (!Array.isArray(sections) || sections.length === 0) {
@@ -107,6 +111,7 @@ export async function POST(
     let sectionsCreated = 0
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i]
+      const pageLimit = section.pageLimit ?? section.page_limit ?? null
       try {
         await sql`
           INSERT INTO proposal_sections (
@@ -117,7 +122,7 @@ export async function POST(
             ${section.key},
             ${section.title},
             ${section.instructions ?? null},
-            ${section.pageLimit ?? null},
+            ${pageLimit},
             ${section.required !== false},
             ${i},
             'empty'
