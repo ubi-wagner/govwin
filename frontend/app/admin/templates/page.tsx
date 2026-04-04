@@ -5,18 +5,18 @@ import { useEffect, useState, useCallback } from 'react'
 interface MasterTemplate {
   id: string
   agency: string
-  program_type: string
-  solicitation_pattern: string | null
-  template_name: string
+  programType: string
+  solicitationPattern: string | null
+  templateName: string
   sections: Record<string, unknown>
-  page_limits: Record<string, unknown> | null
-  eval_criteria: Record<string, unknown> | null
+  pageLimits: Record<string, unknown> | null
+  evalCriteria: Record<string, unknown> | null
   version: number
-  is_current: boolean
+  isCurrent: boolean
   notes: string | null
-  created_by: string | null
-  created_at: string
-  updated_at: string
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export default function AdminTemplatesPage() {
@@ -316,22 +316,22 @@ export default function AdminTemplatesPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-gray-900">{t.template_name}</h3>
-                    {t.is_current && (
+                    <h3 className="text-base font-semibold text-gray-900">{t.templateName}</h3>
+                    {t.isCurrent && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Current</span>
                     )}
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">v{t.version}</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="font-medium text-gray-700">{t.agency}</span>
-                    <span className="uppercase text-xs bg-gray-100 px-2 py-0.5 rounded">{t.program_type}</span>
-                    {t.solicitation_pattern && (
-                      <span className="text-gray-400">{t.solicitation_pattern}</span>
+                    <span className="uppercase text-xs bg-gray-100 px-2 py-0.5 rounded">{t.programType}</span>
+                    {t.solicitationPattern && (
+                      <span className="text-gray-400">{t.solicitationPattern}</span>
                     )}
                   </div>
                 </div>
                 <div className="text-xs text-gray-400">
-                  {new Date(t.created_at).toLocaleDateString()}
+                  {new Date(t.createdAt).toLocaleDateString()}
                 </div>
               </div>
               {t.notes && (
@@ -339,7 +339,7 @@ export default function AdminTemplatesPage() {
               )}
               <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
                 <span>{Object.keys(t.sections ?? {}).length} sections</span>
-                {t.created_by && <span>by {t.created_by}</span>}
+                {t.createdBy && <span>by {t.createdBy}</span>}
               </div>
             </div>
           ))}

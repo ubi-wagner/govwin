@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         mt.template_name
       FROM proposal_purchases pp
       LEFT JOIN proposals p ON pp.proposal_id = p.id
-      LEFT JOIN master_templates mt ON pp.master_template_id = mt.id
+      LEFT JOIN master_templates mt ON pp.template_id = mt.id
       WHERE pp.tenant_id = ${tenant.id}
       ORDER BY pp.purchased_at DESC
     `
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const [purchase] = await sql`
       INSERT INTO proposal_purchases (
         tenant_id, proposal_id, opportunity_id, purchase_type,
-        price_cents, status, purchased_by,
+        price_cents, status,
         cancellation_deadline
       ) VALUES (
         ${tenant.id},
@@ -134,7 +134,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         ${purchaseType},
         ${priceCents},
         'pending',
-        ${session.user.id},
         NOW() + interval '72 hours'
       )
       RETURNING *

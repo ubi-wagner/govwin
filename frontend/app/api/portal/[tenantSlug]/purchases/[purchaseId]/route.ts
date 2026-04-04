@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         mt.template_name
       FROM proposal_purchases pp
       LEFT JOIN proposals p ON pp.proposal_id = p.id
-      LEFT JOIN master_templates mt ON pp.master_template_id = mt.id
+      LEFT JOIN master_templates mt ON pp.template_id = mt.id
       WHERE pp.id = ${purchaseId} AND pp.tenant_id = ${tenant.id}
     `
 
