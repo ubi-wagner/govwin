@@ -172,8 +172,8 @@ export function WaitlistModal() {
               <h3 className="text-xl font-bold text-gray-900">You&apos;re on the list!</h3>
               <p className="mt-3 text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
                 We&apos;ll notify you at <span className="font-semibold text-gray-700">{email}</span> when
-                RFP Pipeline launches on May 15, 2026. Beta testers get the first 3 months of Pipeline Engine
-                free and priority access to our Builders.
+                RFP Pipeline launches on May 15, 2026. Up to 20 small businesses will be selected for early access
+                and personal onboarding by our founder — plus 3 months of free Pipeline Engine subscription.
               </p>
               <button onClick={handleClose} className="btn-primary mt-8 px-8 py-3 text-sm">
                 Got it
@@ -189,7 +189,7 @@ export function WaitlistModal() {
                 </div>
                 <h3 className="mt-4 text-xl font-bold text-gray-900">Join the Waitlist</h3>
                 <p className="mt-2 text-sm text-gray-500">
-                  Launching May 15, 2026. Beta testers get the first 3 months free and priority access to our Builders.
+                  Launching May 15, 2026. Up to 20 small businesses will be selected for early access and personal onboarding by our founder — plus 3 months free.
                 </p>
               </div>
 

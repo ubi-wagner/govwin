@@ -9,12 +9,12 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
     content: {
       hero: {
         eyebrow: 'About RFP Pipeline',
-        title: 'Built by someone who has won SBIR/STTR awards',
-        description: 'RFP Pipeline was created by a founder with over two decades of experience securing SBIR/STTR awards, launching startups, and commercializing federally funded research. We built the tool we always wished we had.',
+        title: 'Level the Playing Field for Small Business Innovation',
+        description: 'The SBIR and STTR programs exist to fund the best ideas from small businesses. We built the platform that makes those programs accessible to CEOs and lean teams who don\'t have six-figure BD budgets.',
       },
       mission: {
         eyebrow: 'Our Mission',
-        title: 'Level the playing field for small businesses pursuing federal research funding',
+        title: 'Make $4B+ in annual SBIR/STTR funding accessible to every innovative small business',
         paragraphs: [
           'The SBIR/STTR programs award billions in federal research funding each year, but finding the right topics, tracking deadlines across dozens of agencies, and writing competitive proposals is overwhelming for small businesses.',
           'RFP Pipeline changes that. Our AI-powered platform continuously scans SAM.gov and agency portals, scores every SBIR, STTR, OTA, and BAA opportunity against your technology focus, and delivers a prioritized pipeline so you can focus on what matters: writing winning proposals.',
@@ -173,9 +173,9 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
   get_started: {
     content: {
       hero: {
-        eyebrow: 'Simple, transparent pricing',
-        title: 'One plan. Everything you need to win SBIR/STTR awards.',
-        description: 'AI-powered opportunity intelligence plus expert proposal support when you need it.',
+        eyebrow: 'Simple, Transparent Pricing',
+        title: '10 Phase I Proposals for Less Than a Consultant.',
+        description: 'Look only, never pay until you build. Pipeline Engine is your monthly SBIR/STTR command center. Builds are one-time, per-proposal fees covering any agency.',
       },
       tiers: [
         {
@@ -202,7 +202,7 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
         { name: 'Phase II Proposal Build', price: '$2,500', description: 'Comprehensive proposal support for SBIR/STTR Phase II submissions. Includes commercialization plan, technical volume review, budget narrative, and full compliance review.' },
       ],
       faqs: [
-        { q: 'What do beta testers get?', a: 'Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders. Launching May 15, 2026.' },
+        { q: 'What do early access members get?', a: 'Up to 20 small businesses who join the waitlist will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine subscription as long as they actively use and test the system. Launching May 15, 2026.' },
         { q: 'What are the per-proposal builds?', a: 'Our Phase I ($999) and Phase II ($2,500) proposal builds pair you with SBIR/STTR experts who review, refine, and help you submit a competitive proposal. These are one-time fees per proposal.' },
         { q: 'Do you offer annual billing?', a: 'Yes — annual plans save you 20%. Contact us for a custom annual agreement.' },
         { q: 'What payment methods do you accept?', a: 'We accept all major credit cards and ACH bank transfers for annual plans. Processed securely via Stripe.' },
@@ -224,10 +224,10 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
   home: {
     content: {
       hero: {
-        eyebrow: 'The SBIR Engine',
-        title: 'We Built It So You Don\'t Have To',
-        description: 'RFP Pipeline delivers high-impact, low-friction, opp-to-prop-to-win capabilities — built on decades of expert knowledge, powered by AI agents trained by the best.',
-        trustBadge: 'Dozens of Phase I, II & III Awards · Hundreds of Millions Secured',
+        eyebrow: 'Built for High-Tech Small Businesses & Startups',
+        title: 'The First Platform Built to Win Non-Dilutive Federal Research Funding',
+        description: 'RFP Pipeline is purpose-built for CEOs and lean-launch teams pursuing SBIR, STTR, Challenge, OTA, and other non-dilutive funding programs with billions in annual awards specifically for small businesses.',
+        trustBadge: '$4B+ Annual SBIR/STTR Funding · 11 Federal Agencies · $199/mo Pipeline Engine',
       },
       features: [
         { icon: 'Search', title: 'Smart Opportunity Discovery', description: 'Automated scanning of SAM.gov, SBIR.gov, and agency-specific portals for SBIR/STTR topics.' },
@@ -255,15 +255,15 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
         result: '$150K SBIR Phase I Award',
       },
       pricingTeaser: {
-        eyebrow: 'Simple Pricing',
-        title: '$199/mo + per-proposal expert support',
-        description: 'One plan with everything you need. Add Phase I ($999) or Phase II ($2,500) proposal builds when you are ready to submit. Launching May 15, 2026.',
+        eyebrow: 'Look Only. Never Pay Until You Build.',
+        title: '10 Phase I proposals for less than the price of a consultant.',
+        description: 'Pipeline Engine runs 24/7 for $199/month. Phase I Build ($999) and Phase II Build ($2,500) are one-time per-proposal fees covering any SBIR or STTR agency. Launching May 15, 2026.',
         ctaText: 'View Plans & Pricing',
         ctaLink: '/get-started',
       },
       cta: {
         title: 'Stop hiring. Start winning.',
-        description: 'You don\'t need a BD team, a proposal shop, or a $15K consultant. Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders.',
+        description: 'Up to 20 small businesses who join the waitlist will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine subscription.',
         primaryLabel: 'Join the Waitlist',
         primaryHref: '/get-started',
         secondaryLabel: 'See the SBIR Engine',
@@ -271,8 +271,8 @@ export const PAGE_DEFAULTS: Record<string, { content: Record<string, unknown>; m
       },
     },
     metadata: {
-      title: 'RFP Pipeline | We Built It So You Don\'t Have To',
-      description: 'Stop hiring BD teams and consultants. RFP Pipeline delivers SBIR/STTR opp-to-prop-to-win capabilities built on decades of expert knowledge. AI agents trained by the best. $199/mo. Launching May 15, 2026.',
+      title: 'RFP Pipeline | The First Platform Built to Win SBIR/STTR Awards',
+      description: 'Purpose-built for high-tech small businesses and startups pursuing SBIR, STTR, OTA, and Challenge funding. $199/mo Pipeline Engine + per-proposal builds. Launching May 15, 2026.',
     },
   },
 }

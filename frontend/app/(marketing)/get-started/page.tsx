@@ -6,9 +6,9 @@ import { InteractivePricingSection } from './checkout-modal'
 
 const STATIC_CONTENT: GetStartedPageContent = {
   hero: {
-    eyebrow: 'Pricing & Packages',
-    title: 'Less Than a Consultant Meeting. More Than a BD Team.',
-    description: 'Everything you need to find, decide, and build winning SBIR proposals. No contracts, no lock-in, no surprise fees.',
+    eyebrow: 'Simple, Transparent Pricing',
+    title: '10 Phase I Proposals for Less Than a Consultant.',
+    description: 'Look only, never pay until you build. Pipeline Engine is your monthly SBIR/STTR command center. Builds are one-time, per-proposal fees covering any agency. No contracts, no lock-in.',
   },
   tiers: [
     {
@@ -33,30 +33,32 @@ const STATIC_CONTENT: GetStartedPageContent = {
       name: 'Phase I Build',
       price: '$999',
       period: 'proposal',
-      description: 'Per proposal',
+      description: 'One-time fee per proposal — any SBIR or STTR agency',
       features: [
         'Expert-reviewed framework',
         'Agency-aligned template',
         'Section-by-section structure',
         'AI-assisted drafting',
         'Content library seeding',
+        'Win $150K+ (150x ROI)',
       ],
-      cta: 'Get Started',
+      cta: 'Join the Waitlist',
       popular: true,
     },
     {
       name: 'Phase II Build',
       price: '$2,500',
       period: 'proposal',
-      description: 'Per proposal',
+      description: 'One-time fee per proposal — any SBIR or STTR agency',
       features: [
         'Everything in Phase I Build',
         'Extended technical volume',
         'Commercialization plan',
         'Budget justification',
         'Past performance narrative',
+        'Win $1M+ (400x ROI)',
       ],
-      cta: 'Get Started',
+      cta: 'Join the Waitlist',
       popular: false,
     },
   ],
@@ -66,36 +68,36 @@ const STATIC_CONTENT: GetStartedPageContent = {
   ],
   faqs: [
     {
-      q: 'What do beta testers get?',
-      a: 'Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders.',
+      q: 'What do early access members get?',
+      a: 'Up to 20 small businesses who join the waitlist will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine subscription as long as they actively use and test the system.',
+    },
+    {
+      q: 'Are Builds one-time fees or recurring?',
+      a: 'Builds are strictly one-time, per-proposal fees. You only pay when you initiate a proposal build. Phase I ($999) and Phase II ($2,500) cover any SBIR or STTR agency. Look only, never pay until you are ready.',
     },
     {
       q: 'How is a build different from a consultant?',
-      a: 'Consultants charge $5K-$15K per proposal. A build gives you expert-reviewed, AI-assembled frameworks for a fraction of the cost.',
+      a: 'Consultants charge $5K-$15K per proposal. A Build gives you expert-reviewed templates, AI-assisted drafting, and compliance checks for a fraction of the cost. 10 Phase I proposals for less than one consultant engagement.',
     },
     {
       q: 'What agencies do you cover?',
-      a: 'All 11 SBIR/STTR participating agencies including DoD, NIH, NSF, DOE, NASA, DHS, USDA, DOT, EPA, DoC, and ED.',
+      a: 'All 11 SBIR and STTR participating federal agencies: DoD, NIH, NSF, DOE, NASA, DHS, USDA, DOT, EPA, DoC (NIST), and ED.',
     },
     {
       q: 'Can I cancel anytime?',
-      a: 'Yes. No contracts. No lock-in.',
-    },
-    {
-      q: 'Do you offer volume discounts?',
-      a: 'Yes. Contact us for multi-proposal pricing.',
-    },
-    {
-      q: 'Is there an annual plan?',
-      a: 'Coming soon. Early adopters lock in the best rate.',
+      a: 'Yes. No contracts. No lock-in. Cancel your Pipeline Engine subscription anytime.',
     },
     {
       q: 'What\'s a SpotLight profile?',
-      a: 'A saved search that continuously matches new opportunities to your technology focus areas.',
+      a: 'A saved search that continuously matches new SBIR, STTR, OTA, BAA, and Challenge opportunities to your technology focus areas.',
     },
     {
       q: 'How fast is a proposal build?',
-      a: 'Most Phase I builds are delivered within 5-7 business days.',
+      a: 'Most Phase I builds are delivered within 5-7 business days. Phase II builds within 10-14 business days.',
+    },
+    {
+      q: 'What is your track record?',
+      a: 'Our founder has won dozens of Phase I, II, and III awards and mentored hundreds of additional wins across hundreds of millions in non-dilutive funding over the last two decades.',
     },
   ],
   contactCta: {
@@ -214,12 +216,12 @@ export default async function GetStartedPage() {
 
       {/* Bottom CTA */}
       <CtaSection
-        title="Start Your SBIR Pipeline Today"
-        description="Find opportunities, build proposals, and win awards with the platform built for SBIR/STTR teams."
+        title="Be One of the First 20."
+        description="Up to 20 small businesses will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine. Launching May 15, 2026."
         primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
-        secondaryLabel="Talk to Us"
-        secondaryHref="/about"
+        secondaryLabel="Meet the Founder"
+        secondaryHref="/team"
       />
     </>
   )

@@ -168,12 +168,12 @@ export default async function SbirEnginePage() {
 
       {/* ───── CTA ───── */}
       <CtaSection
-        title="Stop searching. Start winning."
-        description="The SBIR Engine replaces a BD team, a proposal shop, and a pipeline manager. Built by someone who has done it 100+ times. Powered by AI that learns from every win."
+        title="Be One of the First 20."
+        description="Up to 20 small businesses will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine. The SBIR Engine covers all 11 SBIR and STTR agencies. Launching May 15, 2026."
         primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See Pricing"
-        secondaryHref="/pricing"
+        secondaryHref="/get-started"
       />
     </>
   )
