@@ -7,18 +7,18 @@ import type { AboutPageContent } from '@/types'
 const STATIC_CONTENT: AboutPageContent = {
   hero: {
     eyebrow: 'Our Mission',
-    title: 'We Built It So You Don\'t Have To',
+    title: 'Level the Playing Field for Small Business Innovation',
     description:
-      'We always wanted this system but didn\'t have the team to build it. So we built it — so you don\'t need a team to succeed.',
+      'The SBIR and STTR programs exist to fund the best ideas from small businesses. We built the platform that makes those programs accessible to CEOs and lean teams who don\'t have six-figure BD budgets.',
   },
   problem: {
     eyebrow: 'The Problem We Solve',
-    title: 'Innovation Shouldn\'t Die in a SAM.gov Search Bar',
+    title: 'Brilliant Technology Buried in Procurement Paperwork',
     paragraphs: [
-      'Every small tech company knows the pain. You have brilliant technology — but winning federal contracts means drowning in procurement paperwork, navigating scattered opportunity databases, and decoding evaluation criteria written for insiders.',
+      'The federal government invests over $4 billion annually in SBIR/STTR programs specifically for small businesses. But finding the right topics, tracking deadlines across 11 agencies, and writing competitive proposals is overwhelming for startups and lean teams.',
       'To compete, you needed a BD team, proposal writers, a pipeline manager, and consultants. That is a six-figure investment before you submit a single proposal.',
       'Most companies can\'t afford that. So the best ideas never get funded, the best technology never gets fielded, and innovation stalls — not because the talent isn\'t there, but because the system is broken.',
-      'We refused to let that stand.',
+      'We refused to let that stand. RFP Pipeline changes the equation — $199/month for your SBIR command center, and per-proposal builds when you are ready to submit.',
     ],
   },
   flow: [
@@ -79,9 +79,9 @@ export default async function AboutPage() {
             {content.hero.eyebrow}
           </div>
           <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
-            We Built It So You{' '}
+            Level the{' '}
             <span className="bg-gradient-to-r from-brand-600 to-cyan-500 bg-clip-text text-transparent">
-              Don&apos;t Have To
+              Playing Field
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-600">
@@ -168,11 +168,10 @@ export default async function AboutPage() {
         <div className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-gray-200/80 bg-gradient-to-br from-brand-50 to-white p-8 text-center shadow-card sm:p-10">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-              Ready to Win Without the Overhead?
+              Be One of the First 20
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-gray-600">
-              See how RFP Pipeline turns scattered opportunities into winning
-              proposals — without the cost of a BD team.
+              Up to 20 small businesses will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine. Launching May 15, 2026.
             </p>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link

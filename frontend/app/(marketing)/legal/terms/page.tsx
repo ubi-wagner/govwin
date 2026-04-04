@@ -85,7 +85,7 @@ export default function TermsPage() {
       </p>
       <h3>3.4 General Billing Terms</h3>
       <ul>
-        <li><strong>Beta Access:</strong> Beta testers receive complimentary access to the Pipeline Engine for three (3) months from launch. At the end of the beta period, access continues under a paid plan.</li>
+        <li><strong>Early Access:</strong> Up to 20 small businesses selected from the waitlist will receive complimentary access to the Pipeline Engine for three (3) months from launch, contingent on active use and testing of the platform. At the end of the early access period, access continues under a paid plan.</li>
         <li><strong>Billing Frequency:</strong> As specified in your Subscription Agreement (monthly, annual, or custom). Charges are non-refundable except as required by law.</li>
         <li><strong>Upgrades:</strong> Take effect immediately with prorated charges. <strong>Downgrades:</strong> Take effect at the end of the current billing period.</li>
         <li><strong>Overages:</strong> If usage exceeds plan limits, we may restrict functionality until the account is upgraded. We will not charge overage fees without prior notice and acceptance.</li>

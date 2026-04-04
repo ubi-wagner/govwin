@@ -6,8 +6,8 @@ import type { FeaturesPageContent } from '@/types'
 
 const STATIC_CONTENT: FeaturesPageContent = {
   hero: {
-    title: 'Your Entire BD Team in One Platform',
-    description: 'Every capability you would need to hire for — opportunity scanning, fit analysis, proposal structure, AI drafting, content management, and team collaboration — built into one system that costs less than a single consultant meeting.',
+    title: 'Everything a BD Team Does — Without the Team',
+    description: 'Purpose-built for high-tech small businesses and startups pursuing SBIR, STTR, OTA, and Challenge funding. Opportunity scanning, fit scoring, proposal building, team collaboration, and a learning system that compounds your effort — all for $199/mo.',
   },
   features: [
     { title: 'Opportunity Matching', description: 'AI scans SBIR.gov, SAM.gov, and Grants.gov across all 11 agencies daily. Topics are matched to your technology profile before you log in.', icon: 'search' },
@@ -135,8 +135,8 @@ export default async function FeaturesPage() {
       <Section className="bg-surface-50">
         <SectionHeader
           eyebrow="Core Capabilities"
-          title="Everything a BD team does — without the team"
-          description="We built every capability you would need to hire for. From opportunity scanning to proposal submission, nothing falls through the cracks."
+          title="From Opportunity to Award — Nothing Falls Through"
+          description="Every capability a lean team needs to compete with companies that have full-time BD departments. Covers all 11 SBIR and STTR participating agencies."
         />
         <div className="mt-14 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200/60 sm:grid-cols-2 lg:grid-cols-3">
           {content.features.map((feature, i) => (
@@ -153,12 +153,12 @@ export default async function FeaturesPage() {
 
       {/* CTA */}
       <CtaSection
-        title="Ready to see it in action?"
-        description="Launching May 15, 2026. Join the waitlist as a Beta Tester and get the first 3 months of Pipeline Engine free and priority access to our Builders."
+        title="Be One of the First 20."
+        description="Up to 20 small businesses who join the waitlist will be selected for early access and personal onboarding by our founder — plus 3 months of free Pipeline Engine. Launching May 15, 2026."
         primaryLabel="Join the Waitlist"
         primaryHref="/get-started"
         secondaryLabel="See Pricing"
-        secondaryHref="/pricing"
+        secondaryHref="/get-started"
       />
     </>
   )
