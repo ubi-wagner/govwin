@@ -41,9 +41,18 @@ but what gets built, how it stores data, how it learns, and how it stays secure.
    What this costs per tenant, per agent call, per proposal. How prompt caching
    reduces cost 10x. Token budgets. When to scale what. The break-even math.
 
+8. **[RFP Curation Pipeline](./08-RFP-CURATION-PIPELINE.md)**
+   The admin-side workflow where solicitations are triaged, analyzed, marked up,
+   compliance-verified, and staged before customers see them. The 1:N economics
+   of curating ~100 RFPs/year that serve thousands of customers across cycles.
+   The namespace memory model (USAF:AFWERX:SBIR:Phase1) that makes AI pre-staging
+   better every cycle. Database schema, admin workspace design, and how curated
+   data flows into customer proposal portals.
+
 ---
 
 **Reading order:** Start with Chapter 1 even if you think you understand how LLM
-agents work. The mental model matters for everything that follows. Then Chapters
-2-3 are the core — where agents insert and how they remember. Chapters 4-7 are
+agents work. The mental model matters for everything that follows. Then Chapter 8
+(RFP Curation Pipeline) — this is the critical admin workflow that feeds everything
+downstream. Then Chapters 2-3 for agent archetypes and memory. Chapters 4-7 are
 the operational details that make it production-ready.
