@@ -1,18 +1,14 @@
-import { defineConfig } from 'vitest/config'
-import path from 'path'
+import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   test: {
     environment: 'node',
+    testTimeout: 15000,
+    sequence: { concurrent: false },
     include: ['__tests__/**/*.test.ts'],
-    // Integration tests get more time (DB operations)
-    testTimeout: 15_000,
-    // Run unit tests first, then integration
-    sequence: { shuffle: false },
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
-    },
+    alias: { '@': path.resolve(__dirname) },
   },
-})
+});

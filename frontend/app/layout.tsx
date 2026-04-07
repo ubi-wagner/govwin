@@ -1,18 +1,15 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-
-const inter = Inter({ subsets: ['latin'], display: 'swap' })
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'RFP Pipeline | Government Opportunity Intelligence',
-  description: 'AI-powered platform to discover, score, and win federal government contracts. Built for small businesses and startups pursuing SBIR/STTR and federal procurement.',
-}
+  title: 'RFP Pipeline',
+  description: 'AI-powered proposal management for government contractors',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
-      <body>{children}</body>
+    <html lang="en">
+      <body className="font-sans antialiased">{children}</body>
     </html>
-  )
+  );
 }
