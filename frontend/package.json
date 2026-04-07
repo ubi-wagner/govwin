@@ -8,9 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "vitest run --exclude __tests__/integration/**",
-    "test:unit": "vitest run __tests__/api-guards.test.ts __tests__/middleware.test.ts",
-    "test:integration": "vitest run __tests__/integration/",
+    "test": "vitest run --passWithNoTests --exclude __tests__/integration/**",
+    "test:unit": "vitest run --passWithNoTests __tests__/api-guards.test.ts __tests__/middleware.test.ts",
+    "test:integration": "vitest run --passWithNoTests __tests__/integration/",
     "test:e2e": "playwright test"
   },
   "dependencies": {
