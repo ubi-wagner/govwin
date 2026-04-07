@@ -20,14 +20,28 @@ def handle_signal(sig: signal.Signals) -> None:
 
 
 async def run_migrations() -> None:
-    """Run all SQL migrations in order. Idempotent — safe to run on every boot."""
+    """Run all SQL migrations in order. Idempotent — safe to run on every boot.
+
+    The 000_drop_all.sql file wipes the entire schema before rebuilding.
+    It only runs when ALLOW_SCHEMA_RESET=true (set this on Railway during V1
+    pre-launch). Once you have real customer data, unset this env var.
+    """
     migrations_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'db', 'migrations')
     migrations_dir = os.path.abspath(migrations_dir)
+
+    allow_reset = os.getenv("ALLOW_SCHEMA_RESET", "false").lower() == "true"
 
     sql_files = sorted(glob.glob(os.path.join(migrations_dir, '*.sql')))
     if not sql_files:
         print("[migrate] No migration files found, skipping")
         return
+
+    # Filter out the drop-all migration unless explicitly allowed
+    if not allow_reset:
+        sql_files = [f for f in sql_files if '000_drop_all' not in os.path.basename(f)]
+        print("[migrate] ALLOW_SCHEMA_RESET=false — skipping schema reset")
+    else:
+        print("[migrate] ALLOW_SCHEMA_RESET=true — will drop and recreate schema")
 
     conn = await asyncpg.connect(DATABASE_URL)
     try:
