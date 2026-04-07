@@ -1,12 +1,17 @@
 """
 RFP Pipeline — Main Worker Process
 Listens for job notifications, executes ingestion, scoring, agent tasks.
+Auto-migrates the database on startup.
 """
 import asyncio
 import signal
 import os
+import glob
+import asyncpg
+
 
 shutdown_event = asyncio.Event()
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://govtech:changeme@localhost:5432/govtech_intel")
 
 
 def handle_signal(sig: signal.Signals) -> None:
@@ -14,8 +19,50 @@ def handle_signal(sig: signal.Signals) -> None:
     shutdown_event.set()
 
 
+async def run_migrations() -> None:
+    """Run all SQL migrations in order. Idempotent — safe to run on every boot."""
+    migrations_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'db', 'migrations')
+    migrations_dir = os.path.abspath(migrations_dir)
+
+    sql_files = sorted(glob.glob(os.path.join(migrations_dir, '*.sql')))
+    if not sql_files:
+        print("[migrate] No migration files found, skipping")
+        return
+
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        for filepath in sql_files:
+            filename = os.path.basename(filepath)
+            print(f"[migrate] Running {filename}...")
+            with open(filepath, 'r') as f:
+                sql = f.read()
+            try:
+                await conn.execute(sql)
+                print(f"[migrate] {filename} ✓")
+            except Exception as e:
+                # IF NOT EXISTS / ON CONFLICT DO NOTHING make most statements idempotent
+                # Log but don't crash on duplicate object errors
+                err_msg = str(e)
+                if 'already exists' in err_msg or 'duplicate key' in err_msg:
+                    print(f"[migrate] {filename} — already applied, skipping")
+                else:
+                    print(f"[migrate] {filename} FAILED: {e}")
+                    raise
+        print("[migrate] All migrations complete")
+    finally:
+        await conn.close()
+
+
 async def main() -> None:
     print("RFP Pipeline worker starting...")
+
+    # Auto-migrate on boot
+    try:
+        await run_migrations()
+    except Exception as e:
+        print(f"[migrate] Migration failed: {e}")
+        print("[migrate] Continuing startup — DB may need manual intervention")
+
     # TODO: Initialize database connection pool
     # TODO: Register event handlers
     # TODO: Start cron ticker for pipeline_schedules

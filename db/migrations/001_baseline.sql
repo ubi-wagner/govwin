@@ -20,7 +20,7 @@ $$ LANGUAGE plpgsql;
 -- CORE: AUTH & TENANCY
 -- ============================================================================
 
-CREATE TABLE tenants (
+CREATE TABLE IF NOT EXISTS tenants (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug            TEXT UNIQUE NOT NULL,
     name            TEXT NOT NULL,
@@ -34,9 +34,10 @@ CREATE TABLE tenants (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS tenants_updated ON tenants;
 CREATE TRIGGER tenants_updated BEFORE UPDATE ON tenants FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           TEXT UNIQUE NOT NULL,
     name            TEXT,
@@ -50,12 +51,13 @@ CREATE TABLE users (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS users_updated ON users;
 CREATE TRIGGER users_updated BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_tenant ON users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
 
 -- NextAuth tables
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type            TEXT NOT NULL,
@@ -70,21 +72,21 @@ CREATE TABLE accounts (
     UNIQUE(provider, provider_account_id)
 );
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_token   TEXT UNIQUE NOT NULL,
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires         TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE verification_tokens (
+CREATE TABLE IF NOT EXISTS verification_tokens (
     identifier      TEXT NOT NULL,
     token           TEXT UNIQUE NOT NULL,
     expires         TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (identifier, token)
 );
 
-CREATE TABLE tenant_profiles (
+CREATE TABLE IF NOT EXISTS tenant_profiles (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID UNIQUE NOT NULL REFERENCES tenants(id),
     naics_codes     TEXT[] DEFAULT '{}',
@@ -99,13 +101,14 @@ CREATE TABLE tenant_profiles (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS tenant_profiles_updated ON tenant_profiles;
 CREATE TRIGGER tenant_profiles_updated BEFORE UPDATE ON tenant_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================================
 -- OPPORTUNITIES & PIPELINE
 -- ============================================================================
 
-CREATE TABLE opportunities (
+CREATE TABLE IF NOT EXISTS opportunities (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT NOT NULL,
     source_id       TEXT NOT NULL,
@@ -132,14 +135,15 @@ CREATE TABLE opportunities (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(source, source_id)
 );
+DROP TRIGGER IF EXISTS opportunities_updated ON opportunities;
 CREATE TRIGGER opportunities_updated BEFORE UPDATE ON opportunities FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_opp_source ON opportunities(source, source_id);
-CREATE INDEX idx_opp_agency ON opportunities(agency);
-CREATE INDEX idx_opp_close ON opportunities(close_date);
-CREATE INDEX idx_opp_active ON opportunities(is_active) WHERE is_active;
-CREATE INDEX idx_opp_fts ON opportunities USING GIN (full_text_tsv);
+CREATE INDEX IF NOT EXISTS idx_opp_source ON opportunities(source, source_id);
+CREATE INDEX IF NOT EXISTS idx_opp_agency ON opportunities(agency);
+CREATE INDEX IF NOT EXISTS idx_opp_close ON opportunities(close_date);
+CREATE INDEX IF NOT EXISTS idx_opp_active ON opportunities(is_active) WHERE is_active;
+CREATE INDEX IF NOT EXISTS idx_opp_fts ON opportunities USING GIN (full_text_tsv);
 
-CREATE TABLE tenant_pipeline_items (
+CREATE TABLE IF NOT EXISTS tenant_pipeline_items (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     opportunity_id  UUID NOT NULL REFERENCES opportunities(id),
@@ -163,11 +167,12 @@ CREATE TABLE tenant_pipeline_items (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(tenant_id, opportunity_id)
 );
+DROP TRIGGER IF EXISTS tpi_updated ON tenant_pipeline_items;
 CREATE TRIGGER tpi_updated BEFORE UPDATE ON tenant_pipeline_items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_tpi_tenant_score ON tenant_pipeline_items(tenant_id, total_score DESC);
-CREATE INDEX idx_tpi_tenant_pursuit ON tenant_pipeline_items(tenant_id, pursuit_status);
+CREATE INDEX IF NOT EXISTS idx_tpi_tenant_score ON tenant_pipeline_items(tenant_id, total_score DESC);
+CREATE INDEX IF NOT EXISTS idx_tpi_tenant_pursuit ON tenant_pipeline_items(tenant_id, pursuit_status);
 
-CREATE TABLE tenant_actions (
+CREATE TABLE IF NOT EXISTS tenant_actions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     opportunity_id  UUID NOT NULL REFERENCES opportunities(id),
@@ -181,7 +186,7 @@ CREATE TABLE tenant_actions (
 -- RFP CURATION (Admin workspace)
 -- ============================================================================
 
-CREATE TABLE compliance_variables (
+CREATE TABLE IF NOT EXISTS compliance_variables (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT UNIQUE NOT NULL,
     label           TEXT NOT NULL,
@@ -192,7 +197,7 @@ CREATE TABLE compliance_variables (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE curated_solicitations (
+CREATE TABLE IF NOT EXISTS curated_solicitations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     opportunity_id  UUID NOT NULL REFERENCES opportunities(id),
     namespace       TEXT NOT NULL,
@@ -214,13 +219,14 @@ CREATE TABLE curated_solicitations (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS curated_sol_updated ON curated_solicitations;
 CREATE TRIGGER curated_sol_updated BEFORE UPDATE ON curated_solicitations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_csol_status ON curated_solicitations(status);
-CREATE INDEX idx_csol_namespace ON curated_solicitations(namespace);
-CREATE INDEX idx_csol_opp ON curated_solicitations(opportunity_id);
-CREATE INDEX idx_csol_fts ON curated_solicitations USING GIN (full_text_tsv);
+CREATE INDEX IF NOT EXISTS idx_csol_status ON curated_solicitations(status);
+CREATE INDEX IF NOT EXISTS idx_csol_namespace ON curated_solicitations(namespace);
+CREATE INDEX IF NOT EXISTS idx_csol_opp ON curated_solicitations(opportunity_id);
+CREATE INDEX IF NOT EXISTS idx_csol_fts ON curated_solicitations USING GIN (full_text_tsv);
 
-CREATE TABLE solicitation_compliance (
+CREATE TABLE IF NOT EXISTS solicitation_compliance (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     solicitation_id UUID NOT NULL REFERENCES curated_solicitations(id),
     page_limit_technical INT,
@@ -259,7 +265,7 @@ CREATE TABLE solicitation_compliance (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE solicitation_templates (
+CREATE TABLE IF NOT EXISTS solicitation_templates (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     solicitation_id UUID REFERENCES curated_solicitations(id),
     namespace       TEXT,
@@ -272,7 +278,7 @@ CREATE TABLE solicitation_templates (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE solicitation_outlines (
+CREATE TABLE IF NOT EXISTS solicitation_outlines (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     solicitation_id UUID NOT NULL REFERENCES curated_solicitations(id),
     outline         JSONB NOT NULL,
@@ -282,7 +288,7 @@ CREATE TABLE solicitation_outlines (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE solicitation_topics (
+CREATE TABLE IF NOT EXISTS solicitation_topics (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     solicitation_id UUID NOT NULL REFERENCES curated_solicitations(id),
     topic_number    TEXT,
@@ -300,7 +306,7 @@ CREATE TABLE solicitation_topics (
 -- PROPOSALS & WORKSPACE
 -- ============================================================================
 
-CREATE TABLE proposals (
+CREATE TABLE IF NOT EXISTS proposals (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     opportunity_id  UUID NOT NULL REFERENCES opportunities(id),
@@ -312,10 +318,11 @@ CREATE TABLE proposals (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS proposals_updated ON proposals;
 CREATE TRIGGER proposals_updated BEFORE UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_proposals_tenant ON proposals(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_proposals_tenant ON proposals(tenant_id);
 
-CREATE TABLE proposal_sections (
+CREATE TABLE IF NOT EXISTS proposal_sections (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     section_number  TEXT NOT NULL,
@@ -330,9 +337,10 @@ CREATE TABLE proposal_sections (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS sections_updated ON proposal_sections;
 CREATE TRIGGER sections_updated BEFORE UPDATE ON proposal_sections FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE proposal_collaborators (
+CREATE TABLE IF NOT EXISTS proposal_collaborators (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     user_id         UUID REFERENCES users(id),
@@ -345,7 +353,7 @@ CREATE TABLE proposal_collaborators (
     UNIQUE(proposal_id, email)
 );
 
-CREATE TABLE collaborator_stage_access (
+CREATE TABLE IF NOT EXISTS collaborator_stage_access (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     collaborator_id UUID NOT NULL REFERENCES proposal_collaborators(id),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
@@ -356,10 +364,10 @@ CREATE TABLE collaborator_stage_access (
     access_revoked_at TIMESTAMPTZ,
     granted_by      UUID REFERENCES users(id)
 );
-CREATE INDEX idx_csa_collab ON collaborator_stage_access(collaborator_id);
-CREATE INDEX idx_csa_proposal_stage ON collaborator_stage_access(proposal_id, stage);
+CREATE INDEX IF NOT EXISTS idx_csa_collab ON collaborator_stage_access(collaborator_id);
+CREATE INDEX IF NOT EXISTS idx_csa_proposal_stage ON collaborator_stage_access(proposal_id, stage);
 
-CREATE TABLE proposal_stage_history (
+CREATE TABLE IF NOT EXISTS proposal_stage_history (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     from_stage      TEXT,
@@ -369,7 +377,7 @@ CREATE TABLE proposal_stage_history (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE proposal_comments (
+CREATE TABLE IF NOT EXISTS proposal_comments (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     section_id      UUID REFERENCES proposal_sections(id),
@@ -379,7 +387,7 @@ CREATE TABLE proposal_comments (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE proposal_reviews (
+CREATE TABLE IF NOT EXISTS proposal_reviews (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     stage           TEXT NOT NULL,
@@ -393,7 +401,7 @@ CREATE TABLE proposal_reviews (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE proposal_compliance_matrix (
+CREATE TABLE IF NOT EXISTS proposal_compliance_matrix (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
     requirement_text TEXT NOT NULL,
@@ -410,7 +418,7 @@ CREATE TABLE proposal_compliance_matrix (
 -- CONTENT LIBRARY
 -- ============================================================================
 
-CREATE TABLE library_units (
+CREATE TABLE IF NOT EXISTS library_units (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     content         TEXT NOT NULL,
@@ -427,13 +435,14 @@ CREATE TABLE library_units (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+DROP TRIGGER IF EXISTS library_updated ON library_units;
 CREATE TRIGGER library_updated BEFORE UPDATE ON library_units FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE INDEX idx_library_tenant ON library_units(tenant_id);
-CREATE INDEX idx_library_tenant_cat ON library_units(tenant_id, category);
-CREATE INDEX idx_library_status ON library_units(status) WHERE status = 'approved';
-CREATE INDEX idx_library_embedding ON library_units USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
+CREATE INDEX IF NOT EXISTS idx_library_tenant ON library_units(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_library_tenant_cat ON library_units(tenant_id, category);
+CREATE INDEX IF NOT EXISTS idx_library_status ON library_units(status) WHERE status = 'approved';
+CREATE INDEX IF NOT EXISTS idx_library_embedding ON library_units USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
 
-CREATE TABLE library_harvest_log (
+CREATE TABLE IF NOT EXISTS library_harvest_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     proposal_id     UUID REFERENCES proposals(id),
@@ -441,7 +450,7 @@ CREATE TABLE library_harvest_log (
     harvested_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE library_atom_outcomes (
+CREATE TABLE IF NOT EXISTS library_atom_outcomes (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     unit_id         UUID NOT NULL REFERENCES library_units(id),
     proposal_id     UUID NOT NULL REFERENCES proposals(id),
@@ -449,7 +458,7 @@ CREATE TABLE library_atom_outcomes (
     recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tenant_uploads (
+CREATE TABLE IF NOT EXISTS tenant_uploads (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     file_name       TEXT NOT NULL,
@@ -465,7 +474,7 @@ CREATE TABLE tenant_uploads (
 -- AGENT FABRIC
 -- ============================================================================
 
-CREATE TABLE agent_archetypes (
+CREATE TABLE IF NOT EXISTS agent_archetypes (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     role_name       TEXT UNIQUE NOT NULL,
     display_name    TEXT NOT NULL,
@@ -481,7 +490,7 @@ CREATE TABLE agent_archetypes (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE episodic_memories (
+CREATE TABLE IF NOT EXISTS episodic_memories (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -500,13 +509,13 @@ CREATE TABLE episodic_memories (
     is_archived     BOOLEAN NOT NULL DEFAULT false,
     superseded_by   UUID REFERENCES episodic_memories(id)
 );
-CREATE INDEX idx_em_tenant ON episodic_memories(tenant_id);
-CREATE INDEX idx_em_tenant_role ON episodic_memories(tenant_id, agent_role);
-CREATE INDEX idx_em_archived ON episodic_memories(is_archived) WHERE NOT is_archived;
-CREATE INDEX idx_em_embedding ON episodic_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
-CREATE INDEX idx_em_entities ON episodic_memories USING GIN (entities);
+CREATE INDEX IF NOT EXISTS idx_em_tenant ON episodic_memories(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_em_tenant_role ON episodic_memories(tenant_id, agent_role);
+CREATE INDEX IF NOT EXISTS idx_em_archived ON episodic_memories(is_archived) WHERE NOT is_archived;
+CREATE INDEX IF NOT EXISTS idx_em_embedding ON episodic_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
+CREATE INDEX IF NOT EXISTS idx_em_entities ON episodic_memories USING GIN (entities);
 
-CREATE TABLE semantic_memories (
+CREATE TABLE IF NOT EXISTS semantic_memories (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -528,12 +537,12 @@ CREATE TABLE semantic_memories (
     last_accessed   TIMESTAMPTZ NOT NULL DEFAULT now(),
     access_count    INT NOT NULL DEFAULT 0
 );
-CREATE INDEX idx_sm_tenant ON semantic_memories(tenant_id);
-CREATE INDEX idx_sm_tenant_cat ON semantic_memories(tenant_id, category);
-CREATE INDEX idx_sm_active ON semantic_memories(is_active) WHERE is_active;
-CREATE INDEX idx_sm_embedding ON semantic_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 24, ef_construction = 200);
+CREATE INDEX IF NOT EXISTS idx_sm_tenant ON semantic_memories(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_sm_tenant_cat ON semantic_memories(tenant_id, category);
+CREATE INDEX IF NOT EXISTS idx_sm_active ON semantic_memories(is_active) WHERE is_active;
+CREATE INDEX IF NOT EXISTS idx_sm_embedding ON semantic_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 24, ef_construction = 200);
 
-CREATE TABLE procedural_memories (
+CREATE TABLE IF NOT EXISTS procedural_memories (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -549,11 +558,11 @@ CREATE TABLE procedural_memories (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_pm_tenant ON procedural_memories(tenant_id);
-CREATE INDEX idx_pm_active ON procedural_memories(is_active) WHERE is_active;
-CREATE INDEX idx_pm_embedding ON procedural_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
+CREATE INDEX IF NOT EXISTS idx_pm_tenant ON procedural_memories(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_pm_active ON procedural_memories(is_active) WHERE is_active;
+CREATE INDEX IF NOT EXISTS idx_pm_embedding ON procedural_memories USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
 
-CREATE TABLE agent_task_log (
+CREATE TABLE IF NOT EXISTS agent_task_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -573,10 +582,10 @@ CREATE TABLE agent_task_log (
     error           TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_atl_tenant ON agent_task_log(tenant_id);
-CREATE INDEX idx_atl_tenant_role ON agent_task_log(tenant_id, agent_role);
+CREATE INDEX IF NOT EXISTS idx_atl_tenant ON agent_task_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_atl_tenant_role ON agent_task_log(tenant_id, agent_role);
 
-CREATE TABLE agent_task_queue (
+CREATE TABLE IF NOT EXISTS agent_task_queue (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -591,16 +600,16 @@ CREATE TABLE agent_task_queue (
     error           TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_atq_status ON agent_task_queue(status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_atq_status ON agent_task_queue(status) WHERE status = 'pending';
 
-CREATE TABLE agent_task_results (
+CREATE TABLE IF NOT EXISTS agent_task_results (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id         UUID NOT NULL REFERENCES agent_task_queue(id),
     output          JSONB NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tenant_agent_config (
+CREATE TABLE IF NOT EXISTS tenant_agent_config (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID UNIQUE NOT NULL REFERENCES tenants(id),
     enabled_agents  TEXT[] DEFAULT '{}',
@@ -611,7 +620,7 @@ CREATE TABLE tenant_agent_config (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE agent_performance (
+CREATE TABLE IF NOT EXISTS agent_performance (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     agent_role      TEXT NOT NULL,
@@ -629,7 +638,7 @@ CREATE TABLE agent_performance (
 -- EVENT BUS & AUTOMATION
 -- ============================================================================
 
-CREATE TABLE opportunity_events (
+CREATE TABLE IF NOT EXISTS opportunity_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      TEXT NOT NULL,
     opportunity_id  UUID REFERENCES opportunities(id),
@@ -641,7 +650,7 @@ CREATE TABLE opportunity_events (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE customer_events (
+CREATE TABLE IF NOT EXISTS customer_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      TEXT NOT NULL,
     tenant_id       UUID REFERENCES tenants(id),
@@ -653,7 +662,7 @@ CREATE TABLE customer_events (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE content_events (
+CREATE TABLE IF NOT EXISTS content_events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      TEXT NOT NULL,
     metadata        JSONB DEFAULT '{}',
@@ -661,7 +670,7 @@ CREATE TABLE content_events (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE automation_rules (
+CREATE TABLE IF NOT EXISTS automation_rules (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            TEXT UNIQUE NOT NULL,
     trigger_bus     TEXT NOT NULL CHECK (trigger_bus IN ('opportunity_events','customer_events','content_events')),
@@ -675,7 +684,7 @@ CREATE TABLE automation_rules (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE automation_log (
+CREATE TABLE IF NOT EXISTS automation_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rule_id         UUID REFERENCES automation_rules(id),
     trigger_event_id UUID,
@@ -688,7 +697,7 @@ CREATE TABLE automation_log (
 -- CONTROL PLANE
 -- ============================================================================
 
-CREATE TABLE pipeline_jobs (
+CREATE TABLE IF NOT EXISTS pipeline_jobs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT NOT NULL,
     run_type        TEXT NOT NULL DEFAULT 'full',
@@ -700,9 +709,9 @@ CREATE TABLE pipeline_jobs (
     completed_at    TIMESTAMPTZ,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_pj_status ON pipeline_jobs(status) WHERE status IN ('pending','running');
+CREATE INDEX IF NOT EXISTS idx_pj_status ON pipeline_jobs(status) WHERE status IN ('pending','running');
 
-CREATE TABLE pipeline_schedules (
+CREATE TABLE IF NOT EXISTS pipeline_schedules (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT NOT NULL,
     run_type        TEXT NOT NULL DEFAULT 'full',
@@ -713,7 +722,7 @@ CREATE TABLE pipeline_schedules (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE pipeline_runs (
+CREATE TABLE IF NOT EXISTS pipeline_runs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     job_id          UUID REFERENCES pipeline_jobs(id),
     source          TEXT NOT NULL,
@@ -723,7 +732,7 @@ CREATE TABLE pipeline_runs (
     completed_at    TIMESTAMPTZ
 );
 
-CREATE TABLE api_key_registry (
+CREATE TABLE IF NOT EXISTS api_key_registry (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT UNIQUE NOT NULL,
     encrypted_key   TEXT,
@@ -734,7 +743,7 @@ CREATE TABLE api_key_registry (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE rate_limit_state (
+CREATE TABLE IF NOT EXISTS rate_limit_state (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT UNIQUE NOT NULL,
     daily_limit     INT NOT NULL DEFAULT 1000,
@@ -745,7 +754,7 @@ CREATE TABLE rate_limit_state (
     last_reset_hourly TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE source_health (
+CREATE TABLE IF NOT EXISTS source_health (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source          TEXT UNIQUE NOT NULL,
     status          TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('healthy','degraded','error','unknown')),
@@ -756,7 +765,7 @@ CREATE TABLE source_health (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE system_config (
+CREATE TABLE IF NOT EXISTS system_config (
     key             TEXT PRIMARY KEY,
     value           TEXT NOT NULL,
     description     TEXT,
@@ -767,7 +776,7 @@ CREATE TABLE system_config (
 -- IDENTITY & BILLING
 -- ============================================================================
 
-CREATE TABLE invitations (
+CREATE TABLE IF NOT EXISTS invitations (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     email           TEXT NOT NULL,
@@ -779,7 +788,7 @@ CREATE TABLE invitations (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE consent_records (
+CREATE TABLE IF NOT EXISTS consent_records (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(id),
     document_type   TEXT NOT NULL,
@@ -788,7 +797,7 @@ CREATE TABLE consent_records (
     ip_address      TEXT
 );
 
-CREATE TABLE legal_document_versions (
+CREATE TABLE IF NOT EXISTS legal_document_versions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_type   TEXT NOT NULL,
     version         TEXT NOT NULL,
@@ -798,7 +807,7 @@ CREATE TABLE legal_document_versions (
     UNIQUE(document_type, version)
 );
 
-CREATE TABLE purchases (
+CREATE TABLE IF NOT EXISTS purchases (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     opportunity_id  UUID REFERENCES opportunities(id),
@@ -811,7 +820,7 @@ CREATE TABLE purchases (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID REFERENCES tenants(id),
     user_id         UUID REFERENCES users(id),
@@ -826,7 +835,7 @@ CREATE TABLE audit_log (
 -- ANALYTICS
 -- ============================================================================
 
-CREATE TABLE visitor_sessions (
+CREATE TABLE IF NOT EXISTS visitor_sessions (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id      TEXT UNIQUE NOT NULL,
     first_page      TEXT,
@@ -835,14 +844,14 @@ CREATE TABLE visitor_sessions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE page_views (
+CREATE TABLE IF NOT EXISTS page_views (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id      TEXT NOT NULL,
     page_path       TEXT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE waitlist (
+CREATE TABLE IF NOT EXISTS waitlist (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           TEXT UNIQUE NOT NULL,
     company_name    TEXT,
@@ -854,7 +863,7 @@ CREATE TABLE waitlist (
 -- SPOTLIGHTS
 -- ============================================================================
 
-CREATE TABLE spotlights (
+CREATE TABLE IF NOT EXISTS spotlights (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL REFERENCES tenants(id),
     name            TEXT NOT NULL,
