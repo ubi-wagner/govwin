@@ -1,0 +1,28 @@
+-- Compliance variable master list
+INSERT INTO compliance_variables (name, label, category, data_type, options, is_system) VALUES
+('page_limit', 'Page Limit', 'format', 'number', NULL, true),
+('font_family', 'Font Family', 'format', 'text', NULL, true),
+('font_size', 'Font Size', 'format', 'text', NULL, true),
+('margins', 'Margins', 'format', 'text', NULL, true),
+('line_spacing', 'Line Spacing', 'format', 'select', '["single","1.5","double"]', true),
+('header_format', 'Header Format', 'format', 'text', NULL, true),
+('footer_format', 'Footer Format', 'format', 'text', NULL, true),
+('submission_format', 'Submission Format', 'format', 'select', '["pdf","word","pptx","multiple"]', true),
+('images_allowed', 'Images/Tables Allowed', 'format', 'boolean', NULL, true),
+('slides_allowed', 'Slides Format', 'format', 'boolean', NULL, true),
+('slide_limit', 'Slide Limit', 'format', 'number', NULL, true),
+('required_sections', 'Required Sections', 'content', 'multiselect', NULL, true),
+('required_documents', 'Required Documents', 'content', 'multiselect', NULL, true),
+('evaluation_criteria', 'Evaluation Criteria', 'evaluation', 'multiselect', NULL, true),
+('taba_allowed', 'TABA Allowed', 'cost', 'boolean', NULL, true),
+('indirect_rate_cap', 'Indirect Rate Cap', 'cost', 'number', NULL, true),
+('partner_max_pct', 'Partner Max % of Work', 'cost', 'number', NULL, true),
+('cost_sharing', 'Cost Sharing Required', 'cost', 'boolean', NULL, true),
+('cost_volume_format', 'Cost Volume Format', 'cost', 'select', '["spreadsheet","narrative","both"]', true),
+('pi_employee_required', 'PI Must Be Employee', 'eligibility', 'boolean', NULL, true),
+('pi_university_allowed', 'University PI Allowed (STTR)', 'eligibility', 'boolean', NULL, true),
+('clearance_required', 'Security Clearance', 'eligibility', 'select', '["none","confidential","secret","top_secret"]', true),
+('itar_required', 'ITAR Required', 'eligibility', 'boolean', NULL, true),
+('far_clauses', 'FAR Clauses', 'compliance', 'multiselect', NULL, true),
+('set_aside_type', 'Set-Aside Type', 'eligibility', 'select', '["none","SB","WOSB","SDVOSB","HUBZone","8a"]', true)
+ON CONFLICT (name) DO NOTHING;
