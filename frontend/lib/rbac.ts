@@ -74,3 +74,30 @@ export function requiredRoleForPath(pathname: string): Role | null {
   }
   return null;
 }
+
+/**
+ * Role + tenant aware landing path for a freshly authenticated user.
+ * Used by /portal/page.tsx (the post-login dispatcher) and by the
+ * login page's post-sign-in redirect to send each role to their
+ * correct starting point instead of dumping everyone onto a generic
+ * stub page.
+ *
+ * Rules:
+ *   master_admin / rfp_admin      → /admin/dashboard
+ *   tenant_admin / tenant_user    → /portal/<slug>/dashboard (if slug set)
+ *   partner_user                  → /portal/<slug>/dashboard (if slug set)
+ *   any role with no tenant slug  → null (caller should show
+ *                                   a "no workspace assigned" message)
+ */
+export function getLandingPath(
+  role: Role,
+  tenantSlug: string | null,
+): string | null {
+  if (role === 'master_admin' || role === 'rfp_admin') {
+    return '/admin/dashboard';
+  }
+  if (tenantSlug) {
+    return `/portal/${tenantSlug}/dashboard`;
+  }
+  return null;
+}
