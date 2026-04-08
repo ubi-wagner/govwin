@@ -57,14 +57,35 @@ async def seed_master_admin(database_url: str) -> None:
     """
     conn: Optional[asyncpg.Connection] = None
     try:
+        print("[seed] connecting to database...", flush=True)
         conn = await asyncpg.connect(database_url)
+        print("[seed] db connected, checking for existing master_admin...", flush=True)
 
         # Idempotent guard — never overwrite an existing master_admin
-        existing = await conn.fetchval(
-            "SELECT 1 FROM users WHERE role = 'master_admin' LIMIT 1"
+        existing_row = await conn.fetchrow(
+            """
+            SELECT email, temp_password, is_active,
+                   substring(password_hash, 1, 10) AS hash_prefix,
+                   created_at
+            FROM users
+            WHERE role = 'master_admin'
+            LIMIT 1
+            """
         )
-        if existing:
-            logger.info("[seed] master_admin already exists, skipping")
+        if existing_row is not None:
+            # Use print(flush=True) not logger.info() — the root logger
+            # level defaults to WARNING so INFO messages are silently
+            # dropped, and "silently dropped" is exactly how we ended
+            # up unable to debug the bootstrap path.
+            print(
+                f"[seed] master_admin already exists, skipping. "
+                f"email={existing_row['email']} "
+                f"temp_password={existing_row['temp_password']} "
+                f"is_active={existing_row['is_active']} "
+                f"hash_prefix={existing_row['hash_prefix']!r} "
+                f"created_at={existing_row['created_at']}",
+                flush=True,
+            )
             return
 
         # Use the env var if set (backward compat); otherwise generate
@@ -117,7 +138,9 @@ async def seed_master_admin(database_url: str) -> None:
 
     except Exception as e:
         # Non-fatal — pipeline must keep booting even if seed fails.
-        logger.error("[seed] master_admin seed failed: %s", e)
+        # Use print(flush=True) so the error lands in Railway logs
+        # even under default Python logging config.
+        print(f"[seed] master_admin seed failed: {e!r}", flush=True)
     finally:
         if conn is not None:
             await conn.close()

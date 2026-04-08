@@ -6,8 +6,19 @@ Auto-migrates the database on startup.
 import asyncio
 import signal
 import os
+import sys
 import glob
 import asyncpg
+
+
+# Force line-buffered stdout/stderr so every print() lands in Railway
+# deploy logs immediately. Python defaults to BLOCK-buffered stdout
+# when attached to a pipe (Docker), which means prints get swallowed
+# by the buffer and never appear until the process exits — which this
+# worker never does. This one line is the difference between silent
+# darkness and useful runtime logs.
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 
 shutdown_event = asyncio.Event()
