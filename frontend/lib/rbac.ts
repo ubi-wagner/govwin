@@ -4,8 +4,18 @@
  * hasRoleAtLeast / canAccess to decide whether a request proceeds.
  *
  * See docs/DECISIONS.md D001 for the role hierarchy definition.
+ *
+ * ROLES/Role live here (not in auth.ts) so unit tests can import rbac
+ * without pulling the next-auth runtime into the test environment.
  */
-import { ROLES, type Role } from '../auth';
+export const ROLES = [
+  'master_admin',
+  'rfp_admin',
+  'tenant_admin',
+  'tenant_user',
+  'partner_user',
+] as const;
+export type Role = (typeof ROLES)[number];
 
 const ROLE_RANK: Record<Role, number> = {
   master_admin: 100,

@@ -15,15 +15,9 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { sql } from './lib/db';
+import { ROLES, type Role } from './lib/rbac';
 
-export const ROLES = [
-  'master_admin',
-  'rfp_admin',
-  'tenant_admin',
-  'tenant_user',
-  'partner_user',
-] as const;
-export type Role = (typeof ROLES)[number];
+export { ROLES, type Role };
 
 interface UserRow {
   id: string;
