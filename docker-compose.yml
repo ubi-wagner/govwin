@@ -36,8 +36,8 @@ services:
 
   pipeline:
     build:
-      context: .
-      dockerfile: pipeline/Dockerfile
+      context: ./pipeline
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://govtech:changeme@db:5432/govtech_intel
       STORAGE_ROOT: /data
