@@ -1,52 +1,131 @@
-version: '3.8'
+# Local dev stack for RFP Pipeline.
+#
+# Default command: `docker compose up -d` starts db, pipeline, frontend.
+# To also run the (currently dormant, V1-deferred) CMS service:
+#   docker compose --profile cms up -d
+#
+# All environment variables have dev-safe defaults so the stack works
+# without a .env file out of the box. Override in `.env` (which gets
+# picked up automatically) for any custom config.
+#
+# The db service mounts db/migrations as `/docker-entrypoint-initdb.d`
+# so a fresh postgres volume auto-applies all migrations on first boot.
+# Subsequent boots (data volume intact) do NOT re-run the init scripts,
+# per the standard postgres Docker image contract.
 
 services:
   db:
     image: pgvector/pgvector:pg16
+    container_name: govtech_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-govtech_intel}
+      POSTGRES_USER: ${POSTGRES_USER:-govtech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: govtech
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: govtech_intel
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U govtech -d govtech_intel"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-govtech} -d ${POSTGRES_DB:-govtech_intel}"]
+      interval: 10s
       timeout: 5s
       retries: 5
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://govtech:changeme@db:5432/govtech_intel
-      AUTH_SECRET: dev-secret-change-in-production
-      AUTH_URL: http://localhost:3000
-      STORAGE_ROOT: /data
-    volumes:
-      - storage:/data
-    depends_on:
-      db:
-        condition: service_healthy
 
   pipeline:
     build:
       context: ./pipeline
       dockerfile: Dockerfile
-    environment:
-      DATABASE_URL: postgresql://govtech:changeme@db:5432/govtech_intel
-      STORAGE_ROOT: /data
-    volumes:
-      - storage:/data
+    container_name: govtech_pipeline
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
+      STORAGE_ROOT: /data
+    volumes:
+      - storage:/data
+      - ./docs:/app/docs
+    command: python src/main.py
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3000}
+    container_name: govtech_frontend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-in-production}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      STORAGE_ROOT: /data
+      CMS_SERVICE_URL: http://cms:8000
+    volumes:
+      - storage:/data
+    ports:
+      - "3000:3000"
+
+  # ---------------------------------------------------------------------
+  # CMS service — V1 dormant, only starts with `--profile cms`
+  # ---------------------------------------------------------------------
+  cms-db:
+    image: pgvector/pgvector:pg16
+    container_name: govtech_cms_db
+    restart: unless-stopped
+    profiles: ["cms"]
+    environment:
+      POSTGRES_DB: ${CMS_POSTGRES_DB:-govtech_cms}
+      POSTGRES_USER: ${CMS_POSTGRES_USER:-govtech_cms}
+      POSTGRES_PASSWORD: ${CMS_POSTGRES_PASSWORD:-cms_dev_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - cms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CMS_POSTGRES_USER:-govtech_cms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cms:
+    build:
+      context: ./services/cms
+      dockerfile: Dockerfile
+    container_name: govtech_cms
+    restart: unless-stopped
+    profiles: ["cms"]
+    depends_on:
+      cms-db:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      CMS_DATABASE_URL: postgresql://${CMS_POSTGRES_USER:-govtech_cms}:${CMS_POSTGRES_PASSWORD:-cms_dev_password}@cms-db:5432/${CMS_POSTGRES_DB:-govtech_cms}
+      SHARED_DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CMS_STORAGE_ROOT: /data/cms
+      ALLOWED_ORIGINS: http://localhost:3000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - cms_media:/data/cms
+    ports:
+      - "8000:8000"
 
 volumes:
-  pgdata:
+  postgres_data:
   storage:
+  cms_postgres_data:
+  cms_media:
