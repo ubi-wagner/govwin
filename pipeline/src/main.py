@@ -28,12 +28,18 @@ async def run_migrations() -> None:
     """
     migrations_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'db', 'migrations')
     migrations_dir = os.path.abspath(migrations_dir)
+    print(f"[migrate] Looking for migrations in {migrations_dir}")
 
     allow_reset = os.getenv("ALLOW_SCHEMA_RESET", "false").lower() == "true"
 
     sql_files = sorted(glob.glob(os.path.join(migrations_dir, '*.sql')))
     if not sql_files:
-        print("[migrate] No migration files found, skipping")
+        # Fail loud rather than silently "skipping" — a missing migrations
+        # directory in the image means the Dockerfile is misconfigured
+        # (build context too narrow) and the DB will never auto-migrate.
+        print(f"[migrate] FATAL: no .sql files found at {migrations_dir}")
+        print("[migrate] Check pipeline/Dockerfile — db/ must be COPYed into the image")
+        print("[migrate] See docs/DECISIONS.md for the build context requirement")
         return
 
     # Filter out the drop-all migration unless explicitly allowed
