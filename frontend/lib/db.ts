@@ -16,7 +16,24 @@ export const sql = postgres(DATABASE_URL, {
   max: 10,
   idle_timeout: 30,
   connect_timeout: 10,
-  transform: { column: { to: postgres.toCamel, from: postgres.fromCamel } },
+  // CRITICAL: postgres.js transform direction semantics —
+  //   `from` is applied to column names RECEIVED from the server
+  //          (so snake_case `password_hash` → camelCase `passwordHash`
+  //          in result rows, matching what auth.ts and every other
+  //          caller expects).
+  //   `to` is applied to column names SENT to the server
+  //        (so if any code references `${sql(['passwordHash'])}` in a
+  //        query, it gets converted to `password_hash` on the wire).
+  //
+  // This was previously configured with `to` and `from` SWAPPED,
+  // which meant result rows came back with snake_case keys, and
+  // every `user.passwordHash` / `user.isActive` / `user.tempPassword`
+  // access in auth.ts returned `undefined`. The `if (!user.passwordHash)
+  // return null;` guard in authorize() fired on every login attempt,
+  // which is why NextAuth surfaced "Invalid email or password" even
+  // when the correct credentials were entered against the correct
+  // row — the auth chain never reached the bcrypt.compare step.
+  transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } },
   onnotice: () => {},
 });
 
