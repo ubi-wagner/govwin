@@ -911,3 +911,35 @@ CREATE TRIGGER opp_events_notify AFTER INSERT ON opportunity_events FOR EACH ROW
 CREATE TRIGGER cust_events_notify AFTER INSERT ON customer_events FOR EACH ROW EXECUTE FUNCTION notify_event_bus();
 CREATE TRIGGER content_events_notify AFTER INSERT ON content_events FOR EACH ROW EXECUTE FUNCTION notify_event_bus();
 
+-- ============================================================================
+-- Initial master_admin bootstrap
+-- ----------------------------------------------------------------------------
+-- The very first row in the users table: the system's root administrator.
+-- Baked into the baseline migration so every fresh deploy (local, Railway,
+-- CI) has a working login the moment the schema is created, without needing
+-- a separate seed step or env var coordination.
+--
+-- email:    eric@rfppipeline.com
+-- password: !Wags$$   (the bcrypt hash below corresponds to this plaintext —
+--                     verified locally with bcryptjs.compareSync at cost 12)
+-- role:     master_admin
+-- temp_password = true → middleware force-redirects to /change-password on
+-- first sign-in, so the bootstrap credential MUST be rotated before the
+-- user can access any other route.
+--
+-- ON CONFLICT (email) DO NOTHING keeps this idempotent on every run. On
+-- the existing Railway DB where the same hash was already inserted via
+-- the old 005_bootstrap_master_admin.sql migration, this is a no-op. On a
+-- fresh database it creates the row.
+-- ============================================================================
+INSERT INTO users (email, name, role, password_hash, is_active, temp_password)
+VALUES (
+  'eric@rfppipeline.com',
+  'Eric (Master Admin)',
+  'master_admin',
+  '$2a$12$tM8UzLbaFSjxViTNhC13V.fuj.G56EDgIQZh4oRbthERf9PFs2T7S',
+  true,
+  true
+)
+ON CONFLICT (email) DO NOTHING;
+
