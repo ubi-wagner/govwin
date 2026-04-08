@@ -41,7 +41,10 @@ async def check_db() -> dict[str, Any]:
 def check_s3() -> dict[str, Any]:
     """HeadBucket against the configured bucket."""
     try:
-        from src.storage.s3_client import ping_s3
+        # Bare `storage.s3_client` (not `src.storage.s3_client`) because
+        # sys.path[0] under `python src/main.py` is /app/src, so the
+        # `src` prefix would resolve to /app/src/src which doesn't exist.
+        from storage.s3_client import ping_s3
 
         return ping_s3()
     except Exception as e:
