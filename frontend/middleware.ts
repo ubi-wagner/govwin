@@ -1,22 +1,106 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import { hasRoleAtLeast, isRole, requiredRoleForPath } from '@/lib/rbac';
 
-const PUBLIC_PATHS = ['/', '/login', '/about', '/features', '/pricing', '/engine', '/team', '/customers', '/get-started', '/legal', '/api/health', '/api/waitlist', '/api/stripe/webhook', '/invite'];
+/**
+ * Middleware — runs on the edge, gates every request before it
+ * reaches a page/route handler.
+ *
+ * Responsibilities:
+ *   1. Short-circuit public paths (no auth needed).
+ *   2. Resolve the NextAuth JWT into a user.
+ *   3. If the user has temp_password=true, force them to
+ *      /change-password (except for the change-password endpoint
+ *      itself and the sign-out endpoint).
+ *   4. Enforce the 5-role hierarchy for path prefixes using
+ *      requiredRoleForPath from lib/rbac.ts.
+ *
+ * See docs/DECISIONS.md D001.
+ */
 
-export function middleware(request: NextRequest) {
+const PUBLIC_PATHS = [
+  '/',
+  '/login',
+  '/about',
+  '/features',
+  '/pricing',
+  '/engine',
+  '/team',
+  '/customers',
+  '/get-started',
+  '/legal',
+  '/api/health',
+  '/api/waitlist',
+  '/api/stripe/webhook',
+  '/invite',
+];
+
+function isPublicPath(pathname: string): boolean {
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/favicon') ||
+    pathname.includes('.')
+  ) {
+    return true;
+  }
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+
+export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  // Public paths
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // Static files and Next.js internals
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.includes('.')) {
-    return NextResponse.next();
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+    // NextAuth v5 uses __Secure-authjs.session-token in production
+    // and authjs.session-token in development. getToken handles both.
+  });
+
+  if (!token) {
+    // Unauthenticated — redirect HTML requests to /login,
+    // return 401 for API routes.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
+    }
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // All other paths require auth — handled by layout server components
+  // Force password change on first login.
+  const tempPassword = token.tempPassword === true;
+  const isChangePasswordPath =
+    pathname === '/change-password' || pathname === '/api/auth/change-password';
+  if (tempPassword && !isChangePasswordPath) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'password change required' },
+        { status: 403 },
+      );
+    }
+    return NextResponse.redirect(new URL('/change-password', request.url));
+  }
+
+  // Role-based path gating.
+  const requiredRole = requiredRoleForPath(pathname);
+  if (requiredRole) {
+    const actorRole = token.role;
+    if (!isRole(actorRole)) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    if (!hasRoleAtLeast(actorRole, requiredRole)) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 

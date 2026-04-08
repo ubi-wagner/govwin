@@ -77,6 +77,14 @@ async def main() -> None:
         print(f"[migrate] Migration failed: {e}")
         print("[migrate] Continuing startup — DB may need manual intervention")
 
+    # Seed the initial master_admin user (idempotent; no-op if one exists)
+    try:
+        from src.seeds.master_admin import seed_master_admin
+        await seed_master_admin(DATABASE_URL)
+    except Exception as e:
+        print(f"[seed] master_admin seed failed: {e}")
+        print("[seed] Continuing startup — DB may need manual intervention")
+
     # TODO: Initialize database connection pool
     # TODO: Register event handlers
     # TODO: Start cron ticker for pipeline_schedules
