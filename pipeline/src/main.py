@@ -89,11 +89,17 @@ async def main() -> None:
         print("[migrate] Continuing startup — DB may need manual intervention")
 
     # Seed the initial master_admin user (idempotent; no-op if one exists)
+    # Import is `from seeds...` not `from src.seeds...` because when
+    # Python runs `python src/main.py`, sys.path[0] is the script's
+    # directory (/app/src in the container, pipeline/src locally), so
+    # packages under src/ are importable by their bare name. The old
+    # `src.seeds.*` form was raising ImportError on every boot and
+    # getting swallowed by stdout buffering — see PR #64 + #65.
     try:
-        from src.seeds.master_admin import seed_master_admin
+        from seeds.master_admin import seed_master_admin
         await seed_master_admin(DATABASE_URL)
     except Exception as e:
-        print(f"[seed] master_admin seed failed: {e}")
+        print(f"[seed] master_admin seed failed: {e!r}")
         print("[seed] Continuing startup — DB may need manual intervention")
 
     # TODO: Initialize database connection pool

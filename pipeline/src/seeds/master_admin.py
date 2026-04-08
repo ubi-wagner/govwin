@@ -29,7 +29,7 @@ See docs/DECISIONS.md D004 and plan section 18.
 
 Usage from pipeline/src/main.py::main after run_migrations():
 
-    from src.seeds.master_admin import seed_master_admin
+    from seeds.master_admin import seed_master_admin
     await seed_master_admin(DATABASE_URL)
 
 The seed is a no-op if ANY master_admin already exists. Safe to run
