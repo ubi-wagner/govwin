@@ -22,7 +22,11 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-if (!process.env.AWS_S3_BUCKET_NAME && process.env.NODE_ENV === 'production') {
+// Skip the guard during the Next.js "Collecting page data" step at
+// build time — Railway's build container has no runtime secrets.
+// Runtime still throws if the var is missing when the request fires.
+const _isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+if (!process.env.AWS_S3_BUCKET_NAME && process.env.NODE_ENV === 'production' && !_isBuildPhase) {
   throw new Error('[storage/s3-client] AWS_S3_BUCKET_NAME is required in production');
 }
 
