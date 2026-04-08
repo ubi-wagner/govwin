@@ -25,6 +25,7 @@ interface UserRow {
   name: string | null;
   role: Role;
   tenantId: string | null;
+  tenantSlug: string | null;
   passwordHash: string | null;
   isActive: boolean;
   tempPassword: boolean;
@@ -32,10 +33,17 @@ interface UserRow {
 
 async function findUserByEmail(email: string): Promise<UserRow | null> {
   try {
+    // LEFT JOIN tenants so the JWT can carry the URL-ready tenant slug
+    // alongside the UUID. The /portal dispatcher and role-based landing
+    // redirects need the slug, not the UUID, to build
+    // /portal/<slug>/dashboard URLs.
     const [row] = await sql<UserRow[]>`
-      SELECT id, email, name, role, tenant_id, password_hash, is_active, temp_password
-      FROM users
-      WHERE email = ${email.toLowerCase().trim()}
+      SELECT u.id, u.email, u.name, u.role, u.tenant_id,
+             u.password_hash, u.is_active, u.temp_password,
+             t.slug AS tenant_slug
+      FROM users u
+      LEFT JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.email = ${email.toLowerCase().trim()}
       LIMIT 1
     `;
     return row ?? null;
@@ -96,6 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name ?? undefined,
           role: user.role,
           tenantId: user.tenantId,
+          tenantSlug: user.tenantSlug,
           tempPassword: user.tempPassword,
         };
       },
@@ -107,6 +116,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = (user as { id: string }).id;
         token.role = (user as { role: Role }).role;
         token.tenantId = (user as { tenantId: string | null }).tenantId;
+        token.tenantSlug = (user as { tenantSlug: string | null }).tenantSlug;
         token.tempPassword = (user as { tempPassword: boolean }).tempPassword;
       }
       return token;
@@ -117,6 +127,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as { role?: Role }).role = token.role as Role | undefined;
         (session.user as { tenantId?: string | null }).tenantId =
           (token.tenantId as string | null | undefined) ?? null;
+        (session.user as { tenantSlug?: string | null }).tenantSlug =
+          (token.tenantSlug as string | null | undefined) ?? null;
         (session.user as { tempPassword?: boolean }).tempPassword =
           (token.tempPassword as boolean | undefined) ?? false;
       }

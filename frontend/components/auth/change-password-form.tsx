@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
 export function ChangePasswordForm() {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -40,8 +39,24 @@ export function ChangePasswordForm() {
         setError(msg);
         return;
       }
-      router.replace('/portal');
-      router.refresh();
+      // Password change succeeded. The DB now has temp_password=false,
+      // but our JWT cookie still has tempPassword=true from the
+      // original sign-in — NextAuth issues stateless JWTs and the
+      // route handler has no way to update the existing token. If we
+      // simply navigate somewhere else, middleware will see the stale
+      // tempPassword=true and force-redirect us right back here, and
+      // we'll be stuck in a redirect loop with a form that can no
+      // longer succeed (because the current password is now the new
+      // password and the backend rejects "new matches current").
+      //
+      // Fix: drop the JWT entirely by signing out, then push to
+      // /login?justChanged=1 so the user re-authenticates with the
+      // new password and gets a fresh JWT with tempPassword=false.
+      // signOut with redirect=false prevents NextAuth from doing its
+      // own redirect; we handle navigation ourselves via full reload
+      // so the new cookie state is guaranteed to be picked up.
+      await signOut({ redirect: false });
+      window.location.assign('/login?justChanged=1');
     } catch {
       setError('Network error. Please try again.');
     } finally {

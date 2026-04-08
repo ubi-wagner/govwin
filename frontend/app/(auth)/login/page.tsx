@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation';
 import { auth, signIn } from '@/auth';
 
 interface PageProps {
-  searchParams: Promise<{ error?: string; from?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    from?: string;
+    justChanged?: string;
+  }>;
 }
 
 export default async function LoginPage({ searchParams }: PageProps) {
@@ -12,6 +16,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
   }
   const params = await searchParams;
   const errorMsg = resolveErrorMessage(params.error);
+  const justChanged = params.justChanged === '1';
 
   async function handleLogin(formData: FormData): Promise<void> {
     'use server';
@@ -42,6 +47,14 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
         <p className="text-sm text-gray-500 mb-6">RFP Pipeline portal</p>
 
+        {justChanged ? (
+          <div
+            role="status"
+            className="mb-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+          >
+            Password updated. Please sign in with your new password.
+          </div>
+        ) : null}
         {errorMsg ? (
           <div
             role="alert"
@@ -98,6 +111,8 @@ function resolveErrorMessage(error: string | undefined): string | null {
     case 'invalid':
     case 'CredentialsSignin':
       return 'Invalid email or password.';
+    case 'session':
+      return 'Your session has expired or is invalid. Please sign in again.';
     default:
       return 'Something went wrong. Please try again.';
   }
