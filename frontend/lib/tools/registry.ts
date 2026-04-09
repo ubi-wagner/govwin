@@ -31,6 +31,7 @@ import {
   emitEventStart,
   type EventActor,
 } from '@/lib/events';
+import { recordInvoke } from '@/lib/capacity';
 import { createLogger } from '@/lib/logger';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import type { Tool, ToolContext } from './base';
@@ -192,10 +193,13 @@ export async function invoke<O = unknown>(
     parentEventId: startEventId || ctx.parentEventId,
   };
 
+  const startedAt = Date.now();
+
   try {
     const result = (await tool.handler(parsed.data, handlerCtx)) as O;
+    const durationMs = Date.now() - startedAt;
 
-    // ── 7a. Success end event ─────────────────────────────────────
+    // ── 7a. Success end event + capacity metric ──────────────────
     await emitEventEnd(startEventId, {
       result: {
         tool: name,
@@ -206,10 +210,20 @@ export async function invoke<O = unknown>(
             : typeof result,
       },
     });
-    invokeLog.info({ tool: name }, 'tool invocation succeeded');
+    await recordInvoke({
+      toolName: name,
+      toolNamespace: tool.namespace,
+      actorType: ctx.actor.type,
+      actorId: ctx.actor.id,
+      tenantId: ctx.tenantId,
+      success: true,
+      durationMs,
+    });
+    invokeLog.info({ tool: name, durationMs }, 'tool invocation succeeded');
     return result;
   } catch (err) {
-    // ── 7b. Error end event ───────────────────────────────────────
+    const durationMs = Date.now() - startedAt;
+    // ── 7b. Error end event + capacity metric ───────────────────
     const errorPayload =
       err instanceof Error
         ? {
@@ -223,9 +237,19 @@ export async function invoke<O = unknown>(
       result: { tool: name, outcome: 'error' },
       error: errorPayload,
     });
+    await recordInvoke({
+      toolName: name,
+      toolNamespace: tool.namespace,
+      actorType: ctx.actor.type,
+      actorId: ctx.actor.id,
+      tenantId: ctx.tenantId,
+      success: false,
+      errorCode: errorPayload.code,
+      durationMs,
+    });
 
     invokeLog.warn(
-      { tool: name, err: errorPayload },
+      { tool: name, err: errorPayload, durationMs },
       'tool invocation failed',
     );
 
