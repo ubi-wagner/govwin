@@ -59,6 +59,12 @@ export function canManageTenant(role: Role): boolean {
  * obviously-privileged paths before hitting layout server components.
  */
 const PATH_MIN_ROLE: Array<{ prefix: string; role: Role }> = [
+  // More specific (longer) prefixes MUST come first — requiredRoleForPath
+  // returns the first match. '/admin/system' and '/api/admin/system' are
+  // master_admin-only; they'd otherwise be shadowed by the general
+  // '/admin' rfp_admin entry below.
+  { prefix: '/admin/system', role: 'master_admin' },
+  { prefix: '/api/admin/system', role: 'master_admin' },
   { prefix: '/admin', role: 'rfp_admin' },
   { prefix: '/api/admin', role: 'rfp_admin' },
   { prefix: '/portal', role: 'tenant_user' },
