@@ -540,3 +540,275 @@ Notes:
 - `frontend/app/api/auth/change-password/route.ts` — the existing reference handler for authenticated state change. Predates `withHandler` and currently uses bespoke try/catch; Phase 0.5b will migrate it to the wrapper without changing behavior.
 - `frontend/app/api/tools/[name]/route.ts` (Phase 0.5b) — the generic dual-use adapter that exposes every registered tool over HTTP. See `TOOL_CONVENTIONS.md` for the full wiring pattern.
 - `frontend/app/api/health/route.ts` — the only route exempt from the `{ data }` envelope, documented inline.
+
+---
+
+## Phase 1 worked examples — curation routes
+
+These three routes are the reference implementations of the tool-adapter pattern for the Phase 1 curation workspace. They demonstrate three shapes every admin curation route falls into: (A) a paper-thin single-tool adapter, (B) a list endpoint with cursor pagination, and (C) a multi-tool orchestration route with a rich error matrix. The business logic lives in the tools referenced from `TOOL_CONVENTIONS.md §"Phase 1 worked examples"`; these routes contribute only HTTP plumbing.
+
+### Example 5 — `POST /api/admin/rfp-curation/[solId]/claim`
+
+**File:** `frontend/app/api/admin/rfp-curation/[solId]/claim/route.ts`
+
+The tool-adapter pattern at its thinnest: six lines of handler body, zero business logic, every error path translated for free.
+
+```ts
+import { z } from 'zod';
+import { withHandler } from '@/lib/api-helpers';
+import { invoke } from '@/lib/tools/registry';
+import { zUuid } from '@/lib/validation';
+
+const InputSchema = z.object({ solId: zUuid });
+
+export const POST = withHandler({
+  scope: 'api',
+  inputSchema: InputSchema,
+  requiredRole: 'rfp_admin',
+  async handler(input, ctx) {
+    return invoke('solicitation.claim', { solicitationId: input.solId }, {
+      actor: { type: 'user', id: ctx.actor!.id, email: ctx.actor!.email, role: ctx.actor!.role },
+      tenantId: ctx.actor!.tenantId,
+      requestId: ctx.requestId,
+      log: ctx.log,
+    });
+  },
+});
+```
+
+What each piece does:
+
+- **Path param parsing:** the dynamic `[solId]` segment is passed through the `InputSchema`. Next.js 15 makes dynamic segments available via `params`; the wrapper reads the URL and zod validates the shape. Any malformed UUID returns 422 before the tool is ever called.
+- **`invoke('solicitation.claim', ...)`:** the single call into the tool registry. The registry runs the enforcement chain (look up → role check → tenant scope → zod input parse → emit `tool.invoke.start` → call the handler → emit `tool.invoke.end`). The handler body in the route is blissfully unaware of all of this.
+- **`return ok(result)` is implicit:** the `withHandler` wrapper envelopes whatever the handler returns as `{ data: result }`. No manual `NextResponse.json` call.
+- **Error translation is automatic.** The tool throws `NotFoundError`, `ConflictError`, or `ToolAuthorizationError`; each is an `AppError` subclass with its own `httpStatus`; the wrapper calls `.toResponseBody()` and returns the right status code. No try/catch in the route.
+- **No business logic.** The invariant that a claim must be race-safe lives inside the tool (see `TOOL_CONVENTIONS.md §"Phase 1 worked examples" Example D`). The route literally cannot get it wrong because it has no state to manage.
+
+This is the shape every curation route should converge toward. If a route grows past ~8 lines of handler body, the right fix is almost always "extract the logic into a tool and make the route an adapter over it."
+
+---
+
+### Example 6 — `GET /api/admin/rfp-curation?status=new&limit=50`
+
+**File:** `frontend/app/api/admin/rfp-curation/route.ts`
+
+A list endpoint with cursor pagination. Uses `z.coerce.number()` for URL query params (which arrive as strings), returns the standard `{ items, nextCursor }` envelope, and delegates the actual SQL to a `solicitation.list_triage` tool.
+
+```ts
+import { z } from 'zod';
+import { withHandler } from '@/lib/api-helpers';
+import { invoke } from '@/lib/tools/registry';
+
+const CURATED_STATUS = z.enum([
+  'new', 'claimed', 'released', 'ai_analyzed', 'curation_in_progress',
+  'review_requested', 'approved', 'pushed_to_pipeline', 'dismissed',
+]);
+
+const QuerySchema = z.object({
+  status: CURATED_STATUS.optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().optional(),
+  namespace: z.string().optional(),
+});
+
+interface TriageItem {
+  id: string;
+  opportunityId: string;
+  namespace: string;
+  status: string;
+  claimedBy: string | null;
+  claimedAt: string | null;
+  createdAt: string;
+}
+
+export const GET = withHandler({
+  scope: 'api',
+  method: 'GET',
+  inputSchema: QuerySchema,
+  requiredRole: 'rfp_admin',
+  async handler(input, ctx) {
+    const result = await invoke<{ items: TriageItem[]; nextCursor: string | null }>(
+      'solicitation.list_triage',
+      {
+        status: input.status ?? 'new',
+        limit: input.limit,
+        cursor: input.cursor,
+        namespace: input.namespace,
+      },
+      {
+        actor: { type: 'user', id: ctx.actor!.id, email: ctx.actor!.email, role: ctx.actor!.role },
+        tenantId: ctx.actor!.tenantId,
+        requestId: ctx.requestId,
+        log: ctx.log,
+      },
+    );
+    return result;
+  },
+});
+```
+
+Returned shape (wrapped by `withHandler` as `{ data: ... }`):
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "opportunityId": "7b2c...",
+        "namespace": "afrl:afwerx:sbir:phase_1",
+        "status": "new",
+        "claimedBy": null,
+        "claimedAt": null,
+        "createdAt": "2026-04-08T14:22:11.000Z"
+      }
+    ],
+    "nextCursor": "eyJsYXN0SWQiOiI1NTBlODQwMC0uLi4iLCJsYXN0Q3JlYXRlZEF0IjoiMjAyNi0wNC0wOFQxNDoyMjoxMS4wMDBaIn0="
+  }
+}
+```
+
+**Cursor format.** The cursor is an opaque base64-encoded JSON blob with the last row's `id` and `createdAt`. The tool (not the route) encodes and decodes it:
+
+```ts
+// Inside solicitation.list_triage
+function encodeCursor(row: TriageItem): string {
+  return Buffer.from(JSON.stringify({ lastId: row.id, lastCreatedAt: row.createdAt })).toString('base64');
+}
+
+function decodeCursor(raw: string | undefined): { lastId: string; lastCreatedAt: string } | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, 'base64').toString());
+    if (typeof parsed?.lastId !== 'string' || typeof parsed?.lastCreatedAt !== 'string') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+```
+
+The client treats the cursor as an opaque string and passes it back unchanged on the next request. The server is free to change the encoding at any time without breaking clients.
+
+**Why `z.coerce.number()` for `limit`.** Query-string values arrive as strings (`"50"`, not `50`). `z.coerce.number()` runs `Number(value)` before validating the shape, which is the whole point of the helper — it lets you declare `limit: z.coerce.number().int().min(1).max(200).default(50)` and have it accept both `?limit=50` and a programmatic default.
+
+**Tenant scope.** None — `curated_solicitations` is a global admin table. `requiredRole: 'rfp_admin'` substitutes for tenant isolation; there is no `WHERE tenant_id` clause inside the tool because there is no `tenant_id` column on the table.
+
+---
+
+### Example 7 — `POST /api/admin/rfp-curation/[solId]/push`
+
+**File:** `frontend/app/api/admin/rfp-curation/[solId]/push/route.ts`
+
+A multi-tool orchestration route. The route itself is still thin, but the underlying `solicitation.push` tool composes `solicitation.push` → `memory.write` into a single atomic flow. This is the correct pattern when you need more than one tool call behind a single HTTP endpoint: wrap them in a higher-level tool, not in the route.
+
+```ts
+import { z } from 'zod';
+import { withHandler } from '@/lib/api-helpers';
+import { invoke } from '@/lib/tools/registry';
+import { zUuid } from '@/lib/validation';
+
+const InputSchema = z.object({ solId: zUuid });
+
+interface PushResult {
+  solicitationId: string;
+  opportunityId: string;
+  pushedAt: string;
+}
+
+export const POST = withHandler({
+  scope: 'api',
+  inputSchema: InputSchema,
+  requiredRole: 'rfp_admin',
+  async handler(input, ctx) {
+    const result = await invoke<PushResult>('solicitation.push', { solicitationId: input.solId }, {
+      actor: { type: 'user', id: ctx.actor!.id, email: ctx.actor!.email, role: ctx.actor!.role },
+      tenantId: ctx.actor!.tenantId,
+      requestId: ctx.requestId,
+      log: ctx.log,
+    });
+    // UI uses opportunityId to redirect to the tenant-facing view.
+    return result;
+  },
+});
+```
+
+**What `solicitation.push` does internally:**
+
+1. **Atomic state transition.** `UPDATE curated_solicitations SET status = 'pushed_to_pipeline', pushed_at = now() WHERE id = ${solId} AND status = 'approved' RETURNING opportunity_id`. Zero rows → `ConflictError('solicitation not in approved state')`.
+2. **Required-variable check.** Before the UPDATE, the tool fetches the row's compliance matrix and verifies every `compliance_variables.is_system = true` row has a corresponding value on `solicitation_compliance`. Missing required variables → `ValidationError` with `details: { missingVariables: [...] }` → 422.
+3. **Domain event.** `emitEventSingle({ namespace: 'finder', type: 'rfp.curated_and_pushed', ... })` fires after the UPDATE commits. This event is what downstream scoring workers subscribe to.
+4. **Procedural memory write.** `invoke('memory.write', { memoryType: 'procedural', ... }, ctx)` records a cross-cycle learning artifact: "for namespace X, curation took N rounds, these variables were hardest, these annotations were most common." The inner tool invocation reuses `ctx.parentEventId` so the event tree reconstructs cleanly (see `TOOL_CONVENTIONS.md §"Audit logging"`).
+5. **Return** `{ solicitationId, opportunityId, pushedAt }` so the UI can redirect to `/portal/[tenantSlug]/opportunities/[opportunityId]`.
+
+**Error matrix:**
+
+| Case | Thrown from | AppError | Status | Client handling |
+|---|---|---|---|---|
+| `solId` doesn't parse as UUID | zod in `withHandler` | `ValidationError` | 422 | form field error |
+| Row doesn't exist | tool step 1 pre-check | `NotFoundError` | 404 | toast "solicitation not found" |
+| Row exists but not in `approved` state | tool step 1 UPDATE returns zero rows | `ConflictError` | 409 | toast "solicitation must be approved before pushing" |
+| Missing required compliance variables | tool step 2 | `ValidationError` with `details.missingVariables` | 422 | highlight the missing fields in the curation UI |
+| Actor is not `rfp_admin` | `withHandler` role check | `ForbiddenError` | 403 | middleware normally catches this first |
+| DB is down | postgres.js | unknown → wrapped to `InternalError` by `withHandler` | 500 | generic "try again" toast |
+
+**Test matrix for the three business-logic error paths:**
+
+```ts
+import { POST } from '@/app/api/admin/rfp-curation/[solId]/push/route';
+
+async function callPush(solId: string, session: { user: { id: string; role: string; email: string; tenantId: null } }) {
+  const req = new Request(`http://localhost/api/admin/rfp-curation/${solId}/push`, { method: 'POST' });
+  // In real tests, mock `auth()` to return `session`.
+  return POST(req);
+}
+
+test('404 when solicitation does not exist', async () => {
+  const res = await callPush('00000000-0000-0000-0000-000000000000', adminSession(ADMIN_A));
+  expect(res.status).toBe(404);
+  const body = await res.json();
+  expect(body.code).toBe('NOT_FOUND');
+});
+
+test('409 when solicitation is not in approved state', async () => {
+  const solId = await seedSolicitation({ status: 'curation_in_progress' });
+  const res = await callPush(solId, adminSession(ADMIN_A));
+  expect(res.status).toBe(409);
+  const body = await res.json();
+  expect(body.code).toBe('CONFLICT');
+});
+
+test('422 when required compliance variables are missing', async () => {
+  const solId = await seedSolicitation({ status: 'approved' });
+  await seedSystemComplianceVariables(['page_limit_technical', 'font_family']);
+  // Do NOT seed any solicitation_compliance row, so every required variable is missing.
+  const res = await callPush(solId, adminSession(ADMIN_A));
+  expect(res.status).toBe(422);
+  const body = await res.json();
+  expect(body.code).toBe('VALIDATION_ERROR');
+  expect(body.details.missingVariables).toEqual(
+    expect.arrayContaining(['page_limit_technical', 'font_family']),
+  );
+});
+
+test('happy path: returns opportunityId, writes procedural memory, emits event', async () => {
+  const solId = await seedApprovedSolicitationWithAllVariables();
+  const res = await callPush(solId, adminSession(ADMIN_A));
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body.data.opportunityId).toBeDefined();
+
+  // Side effects
+  const [row] = await sql`SELECT status, pushed_at FROM curated_solicitations WHERE id = ${solId}`;
+  expect(row.status).toBe('pushed_to_pipeline');
+  expect(row.pushed_at).not.toBeNull();
+
+  const events = await sql`SELECT type FROM system_events WHERE type = 'finder.rfp.curated_and_pushed'`;
+  expect(events).toHaveLength(1);
+
+  const memories = await sql`SELECT id FROM procedural_memories WHERE name LIKE 'curation:%'`;
+  expect(memories.length).toBeGreaterThan(0);
+});
+```
+
+**Why the orchestration lives in a tool, not the route.** If the route called `solicitation.push` and then `memory.write` directly, a failure between the two would leave the system in a half-committed state — the solicitation marked pushed but no procedural memory recorded. By wrapping both inside a single `solicitation.push` tool, the tool gets to decide the transaction boundary (and, in Phase 4, can be re-invoked by an agent without re-implementing the orchestration). The route stays a thin adapter; the complexity is testable in one place.

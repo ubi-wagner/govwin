@@ -10,11 +10,15 @@ See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md
 
 ## Current state
 
-**Phase:** 0.5b — Foundation COMPLETE. Next is Phase 1 (RFP Curation).
+**Phase:** 0.5b is **COMPLETE**. Phase 1 (RFP Curation) is **STARTING**.
 
-**Tag:** `v0.5b-foundation-complete` — cut at the closeout commit on branch `claude/analyze-project-status-KbAhg`.
+**Tag:** `v0.5b-foundation-complete` — tagged locally at commit `2c5578a` on branch `claude/analyze-project-status-KbAhg`. 8 commits total on the branch. Not yet pushed to `main`.
 
-### What landed in 0.5b (7 commits, all on one branch)
+**Login works end-to-end:** `eric@rfppipeline.com` / `!Wags$$` → middleware forces `/change-password` → admin dashboard. Verified against a fresh `docker compose down -v && docker compose up -d` this morning.
+
+**Architecture:** V5 as documented in [ARCHITECTURE_V5.md](./ARCHITECTURE_V5.md). A Phase 1 addendum is appended at the end of that file — read it before touching ingesters or the curation workspace.
+
+### What landed in 0.5b (8 commits, all on branch `claude/analyze-project-status-KbAhg`)
 
 | Section | Commit | Deliverable |
 |---|---|---|
@@ -24,9 +28,10 @@ See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md
 | D | `a4e2ca6` | Refactored `/api/auth/change-password` + `/api/health` to withHandler; NEW `/api/tools/[name]` generic adapter |
 | E | `2b9b8bf` | Capacity metrics (migration 008 + `lib/capacity.ts`), `/admin/system` page + `/api/admin/system` endpoint, registry auto-records every invocation |
 | F | `b6b65a0` | 85 vitest tests (52 new): errors, validation, registry enforcement chain |
-| G | (pending closeout) | MIGRATIONS_RUNBOOK, CHANGELOG, CLIFFNOTES update, full validation, tag |
+| G | `92d5a80` | Background agent straggler — doc expansion of `ERROR_HANDLING.md` (350 → 457 lines) |
+| H | `2c5578a` | Closeout: MIGRATIONS_RUNBOOK, CHANGELOG, CLIFFNOTES update, full validation, tag `v0.5b-foundation-complete` |
 
-**Previously shipped in Phase 0.5:**
+**Previously shipped in Phase 0.5 (a):**
 - Auth (NextAuth v5 credentials provider, JWT, role encoding).
 - Middleware (path gate + auth enforcement, edge-safe split with `auth.config.ts`).
 - Storage paths (tenant-scoped, SHA-256 addressed).
@@ -38,8 +43,59 @@ See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md
 - Email normalization trigger (migration 006).
 
 **Tags:**
-- `v0.5-foundation-partial` — **not yet created** (Phase 0.5 was merged without a tag).
-- `v0.5b-foundation-complete` — target tag at the end of the current work.
+- `v0.5-foundation-partial` — **not created** (Phase 0.5a was merged without a tag — see "Lessons from Phase 0.5a and 0.5b" below for why).
+- `v0.5b-foundation-complete` — **cut locally** at `2c5578a`. Will be pushed with the PR that contains this file and `docs/PHASE_1_PLAN.md`.
+
+**Phase 1 scope:** see [PHASE_1_PLAN.md](./PHASE_1_PLAN.md) (sibling commit in the same PR as this cliffnotes update — will exist by the time you read this).
+
+---
+
+## Lessons from Phase 0.5a and 0.5b
+
+Read this before writing any Phase 1 code. Every rule below was paid for with a real bug in 0.5. Skipping them is how you re-earn the same bugs.
+
+### What happened in 0.5a
+
+Phase 0.5 (the original, pre-rebaseline) promised 8 commits: conventions docs, core libs, tool framework, storage layer, auth, capacity/health, test infra, and a cliffnotes-tag closeout. Only partial scope actually shipped. The core libs (logger, errors, api-helpers), the entire dual-use tool framework, all 9 conventions docs, the capacity panel, and the test infrastructure were silently skipped. Auth and storage shipped; everything else was claimed in chat and never committed.
+
+The cause was mechanical, not intellectual: Claude sessions treated "file exists" as "scope done" without cross-checking against the plan. Nobody grep'd the promised file list. Nobody `ls -la`'d the promised directories. Commits were declared complete in conversation and the session moved on. The gap wasn't discovered until the 0.5b rebaseline audit, at which point 5 of 8 commits had to be rebuilt from scratch. Phase 0.5a was merged without a tag precisely because what landed did not match what was promised, and there was no clean artifact to tag.
+
+### What happened in 0.5b
+
+The first half of the day was spent chasing symptoms: failed Railway builds, redirect loops, stale JWT cookies, a missing `master_admin` row. Each symptom looked like its own problem. Each turned out to be a layer deeper than the initial read suggested. The root causes that were actually blocking progress:
+
+1. **postgres.js column transform had `to` and `from` swapped** in `lib/db.ts`. Every field access returned `undefined`, including `user.password_hash`, so `authorize()` never reached `bcrypt.compare`. Login failed with "invalid credentials" while the DB row was perfectly valid. Fixed in PR #67 by swapping to `{ from: toCamel, to: fromCamel }`.
+2. **NextAuth v5 middleware was still using the v4 `getToken()` API.** v4's `getToken()` cannot decrypt v5's JWE session cookie, so middleware saw every request as unauthenticated and redirected to `/login`, creating a loop for users who were actually signed in. Fixed in commit `add9907` with the canonical v5 `auth.config.ts` + edge-safe middleware split.
+3. **`pipeline_schedules` INSERT used unscoped `ON CONFLICT DO NOTHING` but the table had no UNIQUE constraint.** `ON CONFLICT` with no target is a no-op against a table without a unique index, so every migration run inserted duplicate rows. Fixed in migration `005_dedupe_pipeline_schedules.sql` (which deletes dupes) plus a UNIQUE constraint added to `001_baseline.sql`.
+4. **`scripts/seed_admin.ts` read `ADMIN_EMAIL` from env without `.toLowerCase().trim()`.** A mixed-case `.env` value would seed a mixed-case row that the lowercased login query could not find. Fixed in the script and reinforced by migration `006_normalize_user_emails.sql`, which adds a BEFORE INSERT/UPDATE trigger that normalizes email to lowercase at the DB level.
+
+Every one of these four bugs had been flagged as "🟡 SUSPICIOUS but not urgent" in an earlier audit and deferred. Every one of them was the active bug. Nothing that is 🟡 SUSPICIOUS is safe.
+
+### The meta-rules Phase 1 must follow
+
+1. **Scope conformance is not optional.** Before declaring any commit done, open the plan file, extract the list of promised files, and run `ls -la` on every single one. If anything is missing or zero-bytes, the commit is incomplete. The check: `for f in $(grep -oE 'frontend/[^ ]*\.ts[x]?|db/migrations/[^ ]*\.sql' docs/PHASE_1_PLAN.md); do ls -la "$f" || echo MISSING; done`. 0.5a skipped 5 of 8 commits because nobody did this.
+
+2. **`tsc --noEmit` is not sufficient.** Every commit that touches the frontend runs `NODE_ENV=production NEXT_PHASE=phase-production-build npx next build` before push. `tsc` misses ESLint rules (the `react/no-unescaped-entities` apostrophe bug that failed CI twice in 0.5a), page data collection (the `DATABASE_URL` guard bug that only surfaces during static analysis), and edge runtime violations (the middleware v4→v5 migration bug). The check: exit code 0 from the full `next build`, not just from `tsc`.
+
+3. **Run real SQL against real Postgres.** Migrations get applied against a throwaway PostgreSQL 16 instance (spin up as the `postgres` OS user via `pg_ctl -D /tmp/pgtest initdb && pg_ctl -D /tmp/pgtest -l /tmp/pg.log start`) BEFORE push. Apply twice in a row and diff the schema — idempotency is part of the contract. This would have caught the `pipeline_schedules` duplicate accumulation bug on day 1 instead of day 14. The check: two consecutive `bash db/migrations/run.sh` runs produce identical `\dt` output and no new rows in any non-seed table.
+
+4. **Cross-layer contract checks.** Any time two layers share state — frontend auth ↔ middleware, postgres.js column casing ↔ caller camelCase, Python ↔ TypeScript serialization, ingester dedupe hash ↔ DB UNIQUE constraint — put them side by side and verify the contract with a real round-trip. Both the middleware v4/v5 bug and the postgres.js transform bug were "layer A is fine, layer B is fine, but they disagree." Each layer passed its own unit tests. The check: write one integration test that exercises both layers together for every contract.
+
+5. **Cross-language contract checks.** Python and TypeScript implementations of the same concept — storage paths, crypto, event shapes, S3 keys — get round-tripped with real code, not by eyeballing. `lib/storage/paths.ts` ↔ `pipeline/src/storage/paths.py` were byte-verified this way in 0.5b: a test writes a path in TS, reads it in Python, asserts equality, then reverses. Phase 1 ingesters ↔ frontend admin types need the same treatment. The check: at least one round-trip test per shared concept, run as part of `bash scripts/test-all.sh`.
+
+6. **Tool-first, not route-first.** Phase 1 features are implemented as tools first (the canonical place for business logic), then wrapped by thin API adapters that call `executeTool(name, ctx, input)`. Never write a bespoke route handler that isn't backed by a registered tool. This is the dual-use architecture built in 0.5b section C — Phase 1 is its first real test. The check: grep every new `app/api/**/route.ts` for `executeTool` or `registry.get(`; a route that does direct DB work is a regression.
+
+7. **Events are mandatory, not optional.** Every significant Phase 1 action (ingest start/end, triage claim, release for analysis, shredding start/end, curation push) emits start/end events to `system_events` via `lib/events.ts`. Phase 4 agents will subscribe to these; Phase 5 dashboards will replay them; Phase 6 audit logs will query them. If you can't emit an event, you can't do the action. The check: grep every new tool for `emitEvent(` with both a start and end namespace; a tool without events does not pass review.
+
+8. **SUSPICIOUS is not a valid commit state.** Audit findings flagged as "🟡 SUSPICIOUS but not urgent" must either (a) be verified safe with a concrete, committed test, or (b) get fixed in the same commit they were found in. Nothing gets deferred with "I'll come back to it." Every single 0.5a deferral became an active 0.5b bug. The check: before any commit, grep the working tree for `SUSPICIOUS` or `TODO: verify` and resolve every hit.
+
+9. **Tenant isolation is tested, not assumed.** Every Phase 1 tool that reads or writes tenant-scoped data gets a test that seeds two tenants, executes the tool as tenant A, and asserts that tenant B's data is invisible. No exceptions, no "this one is obviously fine." The check: for every new file under `lib/tools/**`, there is a matching test under `tests/unit/tools/**` containing `'isolates tenant'` or `'does not leak cross-tenant'` in a test name.
+
+10. **Background agents get tight scope or they time out.** The 2hr+ agent timeouts last night all happened on agents with vague "write this doc" prompts. The agents that shipped clean had (a) specific file paths, (b) specific section outlines with line-count targets, and (c) "return a brief summary under N words" as the final instruction. Phase 1 background work follows the same pattern. The check: every background agent invocation includes an absolute file path, a section-by-section outline, and an explicit response budget.
+
+### What's intentionally not in this section
+
+Generic software engineering advice ("write tests", "use types"), aspirational statements without mechanism ("be careful with state"), and apologies or emotional language. Every rule above has a specific 0.5 bug behind it and a specific check that prevents its return. If a rule doesn't, it doesn't belong here.
 
 ---
 
