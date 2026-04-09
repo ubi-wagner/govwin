@@ -2,22 +2,29 @@
 
 **Purpose:** running handoff document. Updated at every phase milestone. Any future Claude session (or human contributor) reading this should be able to pick up cleanly from the last state.
 
-**Last updated:** Phase 0.5b in progress (2026-04-09).
+**Last updated:** 2026-04-09 — Phase 0.5b COMPLETE, tag `v0.5b-foundation-complete` cut.
 
-See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md), [TESTING_STRATEGY.md](./TESTING_STRATEGY.md), [NAMESPACES.md](./NAMESPACES.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md).
+See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md), [TESTING_STRATEGY.md](./TESTING_STRATEGY.md), [NAMESPACES.md](./NAMESPACES.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md), [MIGRATIONS_RUNBOOK.md](./MIGRATIONS_RUNBOOK.md), [../CHANGELOG.md](../CHANGELOG.md).
 
 ---
 
 ## Current state
 
-**Phase:** 0.5b — Foundation completion.
+**Phase:** 0.5b — Foundation COMPLETE. Next is Phase 1 (RFP Curation).
 
-**In flight:**
-- Foundation standards docs landing (NAMESPACES, API_CONVENTIONS, TOOL_CONVENTIONS, EVENT_CONTRACT, ERROR_HANDLING, FOLDER_STRUCTURE, TESTING_STRATEGY, DEFINITION_OF_DONE, CLAUDE_CLIFFNOTES).
-- Core libs landing: `lib/logger.ts`, `lib/errors.ts`, `lib/api-helpers.ts`, `lib/validation.ts`, `lib/events.ts` rewrite, `lib/storage/` (s3-client + paths).
-- Tool framework landing: `lib/tools/` registry + `app/api/tools/[name]/route.ts` + `pipeline/src/tools/` dispatcher.
-- Capacity + system_health migration (`008_capacity_and_system_health.sql`).
-- Test framework: `__tests__/setup/pg.ts`, fixtures, actors, scenarios.
+**Tag:** `v0.5b-foundation-complete` — cut at the closeout commit on branch `claude/analyze-project-status-KbAhg`.
+
+### What landed in 0.5b (7 commits, all on one branch)
+
+| Section | Commit | Deliverable |
+|---|---|---|
+| A | `2e076ea` | 9 binding conventions docs (3164 lines total) |
+| B | `3977608` | Core libs: errors, logger, validation, api-helpers, events rewrite, 007_system_events migration, legacy storage deleted |
+| C | `ea20623` | Dual-use tool framework: base, registry, errors, memory-search, memory-write, README, pipeline dispatcher skeleton |
+| D | `a4e2ca6` | Refactored `/api/auth/change-password` + `/api/health` to withHandler; NEW `/api/tools/[name]` generic adapter |
+| E | `2b9b8bf` | Capacity metrics (migration 008 + `lib/capacity.ts`), `/admin/system` page + `/api/admin/system` endpoint, registry auto-records every invocation |
+| F | `b6b65a0` | 85 vitest tests (52 new): errors, validation, registry enforcement chain |
+| G | (pending closeout) | MIGRATIONS_RUNBOOK, CHANGELOG, CLIFFNOTES update, full validation, tag |
 
 **Previously shipped in Phase 0.5:**
 - Auth (NextAuth v5 credentials provider, JWT, role encoding).
