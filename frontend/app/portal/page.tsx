@@ -52,7 +52,7 @@ export default async function PortalDispatcher() {
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-sm p-8">
         <h1 className="text-2xl font-bold text-gray-900">No workspace assigned</h1>
         <p className="mt-3 text-sm text-gray-600">
-          You're signed in but your account isn't linked to a tenant
+          You&apos;re signed in but your account isn&apos;t linked to a tenant
           yet. Ask your administrator to grant you access, or contact
           support if you think this is an error.
         </p>
