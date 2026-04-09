@@ -29,6 +29,13 @@ INSERT INTO source_health (source, status) VALUES
 ON CONFLICT (source) DO NOTHING;
 
 -- Pipeline schedules
+-- Idempotent via ON CONFLICT (source) DO NOTHING. Requires the
+-- UNIQUE(source) constraint added to pipeline_schedules in
+-- 001_baseline.sql. Pre-fix versions of this seed used unscoped
+-- ON CONFLICT DO NOTHING with no constraint to bind to, which
+-- silently inserted duplicates on every re-run. Migration
+-- 005_dedupe_pipeline_schedules.sql cleans up any duplicates that
+-- accumulated under that prior behavior on existing deploys.
 INSERT INTO pipeline_schedules (source, run_type, cron_expression, enabled) VALUES
 ('sam_gov', 'incremental', '0 6 * * *', true),
 ('sbir_gov', 'full', '0 7 * * 1', true),
@@ -37,7 +44,7 @@ INSERT INTO pipeline_schedules (source, run_type, cron_expression, enabled) VALU
 ('memory_decay', 'full', '0 3 * * *', true),
 ('memory_gc', 'full', '0 4 * * 0', true),
 ('memory_compaction', 'full', '0 4 1 * *', true)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (source) DO NOTHING;
 
 -- Legal documents
 INSERT INTO legal_document_versions (document_type, version, effective_date) VALUES

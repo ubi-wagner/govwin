@@ -713,7 +713,7 @@ CREATE INDEX IF NOT EXISTS idx_pj_status ON pipeline_jobs(status) WHERE status I
 
 CREATE TABLE IF NOT EXISTS pipeline_schedules (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source          TEXT NOT NULL,
+    source          TEXT NOT NULL UNIQUE,
     run_type        TEXT NOT NULL DEFAULT 'full',
     cron_expression TEXT NOT NULL,
     enabled         BOOLEAN NOT NULL DEFAULT true,

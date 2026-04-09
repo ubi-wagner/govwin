@@ -35,12 +35,21 @@ const PUBLIC_PATHS = [
   '/invite',
 ];
 
+// Static asset extensions that bypass auth. Exhaustive on purpose:
+// the previous version used `pathname.includes('.')` as a shortcut,
+// which silently bypassed auth on any future route segment that
+// happened to contain a literal dot (e.g., a dynamic param accepting
+// an email or a versioned filename). Anchored to end-of-string so
+// only filename extensions match — not random dots in URL paths.
+const STATIC_ASSET_RE =
+  /\.(ico|png|jpe?g|gif|svg|webp|avif|css|js|mjs|map|woff2?|ttf|otf|eot|txt|xml|json|webmanifest)$/i;
+
 function isPublicPath(pathname: string): boolean {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/favicon') ||
-    pathname.includes('.')
+    STATIC_ASSET_RE.test(pathname)
   ) {
     return true;
   }
