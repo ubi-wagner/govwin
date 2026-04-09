@@ -1,19 +1,19 @@
 /**
- * NextAuth v5 configuration — credentials provider backed by our
- * users table. No pg adapter is used because we issue JWT sessions
- * (not database sessions), which avoids a session table on every
- * request and matches how the middleware checks the token.
+ * NextAuth v5 configuration — full Node-runtime version.
  *
- * Role hierarchy is enforced centrally in middleware.ts and in
- * lib/rbac.ts. This file's only job is to authenticate the user
- * and stamp the minimum set of claims (id, email, role, tenantId,
- * tempPassword) onto the JWT.
+ * This file imports the edge-safe base config from `auth.config.ts`
+ * and merges in the Credentials provider (which needs `lib/db` and
+ * `bcryptjs`, neither of which are Edge-compatible).
+ *
+ * Middleware does NOT import this file directly — see `middleware.ts`
+ * and `auth.config.ts` for the edge-safe split.
  *
  * See docs/DECISIONS.md D001 and D004.
  */
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import { authConfig } from './auth.config';
 import { sql } from './lib/db';
 import { ROLES, type Role } from './lib/rbac';
 
@@ -63,10 +63,7 @@ async function touchLastLogin(userId: string): Promise<void> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: 'Credentials',
@@ -110,29 +107,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = (user as { id: string }).id;
-        token.role = (user as { role: Role }).role;
-        token.tenantId = (user as { tenantId: string | null }).tenantId;
-        token.tenantSlug = (user as { tenantSlug: string | null }).tenantSlug;
-        token.tempPassword = (user as { tempPassword: boolean }).tempPassword;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as { id?: string }).id = token.id as string | undefined;
-        (session.user as { role?: Role }).role = token.role as Role | undefined;
-        (session.user as { tenantId?: string | null }).tenantId =
-          (token.tenantId as string | null | undefined) ?? null;
-        (session.user as { tenantSlug?: string | null }).tenantSlug =
-          (token.tenantSlug as string | null | undefined) ?? null;
-        (session.user as { tempPassword?: boolean }).tempPassword =
-          (token.tempPassword as boolean | undefined) ?? false;
-      }
-      return session;
-    },
-  },
 });
