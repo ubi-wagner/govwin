@@ -69,6 +69,21 @@ export class AppError extends Error {
 | `ExternalServiceError` | 502 | `EXTERNAL_SERVICE_ERROR` | A dependency we called failed (SAM.gov, Anthropic, Stripe, Resend). |
 | `ServiceUnavailableError` | 503 | `SERVICE_UNAVAILABLE` | Service is temporarily unavailable (maintenance, DB down). |
 
+### Phase 1 — curation domain subclasses
+
+The following subclasses are added for the Phase 1 curation pipeline. They live in `frontend/lib/errors.ts` (or are imported from `pipeline/src/errors.py` for the Python ingester path) and follow the same `code` / `httpStatus` / `details` pattern.
+
+| Class | HTTP | Code | Meaning |
+| --- | --- | --- | --- |
+| `IngesterRateLimitError` | 429 | `INGESTER_RATE_LIMITED` | An upstream API (SAM.gov, SBIR.gov, Grants.gov) returned 429 or our local rate-limit guard tripped. `details` carries `{ source, retry_after_seconds, limit_kind }`. |
+| `IngesterContractError` | 502 | `INGESTER_CONTRACT_VIOLATED` | An upstream API returned a payload that doesn't match the expected schema. `details` carries `{ source, expected_field, actual_payload_excerpt }`. |
+| `ShredderBudgetError` | 503 | `SHREDDER_BUDGET_EXCEEDED` | A single shredding run exceeded the per-document Claude token budget (50K input tokens default). `details` carries `{ solicitation_id, token_count, budget }`. |
+| `StateTransitionError` | 409 | `INVALID_STATE_TRANSITION` | A `solicitation.*` tool's atomic UPDATE affected 0 rows because the requested state transition is illegal from the current state. `details` carries `{ solicitation_id, requested_action, from_state, expected_states }`. |
+| `ClaimConflictError` | 409 | `CLAIM_CONFLICT` | A `solicitation.claim` race lost — the row was claimed by a different admin between read and update. `details` carries `{ solicitation_id, current_claimant_id }`. |
+| `ReviewSelfApprovalError` | 403 | `SAME_PERSON_REVIEW` | A curator tried to approve their own work via `solicitation.approve`. The two-admin rule from `docs/DECISIONS.md` D-Phase1-09 forbids it. `details` carries `{ solicitation_id, curated_by, attempted_approver }`. |
+
+These classes are documented here so a future debugger doesn't have to search the codebase. The Python equivalents in `pipeline/src/errors.py` MUST share the same `code` strings — verify with `grep -c "INGESTER_RATE_LIMITED" frontend/lib/errors.ts pipeline/src/errors.py docs/ERROR_HANDLING.md` returning 3.
+
 Prefer the most specific subclass. `InternalError` exists so error paths that can't classify the failure still route through the same envelope — reach for it last, not first.
 
 ### Tool subclasses

@@ -180,3 +180,84 @@ working storage, and working health checks — nothing more.
 
 **Supersedes:** The prior "Phase 1" charter in `.plan.md` implicitly —
 which is wider in scope.
+
+---
+
+# Phase 1 Decisions (added 2026-04-09)
+
+The following decisions are made up-front for Phase 1 (RFP Ingestion & Expert Curation) so the implementation is bound rather than improvised. All Phase 1 commits must reference and respect these decisions; deviation requires a new decision record amending the relevant entry.
+
+## D-Phase1-01: Ingesters live in pipeline, not as tools
+
+**Status:** accepted
+**Decision:** External-API polling (SAM.gov, SBIR.gov, Grants.gov) is implemented as Python ingester classes in `pipeline/src/ingest/` and runs on cron via `pipeline/src/main.py`. Ingesters are NOT registered in the tool registry. They emit `finder.opportunity.ingested` events; everything downstream (triage, curation, shredder dispatch) uses tools.
+**Rationale:** Agents shouldn't be able to trigger polling of upstream rate-limited APIs as a side-effect of `memory.search` or any other tool call. The cron path is the only path. Manual admin-triggered ingest is exposed via the `ingest.trigger_manual` tool which inserts a `pipeline_jobs` row — that goes through the same dispatcher.
+**Consequences:** ingesters can't be invoked from the frontend test suite directly; they're tested via stub upstreams in Python unit tests. Frontend tests assume opportunities exist via DB seed.
+
+## D-Phase1-02: Shredder is dual-callable
+
+**Status:** accepted
+**Decision:** The shredder runs (a) as a pipeline worker on `released_for_analysis` events (full path: PDF download → text extraction → Claude → DB writes), AND (b) as a synchronous extractor invokable by the curation UI via the `compliance.extract_from_text` tool (text fragment → Claude → return suggestions, no DB writes). Both paths share the prompt files and the LLM client, but only the worker path persists.
+**Rationale:** Humans need a fast "preview suggestions" loop in the workspace when they highlight a chunk of text. Agents (Phase 4) need a durable async path that retries on failure and writes to DB. Sharing the prompts ensures the human and the agent see the same extraction logic.
+**Consequences:** the shredder module exposes two entry points (`runner.shred_solicitation` async + DB-writing, `sync_extract.extract_compliance_from_text` sync + return-only). The shredder MUST be tested via both entry points.
+
+## D-Phase1-03: Curation is admin-scoped, not tenant-scoped
+
+**Status:** accepted
+**Decision:** `curated_solicitations`, `solicitation_compliance`, `solicitation_annotations`, and `triage_actions` are visible to all `rfp_admin` users regardless of tenant. The `tenant_id` column is null on these tables. Phase 1 tools that read or write these tables have `tenantScoped: false`.
+**Rationale:** Opportunities are global — the same SAM.gov solicitation is the same solicitation for every customer. Curation work (compliance variable extraction, annotation, push) is performed by the platform team (`rfp_admin` role), not per-tenant. Only the customer-facing scoring + portal layers (Phase 2) become tenant-scoped, where each tenant gets a personalized opportunity feed sorted by their fit score.
+**Consequences:** RLS (Row-Level Security) is NOT enforced on the curation tables. Access is gated entirely by the `rfp_admin` role check in middleware and tool authorization. Phase 2 customer portal tools will have `tenantScoped: true` and enforce per-tenant isolation when reading the SAME opportunity rows.
+
+## D-Phase1-04: Memory namespace key format
+
+**Status:** accepted
+**Decision:** Cross-cycle memory keys use the format `{agency}:{program_office}:{type}:{phase}` (4 parts), with a 3-part variant `{agency}:{type}:{phase}` allowed for sources that don't expose a program office (NSF, NIH). Documented canonically in `docs/NAMESPACES.md` §"Memory namespace keys".
+**Rationale:** The `(agency, program_office, type, phase)` tuple is the natural primary key for "this kind of solicitation" in the federal contracting world. Two AFWERX SBIR Phase I solicitations from different fiscal years are 90%+ similar in compliance requirements; using this as the namespace lets cross-cycle pre-fill work without ML.
+**Consequences:** the key MUST be computed identically in Python (`pipeline/src/shredder/namespace.py compute_namespace_key`) and TypeScript (`frontend/lib/memory/agency-key.ts computeAgencyKey`). Cross-language drift is verified by `frontend/__tests__/lib/memory/cross-lang-agency-key.test.ts`.
+
+## D-Phase1-05: Shredder prompts are versioned files
+
+**Status:** accepted
+**Decision:** Claude prompts live at `pipeline/src/shredder/prompts/v{N}/{name}.txt`. Each prompt has a version number that gets stamped into `system_events` payloads (`prompt_version: 1`) so future quality regressions can be attributed to specific prompt versions. New prompt versions ship as new files (`v2/section_extraction.txt`); the old version stays in git for comparison.
+**Rationale:** Prompt drift is the #1 cause of LLM regression. Without versioning, a prompt change made for one solicitation type can silently degrade quality on a different type and we have no audit trail. Versioning is the only way to attribute regressions.
+**Consequences:** every prompt change is a new file (additive), not an in-place edit. The golden fixture suite (`pipeline/src/shredder/golden_fixtures/`) is the regression canary that catches quality drops between versions.
+
+## D-Phase1-06: Golden fixture suite is mandatory
+
+**Status:** accepted
+**Decision:** Phase 1 §D ships at least 5 real RFPs with hand-verified expected extractions in `pipeline/src/shredder/golden_fixtures/`. A regression test (`pipeline/tests/test_shredder_regression.py`) runs the shredder against them on every Phase 1 commit. Coverage matrix:
+- 1 SAM.gov SBIR Phase I
+- 1 SAM.gov SBIR Phase II
+- 1 SBIR.gov Phase I (different source format)
+- 1 Grants.gov NOFO
+- 1 BAA (structurally different from SBIR)
+**Rationale:** A free-form LLM extractor with no ground truth is a quality time bomb. The fixtures are the only signal that a prompt change didn't silently break something. Phase 4 agents will rely on the same fixtures for their training feedback loop.
+**Consequences:** every Phase 1 PR that touches the shredder must pass the regression suite. The fixtures are checked into git (PDFs are public RFPs with no copyright concerns). When the suite fails, the PR is blocked until the prompt change is fixed or the expected JSON is updated to reflect a deliberate change.
+
+## D-Phase1-07: State transitions are guarded by the tool, not the API route
+
+**Status:** accepted
+**Decision:** Every `solicitation.*` tool that mutates the `curated_solicitations.status` column runs an atomic UPDATE with a WHERE clause on the source state — no "select then update" race windows. The API route is a thin adapter and has zero state-machine logic. The state-machine table lives in `frontend/lib/curation/transitions.ts` and is the single source of truth.
+**Rationale:** Two admins claiming the same solicitation at the same time is a real concurrency case. SELECT-then-UPDATE has a TOCTOU race window where both reads succeed before either UPDATE. Atomic UPDATE-WHERE is race-safe by construction. Putting the logic in the tool (not the route) means Phase 4 agents invoking the same tool get the same race safety automatically.
+**Consequences:** Every state-changing tool tests the race case (two concurrent invocations) and the wrong-state case (invocation from a state that doesn't allow the transition). The universal state-machine matrix test in §I11 runs ~50 cases covering every (from_state, action) combination.
+
+## D-Phase1-08: Migration 009 is additive only
+
+**Status:** accepted
+**Decision:** `db/migrations/009_phase1_curation_extensions.sql` adds columns + tables + indexes + constraints but NEVER drops or alters existing data. Idempotency is verified by applying twice against a throwaway PG16 — second apply must be a no-op (zero rows affected).
+**Rationale:** The 0.5b debugging cycle had a `pipeline_schedules` migration that silently inserted duplicates because of an ON CONFLICT bug. The lesson: every migration is empirically verified idempotent before commit, not assumed from `IF NOT EXISTS` syntax.
+**Consequences:** Phase 1 §B mini-TODO has explicit checkboxes B2 + B3 for the first-apply and second-apply tests against throwaway PG. Future Phase 2+ migrations follow the same pattern.
+
+## D-Phase1-09: Two-admin requirement is enforced at the tool layer, not the data layer
+
+**Status:** accepted
+**Decision:** The curator-cannot-self-approve rule (`approved_by != curated_by`) is enforced inside the `solicitation.approve` tool via the WHERE clause `AND curated_by != ${ctx.actor.id}`, NOT via a CHECK constraint or trigger on the `curated_solicitations` table.
+**Rationale:** The CHECK constraint approach would require the two columns to be NOT NULL when the constraint is checked, which conflicts with the natural lifecycle (curated_by is null until first edit, approved_by is null until approval). Trigger-based enforcement is harder to test and harder to reason about. Tool-layer enforcement is in the obvious place.
+**Consequences:** if a future tool tries to UPDATE `curated_solicitations.status = 'approved'` directly (bypassing `solicitation.approve`), the rule isn't enforced. Mitigation: only `solicitation.approve` is allowed to write `status = 'approved'`, and this is verified by the universal state-machine matrix test in §I11.
+
+## D-Phase1-10: Phase 1 e2e is the tag gate
+
+**Status:** accepted
+**Decision:** Phase 1 cannot be tagged `v1.0-curation-complete` until `frontend/__tests__/scenarios/phase-1-full-curation-e2e.test.ts` (§J1) passes against the throwaway PG. The test walks ingest → triage → claim → release → shred → curate → review (by a second admin) → approve → push and asserts every state transition + every event emission.
+**Rationale:** Section-by-section tests catch unit bugs; the e2e catches integration bugs where two correct sections disagree on a contract. The 0.5b login disaster was an integration bug that no unit test would have caught. Phase 1 closes with a real e2e gate.
+**Consequences:** Phase 2 cannot start until the §J e2e is green. Anyone who proposes to skip §J for "we'll add it later" should be reminded that the 0.5b login flow took ~2 days to debug because there was no e2e gate.

@@ -351,3 +351,123 @@ PROPOSAL OUTCOME (win/loss)
   → GLOBAL POOL LEARNING (anonymized patterns)
   → NEXT PROPOSAL STARTS STRONGER
 ```
+
+---
+
+# Phase 1 Addendum — Curation Pipeline (added 2026-04-09)
+
+This addendum extends V5 with the concrete implementation plan for Phase 1 (`Admin can triage, release, curate, and push RFPs to the customer pipeline`). Phase 1 is the first product surface; everything before it is foundation. Full TODO is in `docs/PHASE_1_PLAN.md` and the 10 mini-TODOs under `docs/phase-1/`.
+
+## Data flow
+
+```
+EXTERNAL SOURCES                    PIPELINE WORKER                   ADMIN UI                          CUSTOMER PORTAL
+────────────────                    ───────────────                   ────────                          ───────────────
+SAM.gov   ──┐
+SBIR.gov  ──┼──> ingester cron ──> opportunities ──> curated_solicitations  ──> /admin/rfp-curation ──> /portal/[slug]/
+Grants.gov ─┘     (sources A)        (table)             (status='new')          (triage queue)           opportunities
+                                                              │                                          (Phase 2)
+                                                              ▼ admin claims
+                                                         status='claimed'
+                                                              │
+                                                              ▼ admin releases
+                                                         status='released_for_analysis'
+                                                              │
+                                          shredder worker pulls job
+                                                              │
+                                                              ▼
+                                          pymupdf4llm + Claude
+                                          (versioned prompts v1)
+                                                              │
+                                                              ▼
+                                                         status='ai_analyzed'
+                                                         ai_extracted JSONB populated
+                                                         solicitation_compliance pre-filled
+                                                              │
+                                                              ▼ admin curates in workspace
+                                                         status='curation_in_progress'
+                                                              │
+                                                              ▼
+                                                         status='review_requested'
+                                                              │
+                                                              ▼ second admin approves
+                                                              │     (curated_by != approved_by)
+                                                              ▼
+                                                         status='approved'
+                                                              │
+                                                              ▼ push
+                                                         status='pushed_to_pipeline'
+                                                         opportunities.is_active=true
+                                                         memory.write(procedural)
+                                                              │
+                                                              └──> visible to customers (Phase 2)
+```
+
+## State machine (canonical)
+
+The `curated_solicitations.status` column is a finite-state machine. The valid states and transitions are:
+
+| From | Allowed transitions | Tool that performs the transition |
+|---|---|---|
+| `new` | `claimed`, `dismissed` | `solicitation.claim`, `solicitation.dismiss` |
+| `claimed` | `released_for_analysis`, `dismissed`, `new` (release the claim) | `solicitation.release`, `solicitation.dismiss`, `solicitation.unclaim` |
+| `released_for_analysis` | `ai_analyzed`, `curation_in_progress` | (shredder worker), `solicitation.skip_shredder` |
+| `ai_analyzed` | `curation_in_progress` | (auto on workspace open) |
+| `curation_in_progress` | `review_requested`, `dismissed` | `solicitation.request_review`, `solicitation.dismiss` |
+| `review_requested` | `approved`, `curation_in_progress` | `solicitation.approve`, `solicitation.reject_review` |
+| `approved` | `pushed_to_pipeline`, `curation_in_progress` | `solicitation.push`, `solicitation.return_to_curation` |
+| `pushed_to_pipeline` | (terminal — visible to customers) | n/a |
+| `dismissed` | (terminal — archived) | n/a |
+
+State transitions are enforced INSIDE the `solicitation.*` tools via atomic UPDATE WHERE clauses (the `WHERE status = 'new' AND claimed_by IS NULL` pattern). Race-safe by construction.
+
+## Tool catalog (Phase 1)
+
+See `docs/TOOL_CONVENTIONS.md` for full specs. Phase 1 introduces 21 new tools:
+
+- **Solicitation lifecycle (11):** `solicitation.list_triage`, `get_detail`, `claim`, `release`, `dismiss`, `request_review`, `approve`, `reject_review`, `push`, `save_annotation`, `delete_annotation`
+- **Compliance (4):** `compliance.list_variables`, `add_variable`, `extract_from_text`, `save_variable_value`
+- **Opportunity (3):** `opportunity.get_by_id`, `list_recent_ingested`, `fetch_raw_document`
+- **Ingest (3):** `ingest.trigger_manual`, `list_recent_runs`, `get_run_detail`
+- **Memory (1 new):** `memory.search_namespace` (joins the existing `memory.search` and `memory.write` from 0.5b)
+
+Every tool is registered in `frontend/lib/tools/index.ts`, has a unit test in `frontend/__tests__/tools/`, and is wrapped by exactly one API route in `frontend/app/api/admin/**`.
+
+## Event lifecycle
+
+Every Phase 1 lifecycle phase emits a corresponding event from the `finder.*` namespace (see `docs/NAMESPACES.md` §"Event namespaces"). The audit + replay path is:
+
+1. `pipeline_jobs` row → `finder.ingest.run.start` event
+2. opportunity inserted → `finder.opportunity.ingested` event (one per row)
+3. admin claims → `finder.rfp.triage_claimed` event + `triage_actions` row
+4. admin releases → `finder.rfp.released_for_analysis` event + new `pipeline_jobs` row for shredder
+5. shredder runs → `finder.rfp.shredding.start` + `.end` events with prompt_version stamped
+6. admin curates → `finder.rfp.annotation_saved` events
+7. admin pushes → `finder.rfp.curated_and_pushed` (the canonical Phase 1 success event)
+
+Phase 4 agents subscribe to these events via `pg_notify` (deferred infrastructure). Phase 5 dashboards query the event stream for ops insight. Phase 6 audit logs serve compliance reporting.
+
+## Multi-admin workflow
+
+The `curated_solicitations` row has three actor columns:
+- `claimed_by` — who currently owns the row (set on claim, reset on release-claim)
+- `curated_by` — who entered curation_in_progress (set on the first state transition into curation_in_progress)
+- `approved_by` — who approved after review (set on `solicitation.approve`)
+
+The constraint `approved_by != curated_by` is enforced in the `solicitation.approve` tool's UPDATE WHERE clause. A curator cannot approve their own work — a second `rfp_admin` must do it. This is the social-engineering review gate; it doesn't prevent collusion but it does prevent accidental self-approval.
+
+## Cross-cycle memory
+
+When the curator pushes a solicitation, `solicitation.push` calls `memory.write` with:
+- `agent_role: 'opportunity_analyst'`
+- `memory_type: 'procedural'`
+- `namespace: <agencyKey>` (e.g., `USAF:AFWERX:SBIR:Phase1`)
+- Content: the curated compliance values + key extraction patterns
+
+When a future curator opens a NEW solicitation in the same namespace, `loadPriorCycleSuggestions` (in `frontend/lib/curation/prefill.ts`) calls `memory.search_namespace` to find prior cycles, then pre-fills the compliance matrix with their values as ghost suggestions. The curator accepts/edits/discards each suggestion.
+
+Phase 4 will have agents read from this same memory store to drive autonomous extraction. The Phase 1 human curators effectively warm the memory cache that Phase 4 agents will graduate to using.
+
+---
+
+For the implementation TODO with verifiable acceptance criteria for every item, see `docs/PHASE_1_PLAN.md`.
