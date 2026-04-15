@@ -122,20 +122,20 @@ class BaseIngester(ABC):
     ) -> str:
         """Write a row to system_events and return the event id."""
         event_id = str(uuid.uuid4())
-        actor = json.dumps({"type": "pipeline", "id": f"ingest:{self.name}"})
         try:
             await conn.execute(
                 """
                 INSERT INTO system_events
-                  (id, namespace, type, phase, actor, tenant_id,
-                   parent_event_id, payload, created_at)
-                VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb, now())
+                  (id, namespace, type, phase, actor_type, actor_id,
+                   tenant_id, parent_event_id, payload, created_at)
+                VALUES ($1, $2, $3, $4, 'pipeline', $5,
+                        $6, $7, $8::jsonb, now())
                 """,
                 uuid.UUID(event_id),
                 namespace,
                 event_type,
                 phase,
-                actor,
+                f"ingest:{self.name}",
                 uuid.UUID(tenant_id) if tenant_id else None,
                 uuid.UUID(parent_event_id) if parent_event_id else None,
                 json.dumps(payload),

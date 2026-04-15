@@ -8,6 +8,7 @@ See docs/phase-1/C-python-ingester-framework.md §C6 for the spec.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -133,7 +134,16 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
 
     job_id = job["id"]
     source = job["source"]
-    metadata = job["metadata"] or {}
+    # asyncpg returns JSONB as a string unless a codec is registered.
+    # Parse defensively so the dispatcher works without codec setup.
+    raw_metadata = job["metadata"]
+    if isinstance(raw_metadata, str):
+        try:
+            metadata = json.loads(raw_metadata) if raw_metadata else {}
+        except json.JSONDecodeError:
+            metadata = {}
+    else:
+        metadata = raw_metadata or {}
     run_type = metadata.get("run_type", "incremental")
 
     log.info("claimed job %s for %s (run_type=%s)", job_id, source, run_type)
@@ -161,7 +171,7 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
             WHERE id = $1
             """,
             job_id,
-            __import__("json").dumps({
+            json.dumps({
                 "inserted": result.inserted,
                 "updated": result.updated,
                 "skipped": result.skipped,
@@ -187,7 +197,7 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
             WHERE id = $1
             """,
             job_id,
-            __import__("json").dumps({"error": str(e)[:500]}),
+            json.dumps({"error": str(e)[:500]}),
         )
 
     return True

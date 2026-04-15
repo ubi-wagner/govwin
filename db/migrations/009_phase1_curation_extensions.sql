@@ -205,3 +205,23 @@ CREATE TRIGGER opportunities_fts_trigger
   ON opportunities
   FOR EACH ROW
   EXECUTE FUNCTION opportunities_fts_update();
+
+-- ============================================================================
+-- 10. pipeline_jobs priority + metadata columns (dispatcher support)
+-- ============================================================================
+-- The Phase 1 cron dispatcher (pipeline/src/ingest/dispatcher.py) selects jobs
+-- ordered by priority DESC, created_at ASC, and carries run parameters in
+-- metadata JSONB (run_type, source-specific flags, etc.). Both columns are
+-- additive and nullable-with-default so existing rows remain valid.
+
+ALTER TABLE pipeline_jobs
+  ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 5;
+
+ALTER TABLE pipeline_jobs
+  ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- Partial index on pending jobs for the dispatcher's FOR UPDATE SKIP LOCKED
+-- claim query (status='pending' ORDER BY priority DESC, created_at ASC).
+CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_pending_queue
+  ON pipeline_jobs (priority DESC, created_at ASC)
+  WHERE status = 'pending';
