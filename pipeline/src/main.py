@@ -1,34 +1,37 @@
 """
 RFP Pipeline — Main Worker Process
-Listens for job notifications, executes ingestion, scoring, agent tasks.
+
+Runs the ingester cron dispatcher + job consumer loop. Polls
+pipeline_schedules every 60 seconds for due jobs, inserts
+pipeline_jobs rows, and consumes them by dispatching to the
+appropriate ingester class (SamGovIngester, SbirGovIngester,
+GrantsGovIngester).
 
 Migrations are applied via the GitHub Actions workflow at
-.github/workflows/migrate.yml, which calls db/migrations/run.sh
-against the Railway Postgres using the DATABASE_URL repo secret.
-This worker does NOT run migrations — previous versions had a
-`run_migrations()` helper here that was dead code because the
-pipeline Dockerfile only copies `src/` (not `db/`), so the function
-could never find the .sql files at /db/migrations inside the
-container. It silently logged "No migration files found, skipping"
-on every boot. Removed in the post-audit cleanup pass.
+.github/workflows/migrate.yml, NOT by this worker. See
+docs/DECISIONS.md D-Phase1-01 for why.
 """
 import asyncio
+import logging
 import signal
 import os
 import sys
-
-import asyncpg  # noqa: F401  # kept for future job-queue dequeue logic
-
 
 # Force line-buffered stdout/stderr so every print() lands in Railway
 # deploy logs immediately. Python defaults to BLOCK-buffered stdout
 # when attached to a pipe (Docker), which means prints get swallowed
 # by the buffer and never appear until the process exits — which this
-# worker never does. This one line is the difference between silent
-# darkness and useful runtime logs.
+# worker never does.
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
+# Configure structured logging before any module-level loggers fire
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("pipeline")
 
 shutdown_event = asyncio.Event()
 DATABASE_URL = os.getenv(
@@ -38,23 +41,23 @@ DATABASE_URL = os.getenv(
 
 
 def handle_signal(sig: signal.Signals) -> None:
-    print(f"Received {sig.name}, shutting down...")
+    log.info("Received %s, shutting down...", sig.name)
     shutdown_event.set()
 
 
 async def main() -> None:
-    print("RFP Pipeline worker starting...")
+    log.info("RFP Pipeline worker starting...")
 
-    # TODO: Initialize database connection pool
-    # TODO: Register event handlers
-    # TODO: Start cron ticker for pipeline_schedules
-    # TODO: Listen for pipeline_worker notifications
-    # TODO: Main loop: dequeue and execute jobs
+    # Import here so the logging config above is already set
+    from ingest.dispatcher import run_consumer_loop
 
-    while not shutdown_event.is_set():
-        await asyncio.sleep(1)
+    await run_consumer_loop(
+        database_url=DATABASE_URL,
+        shutdown_event=shutdown_event,
+        tick_interval=60,
+    )
 
-    print("Pipeline worker stopped.")
+    log.info("Pipeline worker stopped.")
 
 
 if __name__ == "__main__":
