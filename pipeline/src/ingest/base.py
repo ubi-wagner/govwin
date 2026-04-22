@@ -110,6 +110,49 @@ class BaseIngester(ABC):
         )
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+    async def _create_triage_row(
+        self,
+        conn: asyncpg.Connection,
+        opp_id: Any,
+        row: dict[str, Any],
+    ) -> None:
+        """Auto-create a curated_solicitations row for the admin triage queue.
+
+        Every newly-ingested opportunity gets a triage row at status='new'
+        so admins see it immediately in /admin/rfp-curation. Namespace is
+        computed from the opportunity's agency/office/program_type.
+        """
+        from shredder.namespace import compute_namespace_key
+
+        namespace = compute_namespace_key(
+            row.get("agency"),
+            row.get("office"),
+            row.get("program_type"),
+        ) or "pending"
+
+        description = (row.get("description") or "")[:50000]
+
+        try:
+            await conn.execute(
+                """
+                INSERT INTO curated_solicitations
+                  (opportunity_id, namespace, status, full_text)
+                SELECT $1, $2, 'new', $3
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM curated_solicitations WHERE opportunity_id = $1
+                )
+                """,
+                opp_id,
+                namespace,
+                description or None,
+            )
+        except Exception as e:
+            # Don't fail the ingest if the triage row fails — just log.
+            # The UNIQUE on (opportunity_id) means this is safe on re-runs.
+            self.log.warning(
+                "failed to create triage row for opp %s: %s", opp_id, e
+            )
+
     async def _emit_event(
         self,
         conn: asyncpg.Connection,
@@ -188,8 +231,9 @@ class BaseIngester(ABC):
                             row["content_hash"] = self._hash(row)
 
                             # Upsert: ON CONFLICT (content_hash) DO NOTHING
-                            # for new rows, or detect amendment if hash changed
-                            tag = await conn.execute(
+                            # for new rows, or detect amendment if hash changed.
+                            # RETURNING id so we can auto-create a triage row.
+                            upsert_row = await conn.fetchrow(
                                 """
                                 INSERT INTO opportunities
                                   (source, source_id, title, agency, office,
@@ -218,6 +262,7 @@ class BaseIngester(ABC):
                                   content_hash = EXCLUDED.content_hash,
                                   updated_at = now()
                                 WHERE opportunities.content_hash != EXCLUDED.content_hash
+                                RETURNING id, (xmax = 0) AS was_insert
                                 """,
                                 row.get("source"),
                                 row.get("source_id"),
@@ -237,9 +282,19 @@ class BaseIngester(ABC):
                                 row.get("content_hash"),
                             )
 
-                            if tag == "INSERT 0 1":
+                            if upsert_row is None:
+                                # ON CONFLICT matched but content_hash
+                                # was identical — no update, skip.
+                                result.skipped += 1
+                            elif upsert_row["was_insert"]:
                                 result.inserted += 1
-                                # Emit per-opportunity event
+                                opp_id = upsert_row["id"]
+                                # Auto-create curated_solicitations
+                                # row so the opportunity appears in
+                                # the admin triage queue immediately.
+                                await self._create_triage_row(
+                                    conn, opp_id, row
+                                )
                                 await self._emit_event(
                                     conn,
                                     "finder",
@@ -250,7 +305,7 @@ class BaseIngester(ABC):
                                         "content_hash": row.get("content_hash"),
                                     },
                                 )
-                            elif tag == "UPDATE 1":
+                            else:
                                 result.updated += 1
                                 await self._emit_event(
                                     conn,
@@ -262,8 +317,6 @@ class BaseIngester(ABC):
                                         "new_hash": row.get("content_hash"),
                                     },
                                 )
-                            else:
-                                result.skipped += 1
 
                         except Exception as e:
                             result.failed += 1
