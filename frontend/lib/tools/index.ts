@@ -26,6 +26,11 @@ import { opportunityGetByIdTool } from './opportunity-get-by-id';
 import { solicitationClaimTool } from './solicitation-claim';
 import { solicitationReleaseTool } from './solicitation-release';
 import { solicitationDismissTool } from './solicitation-dismiss';
+// Phase 1 §E — approval-flow state-machine tools (E.2b sub-commit)
+import { solicitationRequestReviewTool } from './solicitation-request-review';
+import { solicitationApproveTool } from './solicitation-approve';
+import { solicitationRejectReviewTool } from './solicitation-reject-review';
+import { solicitationPushTool } from './solicitation-push';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -38,6 +43,10 @@ register(opportunityGetByIdTool);
 register(solicitationClaimTool);
 register(solicitationReleaseTool);
 register(solicitationDismissTool);
+register(solicitationRequestReviewTool);
+register(solicitationApproveTool);
+register(solicitationRejectReviewTool);
+register(solicitationPushTool);
 
 // Re-export common surface so callers can import from a single path.
 export {
