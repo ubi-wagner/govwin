@@ -62,6 +62,12 @@ _CHARS_PER_TOKEN_ESTIMATE = 4
 # Cached prompt contents to avoid disk reads per invocation.
 _PROMPT_CACHE: dict[str, str] = {}
 
+# Module-level override hook for tests. When the dispatcher routes a
+# shred_solicitation job, it checks `runner.ANTHROPIC_CLIENT` before
+# instantiating a real SDK client, so e2e tests can inject a mock
+# without patching the import path.
+ANTHROPIC_CLIENT: Any = None
+
 
 def _load_prompt(name: str) -> str:
     """Load a versioned prompt file from pipeline/src/shredder/prompts/v1/."""
