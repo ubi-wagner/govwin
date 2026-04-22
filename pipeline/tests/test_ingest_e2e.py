@@ -43,14 +43,15 @@ async def conn():
 @pytest_asyncio.fixture
 async def clean_tables(conn):
     """Clear the tables we'll test against before each run."""
-    await conn.execute("DELETE FROM pipeline_jobs")
-    await conn.execute("DELETE FROM system_events WHERE namespace = 'finder'")
-    await conn.execute("DELETE FROM opportunities WHERE source IN ('sam_gov', 'sbir_gov', 'grants_gov')")
+    async def _cleanup():
+        await conn.execute("DELETE FROM pipeline_jobs")
+        await conn.execute("DELETE FROM system_events WHERE namespace = 'finder'")
+        await conn.execute("DELETE FROM solicitation_compliance")
+        await conn.execute("DELETE FROM curated_solicitations")
+        await conn.execute("DELETE FROM opportunities WHERE source IN ('sam_gov', 'sbir_gov', 'grants_gov')")
+    await _cleanup()
     yield
-    # cleanup after too
-    await conn.execute("DELETE FROM pipeline_jobs")
-    await conn.execute("DELETE FROM system_events WHERE namespace = 'finder'")
-    await conn.execute("DELETE FROM opportunities WHERE source IN ('sam_gov', 'sbir_gov', 'grants_gov')")
+    await _cleanup()
 
 
 @pytest.mark.asyncio
@@ -162,6 +163,138 @@ async def test_dispatcher_idempotent_content_hash_dedupe(conn, clean_tables, mon
     result = json.loads(second_job_result) if isinstance(second_job_result, str) else second_job_result
     # Either all skipped (row existed with same hash) or all updated-via-conflict
     assert result["inserted"] == 0 or (result["inserted"] + result["skipped"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_consumes_shred_solicitation_job(conn, clean_tables):
+    """A pipeline_jobs row with kind='shred_solicitation' routes to the shredder.
+
+    Injects a mock Anthropic client via shredder.runner.ANTHROPIC_CLIENT
+    so no real Claude calls happen. Verifies the full chain:
+    dispatcher → shredder.runner → DB writes (ai_extracted, namespace,
+    status='ai_analyzed', solicitation_compliance row).
+    """
+    from types import SimpleNamespace
+    from ingest.dispatcher import consume_one_job
+    from shredder import runner as shredder_runner
+    import uuid as _uuid
+
+    # Seed an opportunity + curated_solicitations with full_text
+    opp_id = await conn.fetchval(
+        """
+        INSERT INTO opportunities (source, source_id, title, agency, office, program_type, is_active)
+        VALUES ('sam_gov', $1, 'dispatcher shred test', 'Department of the Air Force',
+                'AFWERX', 'sbir_phase_1', true)
+        RETURNING id
+        """,
+        f"dispatcher-shred-{_uuid.uuid4()}",
+    )
+    sol_id = await conn.fetchval(
+        """
+        INSERT INTO curated_solicitations (opportunity_id, namespace, status, full_text)
+        VALUES ($1, 'pending', 'released_for_analysis', $2)
+        RETURNING id
+        """,
+        opp_id,
+        "The Technical Volume shall not exceed 15 pages. Use Times New Roman.",
+    )
+
+    # Mock Anthropic client returning a minimal valid response for both calls
+    async def _create(**kwargs):
+        user_msg = kwargs["messages"][0]["content"]
+        if "MASTER VARIABLES:" in user_msg:
+            text = json.dumps({
+                "matches": [{
+                    "variable_name": "page_limit_technical", "value": 15,
+                    "source_excerpt": "Technical Volume shall not exceed 15 pages",
+                    "page": None, "confidence": 1.0,
+                }]
+            })
+        else:
+            text = json.dumps({
+                "sections": [{
+                    "key": "submission_format", "title": "Proposal Prep",
+                    "page_range": "1", "summary": "15 page limit",
+                    "raw_text_excerpt": "The Technical Volume shall not exceed 15 pages.",
+                }]
+            })
+        return SimpleNamespace(
+            content=[SimpleNamespace(text=text)],
+            usage=SimpleNamespace(input_tokens=200, output_tokens=100),
+        )
+    mock_client = SimpleNamespace(messages=SimpleNamespace(create=_create))
+    shredder_runner.ANTHROPIC_CLIENT = mock_client
+
+    try:
+        # Insert a shred job
+        await conn.execute(
+            """
+            INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
+            VALUES ('system', 'shred_solicitation', 'pending', 1, $1::jsonb)
+            """,
+            json.dumps({"solicitation_id": str(sol_id)}),
+        )
+
+        processed = await consume_one_job(conn)
+        assert processed is True
+
+        # Job completed
+        job_status = await conn.fetchval(
+            "SELECT status FROM pipeline_jobs WHERE kind='shred_solicitation' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        assert job_status == "completed"
+
+        # Solicitation transitioned to ai_analyzed
+        sol_status = await conn.fetchval(
+            "SELECT status FROM curated_solicitations WHERE id = $1", sol_id
+        )
+        assert sol_status == "ai_analyzed"
+
+        # Namespace computed
+        namespace = await conn.fetchval(
+            "SELECT namespace FROM curated_solicitations WHERE id = $1", sol_id
+        )
+        assert namespace == "USAF:AFWERX:SBIR:Phase1"
+
+        # Compliance row landed with the named column populated
+        page_limit = await conn.fetchval(
+            "SELECT page_limit_technical FROM solicitation_compliance "
+            "WHERE solicitation_id = $1",
+            sol_id,
+        )
+        assert page_limit == 15
+
+    finally:
+        shredder_runner.ANTHROPIC_CLIENT = None
+        await conn.execute("DELETE FROM solicitation_compliance WHERE solicitation_id = $1", sol_id)
+        await conn.execute("DELETE FROM curated_solicitations WHERE id = $1", sol_id)
+        await conn.execute("DELETE FROM opportunities WHERE id = $1", opp_id)
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_shred_job_without_solicitation_id_fails_cleanly(conn, clean_tables):
+    """A shred job missing metadata.solicitation_id marks itself failed."""
+    from ingest.dispatcher import consume_one_job
+
+    await conn.execute(
+        """
+        INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
+        VALUES ('system', 'shred_solicitation', 'pending', 1, '{}'::jsonb)
+        """
+    )
+    assert await consume_one_job(conn) is True
+
+    status = await conn.fetchval(
+        "SELECT status FROM pipeline_jobs WHERE kind='shred_solicitation' LIMIT 1"
+    )
+    assert status == "failed"
+
+    result_row = await conn.fetchval(
+        "SELECT result FROM pipeline_jobs WHERE kind='shred_solicitation' LIMIT 1"
+    )
+    result = json.loads(result_row) if isinstance(result_row, str) else result_row
+    assert "solicitation_id" in result["error"]
 
 
 @pytest.mark.asyncio

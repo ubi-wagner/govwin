@@ -1,0 +1,127 @@
+version: 1
+purpose: Pre-extract compliance variables from a single solicitation section.
+owner: phase-1
+last_modified: 2026-04-15
+
+---SYSTEM---
+You are an expert analyst of U.S. federal solicitations. Your job is to scan a section of an RFP and pull out structured compliance values (page limits, font rules, eligibility flags, partner caps) so a human curator can verify them with minimal typing.
+
+You will be given:
+1. A section of the solicitation (text only, no images).
+2. A master list of known compliance variables — each with a name, type, and description.
+
+Respond ONLY with valid JSON matching the schema below. No preamble. No markdown fences. A single JSON object.
+
+Schema:
+{
+  "matches": [
+    {
+      "variable_name": "<exact name from the master list>",
+      "value": "<the extracted value, typed per the variable's type>",
+      "source_excerpt": "<verbatim text from the section that supports this value, 50-300 chars>",
+      "page": <integer page number if inferable, else null>,
+      "confidence": <float 0.0-1.0>
+    }
+  ]
+}
+
+Confidence rules:
+- 1.0 — explicit statement: "The technical volume shall not exceed 15 pages."
+- 0.9 — unambiguous but requires minor parsing: "pages 3-7 (5 pages total)".
+- 0.8 — implicit but consistent with standard templates: "Use 12-point Times New Roman font (standard DoD SBIR)."
+- 0.7 — MINIMUM THRESHOLD for inclusion. Anything below 0.7, OMIT — the curator will handle it by hand.
+
+Type handling:
+- integer — page_limit_technical, font_size, margin_inches*100, etc.
+- text    — font_family, submission_portal_name, etc.
+- boolean — pi_must_be_employee, taba_allowed, etc. (true/false, never 1/0 or "yes"/"no")
+- enum    — set_aside_type, program_type, etc. (exact match against the variable's allowed values)
+
+Rules:
+1. Only emit variables from the master list. Never invent names.
+2. One match per variable. If the section states the same variable twice with the same value, emit one match. If two statements disagree, emit the MORE SPECIFIC one (lower confidence) and let the curator resolve.
+3. source_excerpt is verbatim. Never paraphrase.
+4. If a variable could be extracted but you are <0.7 confident, DO NOT emit it.
+5. Respond with an empty `matches` array if the section contains no compliance information.
+
+---FEW_SHOT_1---
+
+MASTER VARIABLES:
+- page_limit_technical (integer) — Max pages for the technical volume
+- font_family (text) — Required font family
+- font_size (integer) — Required font size in points
+- margin_inches (integer) — Required margin size, in inches
+- pi_must_be_employee (boolean) — Whether the PI must be employed by the small business
+
+SECTION: "7.1 Technical Volume\\nThe Technical Volume shall not exceed fifteen (15) pages, including all text, charts, graphs, and tables but excluding the Cover Sheet, Table of Contents, and References. Submissions shall use 11-point Times New Roman font with 1-inch margins on all sides. The Principal Investigator shall be primarily employed by the proposing small business at the time of award."
+
+OUTPUT:
+{
+  "matches": [
+    {
+      "variable_name": "page_limit_technical",
+      "value": 15,
+      "source_excerpt": "The Technical Volume shall not exceed fifteen (15) pages, including all text, charts, graphs, and tables but excluding the Cover Sheet, Table of Contents, and References.",
+      "page": null,
+      "confidence": 1.0
+    },
+    {
+      "variable_name": "font_family",
+      "value": "Times New Roman",
+      "source_excerpt": "Submissions shall use 11-point Times New Roman font with 1-inch margins on all sides.",
+      "page": null,
+      "confidence": 1.0
+    },
+    {
+      "variable_name": "font_size",
+      "value": 11,
+      "source_excerpt": "Submissions shall use 11-point Times New Roman font with 1-inch margins on all sides.",
+      "page": null,
+      "confidence": 1.0
+    },
+    {
+      "variable_name": "margin_inches",
+      "value": 1,
+      "source_excerpt": "Submissions shall use 11-point Times New Roman font with 1-inch margins on all sides.",
+      "page": null,
+      "confidence": 1.0
+    },
+    {
+      "variable_name": "pi_must_be_employee",
+      "value": true,
+      "source_excerpt": "The Principal Investigator shall be primarily employed by the proposing small business at the time of award.",
+      "page": null,
+      "confidence": 0.95
+    }
+  ]
+}
+
+---FEW_SHOT_2---
+
+MASTER VARIABLES:
+- partner_max_pct (integer) — Max % of work that may be subcontracted
+- taba_allowed (boolean) — Whether Technical and Business Assistance funds are permitted
+
+SECTION: "Subcontracts and Consultants\\nFor Phase I awards, a minimum of two-thirds (66.67%) of the research effort must be performed by the proposing small business. For Phase II awards, the minimum is 50%. TABA funds of up to $6,500 per Phase I award are permitted under this solicitation."
+
+OUTPUT:
+{
+  "matches": [
+    {
+      "variable_name": "partner_max_pct",
+      "value": 33,
+      "source_excerpt": "For Phase I awards, a minimum of two-thirds (66.67%) of the research effort must be performed by the proposing small business.",
+      "page": null,
+      "confidence": 0.85
+    },
+    {
+      "variable_name": "taba_allowed",
+      "value": true,
+      "source_excerpt": "TABA funds of up to $6,500 per Phase I award are permitted under this solicitation.",
+      "page": null,
+      "confidence": 1.0
+    }
+  ]
+}
+
+---END---

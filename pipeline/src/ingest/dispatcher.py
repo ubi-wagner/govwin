@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import asyncpg
 
@@ -112,6 +112,12 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
     Returns True if a job was processed, False if the queue was empty.
     Uses an atomic UPDATE ... RETURNING to claim the job (race-safe
     against multiple workers, though Phase 1 runs a single worker).
+
+    Routes by pipeline_jobs.kind:
+      - 'ingest'              → ingester (sam_gov, sbir_gov, grants_gov)
+      - 'shred_solicitation'  → shredder.runner.shred_solicitation
+
+    For shred jobs, metadata must contain 'solicitation_id' (UUID str).
     """
     # Atomically claim the next pending job
     job = await conn.fetchrow(
@@ -125,7 +131,7 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, source, metadata
+        RETURNING id, source, kind, metadata
         """
     )
 
@@ -134,6 +140,7 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
 
     job_id = job["id"]
     source = job["source"]
+    kind = job["kind"]
     # asyncpg returns JSONB as a string unless a codec is registered.
     # Parse defensively so the dispatcher works without codec setup.
     raw_metadata = job["metadata"]
@@ -144,48 +151,14 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
             metadata = {}
     else:
         metadata = raw_metadata or {}
-    run_type = metadata.get("run_type", "incremental")
 
-    log.info("claimed job %s for %s (run_type=%s)", job_id, source, run_type)
-
-    ingester_cls = INGESTERS.get(source)
-    if not ingester_cls:
-        log.warning("unknown source %s for job %s — marking failed", source, job_id)
-        await conn.execute(
-            "UPDATE pipeline_jobs SET status = 'failed', completed_at = now() WHERE id = $1",
-            job_id,
-        )
-        return True
+    log.info("claimed job %s (kind=%s, source=%s)", job_id, kind, source)
 
     try:
-        ingester = ingester_cls()
-        result = await ingester.run(conn, run_type)
-
-        # Mark completed with metrics
-        await conn.execute(
-            """
-            UPDATE pipeline_jobs
-            SET status = 'completed',
-                completed_at = now(),
-                result = $2::jsonb
-            WHERE id = $1
-            """,
-            job_id,
-            json.dumps({
-                "inserted": result.inserted,
-                "updated": result.updated,
-                "skipped": result.skipped,
-                "failed": result.failed,
-                "pages_fetched": result.pages_fetched,
-                "duration_ms": result.duration_ms,
-                "errors": result.errors[:5],  # cap at 5 error messages
-            }),
-        )
-        log.info(
-            "job %s completed: inserted=%d updated=%d skipped=%d failed=%d",
-            job_id, result.inserted, result.updated, result.skipped, result.failed,
-        )
-
+        if kind == "shred_solicitation":
+            await _run_shred_job(conn, job_id, metadata)
+        else:  # default: 'ingest'
+            await _run_ingest_job(conn, job_id, source, metadata)
     except Exception as e:
         log.error("job %s failed: %s", job_id, e)
         await conn.execute(
@@ -201,6 +174,105 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
         )
 
     return True
+
+
+async def _run_ingest_job(
+    conn: asyncpg.Connection,
+    job_id: Any,
+    source: str,
+    metadata: dict,
+) -> None:
+    """Execute an ingest job by routing to the right ingester class."""
+    run_type = metadata.get("run_type", "incremental")
+
+    ingester_cls = INGESTERS.get(source)
+    if not ingester_cls:
+        log.warning("unknown source %s for job %s — marking failed", source, job_id)
+        await conn.execute(
+            "UPDATE pipeline_jobs SET status = 'failed', completed_at = now() WHERE id = $1",
+            job_id,
+        )
+        return
+
+    ingester = ingester_cls()
+    result = await ingester.run(conn, run_type)
+
+    await conn.execute(
+        """
+        UPDATE pipeline_jobs
+        SET status = 'completed',
+            completed_at = now(),
+            result = $2::jsonb
+        WHERE id = $1
+        """,
+        job_id,
+        json.dumps({
+            "inserted": result.inserted,
+            "updated": result.updated,
+            "skipped": result.skipped,
+            "failed": result.failed,
+            "pages_fetched": result.pages_fetched,
+            "duration_ms": result.duration_ms,
+            "errors": result.errors[:5],
+        }),
+    )
+    log.info(
+        "job %s completed: inserted=%d updated=%d skipped=%d failed=%d",
+        job_id, result.inserted, result.updated, result.skipped, result.failed,
+    )
+
+
+async def _run_shred_job(
+    conn: asyncpg.Connection,
+    job_id: Any,
+    metadata: dict,
+) -> None:
+    """Execute a shred_solicitation job.
+
+    Expects metadata.solicitation_id. Instantiates an anthropic client
+    lazily so test harnesses can inject a mock via the `ANTHROPIC_CLIENT`
+    attribute on shredder.runner (see test_ingest_e2e.py).
+    """
+    solicitation_id = metadata.get("solicitation_id")
+    if not solicitation_id:
+        await conn.execute(
+            """
+            UPDATE pipeline_jobs
+            SET status = 'failed',
+                completed_at = now(),
+                result = $2::jsonb
+            WHERE id = $1
+            """,
+            job_id,
+            json.dumps({"error": "shred_solicitation job missing metadata.solicitation_id"}),
+        )
+        log.warning("shred job %s missing solicitation_id — marking failed", job_id)
+        return
+
+    # Lazy imports so the dispatcher module can be imported without
+    # the shredder (and its anthropic/pymupdf deps) being fully wired.
+    from shredder import runner as shredder_runner
+
+    # Tests override this attribute to inject a mock client.
+    client = getattr(shredder_runner, "ANTHROPIC_CLIENT", None)
+    if client is None:
+        import anthropic  # lazy — pulls in the SDK only when actually used
+        client = anthropic.AsyncAnthropic()
+
+    result = await shredder_runner.shred_solicitation(conn, solicitation_id, client)
+
+    await conn.execute(
+        """
+        UPDATE pipeline_jobs
+        SET status = 'completed',
+            completed_at = now(),
+            result = $2::jsonb
+        WHERE id = $1
+        """,
+        job_id,
+        json.dumps(result),
+    )
+    log.info("shred job %s completed: %s", job_id, result.get("status"))
 
 
 async def run_consumer_loop(

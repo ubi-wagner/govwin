@@ -18,11 +18,19 @@
 import { register } from './registry';
 import { memorySearchTool } from './memory-search';
 import { memoryWriteTool } from './memory-write';
+// Phase 1 §E — read-only foundation tools (E.1 sub-commit)
+import { solicitationListTriageTool } from './solicitation-list-triage';
+import { solicitationGetDetailTool } from './solicitation-get-detail';
+import { opportunityGetByIdTool } from './opportunity-get-by-id';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
 register(memorySearchTool);
 register(memoryWriteTool);
+// Phase 1 §E tools
+register(solicitationListTriageTool);
+register(solicitationGetDetailTool);
+register(opportunityGetByIdTool);
 
 // Re-export common surface so callers can import from a single path.
 export {

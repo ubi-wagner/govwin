@@ -255,6 +255,27 @@ The following decisions are made up-front for Phase 1 (RFP Ingestion & Expert Cu
 **Rationale:** The CHECK constraint approach would require the two columns to be NOT NULL when the constraint is checked, which conflicts with the natural lifecycle (curated_by is null until first edit, approved_by is null until approval). Trigger-based enforcement is harder to test and harder to reason about. Tool-layer enforcement is in the obvious place.
 **Consequences:** if a future tool tries to UPDATE `curated_solicitations.status = 'approved'` directly (bypassing `solicitation.approve`), the rule isn't enforced. Mitigation: only `solicitation.approve` is allowed to write `status = 'approved'`, and this is verified by the universal state-machine matrix test in §I11.
 
+## D-Phase1-11: DoW (Department of War) aliases to DOD in the memory namespace
+
+**Status:** accepted
+**Decision:** `shredder/namespace.py::_AGENCY_ALIASES` maps `Department of War`, `Dept of War`, and `DoW` to canonical `DOD`. The resulting memory namespace for post-rename solicitations is `DOD:...`, indistinguishable from pre-rename solicitations.
+**Rationale:** DoW is the 2025-09 organizational rename of DoD. Compliance rules, proposal templates, and historical curation data are all continuous across the rename — segmenting the memory namespace would throw away a year of accumulated compliance knowledge for no benefit. The regression test fixture `dow_2026_sbir_baa` in `pipeline/src/shredder/golden_fixtures/` specifically guards this invariant: its `expected.json` expects namespace `DOD:unknown:SBIR:Phase1`, and the mock-mode regression test fails if the alias regresses.
+**Consequences:** Future renames follow the same pattern — add aliases in `_AGENCY_ALIASES`, add a golden fixture covering the post-rename source, add a DECISIONS entry with rationale. If the rules DIVERGE post-rename (unlikely but possible), we'd open a new decision to split the namespace and migrate historical memory to the new key.
+
+## D-Phase1-12: CSO solicitations use `:Open` phase, not `:Phase1`
+
+**Status:** accepted
+**Decision:** Commercial Solutions Opening (CSO) contract vehicles stamp their memory namespace with `phase=Open`, even when the underlying PDF is titled "Phase I CSO". The namespace for `af_x24_5_cso` is `USAF:unknown:CSO:Open`, not `USAF:unknown:CSO:Phase1`.
+**Rationale:** CSO is a single-phase open call. It does not carry the Phase I → Phase II → Phase III funding-progression semantics that SBIR and STTR do. Using `:Open` for all CSOs means memory search across CSO solicitations from the same agency surfaces all relevant historical cycles without artificial phase segmentation. The "Phase I" label on some CSOs is boilerplate borrowed from the SBIR program, not a meaningful phase distinction.
+**Consequences:** §H `memory.search_namespace` queries with prefix `USAF:unknown:CSO:` surface every AF CSO regardless of marketing label. Ingester logic does not need to parse "Phase I" out of CSO titles — the namespace module collapses CSO to `:Open` in `_normalize_phase`. If a CSO ever DOES carry multi-phase semantics (unlikely), we'd introduce a new program_type (`cso_phase_1` analogous to `sbir_phase_1`) rather than changing the namespace module.
+
+## D-Phase1-13: Shredder token budget raised to 150K input tokens / ~$0.45 per run
+
+**Status:** accepted
+**Decision:** `shredder/runner.py::MAX_INPUT_TOKENS_PER_RUN = 150_000`. The pre-flight token estimate uses `chars/4 * 1.25`, not the original `chars/4 * 2`.
+**Rationale:** Spec §D4 originally specified 50K input tokens, sized for typical per-topic SBIR proposals. Real DoD umbrella BAAs are 200K+ chars (capped by the extractor) of dense text — ~50K tokens per pass alone. With per-section compliance calls adding ~20% overhead, a realistic shredding run for a full DoD BAA is 60-100K tokens. 150K gives 1.5× headroom for edge cases without burning runaway cost (~$0.45 per run at Sonnet pricing). The old ×2 estimate multiplier was defensive but wildly inaccurate — per-section compliance calls ship only 500-char excerpts, not the whole doc, so real per-section token cost is ~1-2K tokens regardless of document size.
+**Consequences:** Golden-fixture regression tests in `pipeline/tests/test_shredder_regression.py` now pass against real 200K-char DoD BAA extractions. If future spec work requires running against even larger docs (Component Instruction Appendices — 500K+ chars), we'd consider either (a) pre-slicing the doc to procedural sections only before section extraction, or (b) using Haiku for section extraction + Sonnet only for compliance. Re-evaluate if/when we start seeing `budget_exceeded` events in prod.
+
 ## D-Phase1-10: Phase 1 e2e is the tag gate
 
 **Status:** accepted
