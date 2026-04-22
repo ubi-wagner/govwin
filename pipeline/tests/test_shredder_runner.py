@@ -295,12 +295,18 @@ async def test_budget_exceeded_raises_and_flips_status(conn, seed, monkeypatch):
     from shredder import runner
     from shredder.runner import shred_solicitation
 
-    # Force the solicitation to have a huge full_text (>400K chars so ×2 est
-    # exceeds 50K tokens -- est is chars/4 * 2 = ~200K which is >> 50K).
+    # Trigger budget breach: est = chars/4 * 1.25 > 150_000 requires
+    # ~480_000 chars after the 200K extractor cap. To simulate that,
+    # swap the cap and set full_text above the new bar. The runner
+    # caps full_text at MAX_CHARS_PER_DOCUMENT, so setting it to a
+    # size LARGER than the cap isn't enough — we patch the cap for
+    # this test to 800K so the ×1.25 est on 800K chars = 250K tokens.
+    from shredder import runner as _runner
+    monkeypatch.setattr(_runner, "MAX_CHARS_PER_DOCUMENT", 800_000)
     await conn.execute(
         "UPDATE curated_solicitations SET full_text = $2 WHERE id = $1",
         seed["solicitation_id"],
-        "A" * 500_000,  # will be capped to 200K then estimated as 100K tokens after ×2
+        "A" * 800_000,
     )
 
     fake = _make_fake_anthropic({"sections": []}, {"matches": []})

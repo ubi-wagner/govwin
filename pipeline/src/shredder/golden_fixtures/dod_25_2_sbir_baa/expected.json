@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "fixture_id": "dod_25_2_sbir_baa",
+    "source_pdf": "docs/DoD 25.2 SBIR BAA FULL_04212025.pdf",
+    "status": "STUB — regenerate with scripts/record_golden_output.py (needs ANTHROPIC_API_KEY)",
+    "namespace_expected": "DOD:unknown:SBIR:Phase1",
+    "cross_cycle_pair": "dod_25_1_sbir_baa"
+  },
+  "prompt_version": 1,
+  "model": "claude-sonnet-4-6",
+  "sections": [
+    {"key": "cover"},
+    {"key": "eligibility"},
+    {"key": "submission_format"},
+    {"key": "evaluation_criteria"},
+    {"key": "compliance_requirements"},
+    {"key": "appendix"}
+  ],
+  "compliance_matches": [
+    {"variable_name": "font_size", "value": "10", "min_confidence": 0.9},
+    {"variable_name": "margins", "value": "1 inch", "min_confidence": 0.9},
+    {"variable_name": "submission_format", "value": "DSIP", "min_confidence": 0.9},
+    {"variable_name": "pi_must_be_employee", "value": true, "min_confidence": 0.7}
+  ]
+}

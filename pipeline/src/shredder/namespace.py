@@ -27,6 +27,13 @@ _THREE_PART_AGENCIES = frozenset({"NSF", "NIH", "DOE", "USDA", "DOT", "DHS", "NA
 _AGENCY_ALIASES: dict[str, str] = {
     "DEPT OF DEFENSE": "DOD",
     "DEPARTMENT OF DEFENSE": "DOD",
+    # DoW is the 2025-09 rename of DoD. Mapped to DOD to preserve
+    # organizational continuity — same compliance rules, same historical
+    # knowledge base, same cross-cycle pre-fill from pre-rename solicitations.
+    # See docs/DECISIONS.md (Phase 1 §D.4) for the rationale.
+    "DEPT OF WAR": "DOD",
+    "DEPARTMENT OF WAR": "DOD",
+    "DOW": "DOD",
     "DEPT OF THE AIR FORCE": "USAF",
     "DEPARTMENT OF THE AIR FORCE": "USAF",
     "AIR FORCE": "USAF",

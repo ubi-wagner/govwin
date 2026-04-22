@@ -35,6 +35,12 @@ class TestAgencyNormalization:
     def test_alias_resolution_dod(self):
         assert compute_namespace_key("Department of Defense", "DARPA", "baa", None) == "DOD:DARPA:BAA:Open"
 
+    def test_dow_maps_to_dod(self):
+        """DoW is the 2025 rename of DoD — namespace must preserve continuity."""
+        assert compute_namespace_key("Department of War", None, "sbir_phase_1", None) == "DOD:unknown:SBIR:Phase1"
+        assert compute_namespace_key("DoW", None, "sbir_phase_1", None) == "DOD:unknown:SBIR:Phase1"
+        assert compute_namespace_key("DEPT OF WAR", "DARPA", "baa", None) == "DOD:DARPA:BAA:Open"
+
     def test_lowercase_input_uppercases(self):
         assert compute_namespace_key("usaf", "afwerx", "sbir_phase_1", None) == "USAF:AFWERX:SBIR:Phase1"
 

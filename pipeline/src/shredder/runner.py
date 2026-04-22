@@ -46,10 +46,13 @@ from shredder.namespace import compute_namespace_key
 log = logging.getLogger("pipeline.shredder.runner")
 
 # Absolute cap on total input tokens per shredding run. Claude Sonnet
-# 4 costs ~$3 / 1M input tokens, so 50K = ~$0.15 per run. If a single
-# solicitation needs more than 50K, the doc is too large and we flag
+# costs ~$3 / 1M input tokens, so 150K = ~$0.45 per run. Sized to fit
+# a typical DoD SBIR/STTR umbrella BAA (the extractor caps at 200K
+# chars, which is ~50K tokens — plus ~10 section-level compliance
+# calls at 500 chars + master list + few-shot each). If a single
+# solicitation needs more than this, the doc is too large and we flag
 # it to the admin rather than burn runaway cost.
-MAX_INPUT_TOKENS_PER_RUN = 50_000
+MAX_INPUT_TOKENS_PER_RUN = 150_000
 
 # Model name env var. Defaults to Sonnet 4.6 per the V2 conventions.
 DEFAULT_MODEL = os.environ.get("SHREDDER_MODEL", "claude-sonnet-4-6")
@@ -278,7 +281,13 @@ async def shred_solicitation(
     combined_text = "\n\n---DOCUMENT---\n\n".join(doc_texts)
 
     # ── Step 4: Pre-flight budget check ─────────────────────────────────
-    est_input = _estimate_tokens(combined_text) * 2  # ×2 accounts for per-section re-shipping
+    # Section extraction ships the full combined_text once. Per-section
+    # compliance calls each ship ~500 chars of raw_text_excerpt + master
+    # variable list + few-shot examples — ~1-2K tokens each. For a
+    # typical 5-10 section RFP, the per-section calls add ~20% overhead
+    # on top of the main extraction. ×1.25 pre-flight multiplier is
+    # accurate without being wastefully pessimistic.
+    est_input = int(_estimate_tokens(combined_text) * 1.25)
     if est_input > MAX_INPUT_TOKENS_PER_RUN:
         await _update_status(conn, sol_uuid, "shredder_failed")
         await _emit_event(
