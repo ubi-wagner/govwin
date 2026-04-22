@@ -31,6 +31,11 @@ import { solicitationRequestReviewTool } from './solicitation-request-review';
 import { solicitationApproveTool } from './solicitation-approve';
 import { solicitationRejectReviewTool } from './solicitation-reject-review';
 import { solicitationPushTool } from './solicitation-push';
+// Phase 1 §E — compliance + annotation tools (E.3 sub-commit)
+import { complianceListVariablesTool } from './compliance-list-variables';
+import { complianceSaveVariableValueTool } from './compliance-save-variable-value';
+import { solicitationSaveAnnotationTool } from './solicitation-save-annotation';
+import { solicitationDeleteAnnotationTool } from './solicitation-delete-annotation';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -47,6 +52,10 @@ register(solicitationRequestReviewTool);
 register(solicitationApproveTool);
 register(solicitationRejectReviewTool);
 register(solicitationPushTool);
+register(complianceListVariablesTool);
+register(complianceSaveVariableValueTool);
+register(solicitationSaveAnnotationTool);
+register(solicitationDeleteAnnotationTool);
 
 // Re-export common surface so callers can import from a single path.
 export {
