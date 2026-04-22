@@ -1,8 +1,83 @@
-export default function Page() {
+import { auth } from '@/auth';
+import { redirect, notFound } from 'next/navigation';
+import { sql } from '@/lib/db';
+import { CurationWorkspace } from '@/components/rfp-curation/curation-workspace';
+
+interface Props {
+  params: Promise<{ solId: string }>;
+}
+
+export default async function CurationWorkspacePage({ params }: Props) {
+  const session = await auth();
+  if (!session?.user) redirect('/login');
+
+  const { solId } = await params;
+
+  const solRows = await sql<Record<string, unknown>[]>`
+    SELECT
+      cs.id, cs.opportunity_id, cs.status, cs.namespace,
+      cs.claimed_by, cs.claimed_at, cs.curated_by, cs.approved_by,
+      cs.review_requested_for, cs.phase_like, cs.ai_extracted,
+      cs.ai_confidence, cs.full_text, cs.annotations AS annotations_inline,
+      cs.pushed_at, cs.dismissed_reason, cs.created_at, cs.updated_at,
+      o.title, o.source, o.source_id, o.agency, o.office, o.program_type,
+      o.solicitation_number, o.naics_codes, o.set_aside_type,
+      o.close_date, o.posted_date, o.description
+    FROM curated_solicitations cs
+    JOIN opportunities o ON o.id = cs.opportunity_id
+    WHERE cs.id = ${solId}::uuid
+  `;
+
+  if (solRows.length === 0) notFound();
+  const r = solRows[0];
+
+  const compRows = await sql<Record<string, unknown>[]>`
+    SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid
+  `;
+  const compliance = compRows.length > 0 ? compRows[0] : null;
+
+  const triageRows = await sql<{ id: string; action: string; actorId: string; notes: string | null; createdAt: Date }[]>`
+    SELECT id, action, actor_id, notes, created_at
+    FROM triage_actions WHERE solicitation_id = ${solId}::uuid
+    ORDER BY created_at ASC
+  `;
+
+  const solicitation = {
+    id: r.id as string,
+    opportunityId: r.opportunityId as string,
+    status: r.status as string,
+    namespace: (r.namespace as string) ?? null,
+    claimedBy: (r.claimedBy as string) ?? null,
+    curatedBy: (r.curatedBy as string) ?? null,
+    approvedBy: (r.approvedBy as string) ?? null,
+    aiExtracted: r.aiExtracted ?? null,
+    fullText: (r.fullText as string) ?? null,
+    title: r.title as string,
+    source: r.source as string,
+    agency: (r.agency as string) ?? null,
+    office: (r.office as string) ?? null,
+    programType: (r.programType as string) ?? null,
+    solicitationNumber: (r.solicitationNumber as string) ?? null,
+    description: (r.description as string) ?? null,
+    closeDate: r.closeDate ? (r.closeDate as Date).toISOString() : null,
+    postedDate: r.postedDate ? (r.postedDate as Date).toISOString() : null,
+    createdAt: (r.createdAt as Date).toISOString(),
+  };
+
+  const triageHistory = triageRows.map((t) => ({
+    id: t.id,
+    action: t.action,
+    actorId: t.actorId,
+    notes: t.notes,
+    createdAt: t.createdAt.toISOString(),
+  }));
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">RFP Curation Workspace</h1>
-      <p className="text-gray-500 mt-2">Coming soon</p>
-    </div>
+    <CurationWorkspace
+      solicitation={solicitation}
+      compliance={compliance}
+      triageHistory={triageHistory}
+      currentUserId={session.user.id ?? ''}
+    />
   );
 }

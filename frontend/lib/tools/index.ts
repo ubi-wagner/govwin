@@ -22,15 +22,51 @@ import { memoryWriteTool } from './memory-write';
 import { solicitationListTriageTool } from './solicitation-list-triage';
 import { solicitationGetDetailTool } from './solicitation-get-detail';
 import { opportunityGetByIdTool } from './opportunity-get-by-id';
+// Phase 1 §E — entry state-machine tools (E.2a sub-commit)
+import { solicitationClaimTool } from './solicitation-claim';
+import { solicitationReleaseTool } from './solicitation-release';
+import { solicitationDismissTool } from './solicitation-dismiss';
+// Phase 1 §E — approval-flow state-machine tools (E.2b sub-commit)
+import { solicitationRequestReviewTool } from './solicitation-request-review';
+import { solicitationApproveTool } from './solicitation-approve';
+import { solicitationRejectReviewTool } from './solicitation-reject-review';
+import { solicitationPushTool } from './solicitation-push';
+// Phase 1 §E — compliance + annotation tools (E.3 sub-commit)
+import { complianceListVariablesTool } from './compliance-list-variables';
+import { complianceSaveVariableValueTool } from './compliance-save-variable-value';
+import { solicitationSaveAnnotationTool } from './solicitation-save-annotation';
+import { solicitationDeleteAnnotationTool } from './solicitation-delete-annotation';
+// Phase 1 §E — final sub-commit (E.4): ingest + add_variable + extract_from_text
+import { complianceAddVariableTool } from './compliance-add-variable';
+import { complianceExtractFromTextTool } from './compliance-extract-from-text';
+import { ingestTriggerManualTool } from './ingest-trigger-manual';
+import { ingestListRecentRunsTool } from './ingest-list-recent-runs';
+import { ingestGetRunDetailTool } from './ingest-get-run-detail';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
 register(memorySearchTool);
 register(memoryWriteTool);
-// Phase 1 §E tools
+// Phase 1 §E tools (21 total)
 register(solicitationListTriageTool);
 register(solicitationGetDetailTool);
 register(opportunityGetByIdTool);
+register(solicitationClaimTool);
+register(solicitationReleaseTool);
+register(solicitationDismissTool);
+register(solicitationRequestReviewTool);
+register(solicitationApproveTool);
+register(solicitationRejectReviewTool);
+register(solicitationPushTool);
+register(complianceListVariablesTool);
+register(complianceSaveVariableValueTool);
+register(solicitationSaveAnnotationTool);
+register(solicitationDeleteAnnotationTool);
+register(complianceAddVariableTool);
+register(complianceExtractFromTextTool);
+register(ingestTriggerManualTool);
+register(ingestListRecentRunsTool);
+register(ingestGetRunDetailTool);
 
 // Re-export common surface so callers can import from a single path.
 export {

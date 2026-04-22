@@ -87,6 +87,30 @@ export class ConflictError extends AppError {
 }
 
 /**
+ * 409 — specialized conflict raised by `solicitation.claim` when an
+ * atomic claim attempt finds zero rows (someone else claimed first,
+ * or the row isn't in 'new' state). Mirrors
+ * `pipeline/src/errors.py::ClaimConflictError`.
+ */
+export class ClaimConflictError extends AppError {
+  constructor(message = 'solicitation claim conflict', details?: unknown) {
+    super(message, 'CLAIM_CONFLICT', 409, details);
+  }
+}
+
+/**
+ * 409 — specialized conflict raised by curation state-transition tools
+ * (`solicitation.release`, `.dismiss`, `.request_review`, `.approve`,
+ * `.reject_review`, `.push`) when the target row isn't in the expected
+ * source state. Mirrors `pipeline/src/errors.py::StateTransitionError`.
+ */
+export class StateTransitionError extends AppError {
+  constructor(message = 'invalid state transition', details?: unknown) {
+    super(message, 'INVALID_STATE_TRANSITION', 409, details);
+  }
+}
+
+/**
  * 422 — input failed schema validation. Used by the zod adapter in
  * `withHandler` to report field-level errors. `details` typically
  * contains the zod issue list.
