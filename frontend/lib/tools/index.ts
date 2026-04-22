@@ -22,6 +22,10 @@ import { memoryWriteTool } from './memory-write';
 import { solicitationListTriageTool } from './solicitation-list-triage';
 import { solicitationGetDetailTool } from './solicitation-get-detail';
 import { opportunityGetByIdTool } from './opportunity-get-by-id';
+// Phase 1 §E — entry state-machine tools (E.2a sub-commit)
+import { solicitationClaimTool } from './solicitation-claim';
+import { solicitationReleaseTool } from './solicitation-release';
+import { solicitationDismissTool } from './solicitation-dismiss';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -31,6 +35,9 @@ register(memoryWriteTool);
 register(solicitationListTriageTool);
 register(solicitationGetDetailTool);
 register(opportunityGetByIdTool);
+register(solicitationClaimTool);
+register(solicitationReleaseTool);
+register(solicitationDismissTool);
 
 // Re-export common surface so callers can import from a single path.
 export {
