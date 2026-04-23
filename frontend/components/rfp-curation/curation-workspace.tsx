@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { PdfViewer, type TextSelection } from './pdf-viewer';
 import { TagPopover, type TagAction } from './tag-popover';
+import { Autocomplete } from '@/components/ui/autocomplete';
 
 interface Solicitation {
   id: string;
@@ -161,17 +162,59 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
         ]);
       }
 
-      // Prompt for the value — the source excerpt is what they highlighted,
-      // but the value might be extracted from it (e.g. "15" from "shall not
-      // exceed 15 pages").
-      const defaultValue = action.sourceExcerpt.length <= 100
+      // Fetch memory-based suggestions for this variable + namespace
+      let defaultValue = action.sourceExcerpt.length <= 100
         ? action.sourceExcerpt
         : '';
+      try {
+        const sugResp = await fetch(
+          `/api/admin/compliance-suggest?variableName=${encodeURIComponent(action.variableName)}&namespace=${encodeURIComponent(sol.namespace ?? '')}`,
+        );
+        const sugJson = await sugResp.json();
+        const suggestions: string[] = sugJson.data?.suggestions ?? [];
+        if (suggestions.length > 0 && !defaultValue) {
+          defaultValue = suggestions[0];
+        }
+        if (suggestions.length > 0) {
+          // Show suggestions in the prompt
+          const sugText = suggestions.slice(0, 5).map((s, i) => `  ${i + 1}. ${s}`).join('\n');
+          const value = prompt(
+            `Value for "${action.variableLabel}":\n\nSuggested from prior cycles:\n${sugText}\n\n(Source: "${action.sourceExcerpt.slice(0, 150)}")`,
+            defaultValue,
+          );
+          if (value === null) return;
+
+          await invoke('compliance.save_variable_value', {
+            solicitationId: sol.id,
+            variableName: action.variableName,
+            value: value.trim(),
+            sourceExcerpt: action.sourceExcerpt,
+          });
+
+          setCompState((prev) => ({
+            ...prev,
+            customVariables: {
+              ...(prev?.customVariables as Record<string, unknown> ?? {}),
+              [action.variableName]: {
+                value: value.trim(),
+                source_excerpt: action.sourceExcerpt,
+                verified_by: currentUserId,
+              },
+            },
+          }));
+
+          setTextSelection(null);
+          return;
+        }
+      } catch {
+        // suggestion fetch failed — fall through to no-suggestion path
+      }
+
       const value = prompt(
         `Value for "${action.variableLabel}":\n\n(Source: "${action.sourceExcerpt.slice(0, 200)}")`,
         defaultValue,
       );
-      if (value === null) return; // cancelled
+      if (value === null) return;
 
       await invoke('compliance.save_variable_value', {
         solicitationId: sol.id,
@@ -883,11 +926,11 @@ function AddTopicModal({
             <span className="block text-sm font-medium text-gray-700 mb-1">
               Branch / Component
             </span>
-            <input
+            <Autocomplete
               value={topicBranch}
-              onChange={(e) => setTopicBranch(e.target.value)}
-              placeholder="Air Force, Navy, Army, SOCOM..."
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+              onChange={setTopicBranch}
+              suggestions={['Air Force', 'Army', 'Navy', 'Marine Corps', 'SOCOM', 'DARPA', 'DTRA', 'MDA', 'Space Force', 'DHA', 'NSA', 'NGA']}
+              placeholder="Air Force, Navy, Army..."
             />
           </label>
           <label className="block">
