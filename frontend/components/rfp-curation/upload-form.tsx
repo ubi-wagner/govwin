@@ -1,7 +1,32 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseFilenameMetadata } from '@/lib/rfp-filename-parser';
+import { Autocomplete } from '@/components/ui/autocomplete';
+
+const AGENCIES = [
+  'Department of Defense',
+  'Department of War',
+  'Department of the Air Force',
+  'Department of the Army',
+  'Department of the Navy',
+  'Defense Advanced Research Projects Agency',
+  'National Science Foundation',
+  'National Institutes of Health',
+  'Department of Energy',
+  'Department of Transportation',
+  'Department of Homeland Security',
+  'National Aeronautics and Space Administration',
+  'United States Department of Agriculture',
+  'United States Special Operations Command',
+];
+
+const OFFICES = [
+  'AFWERX', 'AFRL', 'DEVCOM', 'ONR', 'NSWC', 'NAWCAD', 'SOCOM',
+  'DTRA', 'MDA', 'PEO Soldier', 'PEO STRI', 'PEO Aviation',
+  'DARPA/I2O', 'DARPA/DSO', 'DARPA/MTO', 'DARPA/STO',
+];
 
 type Status = 'idle' | 'uploading' | 'success' | 'error';
 
@@ -26,16 +51,43 @@ export function UploadForm() {
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [agency, setAgency] = useState('');
+  const [office, setOffice] = useState('');
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   const totalMb = totalBytes / 1024 / 1024;
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Best-effort auto-fill of metadata from the first file's filename.
+  // Only fills fields that are currently empty so we don't overwrite
+  // whatever the admin has already typed.
+  const autofillFromFilename = useCallback((firstFile: File) => {
+    const form = formRef.current;
+    if (!form) return;
+    const parsed = parseFilenameMetadata(firstFile.name);
+    const setIfEmpty = (fieldName: string, value: string | undefined) => {
+      if (!value) return;
+      const el = form.elements.namedItem(fieldName) as HTMLInputElement | HTMLSelectElement | null;
+      if (el && !el.value.trim()) {
+        el.value = value;
+      }
+    };
+    setIfEmpty('title', parsed.title);
+    setIfEmpty('programType', parsed.programType);
+    setIfEmpty('solicitationNumber', parsed.solicitationNumber);
+    // Agency + office are controlled — set via state
+    if (parsed.agency && !agency) setAgency(parsed.agency);
+  }, [agency]);
 
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
     // Allow replacing the entire set (not appending) — clearer UX
     setFiles(arr);
     setError(null);
-  }, []);
+    if (arr.length > 0) {
+      autofillFromFilename(arr[0]);
+    }
+  }, [autofillFromFilename]);
 
   const removeFile = useCallback(
     (idx: number) => setFiles((prev) => prev.filter((_, i) => i !== idx)),
@@ -70,8 +122,8 @@ export function UploadForm() {
     const form = event.currentTarget;
     const data = new FormData();
     data.set('title', String(new FormData(form).get('title') ?? ''));
-    data.set('agency', String(new FormData(form).get('agency') ?? ''));
-    data.set('office', String(new FormData(form).get('office') ?? ''));
+    data.set('agency', agency);
+    data.set('office', office);
     data.set('programType', String(new FormData(form).get('programType') ?? ''));
     data.set('solicitationNumber', String(new FormData(form).get('solicitationNumber') ?? ''));
     data.set('closeDate', String(new FormData(form).get('closeDate') ?? ''));
@@ -98,7 +150,7 @@ export function UploadForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-8">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-8">
       <fieldset className="space-y-4">
         <legend className="font-semibold text-lg text-gray-800">Solicitation Metadata</legend>
 
@@ -115,27 +167,29 @@ export function UploadForm() {
               placeholder="DoD SBIR 26.1 Annual Program BAA"
             />
           </label>
-          <label className="block">
+          <div className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">
               Agency <span className="text-red-500">*</span>
             </span>
-            <input
+            <Autocomplete
               name="agency"
               required
-              type="text"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              value={agency}
+              onChange={setAgency}
+              suggestions={AGENCIES}
               placeholder="Department of Defense"
             />
-          </label>
-          <label className="block">
+          </div>
+          <div className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">Program Office</span>
-            <input
+            <Autocomplete
               name="office"
-              type="text"
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              value={office}
+              onChange={setOffice}
+              suggestions={OFFICES}
               placeholder="AFWERX, DEVCOM, ONR..."
             />
-          </label>
+          </div>
           <label className="block">
             <span className="block text-sm font-medium text-gray-700 mb-1">
               Program Type <span className="text-red-500">*</span>
