@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
+import { PdfViewer, type TextSelection } from './pdf-viewer';
+import { TagPopover, type TagAction } from './tag-popover';
 
 interface Solicitation {
   id: string;
@@ -107,6 +109,92 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [topicsList, setTopicsList] = useState(topics);
+
+  // PDF text-selection → tag-popover state
+  const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
+  const [variableCatalog, setVariableCatalog] = useState<{ name: string; label: string; category: string }[]>([]);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+
+  // Load compliance variable catalog once for the tag popover
+  useEffect(() => {
+    if (catalogLoaded) return;
+    (async () => {
+      try {
+        const result = await invoke<{ variables: { name: string; label: string; category: string }[] }>(
+          'compliance.list_variables', {},
+        );
+        setVariableCatalog(result.variables);
+        setCatalogLoaded(true);
+      } catch {
+        // catalog load failure is non-fatal — popover just shows empty
+      }
+    })();
+  }, [catalogLoaded, invoke]);
+
+  // Handle text selection from PDF viewer
+  const handleTextSelect = useCallback((sel: TextSelection) => {
+    setTextSelection(sel);
+  }, []);
+
+  // Handle tag action from the popover
+  const handleTag = useCallback(async (action: TagAction) => {
+    try {
+      // If this is a new variable, create it first
+      if (action.isNew) {
+        await invoke('compliance.add_variable', {
+          name: action.variableName,
+          label: action.variableLabel,
+          category: 'other',
+          dataType: 'text',
+        });
+        setVariableCatalog((prev) => [
+          ...prev,
+          { name: action.variableName, label: action.variableLabel, category: 'other' },
+        ]);
+      }
+
+      // Prompt for the value — the source excerpt is what they highlighted,
+      // but the value might be extracted from it (e.g. "15" from "shall not
+      // exceed 15 pages").
+      const defaultValue = action.sourceExcerpt.length <= 100
+        ? action.sourceExcerpt
+        : '';
+      const value = prompt(
+        `Value for "${action.variableLabel}":\n\n(Source: "${action.sourceExcerpt.slice(0, 200)}")`,
+        defaultValue,
+      );
+      if (value === null) return; // cancelled
+
+      await invoke('compliance.save_variable_value', {
+        solicitationId: sol.id,
+        variableName: action.variableName,
+        value: value.trim(),
+        sourceExcerpt: action.sourceExcerpt,
+      });
+
+      // Update local compliance state
+      setCompState((prev) => ({
+        ...prev,
+        customVariables: {
+          ...(prev?.customVariables as Record<string, unknown> ?? {}),
+          [action.variableName]: {
+            value: value.trim(),
+            source_excerpt: action.sourceExcerpt,
+            verified_by: currentUserId,
+          },
+        },
+      }));
+
+      setTextSelection(null);
+    } catch {
+      // error shown via useTool
+    }
+  }, [invoke, sol.id, currentUserId]);
+
+  // Find the first source document (PDF) for the viewer
+  const sourcePdf = documents.find(
+    (d) => d.documentType === 'source' && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')),
+  );
 
   const actions = STATUS_FLOW[sol.status] ?? [];
   const isMyClaimOrUnclaimed =
@@ -434,8 +522,34 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
             </div>
           )}
 
-          {/* Full Text Preview */}
-          {sol.fullText && (
+          {/* PDF Viewer (side-by-side source) — or text fallback */}
+          {sourcePdf ? (
+            <div className="border rounded-lg overflow-hidden relative">
+              <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
+                <h2 className="text-sm font-semibold text-gray-700">
+                  Source Document — {sourcePdf.originalFilename}
+                </h2>
+                <span className="text-xs text-gray-400">
+                  Select text to tag as a compliance variable
+                </span>
+              </div>
+              <PdfViewer
+                documentId={sourcePdf.id}
+                onTextSelect={handleTextSelect}
+                width={650}
+              />
+              {textSelection && (
+                <TagPopover
+                  selectedText={textSelection.text}
+                  pageNumber={textSelection.pageNumber}
+                  position={textSelection.rect}
+                  variables={variableCatalog}
+                  onTag={handleTag}
+                  onClose={() => setTextSelection(null)}
+                />
+              )}
+            </div>
+          ) : sol.fullText ? (
             <div className="border rounded-lg p-4">
               <h2 className="text-lg font-semibold mb-3">Source Text</h2>
               <div className="max-h-96 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
@@ -446,6 +560,16 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
                   </div>
                 )}
               </div>
+            </div>
+          ) : (
+            <div className="border rounded-lg p-4 text-center py-16 bg-gray-50">
+              <p className="text-gray-400">No source document uploaded yet.</p>
+              <a
+                href="/admin/rfp-curation/upload"
+                className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Upload an RFP
+              </a>
             </div>
           )}
 
