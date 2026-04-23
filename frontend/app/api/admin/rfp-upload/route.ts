@@ -220,6 +220,10 @@ export async function POST(request: Request) {
   for (const file of files) {
     const ext = extFromFilename(file.name);
     const safeName = slugSafeName(file.name);
+    // Keep the admin's original filename (with extension) for display.
+    // Strip any path traversal but don't slugify — that breaks display + PDF
+    // type detection (.pdf extension must be preserved).
+    const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
     // Build the storage key. First PDF (typical source) goes to source.pdf;
     // additional files become attachments/<filename>.
     let storageKey: string;
@@ -242,7 +246,7 @@ export async function POST(request: Request) {
         body: buffer,
         contentType: file.type || undefined,
         metadata: {
-          'original-filename': safeName,
+          'original-filename': displayName,
           'uploaded-by': userId ?? 'unknown',
           'solicitation-id': solId,
         },
@@ -263,7 +267,7 @@ export async function POST(request: Request) {
         VALUES
           (${solId}::uuid,
            ${firstPdfKey === storageKey ? 'source' : 'attachment'},
-           ${safeName},
+           ${displayName},
            ${storageKey},
            ${file.size},
            ${file.type || null},

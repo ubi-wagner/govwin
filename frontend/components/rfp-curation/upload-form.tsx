@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseFilenameMetadata } from '@/lib/rfp-filename-parser';
 
 type Status = 'idle' | 'uploading' | 'success' | 'error';
 
@@ -29,13 +30,37 @@ export function UploadForm() {
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   const totalMb = totalBytes / 1024 / 1024;
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Best-effort auto-fill of metadata from the first file's filename.
+  // Only fills fields that are currently empty so we don't overwrite
+  // whatever the admin has already typed.
+  const autofillFromFilename = useCallback((firstFile: File) => {
+    const form = formRef.current;
+    if (!form) return;
+    const parsed = parseFilenameMetadata(firstFile.name);
+    const setIfEmpty = (fieldName: string, value: string | undefined) => {
+      if (!value) return;
+      const el = form.elements.namedItem(fieldName) as HTMLInputElement | HTMLSelectElement | null;
+      if (el && !el.value.trim()) {
+        el.value = value;
+      }
+    };
+    setIfEmpty('title', parsed.title);
+    setIfEmpty('agency', parsed.agency);
+    setIfEmpty('programType', parsed.programType);
+    setIfEmpty('solicitationNumber', parsed.solicitationNumber);
+  }, []);
 
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
     // Allow replacing the entire set (not appending) — clearer UX
     setFiles(arr);
     setError(null);
-  }, []);
+    if (arr.length > 0) {
+      autofillFromFilename(arr[0]);
+    }
+  }, [autofillFromFilename]);
 
   const removeFile = useCallback(
     (idx: number) => setFiles((prev) => prev.filter((_, i) => i !== idx)),
@@ -98,7 +123,7 @@ export function UploadForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-8">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-8">
       <fieldset className="space-y-4">
         <legend className="font-semibold text-lg text-gray-800">Solicitation Metadata</legend>
 

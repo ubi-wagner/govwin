@@ -108,7 +108,15 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
+  const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
   const [topicsList, setTopicsList] = useState(topics);
+
+  // Keep local topicsList in sync with server-provided topics after
+  // router.refresh() re-fetches. Without this the optimistic update
+  // from AddTopicModal gets overwritten or goes stale.
+  useEffect(() => {
+    setTopicsList(topics);
+  }, [topics]);
 
   // PDF text-selection → tag-popover state
   const [textSelection, setTextSelection] = useState<TextSelection | null>(null);
@@ -432,12 +440,20 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
                   Discrete pursuit units — what customers pin in Spotlight
                 </p>
               </div>
-              <button
-                onClick={() => setShowAddTopic(true)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
-              >
-                + Add Topic
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowBulkAddTopics(true)}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border border-gray-200"
+                >
+                  Bulk Import
+                </button>
+                <button
+                  onClick={() => setShowAddTopic(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+                >
+                  + Add Topic
+                </button>
+              </div>
             </div>
             {topicsList.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -497,6 +513,16 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
               onCreated={(newTopic) => {
                 setTopicsList((prev) => [...prev, newTopic]);
                 setShowAddTopic(false);
+                router.refresh();
+              }}
+            />
+          )}
+          {showBulkAddTopics && (
+            <BulkAddTopicsModal
+              solicitationId={sol.id}
+              onClose={() => setShowBulkAddTopics(false)}
+              onComplete={() => {
+                setShowBulkAddTopics(false);
                 router.refresh();
               }}
             />
@@ -900,6 +926,189 @@ function AddTopicModal({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ─── BulkAddTopicsModal ────────────────────────────────────────────
+
+interface ParsedTopicLine {
+  topicNumber: string;
+  title: string;
+  topicBranch?: string;
+  techFocusAreas?: string[];
+}
+
+function parseBulkTopicsText(text: string): {
+  topics: ParsedTopicLine[];
+  errors: string[];
+} {
+  const topics: ParsedTopicLine[] = [];
+  const errors: string[] = [];
+  const lines = text.split('\n');
+  lines.forEach((raw, idx) => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('//')) return;
+
+    // Pipe-delimited: TOPIC_NUMBER | Title | Branch | focus_areas
+    const parts = line.split('|').map((s) => s.trim());
+    if (parts.length < 2) {
+      errors.push(`Line ${idx + 1}: expected at least "TOPIC_NUMBER | Title"`);
+      return;
+    }
+    const [topicNumber, title, branch, focusAreas] = parts;
+    if (!topicNumber || !title) {
+      errors.push(`Line ${idx + 1}: missing topic number or title`);
+      return;
+    }
+    topics.push({
+      topicNumber,
+      title,
+      topicBranch: branch || undefined,
+      techFocusAreas: focusAreas
+        ? focusAreas.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined,
+    });
+  });
+  return { topics, errors };
+}
+
+function BulkAddTopicsModal({
+  solicitationId,
+  onClose,
+  onComplete,
+}: {
+  solicitationId: string;
+  onClose: () => void;
+  onComplete: () => void;
+}) {
+  const { invoke, loading, error } = useTool();
+  const [text, setText] = useState('');
+  const [defaultBranch, setDefaultBranch] = useState('');
+  const [result, setResult] = useState<{ inserted: number; skipped: string[] } | null>(null);
+
+  const { topics, errors: parseErrors } = parseBulkTopicsText(text);
+
+  async function submit() {
+    if (topics.length === 0) return;
+    try {
+      const res = await invoke<{
+        inserted: { id: string; topicNumber: string }[];
+        skipped: string[];
+      }>('opportunity.bulk_add_topics', {
+        solicitationId,
+        topics,
+        defaultBranch: defaultBranch.trim() || undefined,
+        topicStatus: 'open',
+      });
+      setResult({ inserted: res.inserted.length, skipped: res.skipped });
+      // Auto-close + refresh after a short delay so the admin sees the result
+      setTimeout(() => {
+        onComplete();
+      }, 1800);
+    } catch {
+      // error surfaced via useTool
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-navy-800">Bulk Import Topics</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >✕</button>
+        </div>
+        <p className="text-sm text-gray-500">
+          Paste one topic per line in pipe-delimited format. Only{' '}
+          <code className="text-xs bg-gray-100 px-1 rounded">TOPIC_NUMBER | Title</code>{' '}
+          is required.
+          Lines starting with <code className="text-xs bg-gray-100 px-1 rounded">#</code>{' '}
+          are comments.
+        </p>
+
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">Default branch (optional — applied to rows that don&apos;t specify one)</span>
+          <input
+            value={defaultBranch}
+            onChange={(e) => setDefaultBranch(e.target.value)}
+            placeholder="Air Force, Navy, Army..."
+            className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">Topics</span>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={14}
+            spellCheck={false}
+            placeholder={`# Format: TOPIC_NUMBER | Title | Branch | focus_areas
+AF261-001 | Advanced Thermal Protection for Hypersonic Flight | Air Force | hypersonics, materials
+AF261-002 | Autonomous Navigation for GPS-Denied Environments | Air Force | autonomy, robotics
+N261-T01 | Quantum Sensing for Undersea Detection | Navy | quantum, sensing`}
+            className="w-full rounded border border-gray-300 px-3 py-2 text-xs font-mono focus:border-blue-500 outline-none"
+          />
+        </label>
+
+        {parseErrors.length > 0 && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            <p className="font-semibold mb-1">{parseErrors.length} parse warning{parseErrors.length > 1 ? 's' : ''}:</p>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {parseErrors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+              {parseErrors.length > 5 && <li>...and {parseErrors.length - 5} more</li>}
+            </ul>
+          </div>
+        )}
+
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800">
+          <strong>{topics.length}</strong> topic{topics.length !== 1 ? 's' : ''} parsed and ready to import.
+          Duplicates (by topic number) will be skipped.
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+            Imported <strong>{result.inserted}</strong> new topic{result.inserted !== 1 ? 's' : ''}.
+            {result.skipped.length > 0 && (
+              <span className="block mt-1 text-xs text-green-700">
+                Skipped {result.skipped.length} duplicate{result.skipped.length !== 1 ? 's' : ''}:{' '}
+                {result.skipped.slice(0, 5).join(', ')}
+                {result.skipped.length > 5 && `, +${result.skipped.length - 5} more`}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading || topics.length === 0 || result !== null}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+          >
+            {loading ? 'Importing...' : `Import ${topics.length || ''} Topic${topics.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
