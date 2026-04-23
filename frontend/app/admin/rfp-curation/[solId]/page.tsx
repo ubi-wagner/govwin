@@ -42,6 +42,44 @@ export default async function CurationWorkspacePage({ params }: Props) {
     ORDER BY created_at ASC
   `;
 
+  // Topics under this solicitation (the pursuable units — what customers pin)
+  const topicRows = await sql<{
+    id: string;
+    topicNumber: string | null;
+    title: string;
+    topicBranch: string | null;
+    topicStatus: string | null;
+    techFocusAreas: string[] | null;
+    closeDate: Date | null;
+    isActive: boolean;
+  }[]>`
+    SELECT id, topic_number, title, topic_branch, topic_status,
+           tech_focus_areas, close_date, is_active
+    FROM opportunities
+    WHERE solicitation_id = ${solId}::uuid
+    ORDER BY
+      CASE WHEN topic_number IS NULL THEN 1 ELSE 0 END,
+      topic_number ASC
+  `;
+
+  // Linked source documents (uploaded files on this solicitation)
+  const docRows = await sql<{
+    id: string;
+    documentType: string;
+    originalFilename: string;
+    storageKey: string;
+    fileSize: number | null;
+    contentType: string | null;
+    extractedAt: Date | null;
+    createdAt: Date;
+  }[]>`
+    SELECT id, document_type, original_filename, storage_key,
+           file_size, content_type, extracted_at, created_at
+    FROM solicitation_documents
+    WHERE solicitation_id = ${solId}::uuid
+    ORDER BY created_at ASC
+  `;
+
   const solicitation = {
     id: r.id as string,
     opportunityId: r.opportunityId as string,
@@ -72,11 +110,35 @@ export default async function CurationWorkspacePage({ params }: Props) {
     createdAt: t.createdAt.toISOString(),
   }));
 
+  const topics = topicRows.map((t) => ({
+    id: t.id,
+    topicNumber: t.topicNumber,
+    title: t.title,
+    topicBranch: t.topicBranch,
+    topicStatus: t.topicStatus,
+    techFocusAreas: t.techFocusAreas ?? [],
+    closeDate: t.closeDate?.toISOString() ?? null,
+    isActive: t.isActive,
+  }));
+
+  const documents = docRows.map((d) => ({
+    id: d.id,
+    documentType: d.documentType,
+    originalFilename: d.originalFilename,
+    storageKey: d.storageKey,
+    fileSize: d.fileSize,
+    contentType: d.contentType,
+    extractedAt: d.extractedAt?.toISOString() ?? null,
+    createdAt: d.createdAt.toISOString(),
+  }));
+
   return (
     <CurationWorkspace
       solicitation={solicitation}
       compliance={compliance}
       triageHistory={triageHistory}
+      topics={topics}
+      documents={documents}
       currentUserId={session.user.id ?? ''}
     />
   );
