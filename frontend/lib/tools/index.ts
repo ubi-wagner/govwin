@@ -42,6 +42,8 @@ import { complianceExtractFromTextTool } from './compliance-extract-from-text';
 import { ingestTriggerManualTool } from './ingest-trigger-manual';
 import { ingestListRecentRunsTool } from './ingest-list-recent-runs';
 import { ingestGetRunDetailTool } from './ingest-get-run-detail';
+// Phase 1 §E extension: topic under a solicitation (post-migration 013)
+import { opportunityAddTopicTool } from './opportunity-add-topic';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -67,6 +69,7 @@ register(complianceExtractFromTextTool);
 register(ingestTriggerManualTool);
 register(ingestListRecentRunsTool);
 register(ingestGetRunDetailTool);
+register(opportunityAddTopicTool);
 
 // Re-export common surface so callers can import from a single path.
 export {

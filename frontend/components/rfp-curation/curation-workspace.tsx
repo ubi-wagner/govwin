@@ -34,10 +34,34 @@ interface TriageAction {
   createdAt: string;
 }
 
+interface Topic {
+  id: string;
+  topicNumber: string | null;
+  title: string;
+  topicBranch: string | null;
+  topicStatus: string | null;
+  techFocusAreas: string[];
+  closeDate: string | null;
+  isActive: boolean;
+}
+
+interface SolDocument {
+  id: string;
+  documentType: string;
+  originalFilename: string;
+  storageKey: string;
+  fileSize: number | null;
+  contentType: string | null;
+  extractedAt: string | null;
+  createdAt: string;
+}
+
 interface Props {
   solicitation: Solicitation;
   compliance: Record<string, unknown> | null;
   triageHistory: TriageAction[];
+  topics: Topic[];
+  documents: SolDocument[];
   currentUserId: string;
 }
 
@@ -74,13 +98,15 @@ function snakeCase(s: string): string {
   return s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
 
-export function CurationWorkspace({ solicitation, compliance, triageHistory, currentUserId }: Props) {
+export function CurationWorkspace({ solicitation, compliance, triageHistory, topics, documents, currentUserId }: Props) {
   const { invoke, loading, error } = useTool();
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [showAddTopic, setShowAddTopic] = useState(false);
+  const [topicsList, setTopicsList] = useState(topics);
 
   const actions = STATUS_FLOW[sol.status] ?? [];
   const isMyClaimOrUnclaimed =
@@ -250,6 +276,144 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, cur
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Solicitation text + AI sections */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Source Documents */}
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Source Documents</h2>
+              <span className="text-xs text-gray-500">
+                {documents.length} file{documents.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {documents.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                No documents uploaded yet. Upload RFP PDFs + attachments via the{' '}
+                <a href="/admin/rfp-curation/upload" className="text-blue-600 hover:text-blue-800 underline">
+                  upload page
+                </a>.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {documents.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <span className="inline-block w-20 text-xs font-mono text-gray-500">
+                        {d.documentType}
+                      </span>
+                      <span className="text-gray-800 truncate">{d.originalFilename}</span>
+                      {d.fileSize && (
+                        <span className="ml-2 text-xs text-gray-400">
+                          {(d.fileSize / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {d.extractedAt ? (
+                        <span className="text-xs text-green-600">extracted</span>
+                      ) : (
+                        <span className="text-xs text-yellow-600">pending</span>
+                      )}
+                      <button
+                        onClick={async () => {
+                          try {
+                            const resp = await fetch(
+                              `/api/admin/rfp-document/${d.id}/signed-url`,
+                            );
+                            const json = await resp.json();
+                            if (json.data?.url) window.open(json.data.url, '_blank');
+                          } catch {
+                            alert('Failed to generate signed URL');
+                          }
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Topics — the pursuable units under this solicitation */}
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-lg font-semibold">Topics</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Discrete pursuit units — what customers pin in Spotlight
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddTopic(true)}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+              >
+                + Add Topic
+              </button>
+            </div>
+            {topicsList.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                No topics yet. Extract them from the source document, then add
+                each one so customers can pin individual topics under this
+                solicitation.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {topicsList.map((t) => (
+                  <li key={t.id} className="bg-gray-50 rounded px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {t.topicNumber && (
+                            <span className="font-mono text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                              {t.topicNumber}
+                            </span>
+                          )}
+                          <span className="font-medium text-sm text-gray-800 truncate">
+                            {t.title}
+                          </span>
+                        </div>
+                        {(t.topicBranch || t.techFocusAreas.length > 0) && (
+                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                            {t.topicBranch && <span>{t.topicBranch}</span>}
+                            {t.techFocusAreas.length > 0 && (
+                              <span>&middot; {t.techFocusAreas.slice(0, 3).join(', ')}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded ${
+                            t.topicStatus === 'open'
+                              ? 'bg-green-100 text-green-700'
+                              : t.topicStatus === 'pre_release'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-200 text-gray-600'
+                          }`}
+                        >
+                          {t.topicStatus ?? '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {showAddTopic && (
+            <AddTopicModal
+              solicitationId={sol.id}
+              onClose={() => setShowAddTopic(false)}
+              onCreated={(newTopic) => {
+                setTopicsList((prev) => [...prev, newTopic]);
+                setShowAddTopic(false);
+                router.refresh();
+              }}
+            />
+          )}
+
           {/* AI-Extracted Sections */}
           {aiData?.sections && aiData.sections.length > 0 && (
             <div className="border rounded-lg p-4">
@@ -427,6 +591,191 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, cur
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── AddTopicModal ─────────────────────────────────────────────────
+
+function AddTopicModal({
+  solicitationId,
+  onClose,
+  onCreated,
+}: {
+  solicitationId: string;
+  onClose: () => void;
+  onCreated: (t: Topic) => void;
+}) {
+  const { invoke, loading, error } = useTool();
+  const [topicNumber, setTopicNumber] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [topicBranch, setTopicBranch] = useState('');
+  const [techFocus, setTechFocus] = useState('');
+  const [topicStatus, setTopicStatus] = useState<'open' | 'pre_release' | 'closed'>('open');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const result = await invoke<{ topicId: string }>('opportunity.add_topic', {
+        solicitationId,
+        topicNumber: topicNumber.trim(),
+        title: title.trim(),
+        description: description.trim() || undefined,
+        topicBranch: topicBranch.trim() || undefined,
+        techFocusAreas: techFocus
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        topicStatus,
+      });
+      onCreated({
+        id: result.topicId,
+        topicNumber: topicNumber.trim(),
+        title: title.trim(),
+        topicBranch: topicBranch.trim() || null,
+        topicStatus,
+        techFocusAreas: techFocus
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        closeDate: null,
+        isActive: true,
+      });
+    } catch {
+      // error shown via useTool
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <form
+        onSubmit={submit}
+        className="w-full max-w-xl bg-white rounded-lg shadow-xl p-6 space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-navy-800">Add Topic</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+        <p className="text-sm text-gray-500">
+          Topics are the discrete pursuit units customers pin via Spotlight (SBIR topic,
+          BAA task, CSO focus area, OTA work order). Inherits compliance from the parent
+          solicitation.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="col-span-1 block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Topic Number <span className="text-red-500">*</span>
+            </span>
+            <input
+              required
+              value={topicNumber}
+              onChange={(e) => setTopicNumber(e.target.value)}
+              placeholder="AF261-001"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="col-span-1 block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">Topic Status</span>
+            <select
+              value={topicStatus}
+              onChange={(e) => setTopicStatus(e.target.value as 'open' | 'pre_release' | 'closed')}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            >
+              <option value="open">Open</option>
+              <option value="pre_release">Pre-release</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            Title <span className="text-red-500">*</span>
+          </span>
+          <input
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Advanced Thermal Protection for Hypersonic Flight"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">Description</span>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Technical challenge the proposer is solving for..."
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Branch / Component
+            </span>
+            <input
+              value={topicBranch}
+              onChange={(e) => setTopicBranch(e.target.value)}
+              placeholder="Air Force, Navy, Army, SOCOM..."
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Tech Focus Areas
+            </span>
+            <input
+              value={techFocus}
+              onChange={(e) => setTechFocus(e.target.value)}
+              placeholder="AI/ML, Hypersonics (comma-separated)"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !topicNumber.trim() || !title.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+          >
+            {loading ? 'Adding...' : 'Add Topic'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
