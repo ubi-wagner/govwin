@@ -1,0 +1,25 @@
+# Don't ship test code or dev artifacts into the image.
+# NOTE: scripts/ stays in the image — `railway run python scripts/...`
+# depends on those being present.
+tests/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docs / metadata (not needed at runtime)
+README.md
+*.md
+pytest.ini
+
+# Dev / editor
+.env
+.env.*
+.vscode/
+.idea/
+
+# Git (never ships in Docker context anyway, but be explicit)
+.git/
+.gitignore
