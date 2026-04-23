@@ -78,6 +78,12 @@ export default async function RFPCurationPage() {
             {items.length} solicitations &middot; Claim, review, and curate incoming RFPs
           </p>
         </div>
+        <a
+          href="/admin/rfp-curation/upload"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded"
+        >
+          + Upload RFP
+        </a>
       </div>
       <TriageQueue initialItems={items} currentUserId={session.user.id ?? ''} />
     </div>
