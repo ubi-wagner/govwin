@@ -252,9 +252,10 @@ export async function POST(request: Request) {
         },
       });
     } catch (err) {
-      console.error('[rfp-upload] S3 put failed', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[rfp-upload] S3 put failed', { key: storageKey, err: errMsg, stack: err instanceof Error ? err.stack : undefined });
       return NextResponse.json(
-        { error: `Storage upload failed for ${file.name}`, code: 'STORAGE_ERROR' },
+        { error: `Storage upload failed for ${file.name}: ${errMsg}`, code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
