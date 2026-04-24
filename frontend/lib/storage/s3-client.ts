@@ -59,8 +59,10 @@ export async function putObject(input: PutObjectInput): Promise<void> {
   try {
     await s3.send(new PutObjectCommand(params));
   } catch (e) {
-    console.error('[s3.putObject] failed', { key: input.key, err: String(e) });
-    throw new Error('storage put failed');
+    const detail = e instanceof Error ? e.message : String(e);
+    const code = (e as { Code?: string; name?: string })?.Code ?? (e as { name?: string })?.name ?? 'unknown';
+    console.error('[s3.putObject] failed', { key: input.key, bucket: BUCKET, code, err: detail });
+    throw new Error(`S3 put failed (${code}): ${detail}`);
   }
 }
 
