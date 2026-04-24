@@ -33,6 +33,8 @@ interface TriageAction {
   id: string;
   action: string;
   actorId: string;
+  actorName: string | null;
+  actorEmail: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -59,12 +61,62 @@ interface SolDocument {
   createdAt: string;
 }
 
+interface RequiredItem {
+  id: string;
+  itemNumber: number;
+  itemName: string;
+  itemType: string;
+  required: boolean;
+  pageLimit: number | null;
+  slideLimit: number | null;
+  fontFamily: string | null;
+  fontSize: string | null;
+  margins: string | null;
+  lineSpacing: string | null;
+  headerFormat: string | null;
+  footerFormat: string | null;
+  appliesToPhase: string[] | null;
+  verifiedBy: string | null;
+}
+
+interface Volume {
+  id: string;
+  volumeNumber: number;
+  volumeName: string;
+  volumeFormat: string | null;
+  description: string | null;
+  specialRequirements: string[];
+  appliesToPhase: string[] | null;
+  items: RequiredItem[];
+}
+
+interface ActivityEvent {
+  id: string;
+  type: string;
+  phase: string;
+  actorId: string;
+  actorName: string | null;
+  actorEmail: string | null;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+interface InitialAnnotation {
+  id: string;
+  pageNumber: number;
+  sourceExcerpt: string;
+  complianceVariableName: string | null;
+}
+
 interface Props {
   solicitation: Solicitation;
   compliance: Record<string, unknown> | null;
   triageHistory: TriageAction[];
+  activityEvents: ActivityEvent[];
   topics: Topic[];
   documents: SolDocument[];
+  volumes: Volume[];
+  initialAnnotations: InitialAnnotation[];
   currentUserId: string;
 }
 
@@ -101,7 +153,10 @@ function snakeCase(s: string): string {
   return s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
 
-export function CurationWorkspace({ solicitation, compliance, triageHistory, topics, documents, currentUserId }: Props) {
+export function CurationWorkspace({
+  solicitation, compliance, triageHistory, activityEvents,
+  topics, documents, volumes, initialAnnotations, currentUserId,
+}: Props) {
   const { invoke, loading, error } = useTool();
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
@@ -144,6 +199,57 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
   const handleTextSelect = useCallback((sel: TextSelection) => {
     setTextSelection(sel);
   }, []);
+
+  // Persistent annotations loaded from the DB — render as highlight
+  // overlays on the PDF. Initially fetched via /api/admin/rfp-document
+  // when the viewer mounts (future enhancement); for now they get added
+  // in memory as the admin tags things and survive within-session.
+  const [annotations, setAnnotations] = useState<Array<{
+    id: string;
+    pageNumber: number;
+    sourceExcerpt: string;
+    complianceVariableName: string | null;
+  }>>(initialAnnotations);
+
+  // Save a highlight annotation after tagging — persists to
+  // solicitation_annotations so re-opening the workspace shows
+  // the colored overlays on the PDF.
+  const saveAnnotation = useCallback(async (args: {
+    pageNumber: number;
+    sourceExcerpt: string;
+    complianceVariableName?: string;
+  }) => {
+    try {
+      const result = await invoke<{ id: string; kind: string }>(
+        'solicitation.save_annotation',
+        {
+          solicitationId: sol.id,
+          kind: 'compliance_tag',
+          sourceLocation: {
+            page: args.pageNumber,
+            offset: 0,
+            length: args.sourceExcerpt.length,
+          },
+          payload: {
+            excerpt: args.sourceExcerpt,
+            variable_name: args.complianceVariableName ?? null,
+          },
+          complianceVariableName: args.complianceVariableName,
+        },
+      );
+      setAnnotations((prev) => [
+        ...prev,
+        {
+          id: result.id,
+          pageNumber: args.pageNumber,
+          sourceExcerpt: args.sourceExcerpt,
+          complianceVariableName: args.complianceVariableName ?? null,
+        },
+      ]);
+    } catch {
+      // annotation-save failure is non-fatal; the compliance value still saved
+    }
+  }, [invoke, sol.id]);
 
   // Handle tag action from the popover
   const handleTag = useCallback(async (action: TagAction) => {
@@ -203,6 +309,12 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
             },
           }));
 
+          await saveAnnotation({
+            pageNumber: action.pageNumber,
+            sourceExcerpt: action.sourceExcerpt,
+            complianceVariableName: action.variableName,
+          });
+
           setTextSelection(null);
           return;
         }
@@ -236,11 +348,17 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
         },
       }));
 
+      await saveAnnotation({
+        pageNumber: action.pageNumber,
+        sourceExcerpt: action.sourceExcerpt,
+        complianceVariableName: action.variableName,
+      });
+
       setTextSelection(null);
     } catch {
       // error shown via useTool
     }
-  }, [invoke, sol.id, currentUserId]);
+  }, [invoke, sol.id, currentUserId, saveAnnotation]);
 
   // Find the first source document (PDF) for the viewer
   const sourcePdf = documents.find(
@@ -507,7 +625,11 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
             ) : (
               <ul className="space-y-2">
                 {topicsList.map((t) => (
-                  <li key={t.id} className="bg-gray-50 rounded px-3 py-2">
+                  <li
+                    key={t.id}
+                    className="bg-gray-50 rounded px-3 py-2 cursor-pointer hover:bg-gray-100"
+                    onClick={() => router.push(`/admin/rfp-curation/${sol.id}/topic/${t.id}`)}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -571,6 +693,26 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
             />
           )}
 
+          {/* Volumes (proposal response structure) */}
+          <VolumesPanel
+            solicitationId={sol.id}
+            volumes={volumes}
+          />
+
+          {/* AI Compliance Suggestions — accept/reject one at a time */}
+          {aiData?.compliance_matches && aiData.compliance_matches.length > 0 && (
+            <AISuggestionsPanel
+              solicitationId={sol.id}
+              matches={aiData.compliance_matches}
+              verifiedVariables={
+                Object.keys(
+                  (compState?.customVariables as Record<string, unknown>) ?? {},
+                )
+              }
+              onAccepted={() => router.refresh()}
+            />
+          )}
+
           {/* AI-Extracted Sections */}
           {aiData?.sections && aiData.sections.length > 0 && (
             <div className="border rounded-lg p-4">
@@ -597,6 +739,11 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
               <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
                 <h2 className="text-sm font-semibold text-gray-700">
                   Source Document — {sourcePdf.originalFilename}
+                  {annotations.length > 0 && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      {annotations.length} tag{annotations.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
                 </h2>
                 <span className="text-xs text-gray-400">
                   Select text to tag as a compliance variable
@@ -759,26 +906,14 @@ export function CurationWorkspace({ solicitation, compliance, triageHistory, top
             </dl>
           </div>
 
-          {/* Triage History */}
+          {/* Activity Feed (combines state-machine actions + tool events) */}
           <div className="border rounded-lg p-4">
-            <h2 className="text-lg font-semibold mb-3">History</h2>
-            {triageHistory.length === 0 ? (
-              <p className="text-sm text-gray-400">No actions yet.</p>
+            <h2 className="text-lg font-semibold mb-3">Activity</h2>
+            {triageHistory.length === 0 && activityEvents.length === 0 ? (
+              <p className="text-sm text-gray-400">No activity yet.</p>
             ) : (
-              <div className="space-y-2">
-                {triageHistory.map((t) => (
-                  <div key={t.id} className="text-sm border-l-2 border-blue-200 pl-3 py-1">
-                    <div className="font-medium text-gray-700">
-                      {t.action.replace(/_/g, ' ')}
-                    </div>
-                    {t.notes && (
-                      <div className="text-gray-500 text-xs mt-0.5">{t.notes}</div>
-                    )}
-                    <div className="text-gray-400 text-xs">
-                      {new Date(t.createdAt).toLocaleString()} &middot; {t.actorId.slice(0, 8)}...
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {renderCombinedActivity(triageHistory, activityEvents)}
               </div>
             )}
           </div>
@@ -973,6 +1108,120 @@ function AddTopicModal({
   );
 }
 
+// ─── Activity feed helpers ─────────────────────────────────────────
+
+function humanAction(action: string): string {
+  const map: Record<string, string> = {
+    claim: 'claimed this solicitation',
+    release: 'released for AI analysis',
+    dismiss: 'dismissed this solicitation',
+    request_review: 'requested review',
+    approve: 'approved the curation',
+    reject_review: 'rejected the review',
+    push: 'pushed to the pipeline',
+  };
+  return map[action] ?? action.replace(/_/g, ' ');
+}
+
+function humanEvent(
+  type: string,
+  payload: Record<string, unknown> | null,
+): string {
+  const v = (k: string) => (payload && payload[k] != null ? String(payload[k]) : null);
+
+  switch (type) {
+    case 'topic.added':
+      return `added topic ${v('topicNumber') ?? ''}`;
+    case 'topic.bulk_added':
+      return `bulk-added ${v('insertedCount') ?? '?'} topics (${v('skippedCount') ?? '0'} skipped)`;
+    case 'volume.added':
+      return `added Volume ${v('volumeNumber') ?? ''} — ${v('volumeName') ?? ''}`;
+    case 'volume.deleted':
+      return `deleted Volume ${v('volumeNumber') ?? ''}`;
+    case 'required_item.added':
+      return `added required item "${v('itemName') ?? ''}"`;
+    case 'required_item.updated':
+      return `updated a required item`;
+    case 'required_item.deleted':
+      return `deleted a required item`;
+    case 'rfp.annotation_saved':
+      return `tagged source text as ${v('complianceVariableName') ?? 'annotation'}`;
+    case 'rfp.shredding.start':
+      return `started AI analysis`;
+    case 'rfp.shredding.end':
+      return `completed AI analysis (${v('sections_extracted') ?? '?'} sections, ${v('compliance_variables_extracted') ?? '?'} compliance matches)`;
+    default:
+      return type.replace(/\./g, ' ').replace(/_/g, ' ');
+  }
+}
+
+interface UnifiedActivity {
+  id: string;
+  actorName: string | null;
+  actorEmail: string | null;
+  actorId: string;
+  description: string;
+  notes: string | null;
+  createdAt: string;
+  source: 'triage' | 'event';
+}
+
+function renderCombinedActivity(
+  triage: TriageAction[],
+  events: ActivityEvent[],
+): React.ReactNode {
+  const unified: UnifiedActivity[] = [
+    ...triage.map<UnifiedActivity>((t) => ({
+      id: `t-${t.id}`,
+      actorName: t.actorName,
+      actorEmail: t.actorEmail,
+      actorId: t.actorId,
+      description: humanAction(t.action),
+      notes: t.notes,
+      createdAt: t.createdAt,
+      source: 'triage' as const,
+    })),
+    ...events
+      // Skip phase='start'/'end' pairs from tools to reduce noise — keep
+      // the end (which has final status) and drop the start.
+      .filter((e) => e.phase !== 'start')
+      .map<UnifiedActivity>((e) => ({
+        id: `e-${e.id}`,
+        actorName: e.actorName,
+        actorEmail: e.actorEmail,
+        actorId: e.actorId,
+        description: humanEvent(e.type, e.payload),
+        notes: null,
+        createdAt: e.createdAt,
+        source: 'event' as const,
+      })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  return unified.map((u) => {
+    const name = u.actorName ?? u.actorEmail ?? 'System';
+    const when = new Date(u.createdAt);
+    return (
+      <div
+        key={u.id}
+        className={`text-sm border-l-2 pl-3 py-1 ${
+          u.source === 'triage' ? 'border-blue-300' : 'border-indigo-200'
+        }`}
+      >
+        <div className="text-gray-700">
+          <span className="font-medium text-navy-800">{name}</span>{' '}
+          {u.description}
+        </div>
+        {u.notes && (
+          <div className="text-gray-500 text-xs mt-0.5 italic">&ldquo;{u.notes}&rdquo;</div>
+        )}
+        <div className="text-gray-400 text-xs mt-0.5">
+          {when.toLocaleString()}
+        </div>
+      </div>
+    );
+  });
+}
+
 // ─── BulkAddTopicsModal ────────────────────────────────────────────
 
 interface ParsedTopicLine {
@@ -1151,6 +1400,810 @@ N261-T01 | Quantum Sensing for Undersea Detection | Navy | quantum, sensing`}
             {loading ? 'Importing...' : `Import ${topics.length || ''} Topic${topics.length !== 1 ? 's' : ''}`}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── VolumesPanel ──────────────────────────────────────────────────
+
+function VolumesPanel({
+  solicitationId,
+  volumes: initialVolumes,
+}: {
+  solicitationId: string;
+  volumes: Volume[];
+}) {
+  const router = useRouter();
+  const { invoke, loading, error } = useTool();
+  const [volumes, setVolumes] = useState(initialVolumes);
+  const [showAddVolume, setShowAddVolume] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [addItemToVolume, setAddItemToVolume] = useState<string | null>(null);
+  const [editItem, setEditItem] = useState<RequiredItem | null>(null);
+
+  useEffect(() => setVolumes(initialVolumes), [initialVolumes]);
+
+  const toggle = (volumeId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(volumeId)) next.delete(volumeId);
+      else next.add(volumeId);
+      return next;
+    });
+  };
+
+  async function deleteVolume(volumeId: string) {
+    if (!confirm('Delete this volume and all its required items?')) return;
+    try {
+      await invoke('volume.delete', { volumeId });
+      setVolumes((prev) => prev.filter((v) => v.id !== volumeId));
+      router.refresh();
+    } catch {
+      /* surfaced via useTool error */
+    }
+  }
+
+  async function deleteItem(itemId: string) {
+    if (!confirm('Delete this required item?')) return;
+    try {
+      await invoke('volume.delete_required_item', { itemId });
+      router.refresh();
+    } catch {
+      /* surfaced via useTool error */
+    }
+  }
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-lg font-semibold">Response Volumes</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            The proposal structure — what the proposer must produce for each volume
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddVolume(true)}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+        >
+          + Add Volume
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+          {error}
+        </div>
+      )}
+
+      {volumes.length === 0 ? (
+        <p className="text-sm text-gray-400">
+          No volumes defined yet. Add volumes to describe the response structure
+          (Cover Sheet, Technical Volume, Cost Volume, etc.).
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {volumes.map((vol) => {
+            const isOpen = expanded.has(vol.id);
+            return (
+              <div key={vol.id} className="bg-gray-50 rounded border border-gray-200">
+                <div
+                  className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-gray-100"
+                  onClick={() => toggle(vol.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="font-mono text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                      Vol {vol.volumeNumber}
+                    </span>
+                    <span className="font-medium text-sm text-gray-800 truncate">
+                      {vol.volumeName}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {vol.items.length} item{vol.items.length !== 1 ? 's' : ''}
+                    </span>
+                    {vol.appliesToPhase && vol.appliesToPhase.length > 0 && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                        {vol.appliesToPhase.join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteVolume(vol.id);
+                      }}
+                      disabled={loading}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                    <span className="text-gray-400 text-xs">{isOpen ? '▼' : '▶'}</span>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="px-3 pb-3 space-y-2">
+                    {vol.description && (
+                      <p className="text-xs text-gray-500 italic">{vol.description}</p>
+                    )}
+                    {vol.specialRequirements.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {vol.specialRequirements.map((r) => (
+                          <span key={r} className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {vol.items.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No required items. Add the artifacts this volume requires.</p>
+                    ) : (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-gray-500 text-left border-b border-gray-200">
+                            <th className="py-1 pr-2 font-medium">Item</th>
+                            <th className="py-1 pr-2 font-medium">Type</th>
+                            <th className="py-1 pr-2 font-medium">Limit</th>
+                            <th className="py-1 pr-2 font-medium">Format</th>
+                            <th className="py-1 pr-2 font-medium">Phase</th>
+                            <th className="py-1 font-medium"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {vol.items.map((item) => (
+                            <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                              <td className="py-1.5 pr-2">
+                                <div className="font-medium text-gray-800">{item.itemName}</div>
+                                {item.required && <span className="text-xs text-red-600">required</span>}
+                              </td>
+                              <td className="py-1.5 pr-2 text-gray-600">
+                                <code className="text-xs bg-gray-200 px-1 rounded">{item.itemType}</code>
+                              </td>
+                              <td className="py-1.5 pr-2 text-gray-700">
+                                {item.pageLimit != null ? `${item.pageLimit} pp` : ''}
+                                {item.slideLimit != null ? `${item.slideLimit} slides` : ''}
+                              </td>
+                              <td className="py-1.5 pr-2 text-gray-700">
+                                {[item.fontFamily, item.fontSize, item.margins].filter(Boolean).join(' / ') || '—'}
+                              </td>
+                              <td className="py-1.5 pr-2 text-gray-500">
+                                {item.appliesToPhase && item.appliesToPhase.length > 0
+                                  ? item.appliesToPhase.join(',')
+                                  : 'all'}
+                              </td>
+                              <td className="py-1.5 text-right">
+                                <button
+                                  onClick={() => setEditItem(item)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 mr-2"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => deleteItem(item.id)}
+                                  disabled={loading}
+                                  className="text-xs text-red-600 hover:text-red-800"
+                                >
+                                  Del
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+
+                    <button
+                      onClick={() => setAddItemToVolume(vol.id)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      + Add required item
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showAddVolume && (
+        <AddVolumeModal
+          solicitationId={solicitationId}
+          nextNumber={Math.max(0, ...volumes.map((v) => v.volumeNumber)) + 1}
+          onClose={() => setShowAddVolume(false)}
+          onCreated={() => {
+            setShowAddVolume(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {addItemToVolume && (
+        <AddEditItemModal
+          mode="add"
+          volumeId={addItemToVolume}
+          nextNumber={
+            Math.max(
+              0,
+              ...(volumes.find((v) => v.id === addItemToVolume)?.items.map((i) => i.itemNumber) ??
+                [0]),
+            ) + 1
+          }
+          onClose={() => setAddItemToVolume(null)}
+          onSaved={() => {
+            setAddItemToVolume(null);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {editItem && (
+        <AddEditItemModal
+          mode="edit"
+          item={editItem}
+          volumeId={
+            volumes.find((v) => v.items.some((i) => i.id === editItem.id))?.id ?? ''
+          }
+          nextNumber={editItem.itemNumber}
+          onClose={() => setEditItem(null)}
+          onSaved={() => {
+            setEditItem(null);
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddVolumeModal({
+  solicitationId,
+  nextNumber,
+  onClose,
+  onCreated,
+}: {
+  solicitationId: string;
+  nextNumber: number;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const { invoke, loading, error } = useTool();
+  const [volumeNumber, setVolumeNumber] = useState(nextNumber);
+  const [volumeName, setVolumeName] = useState('');
+  const [volumeFormat, setVolumeFormat] = useState<'dsip_standard' | 'l_and_m' | 'custom'>('dsip_standard');
+  const [description, setDescription] = useState('');
+  const [specialRequirementsText, setSpecialRequirementsText] = useState('');
+  const [appliesToPhaseText, setAppliesToPhaseText] = useState('');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await invoke('volume.add', {
+        solicitationId,
+        volumeNumber,
+        volumeName: volumeName.trim(),
+        volumeFormat,
+        description: description.trim() || undefined,
+        specialRequirements: specialRequirementsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        appliesToPhase: appliesToPhaseText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean).length
+          ? appliesToPhaseText.split(',').map((s) => s.trim()).filter(Boolean)
+          : undefined,
+      });
+      onCreated();
+    } catch {
+      /* surfaced via useTool */
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <form onSubmit={submit} className="w-full max-w-lg bg-white rounded-lg shadow-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-navy-800">Add Volume</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <label className="block col-span-1">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              # <span className="text-red-500">*</span>
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={volumeNumber}
+              onChange={(e) => setVolumeNumber(parseInt(e.target.value, 10))}
+              required
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block col-span-2">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
+              Format
+            </span>
+            <select
+              value={volumeFormat}
+              onChange={(e) => setVolumeFormat(e.target.value as 'dsip_standard' | 'l_and_m' | 'custom')}
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+            >
+              <option value="dsip_standard">DSIP Standard</option>
+              <option value="l_and_m">L&amp;M (RFP Style)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+        </div>
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            Volume Name <span className="text-red-500">*</span>
+          </span>
+          <Autocomplete
+            value={volumeName}
+            onChange={setVolumeName}
+            suggestions={[
+              'Cover Sheet',
+              'Technical Volume',
+              'Cost Volume',
+              'Commercialization Plan',
+              'Supporting Documents',
+              'Executive Summary',
+              'Past Performance',
+            ]}
+            placeholder="Technical Volume"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">Description</span>
+          <textarea
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            Special Requirements (comma-separated)
+          </span>
+          <input
+            value={specialRequirementsText}
+            onChange={(e) => setSpecialRequirementsText(e.target.value)}
+            placeholder="foreign_ownership_disclosure, itar_cert, focus_area_alignment"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-sm font-medium text-gray-700 mb-1">
+            Applies to Phase (comma-separated; blank = all phases)
+          </span>
+          <input
+            value={appliesToPhaseText}
+            onChange={(e) => setAppliesToPhaseText(e.target.value)}
+            placeholder="sbir_phase_1, sbir_phase_2"
+            className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 outline-none"
+          />
+        </label>
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
+        )}
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !volumeName.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+          >
+            {loading ? 'Adding...' : 'Add Volume'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AddEditItemModal({
+  mode,
+  volumeId,
+  item,
+  nextNumber,
+  onClose,
+  onSaved,
+}: {
+  mode: 'add' | 'edit';
+  volumeId: string;
+  item?: RequiredItem;
+  nextNumber: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { invoke, loading, error } = useTool();
+  const [itemNumber, setItemNumber] = useState(item?.itemNumber ?? nextNumber);
+  const [itemName, setItemName] = useState(item?.itemName ?? '');
+  const [itemType, setItemType] = useState<string>(item?.itemType ?? 'word_doc');
+  const [required, setRequired] = useState(item?.required ?? true);
+  const [pageLimit, setPageLimit] = useState<string>(item?.pageLimit?.toString() ?? '');
+  const [slideLimit, setSlideLimit] = useState<string>(item?.slideLimit?.toString() ?? '');
+  const [fontFamily, setFontFamily] = useState(item?.fontFamily ?? '');
+  const [fontSize, setFontSize] = useState(item?.fontSize ?? '');
+  const [margins, setMargins] = useState(item?.margins ?? '');
+  const [lineSpacing, setLineSpacing] = useState(item?.lineSpacing ?? '');
+  const [headerFormat, setHeaderFormat] = useState(item?.headerFormat ?? '');
+  const [footerFormat, setFooterFormat] = useState(item?.footerFormat ?? '');
+  const [appliesToPhaseText, setAppliesToPhaseText] = useState(item?.appliesToPhase?.join(', ') ?? '');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const toNumber = (s: string) => (s.trim() ? parseInt(s, 10) : undefined);
+    const phases = appliesToPhaseText.split(',').map((s) => s.trim()).filter(Boolean);
+    try {
+      if (mode === 'add') {
+        await invoke('volume.add_required_item', {
+          volumeId,
+          itemNumber,
+          itemName: itemName.trim(),
+          itemType,
+          required,
+          pageLimit: toNumber(pageLimit),
+          slideLimit: toNumber(slideLimit),
+          fontFamily: fontFamily.trim() || undefined,
+          fontSize: fontSize.trim() || undefined,
+          margins: margins.trim() || undefined,
+          lineSpacing: lineSpacing.trim() || undefined,
+          headerFormat: headerFormat.trim() || undefined,
+          footerFormat: footerFormat.trim() || undefined,
+          appliesToPhase: phases.length ? phases : undefined,
+        });
+      } else if (item) {
+        await invoke('volume.update_required_item', {
+          itemId: item.id,
+          itemName: itemName.trim(),
+          required,
+          pageLimit: toNumber(pageLimit) ?? null,
+          slideLimit: toNumber(slideLimit) ?? null,
+          fontFamily: fontFamily.trim() || null,
+          fontSize: fontSize.trim() || null,
+          margins: margins.trim() || null,
+          lineSpacing: lineSpacing.trim() || null,
+          headerFormat: headerFormat.trim() || null,
+          footerFormat: footerFormat.trim() || null,
+          appliesToPhase: phases.length ? phases : null,
+        });
+      }
+      onSaved();
+    } catch {
+      /* surfaced via useTool */
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <form onSubmit={submit} className="w-full max-w-2xl bg-white rounded-lg shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-navy-800">
+            {mode === 'add' ? 'Add Required Item' : 'Edit Required Item'}
+          </h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <label className="block col-span-1">
+            <span className="block text-xs font-medium text-gray-700 mb-1">
+              # <span className="text-red-500">*</span>
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={itemNumber}
+              onChange={(e) => setItemNumber(parseInt(e.target.value, 10))}
+              required
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block col-span-2">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Type</span>
+            <select
+              value={itemType}
+              onChange={(e) => setItemType(e.target.value)}
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            >
+              <option value="word_doc">Word Doc</option>
+              <option value="slide_deck">Slide Deck</option>
+              <option value="spreadsheet">Spreadsheet</option>
+              <option value="pdf">PDF</option>
+              <option value="text">Plain Text</option>
+              <option value="form_sf424">Form SF-424</option>
+              <option value="form_sbir_certs">Form SBIR Certs</option>
+              <option value="form_other">Form Other</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="block text-xs font-medium text-gray-700 mb-1">
+            Item Name <span className="text-red-500">*</span>
+          </span>
+          <Autocomplete
+            value={itemName}
+            onChange={setItemName}
+            suggestions={[
+              'Technical Approach', 'Cost Volume', 'Commercialization Plan',
+              'Executive Summary', 'Past Performance', 'Cover Sheet',
+              'Abstract', 'Budget Justification', 'Biographical Sketch',
+              'Letter of Intent', 'SF-424 Application',
+            ]}
+            placeholder="Technical Approach Narrative"
+            required
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => setRequired(e.target.checked)}
+          />
+          Required (unchecked = optional)
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Page Limit</span>
+            <input
+              type="number"
+              min={0}
+              value={pageLimit}
+              onChange={(e) => setPageLimit(e.target.value)}
+              placeholder="15"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Slide Limit</span>
+            <input
+              type="number"
+              min={0}
+              value={slideLimit}
+              onChange={(e) => setSlideLimit(e.target.value)}
+              placeholder="25"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Font Family</span>
+            <Autocomplete
+              value={fontFamily}
+              onChange={setFontFamily}
+              suggestions={['Times New Roman', 'Arial', 'Calibri', 'Cambria', 'Helvetica']}
+              placeholder="Times New Roman"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Font Size</span>
+            <Autocomplete
+              value={fontSize}
+              onChange={setFontSize}
+              suggestions={['10', '10.5', '11', '12']}
+              placeholder="10"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Margins</span>
+            <Autocomplete
+              value={margins}
+              onChange={setMargins}
+              suggestions={['1 inch', '1 inch all sides', '0.75 inch', '0.5 inch']}
+              placeholder="1 inch all sides"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Line Spacing</span>
+            <Autocomplete
+              value={lineSpacing}
+              onChange={setLineSpacing}
+              suggestions={['single', '1.15', '1.5', 'double']}
+              placeholder="single"
+            />
+          </label>
+          <label className="block col-span-2">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Header Format</span>
+            <input
+              value={headerFormat}
+              onChange={(e) => setHeaderFormat(e.target.value)}
+              placeholder="{topic_number} - {company_name}"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block col-span-2">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Footer Format</span>
+            <input
+              value={footerFormat}
+              onChange={(e) => setFooterFormat(e.target.value)}
+              placeholder="{company_name} | Page {n} of {total}"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+          <label className="block col-span-2">
+            <span className="block text-xs font-medium text-gray-700 mb-1">
+              Applies to Phase (comma-separated; blank = all phases)
+            </span>
+            <input
+              value={appliesToPhaseText}
+              onChange={(e) => setAppliesToPhaseText(e.target.value)}
+              placeholder="sbir_phase_1"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
+        )}
+
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+          <button type="button" onClick={onClose} className="text-sm text-gray-600 hover:text-gray-800">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !itemName.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+          >
+            {loading ? 'Saving...' : mode === 'add' ? 'Add Item' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ─── AISuggestionsPanel ────────────────────────────────────────────
+
+interface AIMatch {
+  variable_name: string;
+  value: unknown;
+  source_excerpt?: string;
+  page?: number | null;
+  confidence?: number;
+  _section?: string;
+}
+
+function AISuggestionsPanel({
+  solicitationId,
+  matches,
+  verifiedVariables,
+  onAccepted,
+}: {
+  solicitationId: string;
+  matches: AIMatch[];
+  verifiedVariables: string[];
+  onAccepted: () => void;
+}) {
+  const { invoke, loading, error } = useTool();
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [accepted, setAccepted] = useState<Set<string>>(new Set(verifiedVariables));
+
+  // Dedupe by variable_name — show best confidence per var.
+  const pending = new Map<string, AIMatch>();
+  for (const m of matches) {
+    const name = m.variable_name;
+    if (!name || accepted.has(name) || dismissed.has(name)) continue;
+    const existing = pending.get(name);
+    if (!existing || (m.confidence ?? 0) > (existing.confidence ?? 0)) {
+      pending.set(name, m);
+    }
+  }
+  const pendingList = Array.from(pending.values());
+
+  async function accept(match: AIMatch) {
+    try {
+      await invoke('compliance.save_variable_value', {
+        solicitationId,
+        variableName: match.variable_name,
+        value: match.value,
+        sourceExcerpt: match.source_excerpt,
+      });
+      setAccepted((prev) => new Set(prev).add(match.variable_name));
+      onAccepted();
+    } catch {
+      /* surfaced via useTool */
+    }
+  }
+
+  function reject(name: string) {
+    setDismissed((prev) => new Set(prev).add(name));
+  }
+
+  if (pendingList.length === 0) return null;
+
+  return (
+    <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h2 className="text-lg font-semibold text-yellow-900">
+            AI Compliance Suggestions
+          </h2>
+          <p className="text-xs text-yellow-800 mt-0.5">
+            {pendingList.length} value{pendingList.length !== 1 ? 's' : ''} proposed by the AI &mdash; review and accept
+          </p>
+        </div>
+      </div>
+      {error && (
+        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+          {error}
+        </div>
+      )}
+      <div className="space-y-2">
+        {pendingList.map((m) => (
+          <div key={m.variable_name} className="bg-white rounded border border-yellow-200 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-600">{m.variable_name}</span>
+                  {typeof m.confidence === 'number' && (
+                    <span
+                      className={`text-xs px-1.5 py-0.5 rounded ${
+                        m.confidence >= 0.9
+                          ? 'bg-green-100 text-green-800'
+                          : m.confidence >= 0.7
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {Math.round(m.confidence * 100)}% conf
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-sm font-semibold text-gray-900">
+                  {String(m.value)}
+                </div>
+                {m.source_excerpt && (
+                  <div className="mt-1 text-xs text-gray-500 italic">
+                    &ldquo;{m.source_excerpt.slice(0, 200)}&rdquo;
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => accept(m)}
+                  disabled={loading}
+                  className="px-2.5 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs font-medium rounded"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => reject(m.variable_name)}
+                  className="px-2.5 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded"
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

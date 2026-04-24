@@ -45,6 +45,12 @@ import { ingestGetRunDetailTool } from './ingest-get-run-detail';
 // Phase 1 §E extension: topics under a solicitation (post-migration 013)
 import { opportunityAddTopicTool } from './opportunity-add-topic';
 import { opportunityBulkAddTopicsTool } from './opportunity-bulk-add-topics';
+// Phase 1 §E extension: volumes + required items (post-migration 012/014)
+import { volumeAddTool } from './volume-add';
+import { volumeDeleteTool } from './volume-delete';
+import { volumeAddRequiredItemTool } from './volume-add-required-item';
+import { volumeUpdateRequiredItemTool } from './volume-update-required-item';
+import { volumeDeleteRequiredItemTool } from './volume-delete-required-item';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -72,6 +78,11 @@ register(ingestListRecentRunsTool);
 register(ingestGetRunDetailTool);
 register(opportunityAddTopicTool);
 register(opportunityBulkAddTopicsTool);
+register(volumeAddTool);
+register(volumeDeleteTool);
+register(volumeAddRequiredItemTool);
+register(volumeUpdateRequiredItemTool);
+register(volumeDeleteRequiredItemTool);
 
 // Re-export common surface so callers can import from a single path.
 export {
