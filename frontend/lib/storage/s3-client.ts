@@ -32,11 +32,14 @@ if (!process.env.AWS_S3_BUCKET_NAME && process.env.NODE_ENV === 'production' && 
 
 export const BUCKET = process.env.AWS_S3_BUCKET_NAME || 'rfp-pipeline-local';
 
-// Singleton — construct once per process. The SDK uses env vars
-// (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION,
-// AWS_ENDPOINT_URL) for all configuration.
+// Singleton — construct once per process. The SDK v3 reads credentials
+// from AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY and endpoint from
+// AWS_ENDPOINT_URL automatically. HOWEVER: it reads region from
+// AWS_REGION, not AWS_DEFAULT_REGION (which is what Railway + boto3
+// use). We bridge that here.
 export const s3 = new S3Client({
   forcePathStyle: true,
+  region: process.env.AWS_DEFAULT_REGION || process.env.AWS_REGION || 'auto',
 });
 
 export interface PutObjectInput {
