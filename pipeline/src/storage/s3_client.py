@@ -108,3 +108,56 @@ def ping_s3() -> dict[str, Any]:
         return {"ok": True, "bucket": BUCKET}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+# ── Convenience helpers (text, JSON, copy) ──────────────────────────
+
+
+def put_text(*, key: str, text: str, metadata: Optional[dict[str, str]] = None) -> None:
+    """Write a UTF-8 text file (markdown, extracted text, etc.)."""
+    put_object(
+        key=key,
+        body=text.encode("utf-8"),
+        content_type="text/markdown; charset=utf-8",
+        metadata=metadata,
+    )
+
+
+def put_json(*, key: str, obj: Any, metadata: Optional[dict[str, str]] = None) -> None:
+    """Write a JSON file (metadata, compliance snapshot, etc.)."""
+    import json as _json
+
+    put_object(
+        key=key,
+        body=_json.dumps(obj, indent=2, default=str).encode("utf-8"),
+        content_type="application/json; charset=utf-8",
+        metadata=metadata,
+    )
+
+
+def copy_object(*, source_key: str, dest_key: str) -> None:
+    """Server-side copy within the same bucket (no download/upload)."""
+    try:
+        get_s3_client().copy_object(
+            Bucket=BUCKET,
+            CopySource={"Bucket": BUCKET, "Key": source_key},
+            Key=dest_key,
+        )
+    except Exception as e:
+        logger.error(
+            "[s3.copy_object] failed src=%s dst=%s err=%s",
+            source_key, dest_key, e,
+        )
+        raise RuntimeError("storage copy failed") from e
+
+
+def list_keys(*, prefix: str, max_keys: int = 1000) -> list[str]:
+    """List object keys under a prefix (for copy-all operations)."""
+    try:
+        resp = get_s3_client().list_objects_v2(
+            Bucket=BUCKET, Prefix=prefix, MaxKeys=max_keys,
+        )
+        return [obj["Key"] for obj in resp.get("Contents", [])]
+    except Exception as e:
+        logger.error("[s3.list_keys] failed prefix=%s err=%s", prefix, e)
+        raise RuntimeError("storage list failed") from e

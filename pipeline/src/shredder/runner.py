@@ -197,16 +197,18 @@ async def shred_solicitation(
     office = sol_row["office"]
     program_type = sol_row["program_type"]
 
-    # solicitation_documents is introduced in §G. Until then, fall back
-    # to curated_solicitations.full_text. Handle the missing-table case
-    # gracefully so §D.2 doesn't need the §G schema to run.
+    # solicitation_documents — query for source docs that have a storage_key.
+    # The table was created in migration 012; earlier data may not have docs.
     try:
         doc_rows = await conn.fetch(
             """
-            SELECT id, storage_key, original_filename
+            SELECT id, storage_key, original_filename, document_type
             FROM solicitation_documents
             WHERE solicitation_id = $1
-            ORDER BY created_at ASC
+              AND document_type IN ('source', 'topic')
+            ORDER BY
+              CASE document_type WHEN 'source' THEN 0 ELSE 1 END,
+              created_at ASC
             """,
             sol_uuid,
         )
@@ -230,26 +232,113 @@ async def shred_solicitation(
     )
 
     # ── Step 3: Extract text from all documents ─────────────────────────
-    # In stub/test mode, `full_text` may already be populated on the
-    # solicitation (populated by a prior ingestion pass) — we prefer
-    # that over re-extracting from S3 to keep tests hermetic.
+    # For each source/topic document with a storage_key:
+    #   a) Fetch PDF bytes from S3
+    #   b) Extract markdown via pymupdf4llm
+    #   c) Write extracted text to S3 as text.md artifact
+    #   d) Update solicitation_documents.extracted_text + extracted_at
+    #   e) Emit artifact.stored event
+    #
+    # Falls back to curated_solicitations.full_text when no docs exist
+    # (e.g. opportunities seeded from ingesters without file upload).
     doc_texts: list[str] = []
-    total_chars = 0
+    opp_id_str = str(sol_row["opportunity_id"])
+    artifact_keys: list[str] = []
+
     if doc_rows:
+        from storage.s3_client import get_object_bytes, put_text as s3_put_text
+        from storage.paths import rfp_pipeline_path
+
         for doc in doc_rows:
-            # Extraction wiring: storage key → pymupdf4llm. For the
-            # initial §D.2 commit we don't exercise the S3 path; the
-            # e2e tests use full_text on the solicitation and mocks
-            # the doc list to empty. §J will exercise S3 for real.
             storage_key = doc["storage_key"]
-            log.info(
-                "shredder: document %s (key=%s) not yet S3-extracted in D.2; "
-                "see §J for the end-to-end flow",
-                doc["id"], storage_key,
+            doc_id = doc["id"]
+
+            # Skip if already extracted (idempotent re-runs)
+            existing_text = await conn.fetchval(
+                "SELECT extracted_text FROM solicitation_documents WHERE id = $1",
+                doc_id,
+            )
+            if existing_text:
+                capped = existing_text[:MAX_CHARS_PER_DOCUMENT]
+                doc_texts.append(capped)
+                log.info(
+                    "shredder: document %s already extracted (%d chars), reusing",
+                    doc_id, len(capped),
+                )
+                continue
+
+            # Fetch PDF bytes from S3
+            log.info("shredder: fetching %s from S3", storage_key)
+            try:
+                pdf_bytes = get_object_bytes(storage_key)
+            except Exception as e:
+                log.warning(
+                    "shredder: S3 fetch failed for %s: %s — skipping",
+                    storage_key, e,
+                )
+                continue
+
+            if not pdf_bytes:
+                log.warning("shredder: S3 returned empty for %s — skipping", storage_key)
+                continue
+
+            # Extract text via pymupdf4llm
+            try:
+                extracted = extract_text_from_pdf(pdf_bytes)
+            except Exception as e:
+                log.warning(
+                    "shredder: text extraction failed for %s: %s — skipping",
+                    storage_key, e,
+                )
+                continue
+
+            capped = extracted[:MAX_CHARS_PER_DOCUMENT]
+            doc_texts.append(capped)
+
+            # Write text.md artifact to S3 (alongside the source PDF)
+            try:
+                text_key = rfp_pipeline_path(
+                    opportunity_id=opp_id_str, kind="text",
+                )
+                s3_put_text(key=text_key, text=capped)
+                artifact_keys.append(text_key)
+                log.info("shredder: wrote %s (%d chars)", text_key, len(capped))
+            except Exception as e:
+                log.warning("shredder: text.md S3 write failed: %s", e)
+
+            # Update the document row with extracted text + timestamp
+            try:
+                await conn.execute(
+                    """
+                    UPDATE solicitation_documents
+                    SET extracted_text = $2,
+                        extracted_at = now(),
+                        page_count = $3,
+                        updated_at = now()
+                    WHERE id = $1
+                    """,
+                    doc_id,
+                    capped,
+                    len(pdf_bytes) // 40000 + 1,  # rough page estimate
+                )
+            except Exception as e:
+                log.warning("shredder: doc row update failed for %s: %s", doc_id, e)
+
+            # Emit artifact event
+            await _emit_event(
+                conn, "finder", "artifact.stored",
+                {
+                    "solicitation_id": solicitation_id,
+                    "document_id": str(doc_id),
+                    "artifact_type": "extracted_text",
+                    "storage_key": text_key if 'text_key' in dir() else None,
+                    "chars": len(capped),
+                    "source_key": storage_key,
+                },
+                parent_event_id=start_event_id,
             )
     else:
         # No linked documents — fall back to curated_solicitations.full_text
-        # which may have been pre-populated by the ingester / curator.
         full_text = await conn.fetchval(
             "SELECT full_text FROM curated_solicitations WHERE id = $1",
             sol_uuid,
@@ -257,7 +346,14 @@ async def shred_solicitation(
         if full_text:
             capped = full_text[:MAX_CHARS_PER_DOCUMENT]
             doc_texts.append(capped)
-            total_chars = len(capped)
+
+    # Also update curated_solicitations.full_text with the combined extraction
+    if doc_texts:
+        combined_full = "\n\n---DOCUMENT---\n\n".join(doc_texts)
+        await conn.execute(
+            "UPDATE curated_solicitations SET full_text = $2, updated_at = now() WHERE id = $1",
+            sol_uuid, combined_full[:500000],
+        )
 
     if not doc_texts:
         # Nothing to shred — still emit an end event and flip status
@@ -376,6 +472,81 @@ async def shred_solicitation(
     await _write_ai_extracted(conn, sol_uuid, ai_extracted_blob, namespace_key)
     await _upsert_compliance(conn, sol_uuid, column_updates, custom_vars)
     await _update_status(conn, sol_uuid, "ai_analyzed")
+
+    # ── Step 7b: Write section + metadata artifacts to S3 ──────────────
+    # Each atomized section → rfp-pipeline/{oppId}/shredded/{key}.md
+    # Full extraction metadata → rfp-pipeline/{oppId}/metadata.json
+    # These are the artifacts that customer agents will read from their
+    # isolated copies after portal purchase.
+    try:
+        from storage.s3_client import put_text as s3_put_text, put_json as s3_put_json
+        from storage.paths import rfp_pipeline_path
+
+        # Per-section markdown artifacts
+        for section in sections:
+            sec_key = section.get("key", "").strip()
+            if not sec_key:
+                continue
+            sec_text = section.get("raw_text_excerpt") or section.get("summary") or ""
+            sec_header = f"# {section.get('title', sec_key)}\n\n"
+            sec_header += f"**Section key:** {sec_key}\n"
+            if section.get("page_range"):
+                sec_header += f"**Pages:** {section['page_range']}\n"
+            if section.get("summary"):
+                sec_header += f"\n{section['summary']}\n"
+            sec_header += "\n---\n\n"
+
+            try:
+                section_path = rfp_pipeline_path(
+                    opportunity_id=opp_id_str,
+                    kind="shredded",
+                    name=sec_key,
+                )
+                s3_put_text(key=section_path, text=sec_header + sec_text)
+                artifact_keys.append(section_path)
+            except Exception as e:
+                log.warning("shredder: section %s S3 write failed: %s", sec_key, e)
+
+        # Metadata.json — full extraction record for auditability
+        metadata_blob = {
+            "solicitation_id": solicitation_id,
+            "opportunity_id": opp_id_str,
+            "namespace": namespace_key,
+            "prompt_version": 1,
+            "model": DEFAULT_MODEL,
+            "extracted_at": started_at.isoformat(),
+            "sections_found": len(sections),
+            "section_keys": [s.get("key") for s in sections if s.get("key")],
+            "compliance_matches_found": len(all_matches),
+            "column_updates_applied": len(column_updates),
+            "custom_variables_stored": len(custom_vars),
+            "skipped_matches": skipped,
+            "total_input_tokens": sec_in_tokens + comp_in_tokens,
+            "total_output_tokens": sec_out_tokens + comp_out_tokens,
+            "artifact_keys": artifact_keys,
+        }
+        try:
+            meta_path = rfp_pipeline_path(
+                opportunity_id=opp_id_str, kind="metadata",
+            )
+            s3_put_json(key=meta_path, obj=metadata_blob)
+            artifact_keys.append(meta_path)
+        except Exception as e:
+            log.warning("shredder: metadata.json S3 write failed: %s", e)
+
+        # Emit artifact summary event
+        await _emit_event(
+            conn, "finder", "artifacts.written",
+            {
+                "solicitation_id": solicitation_id,
+                "artifact_count": len(artifact_keys),
+                "artifact_keys": artifact_keys[:20],  # cap for payload size
+            },
+            parent_event_id=start_event_id,
+        )
+    except ImportError:
+        # Storage module not available in test — skip artifact writes
+        log.info("shredder: storage module unavailable, skipping S3 artifact writes")
 
     # ── Step 8: Emit end event ──────────────────────────────────────────
     total_in = sec_in_tokens + comp_in_tokens
