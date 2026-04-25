@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { PdfViewer, type TextSelection } from './pdf-viewer';
@@ -161,6 +161,7 @@ export function CurationWorkspace({
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
+  const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
@@ -456,17 +457,52 @@ export function CurationWorkspace({
   };
 
   // Merge AI-suggested (named columns) with human-verified (custom_variables)
-  function getComplianceValue(camelKey: string): { value: unknown; source: 'ai' | 'verified' | null } {
+  function getComplianceValue(camelKey: string): {
+    value: unknown;
+    source: 'ai' | 'verified' | null;
+    sourceExcerpt: string | null;
+    sourcePage: number | null;
+  } {
     const snakeKey = snakeCase(camelKey);
-    const custom = (compState?.customVariables as Record<string, { value: unknown }> | null);
+    const custom = (compState?.customVariables as Record<string, {
+      value: unknown;
+      source_excerpt?: string;
+      page?: number;
+    }> | null);
+
+    // Verified values (from admin actions) — include provenance
     if (custom?.[snakeKey]) {
-      return { value: custom[snakeKey].value, source: 'verified' };
+      return {
+        value: custom[snakeKey].value,
+        source: 'verified',
+        sourceExcerpt: custom[snakeKey].source_excerpt ?? null,
+        sourcePage: custom[snakeKey].page ?? null,
+      };
     }
+
+    // AI-suggested values — look up from ai_extracted.compliance_matches
+    const aiMatches = (aiData?.compliance_matches ?? []) as Array<{
+      variable_name: string;
+      value: unknown;
+      source_excerpt?: string;
+      page?: number | null;
+    }>;
+    const aiMatch = aiMatches.find((m) => m.variable_name === snakeKey);
+    if (aiMatch) {
+      return {
+        value: aiMatch.value,
+        source: 'ai',
+        sourceExcerpt: aiMatch.source_excerpt ?? null,
+        sourcePage: aiMatch.page ?? null,
+      };
+    }
+
+    // Named column fallback
     const aiVal = compState?.[camelKey as keyof typeof compState];
     if (aiVal !== null && aiVal !== undefined) {
-      return { value: aiVal, source: 'ai' };
+      return { value: aiVal, source: 'ai', sourceExcerpt: null, sourcePage: null };
     }
-    return { value: null, source: null };
+    return { value: null, source: null, sourceExcerpt: null, sourcePage: null };
   }
 
   // AI-extracted sections from the shredder
@@ -800,8 +836,15 @@ export function CurationWorkspace({
                 </span>
               </div>
               <PdfViewer
+                ref={pdfViewerRef}
                 documentId={sourcePdf.id}
                 onTextSelect={handleTextSelect}
+                highlights={annotations.map((a) => ({
+                  id: a.id,
+                  pageNumber: a.pageNumber,
+                  sourceExcerpt: a.sourceExcerpt,
+                  variableName: a.complianceVariableName,
+                }))}
                 width={650}
               />
               {textSelection && (
@@ -855,66 +898,85 @@ export function CurationWorkspace({
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
-                const { value, source } = getComplianceValue(field.key);
+                const { value, source, sourceExcerpt, sourcePage } = getComplianceValue(field.key);
                 return (
-                  <div key={field.key} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
-                    <div className="flex-1">
-                      <span className="text-sm text-gray-700">{field.label}</span>
-                      {source && (
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                          source === 'verified' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {source === 'verified' ? 'Verified' : 'AI'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {editingVar === field.key ? (
-                        <>
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveVariable(field.key);
-                              if (e.key === 'Escape') { setEditingVar(null); setEditValue(''); }
-                            }}
-                            className="w-32 text-sm border rounded px-2 py-1"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => handleSaveVariable(field.key)}
-                            disabled={loading}
-                            className="text-xs text-green-600 hover:text-green-800 font-medium"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => { setEditingVar(null); setEditValue(''); }}
-                            className="text-xs text-gray-400 hover:text-gray-600"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <span className={`text-sm font-medium ${value !== null ? 'text-gray-900' : 'text-gray-300'}`}>
-                            {value !== null ? String(value) : '—'}
+                  <div key={field.key} className="py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-700">{field.label}</span>
+                        {source && (
+                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                            source === 'verified' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {source === 'verified' ? 'Verified' : 'AI'}
                           </span>
-                          {['curation_in_progress', 'ai_analyzed', 'claimed'].includes(sol.status) && (
-                            <button
-                              onClick={() => {
-                                setEditingVar(field.key);
-                                setEditValue(value !== null ? String(value) : '');
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingVar === field.key ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveVariable(field.key);
+                                if (e.key === 'Escape') { setEditingVar(null); setEditValue(''); }
                               }}
-                              className="text-xs text-blue-500 hover:text-blue-700"
+                              className="w-32 text-sm border rounded px-2 py-1"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveVariable(field.key)}
+                              disabled={loading}
+                              className="text-xs text-green-600 hover:text-green-800 font-medium"
                             >
-                              Edit
+                              Save
                             </button>
-                          )}
-                        </>
-                      )}
+                            <button
+                              onClick={() => { setEditingVar(null); setEditValue(''); }}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className={`text-sm font-medium ${value !== null ? 'text-gray-900' : 'text-gray-300'}`}>
+                              {value !== null ? String(value) : '—'}
+                            </span>
+                            {['curation_in_progress', 'ai_analyzed', 'claimed'].includes(sol.status) && (
+                              <button
+                                onClick={() => {
+                                  setEditingVar(field.key);
+                                  setEditValue(value !== null ? String(value) : '');
+                                }}
+                                className="text-xs text-blue-500 hover:text-blue-700"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {/* Source provenance — shows WHERE in the PDF this value came from */}
+                    {sourceExcerpt && (
+                      <div className="mt-1 flex items-start gap-1">
+                        {sourcePage && pdfViewerRef.current && (
+                          <button
+                            onClick={() => pdfViewerRef.current?.highlightText(sourcePage, sourceExcerpt)}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 shrink-0 mt-0.5"
+                            title={`Jump to page ${sourcePage}`}
+                          >
+                            p.{sourcePage}
+                          </button>
+                        )}
+                        <span className="text-xs text-gray-400 italic truncate">
+                          &ldquo;{sourceExcerpt.slice(0, 100)}{sourceExcerpt.length > 100 ? '...' : ''}&rdquo;
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
