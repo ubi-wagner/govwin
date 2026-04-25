@@ -26,12 +26,17 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 
+import type { SourceAnchor, AnchorRect } from '@/lib/types/source-anchor';
+
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface TextSelection {
   text: string;
   pageNumber: number;
+  /** Screen-space rect for positioning the tag popover. */
   rect: { top: number; left: number; width: number; height: number };
+  /** Full anchor data for storage — includes percentage-based rects. */
+  anchor: SourceAnchor;
 }
 
 export interface HighlightAnnotation {
@@ -122,7 +127,32 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(
         ? { top: rect.top - containerRect.top, left: rect.left - containerRect.left, width: rect.width, height: rect.height }
         : { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
 
-      onTextSelect({ text, pageNumber, rect: relRect });
+      // Compute percentage-based rects for resolution-independent storage.
+      // Find the rendered page element to get its dimensions.
+      const pageCanvas = containerRef.current?.querySelector('.react-pdf__Page');
+      const pageRect = pageCanvas?.getBoundingClientRect();
+      let anchorRects: AnchorRect[] | undefined;
+      if (pageRect && pageRect.width > 0 && pageRect.height > 0) {
+        // Get ALL client rects from the range (one per line of selection)
+        const clientRects = range.getClientRects();
+        anchorRects = Array.from(clientRects).map((cr) => ({
+          x: ((cr.left - pageRect.left) / pageRect.width) * 100,
+          y: ((cr.top - pageRect.top) / pageRect.height) * 100,
+          w: (cr.width / pageRect.width) * 100,
+          h: (cr.height / pageRect.height) * 100,
+        }));
+      }
+
+      // Build the full source anchor
+      const anchor: SourceAnchor = {
+        page: pageNumber,
+        excerpt: text,
+        rects: anchorRects,
+        method: 'manual_selection',
+        created_at: new Date().toISOString(),
+      };
+
+      onTextSelect({ text, pageNumber, rect: relRect, anchor });
     }, [onTextSelect, currentPage]);
 
     // Highlight overlays for the current page — find matching text in

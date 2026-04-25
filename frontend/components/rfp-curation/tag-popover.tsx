@@ -23,11 +23,15 @@ export interface TagAction {
   sourceExcerpt: string;
   pageNumber: number;
   isNew: boolean;
+  /** Full source anchor from the PDF viewer selection. */
+  anchor?: import('@/lib/types/source-anchor').SourceAnchor;
 }
 
 interface Props {
   selectedText: string;
   pageNumber: number;
+  /** Full anchor from the PDF viewer's text selection. */
+  anchor?: import('@/lib/types/source-anchor').SourceAnchor;
   /** Position relative to the PDF container. */
   position: { top: number; left: number };
   /** Full variable catalog loaded from compliance.list_variables. */
@@ -39,6 +43,7 @@ interface Props {
 export function TagPopover({
   selectedText,
   pageNumber,
+  anchor,
   position,
   variables,
   onTag,
@@ -100,6 +105,7 @@ export function TagPopover({
       sourceExcerpt: selectedText,
       pageNumber,
       isNew: false,
+      anchor,
     });
   };
 
@@ -116,6 +122,7 @@ export function TagPopover({
       sourceExcerpt: selectedText,
       pageNumber,
       isNew: true,
+      anchor,
     });
   };
 

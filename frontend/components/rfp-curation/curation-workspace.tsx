@@ -220,21 +220,38 @@ export function CurationWorkspace({
     pageNumber: number;
     sourceExcerpt: string;
     complianceVariableName?: string;
+    anchor?: import('@/lib/types/source-anchor').SourceAnchor;
   }) => {
     try {
+      // Build the full source_location from the anchor (if provided)
+      // or fall back to the basic page + excerpt shape.
+      const fullAnchor = args.anchor ?? {
+        page: args.pageNumber,
+        excerpt: args.sourceExcerpt,
+        method: 'manual_selection' as const,
+      };
+      // Enrich with document context if we have the source PDF info
+      if (sourcePdf && !fullAnchor.document_id) {
+        fullAnchor.document_id = sourcePdf.id;
+        fullAnchor.document_name = sourcePdf.originalFilename;
+      }
+
       const result = await invoke<{ id: string; kind: string }>(
         'solicitation.save_annotation',
         {
           solicitationId: sol.id,
           kind: 'compliance_tag',
           sourceLocation: {
-            page: args.pageNumber,
-            offset: 0,
-            length: args.sourceExcerpt.length,
+            ...fullAnchor,
+            // Keep the flat fields the tool expects
+            page: fullAnchor.page,
+            offset: fullAnchor.char_offset ?? 0,
+            length: fullAnchor.char_length ?? fullAnchor.excerpt.length,
           },
           payload: {
             excerpt: args.sourceExcerpt,
             variable_name: args.complianceVariableName ?? null,
+            anchor: fullAnchor,
           },
           complianceVariableName: args.complianceVariableName,
         },
@@ -297,6 +314,7 @@ export function CurationWorkspace({
             variableName: action.variableName,
             value: value.trim(),
             sourceExcerpt: action.sourceExcerpt,
+            anchor: action.anchor,
           });
 
           setCompState((prev) => ({
@@ -306,6 +324,8 @@ export function CurationWorkspace({
               [action.variableName]: {
                 value: value.trim(),
                 source_excerpt: action.sourceExcerpt,
+                page: action.anchor?.page ?? action.pageNumber,
+                anchor: action.anchor,
                 verified_by: currentUserId,
               },
             },
@@ -315,6 +335,7 @@ export function CurationWorkspace({
             pageNumber: action.pageNumber,
             sourceExcerpt: action.sourceExcerpt,
             complianceVariableName: action.variableName,
+            anchor: action.anchor,
           });
 
           setTextSelection(null);
@@ -335,9 +356,9 @@ export function CurationWorkspace({
         variableName: action.variableName,
         value: value.trim(),
         sourceExcerpt: action.sourceExcerpt,
+        anchor: action.anchor,
       });
 
-      // Update local compliance state
       setCompState((prev) => ({
         ...prev,
         customVariables: {
@@ -345,6 +366,8 @@ export function CurationWorkspace({
           [action.variableName]: {
             value: value.trim(),
             source_excerpt: action.sourceExcerpt,
+            page: action.anchor?.page ?? action.pageNumber,
+            anchor: action.anchor,
             verified_by: currentUserId,
           },
         },
@@ -462,21 +485,27 @@ export function CurationWorkspace({
     source: 'ai' | 'verified' | null;
     sourceExcerpt: string | null;
     sourcePage: number | null;
+    documentName: string | null;
+    anchor: import('@/lib/types/source-anchor').SourceAnchor | null;
   } {
     const snakeKey = snakeCase(camelKey);
     const custom = (compState?.customVariables as Record<string, {
       value: unknown;
       source_excerpt?: string;
       page?: number;
+      anchor?: import('@/lib/types/source-anchor').SourceAnchor;
     }> | null);
 
-    // Verified values (from admin actions) — include provenance
+    // Verified values (from admin actions) — include full anchor provenance
     if (custom?.[snakeKey]) {
+      const anc = custom[snakeKey].anchor ?? null;
       return {
         value: custom[snakeKey].value,
         source: 'verified',
-        sourceExcerpt: custom[snakeKey].source_excerpt ?? null,
-        sourcePage: custom[snakeKey].page ?? null,
+        sourceExcerpt: custom[snakeKey].source_excerpt ?? anc?.excerpt ?? null,
+        sourcePage: custom[snakeKey].page ?? anc?.page ?? null,
+        documentName: anc?.document_name ?? null,
+        anchor: anc,
       };
     }
 
@@ -494,15 +523,21 @@ export function CurationWorkspace({
         source: 'ai',
         sourceExcerpt: aiMatch.source_excerpt ?? null,
         sourcePage: aiMatch.page ?? null,
+        documentName: null,
+        anchor: aiMatch.page ? {
+          page: aiMatch.page,
+          excerpt: aiMatch.source_excerpt ?? '',
+          method: 'ai_extraction' as const,
+        } : null,
       };
     }
 
     // Named column fallback
     const aiVal = compState?.[camelKey as keyof typeof compState];
     if (aiVal !== null && aiVal !== undefined) {
-      return { value: aiVal, source: 'ai', sourceExcerpt: null, sourcePage: null };
+      return { value: aiVal, source: 'ai', sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
     }
-    return { value: null, source: null, sourceExcerpt: null, sourcePage: null };
+    return { value: null, source: null, sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
   }
 
   // AI-extracted sections from the shredder
@@ -851,6 +886,7 @@ export function CurationWorkspace({
                 <TagPopover
                   selectedText={textSelection.text}
                   pageNumber={textSelection.pageNumber}
+                  anchor={textSelection.anchor}
                   position={textSelection.rect}
                   variables={variableCatalog}
                   onTag={handleTag}
@@ -898,7 +934,7 @@ export function CurationWorkspace({
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
-                const { value, source, sourceExcerpt, sourcePage } = getComplianceValue(field.key);
+                const { value, source, sourceExcerpt, sourcePage, documentName, anchor: varAnchor } = getComplianceValue(field.key);
                 return (
                   <div key={field.key} className="py-2 border-b border-gray-100 last:border-0">
                     <div className="flex items-center justify-between">
@@ -960,21 +996,31 @@ export function CurationWorkspace({
                         )}
                       </div>
                     </div>
-                    {/* Source provenance — shows WHERE in the PDF this value came from */}
-                    {sourceExcerpt && (
-                      <div className="mt-1 flex items-start gap-1">
+                    {/* Source provenance — doc:page:excerpt with click-to-navigate */}
+                    {(sourceExcerpt || sourcePage) && (
+                      <div className="mt-1 flex items-start gap-1 text-xs">
+                        {documentName && (
+                          <span className="text-gray-400 shrink-0 font-mono">
+                            {documentName.length > 25 ? documentName.slice(0, 22) + '...' : documentName}
+                          </span>
+                        )}
                         {sourcePage && pdfViewerRef.current && (
                           <button
-                            onClick={() => pdfViewerRef.current?.highlightText(sourcePage, sourceExcerpt)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 shrink-0 mt-0.5"
-                            title={`Jump to page ${sourcePage}`}
+                            onClick={() => pdfViewerRef.current?.highlightText(sourcePage, sourceExcerpt ?? '')}
+                            className="text-indigo-600 hover:text-indigo-800 shrink-0 font-medium"
+                            title={`Navigate to page ${sourcePage} and highlight the source text`}
                           >
                             p.{sourcePage}
                           </button>
                         )}
-                        <span className="text-xs text-gray-400 italic truncate">
-                          &ldquo;{sourceExcerpt.slice(0, 100)}{sourceExcerpt.length > 100 ? '...' : ''}&rdquo;
-                        </span>
+                        {sourcePage && !pdfViewerRef.current && (
+                          <span className="text-gray-400 shrink-0">p.{sourcePage}</span>
+                        )}
+                        {sourceExcerpt && (
+                          <span className="text-gray-400 italic truncate">
+                            &ldquo;{sourceExcerpt.slice(0, 80)}{sourceExcerpt.length > 80 ? '...' : ''}&rdquo;
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

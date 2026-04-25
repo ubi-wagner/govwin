@@ -76,6 +76,9 @@ const InputSchema = z.object({
   sourceExcerpt: z.string().max(5000).optional(),
   notes: z.string().max(2000).optional(),
   action: z.enum(['verify', 'correct', 'manual_entry']).optional(),
+  /** Full source anchor with page, rects, document reference.
+   *  Stored alongside the value in custom_variables for provenance. */
+  anchor: z.record(z.string(), z.unknown()).optional(),
 });
 
 type Input = z.infer<typeof InputSchema>;
@@ -187,6 +190,10 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
       notes: notes ?? null,
       verified_by: actorId,
       verified_at: new Date().toISOString(),
+      // Full source anchor — carries page, rects, document reference,
+      // section context. Used by the compliance matrix for provenance
+      // display and click-to-navigate. Also stored in HITL memory.
+      anchor: input.anchor ?? null,
     };
 
     let verifiedAt: Date;
