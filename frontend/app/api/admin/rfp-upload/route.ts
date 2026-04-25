@@ -21,7 +21,7 @@
  * Returns: { data: { solicitation_id, opportunity_id, document_ids[] } }
  */
 
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
@@ -158,6 +158,49 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── Global dedup check ─────────────────────────────────────────────
+  // Compute SHA-256 of each file's bytes. Check solicitation_documents
+  // for a matching content_hash globally. If found, return the existing
+  // solicitation so the admin can navigate there instead of creating a
+  // duplicate. Admin can override by acknowledging the duplicate (future
+  // UI — for now it's a hard reject with a link).
+  const fileBuffers: { file: File; buffer: Buffer; hash: string; displayName: string }[] = [];
+  for (const file of files) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const hash = createHash('sha256').update(buffer).digest('hex');
+    const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
+    fileBuffers.push({ file, buffer, hash, displayName });
+  }
+
+  // Check all hashes at once against the global document store
+  const hashes = fileBuffers.map((fb) => fb.hash);
+  const dupeRows = await sql<
+    { contentHash: string; originalFilename: string; solicitationId: string; solTitle: string | null }[]
+  >`
+    SELECT sd.content_hash, sd.original_filename, sd.solicitation_id,
+           COALESCE(cs.solicitation_title, o.title) AS sol_title
+    FROM solicitation_documents sd
+    LEFT JOIN curated_solicitations cs ON cs.id = sd.solicitation_id
+    LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+    WHERE sd.content_hash = ANY(${hashes}::text[])
+  `;
+
+  if (dupeRows.length > 0) {
+    const first = dupeRows[0];
+    return NextResponse.json(
+      {
+        error: `This file has already been uploaded to "${first.solTitle ?? 'an existing solicitation'}". Navigate to the existing solicitation or rename/modify the file if this is a different document.`,
+        code: 'DUPLICATE_FILE',
+        details: {
+          existingSolicitationId: first.solicitationId,
+          existingFilename: first.originalFilename,
+          matchedHash: first.contentHash,
+        },
+      },
+      { status: 409 },
+    );
+  }
+
   // Generate opportunity UUID up front so we can use it for storage paths
   const oppId = randomUUID();
 
@@ -214,18 +257,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Upload each file and create a solicitation_documents row
+  // Upload each file and create a solicitation_documents row.
+  // fileBuffers were pre-computed above (hash + buffer + displayName).
   const documentIds: string[] = [];
   let firstPdfKey: string | null = null;
-  for (const file of files) {
-    const ext = extFromFilename(file.name);
-    const safeName = slugSafeName(file.name);
-    // Keep the admin's original filename (with extension) for display.
-    // Strip any path traversal but don't slugify — that breaks display + PDF
-    // type detection (.pdf extension must be preserved).
-    const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
-    // Build the storage key. First PDF (typical source) goes to source.pdf;
-    // additional files become attachments/<filename>.
+  for (const fb of fileBuffers) {
+    const ext = extFromFilename(fb.file.name);
+    const safeName = slugSafeName(fb.file.name);
     let storageKey: string;
     if (ext === 'pdf' && !firstPdfKey) {
       storageKey = rfpPipelinePath({ opportunityId: oppRowId, kind: 'source', ext: 'pdf' });
@@ -234,19 +272,18 @@ export async function POST(request: Request) {
       storageKey = rfpPipelinePath({
         opportunityId: oppRowId,
         kind: 'attachment',
-        name: safeName, // already extension-stripped + slugified
+        name: safeName,
         ext,
       });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     try {
       await putObject({
         key: storageKey,
-        body: buffer,
-        contentType: file.type || undefined,
+        body: fb.buffer,
+        contentType: fb.file.type || undefined,
         metadata: {
-          'original-filename': displayName,
+          'original-filename': fb.displayName,
           'uploaded-by': userId ?? 'unknown',
           'solicitation-id': solId,
         },
@@ -255,7 +292,7 @@ export async function POST(request: Request) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error('[rfp-upload] S3 put failed', { key: storageKey, err: errMsg, stack: err instanceof Error ? err.stack : undefined });
       return NextResponse.json(
-        { error: `Storage upload failed for ${file.name}: ${errMsg}`, code: 'STORAGE_ERROR' },
+        { error: `Storage upload failed for ${fb.displayName}: ${errMsg}`, code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
@@ -264,14 +301,15 @@ export async function POST(request: Request) {
       const docRows = await sql<{ id: string }[]>`
         INSERT INTO solicitation_documents
           (solicitation_id, document_type, original_filename, storage_key,
-           file_size, content_type, uploaded_by)
+           file_size, content_type, content_hash, uploaded_by)
         VALUES
           (${solId}::uuid,
            ${firstPdfKey === storageKey ? 'source' : 'attachment'},
-           ${displayName},
+           ${fb.displayName},
            ${storageKey},
-           ${file.size},
-           ${file.type || null},
+           ${fb.file.size},
+           ${fb.file.type || null},
+           ${fb.hash},
            ${userId ?? null}::uuid)
         RETURNING id
       `;
