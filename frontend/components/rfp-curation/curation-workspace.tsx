@@ -647,11 +647,25 @@ export function CurationWorkspace({
                 </button>
               </div>
             </div>
+            {/* Topic file drop zone */}
+            <TopicFileDropZone
+              solicitationId={sol.id}
+              onUploaded={(results) => {
+                if (results.length > 0) {
+                  // Pre-fill bulk import with the uploaded files' parsed info
+                  const pasteText = results
+                    .map((r) => [r.topicNumber ?? '', r.title].filter(Boolean).join(' | '))
+                    .join('\n');
+                  setExtractedPasteText(pasteText);
+                  setShowBulkAddTopics(true);
+                }
+              }}
+            />
+
             {topicsList.length === 0 ? (
               <p className="text-sm text-gray-400">
-                No topics yet. Extract them from the source document, then add
-                each one so customers can pin individual topics under this
-                solicitation.
+                No topics yet. Extract them from the source document, drop individual topic
+                files above, or add topics manually.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -2243,6 +2257,102 @@ function AISuggestionsPanel({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── TopicFileDropZone ─────────────────────────────────────────────
+
+function TopicFileDropZone({
+  solicitationId,
+  onUploaded,
+}: {
+  solicitationId: string;
+  onUploaded: (results: Array<{ documentId: string; topicNumber: string | null; title: string; filename: string }>) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (!e.dataTransfer.files.length) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    const data = new FormData();
+    data.set('solicitationId', solicitationId);
+    for (const f of Array.from(e.dataTransfer.files)) {
+      data.append('files', f);
+    }
+
+    try {
+      const resp = await fetch('/api/admin/upload-topic-files', {
+        method: 'POST',
+        body: data,
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
+      }
+      onUploaded(json.data?.uploaded ?? []);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+        dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-gray-50'
+      }`}
+    >
+      {uploading ? (
+        <p className="text-sm text-indigo-600 animate-pulse">Uploading topic files...</p>
+      ) : (
+        <>
+          <p className="text-xs text-gray-500">
+            Drop individual topic PDFs here to auto-parse and stage for review
+          </p>
+          <label className="mt-1 text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline">
+            or browse files
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.doc,.txt"
+              className="sr-only"
+              onChange={async (e) => {
+                if (!e.target.files?.length) return;
+                const data = new FormData();
+                data.set('solicitationId', solicitationId);
+                for (const f of Array.from(e.target.files)) data.append('files', f);
+                setUploading(true);
+                setUploadError(null);
+                try {
+                  const resp = await fetch('/api/admin/upload-topic-files', { method: 'POST', body: data });
+                  const json = await resp.json();
+                  if (!resp.ok) throw new Error(json.error ?? 'Upload failed');
+                  onUploaded(json.data?.uploaded ?? []);
+                } catch (err) {
+                  setUploadError(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          </label>
+        </>
+      )}
+      {uploadError && (
+        <p className="mt-2 text-xs text-red-600">{uploadError}</p>
+      )}
     </div>
   );
 }
