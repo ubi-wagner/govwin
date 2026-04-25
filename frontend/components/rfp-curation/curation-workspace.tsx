@@ -165,6 +165,7 @@ export function CurationWorkspace({
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
+  const [extractedPasteText, setExtractedPasteText] = useState('');
   const [topicsList, setTopicsList] = useState(topics);
 
   // Keep local topicsList in sync with server-provided topics after
@@ -603,6 +604,36 @@ export function CurationWorkspace({
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={async () => {
+                    try {
+                      const resp = await fetch('/api/admin/extract-topics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ solicitationId: sol.id }),
+                      });
+                      const json = await resp.json();
+                      const extracted = json.data?.topics ?? [];
+                      if (extracted.length === 0) {
+                        alert(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
+                        return;
+                      }
+                      // Pre-fill the bulk import modal with extracted topics
+                      const pasteText = extracted
+                        .map((t: { topicNumber: string; title: string; branch?: string | null }) =>
+                          [t.topicNumber, t.title, t.branch ?? ''].filter(Boolean).join(' | ')
+                        )
+                        .join('\n');
+                      setExtractedPasteText(pasteText);
+                      setShowBulkAddTopics(true);
+                    } catch {
+                      alert('Failed to extract topics from the PDF.');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded"
+                >
+                  Extract Topics
+                </button>
+                <button
                   onClick={() => setShowBulkAddTopics(true)}
                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border border-gray-200"
                 >
@@ -685,9 +716,14 @@ export function CurationWorkspace({
           {showBulkAddTopics && (
             <BulkAddTopicsModal
               solicitationId={sol.id}
-              onClose={() => setShowBulkAddTopics(false)}
+              initialText={extractedPasteText}
+              onClose={() => {
+                setShowBulkAddTopics(false);
+                setExtractedPasteText('');
+              }}
               onComplete={() => {
                 setShowBulkAddTopics(false);
+                setExtractedPasteText('');
                 router.refresh();
               }}
             />
@@ -1267,15 +1303,17 @@ function parseBulkTopicsText(text: string): {
 
 function BulkAddTopicsModal({
   solicitationId,
+  initialText,
   onClose,
   onComplete,
 }: {
   solicitationId: string;
+  initialText?: string;
   onClose: () => void;
   onComplete: () => void;
 }) {
   const { invoke, loading, error } = useTool();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [defaultBranch, setDefaultBranch] = useState('');
   const [result, setResult] = useState<{ inserted: number; skipped: string[] } | null>(null);
 
