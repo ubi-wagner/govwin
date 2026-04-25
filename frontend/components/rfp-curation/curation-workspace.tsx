@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { PdfViewer, type TextSelection } from './pdf-viewer';
@@ -161,10 +161,12 @@ export function CurationWorkspace({
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
+  const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
+  const [extractedPasteText, setExtractedPasteText] = useState('');
   const [topicsList, setTopicsList] = useState(topics);
 
   // Keep local topicsList in sync with server-provided topics after
@@ -218,21 +220,38 @@ export function CurationWorkspace({
     pageNumber: number;
     sourceExcerpt: string;
     complianceVariableName?: string;
+    anchor?: import('@/lib/types/source-anchor').SourceAnchor;
   }) => {
     try {
+      // Build the full source_location from the anchor (if provided)
+      // or fall back to the basic page + excerpt shape.
+      const fullAnchor = args.anchor ?? {
+        page: args.pageNumber,
+        excerpt: args.sourceExcerpt,
+        method: 'manual_selection' as const,
+      };
+      // Enrich with document context if we have the source PDF info
+      if (sourcePdf && !fullAnchor.document_id) {
+        fullAnchor.document_id = sourcePdf.id;
+        fullAnchor.document_name = sourcePdf.originalFilename;
+      }
+
       const result = await invoke<{ id: string; kind: string }>(
         'solicitation.save_annotation',
         {
           solicitationId: sol.id,
           kind: 'compliance_tag',
           sourceLocation: {
-            page: args.pageNumber,
-            offset: 0,
-            length: args.sourceExcerpt.length,
+            ...fullAnchor,
+            // Keep the flat fields the tool expects
+            page: fullAnchor.page,
+            offset: fullAnchor.char_offset ?? 0,
+            length: fullAnchor.char_length ?? fullAnchor.excerpt.length,
           },
           payload: {
             excerpt: args.sourceExcerpt,
             variable_name: args.complianceVariableName ?? null,
+            anchor: fullAnchor,
           },
           complianceVariableName: args.complianceVariableName,
         },
@@ -295,6 +314,7 @@ export function CurationWorkspace({
             variableName: action.variableName,
             value: value.trim(),
             sourceExcerpt: action.sourceExcerpt,
+            anchor: action.anchor,
           });
 
           setCompState((prev) => ({
@@ -304,6 +324,8 @@ export function CurationWorkspace({
               [action.variableName]: {
                 value: value.trim(),
                 source_excerpt: action.sourceExcerpt,
+                page: action.anchor?.page ?? action.pageNumber,
+                anchor: action.anchor,
                 verified_by: currentUserId,
               },
             },
@@ -313,6 +335,7 @@ export function CurationWorkspace({
             pageNumber: action.pageNumber,
             sourceExcerpt: action.sourceExcerpt,
             complianceVariableName: action.variableName,
+            anchor: action.anchor,
           });
 
           setTextSelection(null);
@@ -333,9 +356,9 @@ export function CurationWorkspace({
         variableName: action.variableName,
         value: value.trim(),
         sourceExcerpt: action.sourceExcerpt,
+        anchor: action.anchor,
       });
 
-      // Update local compliance state
       setCompState((prev) => ({
         ...prev,
         customVariables: {
@@ -343,6 +366,8 @@ export function CurationWorkspace({
           [action.variableName]: {
             value: value.trim(),
             source_excerpt: action.sourceExcerpt,
+            page: action.anchor?.page ?? action.pageNumber,
+            anchor: action.anchor,
             verified_by: currentUserId,
           },
         },
@@ -455,17 +480,64 @@ export function CurationWorkspace({
   };
 
   // Merge AI-suggested (named columns) with human-verified (custom_variables)
-  function getComplianceValue(camelKey: string): { value: unknown; source: 'ai' | 'verified' | null } {
+  function getComplianceValue(camelKey: string): {
+    value: unknown;
+    source: 'ai' | 'verified' | null;
+    sourceExcerpt: string | null;
+    sourcePage: number | null;
+    documentName: string | null;
+    anchor: import('@/lib/types/source-anchor').SourceAnchor | null;
+  } {
     const snakeKey = snakeCase(camelKey);
-    const custom = (compState?.customVariables as Record<string, { value: unknown }> | null);
+    const custom = (compState?.customVariables as Record<string, {
+      value: unknown;
+      source_excerpt?: string;
+      page?: number;
+      anchor?: import('@/lib/types/source-anchor').SourceAnchor;
+    }> | null);
+
+    // Verified values (from admin actions) — include full anchor provenance
     if (custom?.[snakeKey]) {
-      return { value: custom[snakeKey].value, source: 'verified' };
+      const anc = custom[snakeKey].anchor ?? null;
+      return {
+        value: custom[snakeKey].value,
+        source: 'verified',
+        sourceExcerpt: custom[snakeKey].source_excerpt ?? anc?.excerpt ?? null,
+        sourcePage: custom[snakeKey].page ?? anc?.page ?? null,
+        documentName: anc?.document_name ?? null,
+        anchor: anc,
+      };
     }
+
+    // AI-suggested values — look up from ai_extracted.compliance_matches
+    const aiMatches = (aiData?.compliance_matches ?? []) as Array<{
+      variable_name: string;
+      value: unknown;
+      source_excerpt?: string;
+      page?: number | null;
+    }>;
+    const aiMatch = aiMatches.find((m) => m.variable_name === snakeKey);
+    if (aiMatch) {
+      return {
+        value: aiMatch.value,
+        source: 'ai',
+        sourceExcerpt: aiMatch.source_excerpt ?? null,
+        sourcePage: aiMatch.page ?? null,
+        documentName: null,
+        anchor: aiMatch.page ? {
+          page: aiMatch.page,
+          excerpt: aiMatch.source_excerpt ?? '',
+          method: 'ai_extraction' as const,
+        } : null,
+      };
+    }
+
+    // Named column fallback
     const aiVal = compState?.[camelKey as keyof typeof compState];
     if (aiVal !== null && aiVal !== undefined) {
-      return { value: aiVal, source: 'ai' };
+      return { value: aiVal, source: 'ai', sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
     }
-    return { value: null, source: null };
+    return { value: null, source: null, sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
   }
 
   // AI-extracted sections from the shredder
@@ -603,6 +675,36 @@ export function CurationWorkspace({
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={async () => {
+                    try {
+                      const resp = await fetch('/api/admin/extract-topics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ solicitationId: sol.id }),
+                      });
+                      const json = await resp.json();
+                      const extracted = json.data?.topics ?? [];
+                      if (extracted.length === 0) {
+                        alert(json.data?.message ?? 'No topics found. Use Bulk Import or + Add Topic instead.');
+                        return;
+                      }
+                      // Pre-fill the bulk import modal with extracted topics
+                      const pasteText = extracted
+                        .map((t: { topicNumber: string; title: string; branch?: string | null }) =>
+                          [t.topicNumber, t.title, t.branch ?? ''].filter(Boolean).join(' | ')
+                        )
+                        .join('\n');
+                      setExtractedPasteText(pasteText);
+                      setShowBulkAddTopics(true);
+                    } catch {
+                      alert('Failed to extract topics from the PDF.');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded"
+                >
+                  Extract Topics
+                </button>
+                <button
                   onClick={() => setShowBulkAddTopics(true)}
                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border border-gray-200"
                 >
@@ -616,11 +718,25 @@ export function CurationWorkspace({
                 </button>
               </div>
             </div>
+            {/* Topic file drop zone */}
+            <TopicFileDropZone
+              solicitationId={sol.id}
+              onUploaded={(results) => {
+                if (results.length > 0) {
+                  // Pre-fill bulk import with the uploaded files' parsed info
+                  const pasteText = results
+                    .map((r) => [r.topicNumber ?? '', r.title].filter(Boolean).join(' | '))
+                    .join('\n');
+                  setExtractedPasteText(pasteText);
+                  setShowBulkAddTopics(true);
+                }
+              }}
+            />
+
             {topicsList.length === 0 ? (
               <p className="text-sm text-gray-400">
-                No topics yet. Extract them from the source document, then add
-                each one so customers can pin individual topics under this
-                solicitation.
+                No topics yet. Extract them from the source document, drop individual topic
+                files above, or add topics manually.
               </p>
             ) : (
               <ul className="space-y-2">
@@ -685,9 +801,14 @@ export function CurationWorkspace({
           {showBulkAddTopics && (
             <BulkAddTopicsModal
               solicitationId={sol.id}
-              onClose={() => setShowBulkAddTopics(false)}
+              initialText={extractedPasteText}
+              onClose={() => {
+                setShowBulkAddTopics(false);
+                setExtractedPasteText('');
+              }}
               onComplete={() => {
                 setShowBulkAddTopics(false);
+                setExtractedPasteText('');
                 router.refresh();
               }}
             />
@@ -750,14 +871,22 @@ export function CurationWorkspace({
                 </span>
               </div>
               <PdfViewer
+                ref={pdfViewerRef}
                 documentId={sourcePdf.id}
                 onTextSelect={handleTextSelect}
+                highlights={annotations.map((a) => ({
+                  id: a.id,
+                  pageNumber: a.pageNumber,
+                  sourceExcerpt: a.sourceExcerpt,
+                  variableName: a.complianceVariableName,
+                }))}
                 width={650}
               />
               {textSelection && (
                 <TagPopover
                   selectedText={textSelection.text}
                   pageNumber={textSelection.pageNumber}
+                  anchor={textSelection.anchor}
                   position={textSelection.rect}
                   variables={variableCatalog}
                   onTag={handleTag}
@@ -805,66 +934,95 @@ export function CurationWorkspace({
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
-                const { value, source } = getComplianceValue(field.key);
+                const { value, source, sourceExcerpt, sourcePage, documentName, anchor: varAnchor } = getComplianceValue(field.key);
                 return (
-                  <div key={field.key} className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
-                    <div className="flex-1">
-                      <span className="text-sm text-gray-700">{field.label}</span>
-                      {source && (
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                          source === 'verified' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {source === 'verified' ? 'Verified' : 'AI'}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {editingVar === field.key ? (
-                        <>
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveVariable(field.key);
-                              if (e.key === 'Escape') { setEditingVar(null); setEditValue(''); }
-                            }}
-                            className="w-32 text-sm border rounded px-2 py-1"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => handleSaveVariable(field.key)}
-                            disabled={loading}
-                            className="text-xs text-green-600 hover:text-green-800 font-medium"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => { setEditingVar(null); setEditValue(''); }}
-                            className="text-xs text-gray-400 hover:text-gray-600"
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <span className={`text-sm font-medium ${value !== null ? 'text-gray-900' : 'text-gray-300'}`}>
-                            {value !== null ? String(value) : '—'}
+                  <div key={field.key} className="py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-700">{field.label}</span>
+                        {source && (
+                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                            source === 'verified' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {source === 'verified' ? 'Verified' : 'AI'}
                           </span>
-                          {['curation_in_progress', 'ai_analyzed', 'claimed'].includes(sol.status) && (
-                            <button
-                              onClick={() => {
-                                setEditingVar(field.key);
-                                setEditValue(value !== null ? String(value) : '');
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingVar === field.key ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveVariable(field.key);
+                                if (e.key === 'Escape') { setEditingVar(null); setEditValue(''); }
                               }}
-                              className="text-xs text-blue-500 hover:text-blue-700"
+                              className="w-32 text-sm border rounded px-2 py-1"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSaveVariable(field.key)}
+                              disabled={loading}
+                              className="text-xs text-green-600 hover:text-green-800 font-medium"
                             >
-                              Edit
+                              Save
                             </button>
-                          )}
-                        </>
-                      )}
+                            <button
+                              onClick={() => { setEditingVar(null); setEditValue(''); }}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className={`text-sm font-medium ${value !== null ? 'text-gray-900' : 'text-gray-300'}`}>
+                              {value !== null ? String(value) : '—'}
+                            </span>
+                            {['curation_in_progress', 'ai_analyzed', 'claimed'].includes(sol.status) && (
+                              <button
+                                onClick={() => {
+                                  setEditingVar(field.key);
+                                  setEditValue(value !== null ? String(value) : '');
+                                }}
+                                className="text-xs text-blue-500 hover:text-blue-700"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {/* Source provenance — doc:page:excerpt with click-to-navigate */}
+                    {(sourceExcerpt || sourcePage) && (
+                      <div className="mt-1 flex items-start gap-1 text-xs">
+                        {documentName && (
+                          <span className="text-gray-400 shrink-0 font-mono">
+                            {documentName.length > 25 ? documentName.slice(0, 22) + '...' : documentName}
+                          </span>
+                        )}
+                        {sourcePage && pdfViewerRef.current && (
+                          <button
+                            onClick={() => pdfViewerRef.current?.highlightText(sourcePage, sourceExcerpt ?? '')}
+                            className="text-indigo-600 hover:text-indigo-800 shrink-0 font-medium"
+                            title={`Navigate to page ${sourcePage} and highlight the source text`}
+                          >
+                            p.{sourcePage}
+                          </button>
+                        )}
+                        {sourcePage && !pdfViewerRef.current && (
+                          <span className="text-gray-400 shrink-0">p.{sourcePage}</span>
+                        )}
+                        {sourceExcerpt && (
+                          <span className="text-gray-400 italic truncate">
+                            &ldquo;{sourceExcerpt.slice(0, 80)}{sourceExcerpt.length > 80 ? '...' : ''}&rdquo;
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1267,15 +1425,17 @@ function parseBulkTopicsText(text: string): {
 
 function BulkAddTopicsModal({
   solicitationId,
+  initialText,
   onClose,
   onComplete,
 }: {
   solicitationId: string;
+  initialText?: string;
   onClose: () => void;
   onComplete: () => void;
 }) {
   const { invoke, loading, error } = useTool();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [defaultBranch, setDefaultBranch] = useState('');
   const [result, setResult] = useState<{ inserted: number; skipped: string[] } | null>(null);
 
@@ -2205,6 +2365,102 @@ function AISuggestionsPanel({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── TopicFileDropZone ─────────────────────────────────────────────
+
+function TopicFileDropZone({
+  solicitationId,
+  onUploaded,
+}: {
+  solicitationId: string;
+  onUploaded: (results: Array<{ documentId: string; topicNumber: string | null; title: string; filename: string }>) => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (!e.dataTransfer.files.length) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    const data = new FormData();
+    data.set('solicitationId', solicitationId);
+    for (const f of Array.from(e.dataTransfer.files)) {
+      data.append('files', f);
+    }
+
+    try {
+      const resp = await fetch('/api/admin/upload-topic-files', {
+        method: 'POST',
+        body: data,
+      });
+      const json = await resp.json();
+      if (!resp.ok) {
+        throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
+      }
+      onUploaded(json.data?.uploaded ?? []);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+      className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+        dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 bg-gray-50'
+      }`}
+    >
+      {uploading ? (
+        <p className="text-sm text-indigo-600 animate-pulse">Uploading topic files...</p>
+      ) : (
+        <>
+          <p className="text-xs text-gray-500">
+            Drop individual topic PDFs here to auto-parse and stage for review
+          </p>
+          <label className="mt-1 text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline">
+            or browse files
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.docx,.doc,.txt"
+              className="sr-only"
+              onChange={async (e) => {
+                if (!e.target.files?.length) return;
+                const data = new FormData();
+                data.set('solicitationId', solicitationId);
+                for (const f of Array.from(e.target.files)) data.append('files', f);
+                setUploading(true);
+                setUploadError(null);
+                try {
+                  const resp = await fetch('/api/admin/upload-topic-files', { method: 'POST', body: data });
+                  const json = await resp.json();
+                  if (!resp.ok) throw new Error(json.error ?? 'Upload failed');
+                  onUploaded(json.data?.uploaded ?? []);
+                } catch (err) {
+                  setUploadError(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          </label>
+        </>
+      )}
+      {uploadError && (
+        <p className="mt-2 text-xs text-red-600">{uploadError}</p>
+      )}
     </div>
   );
 }

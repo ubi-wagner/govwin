@@ -53,6 +53,7 @@ export function UploadForm() {
   const [dragOver, setDragOver] = useState(false);
   const [agency, setAgency] = useState('');
   const [office, setOffice] = useState('');
+  const [dupeLink, setDupeLink] = useState<string | null>(null);
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   const totalMb = totalBytes / 1024 / 1024;
@@ -138,10 +139,16 @@ export function UploadForm() {
       });
       const json = await resp.json();
       if (!resp.ok) {
+        // If it's a duplicate file, show a link to the existing solicitation
+        if (json.code === 'DUPLICATE_FILE' && json.details?.existingSolicitationId) {
+          setError(json.error);
+          setDupeLink(`/admin/rfp-curation/${json.details.existingSolicitationId}`);
+          setStatus('error');
+          return;
+        }
         throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
       }
       setStatus('success');
-      // Navigate to the new workspace
       router.push(`/admin/rfp-curation/${json.data.solicitation_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -313,6 +320,14 @@ export function UploadForm() {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
           {error}
+          {dupeLink && (
+            <a
+              href={dupeLink}
+              className="block mt-2 text-blue-600 hover:text-blue-800 underline font-medium"
+            >
+              Go to the existing solicitation &rarr;
+            </a>
+          )}
         </div>
       )}
 
