@@ -1,304 +1,235 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'RFP Pipeline — AI + Expert Federal R&D Proposal Intelligence',
+  title: 'RFP Pipeline — A Proposal Engine, Not a Proposal Gamble',
   description:
-    'Stop chasing SBIR, STTR, BAA, and OTA solicitations alone. RFP Pipeline combines AI-powered opportunity analysis with hands-on expert curation to help small businesses identify, pursue, and win non-dilutive federal R&D funding.',
+    'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.',
 };
 
-export default function Page() {
+export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-gradient-to-b from-navy-900 to-navy-800">
+      <section className="bg-cream-50">
         <div className="max-w-6xl mx-auto px-6 py-24 md:py-36">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold text-brand-400 uppercase tracking-wider mb-4">
-              Now Accepting Applications &mdash; Founding Cohort Limited to 20
-            </p>
-            <h1 className="font-display text-4xl md:text-6xl font-bold text-white leading-tight">
-              Your AI team.
-              <br />
-              Your expert.
-              <br />
-              <span className="text-brand-400">Your federal R&amp;D pipeline.</span>
-            </h1>
-            <p className="mt-8 text-lg md:text-xl text-gray-300 leading-relaxed">
-              RFP Pipeline pairs custom AI agents with hands-on expert curation to help
-              small businesses identify, analyze, and win SBIR, STTR, BAA, OTA, and other
-              non-dilutive federal R&amp;D funding. Every opportunity is expert-reviewed.
-              Every proposal portal is built specifically for your company. Your data never
-              touches another customer&rsquo;s.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/apply"
-                className="inline-flex items-center justify-center px-8 py-4 bg-brand-600 hover:bg-brand-500 text-white text-lg font-semibold rounded-lg shadow-lg transition-all hover:shadow-xl"
-              >
-                Apply for Access
-              </Link>
-              <Link
-                href="/how-it-works"
-                className="inline-flex items-center justify-center px-8 py-4 border border-gray-500 hover:border-brand-400 text-gray-300 hover:text-white text-lg font-semibold rounded-lg transition-colors"
-              >
-                See How It Works
-              </Link>
+          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">
+            AI + Expert &middot; From Application to Submission
+          </p>
+          <h1 className="font-display text-5xl md:text-7xl font-black text-navy-900 leading-[1.05]">
+            A proposal<br />engine, <span className="font-prose italic text-brand-500">not</span> a<br />proposal<br />gamble.
+          </h1>
+          <p className="mt-8 text-xl md:text-2xl text-navy-600 font-prose italic leading-relaxed max-w-2xl">
+            RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on
+            federal R&amp;D expertise — so small businesses can pursue SBIR, STTR, BAA,
+            and OTA funding without burning a month of payroll on every submission.
+          </p>
+          <div className="mt-10 flex flex-col sm:flex-row gap-4">
+            <Link
+              href="/apply"
+              className="inline-flex items-center justify-center px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg shadow-lg transition-all hover:shadow-xl"
+            >
+              Apply for Founding Cohort
+            </Link>
+            <Link
+              href="/value"
+              className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-200 hover:border-brand-400 text-navy-700 text-lg font-semibold rounded-lg transition-colors"
+            >
+              See How It Works
+            </Link>
+          </div>
+          <p className="mt-5 text-sm text-navy-400">
+            Platform launches June 2026. 20 founding-cohort seats. Applications reviewed weekly.
+          </p>
+        </div>
+      </section>
+
+      {/* Stats bar */}
+      <section className="bg-navy-900 border-y border-navy-800">
+        <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {[
+            { number: '4+', label: 'Federal Sources Ingested' },
+            { number: '72h', label: 'Expert-Review SLA' },
+            { number: '20', label: 'Founding Cohort Cap' },
+            { number: '25+', label: 'Years of Fed R&D Expertise' },
+          ].map((stat) => (
+            <div key={stat.label}>
+              <div className="text-4xl md:text-5xl font-display font-black text-white">
+                {stat.number.replace(/h$/, '')}
+                {stat.number.endsWith('h') && (
+                  <span className="font-prose italic text-citrus">h</span>
+                )}
+                {stat.number.endsWith('+') ? '' : ''}
+              </div>
+              <div className="mt-2 text-xs text-navy-400 uppercase tracking-widest">{stat.label}</div>
             </div>
-            <p className="mt-6 text-sm text-gray-500">
-              $299/month after acceptance. No free trial. Cancel anytime.
+          ))}
+        </div>
+      </section>
+
+      {/* Six stages */}
+      <section className="bg-white">
+        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
+          <div className="flex flex-col md:flex-row items-baseline gap-6 mb-16">
+            <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
+              Six stages from curious <span className="font-prose italic text-brand-500">applicant</span> to
+              compliant proposal <span className="font-prose italic text-brand-500">submission</span>.
+            </h2>
+            <p className="text-sm uppercase tracking-widest text-navy-400 shrink-0">
+              Value from Day One —<br />Not Six Months From Now
             </p>
           </div>
-        </div>
-      </section>
 
-      {/* The Problem */}
-      <section className="bg-white border-t">
-        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-800">
-              Small businesses shouldn&rsquo;t need a full BD department to win federal R&amp;D funding
-            </h2>
-            <p className="mt-6 text-lg text-gray-600 leading-relaxed">
-              You built something innovative. The government wants to fund it. But between
-              SAM.gov&rsquo;s firehose, 50-page solicitations, compliance matrices, and the
-              crushing time pressure of a 30-day response window, most small businesses
-              either miss the right opportunities or submit proposals that don&rsquo;t comply.
-            </p>
-          </div>
-          <div className="mt-16 grid md:grid-cols-3 gap-8">
-            <ProblemCard
-              number="01"
-              title="Opportunities buried in noise"
-              body="SAM.gov publishes thousands of listings daily. SBIR.gov, Grants.gov, and agency-specific portals add more. Finding the ones aligned with YOUR technology takes hours every day."
-            />
-            <ProblemCard
-              number="02"
-              title="Compliance is a minefield"
-              body="Page limits, font requirements, required sections, evaluation criteria, partner caps, PI rules, ITAR restrictions. Miss one and your proposal is non-compliant on page one."
-            />
-            <ProblemCard
-              number="03"
-              title="Proposal development is brutal"
-              body="Building a Phase I proposal from scratch takes 80-120 hours. For a small team already doing the actual R&D, that's an impossible time tax. Most give up or submit weak proposals."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Three Pillars */}
-      <section className="bg-gray-50 border-t">
-        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="text-center">
-            <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">How We Solve It</p>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-800">
-              Three services. One platform. Zero guesswork.
-            </h2>
-          </div>
-          <div className="mt-16 grid md:grid-cols-3 gap-10">
-            <Pillar
-              label="Service 1"
-              title="Spotlight"
-              subtitle="$299/month"
-              features={[
-                'Daily ingestion from SAM.gov, SBIR.gov, Grants.gov, and agency portals',
-                'AI-powered analysis and ranking against your company profile',
-                'Expert-curated compliance matrices for every opportunity',
-                'Notifications and deadline reminders for your tech areas',
-                'Monthly 15-minute Ask-the-Expert call with Eric (rolls over)',
-                'Cancel anytime. No contracts.',
-              ]}
-              highlighted={false}
-            />
-            <Pillar
-              label="Service 2"
-              title="Proposal Portal"
-              subtitle="From $999 per proposal"
-              features={[
-                'Expert-reviewed compliance matrix within 72 hours of purchase',
-                'Stage-gated proposal workspace with automated drafting',
-                'AI agents trained exclusively on YOUR company data',
-                'Collaborator access controls by section, phase, and role',
-                'Draft generation: technical volume, cost volume, abstract',
-                'Review-revise-accept workflow with version tracking',
-              ]}
-              highlighted={true}
-            />
-            <Pillar
-              label="Service 3"
-              title="Expert Access"
-              subtitle="Included + on-demand"
-              features={[
-                '15 min/month included with Spotlight (accumulates unused)',
-                'Additional consulting at $500/hour based on availability',
-                'Pre-submission review and strategy sessions',
-                'Pursuit / no-pursuit recommendations with rationale',
-                'Agency-specific guidance: DoD, NSF, DOE, DARPA, DOT',
-                'Direct access to Eric &mdash; not a help desk',
-              ]}
-              highlighted={false}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Why Different */}
-      <section className="bg-white border-t">
-        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="grid md:grid-cols-2 gap-16 items-start">
-            <div>
-              <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">Why We&rsquo;re Different</p>
-              <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-800">
-                AI + Expert, not AI instead of Expert
-              </h2>
-              <p className="mt-6 text-lg text-gray-600 leading-relaxed">
-                Every other &ldquo;AI proposal tool&rdquo; gives you a generic LLM pointed at your
-                document. That&rsquo;s a recipe for confident-sounding non-compliance.
-              </p>
-              <p className="mt-4 text-lg text-gray-600 leading-relaxed">
-                RFP Pipeline is different. Every solicitation that enters our system is
-                reviewed and curated by a human expert with 25+ years of federal R&amp;D
-                funding experience. The AI agents assigned to your company are trained
-                exclusively on your data and our expert-curated compliance intelligence.
-                They never see another customer&rsquo;s information.
-              </p>
-            </div>
-            <div className="space-y-6">
-              <DiffPoint
-                title="Your data is yours alone"
-                body="Every customer gets isolated AI agents, isolated storage, and isolated processing. Your company data, uploaded documents, and proposal drafts are never accessible to other customers or used to train models."
-              />
-              <DiffPoint
-                title="The AI gets smarter each cycle"
-                body="Every compliance value our expert verifies becomes training data for future cycles of the same program. By your third proposal, the AI pre-fills 80%+ of the compliance matrix automatically."
-              />
-              <DiffPoint
-                title="Collaborate without risk"
-                body="Invite partners, subcontractors, and team members to specific sections of specific proposals. Control access by role, document, and proposal phase. Revoke instantly."
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Program Types */}
-      <section className="bg-gray-50 border-t">
-        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="text-center">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-800">
-              Built for small businesses pursuing federal R&amp;D funding
-            </h2>
-            <p className="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
-              If you&rsquo;re commercializing innovative technology and want non-dilutive funding
-              from DoD, NSF, DOE, DARPA, DOT, or other federal agencies, this is for you.
-            </p>
-          </div>
-          <div className="mt-12 grid sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {([
-              { label: 'SBIR Phase I & II', desc: 'Small Business Innovation Research across all agencies' },
-              { label: 'STTR', desc: 'Small Business Technology Transfer with university research partners' },
-              { label: 'BAA', desc: 'Broad Agency Announcements for advanced research programs' },
-              { label: 'OTA & CSO', desc: 'Other Transaction Authority and Commercial Solutions Openings' },
-            ] as const).map((item) => (
-              <div key={item.label} className="p-5 bg-white rounded-lg border border-gray-200 hover:border-brand-300 transition-colors">
-                <h3 className="font-display font-bold text-navy-800">{item.label}</h3>
-                <p className="mt-2 text-sm text-gray-500">{item.desc}</p>
+          <div className="grid md:grid-cols-3 gap-px bg-navy-100 border border-navy-100 rounded-xl overflow-hidden">
+            {[
+              { num: '01', title: 'Apply', subtitle: 'Short application.', body: 'Company info, SAM.gov status, prior awards, tech summary. Filters tire-kickers. Nothing paid yet.' },
+              { num: '02', title: 'Accepted', subtitle: 'Expert reviews every one.', body: 'Personal review within 72 hours. Brief onboarding call. If you\'re a fit for the cohort, you get an invite link.' },
+              { num: '03', title: 'Onboard', subtitle: 'Your library goes live.', body: 'Upload capability statement, past performance, key personnel. Activate subscription. Your AI agents provisioned.' },
+              { num: '04', title: 'Spotlight', subtitle: 'Daily curated pipeline.', body: 'SAM.gov, SBIR.gov, Grants.gov, and agency portals ingested every day. Expert-curated matches ranked to your technology innovation areas.' },
+              { num: '05', title: 'Purchase Portal', subtitle: 'Pay per build.', body: 'Purchase individual Proposal Portal when you find a fit. Expert builds the compliance matrix in 72 hours. AI drafts against your library. Your team revises.' },
+              { num: '06', title: 'Submit & Learn', subtitle: 'The system gets smarter.', body: 'Every submission, every verified value, every debrief feeds future cycles. The AI gets more accurate — and intelligent — enabling proposal development at scale.' },
+            ].map((step) => (
+              <div key={step.num} className="bg-cream-50 p-8">
+                <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">
+                  {step.num} — {step.title}
+                </p>
+                <h3 className="font-display text-lg font-bold text-navy-900">
+                  {step.subtitle.split(/(\*[^*]+\*)/g).map((part, i) =>
+                    part.startsWith('*') ? (
+                      <span key={i} className="font-prose italic text-brand-500">{part.slice(1, -1)}</span>
+                    ) : part
+                  )}
+                </h3>
+                <p className="mt-3 text-sm text-navy-600 leading-relaxed">{step.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Expert Teaser */}
-      <section className="bg-white border-t">
-        <div className="max-w-4xl mx-auto px-6 py-20 md:py-28 text-center">
-          <p className="text-sm font-semibold text-brand-600 uppercase tracking-wider mb-3">Your Expert</p>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-800">
-            Eric Wagner
+      {/* Pricing snapshot */}
+      <section className="bg-navy-900">
+        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
+          <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">How We Charge</p>
+          <h2 className="font-display text-3xl md:text-4xl font-black text-white leading-tight">
+            One subscription.<br />
+            Per-proposal <span className="font-prose italic text-citrus">portals</span>.
           </h2>
-          <p className="mt-6 text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA
-            funding secured. Former president of a $300M aerospace &amp; defense company. Ohio State
-            commercialization veteran who launched 22+ startups. Executive MBA + BS Computer Science.
+          <p className="mt-4 text-lg text-navy-300 font-prose italic max-w-2xl leading-relaxed">
+            Priced and built specifically for small businesses, not enterprise. Low cost subscription
+            provides find and remind capabilities. Per proposal pricing ensures you only pay for
+            builds you choose.
           </p>
-          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Eric personally reviews every solicitation, curates every compliance matrix, and is available
-            for direct consultation. This is not a help desk. This is a senior BD partner who happens to
-            have built the AI that supports him.
-          </p>
-          <Link
-            href="/the-expert"
-            className="mt-8 inline-flex items-center text-brand-600 hover:text-brand-800 font-semibold transition-colors"
-          >
-            Read Eric&rsquo;s full background &rarr;
-          </Link>
+
+          <div className="mt-14 grid md:grid-cols-3 gap-6">
+            <div className="bg-navy-800 border border-navy-700 rounded-xl p-8">
+              <p className="text-xs uppercase tracking-widest text-citrus-400 mb-1">Required &middot; Monthly</p>
+              <h3 className="font-display text-xl font-bold text-white">Spotlight <span className="font-prose italic text-citrus">Subscription</span>.</h3>
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-4xl font-display font-black text-white">$299</span>
+                <span className="text-navy-400">/mo</span>
+              </div>
+              <p className="mt-3 text-sm text-navy-300 leading-relaxed">
+                Daily ingestion. AI-powered ranking against your profile. Expert-curated compliance matrix.
+                Deadline alerts. 15 min of Ask-the-Expert each month (rolls over).
+              </p>
+              <p className="mt-4 text-xs text-navy-500 uppercase tracking-wider">Required to purchase any portal</p>
+            </div>
+            <div className="bg-navy-800 border border-navy-700 rounded-xl p-8">
+              <p className="text-xs uppercase tracking-widest text-brand-400 mb-1">Per-Proposal</p>
+              <h3 className="font-display text-xl font-bold text-white">Phase I — <span className="font-prose italic text-brand-400">Like Effort</span>.</h3>
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-4xl font-display font-black text-white">$999</span>
+                <span className="text-navy-400">per proposal</span>
+              </div>
+              <p className="mt-3 text-sm text-navy-300 leading-relaxed">
+                SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour curation by Expert.
+                Stage-gated workspace. Custom AI drafting.
+              </p>
+            </div>
+            <div className="bg-navy-800 border border-navy-700 rounded-xl p-8">
+              <p className="text-xs uppercase tracking-widest text-brand-400 mb-1">Per-Proposal</p>
+              <h3 className="font-display text-xl font-bold text-white">Phase II — <span className="font-prose italic text-brand-400">Like Effort</span>.</h3>
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-4xl font-display font-black text-white">$1,999</span>
+                <span className="text-navy-400">per proposal</span>
+              </div>
+              <p className="mt-3 text-sm text-navy-300 leading-relaxed">
+                SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20-50+ page tech volumes.
+                Commercialization plans included.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Bottom CTA */}
+      {/* Expert gate */}
+      <section className="bg-cream-50 border-t border-cream-200">
+        <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-4">The Expert Gate</p>
+              <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900 leading-tight">
+                The AI drafts.<br />The Expert <span className="font-prose italic text-brand-500">verifies</span>.<br />Your Team collaborates.
+              </h2>
+            </div>
+            <div className="bg-white border border-cream-200 rounded-xl p-8">
+              <p className="text-xs uppercase tracking-widest text-brand-500 mb-2">Eric Wagner — Founder &amp; Architect</p>
+              <h3 className="font-prose italic text-2xl text-navy-800">
+                25 years of federal R&amp;D funding.
+              </h3>
+              <p className="mt-4 text-sm text-navy-600 leading-relaxed">
+                The Expert personally reviews every application, curates every solicitation
+                released into your Spotlight, and is available for pre-submission review.
+                As the service scales, additional experts will join the roster — you will
+                always know which expert reviewed your pipeline.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-navy-600">
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-award rounded-full" /> 72-hour application &amp; curation SLA</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-award rounded-full" /> 15 min of strategy calls per month</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-award rounded-full" /> Agency-specific: DoD, NSF, DOE, DARPA, DOT</li>
+                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-award rounded-full" /> Additional time on demand — $500/hr</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quote */}
+      <section className="bg-cream-100 border-y border-cream-200">
+        <div className="max-w-4xl mx-auto px-6 py-16 text-center">
+          <blockquote className="font-prose italic text-2xl md:text-3xl text-navy-800 leading-relaxed">
+            &ldquo;Free trials attract tire-kickers who waste expert time that serious applicants need.
+            The application itself is the qualifier.&rdquo;
+          </blockquote>
+          <p className="mt-6 text-xs uppercase tracking-widest text-navy-400">— Why No Free Trial</p>
+        </div>
+      </section>
+
+      {/* Final CTA */}
       <section className="bg-navy-900">
-        <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-white">
-            Ready to stop leaving federal R&amp;D money on the table?
+        <div className="max-w-4xl mx-auto px-6 py-24 text-center">
+          <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">
+            Applications Open &middot; Launch 01 Jun 2026
+          </p>
+          <h2 className="font-display text-3xl md:text-5xl font-black text-white leading-tight">
+            Apply today. Draft your <span className="font-prose italic text-citrus">first</span><br />
+            proposal on launch day.
           </h2>
-          <p className="mt-4 text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            We&rsquo;re accepting 20 founding members for our initial cohort. Apply now and
-            join the small businesses turning AI + expertise into a competitive
-            advantage for federal R&amp;D funding.
-          </p>
-          <Link
-            href="/apply"
-            className="mt-10 inline-flex items-center justify-center px-10 py-4 bg-brand-600 hover:bg-brand-500 text-white text-lg font-semibold rounded-lg shadow-lg transition-all hover:shadow-xl"
-          >
-            Apply for Founding Membership
-          </Link>
-          <p className="mt-4 text-sm text-gray-500">
-            $299/month after acceptance. Includes Spotlight + monthly expert call. Cancel anytime.
-          </p>
+          <div className="mt-10">
+            <Link
+              href="/apply"
+              className="inline-flex items-center justify-center px-10 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg shadow-lg transition-all hover:shadow-xl"
+            >
+              Apply Now
+            </Link>
+          </div>
+          <div className="mt-8 flex items-center justify-center gap-6 text-sm text-navy-400">
+            <span>Founder &amp; Architect</span>
+            <span className="text-cream-200 font-semibold">Eric Wagner</span>
+            <a href="mailto:eric@rfppipeline.com" className="text-citrus-400 hover:text-citrus-300">eric@rfppipeline.com</a>
+          </div>
         </div>
       </section>
     </>
-  );
-}
-
-function ProblemCard({ number, title, body }: { number: string; title: string; body: string }) {
-  return (
-    <div className="relative p-6">
-      <span className="text-5xl font-bold text-brand-100 font-display">{number}</span>
-      <h3 className="mt-2 font-display text-xl font-semibold text-navy-800">{title}</h3>
-      <p className="mt-3 text-gray-600 leading-relaxed">{body}</p>
-    </div>
-  );
-}
-
-function Pillar({
-  label, title, subtitle, features, highlighted,
-}: {
-  label: string; title: string; subtitle: string; features: string[]; highlighted: boolean;
-}) {
-  return (
-    <div className={`p-8 rounded-xl border-2 ${
-      highlighted ? 'border-brand-500 bg-white shadow-lg' : 'border-gray-200 bg-white'
-    }`}>
-      <p className="text-xs font-semibold text-brand-600 uppercase tracking-wider">{label}</p>
-      <h3 className="mt-2 font-display text-2xl font-bold text-navy-800">{title}</h3>
-      <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
-      <ul className="mt-6 space-y-3">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-            <span className="mt-1.5 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-            <span dangerouslySetInnerHTML={{ __html: f }} />
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function DiffPoint({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="p-5 bg-gray-50 rounded-lg border border-gray-100">
-      <h3 className="font-display font-semibold text-navy-800">{title}</h3>
-      <p className="mt-2 text-sm text-gray-600 leading-relaxed">{body}</p>
-    </div>
   );
 }
