@@ -51,6 +51,8 @@ import { volumeDeleteTool } from './volume-delete';
 import { volumeAddRequiredItemTool } from './volume-add-required-item';
 import { volumeUpdateRequiredItemTool } from './volume-update-required-item';
 import { volumeDeleteRequiredItemTool } from './volume-delete-required-item';
+// Canvas document system: library atom persistence
+import { librarySaveAtomTool } from './library-save-atom';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -83,6 +85,7 @@ register(volumeDeleteTool);
 register(volumeAddRequiredItemTool);
 register(volumeUpdateRequiredItemTool);
 register(volumeDeleteRequiredItemTool);
+register(librarySaveAtomTool);
 
 // Re-export common surface so callers can import from a single path.
 export {
