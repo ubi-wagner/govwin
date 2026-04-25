@@ -3,8 +3,9 @@
 **Purpose:** Running handoff document. Any future Claude session reading
 this should pick up cleanly from the last state.
 
-**Last updated:** 2026-04-24 — Phase 1 curation BUILT, marketing live,
-architecture documented, agent fabric design next.
+**Last updated:** 2026-04-25 — Canvas document system BUILT (renderer,
+sidebar, editor, .docx export, library.save_atom tool). Agent fabric +
+canvas architecture documents complete.
 
 **Authoritative architecture:** [`docs/ARCHITECTURE_DAY365.md`](./ARCHITECTURE_DAY365.md)
 — 14 sections, 5 Mermaid diagrams, full status matrix, 6-week critical
@@ -16,7 +17,9 @@ path to June 1 launch. READ THAT FIRST.
 
 **Branch:** `claude/analyze-project-status-KbAhg` — ~25 commits ahead of main.
 **Tests:** 327 total (152 pipeline + 175 frontend), all passing.
-**Migrations:** 001–015, all deployed to prod, all idempotent.
+**Migrations:** 001–017 (015 deployed to prod; 016-017 on branch).
+**Tools:** 29 registered in the dual-use registry.
+**Design docs:** ARCHITECTURE_DAY365.md, AGENT_FABRIC_DESIGN.md, CANVAS_DOCUMENT_ARCHITECTURE.md.
 **Deployment:** Railway auto-deploys frontend + pipeline on merge to main.
 Migrations auto-apply via `migrate.yml` when `db/migrations/**` changes.
 
@@ -58,6 +61,21 @@ master→customer sandbox. Global SHA-256 dedup.
 
 **Source anchors:** Universal SourceAnchor type stored on annotations,
 compliance values, memory. %-based bounding rects.
+
+### Canvas Document System (April 25)
+- **Canvas types:** CanvasDocument, CanvasNode (12 types), FontSpec,
+  NodeEdit. 4 presets (letter standard, SBIR Phase I/II, CSO slides).
+- **Canvas renderer:** WYSIWYG page at actual dimensions with header/footer,
+  per-node type-specific rendering, click-to-select, inline editing.
+- **Canvas sidebar:** compliance status, node detail + history, add content.
+- **Canvas editor:** full CRUD on nodes (add, edit, move, accept, revert,
+  delete), dirty state tracking, save + export buttons.
+- **.docx export:** CanvasDocument JSON → Word doc via `docx` npm package
+  with exact font/margin/header/footer compliance.
+- **library.save_atom tool:** saves accepted nodes to library_units with
+  full provenance, dedup by atom_hash. Tool #29.
+- **Migration 017:** document_templates, canvas_versions, library_units
+  outcome tracking (outcome, outcome_score, original_proposal_id).
 
 ---
 
