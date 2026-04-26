@@ -126,6 +126,32 @@ export async function getSignedGetUrl(key: string, expiresInSeconds = 900): Prom
 }
 
 /**
+ * Presigned PUT URL for direct browser-to-S3 uploads.
+ * Bypasses Next.js body limits — critical for large files (300MB+).
+ * Default TTL is 15 minutes.
+ */
+export async function getSignedPutUrl(
+  key: string,
+  contentType?: string,
+  expiresInSeconds = 900,
+): Promise<string> {
+  try {
+    return await getSignedUrl(
+      s3,
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        ContentType: contentType || 'application/octet-stream',
+      }),
+      { expiresIn: expiresInSeconds },
+    );
+  } catch (e) {
+    console.error('[s3.getSignedPutUrl] failed', { key, err: String(e) });
+    throw new Error('storage presign-put failed');
+  }
+}
+
+/**
  * Health check — verifies the bucket is reachable.
  * Used by /api/health and pipeline /healthz.
  */

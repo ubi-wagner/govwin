@@ -87,22 +87,55 @@ export default function AdminFileManager() {
     loadListing(currentPrefix);
   }, [currentPrefix, loadListing]);
 
-  // ── Upload handler ─────────────────────────────────────────────────
+  // ── Upload handler — presigned URL flow (supports 500MB+ files) ────
   const handleUpload = async (files: FileList | File[]) => {
     setUploading(true);
     setError(null);
     try {
       for (const file of Array.from(files)) {
-        const form = new FormData();
-        form.append('file', file);
-        form.append('prefix', currentPrefix);
-        const res = await fetch('/api/admin/storage', {
-          method: 'POST',
-          body: form,
+        // Step 1: Get a presigned PUT URL from our API
+        const presignRes = await fetch('/api/admin/storage', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            prefix: currentPrefix,
+            contentType: file.type || 'application/octet-stream',
+          }),
         });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error ?? `Upload failed: HTTP ${res.status}`);
+        if (!presignRes.ok) {
+          const body = await presignRes.json().catch(() => ({}));
+          throw new Error(body.error ?? 'Failed to get upload URL');
+        }
+        const { data: presign } = await presignRes.json();
+
+        // Step 2: Upload directly to S3 (bypasses Next.js body limit)
+        const uploadRes = await fetch(presign.url, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        });
+        if (!uploadRes.ok) {
+          throw new Error(`Direct upload failed: HTTP ${uploadRes.status}`);
+        }
+
+        // Step 3: Confirm upload + trigger auto-ingest
+        const confirmRes = await fetch('/api/admin/storage', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: presign.key }),
+        });
+        if (!confirmRes.ok) {
+          const body = await confirmRes.json().catch(() => ({}));
+          throw new Error(body.error ?? 'Upload confirmation failed');
+        }
+
+        const { data: confirm } = await confirmRes.json();
+        if (confirm.sbirIngest && !confirm.sbirIngest.isDuplicate) {
+          setError(null); // clear any previous error
+          alert(`SBIR data ingested: ${confirm.sbirIngest.rowCount} ${confirm.sbirIngest.fileType} records loaded`);
+        } else if (confirm.sbirIngest?.isDuplicate) {
+          alert('This SBIR data file was already ingested (duplicate detected by file hash)');
         }
       }
       await loadListing(currentPrefix);

@@ -1,7 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['pg', 'postgres', 'bcryptjs'],
+  serverExternalPackages: ['pg', 'postgres', 'bcryptjs', 'mammoth', 'pdf-parse'],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '500mb',
+    },
+  },
 };
 
 export default nextConfig;
