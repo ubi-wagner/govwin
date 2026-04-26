@@ -133,7 +133,14 @@ export default function LibraryUploadForm({
         );
 
         // Simulate a brief pause to show the "atomizing" state
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        // Then trigger actual atomization
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        try {
+          await fetch(`/api/portal/${tenantSlug}/library/atomize`, { method: 'POST' });
+        } catch {
+          // atomization failure is non-fatal — docs are uploaded, atoms come later
+        }
 
         setItems((prev) =>
           prev.map((it, i) =>
