@@ -76,43 +76,69 @@ export async function POST(request: Request, ctx: RouteContext) {
       WHERE id = ${id}
     `;
 
-    // Create tenant
+    // Create or find existing tenant
     const slug = slugify(app.companyName);
-    const [tenant] = await sql<{ id: string }[]>`
-      INSERT INTO tenants (name, slug, status)
-      VALUES (${app.companyName}, ${slug}, 'active')
-      RETURNING id
+    let tenantId: string;
+    const [existingTenant] = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE slug = ${slug} LIMIT 1
     `;
+    if (existingTenant) {
+      tenantId = existingTenant.id;
+    } else {
+      const [newTenant] = await sql<{ id: string }[]>`
+        INSERT INTO tenants (name, slug, status)
+        VALUES (${app.companyName}, ${slug}, 'active')
+        RETURNING id
+      `;
+      tenantId = newTenant.id;
+    }
 
-    // Create user with temp password
+    // Create or find existing user, reset temp password for re-acceptance
     const tempPw = crypto.randomUUID().slice(0, 12);
     const hash = await bcrypt.hash(tempPw, 12);
+    let newUserId: string;
 
-    const [newUser] = await sql<{ id: string }[]>`
-      INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
-      VALUES (
-        ${app.contactEmail.toLowerCase().trim()},
-        ${app.contactName},
-        'tenant_admin',
-        ${tenant.id},
-        ${hash},
-        true,
-        true
-      )
-      RETURNING id
+    const [existingUser] = await sql<{ id: string }[]>`
+      SELECT id FROM users WHERE LOWER(email) = ${app.contactEmail.toLowerCase().trim()} LIMIT 1
     `;
+    if (existingUser) {
+      newUserId = existingUser.id;
+      await sql`
+        UPDATE users
+        SET password_hash = ${hash},
+            temp_password = true,
+            tenant_id = ${tenantId},
+            is_active = true
+        WHERE id = ${existingUser.id}
+      `;
+    } else {
+      const [created] = await sql<{ id: string }[]>`
+        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
+        VALUES (
+          ${app.contactEmail.toLowerCase().trim()},
+          ${app.contactName},
+          'tenant_admin',
+          ${tenantId},
+          ${hash},
+          true,
+          true
+        )
+        RETURNING id
+      `;
+      newUserId = created.id;
+    }
 
     // Emit system event
     await emitEventSingle({
       namespace: 'identity',
       type: 'tenant.created',
       actor: userActor(userId, (session.user as { email?: string }).email),
-      tenantId: tenant.id,
+      tenantId: tenantId,
       payload: {
         applicationId: id,
         tenantSlug: slug,
         tenantName: app.companyName,
-        userId: newUser.id,
+        userId: newUserId,
         contactEmail: app.contactEmail,
         reviewNotes: reviewNotes || null,
       },
@@ -135,9 +161,9 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({
       data: {
-        tenantId: tenant.id,
+        tenantId: tenantId,
         tenantSlug: slug,
-        userId: newUser.id,
+        userId: newUserId,
         contactEmail: app.contactEmail,
         contactName: app.contactName,
         companyName: app.companyName,
