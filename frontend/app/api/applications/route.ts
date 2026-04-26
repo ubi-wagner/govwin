@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
+import { sendEmail } from '@/lib/email';
+import { adminNewApplicationAlert } from '@/lib/email-templates';
 
 const ApplicationSchema = z.object({
   contactEmail: z.string().email().max(200),
@@ -173,6 +175,21 @@ export async function POST(request: Request) {
       actor: { type: 'system', id: 'public-apply' },
       tenantId: null,
       payload: { applicationId: rows[0]?.id, companyName: input.companyName },
+    });
+
+    // Notify admin of new application
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'eric@rfppipeline.com';
+    const adminEmailContent = adminNewApplicationAlert({
+      companyName: input.companyName,
+      contactName: input.contactName,
+      contactEmail: input.contactEmail,
+      techSummary: input.techSummary.slice(0, 300),
+      adminDashboardUrl: `${process.env.NEXTAUTH_URL || ''}/admin/applications`,
+    });
+    await sendEmail({
+      to: adminEmail,
+      subject: adminEmailContent.subject,
+      html: adminEmailContent.html,
     });
 
     return NextResponse.json({ data: { id: rows[0].id } }, { status: 201 });

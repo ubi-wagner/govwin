@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { sendEmail } from '@/lib/email';
+import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -114,6 +116,21 @@ export async function POST(request: Request, ctx: RouteContext) {
         contactEmail: app.contactEmail,
         reviewNotes: reviewNotes || null,
       },
+    });
+
+    // Send welcome email with credentials
+    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+    const emailContent = applicationAcceptedEmail({
+      contactName: app.contactName,
+      companyName: app.companyName,
+      tempPassword: tempPw,
+      tenantSlug: slug,
+      loginUrl,
+    });
+    await sendEmail({
+      to: app.contactEmail,
+      subject: emailContent.subject,
+      html: emailContent.html,
     });
 
     return NextResponse.json({

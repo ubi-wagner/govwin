@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { sendEmail } from '@/lib/email';
+import { applicationRejectedEmail } from '@/lib/email-templates';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -40,8 +42,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify application exists and is actionable
-    const [app] = await sql<{ id: string; status: string }[]>`
-      SELECT id, status
+    const [app] = await sql<{ id: string; status: string; contactName: string; contactEmail: string; companyName: string }[]>`
+      SELECT id, status, contact_name, contact_email, company_name
       FROM applications
       WHERE id = ${id}
       LIMIT 1
@@ -77,6 +79,18 @@ export async function POST(request: Request, ctx: RouteContext) {
         applicationId: id,
         reason: reason || null,
       },
+    });
+
+    // Send rejection email
+    const emailContent = applicationRejectedEmail({
+      contactName: app.contactName,
+      companyName: app.companyName,
+      reason: reason,
+    });
+    await sendEmail({
+      to: app.contactEmail,
+      subject: emailContent.subject,
+      html: emailContent.html,
     });
 
     return NextResponse.json({ data: { rejected: true } });
