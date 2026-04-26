@@ -16,7 +16,7 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-export async function POST(_request: Request, ctx: RouteContext) {
+export async function POST(request: Request, ctx: RouteContext) {
   try {
     const session = await auth();
     if (!session?.user) {
@@ -32,6 +32,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (!userId) {
       return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
     }
+
+    // Parse optional review notes from request body
+    let reviewNotes = '';
+    try {
+      const body = await request.json();
+      if (typeof body.reviewNotes === 'string') reviewNotes = body.reviewNotes.trim();
+    } catch { }
 
     // Fetch application
     const [app] = await sql<{
@@ -62,7 +69,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
       UPDATE applications
       SET status = 'accepted',
           reviewed_by = ${userId},
-          reviewed_at = now()
+          reviewed_at = now(),
+          review_notes = ${reviewNotes || null}
       WHERE id = ${id}
     `;
 
@@ -104,6 +112,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         tenantName: app.companyName,
         userId: newUser.id,
         contactEmail: app.contactEmail,
+        reviewNotes: reviewNotes || null,
       },
     });
 

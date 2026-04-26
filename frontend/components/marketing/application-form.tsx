@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { TERMS_TEXT, TERMS_VERSION } from '@/lib/terms';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -32,9 +33,22 @@ export function ApplicationForm() {
   const [targetPrograms, setTargetPrograms] = useState<string[]>([]);
   const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
   const [desiredOutcomes, setDesiredOutcomes] = useState<string[]>([]);
+  const [tcOpen, setTcOpen] = useState(false);
+  const [tcScrolledToBottom, setTcScrolledToBottom] = useState(false);
+  const [tcSignature, setTcSignature] = useState('');
+  const [tcAccepted, setTcAccepted] = useState(false);
+  const tcRef = useRef<HTMLDivElement>(null);
 
-  function toggle(list: string[], setList: (x: string[]) => void, value: string) {
+  const toggle = useCallback((list: string[], setList: (x: string[]) => void, value: string) => {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  }, []);
+
+  function handleTcScroll() {
+    const el = tcRef.current;
+    if (!el) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+      setTcScrolledToBottom(true);
+    }
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -51,7 +65,11 @@ export function ApplicationForm() {
       contactTitle: String(data.get('contactTitle') ?? '').trim() || null,
       contactPhone: String(data.get('contactPhone') ?? '').trim() || null,
       companyName: String(data.get('companyName') ?? '').trim(),
-      companyWebsite: String(data.get('companyWebsite') ?? '').trim() || null,
+      companyWebsite: (() => {
+        let w = String(data.get('companyWebsite') ?? '').trim();
+        if (w && !w.startsWith('http://') && !w.startsWith('https://')) w = 'https://' + w.replace(/^\/\//, '');
+        return w || null;
+      })(),
       companySize: String(data.get('companySize') ?? '') || null,
       companyState: String(data.get('companyState') ?? '').trim() || null,
       samRegistered: data.get('samRegistered') === 'yes',
@@ -65,13 +83,22 @@ export function ApplicationForm() {
       targetPrograms,
       targetAgencies,
       desiredOutcomes,
-      motivation: String(data.get('motivation') ?? '').trim() || null,
-      referralSource: String(data.get('referralSource') ?? '').trim() || null,
-      termsAccepted: data.get('termsAccepted') === 'on',
+      motivation: String(data.get('motivation') ?? '').trim(),
+      referralSource: String(data.get('referralSource') ?? '').trim(),
+      termsAccepted: tcAccepted,
+      termsSignature: tcSignature,
+      termsVersion: TERMS_VERSION,
     };
 
-    if (!payload.termsAccepted) {
-      setError('You must accept the Terms & Conditions to apply.');
+    if (!tcAccepted) {
+      setError('You must review and accept the Terms & Conditions to apply.');
+      setStatus('error');
+      return;
+    }
+
+    const emailField = String(data.get('contactEmail') ?? '').trim().toLowerCase();
+    if (tcSignature.toLowerCase() !== emailField) {
+      setError('Your Terms & Conditions signature must match your contact email.');
       setStatus('error');
       return;
     }
@@ -140,7 +167,8 @@ export function ApplicationForm() {
             <input name="companyName" required type="text" className="form-input" />
           </Field>
           <Field label="Website">
-            <input name="companyWebsite" type="url" className="form-input" placeholder="https://..." />
+            <input name="companyWebsite" type="text" className="form-input" placeholder="www.yourcompany.com" />
+            <span className="text-xs text-gray-400 mt-0.5 block">We&rsquo;ll add https:// automatically</span>
           </Field>
           <Field label="Company size">
             <select name="companySize" className="form-input">
@@ -239,35 +267,108 @@ export function ApplicationForm() {
       </Fieldset>
 
       {/* Why */}
-      <Fieldset title="Why RFP Pipeline?" description="Optional but helpful context.">
-        <Field label="What's driving your interest right now?">
+      <Fieldset title="Why RFP Pipeline?" description="Help us understand your goals.">
+        <Field label="What's driving your interest right now?" required>
           <textarea
             name="motivation"
+            required
             rows={3}
             className="form-input"
             placeholder="E.g. upcoming AFWERX cycle, Phase II gap, commercializing IP from a specific R&D effort..."
           />
         </Field>
-        <Field label="How did you hear about us?">
-          <input name="referralSource" type="text" className="form-input" placeholder="LinkedIn, referral, search, event..." />
+        <Field label="How did you hear about us?" required>
+          <input name="referralSource" required type="text" className="form-input" placeholder="LinkedIn, referral, search, event..." />
         </Field>
       </Fieldset>
 
-      {/* Terms */}
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <label className="flex items-start gap-3 text-sm text-gray-700">
-          <input type="checkbox" name="termsAccepted" required className="mt-1" />
-          <span>
-            I have read and agree to the{' '}
-            <a href="/legal/terms" target="_blank" className="text-brand-600 hover:text-brand-800 underline">
-              Terms &amp; Conditions
-            </a>{' '}
-            and acknowledge that (a) acceptance is at Eric&rsquo;s discretion, (b) if accepted,
-            I will onboard by registering my admin, uploading foundational company documents,
-            and activating a $299/month Spotlight subscription via Stripe, and (c) there is no
-            free trial but subscriptions may be canceled at any time.
-          </span>
-        </label>
+      {/* Terms & Conditions — scroll-to-accept + email signature */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {!tcAccepted ? (
+          <>
+            <div className="p-4 bg-gray-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm text-gray-900">Terms &amp; Conditions</h3>
+                <p className="text-xs text-gray-500 mt-0.5">You must review and accept before submitting</p>
+              </div>
+              {!tcOpen && (
+                <button
+                  type="button"
+                  onClick={() => setTcOpen(true)}
+                  className="px-4 py-2 text-sm font-medium text-brand-600 border border-brand-200 rounded-lg hover:bg-brand-50 transition-colors"
+                >
+                  Review Terms &amp; Conditions
+                </button>
+              )}
+            </div>
+            {tcOpen && (
+              <div className="border-t border-gray-200">
+                <div
+                  ref={tcRef}
+                  onScroll={handleTcScroll}
+                  className="max-h-80 overflow-y-auto p-6 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-mono bg-white"
+                >
+                  {TERMS_TEXT}
+                </div>
+                <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  {!tcScrolledToBottom ? (
+                    <p className="text-sm text-gray-500 text-center">
+                      Please scroll to the bottom of the Terms &amp; Conditions to continue.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-700 font-medium">
+                        By typing your email address below, you certify that you have read, understand,
+                        and agree to these Terms &amp; Conditions, and that you are authorized to bind
+                        your company to these terms.
+                      </p>
+                      <div className="flex gap-3 items-end">
+                        <label className="flex-1 block">
+                          <span className="block text-xs font-medium text-gray-600 mb-1">
+                            Type your email to sign
+                          </span>
+                          <input
+                            type="email"
+                            value={tcSignature}
+                            onChange={(e) => setTcSignature(e.target.value)}
+                            placeholder="your.email@company.com"
+                            className="form-input"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={!tcSignature.trim()}
+                          onClick={() => {
+                            setTcAccepted(true);
+                            setTcOpen(false);
+                          }}
+                          className="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition-colors"
+                        >
+                          I Accept
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-4 bg-emerald-50 flex items-center gap-3">
+            <span className="text-emerald-600 text-lg">&#10003;</span>
+            <div>
+              <p className="text-sm font-medium text-emerald-800">Terms &amp; Conditions accepted</p>
+              <p className="text-xs text-emerald-600">Signed by {tcSignature} &middot; {TERMS_VERSION}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setTcAccepted(false); setTcScrolledToBottom(false); setTcSignature(''); }}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Review again
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -350,8 +451,10 @@ function ChipGroup({
             <button
               key={opt}
               type="button"
+              aria-pressed={isSelected}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onToggle(opt)}
-              className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-full border transition-colors select-none ${
                 isSelected
                   ? 'bg-brand-600 text-white border-brand-600'
                   : 'bg-white text-gray-700 border-gray-300 hover:border-brand-400'
