@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -23,7 +24,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
     }
 
-    // Parse body for rejection reason
+    // Parse body for rejection reason (required)
     let reason = '';
     try {
       const body = await request.json();
@@ -31,7 +32,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         reason = body.reason.trim();
       }
     } catch {
-      // Body is optional; no reason is fine
+      // no valid JSON body
+    }
+
+    if (!reason || reason.length < 10) {
+      return NextResponse.json({ error: 'Review notes are required (min 10 chars)' }, { status: 422 });
     }
 
     // Verify application exists and is actionable
@@ -61,6 +66,18 @@ export async function POST(request: Request, ctx: RouteContext) {
           review_notes = ${reason || null}
       WHERE id = ${id}
     `;
+
+    // Emit system event
+    await emitEventSingle({
+      namespace: 'identity',
+      type: 'application.rejected',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: {
+        applicationId: id,
+        reason: reason || null,
+      },
+    });
 
     return NextResponse.json({ data: { rejected: true } });
   } catch (e) {

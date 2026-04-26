@@ -72,6 +72,7 @@ export function ApplicationReview({ applications }: Props) {
     userId: string;
     tempPassword: string;
   } | null>(null);
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -92,6 +93,8 @@ export function ApplicationReview({ applications }: Props) {
     try {
       const res = await fetch(`/api/admin/applications/${id}/accept`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewNotes: reviewNotes[id] || '' }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -115,8 +118,8 @@ export function ApplicationReview({ applications }: Props) {
   };
 
   const handleReject = async (id: string) => {
-    const reason = window.prompt('Rejection reason:');
-    if (reason === null) return; // cancelled
+    const notes = (reviewNotes[id] || '').trim();
+    if (notes.length < 10) return;
 
     setActionLoading(id);
     setError(null);
@@ -130,7 +133,7 @@ export function ApplicationReview({ applications }: Props) {
       const res = await fetch(`/api/admin/applications/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason: notes }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -382,25 +385,42 @@ export function ApplicationReview({ applications }: Props) {
                   </div>
                 )}
 
-                {/* Action buttons */}
+                {/* Admin review notes + action buttons */}
                 {isActionable(app.status) && (
-                  <div className="mt-4 flex items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleAccept(app.id)}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded"
-                    >
-                      {isLoading ? 'Processing...' : 'Accept'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleReject(app.id)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium rounded"
-                    >
-                      {isLoading ? 'Processing...' : 'Reject'}
-                    </button>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Admin Review Notes <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={reviewNotes[app.id] || ''}
+                        onChange={(e) => setReviewNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                        rows={3}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                        placeholder="Required: summarize your assessment, reasoning for accept/reject, and any conditions or follow-up items..."
+                      />
+                      {(reviewNotes[app.id] || '').trim().length < 10 && (
+                        <p className="text-xs text-gray-400 mt-1">Minimum 10 characters required</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={isLoading || (reviewNotes[app.id] || '').trim().length < 10}
+                        onClick={() => handleAccept(app.id)}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+                      >
+                        {isLoading ? 'Processing...' : 'Accept'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isLoading || (reviewNotes[app.id] || '').trim().length < 10}
+                        onClick={() => handleReject(app.id)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium rounded"
+                      >
+                        {isLoading ? 'Processing...' : 'Reject'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
