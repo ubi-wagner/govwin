@@ -6,6 +6,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex flex-col gap-2 text-sm">
           <a href="/admin/dashboard" className="hover:text-brand-300">Dashboard</a>
           <a href="/admin/rfp-curation" className="hover:text-brand-300">RFP Curation</a>
+          <a href="/admin/applications" className="hover:text-brand-300">Applications</a>
           <a href="/admin/tenants" className="hover:text-brand-300">Tenants</a>
           <a href="/admin/pipeline" className="hover:text-brand-300">Pipeline</a>
           <a href="/admin/sources" className="hover:text-brand-300">Sources</a>

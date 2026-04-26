@@ -15,6 +15,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { ConflictError } from '@/lib/errors';
+import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -56,6 +57,14 @@ export const complianceAddVariableTool = defineTool<Input, Output>({
            false)
         RETURNING id
       `;
+
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'compliance_variable.added',
+        actor: { type: ctx.actor.type, id: ctx.actor.id, email: ctx.actor.email ?? undefined },
+        tenantId: ctx.tenantId ?? null,
+        payload: { variableId: rows[0]?.id, name: input.name, category: input.category },
+      });
 
       ctx.log?.info?.({
         msg: 'compliance.add_variable succeeded',

@@ -36,6 +36,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 import { writeCurationMemory, type CurationAction } from './curation-memory';
 
@@ -222,6 +223,15 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
       `;
       verifiedAt = rows[0].verifiedAt;
     }
+
+    const isNew = compId === null;
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'compliance_value.saved',
+      actor: { type: ctx.actor.type, id: ctx.actor.id, email: ctx.actor.email ?? undefined },
+      tenantId: ctx.tenantId ?? null,
+      payload: { solicitationId: input.solicitationId, variableName: input.variableName, action: isNew ? 'created' : 'updated' },
+    });
 
     // THE HITL write — namespace-tagged episodic memory row.
     let memoryWritten = false;

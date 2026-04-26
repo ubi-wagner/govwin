@@ -27,6 +27,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
+import { emitEventSingle } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
 
@@ -335,6 +336,14 @@ export async function POST(request: Request) {
     // Non-fatal — admin can manually retry via "Release for AI" in the workspace
     console.warn('[rfp-upload] shred job enqueue failed (non-fatal)', err);
   }
+
+  await emitEventSingle({
+    namespace: 'finder',
+    type: 'rfp.manually_uploaded',
+    actor: { type: 'user', id: userId ?? 'unknown' },
+    tenantId: null,
+    payload: { opportunityId: oppRowId, documentCount: documentIds?.length ?? 0 },
+  });
 
   return NextResponse.json(
     {

@@ -199,6 +199,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
     expect(eventTypes).toEqual([
       'rfp.triage_claimed',
       'rfp.released_for_analysis',
+      'compliance_value.saved',
       'rfp.review_requested',
       'rfp.review_approved',
       'rfp.curated_and_pushed',
