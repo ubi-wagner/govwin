@@ -21,115 +21,131 @@ export async function readPptx(
   buffer: Buffer,
   filename: string,
 ): Promise<ImportResult> {
-  const zip = await JSZip.loadAsync(buffer);
+  try {
+    const zip = await JSZip.loadAsync(buffer);
 
-  // Discover slide files and sort numerically
-  const slideEntries = Object.keys(zip.files)
-    .filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
-    .sort((a, b) => {
-      const numA = parseInt(a.match(/slide(\d+)/)?.[1] ?? '0', 10);
-      const numB = parseInt(b.match(/slide(\d+)/)?.[1] ?? '0', 10);
-      return numA - numB;
-    });
+    // Discover slide files and sort numerically
+    const slideEntries = Object.keys(zip.files)
+      .filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)/)?.[1] ?? '0', 10);
+        const numB = parseInt(b.match(/slide(\d+)/)?.[1] ?? '0', 10);
+        return numA - numB;
+      });
 
-  const fileCat = inferCategoryFromFilename(filename);
-  const atoms: ImportedAtom[] = [];
-  let totalChars = 0;
-  let charOffset = 0;
+    const fileCat = inferCategoryFromFilename(filename);
+    const atoms: ImportedAtom[] = [];
+    let totalChars = 0;
+    let charOffset = 0;
 
-  for (let i = 0; i < slideEntries.length; i++) {
-    const slidePath = slideEntries[i];
-    const slideXml = await zip.file(slidePath)?.async('text');
-    if (!slideXml) continue;
+    for (let i = 0; i < slideEntries.length; i++) {
+      try {
+        const slidePath = slideEntries[i];
+        const slideXml = await zip.file(slidePath)?.async('text');
+        if (!slideXml) continue;
 
-    // Extract title and body text from the slide
-    const { title, bodyParagraphs } = parseSlideXml(slideXml);
+        // Extract title and body text from the slide
+        const { title, bodyParagraphs } = parseSlideXml(slideXml);
 
-    // Try to read speaker notes
-    const slideNum = slidePath.match(/slide(\d+)/)?.[1];
-    const notesPath = `ppt/notesSlides/notesSlide${slideNum}.xml`;
-    const notesXml = await zip.file(notesPath)?.async('text');
-    const noteText = notesXml ? extractNotesText(notesXml) : null;
+        // Try to read speaker notes
+        const slideNum = slidePath.match(/slide(\d+)/)?.[1];
+        const notesPath = `ppt/notesSlides/notesSlide${slideNum}.xml`;
+        const notesXml = await zip.file(notesPath)?.async('text');
+        const noteText = notesXml ? extractNotesText(notesXml) : null;
 
-    // Build nodes for this slide
-    const nodes: CanvasNode[] = [];
+        // Build nodes for this slide
+        const nodes: CanvasNode[] = [];
 
-    // Heading from title shape (or fallback to "Slide N")
-    const headingText = title?.trim() || null;
-    const headingDisplay = headingText ?? `Slide ${i + 1}`;
+        // Heading from title shape (or fallback to "Slide N")
+        const headingText = title?.trim() || null;
+        const headingDisplay = headingText ?? `Slide ${i + 1}`;
 
-    nodes.push(createNode({
-      type: 'heading',
-      content: { level: 2, text: headingDisplay } satisfies HeadingContent,
-      source: 'imported',
-      actorId: SYSTEM_ACTOR.id,
-      actorName: SYSTEM_ACTOR.name,
-    }));
+        nodes.push(createNode({
+          type: 'heading',
+          content: { level: 2, text: headingDisplay } satisfies HeadingContent,
+          source: 'imported',
+          actorId: SYSTEM_ACTOR.id,
+          actorName: SYSTEM_ACTOR.name,
+        }));
 
-    // Body text blocks — each non-empty paragraph becomes a text_block
-    for (const para of bodyParagraphs) {
-      const trimmed = para.trim();
-      if (!trimmed) continue;
-      nodes.push(createNode({
-        type: 'text_block',
-        content: { text: trimmed } satisfies TextBlockContent,
-        source: 'imported',
-        actorId: SYSTEM_ACTOR.id,
-        actorName: SYSTEM_ACTOR.name,
-      }));
+        // Body text blocks — each non-empty paragraph becomes a text_block
+        for (const para of bodyParagraphs) {
+          const trimmed = para.trim();
+          if (!trimmed) continue;
+          nodes.push(createNode({
+            type: 'text_block',
+            content: { text: trimmed } satisfies TextBlockContent,
+            source: 'imported',
+            actorId: SYSTEM_ACTOR.id,
+            actorName: SYSTEM_ACTOR.name,
+          }));
+        }
+
+        // Speaker notes as a separate text_block (if present)
+        if (noteText) {
+          nodes.push(createNode({
+            type: 'text_block',
+            content: { text: `[Speaker Notes] ${noteText}` } satisfies TextBlockContent,
+            source: 'imported',
+            actorId: SYSTEM_ACTOR.id,
+            actorName: SYSTEM_ACTOR.name,
+          }));
+        }
+
+        // Skip entirely empty slides (no body content at all)
+        const contentText = nodes.map((n) => getNodeText(n)).join(' ');
+        const charLength = contentText.length;
+        totalChars += charLength;
+
+        // Infer category from heading, then content, then filename
+        const headingCat = headingText ? inferCategory(headingText) : { category: 'general', confidence: 0 };
+        const contentCat = inferCategory(contentText.slice(0, 500));
+        let finalCat = headingCat.confidence >= contentCat.confidence ? headingCat : contentCat;
+        if (finalCat.confidence < fileCat.confidence) {
+          finalCat = fileCat;
+        }
+
+        const tags: string[] = [finalCat.category];
+        if (headingText) tags.push(`heading:${headingText.slice(0, 80)}`);
+        tags.push(`source:${filename.slice(0, 50)}`);
+        tags.push(`slide:${i + 1}`);
+
+        atoms.push({
+          nodes,
+          suggestedCategory: finalCat.category,
+          suggestedTags: tags,
+          headingText,
+          charOffset,
+          charLength,
+          confidence: finalCat.confidence,
+        });
+
+        charOffset += charLength;
+      } catch (slideErr) {
+        console.error(`[pptx-reader] Error parsing slide ${i + 1} of ${filename}:`, slideErr);
+        // Continue with remaining slides
+      }
     }
 
-    // Speaker notes as a separate text_block (if present)
-    if (noteText) {
-      nodes.push(createNode({
-        type: 'text_block',
-        content: { text: `[Speaker Notes] ${noteText}` } satisfies TextBlockContent,
-        source: 'imported',
-        actorId: SYSTEM_ACTOR.id,
-        actorName: SYSTEM_ACTOR.name,
-      }));
-    }
+    const metadata = await extractPptxMetadata(zip, slideEntries.length);
 
-    // Skip entirely empty slides (no body content at all)
-    const contentText = nodes.map((n) => getNodeText(n)).join(' ');
-    const charLength = contentText.length;
-    totalChars += charLength;
-
-    // Infer category from heading, then content, then filename
-    const headingCat = headingText ? inferCategory(headingText) : { category: 'general', confidence: 0 };
-    const contentCat = inferCategory(contentText.slice(0, 500));
-    let finalCat = headingCat.confidence >= contentCat.confidence ? headingCat : contentCat;
-    if (finalCat.confidence < fileCat.confidence) {
-      finalCat = fileCat;
-    }
-
-    const tags: string[] = [finalCat.category];
-    if (headingText) tags.push(`heading:${headingText.slice(0, 80)}`);
-    tags.push(`source:${filename.slice(0, 50)}`);
-    tags.push(`slide:${i + 1}`);
-
-    atoms.push({
-      nodes,
-      suggestedCategory: finalCat.category,
-      suggestedTags: tags,
-      headingText,
-      charOffset,
-      charLength,
-      confidence: finalCat.confidence,
-    });
-
-    charOffset += charLength;
+    return {
+      atoms,
+      sourceFilename: filename,
+      sourceFormat: 'pptx',
+      totalChars,
+      metadata,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error reading PPTX';
+    return {
+      atoms: [],
+      sourceFilename: filename,
+      sourceFormat: 'pptx',
+      totalChars: 0,
+      metadata: { title: `(Error: ${message})` },
+    };
   }
-
-  const metadata = await extractPptxMetadata(zip, slideEntries.length);
-
-  return {
-    atoms,
-    sourceFilename: filename,
-    sourceFormat: 'pptx',
-    totalChars,
-    metadata,
-  };
 }
 
 // ---------------------------------------------------------------------------

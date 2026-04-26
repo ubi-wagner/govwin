@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle } from '@/lib/events';
 
 type RouteParams = { params: Promise<{ tenantSlug: string; unitId: string }> };
 
@@ -175,6 +176,14 @@ export async function PATCH(
       );
     }
 
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'unit_updated',
+      actor: { type: 'user', id: ctx.userId },
+      tenantId: ctx.tenantId,
+      payload: { unitId: ctx.unitId, updatedFields: providedKeys },
+    });
+
     return NextResponse.json({ data: { updated: true } });
   } catch (err) {
     console.error('[library/unit/patch] DB update failed', err);
@@ -204,6 +213,14 @@ export async function DELETE(
         { status: 404 },
       );
     }
+
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'unit_deleted',
+      actor: { type: 'user', id: ctx.userId },
+      tenantId: ctx.tenantId,
+      payload: { unitId: ctx.unitId },
+    });
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (err) {

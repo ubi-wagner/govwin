@@ -13,7 +13,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
 import { emitEventSingle } from '@/lib/events';
 import { readDocx } from '@/lib/import/docx-reader';
@@ -28,21 +29,39 @@ interface RouteContext {
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  try {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
 
+  const sessionUser = session.user as {
+    id?: string;
+    role?: unknown;
+    tenantId?: string | null;
+  };
+  const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+  if (!role || !sessionUser.id) {
+    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  }
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+  }
+
   const { tenantSlug } = await ctx.params;
 
   // Resolve tenant
-  const tenantRows = await sql<{ id: string }[]>`
-    SELECT id FROM tenants WHERE slug = ${tenantSlug}
-  `;
-  if (tenantRows.length === 0) {
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) {
     return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
-  const tenantId = tenantRows[0].id;
+  const tenantId = tenant.id as string;
+
+  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Find pending library units
   // Actual columns: id, tenant_id, content, category, subcategory, tags,
@@ -66,7 +85,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({ data: { atomized: 0, atomsCreated: 0, atoms: [], message: 'No pending documents' } });
   }
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = sessionUser.id;
   let atomized = 0;
   let totalAtomsCreated = 0;
   const allAtomInfo: Array<{ id: string; category: string; headingText: string | null; charLength: number }> = [];
@@ -213,6 +232,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       atoms: allAtomInfo,
     },
   });
+  } catch (err) {
+    console.error('[library/atomize] Unexpected error', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
 
 // ---------------------------------------------------------------------------

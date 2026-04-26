@@ -44,6 +44,7 @@ _CATEGORY_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 _MAX_INGEST_ROWS = 100
+MAX_INGEST_SIZE = 100 * 1024 * 1024  # 100 MB
 
 
 def _require_openpyxl() -> None:
@@ -121,169 +122,182 @@ class XlsxAgent(DocumentAgent):
         AgentCapability.PDF_RENDER,
     }
 
+    def __init__(self) -> None:
+        _require_openpyxl()
+
     # ── Ingest ────────────────────────────────────────────────────────
 
     async def ingest(self, file_bytes: bytes, filename: str) -> CanvasBundle:
         """Read an Excel file and produce a CanvasBundle."""
-        _require_openpyxl()
-
-        wb = load_workbook(BytesIO(file_bytes), data_only=True)
-        nodes: list[CanvasNode] = []
-
-        for sheet_idx, ws in enumerate(wb.worksheets):
-            # ── Heading node for the sheet ──
-            nodes.append(
-                CanvasNode(
-                    id=str(uuid.uuid4()),
-                    type="heading",
-                    content={"text": ws.title, "level": 1},
-                    provenance={"source": filename, "sheet": ws.title},
-                )
+        if not file_bytes:
+            raise ValueError(f"XlsxAgent: empty file '{filename}'")
+        if len(file_bytes) > MAX_INGEST_SIZE:
+            raise ValueError(
+                f"XlsxAgent: file '{filename}' exceeds {MAX_INGEST_SIZE // (1024 * 1024)}MB limit"
             )
 
-            # ── Build merged-cell lookup ──
-            # Maps (min_row, min_col) -> {"rowSpan": n, "colSpan": n}
-            merged_map: dict[tuple[int, int], dict[str, int]] = {}
-            # Set of cells that are *inside* a merge but not the top-left anchor
-            merged_interior: set[tuple[int, int]] = set()
-            for merge_range in ws.merged_cells.ranges:
-                min_row = merge_range.min_row
-                min_col = merge_range.min_col
-                max_row = merge_range.max_row
-                max_col = merge_range.max_col
-                row_span = max_row - min_row + 1
-                col_span = max_col - min_col + 1
-                merged_map[(min_row, min_col)] = {
-                    "rowSpan": row_span,
-                    "colSpan": col_span,
-                }
-                for r in range(min_row, max_row + 1):
-                    for c in range(min_col, max_col + 1):
-                        if (r, c) != (min_row, min_col):
-                            merged_interior.add((r, c))
+        try:
+            wb = load_workbook(BytesIO(file_bytes), data_only=True)
+        except Exception as exc:
+            raise ValueError(f"XlsxAgent: failed to parse '{filename}' — {exc}") from exc
 
-            # ── Read rows ──
-            all_rows: list[list[dict[str, Any]]] = []
-            row_count = 0
-            truncated = False
+        try:
+            nodes: list[CanvasNode] = []
 
-            for row in ws.iter_rows():
-                row_count += 1
-                if row_count > _MAX_INGEST_ROWS:
-                    truncated = True
-                    break
-                cells: list[dict[str, Any]] = []
-                for cell in row:
-                    r, c = cell.row, cell.column
-                    # Skip interior merged cells — only the anchor carries data
-                    if (r, c) in merged_interior:
-                        continue
-                    value = cell.value
-                    cell_dict: dict[str, Any] = {
-                        "value": value if value is not None else "",
-                    }
-                    # Attach merge spans
-                    span = merged_map.get((r, c))
-                    if span:
-                        if span["colSpan"] > 1:
-                            cell_dict["colSpan"] = span["colSpan"]
-                        if span["rowSpan"] > 1:
-                            cell_dict["rowSpan"] = span["rowSpan"]
-                    # Attach cell style
-                    style = _cell_style_dict(cell)
-                    if style:
-                        cell_dict["style"] = style
-                    cells.append(cell_dict)
-                all_rows.append(cells)
-
-            # ── Separate headers from data ──
-            headers: list[dict[str, Any]] = []
-            data_rows: list[list[dict[str, Any]]] = []
-            if all_rows:
-                headers = all_rows[0]
-                data_rows = all_rows[1:]
-
-            # ── Column widths ──
-            column_widths: list[Optional[float]] = []
-            if ws.column_dimensions:
-                max_col_idx = ws.max_column or 0
-                for col_idx in range(1, max_col_idx + 1):
-                    col_letter = get_column_letter(col_idx)
-                    dim = ws.column_dimensions.get(col_letter)
-                    if dim and dim.width:
-                        column_widths.append(dim.width)
-                    else:
-                        column_widths.append(None)
-
-            # ── Table node ──
-            table_meta: dict[str, Any] = {}
-            if truncated:
-                actual_max = ws.max_row or row_count
-                table_meta["truncated"] = True
-                table_meta["total_rows"] = actual_max
-                table_meta["note"] = (
-                    f"Sheet contains {actual_max} rows; only the first "
-                    f"{_MAX_INGEST_ROWS} are included."
-                )
-
-            nodes.append(
-                CanvasNode(
-                    id=str(uuid.uuid4()),
-                    type="table",
-                    content={
-                        "headers": headers,
-                        "rows": data_rows,
-                        "column_widths": column_widths,
-                    },
-                    style={},
-                    provenance={
-                        "source": filename,
-                        "sheet": ws.title,
-                    },
-                    library_tags=_tags_from_sheet(ws.title),
-                )
-            )
-
-            if table_meta:
-                nodes[-1].content["metadata"] = table_meta
-
-            # ── Page break between sheets ──
-            if sheet_idx < len(wb.worksheets) - 1:
+            for sheet_idx, ws in enumerate(wb.worksheets):
+                # ── Heading node for the sheet ──
                 nodes.append(
                     CanvasNode(
                         id=str(uuid.uuid4()),
-                        type="page_break",
-                        content={},
+                        type="heading",
+                        content={"text": ws.title, "level": 1},
+                        provenance={"source": filename, "sheet": ws.title},
                     )
                 )
 
-        # ── Workbook-level metadata ──
-        meta: dict[str, Any] = {"filename": filename}
-        props = wb.properties
-        if props:
-            if props.title:
-                meta["title"] = props.title
-            if props.creator:
-                meta["creator"] = props.creator
-            if props.subject:
-                meta["subject"] = props.subject
-            if props.keywords:
-                meta["keywords"] = props.keywords
-            if props.created:
-                meta["created"] = str(props.created)
-            if props.modified:
-                meta["modified"] = str(props.modified)
+                # ── Build merged-cell lookup ──
+                # Maps (min_row, min_col) -> {"rowSpan": n, "colSpan": n}
+                merged_map: dict[tuple[int, int], dict[str, int]] = {}
+                # Set of cells that are *inside* a merge but not the top-left anchor
+                merged_interior: set[tuple[int, int]] = set()
+                for merge_range in ws.merged_cells.ranges:
+                    min_row = merge_range.min_row
+                    min_col = merge_range.min_col
+                    max_row = merge_range.max_row
+                    max_col = merge_range.max_col
+                    row_span = max_row - min_row + 1
+                    col_span = max_col - min_col + 1
+                    merged_map[(min_row, min_col)] = {
+                        "rowSpan": row_span,
+                        "colSpan": col_span,
+                    }
+                    for r in range(min_row, max_row + 1):
+                        for c in range(min_col, max_col + 1):
+                            if (r, c) != (min_row, min_col):
+                                merged_interior.add((r, c))
 
-        wb.close()
+                # ── Read rows ──
+                all_rows: list[list[dict[str, Any]]] = []
+                row_count = 0
+                truncated = False
 
-        return CanvasBundle(
-            document_id=str(uuid.uuid4()),
-            nodes=nodes,
-            constraints=ComplianceConstraints(format_type="letter"),
-            metadata=meta,
-            source_format="xlsx",
-            source_agent=self.display_name,
-        )
+                for row in ws.iter_rows():
+                    row_count += 1
+                    if row_count > _MAX_INGEST_ROWS:
+                        truncated = True
+                        break
+                    cells: list[dict[str, Any]] = []
+                    for cell in row:
+                        r, c = cell.row, cell.column
+                        # Skip interior merged cells — only the anchor carries data
+                        if (r, c) in merged_interior:
+                            continue
+                        value = cell.value
+                        cell_dict: dict[str, Any] = {
+                            "value": value if value is not None else "",
+                        }
+                        # Attach merge spans
+                        span = merged_map.get((r, c))
+                        if span:
+                            if span["colSpan"] > 1:
+                                cell_dict["colSpan"] = span["colSpan"]
+                            if span["rowSpan"] > 1:
+                                cell_dict["rowSpan"] = span["rowSpan"]
+                        # Attach cell style
+                        style = _cell_style_dict(cell)
+                        if style:
+                            cell_dict["style"] = style
+                        cells.append(cell_dict)
+                    all_rows.append(cells)
+
+                # ── Separate headers from data ──
+                headers: list[dict[str, Any]] = []
+                data_rows: list[list[dict[str, Any]]] = []
+                if all_rows:
+                    headers = all_rows[0]
+                    data_rows = all_rows[1:]
+
+                # ── Column widths ──
+                column_widths: list[Optional[float]] = []
+                if ws.column_dimensions:
+                    max_col_idx = ws.max_column or 0
+                    for col_idx in range(1, max_col_idx + 1):
+                        col_letter = get_column_letter(col_idx)
+                        dim = ws.column_dimensions.get(col_letter)
+                        if dim and dim.width:
+                            column_widths.append(dim.width)
+                        else:
+                            column_widths.append(None)
+
+                # ── Table node ──
+                table_meta: dict[str, Any] = {}
+                if truncated:
+                    actual_max = ws.max_row or row_count
+                    table_meta["truncated"] = True
+                    table_meta["total_rows"] = actual_max
+                    table_meta["note"] = (
+                        f"Sheet contains {actual_max} rows; only the first "
+                        f"{_MAX_INGEST_ROWS} are included."
+                    )
+
+                nodes.append(
+                    CanvasNode(
+                        id=str(uuid.uuid4()),
+                        type="table",
+                        content={
+                            "headers": headers,
+                            "rows": data_rows,
+                            "column_widths": column_widths,
+                        },
+                        style={},
+                        provenance={
+                            "source": filename,
+                            "sheet": ws.title,
+                        },
+                        library_tags=_tags_from_sheet(ws.title),
+                    )
+                )
+
+                if table_meta:
+                    nodes[-1].content["metadata"] = table_meta
+
+                # ── Page break between sheets ──
+                if sheet_idx < len(wb.worksheets) - 1:
+                    nodes.append(
+                        CanvasNode(
+                            id=str(uuid.uuid4()),
+                            type="page_break",
+                            content={},
+                        )
+                    )
+
+            # ── Workbook-level metadata ──
+            meta: dict[str, Any] = {"filename": filename}
+            props = wb.properties
+            if props:
+                if props.title:
+                    meta["title"] = props.title
+                if props.creator:
+                    meta["creator"] = props.creator
+                if props.subject:
+                    meta["subject"] = props.subject
+                if props.keywords:
+                    meta["keywords"] = props.keywords
+                if props.created:
+                    meta["created"] = str(props.created)
+                if props.modified:
+                    meta["modified"] = str(props.modified)
+
+            return CanvasBundle(
+                document_id=str(uuid.uuid4()),
+                nodes=nodes,
+                constraints=ComplianceConstraints(format_type="letter"),
+                metadata=meta,
+                source_format="xlsx",
+                source_agent=self.display_name,
+            )
+        finally:
+            wb.close()
 
     # ── Atomize ───────────────────────────────────────────────────────
 

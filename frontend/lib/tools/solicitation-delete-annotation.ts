@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
+import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
 const InputSchema = z.object({
@@ -44,6 +45,14 @@ export const solicitationDeleteAnnotationTool = defineTool<Input, Output>({
         `annotation not found or not owned by this solicitation`,
       );
     }
+
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'annotation.deleted',
+      actor: { type: ctx.actor.type, id: ctx.actor.id, email: ctx.actor.email ?? undefined },
+      tenantId: ctx.tenantId ?? null,
+      payload: { annotationId: input.annotationId, solicitationId: input.solicitationId },
+    });
 
     ctx.log?.info?.({
       msg: 'solicitation.delete_annotation succeeded',

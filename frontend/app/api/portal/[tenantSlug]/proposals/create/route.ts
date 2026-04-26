@@ -108,7 +108,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
     if (existing) {
       return NextResponse.json(
-        { error: 'Proposal already exists for this topic', data: { proposalId: existing.id } },
+        { error: 'Proposal already exists for this topic' },
         { status: 409 },
       );
     }

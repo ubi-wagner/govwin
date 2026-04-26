@@ -10,7 +10,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle } from '@/lib/events';
 
 const BodySchema = z.object({
   opportunityId: z.string().uuid(),
@@ -36,6 +37,10 @@ async function resolveAuth(ctx: RouteContext) {
     return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
   }
 
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    return { error: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) };
+  }
+
   const { tenantSlug } = await ctx.params;
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
@@ -54,7 +59,7 @@ async function resolveAuth(ctx: RouteContext) {
 export async function POST(request: Request, ctx: RouteContext) {
   const authResult = await resolveAuth(ctx);
   if ('error' in authResult) return authResult.error;
-  const { tenantId } = authResult;
+  const { tenantId, userId } = authResult;
 
   let body: unknown;
   try {
@@ -90,6 +95,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       DO UPDATE SET is_pinned = true
     `;
 
+    await emitEventSingle({
+      namespace: 'spotlight',
+      type: 'topic_pinned',
+      actor: { type: 'user', id: userId },
+      tenantId,
+      payload: { opportunityId },
+    });
+
     return NextResponse.json({ data: { pinned: true, opportunityId } });
   } catch (e) {
     console.error('[spotlight/pin POST] Error:', e);
@@ -100,7 +113,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 export async function DELETE(request: Request, ctx: RouteContext) {
   const authResult = await resolveAuth(ctx);
   if ('error' in authResult) return authResult.error;
-  const { tenantId } = authResult;
+  const { tenantId, userId } = authResult;
 
   let body: unknown;
   try {
@@ -124,6 +137,14 @@ export async function DELETE(request: Request, ctx: RouteContext) {
       DELETE FROM tenant_pipeline_items
       WHERE tenant_id = ${tenantId} AND opportunity_id = ${opportunityId}
     `;
+
+    await emitEventSingle({
+      namespace: 'spotlight',
+      type: 'topic_unpinned',
+      actor: { type: 'user', id: userId },
+      tenantId,
+      payload: { opportunityId },
+    });
 
     return NextResponse.json({ data: { pinned: false, opportunityId } });
   } catch (e) {

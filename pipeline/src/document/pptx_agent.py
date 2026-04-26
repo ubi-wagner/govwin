@@ -42,6 +42,7 @@ except ImportError:  # pragma: no cover
 # ── Constants ──────────────────────────────────────────────────────────────
 EMU_PER_INCH = 914400
 EMU_PER_POINT = 914400 / 72  # 12700
+MAX_INGEST_SIZE = 100 * 1024 * 1024  # 100 MB
 
 # Placeholder type IDs for title detection (python-pptx placeholder_format.idx)
 _TITLE_PLACEHOLDER_IDXS = {0, 1}  # 0 = title, 1 = center title
@@ -150,7 +151,16 @@ class PptxAgent(DocumentAgent):
 
     async def ingest(self, file_bytes: bytes, filename: str) -> CanvasBundle:
         """Read a PPTX file and produce a CanvasBundle."""
-        prs = Presentation(BytesIO(file_bytes))
+        if not file_bytes:
+            raise ValueError(f"PptxAgent: empty file '{filename}'")
+        if len(file_bytes) > MAX_INGEST_SIZE:
+            raise ValueError(
+                f"PptxAgent: file '{filename}' exceeds {MAX_INGEST_SIZE // (1024 * 1024)}MB limit"
+            )
+        try:
+            prs = Presentation(BytesIO(file_bytes))
+        except Exception as exc:
+            raise ValueError(f"PptxAgent: failed to parse '{filename}' — {exc}") from exc
 
         nodes: list[CanvasNode] = []
         image_count = 0

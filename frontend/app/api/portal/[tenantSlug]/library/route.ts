@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle } from '@/lib/events';
 
 export async function GET(
   request: Request,
@@ -282,6 +283,14 @@ export async function POST(
           { status: 400 },
         );
     }
+
+    await emitEventSingle({
+      namespace: 'library',
+      type: `bulk_${action}`,
+      actor: { type: 'user', id: sessionUser.id },
+      tenantId,
+      payload: { action, unitCount: unitIds.length, affected: result },
+    });
 
     return NextResponse.json({ data: { updated: result.count } });
   } catch (err) {

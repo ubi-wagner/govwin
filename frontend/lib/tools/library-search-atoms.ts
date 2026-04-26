@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { defineTool } from './base';
+import { ToolAuthorizationError } from './errors';
 
 // ─── Input schema ──────────────────────────────────────────────────
 
@@ -62,24 +63,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
   tenantScoped: true,
   async handler(input, ctx) {
     const tenantId = ctx.tenantId;
-    if (!tenantId) throw new Error('tenant context required');
-
-    // Build dynamic WHERE clauses. We always filter by tenant_id and
-    // only include approved atoms (draft/archived atoms are not useful
-    // for proposal drafting).
-    const conditions: string[] = [
-      `tenant_id = '${tenantId}'::uuid`,
-      `status = 'approved'`,
-    ];
-    const params: unknown[] = [];
-    let paramIdx = 0;
-
-    // We use postgres.js tagged templates for safety, but building
-    // dynamic queries with conditional clauses requires unsafe() for
-    // the dynamic parts. The values are still parameterised below.
-    //
-    // Instead, we build the query with conditional fragments using
-    // postgres.js tagged template composition.
+    if (!tenantId) throw new ToolAuthorizationError('tenant context required');
 
     const categoryFilter = input.category
       ? sql`AND category = ${input.category}`

@@ -16,13 +16,14 @@ import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
+import { ToolAuthorizationError, ToolExecutionError } from './errors';
 
 const InputSchema = z.object({
   tenantId: z.string().uuid(),
   proposalId: z.string().uuid(),
   nodeId: z.string(),
   nodeType: z.string(),
-  content: z.unknown(),
+  content: z.record(z.string(), z.unknown()),
   category: z.string().max(100),
   tags: z.array(z.string().max(200)).default([]),
   sourceAnchor: z.record(z.string(), z.unknown()).optional(),
@@ -47,7 +48,7 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
   tenantScoped: true,
   async handler(input, ctx) {
     const tenantId = ctx.tenantId;
-    if (!tenantId) throw new Error('tenant context required');
+    if (!tenantId) throw new ToolAuthorizationError('tenant context required');
 
     // Dedupe: if an atom with the same hash already exists for this
     // tenant, skip (don't create duplicates of the same paragraph).
@@ -86,6 +87,9 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
          })}::jsonb)
       RETURNING id
     `;
+    if (!rows.length) {
+      throw new ToolExecutionError('Failed to save library atom — INSERT returned no rows');
+    }
     const id = rows[0].id;
 
     await emitEventSingle({

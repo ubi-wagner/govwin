@@ -15,6 +15,7 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { emitEventSingle } from '@/lib/events';
 
 const ApplicationSchema = z.object({
   contactEmail: z.string().email().max(200),
@@ -103,6 +104,15 @@ export async function POST(request: Request) {
       )
       RETURNING id
     `;
+
+    await emitEventSingle({
+      namespace: 'identity',
+      type: 'application.submitted',
+      actor: { type: 'system', id: 'public-apply' },
+      tenantId: null,
+      payload: { applicationId: rows[0]?.id, companyName: input.companyName },
+    });
+
     return NextResponse.json({ data: { id: rows[0].id } }, { status: 201 });
   } catch (err) {
     const code = (err as { code?: string })?.code;

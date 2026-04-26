@@ -18,9 +18,13 @@ Usage:
 
 from __future__ import annotations
 
+import importlib
+import logging
 from typing import Optional
 
 from .base import DocumentAgent, CanvasBundle, ExportResult
+
+logger = logging.getLogger(__name__)
 
 _agents: dict[str, DocumentAgent] = {}
 _ext_map: dict[str, str] = {}
@@ -104,29 +108,19 @@ async def dispatch(
 
 def _auto_register() -> None:
     """Register all built-in agents. Called on first import."""
-    try:
-        from .docx_agent import DocxAgent
-        register(DocxAgent())
-    except ImportError:
-        pass
-
-    try:
-        from .pptx_agent import PptxAgent
-        register(PptxAgent())
-    except ImportError:
-        pass
-
-    try:
-        from .xlsx_agent import XlsxAgent
-        register(XlsxAgent())
-    except ImportError:
-        pass
-
-    try:
-        from .pdf_agent import PdfAgent
-        register(PdfAgent())
-    except ImportError:
-        pass
+    for module_name, class_name in [
+        ("docx_agent", "DocxAgent"),
+        ("pptx_agent", "PptxAgent"),
+        ("xlsx_agent", "XlsxAgent"),
+        ("pdf_agent", "PdfAgent"),
+    ]:
+        try:
+            mod = importlib.import_module(f".{module_name}", __package__)
+            agent_cls = getattr(mod, class_name)
+            register(agent_cls())
+        except Exception:
+            logger.debug("Failed to register %s from %s", class_name, module_name, exc_info=True)
+            pass
 
 
 _auto_register()

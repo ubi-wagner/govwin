@@ -18,22 +18,33 @@ export async function readDocx(
   buffer: Buffer,
   filename: string,
 ): Promise<ImportResult> {
-  const result = await mammoth.convertToHtml({ buffer });
-  const html = result.value;
+  try {
+    const result = await mammoth.convertToHtml({ buffer });
+    const html = result.value;
 
-  const nodes = htmlToCanvasNodes(html);
-  const atoms = groupByHeading(nodes, filename);
-  const totalChars = nodes.reduce((sum, n) => sum + getTextLength(n), 0);
+    const nodes = htmlToCanvasNodes(html);
+    const atoms = groupByHeading(nodes, filename);
+    const totalChars = nodes.reduce((sum, n) => sum + getTextLength(n), 0);
 
-  const metadata = await extractDocxMetadata(buffer);
+    const metadata = await extractDocxMetadata(buffer);
 
-  return {
-    atoms,
-    sourceFilename: filename,
-    sourceFormat: 'docx',
-    totalChars,
-    metadata,
-  };
+    return {
+      atoms,
+      sourceFilename: filename,
+      sourceFormat: 'docx',
+      totalChars,
+      metadata,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error reading DOCX';
+    return {
+      atoms: [],
+      sourceFilename: filename,
+      sourceFormat: 'docx',
+      totalChars: 0,
+      metadata: { title: `(Error: ${message})` },
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------

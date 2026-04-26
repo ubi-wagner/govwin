@@ -17,6 +17,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerPath } from '@/lib/storage/paths';
+import { emitEventSingle } from '@/lib/events';
 
 const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md'];
@@ -189,6 +190,14 @@ export async function POST(
       );
     }
   }
+
+  await emitEventSingle({
+    namespace: 'library',
+    type: 'files_uploaded',
+    actor: { type: 'user', id: sessionUser.id },
+    tenantId,
+    payload: { fileCount: uploaded.length, files: uploaded.map(f => ({ id: f.id, filename: f.filename })) },
+  });
 
   return NextResponse.json(
     { data: { uploaded } },

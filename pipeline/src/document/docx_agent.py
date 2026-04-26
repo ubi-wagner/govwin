@@ -26,7 +26,14 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
+try:
+    from docx import Document as _Document
+    _HAS_DOCX = True
+except ImportError:
+    _HAS_DOCX = False
+
 EMU_PER_POINT = 12700
+MAX_INGEST_SIZE = 100 * 1024 * 1024  # 100 MB
 EMU_PER_INCH = 914400
 POINTS_PER_INCH = 72
 
@@ -115,9 +122,19 @@ class DocxAgent(DocumentAgent):
     # ── INGEST ─────────────────────────────────────────────────────────
 
     async def ingest(self, file_bytes: bytes, filename: str) -> CanvasBundle:
+        if not _HAS_DOCX:
+            raise ImportError("python-docx is required. Install: pip install python-docx")
+        if not file_bytes:
+            raise ValueError(f"DocxAgent: empty file '{filename}'")
+        if len(file_bytes) > MAX_INGEST_SIZE:
+            raise ValueError(
+                f"DocxAgent: file '{filename}' exceeds {MAX_INGEST_SIZE // (1024 * 1024)}MB limit"
+            )
         from docx import Document
-
-        doc = Document(BytesIO(file_bytes))
+        try:
+            doc = Document(BytesIO(file_bytes))
+        except Exception as exc:
+            raise ValueError(f"DocxAgent: failed to parse '{filename}' — {exc}") from exc
         nodes: list[CanvasNode] = []
         list_buffer: list[dict[str, Any]] = []
         list_type: str | None = None

@@ -46,6 +46,9 @@ async def convert_to_pdf(file_bytes: bytes, source_format: str) -> bytes:
     Convert a document to PDF via LibreOffice headless.
     Raises RuntimeError if soffice is not available.
     """
+    if not file_bytes:
+        raise ValueError("convert_to_pdf: empty file_bytes")
+
     if not is_soffice_available():
         raise RuntimeError(
             "LibreOffice (soffice) not found on PATH. "
@@ -73,9 +76,15 @@ async def convert_to_pdf(file_bytes: bytes, source_format: str) -> bytes:
             env={**os.environ, "HOME": str(work_dir)},
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=CONVERT_TIMEOUT
-        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=CONVERT_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise RuntimeError(
+                f"LibreOffice timed out after {CONVERT_TIMEOUT}s converting {source_format}"
+            )
 
         if proc.returncode != 0:
             logger.error(

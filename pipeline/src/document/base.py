@@ -348,14 +348,16 @@ class DocumentAgent(abc.ABC):
                 elif edit.action == "delete":
                     bundle.nodes.pop(i)
                 elif edit.action == "comment":
-                    comments = node.to_dict().get("comments", [])
-                    comments.append({
-                        "id": edit.node_id + "_c" + str(len(comments)),
+                    if "comments" not in node.content:
+                        node.content["comments"] = []
+                    node.content["comments"].append({
+                        "id": edit.node_id + "_c" + str(len(node.content["comments"])),
                         "actor_id": edit.actor_id,
                         "actor_name": edit.actor_name,
                         "text": edit.comment or "",
                         "timestamp": ts,
                     })
+                    node.history.append(history_entry)
                 elif edit.action in ("accept", "reject"):
                     node.history.append(history_entry)
                 break
@@ -380,10 +382,15 @@ class DocumentAgent(abc.ABC):
     async def _convert_to_pdf(self, native_result: ExportResult) -> ExportResult:
         """Convert a native export to PDF via LibreOffice headless."""
         from .converter import convert_to_pdf
-        pdf_bytes = await convert_to_pdf(
-            native_result.file_bytes,
-            native_result.format,
-        )
+        try:
+            pdf_bytes = await convert_to_pdf(
+                native_result.file_bytes,
+                native_result.format,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"{self.display_name}: PDF conversion failed for '{native_result.filename}'"
+            ) from exc
         return ExportResult(
             file_bytes=pdf_bytes,
             content_type="application/pdf",

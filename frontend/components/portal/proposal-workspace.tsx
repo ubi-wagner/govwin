@@ -174,6 +174,14 @@ export function ProposalWorkspace({
             </button>
           );
         })}
+        {sections.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-lg">No sections yet.</p>
+            <p className="text-sm mt-2">
+              Sections will be created when a proposal is provisioned from a topic with required items.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Locked notice */}

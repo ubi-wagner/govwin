@@ -38,29 +38,40 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   const userName = sessionUser.name ?? sessionUser.email ?? 'Unknown';
 
   // ── Verify the proposal belongs to this tenant ─────────────────────
-  const [proposal] = await sql<{ id: string; solicitationId: string | null }[]>`
-    SELECT id, solicitation_id
-    FROM proposals
-    WHERE id = ${proposalId}
-      AND tenant_id = ${tenantId}
-    LIMIT 1
-  `;
+  let proposal: { id: string; solicitationId: string | null } | undefined;
+  try {
+    const [row] = await sql<{ id: string; solicitationId: string | null }[]>`
+      SELECT id, solicitation_id
+      FROM proposals
+      WHERE id = ${proposalId}
+        AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    proposal = row;
+  } catch (e) {
+    console.error('[portal/sections] proposal query error:', e);
+  }
 
   if (!proposal) notFound();
 
   // ── Load the section's canvas content ──────────────────────────────
-  const sectionRows = await sql<{
+  let sectionRows: {
     id: string;
     title: string | null;
     content: unknown;
     status: string;
     proposalId: string;
-  }[]>`
-    SELECT id, title, content, status, proposal_id
-    FROM proposal_sections
-    WHERE id = ${sectionId}::uuid
-      AND proposal_id = ${proposalId}::uuid
-  `;
+  }[] = [];
+  try {
+    sectionRows = await sql<typeof sectionRows>`
+      SELECT id, title, content, status, proposal_id
+      FROM proposal_sections
+      WHERE id = ${sectionId}::uuid
+        AND proposal_id = ${proposalId}::uuid
+    `;
+  } catch (e) {
+    console.error('[portal/sections] section query error:', e);
+  }
 
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];

@@ -45,6 +45,7 @@ except ImportError:
 
 # PDF points per inch — used for page dimension conversion
 _POINTS_PER_INCH = 72.0
+MAX_PDF_PAGES = 500
 
 
 def _make_id() -> str:
@@ -247,6 +248,13 @@ class PdfAgent(DocumentAgent):
     content, hand off the bundle to a DOCX agent and use its export_pdf().
     """
 
+    def __init__(self) -> None:
+        if not _HAS_PYMUPDF:
+            raise ImportError(
+                "pymupdf and pymupdf4llm are required for PdfAgent. "
+                "Install with: pip install pymupdf pymupdf4llm"
+            )
+
     @property
     def format_id(self) -> str:
         return "pdf"
@@ -276,13 +284,16 @@ class PdfAgent(DocumentAgent):
         into structured CanvasNodes. Extracts document metadata (title,
         author, page count, dimensions) from the pymupdf Document object.
         """
-        if not _HAS_PYMUPDF:
-            raise RuntimeError(
-                "pymupdf4llm is required for PDF ingestion. "
-                "Install it with: pip install pymupdf4llm"
-            )
+        if not file_bytes:
+            raise ValueError(f"PdfAgent: empty file '{filename}'")
 
         doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        if doc.page_count > MAX_PDF_PAGES:
+            doc.close()
+            raise ValueError(
+                f"PdfAgent: '{filename}' has {doc.page_count} pages, "
+                f"exceeding the {MAX_PDF_PAGES}-page limit"
+            )
         try:
             # Extract markdown via pymupdf4llm
             md_text: str = pymupdf4llm.to_markdown(doc)
