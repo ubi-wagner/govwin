@@ -33,6 +33,7 @@ export interface CanvasRules {
   line_spacing: number;
   max_pages: number | null;
   max_slides: number | null;
+  watermark?: { text: string; color?: string; opacity?: number };
 }
 
 /** Standard presets derived from common RFP requirements. */
@@ -128,10 +129,26 @@ export interface ImageContent {
   caption?: string;
 }
 
+export interface TableCellStyle {
+  bg?: string;           // hex color for cell background
+  bold?: boolean;
+  alignment?: 'left' | 'center' | 'right';
+  border?: 'none' | 'thin' | 'thick';
+}
+
+export interface TableCell {
+  text: string;
+  rowSpan?: number;
+  colSpan?: number;
+  style?: TableCellStyle;
+}
+
 export interface TableContent {
-  headers: string[];
-  rows: string[][];
+  headers: (string | TableCell)[];
+  rows: (string | TableCell)[][];
   column_widths?: number[];
+  header_style?: TableCellStyle;  // default style for header row
+  border_style?: 'none' | 'single' | 'double';
 }
 
 export interface CaptionContent {
@@ -165,6 +182,18 @@ export type NodeContent =
   | TocContent
   | UrlContent
   | null;
+
+// ─── Node comments (collaborative annotations) ─────────────────────
+
+export interface NodeComment {
+  id: string;
+  actor_id: string;
+  actor_name: string;
+  text: string;
+  timestamp: string;
+  resolved?: boolean;
+  resolved_by?: string;
+}
 
 // ─── Node edit history ──────────────────────────────────────────────
 
@@ -201,6 +230,7 @@ export interface CanvasNode {
     drafted_at?: string;
   };
   history: NodeEdit[];
+  comments?: NodeComment[];
   library_eligible: boolean;
   library_tags?: string[];
 }
@@ -318,7 +348,8 @@ export function getNodeText(node: CanvasNode): string {
     case 'url': return (node.content as UrlContent).display_text;
     case 'table': {
       const t = node.content as TableContent;
-      return [...t.headers, ...t.rows.flat()].join(' ');
+      const cellText = (c: string | TableCell): string => typeof c === 'string' ? c : c.text;
+      return [...t.headers.map(cellText), ...t.rows.flat().map(cellText)].join(' ');
     }
     default: return '';
   }

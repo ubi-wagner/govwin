@@ -28,29 +28,58 @@ export async function POST(request: Request, _ctx: RouteContext) {
     return NextResponse.json({ error: 'document (CanvasDocument JSON) required' }, { status: 400 });
   }
 
-  if (format !== 'docx') {
+  const title = doc.metadata.title || 'document';
+  const vars = {
+    company_name: 'Your Company',
+    topic_number: doc.metadata.title ?? 'TBD',
+  };
+
+  if (format !== 'docx' && format !== 'pptx' && format !== 'xlsx') {
     return NextResponse.json(
-      { error: `Format "${format}" not yet supported. Available: docx` },
+      { error: `Format "${format}" not supported. Available: docx, pptx, xlsx` },
       { status: 422 },
     );
   }
 
   try {
-    const buffer = await exportToDocx(doc, {
-      company_name: 'Your Company',
-      topic_number: doc.metadata.title ?? 'TBD',
-    });
+    if (format === 'pptx') {
+      const { exportToPptx } = await import('@/lib/export/pptx-exporter');
+      const buffer = await exportToPptx(doc, vars);
+      return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'Content-Disposition': `attachment; filename="${title}.pptx"`,
+          'Content-Length': String(buffer.length),
+        },
+      });
+    }
 
+    if (format === 'xlsx') {
+      const { exportToXlsx } = await import('@/lib/export/xlsx-exporter');
+      const buffer = await exportToXlsx(doc, vars);
+      return new NextResponse(new Uint8Array(buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${title}.xlsx"`,
+          'Content-Length': String(buffer.length),
+        },
+      });
+    }
+
+    // Default: docx
+    const buffer = await exportToDocx(doc, vars);
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${doc.metadata.title || 'document'}.docx"`,
+        'Content-Disposition': `attachment; filename="${title}.docx"`,
         'Content-Length': String(buffer.length),
       },
     });
   } catch (err) {
-    console.error('[export] docx generation failed', err);
+    console.error('[export] generation failed', err);
     return NextResponse.json(
       { error: `Export failed: ${err instanceof Error ? err.message : String(err)}` },
       { status: 500 },

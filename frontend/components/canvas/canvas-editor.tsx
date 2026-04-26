@@ -17,7 +17,7 @@ import { CanvasSidebar } from './canvas-sidebar';
 interface Props {
   initialDocument: CanvasDocument;
   onSave: (doc: CanvasDocument) => Promise<void>;
-  onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'pdf') => Promise<void>;
+  onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => Promise<void>;
   variables?: Record<string, string>;
   readOnly?: boolean;
   actorId: string;
@@ -190,12 +190,36 @@ export function CanvasEditor({
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>
           <div className="flex items-center gap-2">
-            {onExport && (
+            {onExport && (doc.canvas.format === 'letter' || doc.canvas.format === 'custom') && (
+              <>
+                <button
+                  onClick={() => onExport(doc, 'docx')}
+                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                >
+                  Export .docx
+                </button>
+                <button
+                  onClick={() => onExport(doc, 'pdf')}
+                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                >
+                  Export .pdf
+                </button>
+              </>
+            )}
+            {onExport && (doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3') && (
               <button
-                onClick={() => onExport(doc, 'docx')}
+                onClick={() => onExport(doc, 'pptx')}
                 className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
               >
-                Export .docx
+                Export .pptx
+              </button>
+            )}
+            {onExport && doc.nodes.some((n) => n.type === 'table') && (
+              <button
+                onClick={() => onExport(doc, 'xlsx')}
+                className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+              >
+                Export .xlsx
               </button>
             )}
             <button

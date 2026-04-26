@@ -22,10 +22,11 @@ import type {
   ListContent,
   ImageContent,
   TableContent,
+  TableCell as TableCellType,
+  TableCellStyle,
   CaptionContent,
   FootnoteContent,
   UrlContent,
-  estimatePageCount,
 } from '@/lib/types/canvas-document';
 
 interface Props {
@@ -248,6 +249,67 @@ function HeadingNode({ content, scale }: { content: HeadingContent; scale: numbe
   );
 }
 
+function renderFormattedText(content: TextBlockContent): React.ReactNode {
+  if (!content.inline_formats || content.inline_formats.length === 0) {
+    return content.text;
+  }
+
+  const text = content.text;
+  // Sort formats by start position for deterministic rendering
+  const formats = [...content.inline_formats].sort((a, b) => a.start - b.start);
+
+  // Build segments: collect all boundary points
+  const boundaries = new Set<number>();
+  boundaries.add(0);
+  boundaries.add(text.length);
+  for (const f of formats) {
+    boundaries.add(f.start);
+    boundaries.add(f.start + f.length);
+  }
+  const points = [...boundaries].sort((a, b) => a - b);
+
+  const segments: React.ReactNode[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const segStart = points[i];
+    const segEnd = points[i + 1];
+    if (segStart >= segEnd) continue;
+    const segText = text.slice(segStart, segEnd);
+
+    // Determine which formats apply to this segment
+    const activeFormats = formats.filter(
+      (f) => f.start <= segStart && f.start + f.length >= segEnd,
+    );
+
+    if (activeFormats.length === 0) {
+      segments.push(<span key={i}>{segText}</span>);
+    } else {
+      let node: React.ReactNode = segText;
+      for (const f of activeFormats) {
+        switch (f.format) {
+          case 'bold':
+            node = <strong key={`${i}-b`}>{node}</strong>;
+            break;
+          case 'italic':
+            node = <em key={`${i}-i`}>{node}</em>;
+            break;
+          case 'underline':
+            node = <u key={`${i}-u`}>{node}</u>;
+            break;
+          case 'superscript':
+            node = <sup key={`${i}-sup`}>{node}</sup>;
+            break;
+          case 'subscript':
+            node = <sub key={`${i}-sub`}>{node}</sub>;
+            break;
+        }
+      }
+      segments.push(<span key={i}>{node}</span>);
+    }
+  }
+
+  return <>{segments}</>;
+}
+
 function TextBlockNode({
   content, readOnly, onUpdate, isSelected,
 }: {
@@ -267,7 +329,7 @@ function TextBlockNode({
       />
     );
   }
-  return <p className="whitespace-pre-wrap">{content.text}</p>;
+  return <p className="whitespace-pre-wrap">{renderFormattedText(content)}</p>;
 }
 
 function ListNode({ content, ordered }: { content: ListContent; ordered: boolean }) {
@@ -299,22 +361,72 @@ function ImageNode({ content }: { content: ImageContent }) {
   );
 }
 
+function resolveTableCell(cell: string | TableCellType): TableCellType {
+  return typeof cell === 'string' ? { text: cell } : cell;
+}
+
+function tableCellStyleProps(style?: TableCellStyle, fallback?: TableCellStyle): React.CSSProperties {
+  const merged = { ...fallback, ...style };
+  return {
+    backgroundColor: merged.bg ?? undefined,
+    fontWeight: merged.bold ? 'bold' : undefined,
+    textAlign: merged.alignment ?? undefined,
+  };
+}
+
+function tableBorderClass(borderStyle?: 'none' | 'single' | 'double'): string {
+  if (borderStyle === 'none') return '';
+  if (borderStyle === 'double') return 'border-2 border-double border-gray-400';
+  return 'border border-gray-300';
+}
+
 function TableNode({ content }: { content: TableContent }) {
+  const outerBorder = tableBorderClass(content.border_style);
+  const cellBorder = content.border_style === 'none'
+    ? 'px-2 py-1'
+    : content.border_style === 'double'
+    ? 'border-2 border-double border-gray-400 px-2 py-1'
+    : 'border border-gray-300 px-2 py-1';
+
   return (
-    <table className="w-full border-collapse border border-gray-300 text-sm my-2">
+    <table className={`w-full border-collapse text-sm my-2 ${outerBorder || 'border border-gray-300'}`}>
       <thead>
         <tr className="bg-gray-50">
-          {content.headers.map((h, i) => (
-            <th key={i} className="border border-gray-300 px-2 py-1 text-left font-semibold">{h}</th>
-          ))}
+          {content.headers.map((h, i) => {
+            const cell = resolveTableCell(h);
+            const styleProps = tableCellStyleProps(cell.style, content.header_style);
+            return (
+              <th
+                key={i}
+                className={`text-left font-semibold ${cellBorder}`}
+                style={styleProps}
+                rowSpan={cell.rowSpan}
+                colSpan={cell.colSpan}
+              >
+                {cell.text}
+              </th>
+            );
+          })}
         </tr>
       </thead>
       <tbody>
         {content.rows.map((row, ri) => (
           <tr key={ri}>
-            {row.map((cell, ci) => (
-              <td key={ci} className="border border-gray-300 px-2 py-1">{cell}</td>
-            ))}
+            {row.map((c, ci) => {
+              const cell = resolveTableCell(c);
+              const styleProps = tableCellStyleProps(cell.style);
+              return (
+                <td
+                  key={ci}
+                  className={cellBorder}
+                  style={styleProps}
+                  rowSpan={cell.rowSpan}
+                  colSpan={cell.colSpan}
+                >
+                  {cell.text}
+                </td>
+              );
+            })}
           </tr>
         ))}
       </tbody>

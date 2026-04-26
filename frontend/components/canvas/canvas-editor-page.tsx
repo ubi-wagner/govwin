@@ -42,7 +42,7 @@ export function CanvasEditorPage({
     }
   }, [proposalId, sectionId]);
 
-  const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'pdf') => {
+  const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {
     const resp = await fetch(`/api/admin/proposals/${proposalId}/sections/${sectionId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

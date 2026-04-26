@@ -17,7 +17,7 @@ import {
   HeadingLevel,
   Table,
   TableRow,
-  TableCell,
+  TableCell as DocxTableCell,
   WidthType,
   AlignmentType,
   Header,
@@ -25,6 +25,7 @@ import {
   PageNumber,
   NumberFormat,
   BorderStyle,
+  ShadingType,
   convertInchesToTwip,
 } from 'docx';
 import type {
@@ -34,6 +35,7 @@ import type {
   TextBlockContent,
   ListContent,
   TableContent,
+  TableCell as CanvasTableCell,
   CaptionContent,
   FootnoteContent,
   UrlContent,
@@ -174,6 +176,7 @@ function nodeToDocx(
 
     case 'text_block': {
       const c = node.content as TextBlockContent;
+      const runs = createFormattedRuns(c, font, size);
       return [new Paragraph({
         alignment,
         indent: node.style.indent ? { left: node.style.indent * 20 } : undefined,
@@ -181,7 +184,7 @@ function nodeToDocx(
           before: (node.style.space_before ?? 0) * 20,
           after: (node.style.space_after ?? 0) * 20,
         },
-        children: [new TextRun({ text: c.text, font, size })],
+        children: runs,
       })];
     }
 
@@ -199,21 +202,56 @@ function nodeToDocx(
 
     case 'table': {
       const c = node.content as TableContent;
+      const resolveCell = (cell: string | CanvasTableCell): CanvasTableCell =>
+        typeof cell === 'string' ? { text: cell } : cell;
+
       const headerRow = new TableRow({
-        children: c.headers.map((h) =>
-          new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, font, size })] })],
+        children: c.headers.map((h) => {
+          const cell = resolveCell(h);
+          const mergedStyle = { ...c.header_style, ...cell.style };
+          const cellAlignment = mergedStyle.alignment
+            ? ({ left: AlignmentType.LEFT, center: AlignmentType.CENTER, right: AlignmentType.RIGHT } as const)[mergedStyle.alignment] ?? AlignmentType.LEFT
+            : AlignmentType.LEFT;
+          return new DocxTableCell({
+            children: [new Paragraph({
+              alignment: cellAlignment,
+              children: [new TextRun({
+                text: cell.text,
+                bold: mergedStyle.bold !== false,
+                font,
+                size,
+              })],
+            })],
             width: { size: 100 / c.headers.length, type: WidthType.PERCENTAGE },
-          }),
-        ),
+            rowSpan: cell.rowSpan,
+            columnSpan: cell.colSpan,
+            shading: mergedStyle.bg ? { type: ShadingType.SOLID, color: mergedStyle.bg.replace('#', '') } : undefined,
+          });
+        }),
       });
       const dataRows = c.rows.map((row) =>
         new TableRow({
-          children: row.map((cell) =>
-            new TableCell({
-              children: [new Paragraph({ children: [new TextRun({ text: cell, font, size })] })],
-            }),
-          ),
+          children: row.map((rawCell) => {
+            const cell = resolveCell(rawCell);
+            const cellStyle = cell.style;
+            const cellAlignment = cellStyle?.alignment
+              ? ({ left: AlignmentType.LEFT, center: AlignmentType.CENTER, right: AlignmentType.RIGHT } as const)[cellStyle.alignment] ?? AlignmentType.LEFT
+              : AlignmentType.LEFT;
+            return new DocxTableCell({
+              children: [new Paragraph({
+                alignment: cellAlignment,
+                children: [new TextRun({
+                  text: cell.text,
+                  bold: cellStyle?.bold ?? false,
+                  font,
+                  size,
+                })],
+              })],
+              rowSpan: cell.rowSpan,
+              columnSpan: cell.colSpan,
+              shading: cellStyle?.bg ? { type: ShadingType.SOLID, color: cellStyle.bg.replace('#', '') } : undefined,
+            });
+          }),
         }),
       );
       return [new Table({
@@ -271,4 +309,63 @@ function nodeToDocx(
     default:
       return [];
   }
+}
+
+/**
+ * Split a TextBlockContent into multiple TextRun objects, applying
+ * bold/italic/underline/superscript/subscript from inline_formats.
+ */
+function createFormattedRuns(
+  content: TextBlockContent,
+  font: string,
+  size: number,
+): TextRun[] {
+  if (!content.inline_formats || content.inline_formats.length === 0) {
+    return [new TextRun({ text: content.text, font, size })];
+  }
+
+  const text = content.text;
+  const formats = [...content.inline_formats].sort((a, b) => a.start - b.start);
+
+  // Collect all boundary points
+  const boundaries = new Set<number>();
+  boundaries.add(0);
+  boundaries.add(text.length);
+  for (const f of formats) {
+    boundaries.add(f.start);
+    boundaries.add(f.start + f.length);
+  }
+  const points = [...boundaries].sort((a, b) => a - b);
+
+  const runs: TextRun[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const segStart = points[i];
+    const segEnd = points[i + 1];
+    if (segStart >= segEnd) continue;
+    const segText = text.slice(segStart, segEnd);
+
+    // Determine which formats apply to this segment
+    const activeFormats = formats.filter(
+      (f) => f.start <= segStart && f.start + f.length >= segEnd,
+    );
+
+    const isBold = activeFormats.some((f) => f.format === 'bold');
+    const isItalic = activeFormats.some((f) => f.format === 'italic');
+    const isUnderline = activeFormats.some((f) => f.format === 'underline');
+    const isSuperscript = activeFormats.some((f) => f.format === 'superscript');
+    const isSubscript = activeFormats.some((f) => f.format === 'subscript');
+
+    runs.push(new TextRun({
+      text: segText,
+      font,
+      size,
+      bold: isBold || undefined,
+      italics: isItalic || undefined,
+      underline: isUnderline ? {} : undefined,
+      superScript: isSuperscript || undefined,
+      subScript: isSubscript || undefined,
+    }));
+  }
+
+  return runs;
 }
