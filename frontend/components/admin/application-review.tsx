@@ -2,6 +2,36 @@
 
 import { useState } from 'react';
 
+interface SbirLookupResult {
+  company: {
+    companyName: string;
+    uei: string;
+    state: string;
+    numberAwards: number;
+    hubzoneOwned: boolean;
+    womanOwned: boolean;
+    disadvantaged: boolean;
+    companyUrl: string;
+  } | null;
+  awards: Array<{
+    awardTitle: string;
+    agency: string;
+    phase: string;
+    program: string;
+    awardYear: string;
+    awardAmount: number;
+    topicCode: string;
+    abstract: string;
+  }>;
+  summary: {
+    totalAwards: number;
+    totalAmount: number;
+    agencies: string[];
+    phases: string[];
+    yearRange: { first: string; last: string };
+  };
+}
+
 export interface ApplicationItem {
   id: string;
   contactEmail: string;
@@ -73,11 +103,35 @@ export function ApplicationReview({ applications }: Props) {
     tempPassword: string;
   } | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [sbirData, setSbirData] = useState<Record<string, SbirLookupResult | null>>({});
+  const [sbirLoading, setSbirLoading] = useState<Record<string, boolean>>({});
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
     setAcceptResult(null);
     setError(null);
+
+    // Auto-lookup SBIR data when expanding
+    if (!sbirData[id] && !sbirLoading[id]) {
+      const app = items.find(a => a.id === id);
+      if (app) {
+        let domainParam = '';
+        if (app.companyWebsite) {
+          try {
+            const hostname = new URL(app.companyWebsite).hostname;
+            domainParam = '&domain=' + encodeURIComponent(hostname);
+          } catch {
+            // companyWebsite is not a valid URL — skip domain param
+          }
+        }
+        setSbirLoading(prev => ({ ...prev, [id]: true }));
+        fetch(`/api/admin/sbir-data/lookup?company=${encodeURIComponent(app.companyName)}${app.dunsUei ? '&uei=' + encodeURIComponent(app.dunsUei) : ''}${domainParam}`)
+          .then(r => r.json())
+          .then(json => setSbirData(prev => ({ ...prev, [id]: json.data ?? null })))
+          .catch(() => setSbirData(prev => ({ ...prev, [id]: null })))
+          .finally(() => setSbirLoading(prev => ({ ...prev, [id]: false })));
+      }
+    }
   };
 
   const handleAccept = async (id: string) => {
@@ -356,6 +410,62 @@ export function ApplicationReview({ applications }: Props) {
                     )}
                   </div>
                 </div>
+
+                {/* SBIR Award History — auto-enriched */}
+                {sbirLoading[app.id] && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 animate-pulse">
+                    Searching SBIR award database...
+                  </div>
+                )}
+                {sbirData[app.id] && (
+                  <div className="mt-4 col-span-2 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-sm text-indigo-900 mb-2">SBIR/STTR Award History</h4>
+                    {sbirData[app.id]!.summary.totalAwards === 0 ? (
+                      <p className="text-sm text-indigo-600">No SBIR/STTR awards found in database.</p>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-4 gap-3 mb-3">
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-indigo-800">{sbirData[app.id]!.summary.totalAwards}</p>
+                            <p className="text-xs text-indigo-600">Awards</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-indigo-800">${(sbirData[app.id]!.summary.totalAmount / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-indigo-600">Total Funded</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg font-bold text-indigo-800">{sbirData[app.id]!.summary.agencies.join(', ')}</p>
+                            <p className="text-xs text-indigo-600">Agencies</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-lg font-bold text-indigo-800">{sbirData[app.id]!.summary.yearRange.first}–{sbirData[app.id]!.summary.yearRange.last}</p>
+                            <p className="text-xs text-indigo-600">Active Years</p>
+                          </div>
+                        </div>
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-indigo-700 font-medium">View {sbirData[app.id]!.awards.length} awards</summary>
+                          <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                            {sbirData[app.id]!.awards.map((award, i) => (
+                              <div key={i} className="flex justify-between items-center py-1 border-b border-indigo-100">
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium text-gray-800 truncate block">{award.awardTitle || 'Untitled'}</span>
+                                  <span className="text-gray-500">{award.agency} · {award.phase} · {award.program} · {award.topicCode}</span>
+                                </div>
+                                <div className="text-right flex-shrink-0 ml-2">
+                                  <span className="font-medium text-gray-800">${award.awardAmount?.toLocaleString() || 'N/A'}</span>
+                                  <span className="block text-gray-500">{award.awardYear}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </>
+                    )}
+                    {sbirData[app.id]!.company?.womanOwned && <span className="inline-block mt-2 mr-1 px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">Woman Owned</span>}
+                    {sbirData[app.id]!.company?.hubzoneOwned && <span className="inline-block mt-2 mr-1 px-2 py-0.5 text-xs bg-teal-100 text-teal-700 rounded">HUBZone</span>}
+                    {sbirData[app.id]!.company?.disadvantaged && <span className="inline-block mt-2 mr-1 px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">SED</span>}
+                  </div>
+                )}
 
                 {/* Accept result */}
                 {acceptResult && expandedId === app.id && (
