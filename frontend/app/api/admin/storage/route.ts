@@ -17,7 +17,11 @@ import { emitEventSingle } from '@/lib/events';
 import { s3, BUCKET, putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 
 const ADMIN_PREFIX = 'rfp-admin/';
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB — SBIR award files are 300MB+
+
+// Next.js route segment config — allow large uploads and long processing
+export const maxDuration = 120; // seconds (for large CSV ingest)
+export const dynamic = 'force-dynamic';
 
 function isAdminRole(role: string | undefined): boolean {
   return role === 'master_admin' || role === 'rfp_admin';
@@ -121,9 +125,11 @@ export async function POST(request: NextRequest) {
     let formData: FormData;
     try {
       formData = await request.formData();
-    } catch {
+    } catch (parseErr) {
+      const msg = parseErr instanceof Error ? parseErr.message : 'Unknown parse error';
+      console.error('[admin/storage] formData parse failed:', msg);
       return NextResponse.json(
-        { error: 'Invalid multipart body' },
+        { error: `Upload failed: ${msg.includes('size') ? 'File too large for server limit' : 'Invalid multipart body — check file size and format'}` },
         { status: 400 },
       );
     }
