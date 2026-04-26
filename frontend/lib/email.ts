@@ -1,48 +1,42 @@
 /**
  * Email + Calendar via Google Workspace APIs.
  *
- * Uses a service account with domain-wide delegation to send email
- * as eric@rfppipeline.com via Gmail API and create calendar events.
+ * Uses OAuth2 with a refresh token to send email as
+ * platform@rfppipeline.com via Gmail API and create calendar events.
  *
- * Setup (one-time in Google Admin Console):
- * 1. Create a GCP project → enable Gmail API + Calendar API
- * 2. Create a service account → download JSON key
- * 3. In Google Admin → Security → API controls → Domain-wide delegation
- *    → Add the service account client_id with scopes:
- *      https://www.googleapis.com/auth/gmail.send
- *      https://www.googleapis.com/auth/calendar
+ * Setup:
+ * 1. GCP Console → create OAuth2 Web App credentials
+ * 2. OAuth Playground → authorize as platform@rfppipeline.com
+ * 3. Exchange code for tokens → copy the refresh token
  * 4. Set env vars on Railway:
- *    GOOGLE_SERVICE_ACCOUNT_EMAIL=svc@project.iam.gserviceaccount.com
- *    GOOGLE_SERVICE_ACCOUNT_KEY=<base64-encoded JSON key>
- *    GOOGLE_WORKSPACE_EMAIL=eric@rfppipeline.com
+ *    GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+ *    GOOGLE_CLIENT_SECRET=GOCSPX-...
+ *    GOOGLE_REFRESH_TOKEN=1//...
+ *    GOOGLE_WORKSPACE_EMAIL=platform@rfppipeline.com
  */
 
 import { google } from 'googleapis';
 
-const SVC_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const SVC_KEY_B64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-const WORKSPACE_EMAIL = process.env.GOOGLE_WORKSPACE_EMAIL || 'eric@rfppipeline.com';
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
+const WORKSPACE_EMAIL = process.env.GOOGLE_WORKSPACE_EMAIL || 'platform@rfppipeline.com';
 const FALLBACK_RESEND_KEY = process.env.RESEND_API_KEY;
 
+let _cachedAuth: InstanceType<typeof google.auth.OAuth2> | null = null;
+
 function getAuth() {
-  if (!SVC_EMAIL || !SVC_KEY_B64) return null;
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) return null;
+
+  if (_cachedAuth) return _cachedAuth;
 
   try {
-    const keyJson = JSON.parse(
-      Buffer.from(SVC_KEY_B64, 'base64').toString('utf-8'),
-    );
-
-    return new google.auth.JWT({
-      email: SVC_EMAIL,
-      key: keyJson.private_key,
-      scopes: [
-        'https://www.googleapis.com/auth/gmail.send',
-        'https://www.googleapis.com/auth/calendar',
-      ],
-      subject: WORKSPACE_EMAIL,
-    });
+    const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
+    oauth2.setCredentials({ refresh_token: REFRESH_TOKEN });
+    _cachedAuth = oauth2;
+    return oauth2;
   } catch (err) {
-    console.error('[google] Failed to parse service account key:', err);
+    console.error('[google] Failed to create OAuth2 client:', err);
     return null;
   }
 }
