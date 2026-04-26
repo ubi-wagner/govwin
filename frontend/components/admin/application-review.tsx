@@ -215,6 +215,42 @@ export function ApplicationReview({ applications }: Props) {
     }
   };
 
+  const [statusChange, setStatusChange] = useState<Record<string, string>>({});
+  const [statusNote, setStatusNote] = useState<Record<string, string>>({});
+  const [statusLoading, setStatusLoading] = useState<string | null>(null);
+
+  const handleStatusChange = async (id: string) => {
+    const newStatus = statusChange[id];
+    const note = (statusNote[id] || '').trim();
+    if (!newStatus || note.length < 5) return;
+
+    setStatusLoading(id);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/applications/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, note }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error ?? 'Status change failed');
+        return;
+      }
+      setItems((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: newStatus, reviewNotes: note } : a)),
+      );
+      setStatusChange((prev) => ({ ...prev, [id]: '' }));
+      setStatusNote((prev) => ({ ...prev, [id]: '' }));
+      setAcceptResult(null);
+    } catch {
+      setError('Network error changing status');
+    } finally {
+      setStatusLoading(null);
+    }
+  };
+
   const isActionable = (status: string) =>
     status === 'pending' || status === 'under_review';
 
@@ -537,6 +573,56 @@ export function ApplicationReview({ applications }: Props) {
                       Review Notes
                     </p>
                     <p className="text-gray-600">{app.reviewNotes}</p>
+                  </div>
+                )}
+
+                {/* Status change — for already-decided applications (testing + corrections) */}
+                {!isActionable(app.status) && (
+                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Change Status</h4>
+                    <div className="flex items-end gap-3">
+                      <label className="flex-shrink-0">
+                        <span className="block text-xs text-gray-500 mb-1">New status</span>
+                        <select
+                          value={statusChange[app.id] || ''}
+                          onChange={(e) => setStatusChange(prev => ({ ...prev, [app.id]: e.target.value }))}
+                          className="border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        >
+                          <option value="">Select...</option>
+                          {['pending', 'under_review', 'accepted', 'rejected', 'withdrawn']
+                            .filter((s) => s !== app.status)
+                            .map((s) => (
+                              <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                            ))}
+                        </select>
+                      </label>
+                      <div className="flex-1">
+                        <span className="block text-xs text-gray-500 mb-1">Audit note *</span>
+                        <input
+                          type="text"
+                          value={statusNote[app.id] || ''}
+                          onChange={(e) => setStatusNote(prev => ({ ...prev, [app.id]: e.target.value }))}
+                          placeholder="Reason for status change..."
+                          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={
+                          !statusChange[app.id] ||
+                          (statusNote[app.id] || '').trim().length < 5 ||
+                          statusLoading === app.id
+                        }
+                        onClick={() => handleStatusChange(app.id)}
+                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-800 disabled:opacity-40 text-white text-sm font-medium rounded flex-shrink-0"
+                      >
+                        {statusLoading === app.id ? 'Saving...' : 'Update'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Status changes are audited. Changing to &ldquo;pending&rdquo; re-enables the Accept/Reject buttons.
+                      Changing to &ldquo;accepted&rdquo; will NOT re-send the welcome email or create a new tenant.
+                    </p>
                   </div>
                 )}
 
