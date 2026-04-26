@@ -1,6 +1,6 @@
 # RFP Pipeline — Day 365 Architecture
 
-**Status:** Living document. Last updated: 2026-04-24.
+**Status:** Living document. Last updated: 2026-04-26.
 **Audience:** Engineering (Claude sessions), founder, future hires.
 
 RFP Pipeline is a SaaS platform pairing isolated, company-specific AI
@@ -18,8 +18,10 @@ graph TB
     subgraph Railway["Railway Platform"]
         FE["govtech-frontend<br/>Next.js 15"]
         PL["pipeline<br/>Python 3.12"]
-        PG["Postgres 18<br/>pgvector"]
-        S3["S3 Bucket<br/>customers-prod-xvizsdjcxi"]
+        CRM["rfp-crm<br/>FastAPI (CMS-CRM)"]
+        PG["Postgres 18<br/>pgvector<br/>(main DB)"]
+        PG2["Postgres<br/>(CRM DB)"]
+        S3["S3 Bucket<br/>rfp-pipeline-prod-r8t7tr6"]
     end
 
     SAM["SAM.gov API"]
@@ -27,7 +29,33 @@ graph TB
     GRANTS["Grants.gov API"]
     CLAUDE["Claude API<br/>Anthropic"]
     STRIPE["Stripe API"]
-    RESEND["Resend Email"]
+    GMAIL["Gmail API<br/>Google Workspace"]
+    GCAL["Calendar API<br/>Google Workspace"]
+
+    FE -->|queries| PG
+    FE -->|reads/writes| S3
+    PL -->|migrations + jobs| PG
+    PL -->|reads/writes| S3
+    PL -->|ingests from| SAM & SBIR & GRANTS
+    PL -->|shreds via| CLAUDE
+    CRM -->|event listener| PG
+    CRM -->|own tables| PG2
+    CRM -->|sends email| GMAIL
+    CRM -->|creates events| GCAL
+    FE -->|AI drafting| CLAUDE
+    FE -.->|billing| STRIPE
+```
+
+### Service Responsibilities
+
+| Service | Role | Language | Key Dependencies |
+|---------|------|----------|-----------------|
+| **govtech-frontend** | Portal UI, Admin UI, API routes, tools, canvas editor | Next.js 15 / TypeScript | postgres.js, @aws-sdk/client-s3, mammoth, pdf-parse, docx, pptxgenjs, exceljs |
+| **pipeline** | Ingestion, shredding, document agents, cron workers | Python 3.12 | asyncpg, httpx, anthropic, pymupdf4llm, python-docx, python-pptx, openpyxl |
+| **rfp-crm** | Email automation, CMS content, event-driven actions, calendar | FastAPI / Python 3.12 | asyncpg, google-api-python-client, google-auth |
+| **Postgres (main)** | All app data: users, tenants, proposals, library, opportunities, system_events | PostgreSQL 18 + pgvector | 19 migrations (001-019) |
+| **Postgres (CRM)** | CRM-specific: email accounts, templates, campaigns, outbox, cms_events | PostgreSQL | 3 migrations (001-003) |
+| **S3 Bucket** | All file storage: RFP PDFs, customer uploads, library assets, admin operational files | Railway S3-compatible | 3 head folders: rfp-admin/, rfp-pipeline/, customers/ |
 
     SAM --> PL
     SBIR --> PL
@@ -141,12 +169,25 @@ stateDiagram-v2
 | # | Module | Status | Key Files | Schema Tables |
 |---|--------|--------|-----------|---------------|
 | A | **Ingestion & Source Mgmt** | BUILT | `pipeline/src/ingest/{base,dispatcher,sam_gov,sbir_gov,grants_gov}.py` | `opportunities`, `pipeline_jobs`, `pipeline_schedules` |
-| B | **Shredder & Compliance** | BUILT | `pipeline/src/shredder/{runner,extractor,namespace,compliance_mapping,sync_extract}.py`, `prompts/v1/*.txt` | `solicitation_compliance`, `compliance_variables` |
-| C | **Admin Curation Workspace** | BUILT | `frontend/components/rfp-curation/{curation-workspace,pdf-viewer,tag-popover,triage-queue,upload-form}.tsx` | `curated_solicitations`, `solicitation_annotations` |
-| D | **Solicitations → Topics → Volumes** | BUILT | migrations 012-015, `frontend/lib/tools/opportunity-{add-topic,bulk-add-topics}.ts`, `volume-*.ts` | `solicitation_documents`, `solicitation_volumes`, `volume_required_items` |
-| E | **HITL Memory & Pre-fill** | BUILT | `frontend/lib/tools/curation-memory.ts`, `frontend/app/api/admin/compliance-suggest/route.ts` | `episodic_memories` (namespace column) |
-| F | **Customer Onboarding & Billing** | STUB | `frontend/app/api/stripe/{checkout,webhook}/route.ts` (501) | `applications` (BUILT), `tenants`/`tenant_users` (schema exists) |
-| G | **Spotlight Feed & Matching** | PLANNED | — | `opportunities` (topics with tech_focus_areas), customer profile (needs schema) |
+| B | **Shredder & Compliance** | BUILT | `pipeline/src/shredder/{runner,extractor,namespace,compliance_mapping}.py` | `solicitation_compliance`, `compliance_variables` |
+| C | **Admin Curation Workspace** | BUILT | `frontend/components/rfp-curation/{curation-workspace,pdf-viewer,tag-popover}.tsx` | `curated_solicitations`, `solicitation_annotations` |
+| D | **Solicitations → Topics → Volumes** | BUILT | migrations 012-015, tools: `opportunity-*.ts`, `volume-*.ts` | `solicitation_documents`, `solicitation_volumes`, `volume_required_items` |
+| E | **HITL Memory & Pre-fill** | BUILT | `frontend/lib/tools/curation-memory.ts`, compliance-suggest route | `episodic_memories` |
+| F | **Customer Onboarding** | BUILT | `frontend/app/api/admin/applications/[id]/accept/`, T&C, domain-match dedup | `applications`, `tenants`, `users` |
+| G | **Spotlight Feed & Matching** | BUILT | `frontend/app/portal/[slug]/spotlights/page.tsx`, pin/unpin API | `tenant_pipeline_items`, `opportunities` |
+| H | **Library Import & Atomization** | BUILT | `frontend/lib/import/{docx,pptx,pdf,text}-reader.ts`, atomize route | `library_units` |
+| I | **Atom Review UI** | BUILT | `frontend/components/portal/atom-review.tsx`, library CRUD API | `library_units` |
+| J | **Canvas Document Editor** | BUILT | `frontend/components/canvas/{renderer,editor,sidebar,collaboration}.tsx` | `proposal_sections`, `canvas_versions` |
+| K | **AI Drafting Pipeline** | BUILT | `frontend/lib/tools/proposal-draft-section.ts`, draft-all-sections | `proposal_sections` |
+| L | **MS Office Export** | BUILT | `frontend/lib/export/{docx,pptx,xlsx}-exporter.ts` | — |
+| M | **Document Lifecycle Agents** | BUILT | `pipeline/src/document/{base,registry,docx,pptx,xlsx,pdf}_agent.py` | — |
+| N | **S3 File Manager** | BUILT | `frontend/app/api/admin/storage/route.ts`, admin-file-manager component | — |
+| O | **SBIR Award Data** | BUILT | `frontend/lib/sbir-ingest.ts`, lookup API, auto-enrichment | `sbir_companies`, `sbir_awards`, `sbir_data_uploads` |
+| P | **Email & Calendar (Google)** | IN PROGRESS | `frontend/lib/email.ts` (OAuth2), `services/cms/src/gmail.py` | `automation_rules`, `automation_log` |
+| Q | **CMS-CRM Service** | IN PROGRESS | `services/cms/src/{main,event_listener,gmail,templates}.py` | `cms_content`, `email_accounts`, `email_templates` |
+| R | **Stripe Billing** | STUB | — | — |
+| S | **Team Collaboration** | PLANNED | — | — |
+| T | **Color Team Automation** | PLANNED | — | — |
 | H | **Proposal Portal & Workspace** | STUB | `frontend/app/api/portal/[tenantSlug]/proposals/*/route.ts` (501) | `proposals`, `proposal_sections`, `proposal_compliance_matrix` (schema exists) |
 | I | **Library Management** | STUB | — | `library_units`, `library_assets` (schema exists, not populated) |
 | J | **Agent Fabric** | STUB | `pipeline/src/agents/{fabric,context,memory,tools}.py`, 10 archetypes (all `pass`) | `agent_archetypes`, `agent_task_queue`, `agent_task_log` |
