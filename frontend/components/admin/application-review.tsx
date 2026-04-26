@@ -99,8 +99,15 @@ export function ApplicationReview({ applications }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [acceptResult, setAcceptResult] = useState<{
     tenantId: string;
+    tenantSlug: string;
     userId: string;
+    contactEmail: string;
+    contactName: string;
+    companyName: string;
     tempPassword: string;
+    emailSent: boolean;
+    emailProvider: string;
+    emailError: string | null;
   } | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [sbirData, setSbirData] = useState<Record<string, SbirLookupResult | null>>({});
@@ -469,19 +476,57 @@ export function ApplicationReview({ applications }: Props) {
 
                 {/* Accept result */}
                 {acceptResult && expandedId === app.id && (
-                  <div className="mt-4 bg-green-50 border border-green-200 rounded p-3 text-sm">
-                    <p className="font-medium text-green-800 mb-1">
-                      Application accepted - tenant and user created
-                    </p>
-                    <p className="text-green-700">
-                      Tenant ID: {acceptResult.tenantId}
-                    </p>
-                    <p className="text-green-700">
-                      User ID: {acceptResult.userId}
-                    </p>
-                    <p className="text-green-700 font-mono">
-                      Temp Password: {acceptResult.tempPassword}
-                    </p>
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 text-sm space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 text-lg">&#10003;</span>
+                      <p className="font-semibold text-green-800">
+                        {acceptResult.companyName} accepted into RFP Pipeline
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-green-800">
+                      <div>
+                        <span className="text-xs text-green-600 uppercase tracking-wide">Admin Contact</span>
+                        <p className="font-medium">{acceptResult.contactName}</p>
+                        <p className="text-green-700">{acceptResult.contactEmail}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-green-600 uppercase tracking-wide">Workspace</span>
+                        <p className="font-medium">/portal/{acceptResult.tenantSlug}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-green-200 rounded p-3">
+                      <span className="text-xs text-green-600 uppercase tracking-wide">Login Credentials</span>
+                      <div className="mt-1 grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-xs text-gray-500">Email</span>
+                          <p className="font-mono text-sm">{acceptResult.contactEmail}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-gray-500">Temporary Password</span>
+                          <p className="font-mono text-sm font-bold">{acceptResult.tempPassword}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded text-xs ${
+                      acceptResult.emailSent
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      <span>{acceptResult.emailSent ? '&#9993; ' : '&#9888; '}</span>
+                      {acceptResult.emailSent ? (
+                        <span>
+                          Welcome email sent to <strong>{acceptResult.contactEmail}</strong> via {acceptResult.emailProvider}
+                        </span>
+                      ) : (
+                        <span>
+                          Email not sent{acceptResult.emailError ? `: ${acceptResult.emailError}` : ' — no email provider configured'}.
+                          You&rsquo;ll need to manually share the credentials above.
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -35,6 +35,7 @@
     "dom-serializer": "^3.0.0",
     "domutils": "^4.0.2",
     "exceljs": "^4.4.0",
+    "googleapis": "^171.4.0",
     "htmlparser2": "^12.0.0",
     "lucide-react": "^0.577.0",
     "mammoth": "^1.12.0",
