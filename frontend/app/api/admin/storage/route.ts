@@ -10,10 +10,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
+import { getSignedPutUrl } from '@/lib/storage/s3-client';
 import { s3, BUCKET, putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 
 const ADMIN_PREFIX = 'rfp-admin/';
@@ -229,6 +230,128 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to upload file' },
       { status: 500 },
     );
+  }
+}
+
+// ── PUT — get a presigned upload URL (for large files, browser → S3 direct) ──
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    const role = (session.user as { role?: string }).role;
+    if (!isAdminRole(role)) {
+      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+    }
+
+    let body: { filename: string; prefix?: string; contentType?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    if (!body.filename) {
+      return NextResponse.json({ error: 'filename is required' }, { status: 422 });
+    }
+
+    const prefix = body.prefix || ADMIN_PREFIX;
+    if (!prefixIsValid(prefix)) {
+      return NextResponse.json({ error: 'Prefix must start with rfp-admin/' }, { status: 400 });
+    }
+
+    const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    const key = `${cleanPrefix}${body.filename}`;
+
+    const url = await getSignedPutUrl(key, body.contentType, 900);
+
+    return NextResponse.json({
+      data: { url, key, expiresIn: 900 },
+    });
+  } catch (err) {
+    console.error('[admin/storage] PUT (presign) failed', err);
+    return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 });
+  }
+}
+
+// ── PATCH — confirm a direct S3 upload + trigger auto-ingest ─────────
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    const role = (session.user as { role?: string }).role;
+    if (!isAdminRole(role)) {
+      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+    }
+    const userId = (session.user as { id?: string }).id ?? 'unknown';
+
+    let body: { key: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    if (!body.key || !prefixIsValid(body.key)) {
+      return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
+    }
+
+    // Verify the object actually exists in S3
+    try {
+      await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.key }));
+    } catch {
+      return NextResponse.json({ error: 'File not found in storage — upload may have failed' }, { status: 404 });
+    }
+
+    // Get file size from head
+    const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.key }));
+    const size = head.ContentLength ?? 0;
+    const filename = body.key.split('/').pop() ?? body.key;
+
+    await emitEventSingle({
+      namespace: 'admin',
+      type: 'admin.storage.file_uploaded',
+      actor: { type: 'user', id: userId },
+      tenantId: null,
+      payload: { key: body.key, size, originalName: filename },
+    });
+
+    // Auto-detect and ingest SBIR CSV files
+    let sbirResult: { fileType: string; rowCount: number; isDuplicate: boolean } | null = null;
+    if (filename.toLowerCase().endsWith('.csv')) {
+      try {
+        const { getObjectBuffer } = await import('@/lib/storage/s3-client');
+        const buffer = await getObjectBuffer(body.key);
+        if (buffer) {
+          const { detectAndIngestSbirCsv } = await import('@/lib/sbir-ingest');
+          const result = await detectAndIngestSbirCsv(Buffer.from(buffer), filename, userId, body.key);
+          if (result) {
+            sbirResult = { fileType: result.fileType, rowCount: result.rowCount, isDuplicate: result.isDuplicate };
+            if (!result.isDuplicate) {
+              await emitEventSingle({
+                namespace: 'admin',
+                type: 'sbir_data.auto_ingested',
+                actor: { type: 'user', id: userId },
+                tenantId: null,
+                payload: { fileType: result.fileType, rowCount: result.rowCount, filename, storageKey: body.key },
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[admin/storage] SBIR auto-ingest failed (non-fatal)', err);
+      }
+    }
+
+    return NextResponse.json({
+      data: { key: body.key, size, confirmed: true, sbirIngest: sbirResult },
+    });
+  } catch (err) {
+    console.error('[admin/storage] PATCH (confirm) failed', err);
+    return NextResponse.json({ error: 'Failed to confirm upload' }, { status: 500 });
   }
 }
 
