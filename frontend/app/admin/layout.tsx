@@ -14,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/admin/purchases" className="hover:text-brand-300">Purchases</a>
           <a href="/admin/analytics" className="hover:text-brand-300">Analytics</a>
           <a href="/admin/events" className="hover:text-brand-300">Events</a>
+          <a href="/admin/storage" className="hover:text-brand-300">Storage</a>
           <a href="/admin/waitlist" className="hover:text-brand-300">Waitlist</a>
         </nav>
       </aside>
