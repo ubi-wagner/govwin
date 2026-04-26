@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md'];
 const ACCEPT_STRING = ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(',');
@@ -18,6 +19,7 @@ export default function LibraryUploadForm({
 }: {
   tenantSlug: string;
 }) {
+  const router = useRouter();
   const [items, setItems] = useState<UploadItem[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -244,8 +246,8 @@ export default function LibraryUploadForm({
             </div>
           ))}
 
-          {/* Upload button */}
-          <div className="mt-4">
+          {/* Upload button + Review atoms */}
+          <div className="mt-4 flex items-center gap-3">
             <button
               onClick={uploadAll}
               disabled={!hasPending || isUploading}
@@ -253,6 +255,14 @@ export default function LibraryUploadForm({
             >
               {isUploading ? 'Uploading...' : 'Upload All'}
             </button>
+            {items.length > 0 && items.every((it) => it.status === 'done' || it.status === 'error') && items.some((it) => it.status === 'done') && (
+              <button
+                onClick={() => router.push(`/portal/${tenantSlug}/library/review`)}
+                className="rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                Review &amp; Categorize Atoms
+              </button>
+            )}
           </div>
         </div>
       )}
