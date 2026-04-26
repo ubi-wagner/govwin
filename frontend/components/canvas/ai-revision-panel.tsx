@@ -120,16 +120,51 @@ export function AIRevisionPanel({ node, proposalId, onRevised }: Props) {
         </div>
       </div>
 
-      {/* Library replacement */}
+      {/* Library replacement — searches library for matching atoms,
+          then asks Claude to rewrite using them */}
       <button
-        onClick={() => handleRevise(
-          'Replace this text with the most relevant content from the customer\'s library. Preserve the section structure but use proven language from previous winning proposals.',
-          'From Library'
-        )}
+        onClick={async () => {
+          setLastAction('From Library');
+          try {
+            // Search library using current text as query
+            const searchResult = await invoke<{
+              atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
+            }>('library.search_atoms', {
+              query: currentText.slice(0, 200),
+              limit: 5,
+            });
+            const atoms = searchResult.atoms ?? [];
+
+            if (atoms.length === 0) {
+              // No library content found — tell the user
+              await handleRevise(
+                'No matching library atoms found. Rewrite this section using best-practice government proposal language.',
+                'From Library'
+              );
+              return;
+            }
+
+            // Feed library atoms to the draft tool
+            const atomContext = atoms.map((a) =>
+              `[Library atom | category: ${a.category}]\n${a.content}`
+            ).join('\n\n---\n\n');
+
+            await handleRevise(
+              `Replace this text using the following proven content from the customer's library. Adapt the language to fit the current section context:\n\n${atomContext}`,
+              'From Library'
+            );
+          } catch {
+            // Fall back to generic instruction
+            await handleRevise(
+              'Replace this text with the most relevant content from the customer\'s library. Preserve the section structure but use proven language from previous winning proposals.',
+              'From Library'
+            );
+          }
+        }}
         disabled={loading || !currentText}
         className="w-full px-2 py-1.5 text-xs text-left rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-40"
       >
-        Replace with library content
+        {lastAction === 'From Library' && loading ? 'Searching library...' : 'Replace with library content'}
       </button>
 
       {error && (

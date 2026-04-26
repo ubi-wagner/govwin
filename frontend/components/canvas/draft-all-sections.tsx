@@ -61,16 +61,34 @@ export function DraftAllSections({
       setProgress((prev) => ({ ...prev, [sec.id]: 'drafting' }));
 
       try {
-        // Search library for relevant atoms
+        // Search library for relevant atoms — try category match first,
+        // then fall back to text search on the section title. This catches
+        // atoms even when category slugs don't match exactly.
         let libraryAtoms: Array<{ id: string; content: string; category: string; tags?: string[] }> = [];
         try {
+          const categorySlug = sec.title.toLowerCase().replace(/\s+/g, '_');
           const libResult = await invoke<{
             atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
+            total: number;
           }>('library.search_atoms', {
-            category: sec.title.toLowerCase().replace(/\s+/g, '_'),
+            category: categorySlug,
             limit: 5,
           });
           libraryAtoms = libResult.atoms ?? [];
+
+          // If category match found few results, supplement with text search
+          if (libraryAtoms.length < 3) {
+            const textResult = await invoke<{
+              atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
+            }>('library.search_atoms', {
+              query: sec.title,
+              limit: 5 - libraryAtoms.length,
+            });
+            const existingIds = new Set(libraryAtoms.map((a) => a.id));
+            for (const atom of textResult.atoms ?? []) {
+              if (!existingIds.has(atom.id)) libraryAtoms.push(atom);
+            }
+          }
         } catch {
           // Library search failure is non-fatal — draft without library context
         }
