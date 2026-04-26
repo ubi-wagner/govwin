@@ -127,7 +127,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       tenantSlug: slug,
       loginUrl,
     });
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: app.contactEmail,
       subject: emailContent.subject,
       html: emailContent.html,
@@ -136,8 +136,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({
       data: {
         tenantId: tenant.id,
+        tenantSlug: slug,
         userId: newUser.id,
+        contactEmail: app.contactEmail,
+        contactName: app.contactName,
+        companyName: app.companyName,
         tempPassword: tempPw,
+        emailSent: emailResult.provider !== 'skipped',
+        emailProvider: emailResult.provider,
+        emailError: emailResult.error ?? null,
       },
     });
   } catch (e) {
