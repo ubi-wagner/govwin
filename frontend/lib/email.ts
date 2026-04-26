@@ -91,6 +91,8 @@ export interface SendEmailResult {
  * Never throws — returns a result object.
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
+  let gmailError: string | undefined;
+
   // Try Gmail API first
   const auth = getAuth();
   if (auth) {
@@ -112,9 +114,15 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
         messageId: res.data.id ?? undefined,
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[email] Gmail API send failed:', msg);
-      // Fall through to Resend
+      gmailError = err instanceof Error ? err.message : String(err);
+      // Try to extract Google API error details
+      if (err && typeof err === 'object' && 'response' in err) {
+        const gErr = err as { response?: { data?: { error?: { message?: string; status?: string } } } };
+        if (gErr.response?.data?.error?.message) {
+          gmailError = `${gErr.response.data.error.status ?? 'ERROR'}: ${gErr.response.data.error.message}`;
+        }
+      }
+      console.error('[email] Gmail API send failed:', gmailError);
     }
   }
 
@@ -147,8 +155,11 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     }
   }
 
-  console.error('[email] No email provider configured (need GOOGLE_SERVICE_ACCOUNT_KEY or RESEND_API_KEY)');
-  return { provider: 'skipped' };
+  const skipReason = gmailError
+    ? `Gmail failed: ${gmailError}`
+    : 'No email provider configured (need GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN or RESEND_API_KEY)';
+  console.error('[email]', skipReason);
+  return { provider: 'skipped', error: skipReason };
 }
 
 /**
