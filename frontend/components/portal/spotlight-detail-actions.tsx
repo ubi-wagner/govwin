@@ -9,6 +9,7 @@ interface SpotlightDetailActionsProps {
   isPinned: boolean;
   proposalId: string | null;
   proposalStage: string | null;
+  productType?: 'proposal_phase1' | 'proposal_phase2' | null;
 }
 
 export default function SpotlightDetailActions({
@@ -17,6 +18,7 @@ export default function SpotlightDetailActions({
   isPinned: initialPinned,
   proposalId,
   proposalStage,
+  productType,
 }: SpotlightDetailActionsProps) {
   const router = useRouter();
   const [isPinned, setIsPinned] = useState(initialPinned);
@@ -59,7 +61,10 @@ export default function SpotlightDetailActions({
         const res = await fetch(`/api/portal/${tenantSlug}/proposals/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topicId: opportunityId }),
+          body: JSON.stringify({
+            topicId: opportunityId,
+            ...(productType ? { productType } : {}),
+          }),
         });
 
         if (!res.ok) {

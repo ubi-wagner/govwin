@@ -297,6 +297,13 @@ export default async function SpotlightDetailPage({ params }: Props) {
           isPinned={isPinned}
           proposalId={existingProposalId}
           proposalStage={existingProposalStage}
+          productType={
+            opportunity.phase === '1' || opportunity.phase === 'I'
+              ? 'proposal_phase1'
+              : opportunity.phase === '2' || opportunity.phase === 'II'
+                ? 'proposal_phase2'
+                : null
+          }
         />
       </div>
 
