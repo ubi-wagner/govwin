@@ -15,6 +15,35 @@ advancing. No task exceeds 100 lines or 3 minutes of agent work.
 **Goal:** Admin uploads RFP → curates → pushes to Spotlight → customer
 sees scored matches → pins topics.
 
+### What Gets Built
+
+**UI Changes:**
+- 5 admin curation API routes replace 501 stubs → the curation workspace buttons (Claim, Push, Save Compliance) actually work server-side
+- Spotlight detail page shows full topic info: title, agency, funding, close date, tech areas, compliance preview, "Pin" and "Build Proposal" buttons
+- Billing UI on customer portal: current subscription status, Stripe checkout button, manage billing link
+
+**Database:**
+- Migration 020: `subscriptions` (tenant_id, stripe_customer_id, stripe_subscription_id, status, current_period_start/end), `invoices` (stripe_invoice_id, amount, status, paid_at), `payment_events` (webhook audit trail)
+- No changes to existing tables — all curation tables (curated_solicitations, solicitation_compliance, solicitation_volumes, volume_required_items) already exist
+
+**API Routes (6 stubs → real):**
+- `GET /api/admin/rfp-curation` → query curated_solicitations with status filter, join opportunity data
+- `POST /api/admin/rfp-curation/[solId]/claim` → invoke `solicitation.claim` tool (already registered)
+- `POST /api/admin/rfp-curation/[solId]/push` → invoke `solicitation.push` tool
+- `GET/POST /api/admin/rfp-curation/[solId]/compliance` → list/save compliance variables via tools
+- `GET /api/admin/rfp-curation/[solId]` → solicitation detail with documents, topics, volumes
+- `POST /api/stripe/checkout` → Stripe Checkout session creation
+- `POST /api/stripe/webhook` → Stripe event handler (idempotent, verifies signature)
+- `GET /api/stripe/portal` → Stripe customer portal redirect
+
+**Agents:** No new agents. Existing tools (solicitation.claim, solicitation.push, compliance.save_variable_value) get wired to their API routes.
+
+**Automation/Audit:**
+- All curation actions already emit events (finder.solicitation.claimed, finder.solicitation.pushed, etc.)
+- Stripe webhook creates `payment_events` audit rows for every Stripe event
+- `identity.subscription.created` and `identity.subscription.canceled` events added
+- CRM event listener picks up subscription events → sends welcome email with Spotlight access instructions
+
 ### 1.1 — Fix remaining Spotlight data flow
 | Task | Description | Files | Agent Size |
 |------|-------------|-------|------------|
@@ -45,6 +74,34 @@ sees scored matches → pins topics.
 provisioned with sections from volumes → compliance matrix loaded →
 ready for AI drafting.
 
+### What Gets Built
+
+**UI Changes:**
+- "Build Proposal" button on Spotlight detail page triggers Stripe checkout for portal purchase ($999/$1999)
+- Proposal workspace page renders real section data from volume_required_items — section number, title, page allocation, format requirements
+- Stage progress bar (Outline → Draft → Pink → Red → Gold → Final → Submitted) shows current position
+- Canvas editor loads with compliance-aware presets — correct font, margins, page limit, header/footer templates with {company_name}, {topic_number}, {page n of N} interpolation
+- Version history dropdown — revert to any previous save
+
+**Database:**
+- `proposals` row created with stage='outline', linked to opportunity (topic) and tenant
+- `proposal_sections` rows created from `volume_required_items` — one section per required item with title, section_number, page_allocation, status='empty'
+- `canvas_versions` row saved on every canvas save — version_number, content JSON snapshot, created_by, snapshot_reason
+
+**API Routes:**
+- `POST /api/portal/[slug]/proposals/create` — already built, validates against duplicate proposals, provisions sections from volumes
+- `PUT /api/portal/[slug]/proposals/[id]/sections/[sectionId]/save` — persist CanvasDocument JSON, increment version, snapshot to canvas_versions
+- Portal artifact provisioner copies compliance.json + outline + templates from `rfp-pipeline/{opportunityId}/` to `customers/{slug}/proposals/{proposalId}/`
+
+**Agents:**
+- `portal_provisioner.py` in pipeline copies S3 artifacts from master curation to customer sandbox
+- Provenance chain: every canvas node tracks `source: 'template'` with original template_id
+
+**Automation/Audit:**
+- `capture.proposal.purchased` event already fires — CRM sends confirmation email
+- `proposal.section.saved` event on every save with actor, version number, section_id
+- `capture.proposal.provisioned` event when S3 copy completes with artifact manifest
+
 ### 2.1 — Portal purchase flow
 | Task | Description | Files | Agent Size |
 |------|-------------|-------|------------|
@@ -68,6 +125,40 @@ ready for AI drafting.
 
 **Goal:** AI drafts each section using library atoms + RFP context +
 compliance constraints. Customer reviews, revises, accepts.
+
+### What Gets Built
+
+**UI Changes:**
+- "Draft All Sections" button triggers sequential AI drafting — per-section progress with drafting/done/failed indicators (already built, needs live Claude test)
+- AI Revision Panel sidebar — 8 quick actions (Regenerate, Make shorter/longer, More specific, Simpler language, Stronger opening, Add metrics, Fix compliance) + custom prompt input (already built)
+- "Replace with library content" button searches library by content similarity and feeds matching atoms to Claude for rewrite (already built, upgraded this session)
+- NEW: Library picker component — "Insert from Library" button opens a ranked list of candidate atoms from the customer's library, filterable by category, sorted by outcome_score. Click to insert as a new canvas node with `provenance.source = 'library'`
+- NEW: "Save to Library" button on each canvas node — saves accepted content back to library_units with atom_hash dedup, category, tags
+- NEW: Inline text editing — click any text_block to edit directly in the WYSIWYG canvas
+- NEW: Drag-drop node reordering within a section
+- Compliance sidebar tab shows: page limit (current vs max), required subsections checklist, evaluation criteria with check/uncheck
+- Real-time page count indicator — green when under limit, yellow at 90%, red when over
+
+**Database:**
+- `library_units.embedding` column (vector(1536)) populated on atom creation via Claude embedding API
+- No new tables — library_units, library_atom_outcomes, canvas_versions all exist
+
+**API Routes:**
+- `POST /api/tools/proposal.draft_section` — already wired, calls Claude Sonnet with system prompt + library atoms + RFP excerpt + compliance constraints → returns CanvasNode[] JSON
+- `POST /api/tools/library.search_atoms` — upgraded to support vector similarity search when embedding column is populated
+- `POST /api/tools/library.save_atom` — already wired with atom_hash dedup
+- NEW: `POST /api/tools/proposal.check_compliance` — validates section against compliance matrix (page count, required subsections present, font compliance)
+
+**Agents:**
+- `proposal.draft_section` tool — the core AI drafting tool. System prompt instructs Claude as "senior government proposal writer". Input: section title, page limit, font/margin constraints, required subsections, evaluation criteria, RFP excerpt, library atoms. Output: CanvasNode[] with headings, paragraphs, lists.
+- `proposal.check_compliance` tool — NEW. Reads the section's canvas content, compares against the compliance matrix from solicitation_compliance. Returns pass/fail per criterion with specific violations.
+- Library search enhanced with embedding cosine similarity: `ORDER BY embedding <=> $query_embedding, outcome_score DESC`
+
+**Automation/Audit:**
+- Every draft emits `proposal.section.ai_drafted` with model, token count, library atoms used
+- Every revision emits `proposal.section.revised` with action type (regenerate, shorten, etc.)
+- Every library save emits `library.atom.saved` with source proposal, node type, category
+- Compliance check results stored in `proposal_compliance_matrix` table with per-criterion pass/fail
 
 ### 3.1 — Real AI drafting (Claude API)
 | Task | Description | Files | Agent Size |
@@ -101,6 +192,48 @@ compliance constraints. Customer reviews, revises, accepts.
 
 **Goal:** Multiple users work on a proposal with role-based access.
 Proposal advances through review stages with defined gate criteria.
+
+### What Gets Built
+
+**UI Changes:**
+- Team page (`/portal/[slug]/team`) — list current team members with role badges, invite form (email + role + proposal scope + stage scope)
+- Invite acceptance page (`/invite/[token]`) — set password, view assigned proposals
+- Comment threads on canvas nodes — click a node to see/add comments, resolve/unresolve, reply. Color-coded per commenter. Comment count badge on each node.
+- Change indicators on canvas nodes — colored dot per collaborator showing who last edited, with timestamp. Diff view available (word-level comparison).
+- Watermark overlay — auto-generated from proposal stage (DRAFT, PINK TEAM REVIEW, etc.)
+- Review page (`/portal/[slug]/proposals/[id]/review`) — gate criteria checklist (all sections drafted? page limits met? required subsections present?), advance button, stage history timeline
+- Notification banners — "John commented on Technical Approach" with link to the specific node
+
+**Database:**
+- `proposal_collaborators` (already exists) — user_id, proposal_id, role, invited_by, accepted_at
+- `collaborator_stage_access` (already exists) — which stages each collaborator can see/edit
+- `proposal_comments` (already exists) — node_id, actor_id, text, resolved, resolved_by
+- `proposal_stage_history` (already exists) — from_stage, to_stage, actor_id, gate_results JSON, timestamp
+- `proposal_reviews` (already exists) — review_type (pink/red/gold), reviewer_id, section_id, score, comments
+- NEW: `process_templates` table — step function definitions as JSON (steps, conditions, actions, escalations, deadlines)
+- NEW: `process_instances` table — active process state per proposal (current step, started_at, deadline, nudge count)
+
+**API Routes:**
+- `POST /api/portal/[slug]/team/invite` — create user with temp_password=true, insert proposal_collaborators + collaborator_stage_access rows, emit event
+- `POST /api/invite/[token]` — verify token, set password, mark accepted
+- `POST /api/portal/[slug]/proposals/[id]/advance` — validate gate criteria → advance stage → record in proposal_stage_history → emit event
+- `GET /api/portal/[slug]/proposals/[id]/review` — gate criteria status (pass/fail per criterion)
+- `POST /api/portal/[slug]/proposals/[id]/comments` — add/resolve comments on canvas nodes
+
+**Agents (NEW tools):**
+- `proposal.pink_team_review` — Claude reads each section + compliance matrix → generates review comments as if a pink team reviewer. Inserts comments on specific nodes with actionable suggestions.
+- `proposal.red_team_review` — Claude runs compliance check + scoring rubric evaluation against the RFP's evaluation criteria. Scores each section 1-5 with detailed rationale. Inserts structured review in proposal_reviews.
+- `proposal.gold_team_review` — Final quality gate. Checks formatting compliance, cross-references between volumes, consistency of technical claims vs cost/schedule.
+
+**Automation/Audit:**
+- `proposal.stage.advanced` event with from/to stage, actor, gate results → CRM sends email to all collaborators ("Proposal moved to Red Team Review")
+- `proposal.comment.added` event → CRM sends notification to section owner
+- Process engine evaluates `process_templates` against proposal state on every stage change:
+  - If deadline approaching: emit `process.nudge.due` → CRM sends reminder
+  - If deadline passed + nudge_count > threshold: emit `process.escalation.triggered` → CRM notifies admin
+  - If all gate criteria met: auto-suggest advancement to next stage
+- Every invitation emits `identity.collaborator.invited` → CRM sends invite email with temp password
+- Escalation chain: nudge (email) → reminder (email + dashboard flag) → escalation (admin notification)
 
 ### 4.1 — Team collaboration
 | Task | Description | Files | Agent Size |
@@ -139,6 +272,53 @@ Proposal advances through review stages with defined gate criteria.
 **Goal:** All volumes assembled, cross-referenced, formatted per
 compliance matrix, exported as final submission package.
 
+### What Gets Built
+
+**UI Changes:**
+- Proposal workspace reorganized with volume tabs/accordion — each volume (Technical, Cost, Supporting) is a collapsible section containing its required items/sections
+- Per-volume progress bar — percentage of sections in 'complete' or 'approved' status
+- Cover sheet component — auto-populated CanvasDocument from compliance matrix (solicitation number, topic title, company name, CAGE code, UEI, PI info, period of performance) + tenant profile data
+- Table of Contents generator — walks all heading nodes across all sections in a volume, generates a TOC node with section numbers + page estimates
+- Cross-volume reference nodes — "See Section 2.3 in Technical Volume" links that resolve to the correct section
+- "Export Final Package" button on workspace — generates ZIP with all volumes as DOCX/PPTX/XLSX + cover sheet + supporting docs + certifications
+- Download via presigned S3 URL (same pattern as admin storage)
+
+**Database:**
+- `proposal_sections.content` — CanvasDocument JSON for each section (already exists)
+- `document_templates` — canvas presets for cover sheets, certifications, bio templates, past performance templates (table exists from migration 017)
+- Export results stored at `customers/{slug}/proposals/{id}/exports/{timestamp}.zip` in S3
+
+**API Routes:**
+- `POST /api/portal/[slug]/proposals/[id]/export` — orchestrates the full export pipeline:
+  1. Load all sections grouped by volume
+  2. For each section, render CanvasDocument through the appropriate exporter (docx for letter, pptx for slides, xlsx for tables)
+  3. Apply compliance formatting: font family/size from solicitation_compliance, margins, headers/footers with field codes (PAGE, NUMPAGES)
+  4. Generate cover sheet from template
+  5. Generate TOC
+  6. Assemble ZIP with folder structure matching volume hierarchy
+  7. Upload to S3, return presigned download URL
+  8. Emit `proposal.package.exported` event
+
+**Agents (document lifecycle agents already built — now wired to export):**
+- `DocxAgent.export(bundle)` — renders CanvasBundle to .docx with python-docx: headings, paragraphs with inline formatting, lists, tables, page breaks, headers/footers with PAGE fields, watermarks
+- `PptxAgent.export(bundle)` — renders to .pptx for CSO briefing slides
+- `XlsxAgent.export(bundle)` — renders to .xlsx for cost volumes with formulas
+- Cross-format handoff: if a section was authored as DOCX content but needs PDF, `docx_agent.hand_off_to(bundle, pdf_agent)` → DocxAgent exports to .docx → converter renders to PDF via LibreOffice headless
+- Canvas presets for supporting documents:
+  - SF424 (federal form template)
+  - DD2345 (military form template)
+  - Budget justification (structured cost table)
+  - Key personnel bio (heading + paragraphs + table)
+  - Past performance narrative (contract info + relevance + outcomes)
+  - Commercialization plan (market + IP + transition)
+  - CSO slide deck (7 slides: title, problem, approach, team, schedule, cost, Q&A)
+
+**Automation/Audit:**
+- `proposal.package.exported` event with volume count, section count, total pages, file size, format breakdown
+- `proposal.package.downloaded` event when customer downloads the ZIP
+- Export history visible in proposal workspace — timestamp, who exported, file size, download link (24h expiry)
+- Compliance validation runs automatically before export — if any section fails compliance check, export shows warnings but still proceeds (customer's choice to submit non-compliant)
+
 ### 5.1 — Multi-volume workspace
 | Task | Description | Files | Agent Size |
 |------|-------------|-------|------------|
@@ -175,6 +355,38 @@ compliance matrix, exported as final submission package.
 
 **Goal:** Win/loss outcomes feed back into the library. Winning atoms
 rank higher. AI drafts improve over time.
+
+### What Gets Built
+
+**UI Changes:**
+- Proposals list page gets an "Outcome" column — pending (gray), awarded (green trophy), rejected (red), withdrawn (gray strikethrough)
+- "Record Outcome" button on submitted proposals — dropdown: awarded, rejected, withdrawn + notes field
+- Library page gets analytics row: total atoms, by category breakdown, win rate by category bar chart
+- Library atoms from winning proposals show a gold trophy badge in search results and the library list
+- Atom detail shows "Used in N proposals (W wins, L losses)" with links to the proposals
+- Dashboard stat card: "Win Rate: X%" based on recorded outcomes
+
+**Database:**
+- `proposals.outcome` column — 'pending' | 'awarded' | 'rejected' | 'withdrawn' (column may already exist, verify)
+- `proposals.outcome_recorded_at`, `proposals.outcome_recorded_by`
+- `library_atom_outcomes` (already exists) — unit_id, proposal_id, outcome, recorded_at
+- `library_units.outcome_score` (already exists, added by migration 017) — recalculated on outcome recording
+
+**API Routes:**
+- `POST /api/portal/[slug]/proposals/[id]/outcome` — record outcome, update proposal, fan out to library_atom_outcomes for every atom used in that proposal (tracked via provenance.library_unit_id on canvas nodes)
+- `GET /api/portal/[slug]/library/analytics` — aggregate stats: total atoms, by category, win rate, usage count distribution
+
+**Agents:**
+- Auto-harvest agent — when proposal stage = 'submitted', walk all canvas nodes across all sections. For each node with `library_eligible = true` that isn't already in the library, call `library.save_atom` with the proposal_id as provenance. This ensures winning content enters the library automatically.
+- Outcome score recalculator — when an outcome is recorded, query all `library_atom_outcomes` for each affected atom, compute weighted average: `score = sum(outcome_weight * recency_weight) / count`. Awards = 1.0, rejections = 0.0, recency decays by 0.9 per year. Write to `library_units.outcome_score`.
+
+**Automation/Audit:**
+- `proposal.outcome.recorded` event with outcome, proposal_id, tenant_id → CRM updates customer health score
+- `library.outcome.recalculated` event with atoms affected count, score changes
+- `library.harvest.completed` event with atoms harvested count, categories
+- Admin dashboard shows win rate trend over time
+- CRM sends "Congratulations" or "Debrief" email based on outcome
+- Outcome data feeds into Spotlight scoring — topics from agencies where the customer has won before get a score boost
 
 ### 6.1 — Outcome recording
 | Task | Description | Files | Agent Size |
