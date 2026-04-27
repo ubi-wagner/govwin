@@ -379,17 +379,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
     }
 
-    // 2. Parse multipart form data
-    const formData = await request.formData();
-    const file = formData.get('file');
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: 'Missing file field' }, { status: 400 });
+    // 2. Support two modes:
+    //    a) Multipart form upload (small files)
+    //    b) JSON body with { s3Key } (large files already in S3 via presigned upload)
+    let fileBuffer: Buffer;
+    let filename: string;
+
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      // Mode B: read from S3
+      const body = await request.json();
+      const s3Key = body.s3Key;
+      if (!s3Key || typeof s3Key !== 'string') {
+        return NextResponse.json({ error: 'Missing s3Key in JSON body' }, { status: 400 });
+      }
+      const { getObjectBuffer } = await import('@/lib/storage/s3-client');
+      const buf = await getObjectBuffer(s3Key);
+      if (!buf) {
+        return NextResponse.json({ error: `File not found in S3: ${s3Key}` }, { status: 404 });
+      }
+      fileBuffer = Buffer.from(buf);
+      filename = s3Key.split('/').pop() || 'unknown.csv';
+    } else {
+      // Mode A: multipart form upload
+      const formData = await request.formData();
+      const file = formData.get('file');
+      if (!file || !(file instanceof File)) {
+        return NextResponse.json({ error: 'Missing file field' }, { status: 400 });
+      }
+      filename = file.name || 'unknown.csv';
+      fileBuffer = Buffer.from(await file.arrayBuffer());
     }
 
-    const filename = file.name || 'unknown.csv';
-
-    // Read file as text — for very large files we process line-by-line below
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
     const fileText = fileBuffer.toString('utf-8');
 
     // 3. Compute SHA-256 hash
