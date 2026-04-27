@@ -51,7 +51,7 @@ function formatDuration(startedAt: Date | null, completedAt: Date | null, status
 
 function statusBadge(status: string) {
   const styles: Record<string, string> = {
-    queued: 'bg-gray-100 text-gray-700',
+    pending: 'bg-gray-100 text-gray-700',
     running: 'bg-blue-100 text-blue-700 animate-pulse',
     completed: 'bg-green-100 text-green-700',
     failed: 'bg-red-100 text-red-700',
