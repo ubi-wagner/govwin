@@ -591,6 +591,26 @@ export function CurationWorkspace({
         </div>
       </div>
 
+      {/* Quick-nav tabs */}
+      <nav className="flex items-center gap-1 mb-6 border-b pb-2">
+        {[
+          { label: 'Documents', target: 'section-documents' },
+          { label: 'Topics', target: 'section-topics' },
+          { label: 'Compliance', target: 'section-compliance' },
+          { label: 'Customer Interest', target: 'section-customer-interest' },
+        ].map((tab) => (
+          <button
+            key={tab.target}
+            onClick={() =>
+              document.getElementById(tab.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
           {error}
@@ -623,6 +643,7 @@ export function CurationWorkspace({
         {/* Left: Solicitation text + AI sections */}
         <div className="lg:col-span-2 space-y-6">
           {/* Source Documents — multi-document view with inline upload */}
+          <div id="section-documents" />
           <DocumentsSection
             solicitationId={sol.id}
             documents={documents}
@@ -632,7 +653,7 @@ export function CurationWorkspace({
           />
 
           {/* Topics — the pursuable units under this solicitation */}
-          <div className="border rounded-lg p-4">
+          <div id="section-topics" className="border rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-lg font-semibold">Topics</h2>
@@ -897,7 +918,7 @@ export function CurationWorkspace({
         {/* Right sidebar: Compliance Matrix + Metadata + History */}
         <div className="space-y-6">
           {/* Compliance Matrix */}
-          <div className="border rounded-lg p-4">
+          <div id="section-compliance" className="border rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
@@ -1046,7 +1067,7 @@ export function CurationWorkspace({
       </div>
 
       {/* Customer Interest — demand signal from tenants who pinned topics */}
-      <div className="mt-6 border rounded-lg p-4">
+      <div id="section-customer-interest" className="mt-6 border rounded-lg p-4">
         <h2 className="text-lg font-semibold mb-3">Customer Interest</h2>
         {customerInterest.length === 0 ? (
           <p className="text-sm text-gray-400">

@@ -120,11 +120,19 @@ export default async function SourcesPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Opportunity Sources</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Bookmarked sites for monitoring federal R&amp;D funding opportunities
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Opportunity Sources</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Bookmarked sites for monitoring federal R&amp;D funding opportunities
+          </p>
+        </div>
+        <a
+          href="/admin/rfp-curation/upload"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded"
+        >
+          + New Solicitation
+        </a>
       </div>
       <SourcesHub initialProfiles={profiles} initialActivity={activity} />
     </div>
