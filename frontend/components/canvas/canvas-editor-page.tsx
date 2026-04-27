@@ -17,6 +17,7 @@ interface Props {
   proposalId: string;
   actorId: string;
   actorName: string;
+  readOnly?: boolean;
 }
 
 export function CanvasEditorPage({
@@ -25,6 +26,7 @@ export function CanvasEditorPage({
   proposalId,
   actorId,
   actorName,
+  readOnly = false,
 }: Props) {
   const router = useRouter();
   const { invoke } = useTool();
@@ -81,6 +83,7 @@ export function CanvasEditorPage({
           onExport={handleExport}
           actorId={actorId}
           actorName={actorName}
+          readOnly={readOnly}
           variables={{
             company_name: 'Your Company',
             topic_number: 'TBD',

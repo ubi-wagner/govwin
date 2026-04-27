@@ -38,10 +38,11 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   const userName = sessionUser.name ?? sessionUser.email ?? 'Unknown';
 
   // ── Verify the proposal belongs to this tenant ─────────────────────
-  let proposal: { id: string; solicitationId: string | null } | undefined;
+  // Also fetch is_locked — when workspace_locked the editor is readOnly.
+  let proposal: { id: string; solicitationId: string | null; isLocked: boolean } | undefined;
   try {
-    const [row] = await sql<{ id: string; solicitationId: string | null }[]>`
-      SELECT id, solicitation_id
+    const [row] = await sql<{ id: string; solicitationId: string | null; isLocked: boolean }[]>`
+      SELECT id, solicitation_id, is_locked
       FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
@@ -106,6 +107,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       proposalId={proposalId}
       actorId={userId}
       actorName={userName}
+      readOnly={proposal.isLocked}
     />
   );
 }
