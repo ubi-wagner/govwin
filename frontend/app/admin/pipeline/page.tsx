@@ -6,9 +6,10 @@ export const dynamic = 'force-dynamic';
 
 type JobRow = {
   id: string;
-  jobType: string;
+  source: string;
+  kind: string;
   status: string;
-  payload: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
   result: Record<string, unknown> | null;
   error: string | null;
   createdAt: Date;
@@ -18,10 +19,9 @@ type JobRow = {
 
 type ScheduleRow = {
   id: string;
-  name: string;
   source: string;
-  schedule: string;
-  isActive: boolean;
+  cronExpression: string;
+  enabled: boolean;
   lastRunAt: Date | null;
   nextRunAt: Date | null;
 };
@@ -65,20 +65,20 @@ function statusBadge(status: string) {
   );
 }
 
-function typeBadge(jobType: string) {
+function typeBadge(source: string, kind: string) {
   const colors: Record<string, string> = {
     shred_solicitation: 'bg-purple-100 text-purple-700',
-    ingest_sam: 'bg-indigo-100 text-indigo-700',
-    ingest_sbir: 'bg-blue-100 text-blue-700',
-    ingest_grants: 'bg-teal-100 text-teal-700',
-    atomize: 'bg-amber-100 text-amber-700',
-    score: 'bg-orange-100 text-orange-700',
+    sam: 'bg-indigo-100 text-indigo-700',
+    sbir: 'bg-blue-100 text-blue-700',
+    grants: 'bg-teal-100 text-teal-700',
+    ingest: 'bg-amber-100 text-amber-700',
   };
+  const label = kind === 'ingest' ? source : kind;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors[jobType] ?? 'bg-gray-100 text-gray-600'}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors[label] ?? colors[kind] ?? 'bg-gray-100 text-gray-600'}`}
     >
-      {jobType}
+      {label}
     </span>
   );
 }
@@ -99,7 +99,7 @@ export default async function PipelinePage() {
 
   try {
     jobs = await sql<JobRow[]>`
-      SELECT id, job_type, status, payload, result, error,
+      SELECT id, source, kind, status, metadata, result, error,
              created_at, started_at, completed_at
       FROM pipeline_jobs
       ORDER BY created_at DESC
@@ -112,9 +112,9 @@ export default async function PipelinePage() {
 
   try {
     schedules = await sql<ScheduleRow[]>`
-      SELECT id, name, source, schedule, is_active, last_run_at, next_run_at
+      SELECT id, source, cron_expression, enabled, last_run_at, next_run_at
       FROM pipeline_schedules
-      ORDER BY name
+      ORDER BY source
     `;
   } catch (e) {
     console.error('[admin/pipeline] schedules query failed:', e);
@@ -148,10 +148,9 @@ export default async function PipelinePage() {
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Source</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Schedule</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Active</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Cron Expression</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Enabled</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Last Run</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Next Run</th>
                 </tr>
@@ -159,11 +158,10 @@ export default async function PipelinePage() {
               <tbody className="divide-y divide-gray-100">
                 {schedules.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{s.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.source}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{s.schedule}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{s.source}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{s.cronExpression}</td>
                     <td className="px-4 py-3">
-                      {s.isActive ? (
+                      {s.enabled ? (
                         <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                           Active
                         </span>
@@ -220,21 +218,21 @@ export default async function PipelinePage() {
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                       {relativeTime(job.createdAt)}
                     </td>
-                    <td className="px-4 py-3">{typeBadge(job.jobType)}</td>
+                    <td className="px-4 py-3">{typeBadge(job.source, job.kind)}</td>
                     <td className="px-4 py-3">{statusBadge(job.status)}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-mono text-xs">
                       {formatDuration(job.startedAt, job.completedAt, job.status)}
                     </td>
                     <td className="px-4 py-3 max-w-xs">
-                      {job.payload || job.result ? (
+                      {job.metadata || job.result ? (
                         <details className="cursor-pointer">
                           <summary className="text-xs text-blue-600 hover:underline">
-                            {job.payload ? 'payload' : ''}{job.payload && job.result ? ' + ' : ''}{job.result ? 'result' : ''}
+                            {job.metadata ? 'metadata' : ''}{job.metadata && job.result ? ' + ' : ''}{job.result ? 'result' : ''}
                           </summary>
                           <div className="mt-1 space-y-1">
-                            {job.payload && (
+                            {job.metadata && (
                               <pre className="text-xs bg-gray-50 rounded p-2 overflow-x-auto max-h-40 text-gray-700">
-                                {JSON.stringify(job.payload, null, 2)}
+                                {JSON.stringify(job.metadata, null, 2)}
                               </pre>
                             )}
                             {job.result && (

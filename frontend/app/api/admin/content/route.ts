@@ -101,7 +101,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // Input validation
     const slug = typeof body.slug === 'string' ? body.slug.trim() : '';

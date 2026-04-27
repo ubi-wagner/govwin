@@ -13,6 +13,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  try {
   const { tenantSlug } = await params;
 
   // ---------- Auth ----------
@@ -83,7 +84,6 @@ export async function GET(
   }
 
   // ---------- Build and execute query ----------
-  try {
     // Build dynamic filter fragments
     const filters = [sql`tenant_id = ${tenantId}::uuid`];
 
@@ -123,7 +123,7 @@ export async function GET(
 
     return NextResponse.json({ data: { units, total } });
   } catch (err) {
-    console.error('[library/list] DB query failed', err);
+    console.error('[library/list] error', err);
     return NextResponse.json(
       { error: 'Failed to fetch library units' },
       { status: 500 },
@@ -135,6 +135,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  try {
   const { tenantSlug } = await params;
 
   // ---------- Auth ----------
@@ -234,7 +235,6 @@ export async function POST(
   }
 
   // ---------- Execute ----------
-  try {
     let result: { count: number };
 
     switch (action) {
@@ -294,7 +294,7 @@ export async function POST(
 
     return NextResponse.json({ data: { updated: result.count } });
   } catch (err) {
-    console.error('[library/bulk] DB operation failed', err);
+    console.error('[library/bulk] error', err);
     return NextResponse.json(
       { error: 'Bulk operation failed' },
       { status: 500 },

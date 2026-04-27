@@ -14,39 +14,44 @@ type RouteParams = { params: Promise<{ tenantSlug: string; unitId: string }> };
 
 /** Shared auth + tenant verification, returns context or an error response. */
 async function authorize(request: Request, { params }: RouteParams, minRole: Role) {
-  const { tenantSlug, unitId } = await params;
+  try {
+    const { tenantSlug, unitId } = await params;
 
-  const session = await auth();
-  if (!session?.user) {
-    return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+    const session = await auth();
+    if (!session?.user) {
+      return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+    const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
+    }
+
+    if (!hasRoleAtLeast(role, minRole)) {
+      return { error: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) };
+    }
+
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return { error: NextResponse.json({ error: 'Tenant not found' }, { status: 404 }) };
+    }
+    const tenantId = tenant.id as string;
+
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+    }
+
+    return { tenantId, unitId, role, userId: sessionUser.id };
+  } catch (err) {
+    console.error('[library/unit/authorize] error', err);
+    return { error: NextResponse.json({ error: 'Internal server error' }, { status: 500 }) };
   }
-
-  const sessionUser = session.user as {
-    id?: string;
-    role?: unknown;
-    tenantId?: string | null;
-  };
-  const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
-  if (!role || !sessionUser.id) {
-    return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
-  }
-
-  if (!hasRoleAtLeast(role, minRole)) {
-    return { error: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) };
-  }
-
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) {
-    return { error: NextResponse.json({ error: 'Tenant not found' }, { status: 404 }) };
-  }
-  const tenantId = tenant.id as string;
-
-  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
-  if (!hasAccess) {
-    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  }
-
-  return { tenantId, unitId, role, userId: sessionUser.id };
 }
 
 export async function GET(

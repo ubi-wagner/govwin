@@ -17,7 +17,7 @@ from .templates import render_template
 logger = logging.getLogger('cms.events')
 
 _task: asyncio.Task | None = None
-_last_processed_at: str | None = None
+_last_processed_at: object | None = None
 POLL_INTERVAL = int(os.getenv('EVENT_POLL_INTERVAL', '10'))
 
 
@@ -62,7 +62,7 @@ async def _process_new_events():
     # Discover the automation_rules schema dynamically
     try:
         cols = await pool.fetch(
-            "SELECT column_name FROM information_schema.columns WHERE table_name = 'automation_rules'"
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'automation_rules' AND table_schema = 'public'"
         )
         col_names = {r['column_name'] for r in cols}
     except Exception as e:
@@ -101,10 +101,21 @@ async def _process_new_events():
         logger.warning(f'Cannot fetch system_events: {e}')
         return
 
+    # Events already handled by frontend direct sends — skip to avoid duplicates.
+    # Remove these once CRM is the sole email sender.
+    FRONTEND_HANDLED = {
+        ('identity', 'tenant.created'),
+        ('identity', 'application.rejected'),
+        ('identity', 'application.submitted'),
+    }
+
     for event in events:
-        _last_processed_at = str(event['created_at'])
+        _last_processed_at = event['created_at']
         ns = event.get('namespace', '')
         etype = event.get('type', '')
+
+        if (ns, etype) in FRONTEND_HANDLED:
+            continue
 
         for rule in rules:
             if _rule_matches(rule, col_names, ns, etype):
