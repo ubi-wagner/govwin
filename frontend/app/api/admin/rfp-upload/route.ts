@@ -28,6 +28,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
 import { emitEventSingle } from '@/lib/events';
+import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
 
@@ -324,8 +325,54 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── Extract text from the first PDF immediately ──────────────────────
+  // This removes the dependency on the pipeline shredder for text
+  // extraction. The extracted text is stored in solicitation_documents
+  // so topic extraction can run right away.
+  let extractedText: string | null = null;
+  const firstPdfFb = fileBuffers.find(
+    (fb) => extFromFilename(fb.file.name) === 'pdf',
+  );
+  if (firstPdfFb && documentIds.length > 0) {
+    try {
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: new Uint8Array(firstPdfFb.buffer) });
+      const textResult = await parser.getText();
+      const rawText = textResult.text?.slice(0, 500000) || '';
+      try { await parser.destroy(); } catch { /* ignore cleanup */ }
+
+      if (rawText.length > 100) {
+        extractedText = rawText;
+        // Update the source document row with the extracted text
+        await sql`
+          UPDATE solicitation_documents
+          SET extracted_text = ${extractedText}
+          WHERE solicitation_id = ${solId}::uuid
+            AND document_type = 'source'
+        `;
+      }
+    } catch (err) {
+      console.error('[rfp-upload] PDF text extraction failed (non-fatal):', err);
+    }
+  }
+
+  // ── Auto-extract topics from the text ──────────────────────────────
+  // Run topic extraction synchronously so the admin sees topics
+  // immediately in the curation workspace instead of clicking manually.
+  let topicsExtracted = 0;
+  if (extractedText && extractedText.length > 100) {
+    try {
+      const result = await extractTopicsForSolicitation(solId, extractedText);
+      topicsExtracted = result.topics?.length ?? 0;
+    } catch (err) {
+      console.error('[rfp-upload] auto topic extraction failed (non-fatal):', err);
+    }
+  }
+
   // Enqueue a shred job so the pipeline extracts text + runs Claude.
-  // Picked up by the dispatcher on the next tick.
+  // Picked up by the dispatcher on the next tick. Even though we already
+  // extracted text above, the pipeline may do additional processing
+  // (embeddings, Claude analysis, etc.).
   try {
     await sql`
       INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
@@ -334,7 +381,7 @@ export async function POST(request: Request) {
     `;
   } catch (err) {
     // Non-fatal — admin can manually retry via "Release for AI" in the workspace
-    console.warn('[rfp-upload] shred job enqueue failed (non-fatal)', err);
+    console.error('[rfp-upload] shred job enqueue failed (non-fatal)', err);
   }
 
   await emitEventSingle({
@@ -352,6 +399,8 @@ export async function POST(request: Request) {
         solicitation_id: solId,
         document_ids: documentIds,
         total_bytes: totalBytes,
+        text_extracted: extractedText !== null,
+        topics_found: topicsExtracted,
       },
     },
     { status: 201 },
