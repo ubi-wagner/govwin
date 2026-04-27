@@ -14,16 +14,18 @@ interface RouteContext {
  * Creates a new proposal for a given topic (opportunity). Admin-granted
  * for the founding cohort — no Stripe required.
  *
- * Input:  { topicId: string }  (opportunities.id — the topic row)
+ * Input:  { topicId: string, productType?: 'proposal_phase1' | 'proposal_phase2' }
+ *         (topicId is opportunities.id — the topic row)
  * Output: { data: { proposalId: string, sectionCount: number } }
  *
  * Steps:
  *   1. Auth + tenant access check (tenant_admin or above)
  *   2. Validate topicId exists and get its solicitation_id
- *   3. Create the proposals row
- *   4. Find the solicitation's volume_required_items
- *   5. Create proposal_sections from required items
- *   6. Emit capture.proposal.purchased event
+ *   3. Check for duplicate proposals (same tenant + opportunity)
+ *   4. Create the proposals row
+ *   5. Find the solicitation's volume_required_items (filtered by phase if productType set)
+ *   6. Create proposal_sections from required items
+ *   7. Emit capture.proposal.created event
  */
 export async function POST(request: Request, ctx: RouteContext) {
   try {
@@ -63,7 +65,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { topicId?: unknown };
+    let body: { topicId?: unknown; productType?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -74,6 +76,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (typeof topicId !== 'string' || !topicId.trim()) {
       return NextResponse.json({ error: 'topicId is required' }, { status: 400 });
     }
+
+    const validProductTypes = ['proposal_phase1', 'proposal_phase2'] as const;
+    const productType = typeof body.productType === 'string' &&
+      (validProductTypes as readonly string[]).includes(body.productType)
+      ? body.productType
+      : null;
 
     // ── Find the topic (opportunity) and its parent solicitation ─────
     const [topic] = await sql<{
@@ -131,18 +139,40 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     // ── Find required items from the solicitation's volumes ──────────
-    const requiredItems = await sql<{
-      id: string;
-      itemNumber: number;
-      itemName: string;
-      pageLimit: number | null;
-    }[]>`
-      SELECT vri.id, vri.item_number, vri.item_name, vri.page_limit
-      FROM volume_required_items vri
-      JOIN solicitation_volumes sv ON sv.id = vri.volume_id
-      WHERE sv.solicitation_id = ${topic.solicitationId}
-      ORDER BY sv.volume_number ASC, vri.item_number ASC
-    `;
+    // When productType is set, map to phase filter for applies_to_phase
+    const phaseFilter = productType === 'proposal_phase1'
+      ? 'phase_1'
+      : productType === 'proposal_phase2'
+        ? 'phase_2'
+        : null;
+
+    const requiredItems = phaseFilter
+      ? await sql<{
+          id: string;
+          itemNumber: number;
+          itemName: string;
+          pageLimit: number | null;
+        }[]>`
+          SELECT vri.id, vri.item_number, vri.item_name, vri.page_limit
+          FROM volume_required_items vri
+          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
+          WHERE sv.solicitation_id = ${topic.solicitationId}
+            AND (sv.applies_to_phase IS NULL OR sv.applies_to_phase = '{}' OR ${phaseFilter} = ANY(sv.applies_to_phase))
+            AND (vri.applies_to_phase IS NULL OR vri.applies_to_phase = '{}' OR ${phaseFilter} = ANY(vri.applies_to_phase))
+          ORDER BY sv.volume_number ASC, vri.item_number ASC
+        `
+      : await sql<{
+          id: string;
+          itemNumber: number;
+          itemName: string;
+          pageLimit: number | null;
+        }[]>`
+          SELECT vri.id, vri.item_number, vri.item_name, vri.page_limit
+          FROM volume_required_items vri
+          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
+          WHERE sv.solicitation_id = ${topic.solicitationId}
+          ORDER BY sv.volume_number ASC, vri.item_number ASC
+        `;
 
     // ── Create proposal_sections from required items ─────────────────
     let sectionCount = 0;
@@ -182,7 +212,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({
       namespace: 'capture',
-      type: 'proposal.purchased',
+      type: 'proposal.created',
       actor: userActor(userId, sessionUser.email),
       tenantId,
       payload: {
@@ -191,6 +221,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         solicitationId: topic.solicitationId,
         sectionCount,
         title: proposalTitle,
+        productType: productType ?? undefined,
       },
     });
 
