@@ -1,24 +1,29 @@
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
-      <aside className="w-64 bg-navy-900 text-white p-6">
-        <h2 className="text-lg font-bold mb-6">Admin</h2>
-        <nav className="flex flex-col gap-2 text-sm">
-          <a href="/admin/dashboard" className="hover:text-brand-300">Dashboard</a>
-          <a href="/admin/rfp-curation" className="hover:text-brand-300">RFP Curation</a>
-          <a href="/admin/applications" className="hover:text-brand-300">Applications</a>
-          <a href="/admin/tenants" className="hover:text-brand-300">Tenants</a>
-          <a href="/admin/pipeline" className="hover:text-brand-300">Pipeline</a>
-          <a href="/admin/sources" className="hover:text-brand-300">Sources</a>
-          <a href="/admin/agents" className="hover:text-brand-300">Agents</a>
-          <a href="/admin/purchases" className="hover:text-brand-300">Purchases</a>
-          <a href="/admin/analytics" className="hover:text-brand-300">Analytics</a>
-          <a href="/admin/events" className="hover:text-brand-300">Events</a>
-          <a href="/admin/storage" className="hover:text-brand-300">Storage</a>
-          <a href="/admin/waitlist" className="hover:text-brand-300">Waitlist</a>
+      <aside className="w-64 bg-navy-900 text-white p-6 flex flex-col">
+        <a href="/admin/dashboard" className="text-lg font-bold mb-6 hover:text-brand-300">RFP Admin</a>
+        <nav className="flex flex-col gap-1 text-sm flex-1">
+          <span className="text-xs text-gray-500 uppercase tracking-wider mt-2 mb-1">Operations</span>
+          <a href="/admin/dashboard" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Dashboard</a>
+          <a href="/admin/applications" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Applications</a>
+          <a href="/admin/rfp-curation" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">RFP Curation</a>
+          <a href="/admin/tenants" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Tenants</a>
+
+          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Monitoring</span>
+          <a href="/admin/events" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Event Stream</a>
+          <a href="/admin/pipeline" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Pipeline Jobs</a>
+          <a href="/admin/system" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">System Health</a>
+
+          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
+          <a href="/admin/content" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">CMS Content</a>
+          <a href="/admin/storage" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">S3 Storage</a>
         </nav>
+        <div className="text-xs text-gray-600 mt-4">
+          <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>
+        </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-8 bg-gray-50 min-h-screen">{children}</main>
     </div>
   );
 }
