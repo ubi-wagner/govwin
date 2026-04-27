@@ -68,23 +68,19 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
 
     const rows = await sql<{ id: string }[]>`
       INSERT INTO library_units
-        (tenant_id, content, content_type, category, tags, status,
-         original_proposal_id, original_node_id, atom_hash, metadata)
+        (tenant_id, content, category, tags, status, source_type, source_id,
+         original_proposal_id, original_node_id, atom_hash)
       VALUES
         (${tenantId}::uuid,
          ${contentJson},
-         ${input.nodeType},
          ${input.category},
          ${input.tags}::text[],
          'approved',
+         'ai',
+         ${JSON.stringify(input.sourceAnchor ?? null)},
          ${input.proposalId}::uuid,
          ${input.nodeId},
-         ${input.atomHash ?? null},
-         ${JSON.stringify({
-           source_anchor: input.sourceAnchor ?? null,
-           saved_by: ctx.actor.id,
-           saved_at: new Date().toISOString(),
-         })}::jsonb)
+         ${input.atomHash ?? null})
       RETURNING id
     `;
     if (!rows.length) {

@@ -31,6 +31,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ tenantSlug: string }> },
 ) {
+  try {
   const { tenantSlug } = await params;
 
   // ---------- Auth ----------
@@ -203,6 +204,13 @@ export async function POST(
     { data: { uploaded } },
     { status: 201 },
   );
+  } catch (err) {
+    console.error('[library/upload] Unexpected error', err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
+  }
 }
 
 export const config = {

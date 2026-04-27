@@ -115,24 +115,26 @@ async function insertCompanyBatch(rows: RawRow[]): Promise<void> {
   const params: (string | number | boolean | null)[] = [];
   let idx = 1;
   for (const row of rows) {
-    placeholders.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`);
+    placeholders.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`);
     params.push(
       trimOrNull(row.company_name) ?? '', trimOrNull(row.uei), trimOrNull(row.duns),
       trimOrNull(row.address1), trimOrNull(row.address2), trimOrNull(row.city),
       trimOrNull(row.state), trimOrNull(row.zip), trimOrNull(row.country),
       trimOrNull(row.company_url), parseBool(row.hubzone_owned),
       parseBool(row.woman_owned), parseBool(row.disadvantaged),
+      parseInt2(row.number_awards),
     );
   }
   await sql.unsafe(
-    `INSERT INTO sbir_companies (company_name,uei,duns,address1,address2,city,state,zip,country,company_url,hubzone_owned,woman_owned,disadvantaged)
+    `INSERT INTO sbir_companies (company_name,uei,duns,address1,address2,city,state,zip,country,company_url,hubzone_owned,woman_owned,disadvantaged,number_awards)
      VALUES ${placeholders.join(',')}
      ON CONFLICT (uei) WHERE uei IS NOT NULL AND uei != '' DO UPDATE SET
        company_name=EXCLUDED.company_name, duns=COALESCE(EXCLUDED.duns,sbir_companies.duns),
        address1=COALESCE(EXCLUDED.address1,sbir_companies.address1), city=COALESCE(EXCLUDED.city,sbir_companies.city),
        state=COALESCE(EXCLUDED.state,sbir_companies.state), zip=COALESCE(EXCLUDED.zip,sbir_companies.zip),
        company_url=COALESCE(EXCLUDED.company_url,sbir_companies.company_url),
-       hubzone_owned=EXCLUDED.hubzone_owned, woman_owned=EXCLUDED.woman_owned, disadvantaged=EXCLUDED.disadvantaged, updated_at=now()`,
+       hubzone_owned=EXCLUDED.hubzone_owned, woman_owned=EXCLUDED.woman_owned, disadvantaged=EXCLUDED.disadvantaged,
+       number_awards=EXCLUDED.number_awards, updated_at=now()`,
     params,
   );
 }

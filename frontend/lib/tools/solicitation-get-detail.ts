@@ -87,7 +87,7 @@ interface Annotation {
   complianceVariableName: string | null;
   sourceLocation: unknown;
   payload: unknown;
-  createdBy: string;
+  actorId: string;
   createdAt: string;
 }
 
@@ -219,7 +219,7 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
     // 3. annotations
     const annRows = await sql`
       SELECT id, kind, compliance_variable_name,
-             source_location, payload, created_by, created_at
+             source_location, payload, actor_id, created_at
       FROM solicitation_annotations
       WHERE solicitation_id = ${solicitationId}::uuid
       ORDER BY created_at ASC
@@ -230,7 +230,7 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
       complianceVariableName: a.complianceVariableName ?? null,
       sourceLocation: a.sourceLocation,
       payload: a.payload,
-      createdBy: a.createdBy,
+      actorId: a.actorId,
       createdAt: toIsoOrNull(a.createdAt)!,
     }));
 

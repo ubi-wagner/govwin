@@ -201,7 +201,7 @@ export async function POST(request: Request, ctx: RouteContext) {
            ${atom.suggestedCategory},
            ${sql.array(atom.suggestedTags)}::text[],
            'draft',
-           'atom',
+           'upload',
            ${JSON.stringify(atomMetadata)},
            ${unit.id}::uuid)
         RETURNING id

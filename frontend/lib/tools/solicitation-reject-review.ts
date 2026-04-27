@@ -65,7 +65,7 @@ export const solicitationRejectReviewTool = defineTool<Input, Output>({
       INSERT INTO triage_actions
         (solicitation_id, actor_id, action, from_state, to_state, notes)
       VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'reject_review',
+        (${solicitationId}::uuid, ${actorId}::uuid, 'reject',
          'review_requested', 'curation_in_progress', ${notes})
     `;
 
