@@ -133,9 +133,18 @@ ALTER TABLE solicitation_documents
 - Reuse the parser from `/api/admin/sources/[profileId]/paste-import`
 - ~15 lines added
 
-### Task 8: Update admin nav + links
-- Sources page gets "New Solicitation" button that creates a blank
-  solicitation and redirects to its detail page
+### Task 8: Customer activity on solicitation detail
+- Show which customers have pinned topics from this solicitation
+- Show which customers bought portals for topics
+- Show proposal status per customer (outline, drafting, submitted, etc.)
+- Query: tenant_pipeline_items + proposals joined through opportunities
+- Display as a "Customer Interest" panel on the solicitation detail page
+- Shows: customer name, topic pinned, portal purchased (Y/N), proposal stage, outcome
+- This is the admin's demand signal — helps prioritize curation effort
+- ~40 lines new component
+
+### Task 9: Update admin nav + links
+- Sources page gets "New Solicitation" button
 - Curation workspace header gets "Documents" and "Topics" quick-nav tabs
 - Triage queue items link to the correct detail page
 - ~10 lines modified

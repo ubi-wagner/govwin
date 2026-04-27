@@ -7,16 +7,24 @@
  * curated_solicitations + solicitation_documents rows, and
  * enqueues a shred job so the pipeline extracts text + runs Claude.
  *
- * Form fields (multipart/form-data):
+ * Supports two modes:
+ *
+ * 1) New solicitation (default):
  *   title            — solicitation title (required)
  *   agency           — agency name (required)
  *   office           — program office (optional)
- *   program_type     — sbir_phase_1 | sbir_phase_2 | sttr_phase_1 | ... | cso | baa | ota (required)
- *   solicitation_number — optional
- *   close_date       — ISO 8601 (optional)
- *   posted_date      — ISO 8601 (optional)
+ *   programType      — sbir_phase_1 | sbir_phase_2 | ... | baa | ota (required)
+ *   solicitationNumber — optional
+ *   closeDate        — ISO 8601 (optional)
+ *   postedDate       — ISO 8601 (optional)
  *   description      — short summary (optional)
- *   files[]          — one or more File objects (required, at least 1)
+ *   files            — one or more File objects (required, at least 1)
+ *
+ * 2) Attach to existing solicitation:
+ *   solicitationId   — existing curated_solicitations.id (required)
+ *   documentType     — rfp | nofo | instructions | amendment | etc. (optional, default 'source')
+ *   isPrimary        — 'true' to mark as primary doc (optional)
+ *   files            — one or more File objects (required, at least 1)
  *
  * Returns: { data: { solicitation_id, opportunity_id, document_ids[] } }
  */
@@ -100,29 +108,40 @@ export async function POST(request: Request) {
     );
   }
 
-  const metaInput = {
-    title: String(formData.get('title') ?? ''),
-    agency: String(formData.get('agency') ?? ''),
-    office: formData.get('office') ? String(formData.get('office')) : null,
-    programType: String(formData.get('programType') ?? ''),
-    solicitationNumber: formData.get('solicitationNumber') ? String(formData.get('solicitationNumber')) : null,
-    closeDate: formData.get('closeDate') ? String(formData.get('closeDate')) : null,
-    postedDate: formData.get('postedDate') ? String(formData.get('postedDate')) : null,
-    description: formData.get('description') ? String(formData.get('description')) : null,
-  };
+  // ── Attach-to-existing mode ──────────────────────────────────────
+  // When solicitationId is provided, skip opportunity/solicitation creation
+  // and just attach documents to the existing solicitation.
+  const existingSolId = formData.get('solicitationId') ? String(formData.get('solicitationId')) : null;
+  const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
+  const requestedIsPrimary = formData.get('isPrimary') === 'true';
 
-  const parsed = MetaSchema.safeParse(metaInput);
-  if (!parsed.success) {
-    return NextResponse.json(
-      {
-        error: 'Invalid metadata',
-        code: 'VALIDATION_ERROR',
-        details: parsed.error.issues,
-      },
-      { status: 422 },
-    );
+  // Metadata is only required when creating a new solicitation
+  let meta: z.infer<typeof MetaSchema> | null = null;
+  if (!existingSolId) {
+    const metaInput = {
+      title: String(formData.get('title') ?? ''),
+      agency: String(formData.get('agency') ?? ''),
+      office: formData.get('office') ? String(formData.get('office')) : null,
+      programType: String(formData.get('programType') ?? ''),
+      solicitationNumber: formData.get('solicitationNumber') ? String(formData.get('solicitationNumber')) : null,
+      closeDate: formData.get('closeDate') ? String(formData.get('closeDate')) : null,
+      postedDate: formData.get('postedDate') ? String(formData.get('postedDate')) : null,
+      description: formData.get('description') ? String(formData.get('description')) : null,
+    };
+
+    const parsed = MetaSchema.safeParse(metaInput);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid metadata',
+          code: 'VALIDATION_ERROR',
+          details: parsed.error.issues,
+        },
+        { status: 422 },
+      );
+    }
+    meta = parsed.data;
   }
-  const meta = parsed.data;
 
   // Collect files
   const files: File[] = [];
@@ -203,66 +222,100 @@ export async function POST(request: Request) {
     );
   }
 
-  // Generate opportunity UUID up front so we can use it for storage paths
-  const oppId = randomUUID();
-
-  // Insert opportunity row. source_id derived from the UUID for uniqueness.
-  // Source is 'manual_upload' to distinguish from ingester-sourced rows.
-  // postgres.js's tagged-template type-check doesn't like undefined, so
-  // we explicitly narrow all nullable params to `string | null | Date`.
-  const officeParam: string | null = meta.office ?? null;
-  const solNumParam: string | null = meta.solicitationNumber ?? null;
-  const closeParam: Date | null = meta.closeDate ? new Date(meta.closeDate) : null;
-  const postedParam: Date | null = meta.postedDate ? new Date(meta.postedDate) : null;
-  const descParam: string | null = meta.description ?? null;
-
+  // ── Resolve or create the solicitation ────────────────────────────
   let oppRowId: string;
-  try {
-    const rows = await sql<{ id: string }[]>`
-      INSERT INTO opportunities
-        (id, source, source_id, title, agency, office, program_type,
-         solicitation_number, close_date, posted_date, description,
-         content_hash, is_active)
-      VALUES
-        (${oppId}::uuid, 'manual_upload', ${'manual-' + oppId},
-         ${meta.title}, ${meta.agency}, ${officeParam},
-         ${meta.programType}, ${solNumParam},
-         ${closeParam}, ${postedParam},
-         ${descParam},
-         md5(${meta.title} || ${descParam ?? ''}),
-         true)
-      RETURNING id
+  let solId: string;
+
+  if (existingSolId) {
+    // Attach-to-existing: look up the solicitation to get its opportunity_id
+    const solRows = await sql<{ id: string; opportunityId: string }[]>`
+      SELECT cs.id, cs.opportunity_id
+      FROM curated_solicitations cs
+      WHERE cs.id = ${existingSolId}::uuid
     `;
-    oppRowId = rows[0].id;
-  } catch (err) {
-    console.error('[rfp-upload] opportunity insert failed', err);
-    return NextResponse.json(
-      { error: 'Failed to create opportunity row', code: 'DB_ERROR' },
-      { status: 500 },
-    );
+    if (solRows.length === 0) {
+      return NextResponse.json(
+        { error: 'Solicitation not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+    solId = solRows[0].id;
+    oppRowId = solRows[0].opportunityId;
+  } else {
+    // ── New solicitation flow ─────────────────────────────────────────
+    if (!meta) {
+      return NextResponse.json(
+        { error: 'Metadata (title, agency, programType) required for new solicitations', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
+    const oppId = randomUUID();
+    const officeParam: string | null = meta.office ?? null;
+    const solNumParam: string | null = meta.solicitationNumber ?? null;
+    const closeParam: Date | null = meta.closeDate ? new Date(meta.closeDate) : null;
+    const postedParam: Date | null = meta.postedDate ? new Date(meta.postedDate) : null;
+    const descParam: string | null = meta.description ?? null;
+
+    try {
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO opportunities
+          (id, source, source_id, title, agency, office, program_type,
+           solicitation_number, close_date, posted_date, description,
+           content_hash, is_active)
+        VALUES
+          (${oppId}::uuid, 'manual_upload', ${'manual-' + oppId},
+           ${meta.title}, ${meta.agency}, ${officeParam},
+           ${meta.programType}, ${solNumParam},
+           ${closeParam}, ${postedParam},
+           ${descParam},
+           md5(${meta.title} || ${descParam ?? ''}),
+           true)
+        RETURNING id
+      `;
+      oppRowId = rows[0].id;
+    } catch (err) {
+      console.error('[rfp-upload] opportunity insert failed', err);
+      return NextResponse.json(
+        { error: 'Failed to create opportunity row', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
+
+    try {
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO curated_solicitations (opportunity_id, namespace, status)
+        VALUES (${oppRowId}::uuid, 'pending', 'new')
+        RETURNING id
+      `;
+      solId = rows[0].id;
+    } catch (err) {
+      console.error('[rfp-upload] curated_solicitations insert failed', err);
+      return NextResponse.json(
+        { error: 'Failed to create solicitation row', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   }
 
-  // Insert curated_solicitations row (status='new' so it appears in triage)
-  let solId: string;
-  try {
-    const rows = await sql<{ id: string }[]>`
-      INSERT INTO curated_solicitations (opportunity_id, namespace, status)
-      VALUES (${oppRowId}::uuid, 'pending', 'new')
-      RETURNING id
-    `;
-    solId = rows[0].id;
-  } catch (err) {
-    console.error('[rfp-upload] curated_solicitations insert failed', err);
-    return NextResponse.json(
-      { error: 'Failed to create solicitation row', code: 'DB_ERROR' },
-      { status: 500 },
-    );
+  // ── If isPrimary requested, clear existing primary flags first ────
+  if (requestedIsPrimary) {
+    try {
+      await sql`
+        UPDATE solicitation_documents
+        SET is_primary = false
+        WHERE solicitation_id = ${solId}::uuid AND is_primary = true
+      `;
+    } catch (err) {
+      console.error('[rfp-upload] clear primary flags failed (non-fatal)', err);
+    }
   }
 
   // Upload each file and create a solicitation_documents row.
   // fileBuffers were pre-computed above (hash + buffer + displayName).
   const documentIds: string[] = [];
   let firstPdfKey: string | null = null;
+  const docType = requestedDocType ?? 'source';
   for (const fb of fileBuffers) {
     const ext = extFromFilename(fb.file.name);
     const safeName = slugSafeName(fb.file.name);
@@ -300,19 +353,23 @@ export async function POST(request: Request) {
     }
 
     try {
+      // For new solicitations without an explicit type, first PDF gets 'source'
+      const effectiveType = existingSolId ? docType : (firstPdfKey === storageKey ? 'source' : 'attachment');
+      const isPrimary = requestedIsPrimary && firstPdfKey === storageKey;
       const docRows = await sql<{ id: string }[]>`
         INSERT INTO solicitation_documents
           (solicitation_id, document_type, original_filename, storage_key,
-           file_size, content_type, content_hash, uploaded_by)
+           file_size, content_type, content_hash, uploaded_by, is_primary)
         VALUES
           (${solId}::uuid,
-           ${firstPdfKey === storageKey ? 'source' : 'attachment'},
+           ${effectiveType},
            ${fb.displayName},
            ${storageKey},
            ${fb.file.size},
            ${fb.file.type || null},
            ${fb.hash},
-           ${userId ?? null}::uuid)
+           ${userId ?? null}::uuid,
+           ${isPrimary})
         RETURNING id
       `;
       documentIds.push(docRows[0].id);
@@ -325,15 +382,17 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Extract text from the first PDF immediately ──────────────────────
+  // ── Extract text from the primary/first PDF immediately ───────────
   // This removes the dependency on the pipeline shredder for text
   // extraction. The extracted text is stored in solicitation_documents
   // so topic extraction can run right away.
+  // For attach-to-existing, only extract if this upload is marked primary.
+  const shouldExtract = !existingSolId || requestedIsPrimary;
   let extractedText: string | null = null;
   const firstPdfFb = fileBuffers.find(
     (fb) => extFromFilename(fb.file.name) === 'pdf',
   );
-  if (firstPdfFb && documentIds.length > 0) {
+  if (shouldExtract && firstPdfFb && documentIds.length > 0) {
     try {
       const { PDFParse } = await import('pdf-parse');
       const parser = new PDFParse({ data: new Uint8Array(firstPdfFb.buffer) });
@@ -343,12 +402,11 @@ export async function POST(request: Request) {
 
       if (rawText.length > 100) {
         extractedText = rawText;
-        // Update the source document row with the extracted text
+        // Update the document row with the extracted text
         await sql`
           UPDATE solicitation_documents
           SET extracted_text = ${extractedText}
-          WHERE solicitation_id = ${solId}::uuid
-            AND document_type = 'source'
+          WHERE id = ${documentIds[0]}::uuid
         `;
       }
     } catch (err) {
@@ -373,23 +431,25 @@ export async function POST(request: Request) {
   // Picked up by the dispatcher on the next tick. Even though we already
   // extracted text above, the pipeline may do additional processing
   // (embeddings, Claude analysis, etc.).
-  try {
-    await sql`
-      INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
-      VALUES ('system', 'shred_solicitation', 'pending', 2,
-              ${JSON.stringify({ solicitation_id: solId, triggered_by: 'manual_upload' })}::jsonb)
-    `;
-  } catch (err) {
-    // Non-fatal — admin can manually retry via "Release for AI" in the workspace
-    console.error('[rfp-upload] shred job enqueue failed (non-fatal)', err);
+  if (shouldExtract) {
+    try {
+      await sql`
+        INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
+        VALUES ('system', 'shred_solicitation', 'pending', 2,
+                ${JSON.stringify({ solicitation_id: solId, triggered_by: existingSolId ? 'doc_attach' : 'manual_upload' })}::jsonb)
+      `;
+    } catch (err) {
+      // Non-fatal — admin can manually retry via "Release for AI" in the workspace
+      console.error('[rfp-upload] shred job enqueue failed (non-fatal)', err);
+    }
   }
 
   await emitEventSingle({
     namespace: 'finder',
-    type: 'rfp.manually_uploaded',
+    type: existingSolId ? 'rfp.document_attached' : 'rfp.manually_uploaded',
     actor: { type: 'user', id: userId ?? 'unknown' },
     tenantId: null,
-    payload: { opportunityId: oppRowId, documentCount: documentIds?.length ?? 0 },
+    payload: { opportunityId: oppRowId, solicitationId: solId, documentCount: documentIds?.length ?? 0 },
   });
 
   return NextResponse.json(
