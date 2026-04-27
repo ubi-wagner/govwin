@@ -3,7 +3,7 @@
 **Purpose:** Concise handoff document. Any future Claude session reads this
 to immediately understand where the project is and what was done.
 
-**Last updated:** 2026-04-27
+**Last updated:** 2026-04-27 (post audit round 3)
 
 **Authoritative architecture:** [`docs/ARCHITECTURE_DAY365.md`](./ARCHITECTURE_DAY365.md)
 
@@ -107,11 +107,22 @@ Major features built this session:
 
 ---
 
-### Current Blockers / In-Progress
+### Audit Status
 
-- **Gmail API OAuth2** — configured but returning "skipped" in some cases. Test
-  endpoint deployed (`/api/admin/test-email`), needs debugging after Railway redeploy.
-- **Railway deploy speed** — slow at the moment.
+Three rounds of comprehensive audits completed:
+- **Round 1:** 47 issues (auth gaps, missing events, fault tolerance) — all fixed
+- **Round 2:** 19 issues (schema mismatches, error handling, CRM) — all fixed
+- **Round 3:** 2 issues (final column name mismatches) — all fixed
+- **Result:** All SQL references verified against 19 migrations, 49 tables. Clean.
+
+### Current Blockers
+
+- **Gmail OAuth2** — token refreshed, env vars set on both frontend + CRM. Needs HITL
+  verification via `/api/admin/test-email` endpoint after next deploy.
+- **300MB SBIR award CSV** — presigned URL upload works, auto-ingest skips files >100MB.
+  Use dedicated `/api/admin/sbir-data/ingest` endpoint for large files.
+- **CRM event listener** — dynamically adapts to automation_rules schema. Skips
+  events already handled by frontend to prevent duplicate emails.
 - **Large SBIR CSV upload** (300MB) — presigned URL flow built but not yet tested on
   Railway.
 

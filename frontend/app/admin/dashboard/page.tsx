@@ -80,7 +80,7 @@ export default async function DashboardPage() {
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM tenants WHERE status = 'active'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_units WHERE status = 'approved'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM proposals WHERE stage NOT IN ('submitted', 'archived')`),
-    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM curated_solicitations WHERE status IN ('new', 'claimed', 'in_review')`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM curated_solicitations WHERE status IN ('new', 'claimed', 'curation_in_progress', 'review_requested')`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '24 hours'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM sbir_companies`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM sbir_awards`),
