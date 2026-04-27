@@ -63,7 +63,7 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
 
     const rows = await sql<{ id: string; createdAt: Date }[]>`
       INSERT INTO solicitation_annotations
-        (solicitation_id, created_by, kind, compliance_variable_name,
+        (solicitation_id, actor_id, kind, compliance_variable_name,
          source_location, payload)
       VALUES
         (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
