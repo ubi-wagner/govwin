@@ -42,3 +42,50 @@ jobs:
       - run: pip install -r requirements.txt
       - run: pip install pytest pytest-asyncio
       - run: python -m pytest tests/ -v
+
+  crm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/cms
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python -c "import ast; [ast.parse(open(f).read()) for f in __import__('glob').glob('src/**/*.py', recursive=True)]"
+        name: Syntax check
+
+  migrate-crm:
+    runs-on: ubuntu-latest
+    needs: [crm]
+    if: github.ref == 'refs/heads/main'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run CRM migrations
+        run: bash services/cms/db/run.sh
+        env:
+          CMS_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_db
+      - name: Verify tables exist
+        run: |
+          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q cms_posts
+          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q email_accounts
+          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q email_outbox
+          echo "All CRM tables verified"
+        env:
+          CMS_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_db
