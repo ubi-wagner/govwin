@@ -3,21 +3,24 @@
 **Purpose:** Concise handoff document. Any future Claude session reads this
 to immediately understand where the project is and what was done.
 
-**Last updated:** 2026-04-26
+**Last updated:** 2026-04-27
 
 **Authoritative architecture:** [`docs/ARCHITECTURE_DAY365.md`](./ARCHITECTURE_DAY365.md)
 
 ---
 
-## Current State (2026-04-26)
+## Current State (2026-04-27)
 
 ### What's Built and Deployed
 
 - **Frontend**: Next.js 15 on Railway (`govtech-frontend`), auto-deploys on merge
 - **Pipeline**: Python 3.12 on Railway (`pipeline`), auto-deploys on merge
-- **PostgreSQL**: PG 18, Railway managed (`govtech_intel`)
+- **CRM Service**: FastAPI on Railway (`rfp-crm`), event listener + Gmail + CMS
+- **PostgreSQL (main)**: PG 18, Railway managed, 19 migrations (001-019)
+- **PostgreSQL (CRM)**: Separate Railway instance, 3 migrations (001-003), auto-migrate on boot
 - **S3 Bucket**: Railway storage (`rfp-pipeline-prod-r8t7tr6` at `t3.storageapi.dev`)
 - **Auth**: `eric@rfppipeline.com` is master_admin, login works end-to-end
+- **Email**: Google Workspace OAuth2 via `platform@rfppipeline.com` (aliases: spotlight@, notifications@, noreply@, support@→eric@)
 
 ### Sprint Summary (this session)
 
@@ -44,8 +47,14 @@ Major features built this session:
 9. **CMS content system** — `automation_rules` + `cms_content` tables, content API for
    marketing pages.
 10. **Presigned URL uploads** — browser-to-S3 direct upload for 300MB+ files.
-11. **Onboarding guides** — Customer Guide (323 lines) + Admin Operations Guide
-    (487 lines).
+11. **Onboarding guides** — Customer Guide (323 lines) + Admin Operations Guide (487 lines).
+12. **CRM Service** — FastAPI at `services/cms/`, event listener polling system_events,
+    Gmail API integration, email templates, auto-migrate on boot, CI job.
+13. **Admin monitoring UI** — real dashboard (8 stat cards + event stream), event stream
+    viewer (filterable, auto-refresh), pipeline jobs viewer, tenants list. Sidebar
+    reorganized into Operations/Monitoring/Content groups.
+14. **Application accept/reject flow** — re-acceptance handles existing tenant/user,
+    mandatory admin notes, status toggle for testing, email delivery status display.
 
 ---
 
@@ -73,6 +82,20 @@ Major features built this session:
 
 **Pipeline — Document agents:**
 - `pipeline/src/document/` — base.py, registry.py, converter.py, docx/pptx/xlsx/pdf agents
+
+**CRM Service:**
+- `services/cms/src/main.py` — FastAPI app with lifespan (DB, event bridge, listener)
+- `services/cms/src/event_listener.py` — polls system_events, triggers automation rules
+- `services/cms/src/gmail.py` — Gmail API via OAuth2 refresh token
+- `services/cms/src/templates.py` — email template renderer
+- `services/cms/db/run.sh` — migration runner (auto-runs on boot)
+- `services/cms/db/001-003*.sql` — CMS schema, email engine, HITL outbox
+
+**Admin monitoring pages:**
+- `frontend/app/admin/dashboard/page.tsx` — stat cards + event stream
+- `frontend/app/admin/events/page.tsx` + `event-stream-client.tsx` — filterable event viewer
+- `frontend/app/admin/pipeline/page.tsx` — job queue + cron schedules
+- `frontend/app/admin/tenants/page.tsx` — tenant list with counts
 
 **Migrations:**
 - `db/migrations/018_sbir_award_data.sql` — SBIR tables
