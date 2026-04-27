@@ -4,6 +4,9 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 
+export const maxDuration = 300; // 5 minutes for large CSV processing
+export const dynamic = 'force-dynamic';
+
 // ---------------------------------------------------------------------------
 // CSV parser — handles quoted fields, Windows line endings, large files
 // ---------------------------------------------------------------------------
@@ -525,9 +528,10 @@ export async function POST(request: Request) {
       data: { fileType, rowCount, filename },
     });
   } catch (e) {
-    console.error('[api/admin/sbir-data/ingest] POST error:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[api/admin/sbir-data/ingest] POST error:', msg);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: `Ingest failed: ${msg.slice(0, 500)}` },
       { status: 500 },
     );
   }
