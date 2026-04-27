@@ -123,7 +123,6 @@ export default async function SpotlightDetailPage({ params }: Props) {
   if (!opportunity) notFound();
 
   // ---------- Check pinned status ----------
-  let pipelineItemId: string | null = null;
   let isPinned = false;
 
   try {
@@ -133,7 +132,6 @@ export default async function SpotlightDetailPage({ params }: Props) {
       LIMIT 1
     `;
     if (rows[0]) {
-      pipelineItemId = rows[0].id;
       isPinned = rows[0].isPinned;
     }
   } catch (e) {
