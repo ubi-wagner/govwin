@@ -56,10 +56,14 @@ async def _process_new_events():
     if not pool:
         return
 
-    # Fetch automation rules
-    rules = await pool.fetch(
-        'SELECT * FROM automation_rules WHERE is_active = true'
-    )
+    # Fetch automation rules (may not exist if migration 019 hasn't run on shared DB)
+    try:
+        rules = await pool.fetch(
+            'SELECT * FROM automation_rules WHERE is_active = true'
+        )
+    except Exception as e:
+        logger.warning(f'automation_rules table not available: {e}')
+        return
     if not rules:
         return
 
