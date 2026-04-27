@@ -15,6 +15,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/admin/pipeline" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Pipeline Jobs</a>
           <a href="/admin/system" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">System Health</a>
 
+          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Intelligence</span>
+          <a href="/admin/sources" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Sources</a>
+
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
           <a href="/admin/content" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">CMS Content</a>
           <a href="/admin/storage" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">S3 Storage</a>

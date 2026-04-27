@@ -149,11 +149,10 @@ function PasteTopicsModal({ profileId, sourceName, onClose, onImported }: PasteM
 
     try {
       // Log the paste event
-      await fetch('/api/admin/sources', {
+      await fetch(`/api/admin/sources/${profileId}/visit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId,
           action: 'paste_topics',
           notes: `Pasted ${parsed.length} rows from ${sourceName}`,
           topicsCount: parsed.length,
@@ -326,26 +325,16 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
     if (!noteText.trim()) return;
     setSavingNote(true);
     try {
-      const res = await fetch('/api/admin/sources', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: source.id,
-          action: 'note',
-          notes: noteText.trim(),
-        }),
-      });
-      if (res.ok) {
-        setNoteText('');
-        setShowNoteInput(false);
-        onRefresh();
-      }
+      await logVisit('note', { notes: noteText.trim() });
+      setNoteText('');
+      setShowNoteInput(false);
+      onRefresh();
     } catch {
       // Fail silently for note save
     } finally {
       setSavingNote(false);
     }
-  }, [noteText, source.id, onRefresh]);
+  }, [noteText, logVisit, onRefresh]);
 
   const handleFileUpload = useCallback(
     async (files: FileList | File[]) => {
@@ -354,15 +343,9 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
 
       try {
         // Log the upload event
-        await fetch('/api/admin/sources', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: source.id,
-            action: 'upload',
-            notes: `Uploading ${files.length} file(s)`,
-            filesCount: files.length,
-          }),
+        await logVisit('upload', {
+          notes: `Uploading ${files.length} file(s)`,
+          filesCount: files.length,
         });
 
         // Upload via the RFP upload route
@@ -392,7 +375,7 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
         setUploading(false);
       }
     },
-    [source, onRefresh],
+    [source, onRefresh, logVisit],
   );
 
   const onDrop = useCallback(
@@ -644,7 +627,7 @@ export default function SourcesHub({ initialProfiles, initialActivity }: Sources
       const res = await fetch('/api/admin/sources');
       if (res.ok) {
         const json = await res.json();
-        setProfiles(json.data.profiles);
+        setProfiles(json.data.sources);
         setActivity(json.data.recentActivity);
       }
     } catch {
