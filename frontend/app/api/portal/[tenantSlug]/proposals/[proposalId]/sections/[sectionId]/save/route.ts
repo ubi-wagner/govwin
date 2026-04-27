@@ -138,7 +138,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
       data: {
         sectionId,
         version: nextVersion,
-        status: newStatus ?? section.version,
+        status: newStatus ?? section.status,
       },
     });
   } catch (e) {
