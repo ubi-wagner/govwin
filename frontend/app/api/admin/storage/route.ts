@@ -264,7 +264,7 @@ export async function PUT(request: NextRequest) {
     const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
     const key = `${cleanPrefix}${body.filename}`;
 
-    const url = await getSignedPutUrl(key, body.contentType, 900);
+    const url = await getSignedPutUrl(key, body.contentType, 3600);
 
     return NextResponse.json({
       data: { url, key, expiresIn: 900 },
@@ -319,9 +319,10 @@ export async function PATCH(request: NextRequest) {
       payload: { key: body.key, size, originalName: filename },
     });
 
-    // Auto-detect and ingest SBIR CSV files
+    // Auto-detect and ingest SBIR CSV files (skip for very large files — they need pipeline processing)
+    const MAX_AUTO_INGEST_BYTES = 100 * 1024 * 1024; // 100MB
     let sbirResult: { fileType: string; rowCount: number; isDuplicate: boolean } | null = null;
-    if (filename.toLowerCase().endsWith('.csv')) {
+    if (filename.toLowerCase().endsWith('.csv') && size <= MAX_AUTO_INGEST_BYTES) {
       try {
         const { getObjectBuffer } = await import('@/lib/storage/s3-client');
         const buffer = await getObjectBuffer(body.key);
@@ -346,8 +347,18 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const tooLargeForAutoIngest = filename.toLowerCase().endsWith('.csv') && size > MAX_AUTO_INGEST_BYTES;
+
     return NextResponse.json({
-      data: { key: body.key, size, confirmed: true, sbirIngest: sbirResult },
+      data: {
+        key: body.key,
+        size,
+        confirmed: true,
+        sbirIngest: sbirResult,
+        ...(tooLargeForAutoIngest ? {
+          notice: `File is ${(size / 1024 / 1024).toFixed(0)}MB — too large for auto-ingest (limit ${MAX_AUTO_INGEST_BYTES / 1024 / 1024}MB). Use POST /api/admin/sbir-data/ingest to process it.`,
+        } : {}),
+      },
     });
   } catch (err) {
     console.error('[admin/storage] PATCH (confirm) failed', err);

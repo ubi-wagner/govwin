@@ -109,15 +109,27 @@ export default function AdminFileManager() {
         }
         const { data: presign } = await presignRes.json();
 
-        // Step 2: Upload directly to S3 (bypasses Next.js body limit)
-        const uploadRes = await fetch(presign.url, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        // Step 2: Upload directly to S3 via XMLHttpRequest (supports progress)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', presign.url);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              setError(`Uploading ${file.name}: ${pct}% (${(e.loaded / 1024 / 1024).toFixed(1)}MB / ${(e.total / 1024 / 1024).toFixed(1)}MB)`);
+            }
+          };
+          xhr.onload = () => {
+            setError(null);
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`Direct upload failed: HTTP ${xhr.status}`));
+          };
+          xhr.onerror = () => reject(new Error('Upload failed — network error'));
+          xhr.ontimeout = () => reject(new Error('Upload timed out'));
+          xhr.timeout = 3600000; // 1 hour for very large files
+          xhr.send(file);
         });
-        if (!uploadRes.ok) {
-          throw new Error(`Direct upload failed: HTTP ${uploadRes.status}`);
-        }
 
         // Step 3: Confirm upload + trigger auto-ingest
         const confirmRes = await fetch('/api/admin/storage', {
@@ -132,10 +144,12 @@ export default function AdminFileManager() {
 
         const { data: confirm } = await confirmRes.json();
         if (confirm.sbirIngest && !confirm.sbirIngest.isDuplicate) {
-          setError(null); // clear any previous error
+          setError(null);
           alert(`SBIR data ingested: ${confirm.sbirIngest.rowCount} ${confirm.sbirIngest.fileType} records loaded`);
         } else if (confirm.sbirIngest?.isDuplicate) {
           alert('This SBIR data file was already ingested (duplicate detected by file hash)');
+        } else if (confirm.notice) {
+          alert(confirm.notice);
         }
       }
       await loadListing(currentPrefix);
