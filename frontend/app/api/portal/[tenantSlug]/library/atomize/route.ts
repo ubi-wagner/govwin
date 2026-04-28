@@ -32,7 +32,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   const sessionUser = session.user as {
@@ -42,11 +42,11 @@ export async function POST(request: Request, ctx: RouteContext) {
   };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   const { tenantSlug } = await ctx.params;
@@ -54,13 +54,13 @@ export async function POST(request: Request, ctx: RouteContext) {
   // Resolve tenant
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
-    return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
   }
   const tenantId = tenant.id as string;
 
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   // Find pending library units
@@ -234,7 +234,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   });
   } catch (err) {
     console.error('[library/atomize] Unexpected error', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }
 

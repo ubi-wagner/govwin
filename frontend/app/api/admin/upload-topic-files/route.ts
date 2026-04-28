@@ -35,11 +35,11 @@ function parseTopicFromFilename(filename: string): { topicNumber: string | null;
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
-    return NextResponse.json({ error: 'rfp_admin required' }, { status: 403 });
+    return NextResponse.json({ error: 'rfp_admin required', code: 'FORBIDDEN' }, { status: 403 });
   }
   const userId = (session.user as { id?: string }).id;
 
@@ -47,12 +47,12 @@ export async function POST(request: Request) {
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json({ error: 'Invalid multipart body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid multipart body', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   const solicitationId = String(formData.get('solicitationId') ?? '');
   if (!solicitationId) {
-    return NextResponse.json({ error: 'solicitationId required' }, { status: 400 });
+    return NextResponse.json({ error: 'solicitationId required', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   // Verify solicitation exists + get its primary opportunity for path generation
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     SELECT id, opportunity_id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
   `;
   if (solRows.length === 0) {
-    return NextResponse.json({ error: 'Solicitation not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
   }
   const oppId = solRows[0].opportunityId ?? solicitationId;
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     if (entry instanceof File) files.push(entry);
   }
   if (files.length === 0) {
-    return NextResponse.json({ error: 'At least one file required' }, { status: 422 });
+    return NextResponse.json({ error: 'At least one file required', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
 
   const uploaded: Array<{ documentId: string; topicNumber: string | null; title: string; filename: string }> = [];

@@ -23,7 +23,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const sessionUser = session.user as {
@@ -35,19 +35,19 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { tenantSlug, proposalId, sectionId } = await ctx.params;
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -55,15 +55,15 @@ export async function PUT(request: Request, ctx: RouteContext) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     if (body.content === undefined || body.content === null) {
-      return NextResponse.json({ error: 'content is required' }, { status: 400 });
+      return NextResponse.json({ error: 'content is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     if (typeof body.content !== 'object') {
-      return NextResponse.json({ error: 'content must be an object' }, { status: 400 });
+      return NextResponse.json({ error: 'content must be an object', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const newStatus = typeof body.status === 'string' &&
@@ -80,11 +80,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     `;
 
     if (!proposal) {
-      return NextResponse.json({ error: 'Proposal not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     if (proposal.isLocked) {
-      return NextResponse.json({ error: 'Proposal is locked' }, { status: 423 });
+      return NextResponse.json({ error: 'Proposal is locked', code: 'VALIDATION_ERROR' }, { status: 423 });
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
@@ -96,7 +96,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     `;
 
     if (!section) {
-      return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Update section ──────────────────────────────────────────────
@@ -144,7 +144,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/portal/proposals/sections/save] error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

@@ -21,7 +21,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const { slug } = await ctx.params;
 
     if (!slug || typeof slug !== 'string') {
-      return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing slug', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const [article] = await sql<{
@@ -49,12 +49,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     `;
 
     if (!article) {
-      return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Article not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     return NextResponse.json({ data: { article } });
   } catch (e) {
     console.error('[api/content/slug GET] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

@@ -6,16 +6,16 @@ export async function POST() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin') {
-      return NextResponse.json({ error: 'master_admin only' }, { status: 403 });
+      return NextResponse.json({ error: 'master_admin only', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const adminEmail = (session.user as { email?: string }).email;
     if (!adminEmail) {
-      return NextResponse.json({ error: 'No email in session' }, { status: 400 });
+      return NextResponse.json({ error: 'No email in session', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const hasClientId = !!process.env.GOOGLE_CLIENT_ID;
@@ -56,7 +56,7 @@ export async function POST() {
   } catch (err) {
     console.error('[api/admin/test-email] POST error:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

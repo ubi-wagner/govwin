@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     if (!company || company.trim().length === 0) {
       return NextResponse.json(
-        { error: 'company query parameter is required' },
+        { error: 'company query parameter is required', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error('[sbir-data/lookup] Error:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

@@ -16,11 +16,11 @@ export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const sources = await sql`
@@ -43,7 +43,7 @@ export async function GET() {
     return NextResponse.json({ data: { sources, recentActivity } });
   } catch (e) {
     console.error('[api/admin/sources GET] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }
 
@@ -53,23 +53,23 @@ export async function POST(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     let body: Record<string, unknown>;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Input validation ──────────────────────────────────────────
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
 
     if (!name || !siteType || !baseUrl) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, siteType, baseUrl' },
+        { error: 'Missing required fields: name, siteType, baseUrl', code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     const validSiteTypes = ['dsip', 'sam_gov', 'sbir_gov', 'grants_gov', 'afwerx', 'xtech', 'nsf', 'custom'];
     if (!validSiteTypes.includes(siteType)) {
       return NextResponse.json(
-        { error: `Invalid siteType. Must be one of: ${validSiteTypes.join(', ')}` },
+        { error: `Invalid siteType. Must be one of: ${validSiteTypes.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     `;
 
     await emitEventSingle({
-      namespace: 'admin',
+      namespace: 'finder',
       type: 'source.created',
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: { sourceId: row.id, name: row.name, siteType },
@@ -122,6 +122,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { id: row.id, name: row.name } });
   } catch (e) {
     console.error('[api/admin/sources POST] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

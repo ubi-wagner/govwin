@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const user = session.user as {
@@ -32,15 +32,15 @@ export async function POST(request: Request) {
 
     const role: Role | null = isRole(user.role) ? user.role : null;
     if (!role || !user.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     if (!user.tenantId) {
-      return NextResponse.json({ error: 'No tenant associated with user' }, { status: 400 });
+      return NextResponse.json({ error: 'No tenant associated with user', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Input validation ─────────────────────────────────────────
@@ -48,13 +48,13 @@ export async function POST(request: Request) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const productType = body.productType as ProductType | undefined;
     if (!productType || !VALID_PRODUCT_TYPES.includes(productType)) {
       return NextResponse.json(
-        { error: 'Invalid productType. Must be one of: finder_subscription, proposal_phase1, proposal_phase2' },
+        { error: 'Invalid productType. Must be one of: finder_subscription, proposal_phase1, proposal_phase2', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       !opportunityId
     ) {
       return NextResponse.json(
-        { error: 'opportunityId is required for proposal purchases' },
+        { error: 'opportunityId is required for proposal purchases', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       SELECT id, name, slug, billing_email FROM tenants WHERE id = ${user.tenantId}
     `;
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const customerEmail = tenant.billingEmail ?? user.email ?? '';
@@ -97,12 +97,12 @@ export async function POST(request: Request) {
     );
 
     if (!checkoutSession.url) {
-      return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create checkout session', code: 'DB_ERROR' }, { status: 500 });
     }
 
     return NextResponse.json({ data: { url: checkoutSession.url } });
   } catch (err) {
     console.error('[stripe/checkout] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

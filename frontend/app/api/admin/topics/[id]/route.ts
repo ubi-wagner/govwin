@@ -28,11 +28,11 @@ interface RouteContext {
 export async function PATCH(request: Request, ctx: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
-    return NextResponse.json({ error: 'rfp_admin role required' }, { status: 403 });
+    return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   const { id } = await ctx.params;
@@ -40,7 +40,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid input', details: parsed.error.issues },
+      { error: 'Invalid input', details: parsed.error.issues , code: 'VALIDATION_ERROR' },
       { status: 422 },
     );
   }
@@ -66,7 +66,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       RETURNING id, solicitation_id
     `;
     if (rows.length === 0) {
-      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Topic not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const userId = (session.user as { id?: string; email?: string }).id;
@@ -85,6 +85,6 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ data: { id, updated: true } });
   } catch (err) {
     console.error('[topics PATCH] failed', err);
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Update failed', code: 'DB_ERROR' }, { status: 500 });
   }
 }

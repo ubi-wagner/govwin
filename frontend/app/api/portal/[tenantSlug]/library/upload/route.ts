@@ -38,7 +38,7 @@ export async function POST(
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json(
-      { error: 'Authentication required' },
+      { error: 'Authentication required', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
@@ -51,7 +51,7 @@ export async function POST(
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
     return NextResponse.json(
-      { error: 'Invalid session' },
+      { error: 'Invalid session', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
@@ -59,7 +59,7 @@ export async function POST(
   // tenant_user or higher
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     return NextResponse.json(
-      { error: 'Insufficient permissions' },
+      { error: 'Insufficient permissions', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -68,7 +68,7 @@ export async function POST(
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
     return NextResponse.json(
-      { error: 'Tenant not found' },
+      { error: 'Tenant not found', code: 'NOT_FOUND' },
       { status: 404 },
     );
   }
@@ -77,7 +77,7 @@ export async function POST(
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     return NextResponse.json(
-      { error: 'Forbidden' },
+      { error: 'Forbidden', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -88,7 +88,7 @@ export async function POST(
     formData = await request.formData();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid multipart body' },
+      { error: 'Invalid multipart body', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -99,7 +99,7 @@ export async function POST(
   }
   if (files.length === 0) {
     return NextResponse.json(
-      { error: 'At least one file is required' },
+      { error: 'At least one file is required', code: 'VALIDATION_ERROR' },
       { status: 422 },
     );
   }
@@ -111,14 +111,14 @@ export async function POST(
     const ext = extFromFilename(f.name);
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return NextResponse.json(
-        { error: `Unsupported file type: .${ext} (allowed: ${ALLOWED_EXTENSIONS.join(', ')})` },
+        { error: `Unsupported file type: .${ext} (allowed: ${ALLOWED_EXTENSIONS.join(', ')})`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
   }
   if (totalBytes > MAX_TOTAL_BYTES) {
     return NextResponse.json(
-      { error: `Total upload size ${(totalBytes / 1024 / 1024).toFixed(1)}MB exceeds ${MAX_TOTAL_BYTES / 1024 / 1024}MB limit` },
+      { error: `Total upload size ${(totalBytes / 1024 / 1024).toFixed(1)}MB exceeds ${MAX_TOTAL_BYTES / 1024 / 1024}MB limit`, code: 'VALIDATION_ERROR' },
       { status: 413 },
     );
   }
@@ -155,7 +155,7 @@ export async function POST(
       const detail = err instanceof Error ? err.message : String(err);
       console.error('[library/upload] S3 put failed', { key: storageKey, err: detail });
       return NextResponse.json(
-        { error: 'File upload failed' },
+        { error: 'File upload failed', code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
@@ -186,7 +186,7 @@ export async function POST(
     } catch (err) {
       console.error('[library/upload] DB insert failed', err);
       return NextResponse.json(
-        { error: 'Failed to create library record' },
+        { error: 'Failed to create library record', code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
@@ -207,7 +207,7 @@ export async function POST(
   } catch (err) {
     console.error('[library/upload] Unexpected error', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

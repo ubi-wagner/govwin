@@ -27,22 +27,22 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Auth ────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     // ── Params ──────────────────────────────────────────────────────
     const { profileId } = await ctx.params;
     if (!UUID_RE.test(profileId)) {
-      return NextResponse.json({ error: 'Invalid profileId format' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Body ────────────────────────────────────────────────────────
@@ -50,13 +50,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const action = typeof body.action === 'string' ? body.action.trim() : '';
     if (!action || !(VALID_ACTIONS as readonly string[]).includes(action)) {
       return NextResponse.json(
-        { error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` },
+        { error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -80,7 +80,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       LIMIT 1
     `;
     if (!profile) {
-      return NextResponse.json({ error: 'Source profile not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Source profile not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Insert visit ────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Emit event ──────────────────────────────────────────────────
     await emitEventSingle({
-      namespace: 'admin',
+      namespace: 'finder',
       type: 'source.activity',
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: {
@@ -123,6 +123,6 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({ data: { visitId: visit.id } });
   } catch (e) {
     console.error('[api/admin/sources/[profileId]/visit POST] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

@@ -11,37 +11,37 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin') {
-      return NextResponse.json({ error: 'master_admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const { id } = await ctx.params;
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     let body: { status: string; note: string };
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const validStatuses = ['pending', 'under_review', 'accepted', 'rejected', 'withdrawn'];
     if (!validStatuses.includes(body.status)) {
       return NextResponse.json(
-        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
 
     if (!body.note || body.note.trim().length < 5) {
       return NextResponse.json(
-        { error: 'Audit note required (min 5 chars)' },
+        { error: 'Audit note required (min 5 chars)', code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -50,7 +50,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       SELECT id, status, company_name, contact_email FROM applications WHERE id = ${id} LIMIT 1
     `;
     if (!app) {
-      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Application not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const previousStatus = app.status;
@@ -84,6 +84,6 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
   } catch (e) {
     console.error('[api/admin/applications/status] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

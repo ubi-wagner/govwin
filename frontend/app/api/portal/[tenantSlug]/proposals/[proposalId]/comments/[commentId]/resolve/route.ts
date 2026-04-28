@@ -18,7 +18,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const sessionUser = session.user as {
@@ -30,19 +30,19 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { tenantSlug, proposalId, commentId } = await ctx.params;
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
@@ -54,7 +54,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     `;
 
     if (!proposal) {
-      return NextResponse.json({ error: 'Proposal not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Resolve the comment ──────────────────────────────────────────
@@ -67,7 +67,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     `;
 
     if (!comment) {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Comment not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Emit event ───────────────────────────────────────────────────
@@ -88,7 +88,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/portal/proposals/comments/resolve] error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

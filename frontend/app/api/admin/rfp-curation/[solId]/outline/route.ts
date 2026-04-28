@@ -143,6 +143,22 @@ export async function POST(
       );
     }
 
+    // Validate outline has expected shape: must be a non-array object with
+    // at least one key (e.g. volumes, sections, or title)
+    if (Array.isArray(outline)) {
+      return NextResponse.json(
+        { error: 'outline must be a JSON object, not an array', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+    const outlineKeys = Object.keys(outline as Record<string, unknown>);
+    if (outlineKeys.length === 0) {
+      return NextResponse.json(
+        { error: 'outline must not be empty', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
     const actorId = user.id!;
 
     // ── Verify solicitation exists ──────────────────────────────────

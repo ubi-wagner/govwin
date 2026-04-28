@@ -30,10 +30,31 @@ All services share one PostgreSQL database (govtech_intel) and one storage volum
 - `npx tsc --noEmit` must pass — zero type errors
 - No unhandled promises
 - No console.log — use console.error for error logging only
-- Return consistent shapes: `{ data: T }` success, `{ error: string }` failure
+- Return consistent shapes: `{ data: T }` success, `{ error: string, code: string }` failure
 - Auth checks first, then input validation, then business logic
 - Always verify tenant access before returning tenant-specific data
 - Parameterize all SQL queries (postgres.js tagged templates)
+- EVERY error response MUST include both `error` and `code` fields
+- EVERY `await sql` call MUST be inside try/catch
+- Portal routes MUST verify tenant access — never query by ID alone
+- Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
+- Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
+
+## SOP: Events
+- Namespaces: finder (admin), capture (customer), identity (auth only),
+  proposal (workspace), library (content), system (infra), tool (invocations)
+- NEVER use: admin, cms, spotlight as namespaces
+- Type format: entity.action_past_tense (snake_case)
+- Admin events: tenantId = null
+- Portal events: tenantId = actual tenant UUID
+
+## Engineering Reference
+See CLAUDE_CLIFFNOTES.md for:
+- Complete DB schema quick reference (all column names)
+- Canonical API route template
+- Common mistakes caught in audits (with fixes)
+- Event namespace rules
+- Architecture quick reference
 
 ## SOP: Security
 - Never trust client input — validate and sanitize

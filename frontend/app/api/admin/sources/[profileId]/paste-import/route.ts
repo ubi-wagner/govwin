@@ -287,22 +287,22 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     // ── Params ────────────────────────────────────────────────────
     const { profileId } = await ctx.params;
     if (!UUID_RE.test(profileId)) {
-      return NextResponse.json({ error: 'Invalid profileId format' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid profileId format', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Body ──────────────────────────────────────────────────────
@@ -310,17 +310,20 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const pastedContent = typeof body.pastedContent === 'string' ? body.pastedContent : '';
     const solicitationId = typeof body.solicitationId === 'string' ? body.solicitationId.trim() : '';
 
     if (!pastedContent.trim()) {
-      return NextResponse.json({ error: 'pastedContent is required' }, { status: 422 });
+      return NextResponse.json({ error: 'pastedContent is required', code: 'VALIDATION_ERROR' }, { status: 422 });
+    }
+    if (pastedContent.length > 500000) {
+      return NextResponse.json({ error: 'pastedContent exceeds 500KB size limit', code: 'VALIDATION_ERROR' }, { status: 413 });
     }
     if (!solicitationId || !UUID_RE.test(solicitationId)) {
-      return NextResponse.json({ error: 'Valid solicitationId (UUID) is required' }, { status: 422 });
+      return NextResponse.json({ error: 'Valid solicitationId (UUID) is required', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
     // ── Verify profile exists ─────────────────────────────────────
@@ -330,7 +333,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       LIMIT 1
     `;
     if (!profile) {
-      return NextResponse.json({ error: 'Source profile not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Source profile not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Verify solicitation exists ────────────────────────────────
@@ -349,7 +352,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       WHERE cs.id = ${solicitationId}::uuid
     `;
     if (solRows.length === 0) {
-      return NextResponse.json({ error: 'Solicitation not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
     }
     const parent = solRows[0];
 
@@ -358,7 +361,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     if (parsedTopics.length === 0) {
       return NextResponse.json(
-        { error: 'No topics could be parsed from the pasted content' },
+        { error: 'No topics could be parsed from the pasted content', code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -463,7 +466,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Emit event ────────────────────────────────────────────────
     await emitEventSingle({
-      namespace: 'admin',
+      namespace: 'finder',
       type: 'source.activity',
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: {
@@ -487,6 +490,6 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
   } catch (e) {
     console.error('[api/admin/sources/[profileId]/paste-import POST] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

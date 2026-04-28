@@ -13,20 +13,20 @@ import { emitEventSingle, systemActor } from '@/lib/events';
  */
 export async function POST(request: Request) {
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'Stripe not configured', code: 'DB_ERROR' }, { status: 500 });
   }
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     console.error('[stripe/webhook] STRIPE_WEBHOOK_SECRET not configured');
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'Webhook secret not configured', code: 'DB_ERROR' }, { status: 500 });
   }
 
   // ── Verify signature ────────────────────────────────────────────
   const body = await request.text();
   const sig = request.headers.get('stripe-signature');
   if (!sig) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+    return NextResponse.json({ error: 'Missing stripe-signature header', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   let event: Stripe.Event;
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
     console.error('[stripe/webhook] Signature verification failed:', err);
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid signature', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   // ── Handle events ───────────────────────────────────────────────
@@ -112,7 +112,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
     `;
     await emitEventSingle({
-      namespace: 'identity',
+      namespace: 'capture',
       type: 'subscription.created',
       actor: systemActor('stripe-webhook'),
       tenantId,
@@ -157,7 +157,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   `;
 
   await emitEventSingle({
-    namespace: 'identity',
+    namespace: 'capture',
     type: 'subscription.renewed',
     actor: systemActor('stripe-webhook'),
     tenantId: tenant.id,
@@ -182,7 +182,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   `;
 
   await emitEventSingle({
-    namespace: 'identity',
+    namespace: 'capture',
     type: 'subscription.canceled',
     actor: systemActor('stripe-webhook'),
     tenantId: tenant.id,

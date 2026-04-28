@@ -20,7 +20,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const sessionUser = session.user as {
@@ -31,19 +31,19 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
@@ -55,7 +55,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     `;
 
     if (!proposal) {
-      return NextResponse.json({ error: 'Proposal not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Optional nodeId filter ───────────────────────────────────────
@@ -127,7 +127,7 @@ export async function GET(request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/portal/proposals/comments] GET error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }
@@ -145,7 +145,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const sessionUser = session.user as {
@@ -157,19 +157,19 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -177,15 +177,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     if (typeof body.nodeId !== 'string' || !body.nodeId.trim()) {
-      return NextResponse.json({ error: 'nodeId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'nodeId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     if (typeof body.text !== 'string' || !body.text.trim()) {
-      return NextResponse.json({ error: 'text is required' }, { status: 400 });
+      return NextResponse.json({ error: 'text is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const nodeId = body.nodeId.trim();
@@ -200,7 +200,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     if (!proposal) {
-      return NextResponse.json({ error: 'Proposal not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Insert comment ───────────────────────────────────────────────
@@ -236,7 +236,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/portal/proposals/comments] POST error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

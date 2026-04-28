@@ -13,7 +13,7 @@ export async function POST() {
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const user = session.user as {
@@ -25,15 +25,15 @@ export async function POST() {
 
     const role: Role | null = isRole(user.role) ? user.role : null;
     if (!role || !user.id) {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     if (!user.tenantId) {
-      return NextResponse.json({ error: 'No tenant associated with user' }, { status: 400 });
+      return NextResponse.json({ error: 'No tenant associated with user', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Business logic ───────────────────────────────────────────
@@ -41,12 +41,12 @@ export async function POST() {
       SELECT stripe_customer_id, slug FROM tenants WHERE id = ${user.tenantId}
     `;
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     if (!tenant.stripeCustomerId) {
       return NextResponse.json(
-        { error: 'No billing account found. Please subscribe first.' },
+        { error: 'No billing account found. Please subscribe first.', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -61,6 +61,6 @@ export async function POST() {
     return NextResponse.json({ data: { url: portalSession.url } });
   } catch (err) {
     console.error('[stripe/portal] Error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

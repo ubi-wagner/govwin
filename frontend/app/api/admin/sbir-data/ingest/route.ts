@@ -371,15 +371,15 @@ export async function POST(request: Request) {
     // 1. Auth check
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'master_admin or rfp_admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     // 2. Support two modes:
@@ -394,12 +394,12 @@ export async function POST(request: Request) {
       const body = await request.json();
       const s3Key = body.s3Key;
       if (!s3Key || typeof s3Key !== 'string') {
-        return NextResponse.json({ error: 'Missing s3Key in JSON body' }, { status: 400 });
+        return NextResponse.json({ error: 'Missing s3Key in JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const { getObjectBuffer } = await import('@/lib/storage/s3-client');
       const buf = await getObjectBuffer(s3Key);
       if (!buf) {
-        return NextResponse.json({ error: `File not found in S3: ${s3Key}` }, { status: 404 });
+        return NextResponse.json({ error: `File not found in S3: ${s3Key}`, code: 'NOT_FOUND' }, { status: 404 });
       }
       fileBuffer = Buffer.from(buf);
       filename = s3Key.split('/').pop() || 'unknown.csv';
@@ -408,7 +408,7 @@ export async function POST(request: Request) {
       const formData = await request.formData();
       const file = formData.get('file');
       if (!file || !(file instanceof File)) {
-        return NextResponse.json({ error: 'Missing file field' }, { status: 400 });
+        return NextResponse.json({ error: 'Missing file field', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       filename = file.name || 'unknown.csv';
       fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -425,7 +425,7 @@ export async function POST(request: Request) {
     `;
     if (existingUpload) {
       return NextResponse.json(
-        { error: `This file has already been uploaded (matched ${existingUpload.filename})` },
+        { error: `This file has already been uploaded (matched ${existingUpload.filename})`, code: 'VALIDATION_ERROR' },
         { status: 409 },
       );
     }
@@ -434,7 +434,7 @@ export async function POST(request: Request) {
     const lines = splitLines(fileText);
     const headerResult = lines.next();
     if (headerResult.done || !headerResult.value.trim()) {
-      return NextResponse.json({ error: 'CSV file is empty or has no header row' }, { status: 400 });
+      return NextResponse.json({ error: 'CSV file is empty or has no header row', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const headerLine = headerResult.value;
@@ -456,7 +456,7 @@ export async function POST(request: Request) {
       headerMap = COMPANY_HEADER_MAP;
     } else {
       return NextResponse.json(
-        { error: 'Unable to detect file type. Expected headers like "Award Title", "Award Amount", or "Number Awards".' },
+        { error: 'Unable to detect file type. Expected headers like "Award Title", "Award Amount", or "Number Awards".', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[api/admin/sbir-data/ingest] POST error:', msg);
     return NextResponse.json(
-      { error: `Ingest failed: ${msg.slice(0, 500)}` },
+      { error: `Ingest failed: ${msg.slice(0, 500)}`, code: 'DB_ERROR' },
       { status: 500 },
     );
   }
@@ -545,11 +545,11 @@ export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
-      return NextResponse.json({ error: 'master_admin or rfp_admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const uploads = await sql`
@@ -560,7 +560,7 @@ export async function GET() {
   } catch (e) {
     console.error('[api/admin/sbir-data/ingest] GET error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

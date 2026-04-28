@@ -34,7 +34,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Auth ──────────────────────────────────────────────────────────
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const sessionUser = session.user as {
@@ -46,24 +46,24 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !hasRoleAtLeast(role, 'tenant_admin')) {
-      return NextResponse.json({ error: 'tenant_admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'tenant_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = sessionUser.id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { tenantSlug } = await ctx.params;
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(userId, role, tenantId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied' }, { status: 403 });
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -71,12 +71,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const topicId = body.topicId;
     if (typeof topicId !== 'string' || !topicId.trim()) {
-      return NextResponse.json({ error: 'topicId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'topicId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     const validProductTypes = ['proposal_phase1', 'proposal_phase2'] as const;
@@ -102,12 +102,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     if (!topic) {
-      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Topic not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     if (!topic.solicitationId) {
       return NextResponse.json(
-        { error: 'Topic has no linked solicitation' },
+        { error: 'Topic has no linked solicitation', code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -121,7 +121,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
     if (existing) {
       return NextResponse.json(
-        { error: 'Proposal already exists for this topic' },
+        { error: 'Proposal already exists for this topic', code: 'VALIDATION_ERROR' },
         { status: 409 },
       );
     }
@@ -292,7 +292,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/portal/proposals/create] error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }
