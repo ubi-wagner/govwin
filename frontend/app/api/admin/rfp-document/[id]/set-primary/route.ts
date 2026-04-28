@@ -32,6 +32,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
 
   const { id } = await ctx.params;
 
+  try {
   // Look up the document to find its solicitation_id
   const docRows = await sql<{ id: string; solicitationId: string; isPrimary: boolean }[]>`
     SELECT id, solicitation_id, is_primary
@@ -46,8 +47,6 @@ export async function POST(_req: Request, ctx: RouteContext) {
   }
 
   const doc = docRows[0];
-
-  try {
     // Clear all primary flags for this solicitation, then set the new one
     await sql`
       UPDATE solicitation_documents

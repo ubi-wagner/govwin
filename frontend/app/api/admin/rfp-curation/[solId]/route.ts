@@ -71,30 +71,38 @@ export async function GET(
     // ── Fetch related data in parallel ──────────────────────────────
     const [topics, documents, volumes, compliance] = await Promise.all([
       sql`
-        SELECT * FROM opportunity_topics
-        WHERE opportunity_id = ${solicitation.opportunityId}::uuid
+        SELECT id, topic_number, title, topic_branch, topic_status,
+               tech_focus_areas, close_date, is_active, created_at
+        FROM opportunities
+        WHERE solicitation_id = ${solId}::uuid
         ORDER BY topic_number ASC NULLS LAST, created_at ASC
       `,
       sql`
-        SELECT * FROM solicitation_documents
+        SELECT id, document_type, original_filename, storage_key,
+               file_size, content_type, extracted_at, is_primary, created_at
+        FROM solicitation_documents
         WHERE solicitation_id = ${solId}::uuid
-        ORDER BY created_at ASC
+        ORDER BY is_primary DESC, created_at ASC
       `,
       sql`
-        SELECT v.*, json_agg(
-          json_build_object(
-            'id', ri.id,
-            'label', ri.label,
-            'description', ri.description,
-            'itemOrder', ri.item_order,
-            'required', ri.required
-          ) ORDER BY ri.item_order ASC
-        ) FILTER (WHERE ri.id IS NOT NULL) AS required_items
+        SELECT v.id, v.volume_number, v.volume_name, v.volume_format,
+               v.description, v.special_requirements,
+               json_agg(
+                 json_build_object(
+                   'id', ri.id,
+                   'itemName', ri.item_name,
+                   'itemNumber', ri.item_number,
+                   'itemType', ri.item_type,
+                   'required', ri.required,
+                   'pageLimit', ri.page_limit,
+                   'slideLimit', ri.slide_limit
+                 ) ORDER BY ri.item_number ASC
+               ) FILTER (WHERE ri.id IS NOT NULL) AS required_items
         FROM solicitation_volumes v
         LEFT JOIN volume_required_items ri ON ri.volume_id = v.id
         WHERE v.solicitation_id = ${solId}::uuid
         GROUP BY v.id
-        ORDER BY v.volume_order ASC
+        ORDER BY v.volume_number ASC
       `,
       sql`
         SELECT * FROM solicitation_compliance

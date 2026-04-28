@@ -108,6 +108,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       actorId={userId}
       actorName={userName}
       readOnly={proposal.isLocked}
+      tenantSlug={tenantSlug}
     />
   );
 }

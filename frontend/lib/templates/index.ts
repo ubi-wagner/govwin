@@ -50,19 +50,15 @@ export function resolveTemplateKey(
   programType: string,
   itemType: string,
 ): string | null {
+  let key: string | null = null;
   if (itemType === 'slide_deck') {
-    if (programType === 'cso') return 'dod-cso-phase1-briefing';
-    return null;
+    if (programType === 'cso') key = 'dod-cso-phase1-briefing';
+  } else if (itemType === 'word_doc' || itemType === 'pdf' || itemType === 'text') {
+    if (programType === 'sbir_phase_1') key = 'dod-sbir-phase1-technical';
+    if (programType === 'sbir_phase_2') key = 'dod-sbir-phase2-technical';
   }
-  if (itemType === 'spreadsheet') {
-    return null;
-  }
-  if (itemType === 'word_doc' || itemType === 'pdf' || itemType === 'text') {
-    if (programType === 'sbir_phase_1') return 'dod-sbir-phase1-technical';
-    if (programType === 'sbir_phase_2') return 'dod-sbir-phase2-technical';
-    return null;
-  }
-  return null;
+  if (key && !TEMPLATE_MAP[key]) return null;
+  return key;
 }
 
 /**
