@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     if (!company || company.trim().length === 0) {
       return NextResponse.json(
-        { error: 'company query parameter is required' },
+        { error: 'company query parameter is required', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -64,7 +64,8 @@ export async function GET(request: Request) {
 
     if (!companyRow && domain && domain.trim().length > 0) {
       // Strategy 2: domain ILIKE match on company_url
-      const domainPattern = `%${domain.trim()}%`;
+      const escapedDomain = domain.trim().replace(/[%_\\]/g, '\\$&');
+      const domainPattern = `%${escapedDomain}%`;
       const rows = await sql`
         SELECT id, company_name, uei, duns, address1, address2, city, state, zip,
                country, company_url, hubzone_owned, woman_owned, disadvantaged,
@@ -105,7 +106,8 @@ export async function GET(request: Request) {
     }
 
     if (awards.length === 0 && domain && domain.trim().length > 0) {
-      const domainPattern = `%${domain.trim()}%`;
+      const escapedDomain = domain.trim().replace(/[%_\\]/g, '\\$&');
+      const domainPattern = `%${escapedDomain}%`;
       awards = await sql`
         SELECT award_title, agency, branch, phase, program, award_year,
                award_amount, topic_code, abstract, uei, company_name,
@@ -162,7 +164,7 @@ export async function GET(request: Request) {
   } catch (err) {
     console.error('[sbir-data/lookup] Error:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

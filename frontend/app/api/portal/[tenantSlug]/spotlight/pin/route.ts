@@ -24,7 +24,7 @@ interface RouteContext {
 async function resolveAuth(ctx: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return { error: NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }) };
+    return { error: NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   }
 
   const sessionUser = session.user as {
@@ -34,23 +34,23 @@ async function resolveAuth(ctx: RouteContext) {
   };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
-    return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
+    return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   }
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
-    return { error: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) };
+    return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
   }
 
   const { tenantSlug } = await ctx.params;
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
-    return { error: NextResponse.json({ error: 'Tenant not found' }, { status: 404 }) };
+    return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   }
 
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
-    return { error: NextResponse.json({ error: 'Access denied' }, { status: 403 }) };
+    return { error: NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 }) };
   }
 
   return { tenantId, userId: sessionUser.id };
@@ -65,13 +65,13 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid input', details: parsed.error.issues },
+      { error: 'Invalid input', details: parsed.error.issues , code: 'VALIDATION_ERROR' },
       { status: 422 },
     );
   }
@@ -84,7 +84,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       SELECT id FROM opportunities WHERE id = ${opportunityId}
     `;
     if (!opp) {
-      return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Opportunity not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // Upsert — if already exists, just set is_pinned=true
@@ -96,7 +96,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     await emitEventSingle({
-      namespace: 'spotlight',
+      namespace: 'capture',
       type: 'topic_pinned',
       actor: { type: 'user', id: userId },
       tenantId,
@@ -106,7 +106,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({ data: { pinned: true, opportunityId } });
   } catch (e) {
     console.error('[spotlight/pin POST] Error:', e);
-    return NextResponse.json({ error: 'Failed to pin topic' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to pin topic', code: 'STORAGE_ERROR' }, { status: 500 });
   }
 }
 
@@ -119,13 +119,13 @@ export async function DELETE(request: Request, ctx: RouteContext) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid input', details: parsed.error.issues },
+      { error: 'Invalid input', details: parsed.error.issues , code: 'VALIDATION_ERROR' },
       { status: 422 },
     );
   }
@@ -139,7 +139,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     `;
 
     await emitEventSingle({
-      namespace: 'spotlight',
+      namespace: 'capture',
       type: 'topic_unpinned',
       actor: { type: 'user', id: userId },
       tenantId,
@@ -149,6 +149,6 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     return NextResponse.json({ data: { pinned: false, opportunityId } });
   } catch (e) {
     console.error('[spotlight/pin DELETE] Error:', e);
-    return NextResponse.json({ error: 'Failed to unpin topic' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to unpin topic', code: 'STORAGE_ERROR' }, { status: 500 });
   }
 }

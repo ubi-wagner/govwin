@@ -71,13 +71,14 @@ export default async function CurationWorkspacePage({ params }: Props) {
     fileSize: number | null;
     contentType: string | null;
     extractedAt: Date | null;
+    isPrimary: boolean;
     createdAt: Date;
   }[]>`
     SELECT id, document_type, original_filename, storage_key,
-           file_size, content_type, extracted_at, created_at
+           file_size, content_type, extracted_at, is_primary, created_at
     FROM solicitation_documents
     WHERE solicitation_id = ${solId}::uuid
-    ORDER BY created_at ASC
+    ORDER BY is_primary DESC, created_at ASC
   `;
 
   // Volumes with their required items (joined in one query)
@@ -246,6 +247,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
     fileSize: d.fileSize,
     contentType: d.contentType,
     extractedAt: d.extractedAt?.toISOString() ?? null,
+    isPrimary: d.isPrimary,
     createdAt: d.createdAt.toISOString(),
   }));
 
@@ -259,6 +261,68 @@ export default async function CurationWorkspacePage({ params }: Props) {
     appliesToPhase: v.appliesToPhase,
     items: v.items ?? [],
   }));
+
+  // Customer Interest: tenants who have pinned topics under this solicitation
+  let customerInterest: {
+    tenantId: string;
+    tenantName: string;
+    tenantSlug: string;
+    topicNumber: string | null;
+    topicTitle: string;
+    isPinned: boolean;
+    pinnedAt: string;
+    proposalId: string | null;
+    proposalStage: string | null;
+    proposalCreatedAt: string | null;
+  }[] = [];
+
+  try {
+    const interestRows = await sql<{
+      tenantId: string;
+      tenantName: string;
+      tenantSlug: string;
+      topicNumber: string | null;
+      topicTitle: string;
+      isPinned: boolean;
+      pinnedAt: Date;
+      proposalId: string | null;
+      proposalStage: string | null;
+      proposalCreatedAt: Date | null;
+    }[]>`
+      SELECT
+        t.id AS tenant_id,
+        t.name AS tenant_name,
+        t.slug AS tenant_slug,
+        o.topic_number,
+        o.title AS topic_title,
+        tpi.is_pinned,
+        tpi.created_at AS pinned_at,
+        p.id AS proposal_id,
+        p.stage AS proposal_stage,
+        p.created_at AS proposal_created_at
+      FROM opportunities o
+      JOIN tenant_pipeline_items tpi ON tpi.opportunity_id = o.id AND tpi.is_pinned = true
+      JOIN tenants t ON t.id = tpi.tenant_id
+      LEFT JOIN proposals p ON p.opportunity_id = o.id AND p.tenant_id = tpi.tenant_id
+      WHERE o.solicitation_id = ${solId}::uuid
+      ORDER BY tpi.created_at DESC
+    `;
+
+    customerInterest = interestRows.map((row) => ({
+      tenantId: row.tenantId,
+      tenantName: row.tenantName,
+      tenantSlug: row.tenantSlug,
+      topicNumber: row.topicNumber,
+      topicTitle: row.topicTitle,
+      isPinned: row.isPinned,
+      pinnedAt: row.pinnedAt.toISOString(),
+      proposalId: row.proposalId,
+      proposalStage: row.proposalStage,
+      proposalCreatedAt: row.proposalCreatedAt?.toISOString() ?? null,
+    }));
+  } catch (err) {
+    console.error('[CurationWorkspacePage] customer interest query failed:', err);
+  }
 
   // Persisted annotations (compliance tags on the source PDF)
   const annotationRows = await sql<{
@@ -292,6 +356,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
       documents={documents}
       volumes={volumes}
       initialAnnotations={initialAnnotations}
+      customerInterest={customerInterest}
       currentUserId={session.user.id ?? ''}
     />
   );

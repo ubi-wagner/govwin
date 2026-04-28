@@ -10,6 +10,9 @@
 # DB
 asyncpg>=0.29.0
 
+# Password hashing (master_admin bootstrap seed)
+bcrypt>=4.1.0
+
 # HTTP client (ingesters)
 httpx>=0.27.0
 

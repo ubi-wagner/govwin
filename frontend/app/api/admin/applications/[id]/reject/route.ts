@@ -13,17 +13,17 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'master_admin') {
-      return NextResponse.json({ error: 'master_admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const { id } = await ctx.params;
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     // Parse body for rejection reason (required)
@@ -38,7 +38,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     if (!reason || reason.length < 10) {
-      return NextResponse.json({ error: 'Review notes are required (min 10 chars)' }, { status: 422 });
+      return NextResponse.json({ error: 'Review notes are required (min 10 chars)', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
     // Verify application exists and is actionable
@@ -50,11 +50,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     if (!app) {
-      return NextResponse.json({ error: 'Application not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Application not found', code: 'NOT_FOUND' }, { status: 404 });
     }
     if (app.status !== 'pending' && app.status !== 'under_review') {
       return NextResponse.json(
-        { error: `Application is already ${app.status}` },
+        { error: `Application is already ${app.status}`, code: 'VALIDATION_ERROR' },
         { status: 409 },
       );
     }
@@ -97,7 +97,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   } catch (e) {
     console.error('[api/admin/applications/reject] error:', e);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

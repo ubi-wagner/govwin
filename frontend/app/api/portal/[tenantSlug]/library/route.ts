@@ -20,7 +20,7 @@ export async function GET(
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json(
-      { error: 'Authentication required' },
+      { error: 'Authentication required', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
@@ -33,14 +33,14 @@ export async function GET(
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
     return NextResponse.json(
-      { error: 'Invalid session' },
+      { error: 'Invalid session', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     return NextResponse.json(
-      { error: 'Insufficient permissions' },
+      { error: 'Insufficient permissions', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -49,7 +49,7 @@ export async function GET(
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
     return NextResponse.json(
-      { error: 'Tenant not found' },
+      { error: 'Tenant not found', code: 'NOT_FOUND' },
       { status: 404 },
     );
   }
@@ -58,7 +58,7 @@ export async function GET(
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     return NextResponse.json(
-      { error: 'Forbidden' },
+      { error: 'Forbidden', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -78,7 +78,7 @@ export async function GET(
   // Validate status if provided
   if (status && !['draft', 'approved', 'archived'].includes(status)) {
     return NextResponse.json(
-      { error: 'Invalid status. Must be one of: draft, approved, archived' },
+      { error: 'Invalid status. Must be one of: draft, approved, archived', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -107,25 +107,35 @@ export async function GET(
       (acc, fragment, i) => (i === 0 ? fragment : sql`${acc} AND ${fragment}`),
     );
 
-    const [countResult] = await sql<{ count: string }[]>`
-      SELECT count(*)::text AS count FROM library_units WHERE ${where}
-    `;
-    const total = parseInt(countResult.count, 10);
+    let total: number;
+    let units: Record<string, unknown>[];
+    try {
+      const [countResult] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM library_units WHERE ${where}
+      `;
+      total = parseInt(countResult.count, 10);
 
-    const units = await sql`
-      SELECT *
-      FROM library_units
-      WHERE ${where}
-      ORDER BY outcome_score DESC NULLS LAST, usage_count DESC, created_at DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `;
+      units = await sql`
+        SELECT *
+        FROM library_units
+        WHERE ${where}
+        ORDER BY outcome_score DESC NULLS LAST, usage_count DESC, created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
+    } catch (dbErr) {
+      console.error('[library/list] DB query failed', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to query library units', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ data: { units, total } });
   } catch (err) {
     console.error('[library/list] error', err);
     return NextResponse.json(
-      { error: 'Failed to fetch library units' },
+      { error: 'Failed to fetch library units', code: 'STORAGE_ERROR' },
       { status: 500 },
     );
   }
@@ -142,7 +152,7 @@ export async function POST(
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json(
-      { error: 'Authentication required' },
+      { error: 'Authentication required', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
@@ -155,7 +165,7 @@ export async function POST(
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
     return NextResponse.json(
-      { error: 'Invalid session' },
+      { error: 'Invalid session', code: 'UNAUTHENTICATED' },
       { status: 401 },
     );
   }
@@ -163,7 +173,7 @@ export async function POST(
   // Bulk operations require tenant_admin or above
   if (!hasRoleAtLeast(role, 'tenant_admin')) {
     return NextResponse.json(
-      { error: 'Insufficient permissions' },
+      { error: 'Insufficient permissions', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -172,7 +182,7 @@ export async function POST(
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
     return NextResponse.json(
-      { error: 'Tenant not found' },
+      { error: 'Tenant not found', code: 'NOT_FOUND' },
       { status: 404 },
     );
   }
@@ -181,7 +191,7 @@ export async function POST(
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     return NextResponse.json(
-      { error: 'Forbidden' },
+      { error: 'Forbidden', code: 'FORBIDDEN' },
       { status: 403 },
     );
   }
@@ -197,7 +207,7 @@ export async function POST(
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid JSON body' },
+      { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -207,7 +217,7 @@ export async function POST(
   // ---------- Validate ----------
   if (!action || !Array.isArray(unitIds) || unitIds.length === 0) {
     return NextResponse.json(
-      { error: 'action (string) and unitIds (non-empty array) are required' },
+      { error: 'action (string) and unitIds (non-empty array) are required', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -215,21 +225,21 @@ export async function POST(
   const validActions = ['approve', 'archive', 'delete', 'set_category', 'add_tags'];
   if (!validActions.includes(action)) {
     return NextResponse.json(
-      { error: `Invalid action. Must be one of: ${validActions.join(', ')}` },
+      { error: `Invalid action. Must be one of: ${validActions.join(', ')}`, code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
 
   if (action === 'set_category' && (!newCategory || typeof newCategory !== 'string')) {
     return NextResponse.json(
-      { error: 'category (string) is required for set_category action' },
+      { error: 'category (string) is required for set_category action', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
 
   if (action === 'add_tags' && (!Array.isArray(newTags) || newTags.length === 0)) {
     return NextResponse.json(
-      { error: 'tags (non-empty array) is required for add_tags action' },
+      { error: 'tags (non-empty array) is required for add_tags action', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -279,7 +289,7 @@ export async function POST(
 
       default:
         return NextResponse.json(
-          { error: 'Unhandled action' },
+          { error: 'Unhandled action', code: 'VALIDATION_ERROR' },
           { status: 400 },
         );
     }
@@ -296,7 +306,7 @@ export async function POST(
   } catch (err) {
     console.error('[library/bulk] error', err);
     return NextResponse.json(
-      { error: 'Bulk operation failed' },
+      { error: 'Bulk operation failed', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

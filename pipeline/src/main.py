@@ -48,6 +48,14 @@ def handle_signal(sig: signal.Signals) -> None:
 async def main() -> None:
     log.info("RFP Pipeline worker starting...")
 
+    # Bootstrap seed: ensure a master_admin user exists so the
+    # platform has a working login immediately after deploy.
+    try:
+        from seeds.master_admin import seed_master_admin
+        await seed_master_admin(DATABASE_URL)
+    except Exception as exc:
+        log.error("master_admin seed failed (non-fatal): %s", exc)
+
     # Import here so the logging config above is already set
     from ingest.dispatcher import run_consumer_loop
 

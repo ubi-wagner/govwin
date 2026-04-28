@@ -32,7 +32,7 @@ const WELL_KNOWN: Record<string, string[]> = {
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
   if (!variableName) {
     return NextResponse.json(
-      { error: 'variableName query param required' },
+      { error: 'variableName query param required', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }

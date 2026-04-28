@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       `;
 
       if (!article) {
-        return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Article not found', code: 'NOT_FOUND' }, { status: 404 });
       }
 
       return NextResponse.json({ data: { article } });
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: { articles } });
   } catch (e) {
     console.error('[api/admin/content GET] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }
 
@@ -89,23 +89,23 @@ export async function POST(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'rfp_admin' && role !== 'master_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     let body: Record<string, unknown>;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // Input validation
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 
     if (!slug || !title || !contentType || !articleBody) {
       return NextResponse.json(
-        { error: 'Missing required fields: slug, title, contentType, body' },
+        { error: 'Missing required fields: slug, title, contentType, body', code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
     const validTypes = ['blog_post', 'resource', 'guide', 'announcement', 'faq'];
     if (!validTypes.includes(contentType)) {
       return NextResponse.json(
-        { error: `Invalid contentType. Must be one of: ${validTypes.join(', ')}` },
+        { error: `Invalid contentType. Must be one of: ${validTypes.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
 
     const eventType = published ? 'cms.content.published' : 'cms.content.updated';
     await emitEventSingle({
-      namespace: 'cms',
+      namespace: 'finder',
       type: eventType,
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: { slug, title, contentType },
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { id: row.id, slug } });
   } catch (e) {
     console.error('[api/admin/content POST] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }
 
@@ -188,22 +188,22 @@ export async function DELETE(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
     if (role !== 'rfp_admin' && role !== 'master_admin') {
-      return NextResponse.json({ error: 'Admin role required' }, { status: 403 });
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
-      return NextResponse.json({ error: 'Missing user id in session' }, { status: 401 });
+      return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
     if (!slug) {
-      return NextResponse.json({ error: 'Missing required param: slug' }, { status: 422 });
+      return NextResponse.json({ error: 'Missing required param: slug', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
     const rows = await sql<{ id: string }[]>`
@@ -211,11 +211,11 @@ export async function DELETE(request: Request) {
     `;
 
     if (rows.length === 0) {
-      return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Article not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     await emitEventSingle({
-      namespace: 'cms',
+      namespace: 'finder',
       type: 'cms.content.deleted',
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: { slug, deletedId: rows[0].id },
@@ -224,6 +224,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ data: { deleted: true } });
   } catch (e) {
     console.error('[api/admin/content DELETE] error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

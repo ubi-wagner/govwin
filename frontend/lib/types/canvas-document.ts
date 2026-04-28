@@ -141,14 +141,20 @@ export interface TableCell {
   rowSpan?: number;
   colSpan?: number;
   style?: TableCellStyle;
+  formula?: string;
+  number_format?: string;
+  cell_type?: 'text' | 'number' | 'currency' | 'percent' | 'formula';
+  value?: number | null;
 }
 
 export interface TableContent {
   headers: (string | TableCell)[];
   rows: (string | TableCell)[][];
   column_widths?: number[];
-  header_style?: TableCellStyle;  // default style for header row
+  header_style?: TableCellStyle;
   border_style?: 'none' | 'single' | 'double';
+  sheet_name?: string;
+  is_spreadsheet?: boolean;
 }
 
 export interface CaptionContent {

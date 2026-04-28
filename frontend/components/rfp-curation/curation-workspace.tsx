@@ -58,6 +58,7 @@ interface SolDocument {
   fileSize: number | null;
   contentType: string | null;
   extractedAt: string | null;
+  isPrimary: boolean;
   createdAt: string;
 }
 
@@ -108,6 +109,19 @@ interface InitialAnnotation {
   complianceVariableName: string | null;
 }
 
+interface CustomerInterestItem {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  topicNumber: string | null;
+  topicTitle: string;
+  isPinned: boolean;
+  pinnedAt: string;
+  proposalId: string | null;
+  proposalStage: string | null;
+  proposalCreatedAt: string | null;
+}
+
 interface Props {
   solicitation: Solicitation;
   compliance: Record<string, unknown> | null;
@@ -117,6 +131,7 @@ interface Props {
   documents: SolDocument[];
   volumes: Volume[];
   initialAnnotations: InitialAnnotation[];
+  customerInterest: CustomerInterestItem[];
   currentUserId: string;
 }
 
@@ -155,7 +170,7 @@ function snakeCase(s: string): string {
 
 export function CurationWorkspace({
   solicitation, compliance, triageHistory, activityEvents,
-  topics, documents, volumes, initialAnnotations, currentUserId,
+  topics, documents, volumes, initialAnnotations, customerInterest, currentUserId,
 }: Props) {
   const { invoke, loading, error } = useTool();
   const router = useRouter();
@@ -385,10 +400,12 @@ export function CurationWorkspace({
     }
   }, [invoke, sol.id, currentUserId, saveAnnotation]);
 
-  // Find the first source document (PDF) for the viewer
-  const sourcePdf = documents.find(
-    (d) => d.documentType === 'source' && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')),
-  );
+  // Find the primary document (or first source PDF) for the viewer
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const sourcePdf = activeDocId
+    ? documents.find((d) => d.id === activeDocId)
+    : documents.find((d) => d.isPrimary && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')))
+      ?? documents.find((d) => d.documentType === 'source' && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')));
 
   const actions = STATUS_FLOW[sol.status] ?? [];
   const isMyClaimOrUnclaimed =
@@ -574,6 +591,26 @@ export function CurationWorkspace({
         </div>
       </div>
 
+      {/* Quick-nav tabs */}
+      <nav className="flex items-center gap-1 mb-6 border-b pb-2">
+        {[
+          { label: 'Documents', target: 'section-documents' },
+          { label: 'Topics', target: 'section-topics' },
+          { label: 'Compliance', target: 'section-compliance' },
+          { label: 'Customer Interest', target: 'section-customer-interest' },
+        ].map((tab) => (
+          <button
+            key={tab.target}
+            onClick={() =>
+              document.getElementById(tab.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+            className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
           {error}
@@ -605,67 +642,18 @@ export function CurationWorkspace({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Solicitation text + AI sections */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Source Documents */}
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Source Documents</h2>
-              <span className="text-xs text-gray-500">
-                {documents.length} file{documents.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            {documents.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                No documents uploaded yet. Upload RFP PDFs + attachments via the{' '}
-                <a href="/admin/rfp-curation/upload" className="text-blue-600 hover:text-blue-800 underline">
-                  upload page
-                </a>.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {documents.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 text-sm">
-                    <div className="flex-1 min-w-0">
-                      <span className="inline-block w-20 text-xs font-mono text-gray-500">
-                        {d.documentType}
-                      </span>
-                      <span className="text-gray-800 truncate">{d.originalFilename}</span>
-                      {d.fileSize && (
-                        <span className="ml-2 text-xs text-gray-400">
-                          {(d.fileSize / 1024 / 1024).toFixed(2)} MB
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {d.extractedAt ? (
-                        <span className="text-xs text-green-600">extracted</span>
-                      ) : (
-                        <span className="text-xs text-yellow-600">pending</span>
-                      )}
-                      <button
-                        onClick={async () => {
-                          try {
-                            const resp = await fetch(
-                              `/api/admin/rfp-document/${d.id}/signed-url`,
-                            );
-                            const json = await resp.json();
-                            if (json.data?.url) window.open(json.data.url, '_blank');
-                          } catch {
-                            alert('Failed to generate signed URL');
-                          }
-                        }}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {/* Source Documents — multi-document view with inline upload */}
+          <div id="section-documents" />
+          <DocumentsSection
+            solicitationId={sol.id}
+            documents={documents}
+            activeDocId={activeDocId}
+            onSelectDocument={(docId) => setActiveDocId(docId)}
+            onDocumentsChanged={() => router.refresh()}
+          />
 
           {/* Topics — the pursuable units under this solicitation */}
-          <div className="border rounded-lg p-4">
+          <div id="section-topics" className="border rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-lg font-semibold">Topics</h2>
@@ -930,7 +918,7 @@ export function CurationWorkspace({
         {/* Right sidebar: Compliance Matrix + Metadata + History */}
         <div className="space-y-6">
           {/* Compliance Matrix */}
-          <div className="border rounded-lg p-4">
+          <div id="section-compliance" className="border rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
             <div className="space-y-2">
               {COMPLIANCE_FIELDS.map((field) => {
@@ -1077,6 +1065,291 @@ export function CurationWorkspace({
           </div>
         </div>
       </div>
+
+      {/* Customer Interest — demand signal from tenants who pinned topics */}
+      <div id="section-customer-interest" className="mt-6 border rounded-lg p-4">
+        <h2 className="text-lg font-semibold mb-3">Customer Interest</h2>
+        {customerInterest.length === 0 ? (
+          <p className="text-sm text-gray-400">
+            No customer interest yet. Push topics to Spotlight to start receiving pins.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-gray-500">
+                  <th className="pb-2 pr-4 font-medium">Customer</th>
+                  <th className="pb-2 pr-4 font-medium">Topic Pinned</th>
+                  <th className="pb-2 pr-4 font-medium">Pinned Date</th>
+                  <th className="pb-2 pr-4 font-medium">Portal Purchased</th>
+                  <th className="pb-2 pr-4 font-medium">Stage</th>
+                  <th className="pb-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {customerInterest.map((ci, idx) => (
+                  <tr key={`${ci.tenantId}-${ci.topicNumber ?? idx}`} className="hover:bg-gray-50">
+                    <td className="py-2 pr-4">
+                      <a
+                        href={`/admin/tenants/${ci.tenantId}`}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {ci.tenantName}
+                      </a>
+                    </td>
+                    <td className="py-2 pr-4 text-gray-700">
+                      {ci.topicNumber ? (
+                        <span>
+                          <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded mr-1.5">
+                            {ci.topicNumber}
+                          </span>
+                          {ci.topicTitle}
+                        </span>
+                      ) : (
+                        <span>{ci.topicTitle}</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500">
+                      {new Date(ci.pinnedAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {ci.proposalId ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          No
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {ci.proposalStage ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          ci.proposalStage === 'submitted' ? 'bg-emerald-100 text-emerald-800' :
+                          ci.proposalStage === 'final' ? 'bg-green-100 text-green-800' :
+                          ci.proposalStage === 'gold_team' ? 'bg-yellow-100 text-yellow-800' :
+                          ci.proposalStage === 'red_team' ? 'bg-red-100 text-red-800' :
+                          ci.proposalStage === 'pink_team' ? 'bg-pink-100 text-pink-800' :
+                          ci.proposalStage === 'draft' ? 'bg-blue-100 text-blue-800' :
+                          ci.proposalStage === 'outline' ? 'bg-indigo-100 text-indigo-800' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {ci.proposalStage.replace(/_/g, ' ')}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      {ci.proposalId && (
+                        <a
+                          href={`/portal/${ci.tenantSlug}/proposals/${ci.proposalId}`}
+                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                        >
+                          View Portal
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── DocumentsSection ──────────────────────────────────────────────
+
+const DOCUMENT_TYPE_OPTIONS = [
+  { value: 'rfp', label: 'RFP' },
+  { value: 'nofo', label: 'NOFO' },
+  { value: 'instructions', label: 'Instructions' },
+  { value: 'amendment', label: 'Amendment' },
+  { value: 'qa', label: 'Q&A' },
+  { value: 'template', label: 'Template' },
+  { value: 'supporting', label: 'Supporting' },
+  { value: 'attachment', label: 'Attachment' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+const DOC_TYPE_COLORS: Record<string, string> = {
+  rfp: 'bg-blue-100 text-blue-700',
+  nofo: 'bg-blue-100 text-blue-700',
+  source: 'bg-blue-100 text-blue-700',
+  instructions: 'bg-purple-100 text-purple-700',
+  amendment: 'bg-orange-100 text-orange-700',
+  qa: 'bg-teal-100 text-teal-700',
+  template: 'bg-pink-100 text-pink-700',
+  supporting: 'bg-gray-100 text-gray-700',
+  attachment: 'bg-gray-100 text-gray-600',
+  other: 'bg-gray-100 text-gray-600',
+};
+
+function DocumentsSection({
+  solicitationId,
+  documents,
+  activeDocId,
+  onSelectDocument,
+  onDocumentsChanged,
+}: {
+  solicitationId: string;
+  documents: SolDocument[];
+  activeDocId: string | null;
+  onSelectDocument: (docId: string) => void;
+  onDocumentsChanged: () => void;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string>('rfp');
+  const [markAsPrimary, setMarkAsPrimary] = useState(false);
+
+  async function uploadFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    const data = new FormData();
+    data.set('solicitationId', solicitationId);
+    data.set('documentType', selectedType);
+    if (markAsPrimary) data.set('isPrimary', 'true');
+    for (const f of files) data.append('files', f);
+    try {
+      const resp = await fetch('/api/admin/rfp-upload', { method: 'POST', body: data });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
+      onDocumentsChanged();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function togglePrimary(docId: string) {
+    try {
+      const resp = await fetch(`/api/admin/rfp-document/${docId}/set-primary`, { method: 'POST' });
+      if (!resp.ok) {
+        const json = await resp.json();
+        throw new Error(json.error ?? 'Failed to update primary');
+      }
+      onDocumentsChanged();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Source Documents</h2>
+        <span className="text-xs text-gray-500">
+          {documents.length} file{documents.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Document list */}
+      {documents.length > 0 && (
+        <ul className="space-y-2 mb-4">
+          {documents.map((d) => (
+            <li
+              key={d.id}
+              className={`flex items-center justify-between rounded px-3 py-2 text-sm cursor-pointer transition-colors ${
+                activeDocId === d.id ? 'bg-blue-50 ring-1 ring-blue-300' : 'bg-gray-50 hover:bg-gray-100'
+              }`}
+              onClick={() => {
+                if (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')) {
+                  onSelectDocument(d.id);
+                }
+              }}
+            >
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                {/* Primary star */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); togglePrimary(d.id); }}
+                  title={d.isPrimary ? 'Primary document' : 'Set as primary'}
+                  className={`shrink-0 ${d.isPrimary ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'}`}
+                >
+                  {d.isPrimary ? '★' : '☆'}
+                </button>
+                {/* Type badge */}
+                <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${DOC_TYPE_COLORS[d.documentType] ?? DOC_TYPE_COLORS.other}`}>
+                  {d.documentType}
+                </span>
+                <span className="text-gray-800 truncate">{d.originalFilename}</span>
+                {d.fileSize && (
+                  <span className="ml-1 text-xs text-gray-400 shrink-0">
+                    {d.fileSize > 1024 * 1024
+                      ? `${(d.fileSize / 1024 / 1024).toFixed(1)} MB`
+                      : `${Math.round(d.fileSize / 1024)} KB`}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {d.extractedAt ? (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">extracted</span>
+                ) : (
+                  <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">pending</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Inline upload drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); uploadFiles(e.dataTransfer.files); }}
+        className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+          dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'
+        }`}
+      >
+        {uploading ? (
+          <p className="text-sm text-blue-600 animate-pulse text-center">Uploading...</p>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="text-xs border border-gray-300 rounded px-2 py-1"
+              >
+                {DOCUMENT_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <label className="flex items-center gap-1 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={markAsPrimary}
+                  onChange={(e) => setMarkAsPrimary(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Primary
+              </label>
+            </div>
+            <label className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+              Drop files here or click to upload
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md"
+                className="sr-only"
+                onChange={(e) => { if (e.target.files) uploadFiles(e.target.files); }}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+      {uploadError && (
+        <p className="mt-2 text-xs text-red-600">{uploadError}</p>
+      )}
     </div>
   );
 }
@@ -1389,21 +1662,63 @@ interface ParsedTopicLine {
   techFocusAreas?: string[];
 }
 
+/**
+ * Smart paste parser — auto-detects tab-separated, pipe-separated, or
+ * comma-separated topic data. Handles tables copied from DSIP, AFWERX,
+ * or any tabular source. Skips header rows and comment lines.
+ */
+function detectDelimiter(lines: string[]): string {
+  // Sample the first few data lines (skip blanks/comments)
+  const samples = lines
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#') && !l.startsWith('//'))
+    .slice(0, 5);
+  if (samples.length === 0) return '|';
+
+  const tabCount = samples.reduce((n, l) => n + (l.includes('\t') ? 1 : 0), 0);
+  const pipeCount = samples.reduce((n, l) => n + (l.includes('|') ? 1 : 0), 0);
+
+  // Tabs win if most sample lines contain them (copy-paste from spreadsheets)
+  if (tabCount >= samples.length * 0.6) return '\t';
+  // Pipes next (our legacy format)
+  if (pipeCount >= samples.length * 0.6) return '|';
+  // Fallback: comma — but only if lines have 2+ commas (avoid false positive
+  // on commas inside prose)
+  const commaCount = samples.reduce(
+    (n, l) => n + ((l.match(/,/g) ?? []).length >= 2 ? 1 : 0), 0,
+  );
+  if (commaCount >= samples.length * 0.6) return ',';
+  // Default pipe
+  return '|';
+}
+
+const HEADER_KEYWORDS = /^(topic\s*(number|#|id)|title|branch|focus|area|status|description|number)/i;
+
 function parseBulkTopicsText(text: string): {
   topics: ParsedTopicLine[];
   errors: string[];
+  detectedFormat: string;
 } {
   const topics: ParsedTopicLine[] = [];
   const errors: string[] = [];
   const lines = text.split('\n');
+  const delimiter = detectDelimiter(lines);
+  const detectedFormat = delimiter === '\t' ? 'tab' : delimiter === '|' ? 'pipe' : 'comma';
+
   lines.forEach((raw, idx) => {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line.startsWith('//')) return;
 
-    // Pipe-delimited: TOPIC_NUMBER | Title | Branch | focus_areas
-    const parts = line.split('|').map((s) => s.trim());
+    // Skip header rows — lines where most cells match known column headers
+    const testParts = line.split(delimiter).map((s) => s.trim());
+    const headerMatches = testParts.filter((p) => HEADER_KEYWORDS.test(p)).length;
+    if (headerMatches >= 2) return;
+    // Skip separator rows (e.g. "---|---|---")
+    if (/^[-|+\s]+$/.test(line)) return;
+
+    const parts = testParts;
     if (parts.length < 2) {
-      errors.push(`Line ${idx + 1}: expected at least "TOPIC_NUMBER | Title"`);
+      errors.push(`Line ${idx + 1}: expected at least 2 columns (topic number + title)`);
       return;
     }
     const [topicNumber, title, branch, focusAreas] = parts;
@@ -1420,7 +1735,7 @@ function parseBulkTopicsText(text: string): {
         : undefined,
     });
   });
-  return { topics, errors };
+  return { topics, errors, detectedFormat };
 }
 
 function BulkAddTopicsModal({
@@ -1438,8 +1753,9 @@ function BulkAddTopicsModal({
   const [text, setText] = useState(initialText ?? '');
   const [defaultBranch, setDefaultBranch] = useState('');
   const [result, setResult] = useState<{ inserted: number; skipped: string[] } | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const { topics, errors: parseErrors } = parseBulkTopicsText(text);
+  const { topics, errors: parseErrors, detectedFormat } = parseBulkTopicsText(text);
 
   async function submit() {
     if (topics.length === 0) return;
@@ -1470,7 +1786,7 @@ function BulkAddTopicsModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-3xl bg-white rounded-lg shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xl font-bold text-navy-800">Bulk Import Topics</h2>
           <button
@@ -1479,15 +1795,15 @@ function BulkAddTopicsModal({
           >✕</button>
         </div>
         <p className="text-sm text-gray-500">
-          Paste one topic per line in pipe-delimited format. Only{' '}
-          <code className="text-xs bg-gray-100 px-1 rounded">TOPIC_NUMBER | Title</code>{' '}
-          is required.
+          Paste a topic table copied from DSIP, AFWERX, or any source site.
+          Tab-separated, pipe-separated, and comma-separated formats are all
+          auto-detected. Header rows and separator lines are skipped automatically.
           Lines starting with <code className="text-xs bg-gray-100 px-1 rounded">#</code>{' '}
-          are comments.
+          are treated as comments.
         </p>
 
         <label className="block">
-          <span className="block text-sm font-medium text-gray-700 mb-1">Default branch (optional — applied to rows that don&apos;t specify one)</span>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Default branch (optional — applied to rows without a branch column)</span>
           <input
             value={defaultBranch}
             onChange={(e) => setDefaultBranch(e.target.value)}
@@ -1500,16 +1816,64 @@ function BulkAddTopicsModal({
           <span className="block text-sm font-medium text-gray-700 mb-1">Topics</span>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={14}
+            onChange={(e) => { setText(e.target.value); setShowPreview(false); }}
+            rows={10}
             spellCheck={false}
-            placeholder={`# Format: TOPIC_NUMBER | Title | Branch | focus_areas
-AF261-001 | Advanced Thermal Protection for Hypersonic Flight | Air Force | hypersonics, materials
-AF261-002 | Autonomous Navigation for GPS-Denied Environments | Air Force | autonomy, robotics
-N261-T01 | Quantum Sensing for Undersea Detection | Navy | quantum, sensing`}
+            placeholder="Paste a topic table copied from DSIP or any source site.
+
+Supports tab-separated (spreadsheet paste), pipe-separated, or CSV:
+
+AF261-001	Advanced Thermal Protection	Air Force
+AF261-002	Autonomous Navigation for GPS-Denied	Air Force
+N261-T01	Quantum Sensing for Undersea Detection	Navy"
             className="w-full rounded border border-gray-300 px-3 py-2 text-xs font-mono focus:border-blue-500 outline-none"
           />
         </label>
+
+        {text.trim() && topics.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800 flex-1">
+              <strong>{topics.length}</strong> topic{topics.length !== 1 ? 's' : ''} parsed
+              (detected <strong>{detectedFormat}</strong>-separated format).
+              Duplicates (by topic number) will be skipped.
+            </div>
+            <button
+              onClick={() => setShowPreview((v) => !v)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+            >
+              {showPreview ? 'Hide Preview' : 'Preview'}
+            </button>
+          </div>
+        )}
+
+        {/* Preview table of parsed topics */}
+        {showPreview && topics.length > 0 && (
+          <div className="border rounded overflow-x-auto max-h-48 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b text-left text-gray-500">
+                  <th className="px-2 py-1 font-medium">Topic #</th>
+                  <th className="px-2 py-1 font-medium">Title</th>
+                  <th className="px-2 py-1 font-medium">Branch</th>
+                  <th className="px-2 py-1 font-medium">Focus Areas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topics.slice(0, 50).map((t, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="px-2 py-1 font-mono text-indigo-700">{t.topicNumber}</td>
+                    <td className="px-2 py-1 text-gray-800">{t.title}</td>
+                    <td className="px-2 py-1 text-gray-600">{t.topicBranch ?? ''}</td>
+                    <td className="px-2 py-1 text-gray-500">{t.techFocusAreas?.join(', ') ?? ''}</td>
+                  </tr>
+                ))}
+                {topics.length > 50 && (
+                  <tr><td colSpan={4} className="px-2 py-1 text-gray-400 text-center">...and {topics.length - 50} more</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {parseErrors.length > 0 && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
@@ -1520,11 +1884,6 @@ N261-T01 | Quantum Sensing for Undersea Detection | Navy | quantum, sensing`}
             </ul>
           </div>
         )}
-
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800">
-          <strong>{topics.length}</strong> topic{topics.length !== 1 ? 's' : ''} parsed and ready to import.
-          Duplicates (by topic number) will be skipped.
-        </div>
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">

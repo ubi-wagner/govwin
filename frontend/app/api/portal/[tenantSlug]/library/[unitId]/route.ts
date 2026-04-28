@@ -19,7 +19,7 @@ async function authorize(request: Request, { params }: RouteParams, minRole: Rol
 
     const session = await auth();
     if (!session?.user) {
-      return { error: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
+      return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
     }
 
     const sessionUser = session.user as {
@@ -29,28 +29,28 @@ async function authorize(request: Request, { params }: RouteParams, minRole: Rol
     };
     const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
-      return { error: NextResponse.json({ error: 'Invalid session' }, { status: 401 }) };
+      return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
     }
 
     if (!hasRoleAtLeast(role, minRole)) {
-      return { error: NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) };
+      return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
     }
 
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
-      return { error: NextResponse.json({ error: 'Tenant not found' }, { status: 404 }) };
+      return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
     }
     const tenantId = tenant.id as string;
 
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
-      return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+      return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
     }
 
     return { tenantId, unitId, role, userId: sessionUser.id };
   } catch (err) {
     console.error('[library/unit/authorize] error', err);
-    return { error: NextResponse.json({ error: 'Internal server error' }, { status: 500 }) };
+    return { error: NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 }) };
   }
 }
 
@@ -69,7 +69,7 @@ export async function GET(
 
     if (!unit) {
       return NextResponse.json(
-        { error: 'Library unit not found' },
+        { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
@@ -78,7 +78,7 @@ export async function GET(
   } catch (err) {
     console.error('[library/unit/get] DB query failed', err);
     return NextResponse.json(
-      { error: 'Failed to fetch library unit' },
+      { error: 'Failed to fetch library unit', code: 'STORAGE_ERROR' },
       { status: 500 },
     );
   }
@@ -103,7 +103,7 @@ export async function PATCH(
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid JSON body' },
+      { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -114,28 +114,28 @@ export async function PATCH(
 
   if (body.content !== undefined) {
     if (typeof body.content !== 'string') {
-      return NextResponse.json({ error: 'content must be a string' }, { status: 400 });
+      return NextResponse.json({ error: 'content must be a string', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     updates.push(sql`content = ${body.content}`);
   }
 
   if (body.category !== undefined) {
     if (typeof body.category !== 'string') {
-      return NextResponse.json({ error: 'category must be a string' }, { status: 400 });
+      return NextResponse.json({ error: 'category must be a string', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     updates.push(sql`category = ${body.category}`);
   }
 
   if (body.subcategory !== undefined) {
     if (typeof body.subcategory !== 'string') {
-      return NextResponse.json({ error: 'subcategory must be a string' }, { status: 400 });
+      return NextResponse.json({ error: 'subcategory must be a string', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     updates.push(sql`subcategory = ${body.subcategory}`);
   }
 
   if (body.tags !== undefined) {
     if (!Array.isArray(body.tags)) {
-      return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
+      return NextResponse.json({ error: 'tags must be an array', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     updates.push(sql`tags = ${sql.array(body.tags)}`);
   }
@@ -143,7 +143,7 @@ export async function PATCH(
   if (body.status !== undefined) {
     if (!['draft', 'approved', 'archived'].includes(body.status)) {
       return NextResponse.json(
-        { error: 'Invalid status. Must be one of: draft, approved, archived' },
+        { error: 'Invalid status. Must be one of: draft, approved, archived', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -154,7 +154,7 @@ export async function PATCH(
   const providedKeys = Object.keys(body).filter((k) => allowedFields.includes(k));
   if (providedKeys.length === 0) {
     return NextResponse.json(
-      { error: `No valid fields to update. Allowed: ${allowedFields.join(', ')}` },
+      { error: `No valid fields to update. Allowed: ${allowedFields.join(', ')}`, code: 'VALIDATION_ERROR' },
       { status: 400 },
     );
   }
@@ -176,7 +176,7 @@ export async function PATCH(
 
     if (result.count === 0) {
       return NextResponse.json(
-        { error: 'Library unit not found' },
+        { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
@@ -193,7 +193,7 @@ export async function PATCH(
   } catch (err) {
     console.error('[library/unit/patch] DB update failed', err);
     return NextResponse.json(
-      { error: 'Failed to update library unit' },
+      { error: 'Failed to update library unit', code: 'DB_ERROR' },
       { status: 500 },
     );
   }
@@ -214,7 +214,7 @@ export async function DELETE(
 
     if (result.count === 0) {
       return NextResponse.json(
-        { error: 'Library unit not found' },
+        { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
@@ -231,7 +231,7 @@ export async function DELETE(
   } catch (err) {
     console.error('[library/unit/delete] DB delete failed', err);
     return NextResponse.json(
-      { error: 'Failed to delete library unit' },
+      { error: 'Failed to delete library unit', code: 'STORAGE_ERROR' },
       { status: 500 },
     );
   }

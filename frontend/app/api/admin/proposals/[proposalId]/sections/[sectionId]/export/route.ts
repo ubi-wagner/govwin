@@ -17,7 +17,7 @@ interface RouteContext {
 export async function POST(request: Request, _ctx: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
   }
 
   const body = await request.json();
@@ -25,7 +25,7 @@ export async function POST(request: Request, _ctx: RouteContext) {
   const format = body?.format as string;
 
   if (!doc || !doc.nodes) {
-    return NextResponse.json({ error: 'document (CanvasDocument JSON) required' }, { status: 400 });
+    return NextResponse.json({ error: 'document (CanvasDocument JSON) required', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   const title = doc.metadata.title || 'document';
@@ -36,7 +36,7 @@ export async function POST(request: Request, _ctx: RouteContext) {
 
   if (format !== 'docx' && format !== 'pptx' && format !== 'xlsx') {
     return NextResponse.json(
-      { error: `Format "${format}" not supported. Available: docx, pptx, xlsx` },
+      { error: `Format "${format}" not supported. Available: docx, pptx, xlsx`, code: 'VALIDATION_ERROR' },
       { status: 422 },
     );
   }
@@ -81,7 +81,7 @@ export async function POST(request: Request, _ctx: RouteContext) {
   } catch (err) {
     console.error('[export] generation failed', err);
     return NextResponse.json(
-      { error: `Export failed: ${err instanceof Error ? err.message : String(err)}` },
+      { error: `Export failed: ${err instanceof Error ? err.message : String(err)}`, code: 'DB_ERROR' },
       { status: 500 },
     );
   }
