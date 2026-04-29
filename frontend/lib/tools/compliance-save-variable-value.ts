@@ -36,6 +36,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 import { writeCurationMemory, type CurationAction } from './curation-memory';
@@ -230,7 +231,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
       type: 'compliance_value.saved',
       actor: { type: ctx.actor.type, id: ctx.actor.id, email: ctx.actor.email ?? undefined },
       tenantId: ctx.tenantId ?? null,
-      payload: { solicitationId: input.solicitationId, variableName: input.variableName, action: isNew ? 'created' : 'updated' },
+      payload: { correlationId: randomUUID(), solicitationId: input.solicitationId, variableName: input.variableName, action: isNew ? 'created' : 'updated' },
     });
 
     // THE HITL write — namespace-tagged episodic memory row.

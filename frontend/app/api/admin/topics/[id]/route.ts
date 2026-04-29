@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 
 const BodySchema = z.object({
@@ -76,6 +77,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       type: 'topic.updated',
       actor: { type: 'user', id: userId ?? 'unknown', email: userEmail ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         topicId: id,
         solicitationId: rows[0].solicitationId,
         changes: Object.keys(input),

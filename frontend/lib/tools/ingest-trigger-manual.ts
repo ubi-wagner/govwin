@@ -12,6 +12,7 @@
 
 import { z } from 'zod';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -54,9 +55,9 @@ export const ingestTriggerManualTool = defineTool<Input, Output>({
 
     await emitEventSingle({
       namespace: 'finder',
-      type: 'ingest.manual_triggered',
+      type: 'ingest.triggered',
       actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
-      payload: { jobId, source, runType, priority },
+      payload: { correlationId: randomUUID(), jobId, source, runType, priority },
     });
 
     ctx.log?.info?.({

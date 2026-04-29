@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -374,6 +374,21 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
     const existingSet = new Set(existingRows.map((r) => r.topicNumber));
 
+    // ── Start event for multi-step paste-import ───────────────────
+    const eventId = await emitEventStart({
+      namespace: 'finder',
+      type: 'topic.imported',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: {
+        sourceId: profileId,
+        sourceName: profile.name,
+        solicitationId,
+        parsedTopicCount: parsedTopics.length,
+        format,
+      },
+    });
+
     // ── Dedupe within input ───────────────────────────────────────
     const seenInput = new Set<string>();
     const source = parent.inheritSource ?? 'manual_upload';
@@ -464,19 +479,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       WHERE id = ${profileId}::uuid
     `;
 
-    // ── Emit event ────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source.activity',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        action: 'import_topics',
-        sourceName: profile.name,
-        sourceId: profileId,
-        solicitationId,
+    // ── End event ─────────────────────────────────────────────────
+    await emitEventEnd(eventId, {
+      result: {
         importedCount: inserted.length,
         skippedCount: skipped.length,
-        format,
       },
     });
 

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -125,6 +125,19 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 409 },
       );
     }
+
+    // ── Start event for multi-step proposal creation ──────────────────
+    const eventId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.created',
+      actor: userActor(userId, sessionUser.email),
+      tenantId,
+      payload: {
+        topicId,
+        solicitationId: topic.solicitationId,
+        productType: productType ?? undefined,
+      },
+    });
 
     // ── Create the proposal ──────────────────────────────────────────
     const proposalTitle = topic.topicNumber
@@ -267,19 +280,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       sectionCount = 1;
     }
 
-    // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'proposal.created',
-      actor: userActor(userId, sessionUser.email),
-      tenantId,
-      payload: {
+    // ── End event ─────────────────────────────────────────────────────
+    await emitEventEnd(eventId, {
+      result: {
         proposalId: proposal.id,
-        topicId,
-        solicitationId: topic.solicitationId,
         sectionCount,
         title: proposalTitle,
-        productType: productType ?? undefined,
       },
     });
 

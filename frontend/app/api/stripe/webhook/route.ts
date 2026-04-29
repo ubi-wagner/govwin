@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { getAmountCents, type ProductType } from '@/lib/stripe';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
 
 /**
@@ -113,18 +114,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     `;
     await emitEventSingle({
       namespace: 'capture',
-      type: 'subscription.created',
+      type: 'subscription.started',
       actor: systemActor('stripe-webhook'),
       tenantId,
-      payload: { sessionId, productType },
+      payload: { correlationId: randomUUID(), sessionId, productType },
     });
   } else {
     await emitEventSingle({
       namespace: 'capture',
-      type: 'proposal.purchased',
+      type: 'purchase.completed',
       actor: systemActor('stripe-webhook'),
       tenantId,
-      payload: { sessionId, productType, opportunityId },
+      payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
     });
   }
 }
@@ -161,7 +162,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     type: 'subscription.renewed',
     actor: systemActor('stripe-webhook'),
     tenantId: tenant.id,
-    payload: { invoiceId: invoice.id, subscriptionId },
+    payload: { correlationId: randomUUID(), invoiceId: invoice.id, subscriptionId },
   });
 }
 
@@ -186,6 +187,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     type: 'subscription.canceled',
     actor: systemActor('stripe-webhook'),
     tenantId: tenant.id,
-    payload: { subscriptionId: subscription.id },
+    payload: { correlationId: randomUUID(), subscriptionId: subscription.id },
   });
 }

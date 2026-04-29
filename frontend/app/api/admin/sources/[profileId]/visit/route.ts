@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -109,9 +110,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Emit event ──────────────────────────────────────────────────
     await emitEventSingle({
       namespace: 'finder',
-      type: 'source.activity',
+      type: 'source.visited',
       actor: userActor(userId, (session.user as { email?: string }).email),
       payload: {
+        correlationId: randomUUID(),
         action,
         sourceName: profile.name,
         sourceId: profileId,

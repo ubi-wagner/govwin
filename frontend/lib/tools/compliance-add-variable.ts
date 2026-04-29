@@ -15,6 +15,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { ConflictError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -63,7 +64,7 @@ export const complianceAddVariableTool = defineTool<Input, Output>({
         type: 'compliance_variable.added',
         actor: { type: ctx.actor.type, id: ctx.actor.id, email: ctx.actor.email ?? undefined },
         tenantId: ctx.tenantId ?? null,
-        payload: { variableId: rows[0]?.id, name: input.name, category: input.category },
+        payload: { correlationId: randomUUID(), variableId: rows[0]?.id, name: input.name, category: input.category },
       });
 
       ctx.log?.info?.({

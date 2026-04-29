@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { StateTransitionError, NotFoundError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -71,9 +72,9 @@ export const solicitationRejectReviewTool = defineTool<Input, Output>({
 
     await emitEventSingle({
       namespace: 'finder',
-      type: 'rfp.review_rejected',
+      type: 'solicitation.review_rejected',
       actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
-      payload: { solicitationId, reviewerId: actorId },
+      payload: { correlationId: randomUUID(), solicitationId, reviewerId: actorId },
     });
 
     ctx.log?.info?.({

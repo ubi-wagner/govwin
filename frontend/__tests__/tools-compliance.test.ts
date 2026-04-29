@@ -247,7 +247,7 @@ describe('solicitation.save_annotation', () => {
     expect(result.id).toBe(ANNO_ID);
     expect(result.kind).toBe('highlight');
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'rfp.annotation_saved' }),
+      expect.objectContaining({ type: 'annotation.saved' }),
     );
   });
 

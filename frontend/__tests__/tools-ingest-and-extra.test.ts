@@ -183,7 +183,7 @@ describe('ingest.trigger_manual', () => {
     expect(result.jobId).toBe('job-uuid');
     expect(result.priority).toBe(1);
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'ingest.manual_triggered' }),
+      expect.objectContaining({ type: 'ingest.triggered' }),
     );
   });
 

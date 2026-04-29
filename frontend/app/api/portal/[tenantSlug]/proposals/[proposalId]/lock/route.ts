@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -74,11 +75,11 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({
-      namespace: 'capture',
-      type: 'proposal.workspace_locked',
+      namespace: 'proposal',
+      type: 'proposal.locked',
       actor: userActor(sessionUser.id, sessionUser.email),
       tenantId,
-      payload: { proposalId },
+      payload: { correlationId: randomUUID(), proposalId },
     });
 
     return NextResponse.json({
@@ -159,11 +160,11 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({
-      namespace: 'capture',
-      type: 'proposal.workspace_unlocked',
+      namespace: 'proposal',
+      type: 'proposal.unlocked',
       actor: userActor(sessionUser.id, sessionUser.email),
       tenantId,
-      payload: { proposalId },
+      payload: { correlationId: randomUUID(), proposalId },
     });
 
     return NextResponse.json({

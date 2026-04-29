@@ -9,6 +9,7 @@
  * Auth: master_admin or rfp_admin only.
  */
 
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/auth';
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
     const fileHash = createHash('sha256').update(buffer).digest('hex');
     const [existingFile] = await sql<{ key: string }[]>`
       SELECT payload->>'key' AS key FROM system_events
-      WHERE type = 'admin.storage.file_uploaded'
+      WHERE type = 'file.uploaded'
         AND payload->>'fileHash' = ${fileHash}
       LIMIT 1
     `;
@@ -193,10 +194,10 @@ export async function POST(request: NextRequest) {
 
     await emitEventSingle({
       namespace: 'system',
-      type: 'admin.storage.file_uploaded',
+      type: 'file.uploaded',
       actor: { type: 'user', id: userId },
       tenantId: null,
-      payload: { key, size: file.size, originalName, fileHash },
+      payload: { correlationId: randomUUID(), key, size: file.size, originalName, fileHash },
     });
 
     // Auto-detect and ingest SBIR CSV files on upload
@@ -209,10 +210,10 @@ export async function POST(request: NextRequest) {
         if (!result.isDuplicate) {
           await emitEventSingle({
             namespace: 'system',
-            type: 'sbir_data.auto_ingested',
+            type: 'sbir_data.ingested',
             actor: { type: 'user', id: userId },
             tenantId: null,
-            payload: { fileType: result.fileType, rowCount: result.rowCount, filename: originalName, storageKey: key },
+            payload: { correlationId: randomUUID(), fileType: result.fileType, rowCount: result.rowCount, filename: originalName, storageKey: key },
           });
         }
       }
@@ -313,10 +314,10 @@ export async function PATCH(request: NextRequest) {
 
     await emitEventSingle({
       namespace: 'system',
-      type: 'admin.storage.file_uploaded',
+      type: 'file.uploaded',
       actor: { type: 'user', id: userId },
       tenantId: null,
-      payload: { key: body.key, size, originalName: filename },
+      payload: { correlationId: randomUUID(), key: body.key, size, originalName: filename },
     });
 
     // Auto-detect and ingest SBIR CSV files (skip for very large files — they need pipeline processing)
@@ -334,10 +335,10 @@ export async function PATCH(request: NextRequest) {
             if (!result.isDuplicate) {
               await emitEventSingle({
                 namespace: 'system',
-                type: 'sbir_data.auto_ingested',
+                type: 'sbir_data.ingested',
                 actor: { type: 'user', id: userId },
                 tenantId: null,
-                payload: { fileType: result.fileType, rowCount: result.rowCount, filename, storageKey: body.key },
+                payload: { correlationId: randomUUID(), fileType: result.fileType, rowCount: result.rowCount, filename, storageKey: body.key },
               });
             }
           }
@@ -413,10 +414,10 @@ export async function DELETE(request: NextRequest) {
 
     await emitEventSingle({
       namespace: 'system',
-      type: 'admin.storage.file_deleted',
+      type: 'file.deleted',
       actor: { type: 'user', id: userId },
       tenantId: null,
-      payload: { key },
+      payload: { correlationId: randomUUID(), key },
     });
 
     return NextResponse.json({ data: { deleted: true } });

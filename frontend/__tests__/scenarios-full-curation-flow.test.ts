@@ -197,12 +197,12 @@ describe('Phase 1 §E24 — full curation flow', () => {
     // ── Verify HITL signal — events covering the full flow ────
     const eventTypes = emitSingleMock.mock.calls.map((c) => (c[0] as { type: string }).type);
     expect(eventTypes).toEqual([
-      'rfp.triage_claimed',
-      'rfp.released_for_analysis',
+      'solicitation.claimed',
+      'solicitation.released',
       'compliance_value.saved',
-      'rfp.review_requested',
-      'rfp.review_approved',
-      'rfp.curated_and_pushed',
+      'solicitation.review_requested',
+      'solicitation.approved',
+      'solicitation.pushed',
     ]);
   });
 

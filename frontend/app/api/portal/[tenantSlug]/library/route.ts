@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 
 export async function GET(
@@ -296,10 +297,10 @@ export async function POST(
 
     await emitEventSingle({
       namespace: 'library',
-      type: `bulk_${action}`,
+      type: `unit.${action === 'approve' ? 'approved' : action === 'archive' ? 'archived' : action === 'delete' ? 'deleted' : action === 'set_category' ? 'categorized' : 'tagged'}`,
       actor: { type: 'user', id: sessionUser.id },
       tenantId,
-      payload: { action, unitCount: unitIds.length, affected: result },
+      payload: { correlationId: randomUUID(), action, unitCount: unitIds.length, affected: result },
     });
 
     return NextResponse.json({ data: { updated: result.count } });

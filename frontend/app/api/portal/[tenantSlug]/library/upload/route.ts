@@ -194,10 +194,10 @@ export async function POST(
 
   await emitEventSingle({
     namespace: 'library',
-    type: 'files_uploaded',
+    type: 'file.uploaded',
     actor: { type: 'user', id: sessionUser.id },
     tenantId,
-    payload: { fileCount: uploaded.length, files: uploaded.map(f => ({ id: f.id, filename: f.filename })) },
+    payload: { correlationId: randomUUID(), fileCount: uploaded.length, files: uploaded.map(f => ({ id: f.id, filename: f.filename })) },
   });
 
   return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -212,11 +213,12 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({
-      namespace: 'capture',
-      type: 'proposal.comment_added',
+      namespace: 'proposal',
+      type: 'comment.created',
       actor: userActor(sessionUser.id, sessionUser.email),
       tenantId,
       payload: {
+        correlationId: randomUUID(),
         proposalId,
         commentId: comment.id,
         nodeId,

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 
 interface RouteContext {
@@ -71,10 +72,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     await emitEventSingle({
-      namespace: 'capture',
-      type: 'proposal.section.saved',
+      namespace: 'proposal',
+      type: 'section.saved',
       actor: { type: 'user', id: userId ?? 'unknown', email: (session.user as { email?: string }).email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         proposalId,
         sectionId,
         versionNumber,

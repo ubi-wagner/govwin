@@ -92,7 +92,7 @@ describe('solicitation.claim', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'finder',
-        type: 'rfp.triage_claimed',
+        type: 'solicitation.claimed',
       }),
     );
   });
@@ -149,7 +149,7 @@ describe('solicitation.release', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'finder',
-        type: 'rfp.released_for_analysis',
+        type: 'solicitation.released',
       }),
     );
     // Verify 3 sql calls: UPDATE, triage audit INSERT, pipeline_jobs INSERT
@@ -201,7 +201,7 @@ describe('solicitation.dismiss', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'finder',
-        type: 'rfp.triage_dismissed',
+        type: 'solicitation.dismissed',
       }),
     );
     // 4 sql calls: SELECT + UPDATE + triage_actions INSERT + memory INSERT

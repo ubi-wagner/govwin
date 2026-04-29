@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 
 const BodySchema = z.object({
@@ -97,10 +98,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     await emitEventSingle({
       namespace: 'capture',
-      type: 'topic_pinned',
+      type: 'topic.pinned',
       actor: { type: 'user', id: userId },
       tenantId,
-      payload: { opportunityId },
+      payload: { correlationId: randomUUID(), opportunityId },
     });
 
     return NextResponse.json({ data: { pinned: true, opportunityId } });
@@ -140,10 +141,10 @@ export async function DELETE(request: Request, ctx: RouteContext) {
 
     await emitEventSingle({
       namespace: 'capture',
-      type: 'topic_unpinned',
+      type: 'topic.unpinned',
       actor: { type: 'user', id: userId },
       tenantId,
-      payload: { opportunityId },
+      payload: { correlationId: randomUUID(), opportunityId },
     });
 
     return NextResponse.json({ data: { pinned: false, opportunityId } });

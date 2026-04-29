@@ -35,7 +35,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
-import { emitEventSingle } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
@@ -222,6 +222,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── Start event for the multi-step upload operation ────────────────
+  const eventId = await emitEventStart({
+    namespace: 'finder',
+    type: existingSolId ? 'rfp.attached' : 'rfp.uploaded',
+    actor: userActor(userId ?? 'unknown'),
+    tenantId: null,
+    payload: {
+      fileCount: files.length,
+      totalBytes,
+      existingSolicitationId: existingSolId ?? undefined,
+    },
+  });
+
   // ── Resolve or create the solicitation ────────────────────────────
   let oppRowId: string;
   let solId: string;
@@ -234,6 +247,7 @@ export async function POST(request: Request) {
       WHERE cs.id = ${existingSolId}::uuid
     `;
     if (solRows.length === 0) {
+      await emitEventEnd(eventId, { error: { message: 'Solicitation not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Solicitation not found', code: 'NOT_FOUND' },
         { status: 404 },
@@ -244,6 +258,7 @@ export async function POST(request: Request) {
   } else {
     // ── New solicitation flow ─────────────────────────────────────────
     if (!meta) {
+      await emitEventEnd(eventId, { error: { message: 'Missing metadata', code: 'VALIDATION_ERROR' } });
       return NextResponse.json(
         { error: 'Metadata (title, agency, programType) required for new solicitations', code: 'VALIDATION_ERROR' },
         { status: 422 },
@@ -276,6 +291,7 @@ export async function POST(request: Request) {
       oppRowId = rows[0].id;
     } catch (err) {
       console.error('[rfp-upload] opportunity insert failed', err);
+      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'Failed to create opportunity row', code: 'DB_ERROR' },
         { status: 500 },
@@ -291,6 +307,7 @@ export async function POST(request: Request) {
       solId = rows[0].id;
     } catch (err) {
       console.error('[rfp-upload] curated_solicitations insert failed', err);
+      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'Failed to create solicitation row', code: 'DB_ERROR' },
         { status: 500 },
@@ -346,6 +363,7 @@ export async function POST(request: Request) {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error('[rfp-upload] S3 put failed', { key: storageKey, err: errMsg, stack: err instanceof Error ? err.stack : undefined });
+      await emitEventEnd(eventId, { error: { message: `S3 put failed: ${errMsg}`, code: 'STORAGE_ERROR' } });
       return NextResponse.json(
         { error: `Storage upload failed for ${fb.displayName}: ${errMsg}`, code: 'STORAGE_ERROR' },
         { status: 500 },
@@ -375,6 +393,7 @@ export async function POST(request: Request) {
       documentIds.push(docRows[0].id);
     } catch (err) {
       console.error('[rfp-upload] document insert failed', err);
+      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'Failed to record document', code: 'DB_ERROR' },
         { status: 500 },
@@ -444,12 +463,14 @@ export async function POST(request: Request) {
     }
   }
 
-  await emitEventSingle({
-    namespace: 'finder',
-    type: existingSolId ? 'rfp.document_attached' : 'rfp.manually_uploaded',
-    actor: { type: 'user', id: userId ?? 'unknown' },
-    tenantId: null,
-    payload: { opportunityId: oppRowId, solicitationId: solId, documentCount: documentIds?.length ?? 0 },
+  await emitEventEnd(eventId, {
+    result: {
+      opportunityId: oppRowId,
+      solicitationId: solId,
+      documentCount: documentIds?.length ?? 0,
+      textExtracted: extractedText !== null,
+      topicsExtracted: topicsExtracted,
+    },
   });
 
   return NextResponse.json(

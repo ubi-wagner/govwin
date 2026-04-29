@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 // ─── GET: list active sources ─────────────────────────────────────
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
       namespace: 'finder',
       type: 'source.created',
       actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { sourceId: row.id, name: row.name, siteType },
+      payload: { correlationId: randomUUID(), sourceId: row.id, name: row.name, siteType },
     });
 
     return NextResponse.json({ data: { id: row.id, name: row.name } });

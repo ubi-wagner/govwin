@@ -15,6 +15,7 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { adminNewApplicationAlert } from '@/lib/email-templates';
@@ -170,11 +171,11 @@ export async function POST(request: Request) {
     `;
 
     await emitEventSingle({
-      namespace: 'identity',
+      namespace: 'capture',
       type: 'application.submitted',
       actor: { type: 'system', id: 'public-apply' },
       tenantId: null,
-      payload: { applicationId: rows[0]?.id, companyName: input.companyName },
+      payload: { correlationId: randomUUID(), applicationId: rows[0]?.id, companyName: input.companyName },
     });
 
     // Notify admin of new application

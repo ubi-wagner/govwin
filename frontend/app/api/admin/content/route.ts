@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 // ─── GET: public listing ───────────────────────────────────────────
@@ -167,12 +168,11 @@ export async function POST(request: Request) {
       RETURNING id
     `;
 
-    const eventType = published ? 'cms.content.published' : 'cms.content.updated';
     await emitEventSingle({
-      namespace: 'finder',
-      type: eventType,
+      namespace: 'system',
+      type: published ? 'content.published' : 'content.updated',
       actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { slug, title, contentType },
+      payload: { correlationId: randomUUID(), slug, title, contentType },
     });
 
     return NextResponse.json({ data: { id: row.id, slug } });
@@ -215,10 +215,10 @@ export async function DELETE(request: Request) {
     }
 
     await emitEventSingle({
-      namespace: 'finder',
-      type: 'cms.content.deleted',
+      namespace: 'system',
+      type: 'content.deleted',
       actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { slug, deletedId: rows[0].id },
+      payload: { correlationId: randomUUID(), slug, deletedId: rows[0].id },
     });
 
     return NextResponse.json({ data: { deleted: true } });
