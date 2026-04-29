@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { ConflictError, NotFoundError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -74,6 +75,7 @@ export const volumeAddTool = defineTool<Input, Output>({
       type: 'volume.added',
       actor: { type: 'user', id: ctx.actor.id, email: ctx.actor.email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         solicitationId: input.solicitationId,
         volumeId: rows[0].id,
         volumeNumber: input.volumeNumber,

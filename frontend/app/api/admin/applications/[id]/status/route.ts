@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -65,11 +66,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     await emitEventSingle({
-      namespace: 'identity',
+      namespace: 'capture',
       type: 'application.status_changed',
       actor: userActor(userId, (session.user as { email?: string }).email),
       tenantId: null,
       payload: {
+        correlationId: randomUUID(),
         applicationId: id,
         companyName: app.companyName,
         contactEmail: app.contactEmail,

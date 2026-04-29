@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 export const maxDuration = 300; // 5 minutes for large CSV processing
 export const dynamic = 'force-dynamic';
@@ -470,6 +470,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── Start event for multi-step CSV ingest ──────────────────────
+    const eventId = await emitEventStart({
+      namespace: 'finder',
+      type: 'sbir_data.ingested',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: { filename, fileType },
+    });
+
     // 6. Parse CSV lines and batch insert
     let rowCount = 0;
     let batch: RawRow[] = [];
@@ -515,12 +524,9 @@ export async function POST(request: Request) {
       VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId})
     `;
 
-    // 10. Emit event
-    await emitEventSingle({
-      namespace: 'admin',
-      type: 'admin.sbir_data.ingested',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { fileType, rowCount, filename },
+    // 10. End event
+    await emitEventEnd(eventId, {
+      result: { fileType, rowCount, filename },
     });
 
     // 11. Return result

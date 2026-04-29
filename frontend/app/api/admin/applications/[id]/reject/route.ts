@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
@@ -71,11 +72,12 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // Emit system event
     await emitEventSingle({
-      namespace: 'identity',
+      namespace: 'capture',
       type: 'application.rejected',
       actor: userActor(userId, (session.user as { email?: string }).email),
       tenantId: null,
       payload: {
+        correlationId: randomUUID(),
         applicationId: id,
         reason: reason || null,
       },

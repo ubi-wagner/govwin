@@ -21,6 +21,7 @@ import {
   NotFoundError,
   StateTransitionError,
 } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 import { writeCurationMemory } from './curation-memory';
@@ -107,9 +108,10 @@ export const solicitationApproveTool = defineTool<Input, Output>({
 
     await emitEventSingle({
       namespace: 'finder',
-      type: 'rfp.review_approved',
+      type: 'solicitation.approved',
       actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         solicitationId,
         curatedBy,
         approvedBy: actorId,

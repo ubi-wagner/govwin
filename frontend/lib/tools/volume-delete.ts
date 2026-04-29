@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -33,6 +34,7 @@ export const volumeDeleteTool = defineTool<Input, Output>({
       type: 'volume.deleted',
       actor: { type: 'user', id: ctx.actor.id, email: ctx.actor.email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         solicitationId: rows[0].solicitationId,
         volumeId: input.volumeId,
         volumeNumber: rows[0].volumeNumber,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
@@ -19,6 +19,7 @@ function slugify(name: string): string {
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
+  let eventId = '';
   try {
     const session = await auth();
     if (!session?.user) {
@@ -65,6 +66,19 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 409 },
       );
     }
+
+    // ── Start event for multi-step accept operation ────────────────
+    eventId = await emitEventStart({
+      namespace: 'capture',
+      type: 'application.accepted',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: {
+        applicationId: id,
+        companyName: app.companyName,
+        contactEmail: app.contactEmail,
+      },
+    });
 
     // Update application status
     await sql`
@@ -128,22 +142,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       newUserId = created.id;
     }
 
-    // Emit system event
-    await emitEventSingle({
-      namespace: 'identity',
-      type: 'tenant.created',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      tenantId: tenantId,
-      payload: {
-        applicationId: id,
-        tenantSlug: slug,
-        tenantName: app.companyName,
-        userId: newUserId,
-        contactEmail: app.contactEmail,
-        reviewNotes: reviewNotes || null,
-      },
-    });
-
     // Send welcome email with credentials
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
     const emailContent = applicationAcceptedEmail({
@@ -157,6 +155,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       to: app.contactEmail,
       subject: emailContent.subject,
       html: emailContent.html,
+    });
+
+    await emitEventEnd(eventId, {
+      result: {
+        tenantId,
+        tenantSlug: slug,
+        userId: newUserId,
+        emailSent: emailResult.provider !== 'skipped',
+      },
     });
 
     return NextResponse.json({
@@ -175,6 +182,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
   } catch (e) {
     console.error('[api/admin/applications/accept] error:', e);
+    if (eventId) {
+      await emitEventEnd(eventId, {
+        error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' },
+      });
+    }
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },
       { status: 500 },

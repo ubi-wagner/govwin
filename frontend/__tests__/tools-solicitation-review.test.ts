@@ -91,7 +91,7 @@ describe('solicitation.request_review', () => {
 
     expect(result.status).toBe('review_requested');
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'rfp.review_requested' }),
+      expect.objectContaining({ type: 'solicitation.review_requested' }),
     );
   });
 
@@ -131,7 +131,7 @@ describe('solicitation.approve', () => {
     expect(result.status).toBe('approved');
     expect(result.curatedBy).toBe(CURATOR_ID);
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'rfp.review_approved' }),
+      expect.objectContaining({ type: 'solicitation.approved' }),
     );
     // 3 sql calls: UPDATE + triage + memory
     expect(sqlMock).toHaveBeenCalledTimes(3);
@@ -195,7 +195,7 @@ describe('solicitation.reject_review', () => {
 
     expect(result.status).toBe('curation_in_progress');
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'rfp.review_rejected' }),
+      expect.objectContaining({ type: 'solicitation.review_rejected' }),
     );
   });
 
@@ -242,7 +242,7 @@ describe('solicitation.push', () => {
     expect(result.opportunityId).toBe(OPP_ID);
     expect(result.namespace).toBe(NAMESPACE);
     expect(emitSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'rfp.curated_and_pushed' }),
+      expect.objectContaining({ type: 'solicitation.pushed' }),
     );
     // 5 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + memory
     expect(sqlMock).toHaveBeenCalledTimes(5);

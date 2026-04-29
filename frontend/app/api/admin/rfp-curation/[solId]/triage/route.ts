@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
@@ -179,6 +180,7 @@ export async function POST(
       type: 'solicitation.triaged',
       actor: userActor(actorId, user.email),
       payload: {
+        correlationId: randomUUID(),
         solicitationId: solId,
         action,
         fromState,

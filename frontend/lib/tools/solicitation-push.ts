@@ -23,6 +23,7 @@ import {
   StateTransitionError,
   ValidationError,
 } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 import { writeCurationMemory } from './curation-memory';
@@ -149,9 +150,10 @@ export const solicitationPushTool = defineTool<Input, Output>({
 
     await emitEventSingle({
       namespace: 'finder',
-      type: 'rfp.curated_and_pushed',
+      type: 'solicitation.pushed',
       actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         solicitationId,
         opportunityId: r.opportunityId,
         namespace: r.namespace,

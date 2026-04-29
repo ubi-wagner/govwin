@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -133,7 +134,7 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
       namespace: 'finder',
       type: 'required_item.updated',
       actor: { type: 'user', id: ctx.actor.id, email: ctx.actor.email ?? undefined },
-      payload: { itemId: input.itemId, volumeId: rows[0].volumeId },
+      payload: { correlationId: randomUUID(), itemId: input.itemId, volumeId: rows[0].volumeId },
     });
 
     return { itemId: input.itemId, updated: true as const };

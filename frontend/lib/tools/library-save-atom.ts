@@ -14,6 +14,7 @@
 
 import { z } from 'zod';
 import { sql } from '@/lib/db';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 import { ToolAuthorizationError, ToolExecutionError } from './errors';
@@ -94,6 +95,7 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
       actor: { type: 'user', id: ctx.actor.id, email: ctx.actor.email ?? undefined },
       tenantId,
       payload: {
+        correlationId: randomUUID(),
         libraryUnitId: id,
         proposalId: input.proposalId,
         nodeType: input.nodeType,

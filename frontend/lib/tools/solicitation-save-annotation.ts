@@ -10,6 +10,7 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { NotFoundError } from '@/lib/errors';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
@@ -75,9 +76,10 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
 
     await emitEventSingle({
       namespace: 'finder',
-      type: 'rfp.annotation_saved',
+      type: 'annotation.saved',
       actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
       payload: {
+        correlationId: randomUUID(),
         solicitationId,
         annotationId: rows[0].id,
         kind,

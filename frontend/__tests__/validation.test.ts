@@ -61,7 +61,7 @@ describe('zTenantSlug', () => {
 describe('zDottedName', () => {
   it('accepts valid dotted identifiers', () => {
     expect(zDottedName.safeParse('memory.search').success).toBe(true);
-    expect(zDottedName.safeParse('finder.rfp.curated_and_pushed').success).toBe(true);
+    expect(zDottedName.safeParse('finder.solicitation.pushed').success).toBe(true);
     expect(zDottedName.safeParse('tool.invoke.start').success).toBe(true);
   });
 

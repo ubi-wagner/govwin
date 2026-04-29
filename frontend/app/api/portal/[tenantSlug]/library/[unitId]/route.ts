@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 
 type RouteParams = { params: Promise<{ tenantSlug: string; unitId: string }> };
@@ -183,10 +184,10 @@ export async function PATCH(
 
     await emitEventSingle({
       namespace: 'library',
-      type: 'unit_updated',
+      type: 'unit.updated',
       actor: { type: 'user', id: ctx.userId },
       tenantId: ctx.tenantId,
-      payload: { unitId: ctx.unitId, updatedFields: providedKeys },
+      payload: { correlationId: randomUUID(), unitId: ctx.unitId, updatedFields: providedKeys },
     });
 
     return NextResponse.json({ data: { updated: true } });
@@ -221,10 +222,10 @@ export async function DELETE(
 
     await emitEventSingle({
       namespace: 'library',
-      type: 'unit_deleted',
+      type: 'unit.deleted',
       actor: { type: 'user', id: ctx.userId },
       tenantId: ctx.tenantId,
-      payload: { unitId: ctx.unitId },
+      payload: { correlationId: randomUUID(), unitId: ctx.unitId },
     });
 
     return NextResponse.json({ data: { deleted: true } });

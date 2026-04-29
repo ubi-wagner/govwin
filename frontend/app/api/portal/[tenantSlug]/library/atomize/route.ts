@@ -16,7 +16,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
-import { emitEventSingle } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { readDocx } from '@/lib/import/docx-reader';
 import { readPptx } from '@/lib/import/pptx-reader';
 import { readPdf } from '@/lib/import/pdf-reader';
@@ -86,6 +86,16 @@ export async function POST(request: Request, ctx: RouteContext) {
   }
 
   const userId = sessionUser.id;
+
+  // ── Start event for multi-step atomization ─────────────────────
+  const eventId = await emitEventStart({
+    namespace: 'library',
+    type: 'document.atomized',
+    actor: userActor(userId),
+    tenantId,
+    payload: { pendingCount: pending.length },
+  });
+
   let atomized = 0;
   let totalAtomsCreated = 0;
   const allAtomInfo: Array<{ id: string; category: string; headingText: string | null; charLength: number }> = [];
@@ -217,12 +227,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
   }
 
-  await emitEventSingle({
-    namespace: 'library',
-    type: 'batch_atomized',
-    actor: { type: 'user', id: userId ?? 'unknown' },
-    tenantId,
-    payload: { documentsAtomized: atomized, atomsCreated: totalAtomsCreated },
+  await emitEventEnd(eventId, {
+    result: { documentsAtomized: atomized, atomsCreated: totalAtomsCreated },
   });
 
   return NextResponse.json({

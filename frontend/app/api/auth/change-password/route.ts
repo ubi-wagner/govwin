@@ -30,7 +30,6 @@ import {
 import { zPassword } from '@/lib/validation';
 import {
   emitEventEnd,
-  emitEventSingle,
   emitEventStart,
   userActor,
 } from '@/lib/events';
@@ -59,7 +58,7 @@ export const POST = withHandler({
 
     const startEventId = await emitEventStart({
       namespace: 'identity',
-      type: 'user.password_changing',
+      type: 'user.password_changed',
       actor: userActor(userId, ctx.actor.email),
       payload: { userId },
     });
@@ -93,16 +92,6 @@ export const POST = withHandler({
 
       await emitEventEnd(startEventId, {
         result: { userId, outcome: 'success' },
-      });
-
-      // Also emit a single event so the admin audit log has a clean
-      // "password changed" entry without having to reconstruct it
-      // from the start/end pair.
-      await emitEventSingle({
-        namespace: 'identity',
-        type: 'user.password_changed',
-        actor: userActor(userId, ctx.actor.email),
-        payload: { userId },
       });
 
       ctx.log.info(
