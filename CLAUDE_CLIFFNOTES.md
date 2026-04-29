@@ -235,8 +235,23 @@ tool.*       — Tool invocations (start, end, error)
 
 NEVER use: `admin.*`, `cms.*`, `spotlight.*` as namespaces.
 
-Event type format: `entity.action_past_tense` (snake_case)
-Examples: `rfp.manually_uploaded`, `subscription.created`, `section.saved`
+Event type format: `entity.verb_past_tense` (snake_case)
+Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
+
+### Phase: start / end / single
+- `start` + `end` for multi-step operations (enables stuck detection, retry, chaining)
+- `single` for atomic CRUD operations
+- Every payload includes `correlationId: crypto.randomUUID()`
+
+### Workflow Automation (pipeline/src/workflows/)
+Events that match a workflow trigger automatically instantiate a job:
+- `finder:rfp.uploaded:end` → OnRfpUploaded (shred → compliance → notify)
+- `finder:solicitation.pushed:single` → OnSolicitationPushed (match tenants → digest)
+- `capture:application.accepted:end` → OnApplicationAccepted (welcome → library → reminder)
+- `proposal:proposal.created:end` → OnProposalCreated (AI draft → notify)
+- `proposal:proposal.advanced:single` → OnProposalAdvanced (review → notify → HITL wait)
+
+See docs/EVENT_CONTRACT.md for the full registry and workflow architecture.
 
 ---
 
