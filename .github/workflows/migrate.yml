@@ -1,15 +1,37 @@
 name: Run Database Migrations
 
-# Runs pending migrations against the production database.
-# Triggered on push to main (when migration files change) or manually.
+# Runs pending migrations against production and/or staging databases.
+# Supports both the main app DB (db/migrations/) and the CRM DB (services/cms/db/).
+#
+# Triggered automatically on push to main when migration files change,
+# or manually via workflow_dispatch with environment + database selectors.
 
 on:
   push:
     branches: [main, master]
     paths:
       - 'db/migrations/**'
+      - 'services/cms/db/**'
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - 'production'
+          - 'staging'
+          - 'both'
+      database:
+        description: 'Which database(s) to migrate'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'main'
+          - 'crm'
       dry_run:
         description: 'Dry run — show what would run without executing'
         required: false
@@ -18,55 +40,112 @@ on:
         options:
           - 'false'
           - 'true'
-      seed:
-        description: 'Seed admin account after migrations'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
 
 jobs:
-  migrate:
-    name: Run pending migrations
+  # ─── Main DB — Production ──────────────────────────────────────────
+  migrate-main-prod:
+    name: Main DB → Production
     runs-on: ubuntu-latest
-
+    if: >-
+      (github.event_name == 'push') ||
+      (github.event.inputs.environment != 'staging' && github.event.inputs.database != 'crm')
     steps:
       - uses: actions/checkout@v5
-
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Check connection
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::DATABASE_URL secret is not set. Add it in GitHub > Settings > Secrets."
-            exit 1
-          fi
-          echo "Testing database connection..."
-          psql "$DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
-          echo "Connection successful."
-
       - name: Run migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret not set"
+            exit 1
+          fi
           chmod +x db/migrations/run.sh
-
           FLAGS=""
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            FLAGS="--dry-run"
-          fi
-          if [ "${{ github.event.inputs.seed }}" = "true" ]; then
-            FLAGS="$FLAGS --seed"
-          fi
-
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then FLAGS="--dry-run"; fi
+          echo "=== Main DB → Production ==="
+          psql "$DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
           ./db/migrations/run.sh $FLAGS
+          echo "--- Migration status ---"
+          ./db/migrations/run.sh --status
 
-      - name: Show migration status
+  # ─── Main DB — Staging ─────────────────────────────────────────────
+  migrate-main-staging:
+    name: Main DB → Staging
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event.inputs.environment == 'staging' || github.event.inputs.environment == 'both') &&
+      github.event.inputs.database != 'crm'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run migrations
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: ./db/migrations/run.sh --status
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::STAGING_DATABASE_URL secret not set"
+            exit 1
+          fi
+          chmod +x db/migrations/run.sh
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then FLAGS="--dry-run"; fi
+          echo "=== Main DB → Staging ==="
+          psql "$DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          ./db/migrations/run.sh $FLAGS
+          echo "--- Migration status ---"
+          ./db/migrations/run.sh --status
+
+  # ─── CRM DB — Production ──────────────────────────────────────────
+  migrate-crm-prod:
+    name: CRM DB → Production
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'push') ||
+      (github.event.inputs.environment != 'staging' && github.event.inputs.database != 'main')
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run CRM migrations
+        env:
+          CMS_DATABASE_URL: ${{ secrets.CMS_DATABASE_URL }}
+        run: |
+          if [ -z "$CMS_DATABASE_URL" ]; then
+            echo "::warning::CMS_DATABASE_URL not set — skipping CRM migrations"
+            exit 0
+          fi
+          chmod +x services/cms/db/run.sh
+          echo "=== CRM DB → Production ==="
+          psql "$CMS_DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          services/cms/db/run.sh
+          echo "--- CRM migration status ---"
+          services/cms/db/run.sh --status
+
+  # ─── CRM DB — Staging ─────────────────────────────────────────────
+  migrate-crm-staging:
+    name: CRM DB → Staging
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event.inputs.environment == 'staging' || github.event.inputs.environment == 'both') &&
+      github.event.inputs.database != 'main'
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Run CRM migrations
+        env:
+          CMS_DATABASE_URL: ${{ secrets.CMS_STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$CMS_DATABASE_URL" ]; then
+            echo "::warning::CMS_STAGING_DATABASE_URL not set — skipping CRM staging migrations"
+            exit 0
+          fi
+          chmod +x services/cms/db/run.sh
+          echo "=== CRM DB → Staging ==="
+          psql "$CMS_DATABASE_URL" -c "SELECT 1 AS connection_ok;" -tA
+          services/cms/db/run.sh
+          echo "--- CRM migration status ---"
+          services/cms/db/run.sh --status
