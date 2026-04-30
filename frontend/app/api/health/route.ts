@@ -31,6 +31,7 @@ interface CheckResult {
 interface HealthResponse {
   ok: boolean;
   version: string;
+  environment: string;
   uptimeMs: number;
   checks: {
     db: CheckResult;
@@ -47,6 +48,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   const body: HealthResponse = {
     ok: db.ok && s3.ok,
     version: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev',
+    environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
     checks: { db, s3 },
   };

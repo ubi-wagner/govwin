@@ -26,11 +26,13 @@ logger = logging.getLogger('cms')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info('CMS-CRM service starting...')
+    env = os.getenv('RAILWAY_ENVIRONMENT_NAME', 'local')
+    sha = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'dev')[:7]
+    logger.info('CMS-CRM service starting... (env=%s, version=%s)', env, sha)
     await init_db()
     await init_event_bridge()
     await start_event_listener()
-    logger.info('CMS-CRM service ready')
+    logger.info('CMS-CRM service ready (env=%s)', env)
     yield
     logger.info('CMS-CRM service shutting down...')
     await stop_event_listener()

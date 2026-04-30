@@ -46,7 +46,9 @@ def handle_signal(sig: signal.Signals) -> None:
 
 
 async def main() -> None:
-    log.info("RFP Pipeline worker starting...")
+    env = os.getenv("RAILWAY_ENVIRONMENT_NAME", "local")
+    sha = os.getenv("RAILWAY_GIT_COMMIT_SHA", "dev")[:7]
+    log.info("RFP Pipeline worker starting... (env=%s, version=%s)", env, sha)
 
     # Bootstrap seed: ensure a master_admin user exists so the
     # platform has a working login immediately after deploy.
