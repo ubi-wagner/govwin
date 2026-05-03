@@ -219,8 +219,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       tenantId,
       payload: {
         correlationId: randomUUID(),
+        tenantId,
+        tenantSlug,
         proposalId,
         commentId: comment.id,
+        commentText: text,
         nodeId,
       },
     });

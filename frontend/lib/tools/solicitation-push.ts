@@ -148,6 +148,14 @@ export const solicitationPushTool = defineTool<Input, Output>({
          'approved', 'pushed_to_pipeline')
     `;
 
+    // Count topics (opportunities) linked to this solicitation for
+    // downstream workflow matching (on_solicitation_pushed expects it).
+    const [topicRow] = await sql<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM opportunities
+      WHERE solicitation_id = ${solicitationId}::uuid
+    `;
+    const topicCount = parseInt(topicRow?.count ?? '0', 10);
+
     await emitEventSingle({
       namespace: 'finder',
       type: 'solicitation.pushed',
@@ -157,6 +165,7 @@ export const solicitationPushTool = defineTool<Input, Output>({
         solicitationId,
         opportunityId: r.opportunityId,
         namespace: r.namespace,
+        topicCount,
       },
     });
 

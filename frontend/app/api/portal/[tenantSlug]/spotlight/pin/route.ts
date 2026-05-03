@@ -54,13 +54,13 @@ async function resolveAuth(ctx: RouteContext) {
     return { error: NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 }) };
   }
 
-  return { tenantId, userId: sessionUser.id };
+  return { tenantId, tenantSlug, userId: sessionUser.id };
 }
 
 export async function POST(request: Request, ctx: RouteContext) {
   const authResult = await resolveAuth(ctx);
   if ('error' in authResult) return authResult.error;
-  const { tenantId, userId } = authResult;
+  const { tenantId, tenantSlug, userId } = authResult;
 
   let body: unknown;
   try {
@@ -80,9 +80,9 @@ export async function POST(request: Request, ctx: RouteContext) {
   const { opportunityId } = parsed.data;
 
   try {
-    // Verify opportunity exists
-    const [opp] = await sql<{ id: string }[]>`
-      SELECT id FROM opportunities WHERE id = ${opportunityId}
+    // Verify opportunity exists and fetch title for event payload
+    const [opp] = await sql<{ id: string; title: string }[]>`
+      SELECT id, title FROM opportunities WHERE id = ${opportunityId}
     `;
     if (!opp) {
       return NextResponse.json({ error: 'Opportunity not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -101,7 +101,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       type: 'topic.pinned',
       actor: { type: 'user', id: userId },
       tenantId,
-      payload: { correlationId: randomUUID(), opportunityId },
+      payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId, topicTitle: opp.title },
     });
 
     return NextResponse.json({ data: { pinned: true, opportunityId } });
@@ -114,7 +114,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 export async function DELETE(request: Request, ctx: RouteContext) {
   const authResult = await resolveAuth(ctx);
   if ('error' in authResult) return authResult.error;
-  const { tenantId, userId } = authResult;
+  const { tenantId, tenantSlug, userId } = authResult;
 
   let body: unknown;
   try {
@@ -144,7 +144,7 @@ export async function DELETE(request: Request, ctx: RouteContext) {
       type: 'topic.unpinned',
       actor: { type: 'user', id: userId },
       tenantId,
-      payload: { correlationId: randomUUID(), opportunityId },
+      payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId },
     });
 
     return NextResponse.json({ data: { pinned: false, opportunityId } });

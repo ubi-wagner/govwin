@@ -79,6 +79,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
       tenantId,
       payload: {
         correlationId: randomUUID(),
+        tenantId,
+        tenantSlug,
         proposalId,
         commentId,
       },

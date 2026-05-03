@@ -467,6 +467,7 @@ export async function POST(request: Request) {
     result: {
       opportunityId: oppRowId,
       solicitationId: solId,
+      documentIds,
       documentCount: documentIds?.length ?? 0,
       textExtracted: extractedText !== null,
       topicsExtracted: topicsExtracted,

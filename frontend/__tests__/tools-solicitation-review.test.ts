@@ -232,6 +232,7 @@ describe('solicitation.push', () => {
       .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
       .mockResolvedValueOnce(undefined) // opportunities UPDATE
       .mockResolvedValueOnce(undefined) // triage_actions
+      .mockResolvedValueOnce([{ count: '3' }]) // topic COUNT
       .mockResolvedValueOnce(undefined); // memory INSERT
 
     const result = await invoke('solicitation.push',
@@ -244,8 +245,8 @@ describe('solicitation.push', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.pushed' }),
     );
-    // 5 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + memory
-    expect(sqlMock).toHaveBeenCalledTimes(5);
+    // 6 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + COUNT topics + memory
+    expect(sqlMock).toHaveBeenCalledTimes(6);
   });
 
   it('throws ValidationError when submission_format is missing', async () => {

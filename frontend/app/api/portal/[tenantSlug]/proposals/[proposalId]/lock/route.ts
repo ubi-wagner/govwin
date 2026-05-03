@@ -79,7 +79,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
       type: 'proposal.locked',
       actor: userActor(sessionUser.id, sessionUser.email),
       tenantId,
-      payload: { correlationId: randomUUID(), proposalId },
+      payload: { correlationId: randomUUID(), tenantId, tenantSlug, proposalId },
     });
 
     return NextResponse.json({
@@ -164,7 +164,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       type: 'proposal.unlocked',
       actor: userActor(sessionUser.id, sessionUser.email),
       tenantId,
-      payload: { correlationId: randomUUID(), proposalId },
+      payload: { correlationId: randomUUID(), tenantId, tenantSlug, proposalId },
     });
 
     return NextResponse.json({

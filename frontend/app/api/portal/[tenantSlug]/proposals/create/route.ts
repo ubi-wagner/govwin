@@ -133,6 +133,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       actor: userActor(userId, sessionUser.email),
       tenantId,
       payload: {
+        tenantId,
+        tenantSlug,
         topicId,
         solicitationId: topic.solicitationId,
         productType: productType ?? undefined,
@@ -283,6 +285,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── End event ─────────────────────────────────────────────────────
     await emitEventEnd(eventId, {
       result: {
+        tenantId,
+        tenantSlug,
         proposalId: proposal.id,
         sectionCount,
         title: proposalTitle,
