@@ -15,6 +15,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
 interface RouteContext {
   params: Promise<{ solId: string }>;
@@ -199,6 +201,14 @@ export async function POST(
         RETURNING id, outline
       `;
     }
+
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'outline.saved',
+      actor: { type: 'user', id: actorId },
+      tenantId: null,
+      payload: { correlationId: randomUUID(), solicitationId: solId, outlineId: row.id },
+    });
 
     return NextResponse.json({
       data: { outline: row.outline, outlineId: row.id },

@@ -9,6 +9,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -60,6 +62,15 @@ export async function POST(_req: Request, ctx: RouteContext) {
       SET is_primary = true
       WHERE id = ${id}::uuid
     `;
+
+    const userId = (session.user as { id?: string }).id;
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'document.primary_set',
+      actor: { type: 'user', id: userId ?? 'unknown' },
+      tenantId: null,
+      payload: { correlationId: randomUUID(), documentId: id, solicitationId: doc.solicitationId },
+    });
 
     return NextResponse.json({ data: { id, isPrimary: true } });
   } catch (err) {

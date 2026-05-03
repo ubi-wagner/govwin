@@ -13,6 +13,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
 interface RouteContext {
   params: Promise<{ solId: string }>;
@@ -164,6 +166,14 @@ export async function POST(
          ${typeof complianceVariableName === 'string' ? complianceVariableName : null})
       RETURNING *
     `;
+
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'annotation.saved',
+      actor: { type: 'user', id: actorId },
+      tenantId: null,
+      payload: { correlationId: randomUUID(), solicitationId: solId, annotationId: (annotation as { id: string }).id },
+    });
 
     return NextResponse.json({ data: { annotation } });
   } catch (error) {

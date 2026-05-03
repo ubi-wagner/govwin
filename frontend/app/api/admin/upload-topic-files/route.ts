@@ -18,6 +18,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { putObject } from '@/lib/storage/s3-client';
+import { emitEventSingle } from '@/lib/events';
 
 // Common topic-number patterns in filenames
 const TOPIC_RE = /([A-Z]{1,5}\d{2,3}[._-]\w{1,10})/i;
@@ -132,6 +133,21 @@ export async function POST(request: Request) {
       topicNumber,
       title,
       filename: displayName,
+    });
+  }
+
+  if (uploaded.length > 0) {
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'topic_file.uploaded',
+      actor: { type: 'user', id: userId ?? 'unknown' },
+      tenantId: null,
+      payload: {
+        correlationId: randomUUID(),
+        solicitationId,
+        fileCount: uploaded.length,
+        documentIds: uploaded.map(u => u.documentId),
+      },
     });
   }
 
