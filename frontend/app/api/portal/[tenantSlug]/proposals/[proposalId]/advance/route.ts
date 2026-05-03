@@ -99,8 +99,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     const notes = typeof body.notes === 'string' ? body.notes : null;
 
     // ── Load current proposal ────────────────────────────────────────
-    const [proposal] = await sql<{ id: string; stage: string }[]>`
-      SELECT id, stage FROM proposals
+    const [proposal] = await sql<{ id: string; stage: string; title: string }[]>`
+      SELECT id, stage, title FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
       LIMIT 1
@@ -152,7 +152,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       tenantId,
       payload: {
         correlationId: randomUUID(),
+        tenantId,
+        tenantSlug,
         proposalId,
+        proposalTitle: proposal.title,
         previousStage,
         targetStage,
         locked: shouldLock,

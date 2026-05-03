@@ -89,8 +89,8 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    const [section] = await sql<{ id: string; version: number; status: string }[]>`
-      SELECT id, version, status FROM proposal_sections
+    const [section] = await sql<{ id: string; version: number; status: string; title: string }[]>`
+      SELECT id, version, status, title FROM proposal_sections
       WHERE id = ${sectionId}
         AND proposal_id = ${proposalId}
       LIMIT 1
@@ -129,8 +129,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
       tenantId,
       payload: {
         correlationId: randomUUID(),
+        tenantId,
+        tenantSlug,
         proposalId,
         sectionId,
+        sectionTitle: section.title,
         version: nextVersion,
         status: newStatus ?? undefined,
       },

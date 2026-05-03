@@ -91,9 +91,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.error('[auth.authorize] bcrypt error', String(e));
           return null;
         }
-        if (!ok) return null;
+        if (!ok) {
+          try {
+            await sql`
+              INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, actor_email, payload)
+              VALUES ('identity', 'user.login_failed', 'single', 'system', 'auth', ${email},
+                      ${JSON.stringify({ correlationId: crypto.randomUUID() })}::jsonb)
+            `;
+          } catch { /* non-critical */ }
+          return null;
+        }
 
         await touchLastLogin(user.id);
+
+        try {
+          await sql`
+            INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, actor_email, payload)
+            VALUES ('identity', 'user.logged_in', 'single', 'user', ${user.id}, ${user.email},
+                    ${JSON.stringify({ correlationId: crypto.randomUUID() })}::jsonb)
+          `;
+        } catch { /* non-critical */ }
 
         return {
           id: user.id,

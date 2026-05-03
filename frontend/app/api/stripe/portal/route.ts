@@ -3,6 +3,8 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { createCustomerPortalSession } from '@/lib/stripe';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
 /**
  * Creates a Stripe Customer Portal session for the authenticated
@@ -57,6 +59,14 @@ export async function POST() {
       tenant.stripeCustomerId,
       returnUrl,
     );
+
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'billing.portal_opened',
+      actor: { type: 'user', id: user.id! },
+      tenantId: user.tenantId,
+      payload: { correlationId: randomUUID(), tenantId: user.tenantId },
+    });
 
     return NextResponse.json({ data: { url: portalSession.url } });
   } catch (err) {

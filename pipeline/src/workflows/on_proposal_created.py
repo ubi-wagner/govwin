@@ -26,7 +26,7 @@ class OnProposalCreated(Workflow):
             step_type=StepType.AI_INVOKE,
             action="tool.proposal.draft_all_sections",
             input_map={
-                "proposal_id": "result.proposalId",
+                "proposal_id": "payload.proposalId",
                 "tenant_id": "payload.tenantId",
             },
             timeout_minutes=15,
@@ -41,7 +41,7 @@ class OnProposalCreated(Workflow):
                 "channel": '"email"',
                 "template": '"proposal_workspace_ready"',
                 "tenant_id": "payload.tenantId",
-                "proposal_id": "result.proposalId",
+                "proposal_id": "payload.proposalId",
             },
         ),
     ]

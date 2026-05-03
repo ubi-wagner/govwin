@@ -184,6 +184,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active
       .mockResolvedValueOnce(undefined)                   // triage_actions
+      .mockResolvedValueOnce([{ count: '5' }])            // topic COUNT
       .mockResolvedValueOnce(undefined);                  // push memory INSERT
 
     const push = await invoke('solicitation.push', {

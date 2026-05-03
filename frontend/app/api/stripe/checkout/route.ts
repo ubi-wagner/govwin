@@ -7,6 +7,8 @@ import {
   getOrCreateStripeCustomer,
   type ProductType,
 } from '@/lib/stripe';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
 const VALID_PRODUCT_TYPES: ProductType[] = [
   'finder_subscription',
@@ -99,6 +101,14 @@ export async function POST(request: Request) {
     if (!checkoutSession.url) {
       return NextResponse.json({ error: 'Failed to create checkout session', code: 'DB_ERROR' }, { status: 500 });
     }
+
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'checkout.started',
+      actor: { type: 'user', id: user.id!, email: user.email ?? undefined },
+      tenantId: user.tenantId,
+      payload: { correlationId: randomUUID(), productType, tenantId: user.tenantId },
+    });
 
     return NextResponse.json({ data: { url: checkoutSession.url } });
   } catch (err) {
