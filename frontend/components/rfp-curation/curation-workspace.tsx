@@ -6,6 +6,7 @@ import { useTool } from '@/lib/hooks/use-tool';
 import { PdfViewer, type TextSelection } from './pdf-viewer';
 import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
+import { TopicComplianceManager } from './topic-compliance-manager';
 
 interface Solicitation {
   id: string;
@@ -181,6 +182,7 @@ export function CurationWorkspace({
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
+  const [showTopicCompliance, setShowTopicCompliance] = useState(false);
   const [extractedPasteText, setExtractedPasteText] = useState('');
   const [topicsList, setTopicsList] = useState(topics);
 
@@ -662,6 +664,18 @@ export function CurationWorkspace({
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {topicsList.length > 0 && (
+                  <button
+                    onClick={() => setShowTopicCompliance(!showTopicCompliance)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded border ${
+                      showTopicCompliance
+                        ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {showTopicCompliance ? 'Hide Compliance' : 'Manage Compliance'}
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     try {
@@ -774,6 +788,15 @@ export function CurationWorkspace({
               </ul>
             )}
           </div>
+
+          {/* Topic Compliance Manager — toggled by "Manage Compliance" button */}
+          {showTopicCompliance && topicsList.length > 0 && (
+            <TopicComplianceManager
+              solicitationId={sol.id}
+              topics={topicsList}
+              onClose={() => setShowTopicCompliance(false)}
+            />
+          )}
 
           {showAddTopic && (
             <AddTopicModal

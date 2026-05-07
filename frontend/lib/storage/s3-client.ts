@@ -18,6 +18,7 @@ import {
   HeadObjectCommand,
   HeadBucketCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -105,6 +106,26 @@ export async function deleteObject(key: string): Promise<void> {
   } catch (e) {
     console.error('[s3.deleteObject] failed', { key, err: String(e) });
     throw new Error('storage delete failed');
+  }
+}
+
+/**
+ * Copy an object within the same bucket.
+ * Used during proposal provisioning to copy RFP documents into the customer sandbox.
+ */
+export async function copyObject({ sourceKey, destKey }: { sourceKey: string; destKey: string }): Promise<void> {
+  try {
+    const command = new CopyObjectCommand({
+      Bucket: BUCKET,
+      CopySource: `${BUCKET}/${sourceKey}`,
+      Key: destKey,
+    });
+    await s3.send(command);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    const code = (e as { Code?: string; name?: string })?.Code ?? (e as { name?: string })?.name ?? 'unknown';
+    console.error('[s3.copyObject] failed', { sourceKey, destKey, bucket: BUCKET, code, err: detail });
+    throw new Error(`S3 copy failed (${code}): ${detail}`);
   }
 }
 
