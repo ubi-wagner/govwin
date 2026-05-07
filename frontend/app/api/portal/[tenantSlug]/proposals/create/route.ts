@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
+import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -158,47 +159,30 @@ export async function POST(request: Request, ctx: RouteContext) {
       RETURNING id
     `;
 
-    // ── Find required items from the solicitation's volumes ──────────
-    // When productType is set, map to phase filter for applies_to_phase
-    const phaseFilter = productType === 'proposal_phase1'
-      ? 'phase_1'
-      : productType === 'proposal_phase2'
-        ? 'phase_2'
-        : null;
+    // ── Resolve compliance + volumes via topic -> solicitation -> defaults chain ─
+    const resolved = await resolveTopicCompliance(topicId);
 
-    const requiredItems = phaseFilter
-      ? await sql<{
-          id: string;
-          itemNumber: number;
-          itemName: string;
-          itemType: string;
-          volumeId: string;
-          pageLimit: number | null;
-        }[]>`
-          SELECT vri.id, vri.item_number, vri.item_name, vri.item_type,
-                 vri.volume_id, vri.page_limit
-          FROM volume_required_items vri
-          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
-          WHERE sv.solicitation_id = ${topic.solicitationId}
-            AND (sv.applies_to_phase IS NULL OR sv.applies_to_phase = '{}' OR ${phaseFilter} = ANY(sv.applies_to_phase))
-            AND (vri.applies_to_phase IS NULL OR vri.applies_to_phase = '{}' OR ${phaseFilter} = ANY(vri.applies_to_phase))
-          ORDER BY sv.volume_number ASC, vri.item_number ASC
-        `
-      : await sql<{
-          id: string;
-          itemNumber: number;
-          itemName: string;
-          itemType: string;
-          volumeId: string;
-          pageLimit: number | null;
-        }[]>`
-          SELECT vri.id, vri.item_number, vri.item_name, vri.item_type,
-                 vri.volume_id, vri.page_limit
-          FROM volume_required_items vri
-          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
-          WHERE sv.solicitation_id = ${topic.solicitationId}
-          ORDER BY sv.volume_number ASC, vri.item_number ASC
-        `;
+    // Flatten resolved volumes into a requiredItems list for section creation.
+    // Each item gets a synthetic section number based on volume + item ordering.
+    const requiredItems: Array<{
+      itemNumber: number;
+      itemName: string;
+      itemType: string;
+      pageLimit: number | null;
+    }> = [];
+
+    let globalItemIndex = 0;
+    for (const vol of resolved.volumes) {
+      for (const item of vol.items) {
+        globalItemIndex++;
+        requiredItems.push({
+          itemNumber: globalItemIndex,
+          itemName: item.itemName as string,
+          itemType: item.itemType as string,
+          pageLimit: (item.pageLimit as number) ?? null,
+        });
+      }
+    }
 
     // ── Create proposal_sections from required items ─────────────────
     // Build merge-field variables for template interpolation
@@ -243,8 +227,6 @@ export async function POST(request: Request, ctx: RouteContext) {
             // Set metadata IDs linking this document to the proposal structure
             templateDoc.metadata.proposal_id = proposal.id;
             templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-            templateDoc.metadata.volume_id = item.volumeId;
-            templateDoc.metadata.required_item_id = item.id;
             templateDoc.metadata.created_at = new Date().toISOString();
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = userId;
