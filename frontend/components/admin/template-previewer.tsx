@@ -16,7 +16,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { CanvasRenderer } from '@/components/canvas/canvas-renderer';
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
-import { getTemplate, type TemplateKey } from '@/lib/templates';
+import { getTemplate } from '@/lib/templates';
 
 // --- Template registry metadata (display info for selector) ---
 
