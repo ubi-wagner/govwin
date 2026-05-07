@@ -115,6 +115,16 @@ async def _process_new_events():
         if (ns, etype) in FRONTEND_HANDLED:
             continue
 
+        # Handle workflow NOTIFY steps directly — these events carry the
+        # template name and recipient info in their payload so we don't
+        # need to match against automation_rules.
+        if ns == 'system' and etype == 'notification.requested':
+            try:
+                await _handle_notification_requested(event)
+            except Exception as e:
+                logger.error(f'notification.requested handling failed: {e}')
+            continue
+
         for rule in rules:
             if _rule_matches(rule, col_names, ns, etype):
                 try:
@@ -255,6 +265,78 @@ async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) ->
         logger.warning(f'Failed to resolve recipient from {to_field}={raw_value}: {e}')
 
     return None
+
+
+async def _handle_notification_requested(event) -> None:
+    """Handle a ``system:notification.requested`` event emitted by a workflow
+    NOTIFY step.
+
+    The event payload contains:
+      - template: template name to render
+      - channel: delivery channel ("email" for V1)
+      - tenant_id / user_id / to_role: recipient identifiers
+      - additional fields forwarded as template context
+    """
+    payload = event.get('payload')
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except (json.JSONDecodeError, TypeError):
+            payload = {}
+    if not payload:
+        logger.warning('notification.requested event has no payload, skipping')
+        return
+
+    channel = payload.get('channel', 'email')
+    if channel != 'email':
+        logger.info(f'notification.requested channel={channel} not supported in V1, skipping')
+        return
+
+    template_name = payload.get('template', '')
+    if not template_name:
+        logger.warning('notification.requested event has no template, skipping')
+        return
+
+    # Render the template
+    html = render_template(template_name, payload)
+    if not html:
+        logger.warning(f'No template rendered for "{template_name}" in notification.requested, skipping')
+        return
+
+    # Resolve recipient
+    to_email = None
+
+    # Check for admin-targeted notifications (to_role = rfp_admin)
+    to_role = payload.get('to_role')
+    if to_role in ('rfp_admin', 'master_admin'):
+        to_email = ADMIN_EMAIL
+    else:
+        # Try to resolve from user_id or tenant_id
+        for field in ('user_id', 'tenant_id'):
+            val = payload.get(field)
+            if val:
+                resolved = await _resolve_recipient_email(
+                    f'payload.{field}', payload, event
+                )
+                if resolved:
+                    to_email = resolved
+                    break
+
+    # Fall back to direct email fields in the payload
+    if not to_email:
+        to_email = payload.get('contactEmail') or payload.get('email') or payload.get('to')
+    if not to_email:
+        logger.warning(f'No recipient resolved for notification.requested template="{template_name}", skipping')
+        return
+
+    subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
+
+    result = await send_email(
+        to=to_email,
+        subject=subject,
+        html=html,
+    )
+    logger.info(f'notification.requested: sent "{template_name}" to {to_email}: {result}')
 
 
 async def _do_action(action_type: str, config: dict, payload: dict, event):

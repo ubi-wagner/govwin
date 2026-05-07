@@ -159,22 +159,64 @@ async def _execute_notify(
     action: str,
     inputs: dict[str, Any],
 ) -> dict[str, Any]:
-    """Execute a notification step.
+    """Execute a notification step by emitting a system event.
 
-    For V1, we log the notification details. Actual email/webhook
-    delivery will be wired in V2.
+    Inserts a ``system:notification.requested`` event into system_events.
+    The CRM event_listener polls for these events and delivers the email
+    via Gmail API using the template and recipient specified in ``inputs``.
+
+    The ``inputs`` dict is populated from the step's ``input_map`` and
+    typically contains:
+      - channel: "email" (only email supported in V1)
+      - template: template name (e.g. "welcome_accepted")
+      - tenant_id / user_id / to_role: recipient identifiers
+      - additional context fields forwarded as template variables
     """
+    channel = inputs.get("channel", "email")
+    template = inputs.get("template", "unknown")
+
     log.info(
         "NOTIFY: action=%s channel=%s template=%s",
         action,
-        inputs.get("channel", "unknown"),
-        inputs.get("template", "unknown"),
+        channel,
+        template,
     )
+
+    # Build the notification payload for the CRM event_listener
+    notification_payload = {
+        "channel": channel,
+        "template": template,
+        **{k: v for k, v in inputs.items() if k not in ("channel",)},
+    }
+
+    # Emit a system event that the CRM event_listener will pick up
+    try:
+        await emit_event(
+            conn,
+            namespace="system",
+            type="notification.requested",
+            payload=notification_payload,
+        )
+        log.info(
+            "NOTIFY: emitted notification.requested event (template=%s)",
+            template,
+        )
+    except Exception as exc:
+        log.error("NOTIFY: failed to emit notification event: %s", exc)
+        return {
+            "result": {
+                "notified": False,
+                "channel": channel,
+                "template": template,
+                "error": str(exc),
+            }
+        }
+
     return {
         "result": {
             "notified": True,
-            "channel": inputs.get("channel"),
-            "template": inputs.get("template"),
+            "channel": channel,
+            "template": template,
         }
     }
 
