@@ -246,11 +246,11 @@ class SamGovIngester(BaseIngester):
         # Try DB-stored encrypted key first
         try:
             row = await conn.fetchrow(
-                "SELECT encrypted_value FROM api_key_registry "
+                "SELECT encrypted_key FROM api_key_registry "
                 "WHERE source = 'sam_gov'"
             )
-            if row and row["encrypted_value"]:
-                self._api_key = decrypt_api_key(row["encrypted_value"])
+            if row and row["encrypted_key"]:
+                self._api_key = decrypt_api_key(row["encrypted_key"])
                 log.info("Using SAM.gov API key from database (encrypted)")
                 return self._api_key
         except Exception as e:
