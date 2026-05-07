@@ -101,7 +101,7 @@ export async function GET(
       }
     }
     if (q) {
-      filters.push(sql`content ILIKE ${'%' + q + '%'}`);
+      filters.push(sql`content ILIKE ${'%' + q.replace(/[%_\\]/g, '\\$&') + '%'}`);
     }
 
     const where = filters.reduce(
