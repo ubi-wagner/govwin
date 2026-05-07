@@ -357,6 +357,20 @@ outline → draft → pink_team → red_team → gold_team → final → submitt
 ```
 Workspace auto-locks on `final` and `submitted`.
 
+### Deployment
+- Single environment: `main` branch → Railway production auto-deploy
+- Staging environment exists on Railway but is dormant until first paying customer
+- Migration workflow supports both environments when needed
+- DO NOT add staging ceremony (dual secrets, dual migrations) until explicitly asked
+
+### Source Scout (Opportunity Monitoring)
+- `source_profiles` table with `auto_crawl_enabled`, `crawl_cron`
+- `source_regions` for admin-annotated page areas with Claude guidance
+- `source_snapshots` + `source_diffs` for change tracking
+- Scout tool: HTTP fetch + Claude classification (no Playwright)
+- Workflow: `on_source_change_detected` → draft RFP → notify admin
+- Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
+
 ---
 
 ## 6. File Naming & Location Conventions
