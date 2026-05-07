@@ -8,7 +8,7 @@
  * Route: /admin/templates
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TemplatePreviewer } from '@/components/admin/template-previewer';
 import { getTemplate } from '@/lib/templates';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
@@ -195,7 +195,7 @@ export default function AdminTemplatesPage() {
 
   // Apply filters
   const filtered = useMemo(() => {
-    return allRecords.filter((r) => {
+    return allRecords.filter((r: TemplateRecord) => {
       if (filterType && r.template_type !== filterType) return false;
       if (filterAgency && r.agency !== filterAgency) return false;
       if (filterProgram && r.program_type !== filterProgram) return false;
@@ -222,7 +222,7 @@ export default function AdminTemplatesPage() {
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <select
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterType(e.target.value)}
           className="border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
           {TEMPLATE_TYPES.map((t) => (
@@ -231,7 +231,7 @@ export default function AdminTemplatesPage() {
         </select>
         <select
           value={filterAgency}
-          onChange={(e) => setFilterAgency(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterAgency(e.target.value)}
           className="border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
           {AGENCIES.map((a) => (
@@ -240,7 +240,7 @@ export default function AdminTemplatesPage() {
         </select>
         <select
           value={filterProgram}
-          onChange={(e) => setFilterProgram(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterProgram(e.target.value)}
           className="border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
         >
           {PROGRAM_TYPES.map((p) => (
@@ -264,7 +264,7 @@ export default function AdminTemplatesPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((record) => (
+          {filtered.map((record: TemplateRecord) => (
             <div
               key={record.id}
               className="flex items-center gap-4 p-4 bg-white border rounded-lg hover:border-gray-300 transition-colors"

@@ -12,7 +12,7 @@
  *   - Canvas rendering via CanvasRenderer in read-only mode
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { CanvasRenderer } from '@/components/canvas/canvas-renderer';
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
@@ -149,7 +149,7 @@ export function TemplatePreviewer({
             <label className="block text-xs font-medium text-gray-500 mb-1">Template</label>
             <select
               value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedKey(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {TEMPLATE_OPTIONS.map((opt) => (

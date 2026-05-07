@@ -21,15 +21,6 @@ interface RouteContext {
   params: Promise<{ solId: string; topicId: string }>;
 }
 
-/** Columns we expose from solicitation_compliance (snake_case for DB, camelCase in output). */
-const COMPLIANCE_COLUMNS = [
-  'page_limit_technical', 'page_limit_cost', 'font_family', 'font_size',
-  'margins', 'line_spacing', 'header_required', 'header_format',
-  'footer_required', 'footer_format', 'submission_format',
-  'slides_allowed', 'slide_limit', 'taba_allowed',
-  'pi_must_be_employee', 'partner_max_pct', 'clearance_required', 'itar_required',
-] as const;
-
 function rowToCompliance(row: Record<string, unknown>): Record<string, unknown> {
   return {
     pageLimitTechnical: row.pageLimitTechnical ?? null,

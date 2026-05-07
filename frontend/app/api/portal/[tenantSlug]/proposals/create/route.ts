@@ -5,6 +5,8 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
+import { putObject, copyObject } from '@/lib/storage/s3-client';
+import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -65,6 +67,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     const hasAccess = await verifyTenantAccess(userId, role, tenantId);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Stripe gate — founding cohort bypass
+    // When Stripe is live, check for a valid purchase or active subscription
+    // before allowing proposal creation. For now, all tenant_admins can create.
+    const FOUNDING_COHORT_BYPASS = true; // Set to false when Stripe billing is enforced
+    if (!FOUNDING_COHORT_BYPASS) {
+      return NextResponse.json(
+        { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
+        { status: 402 },
+      );
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -264,6 +277,79 @@ export async function POST(request: Request, ctx: RouteContext) {
       sectionCount = 1;
     }
 
+    // ── Provision S3 artifacts (non-blocking — failure is logged, not fatal) ─
+    let docsCopied = 0;
+    try {
+      // 1. Freeze compliance snapshot
+      const complianceSnapshot = JSON.stringify(resolved.compliance, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'compliance.json'),
+        body: Buffer.from(complianceSnapshot),
+        contentType: 'application/json',
+        metadata: { 'snapshot-type': 'compliance', 'source-solicitation': topic.solicitationId ?? '' },
+      });
+
+      // 2. Save volumes structure
+      const volumesSnapshot = JSON.stringify(resolved.volumes, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'volumes.json'),
+        body: Buffer.from(volumesSnapshot),
+        contentType: 'application/json',
+      });
+
+      // 3. Copy RFP documents to customer sandbox
+      const solDocs = await sql<{
+        id: string;
+        storageKey: string;
+        originalFilename: string;
+        documentType: string;
+        isPrimary: boolean;
+      }[]>`
+        SELECT id, storage_key, original_filename, document_type, is_primary
+        FROM solicitation_documents
+        WHERE solicitation_id = ${topic.solicitationId}::uuid
+        ORDER BY is_primary DESC, created_at ASC
+      `;
+
+      for (const doc of solDocs) {
+        try {
+          await copyObject({
+            sourceKey: doc.storageKey,
+            destKey: customerProposalPath(tenantSlug, proposal.id, `rfp/${doc.originalFilename}`),
+          });
+          docsCopied++;
+        } catch (copyErr) {
+          console.error('[api/portal/proposals/create] rfp doc copy failed', {
+            docId: doc.id,
+            sourceKey: doc.storageKey,
+            err: copyErr instanceof Error ? copyErr.message : String(copyErr),
+          });
+        }
+      }
+
+      // 4. Save topic metadata snapshot
+      const topicSnapshot = JSON.stringify({
+        topicNumber: topic.topicNumber,
+        title: topic.title,
+        agency: topic.agency,
+        programType: topic.programType,
+        solicitationNumber: topic.solicitationNumber,
+        snapshotAt: new Date().toISOString(),
+      }, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'topic.json'),
+        body: Buffer.from(topicSnapshot),
+        contentType: 'application/json',
+      });
+    } catch (artifactErr) {
+      // Artifact provisioning is enrichment — DB rows are the critical path.
+      // Log the warning but do not fail the proposal creation.
+      console.error('[api/portal/proposals/create] artifact provisioning warning', {
+        proposalId: proposal.id,
+        err: artifactErr instanceof Error ? artifactErr.message : String(artifactErr),
+      });
+    }
+
     // ── End event ─────────────────────────────────────────────────────
     await emitEventEnd(eventId, {
       result: {
@@ -272,6 +358,12 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalId: proposal.id,
         sectionCount,
         title: proposalTitle,
+        artifactsProvisioned: {
+          compliance: true,
+          volumes: true,
+          rfpDocuments: docsCopied,
+          topicMetadata: true,
+        },
       },
     });
 
