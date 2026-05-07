@@ -23,6 +23,20 @@ export interface SourceProfile {
   updatedAt: string;
   visitCount: string | number;
   lastActivity: string | null;
+  autoCrawlEnabled: boolean;
+  crawlCron: string | null;
+  lastCrawlAt: string | null;
+}
+
+export interface SourceDiff {
+  id: string;
+  profileId: string;
+  summary: string | null;
+  severity: string;
+  isMeaningful: boolean;
+  createdAt: string;
+  sourceName: string;
+  regionName: string | null;
 }
 
 export interface SourceVisit {
@@ -87,6 +101,26 @@ function formatRelative(iso: string): string {
   if (diffDay < 7) return `${diffDay}d ago`;
   return formatDate(iso);
 }
+
+function formatCron(cron: string | null): string {
+  if (!cron) return 'daily';
+  // Simple cron-to-human for the common patterns we use
+  const parts = cron.split(' ');
+  if (parts.length < 5) return cron;
+  const [min, hour, , , dow] = parts;
+  const timeStr = `${hour.padStart(2, '0')}:${min.padStart(2, '0')} UTC`;
+  if (dow === '*') return `daily at ${timeStr}`;
+  const dayNames: Record<string, string> = { '0': 'Sun', '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat' };
+  return `${dayNames[dow] ?? dow} at ${timeStr}`;
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  info: 'bg-gray-100 text-gray-700',
+  low: 'bg-blue-100 text-blue-700',
+  medium: 'bg-yellow-100 text-yellow-800',
+  high: 'bg-orange-100 text-orange-700',
+  critical: 'bg-red-100 text-red-700',
+};
 
 // ── Paste Topics Modal ──────────────────────────────────────────────
 
@@ -296,8 +330,28 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [scouting, setScouting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleScoutNow = useCallback(async () => {
+    setScouting(true);
+    try {
+      const res = await fetch(`/api/admin/sources/${source.id}/scout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error('[source-card] scout failed:', body.error);
+      }
+      onRefresh();
+    } catch (err) {
+      console.error('[source-card] scout failed:', err);
+    } finally {
+      setScouting(false);
+    }
+  }, [source.id, onRefresh]);
 
   const logVisit = useCallback(
     async (action: string, extra?: { url?: string; notes?: string; filesCount?: number; topicsCount?: number }) => {
@@ -423,6 +477,24 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
           {source.baseUrl}
         </a>
 
+        {/* Crawl status indicator */}
+        <div className="flex items-center gap-3 text-xs">
+          {source.autoCrawlEnabled ? (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-gray-600">Auto-crawl: {formatCron(source.crawlCron)}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
+              <span className="text-gray-500">Manual only</span>
+            </span>
+          )}
+          <span className="text-gray-400">
+            Last crawl: {source.lastCrawlAt ? formatRelative(source.lastCrawlAt) : 'never'}
+          </span>
+        </div>
+
         {/* Expandable: Admin Notes */}
         {source.adminNotes && (
           <div>
@@ -488,6 +560,13 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
             className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm font-medium hover:bg-gray-500"
           >
             Add Note
+          </button>
+          <button
+            onClick={handleScoutNow}
+            disabled={scouting}
+            className="px-3 py-1.5 bg-teal-600 text-white rounded text-sm font-medium hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {scouting ? 'Scouting...' : 'Scout Now'}
           </button>
         </div>
 
@@ -611,14 +690,66 @@ function ActivityTimeline({ visits }: ActivityTimelineProps) {
 
 // ── Main Exported Component ─────────────────────────────────────────
 
+// ── Recent Changes Feed ─────────────────────────────────────────────
+
+interface RecentChangesFeedProps {
+  diffs: SourceDiff[];
+}
+
+function RecentChangesFeed({ diffs }: RecentChangesFeedProps) {
+  if (diffs.length === 0) {
+    return (
+      <div className="text-sm text-gray-500 py-4 text-center">
+        No meaningful changes detected yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {diffs.map((d) => {
+        const severityColor = SEVERITY_COLORS[d.severity] ?? SEVERITY_COLORS.info;
+        return (
+          <div key={d.id} className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
+            <div className="text-xs text-gray-400 w-24 shrink-0 pt-0.5">
+              {formatRelative(d.createdAt)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={`/admin/sources/${d.profileId}`}
+                  className="text-sm font-medium text-gray-800 hover:text-indigo-600"
+                >
+                  {d.sourceName}
+                </a>
+                {d.regionName && (
+                  <span className="text-xs text-gray-500">{d.regionName}</span>
+                )}
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${severityColor}`}>
+                  {d.severity}
+                </span>
+              </div>
+              {d.summary && <p className="text-sm text-gray-500 mt-0.5 truncate">{d.summary}</p>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main Exported Component ─────────────────────────────────────────
+
 interface SourcesHubProps {
   initialProfiles: SourceProfile[];
   initialActivity: SourceVisit[];
+  initialDiffs?: SourceDiff[];
 }
 
-export default function SourcesHub({ initialProfiles, initialActivity }: SourcesHubProps) {
+export default function SourcesHub({ initialProfiles, initialActivity, initialDiffs }: SourcesHubProps) {
   const [profiles, setProfiles] = useState<SourceProfile[]>(initialProfiles);
   const [activity, setActivity] = useState<SourceVisit[]>(initialActivity);
+  const [diffs, setDiffs] = useState<SourceDiff[]>(initialDiffs ?? []);
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -629,6 +760,9 @@ export default function SourcesHub({ initialProfiles, initialActivity }: Sources
         const json = await res.json();
         setProfiles(json.data.sources);
         setActivity(json.data.recentActivity);
+        if (json.data.recentDiffs) {
+          setDiffs(json.data.recentDiffs);
+        }
       }
     } catch {
       // Fail silently — data stays as-is
@@ -663,6 +797,14 @@ export default function SourcesHub({ initialProfiles, initialActivity }: Sources
             No active source profiles found. Add source profiles to the database to get started.
           </div>
         )}
+      </div>
+
+      {/* Recent Changes */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Recent Changes</h2>
+        <div className="bg-white rounded-lg border shadow-sm p-4">
+          <RecentChangesFeed diffs={diffs} />
+        </div>
       </div>
 
       {/* Recent Activity */}

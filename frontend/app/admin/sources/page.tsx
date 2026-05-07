@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import SourcesHub, {
   type SourceProfile,
   type SourceVisit,
+  type SourceDiff,
 } from '@/components/admin/source-card-actions';
 
 // ── Types for raw DB rows ───────────────────────────────────────────
@@ -27,6 +28,9 @@ type SourceProfileRow = {
   updatedAt: Date;
   visitCount: string;
   lastActivity: Date | null;
+  autoCrawlEnabled: boolean | null;
+  crawlCron: string | null;
+  lastCrawlAt: Date | null;
 };
 
 type SourceVisitRow = {
@@ -43,6 +47,17 @@ type SourceVisitRow = {
   sourceName: string;
 };
 
+type SourceDiffRow = {
+  id: string;
+  profileId: string;
+  summary: string | null;
+  severity: string;
+  isMeaningful: boolean;
+  createdAt: Date;
+  sourceName: string;
+  regionName: string | null;
+};
+
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function SourcesPage() {
@@ -56,6 +71,7 @@ export default async function SourcesPage() {
 
   let profileRows: SourceProfileRow[] = [];
   let visitRows: SourceVisitRow[] = [];
+  let diffRows: SourceDiffRow[] = [];
 
   try {
     profileRows = await sql<SourceProfileRow[]>`
@@ -82,6 +98,23 @@ export default async function SourcesPage() {
     console.error('[admin/sources] activity query failed:', e);
   }
 
+  try {
+    diffRows = await sql<SourceDiffRow[]>`
+      SELECT sd.id, sd.profile_id, sd.summary, sd.severity,
+             sd.is_meaningful, sd.created_at,
+             sp.name AS source_name,
+             sr.name AS region_name
+      FROM source_diffs sd
+      JOIN source_profiles sp ON sp.id = sd.profile_id
+      LEFT JOIN source_regions sr ON sr.id = sd.region_id
+      WHERE sd.is_meaningful = true
+      ORDER BY sd.created_at DESC
+      LIMIT 20
+    `;
+  } catch (e) {
+    console.error('[admin/sources] diffs query failed:', e);
+  }
+
   // Serialize Date objects to ISO strings for the client component
   const profiles: SourceProfile[] = profileRows.map((r) => ({
     id: r.id,
@@ -102,6 +135,9 @@ export default async function SourcesPage() {
     updatedAt: r.updatedAt.toISOString(),
     visitCount: r.visitCount,
     lastActivity: r.lastActivity?.toISOString() ?? null,
+    autoCrawlEnabled: r.autoCrawlEnabled ?? false,
+    crawlCron: r.crawlCron ?? null,
+    lastCrawlAt: r.lastCrawlAt?.toISOString() ?? null,
   }));
 
   const activity: SourceVisit[] = visitRows.map((v) => ({
@@ -116,6 +152,17 @@ export default async function SourcesPage() {
     metadata: v.metadata,
     createdAt: v.createdAt.toISOString(),
     sourceName: v.sourceName,
+  }));
+
+  const recentDiffs: SourceDiff[] = diffRows.map((d) => ({
+    id: d.id,
+    profileId: d.profileId,
+    summary: d.summary,
+    severity: d.severity,
+    isMeaningful: d.isMeaningful,
+    createdAt: d.createdAt.toISOString(),
+    sourceName: d.sourceName,
+    regionName: d.regionName,
   }));
 
   return (
@@ -134,7 +181,11 @@ export default async function SourcesPage() {
           + New Solicitation
         </a>
       </div>
-      <SourcesHub initialProfiles={profiles} initialActivity={activity} />
+      <SourcesHub
+        initialProfiles={profiles}
+        initialActivity={activity}
+        initialDiffs={recentDiffs}
+      />
     </div>
   );
 }

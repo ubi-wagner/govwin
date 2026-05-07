@@ -18,6 +18,7 @@ import asyncpg
 from ingest.sam_gov import SamGovIngester
 from ingest.sbir_gov import SbirGovIngester
 from ingest.grants_gov import GrantsGovIngester
+from ingest.dsip import DsipIngester
 
 log = logging.getLogger("pipeline.dispatcher")
 
@@ -26,6 +27,7 @@ INGESTERS = {
     "sam_gov": SamGovIngester,
     "sbir_gov": SbirGovIngester,
     "grants_gov": GrantsGovIngester,
+    "dsip": DsipIngester,
 }
 
 
@@ -116,8 +118,11 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
     Routes by pipeline_jobs.kind:
       - 'ingest'              → ingester (sam_gov, sbir_gov, grants_gov)
       - 'shred_solicitation'  → shredder.runner.shred_solicitation
+      - 'scout_source'        → source scout (single source or all due)
 
     For shred jobs, metadata must contain 'solicitation_id' (UUID str).
+    For scout jobs, metadata may contain 'source_id' (UUID str); if
+    absent, scouts all sources where auto_crawl is enabled and due.
     """
     # Atomically claim the next pending job
     job = await conn.fetchrow(
@@ -157,6 +162,8 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
     try:
         if kind == "shred_solicitation":
             await _run_shred_job(conn, job_id, metadata)
+        elif kind == "scout_source":
+            await _run_scout_job(conn, job_id, metadata)
         else:  # default: 'ingest'
             await _run_ingest_job(conn, job_id, source, metadata)
     except Exception as e:
@@ -273,6 +280,46 @@ async def _run_shred_job(
         json.dumps(result),
     )
     log.info("shred job %s completed: %s", job_id, result.get("status"))
+
+
+async def _run_scout_job(
+    conn: asyncpg.Connection,
+    job_id: Any,
+    metadata: dict,
+) -> None:
+    """Execute a scout_source job.
+
+    If metadata contains 'source_id', scouts that single source.
+    Otherwise, scouts all sources where auto_crawl is enabled and due.
+    """
+    # Lazy import so the dispatcher can be imported without the scout
+    # worker and its httpx/anthropic dependencies being fully wired.
+    from workers.source_scout import scout_source, scout_all_due
+
+    source_id = metadata.get("source_id")
+
+    if source_id:
+        result = await scout_source(conn, source_id)
+    else:
+        result = await scout_all_due(conn)
+
+    status = "failed" if result.get("error") else "completed"
+
+    await conn.execute(
+        """
+        UPDATE pipeline_jobs
+        SET status = $2,
+            completed_at = now(),
+            result = $3::jsonb
+        WHERE id = $1
+        """,
+        job_id,
+        status,
+        json.dumps(result),
+    )
+    log.info("scout job %s %s: %s", job_id, status, {
+        k: v for k, v in result.items() if k != "results"
+    })
 
 
 async def run_consumer_loop(
