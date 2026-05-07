@@ -12,7 +12,6 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TemplatePreviewer } from '@/components/admin/template-previewer';
 import { getTemplate } from '@/lib/templates';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
-import { getNodeText } from '@/lib/types/canvas-document';
 
 // --- Template metadata (mirrors the document_templates DB schema) ---
 
