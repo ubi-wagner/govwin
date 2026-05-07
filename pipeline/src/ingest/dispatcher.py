@@ -281,6 +281,33 @@ async def _run_shred_job(
     )
     log.info("shred job %s completed: %s", job_id, result.get("status"))
 
+    # Emit the finder.rfp.shredded lifecycle event so downstream systems
+    # (scoring, spotlight, customer notifications) can react.
+    if result.get("status") == "ai_analyzed":
+        import uuid as _uuid
+        try:
+            await conn.execute(
+                """
+                INSERT INTO system_events
+                  (id, namespace, type, phase, actor_type, actor_id,
+                   payload, created_at)
+                VALUES ($1, 'finder', 'rfp.shredded', 'single',
+                        'pipeline', 'dispatcher',
+                        $2::jsonb, now())
+                """,
+                _uuid.uuid4(),
+                json.dumps({
+                    "solicitation_id": solicitation_id,
+                    "job_id": str(job_id),
+                    "status": result.get("status"),
+                    "sections": result.get("sections", 0),
+                    "compliance_matches": result.get("compliance_matches", 0),
+                    "namespace": result.get("namespace"),
+                }),
+            )
+        except Exception as e:
+            log.error("failed to emit rfp.shredded event for job %s: %s", job_id, e)
+
 
 async def _run_scout_job(
     conn: asyncpg.Connection,

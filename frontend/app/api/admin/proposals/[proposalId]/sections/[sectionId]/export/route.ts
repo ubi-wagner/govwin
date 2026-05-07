@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { isRole } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -18,6 +19,12 @@ export async function POST(request: Request, _ctx: RouteContext) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
+  }
+
+  const sessionUser = session.user as { role?: unknown };
+  const role = isRole(sessionUser.role) ? sessionUser.role : null;
+  if (role !== 'master_admin' && role !== 'rfp_admin') {
+    return NextResponse.json({ error: 'Admin access required', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   const body = await request.json();
