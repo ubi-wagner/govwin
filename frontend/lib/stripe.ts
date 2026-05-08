@@ -25,18 +25,20 @@ export const stripe = process.env.STRIPE_SECRET_KEY
 
 // ─── Product types ──────────────────────────────────────────────────
 
-export type ProductType = 'finder_subscription' | 'proposal_phase1' | 'proposal_phase2';
+export type ProductType = 'finder_subscription' | 'proposal_phase1' | 'proposal_phase2' | 'expert_consulting';
 
 const PRICE_IDS: Record<ProductType, string | undefined> = {
   finder_subscription: process.env.STRIPE_SPOTLIGHT_PRICE_ID,
   proposal_phase1: process.env.STRIPE_PROPOSAL_P1_PRICE_ID,
   proposal_phase2: process.env.STRIPE_PROPOSAL_P2_PRICE_ID,
+  expert_consulting: process.env.STRIPE_CONSULTING_PRICE_ID,
 };
 
 const AMOUNTS_CENTS: Record<ProductType, number> = {
   finder_subscription: 29900,
   proposal_phase1: 99900,
   proposal_phase2: 199900,
+  expert_consulting: 50000,
 };
 
 export function getAmountCents(productType: ProductType): number {
@@ -93,6 +95,7 @@ export async function createCheckoutSession(
     tenantSlug: string;
     customerId: string;
     opportunityId?: string;
+    quantity?: number;
   },
 ): Promise<Stripe.Checkout.Session> {
   if (!stripe) throw new Error('Stripe is not configured');
@@ -103,6 +106,7 @@ export async function createCheckoutSession(
   }
 
   const isSubscription = productType === 'finder_subscription';
+  const quantity = metadata.quantity ?? 1;
 
   const successUrl = `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}/portal/${metadata.tenantSlug}/billing`;
@@ -110,12 +114,13 @@ export async function createCheckoutSession(
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     customer: metadata.customerId,
     mode: isSubscription ? 'subscription' : 'payment',
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [{ price: priceId, quantity }],
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata: {
       tenant_id: tenantId,
       product_type: productType,
+      ...(quantity > 1 ? { quantity: String(quantity) } : {}),
       ...(metadata.opportunityId ? { opportunity_id: metadata.opportunityId } : {}),
     },
   };

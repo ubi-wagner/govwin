@@ -14,6 +14,7 @@ const VALID_PRODUCT_TYPES: ProductType[] = [
   'finder_subscription',
   'proposal_phase1',
   'proposal_phase2',
+  'expert_consulting',
 ];
 
 export async function POST(request: Request) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     // ── Input validation ─────────────────────────────────────────
-    let body: { productType?: string; opportunityId?: string };
+    let body: { productType?: string; opportunityId?: string; quantity?: number };
     try {
       body = await request.json();
     } catch {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     const productType = body.productType as ProductType | undefined;
     if (!productType || !VALID_PRODUCT_TYPES.includes(productType)) {
       return NextResponse.json(
-        { error: 'Invalid productType. Must be one of: finder_subscription, proposal_phase1, proposal_phase2', code: 'VALIDATION_ERROR' },
+        { error: 'Invalid productType. Must be one of: finder_subscription, proposal_phase1, proposal_phase2, expert_consulting', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -70,6 +71,11 @@ export async function POST(request: Request) {
         { error: 'opportunityId is required for proposal purchases', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
+    }
+
+    let quantity = 1;
+    if (productType === 'expert_consulting') {
+      quantity = Math.min(Math.max(Math.floor(body.quantity ?? 1), 1), 10);
     }
 
     // ── Business logic ───────────────────────────────────────────
@@ -95,6 +101,7 @@ export async function POST(request: Request) {
         tenantSlug: tenant.slug,
         customerId,
         opportunityId: opportunityId ?? undefined,
+        quantity,
       },
     );
 

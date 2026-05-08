@@ -31,9 +31,11 @@ function formatProductType(type: string): string {
     case 'finder_subscription':
       return 'Spotlight Subscription';
     case 'proposal_phase1':
-      return 'Proposal Portal (Phase 1)';
+      return 'Proposal Portal (Phase I)';
     case 'proposal_phase2':
-      return 'Proposal Portal (Phase 2)';
+      return 'Proposal Portal (Phase II)';
+    case 'expert_consulting':
+      return 'Expert Consulting';
     default:
       return type;
   }
@@ -80,6 +82,8 @@ export default function BillingPanel({
   const [error, setError] = useState<string | null>(null);
   const [isCheckoutPending, startCheckoutTransition] = useTransition();
   const [isPortalPending, startPortalTransition] = useTransition();
+  const [isConsultingPending, startConsultingTransition] = useTransition();
+  const [consultingHours, setConsultingHours] = useState(1);
 
   function handleSubscribe() {
     setError(null);
@@ -132,8 +136,38 @@ export default function BillingPanel({
     });
   }
 
+  function handlePurchaseConsulting() {
+    setError(null);
+    startConsultingTransition(async () => {
+      try {
+        const res = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productType: 'expert_consulting', quantity: consultingHours }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          setError(data?.error ?? 'Failed to start checkout');
+          return;
+        }
+        const data = await res.json();
+        if (data?.data?.url) {
+          window.location.href = data.data.url;
+        } else {
+          setError('No checkout URL returned');
+        }
+      } catch {
+        setError('Network error');
+      }
+    });
+  }
+
   const isActive = subscriptionStatus === 'active';
   const isCanceled = subscriptionStatus === 'canceled';
+
+  const totalConsultingHours = purchases
+    .filter((p) => p.productType === 'expert_consulting' && p.status === 'completed')
+    .reduce((sum, p) => sum + Math.round(p.amountCents / 50000), 0);
 
   return (
     <div className="space-y-8">
@@ -190,6 +224,49 @@ export default function BillingPanel({
 
         {error && (
           <p className="mt-3 text-sm text-red-600">{error}</p>
+        )}
+      </div>
+
+      {/* Expert Consulting */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-2">Expert Consulting — Eric Wagner</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Pre-paid 1-on-1 strategy sessions. Pursuit recommendations, agency guidance,
+          pre-submission review, and competitive positioning. $500/hour, purchased in
+          1-hour increments.
+        </p>
+
+        {totalConsultingHours > 0 && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-sm text-blue-800 font-medium">
+              {totalConsultingHours} hour{totalConsultingHours !== 1 ? 's' : ''} purchased
+            </span>
+            <span className="text-xs text-blue-600 ml-2">Schedule via your dashboard</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600 font-medium">Hours:</label>
+          <select
+            value={consultingHours}
+            onChange={(e) => setConsultingHours(parseInt(e.target.value, 10))}
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <option key={n} value={n}>{n} hour{n > 1 ? 's' : ''} — ${n * 500}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handlePurchaseConsulting}
+            disabled={isConsultingPending || !isActive}
+            className="px-4 py-1.5 text-sm rounded-lg font-medium bg-navy-900 text-white hover:bg-navy-800 transition-colors disabled:opacity-50"
+          >
+            {isConsultingPending ? 'Redirecting...' : `Purchase ${consultingHours} Hour${consultingHours > 1 ? 's' : ''}`}
+          </button>
+        </div>
+        {!isActive && (
+          <p className="mt-2 text-xs text-gray-400">Requires active Spotlight subscription</p>
         )}
       </div>
 

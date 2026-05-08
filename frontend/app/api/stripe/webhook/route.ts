@@ -88,14 +88,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   `;
   if (existing) return;
 
-  const amountCents = getAmountCents(productType);
+  const quantity = parseInt(session.metadata?.quantity ?? '1', 10) || 1;
+  const amountCents = getAmountCents(productType) * quantity;
   const paymentIntent = typeof session.payment_intent === 'string'
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
 
   // Insert the purchase record
   await sql`
-    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
+    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status, metadata)
     VALUES (
       ${tenantId},
       ${opportunityId},
@@ -103,7 +104,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       ${paymentIntent},
       ${productType},
       ${amountCents},
-      'completed'
+      'completed',
+      ${JSON.stringify(quantity > 1 ? { quantity, hours: quantity } : {})}::jsonb
     )
   `;
 
@@ -118,6 +120,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       actor: systemActor('stripe-webhook'),
       tenantId,
       payload: { correlationId: randomUUID(), sessionId, productType },
+    });
+  } else if (productType === 'expert_consulting') {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'consulting.purchased',
+      actor: systemActor('stripe-webhook'),
+      tenantId,
+      payload: { correlationId: randomUUID(), sessionId, productType, hours: quantity },
     });
   } else {
     await emitEventSingle({
