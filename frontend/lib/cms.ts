@@ -8,6 +8,8 @@
 
 import { sql } from '@/lib/db';
 
+export type ContentStatus = 'draft' | 'pending' | 'published' | 'private' | 'archived';
+
 export interface ContentRow {
   id: string;
   slug: string;
@@ -18,6 +20,7 @@ export interface ContentRow {
   author: string | null;
   tags: string[];
   published: boolean;
+  status: ContentStatus;
   publishedAt: Date | null;
   featuredImage: string | null;
   externalUrl: string | null;
@@ -34,10 +37,10 @@ export async function getPublishedContent(contentType: string, limit?: number): 
   try {
     const rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, external_url,
+             published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
       FROM cms_content
-      WHERE content_type = ${contentType} AND published = true
+      WHERE content_type = ${contentType} AND status = 'published'
       ORDER BY display_order ASC, published_at DESC
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;
@@ -55,10 +58,10 @@ export async function getContentBySlug(slug: string): Promise<ContentRow | null>
   try {
     const [row] = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, external_url,
+             published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
       FROM cms_content
-      WHERE slug = ${slug} AND published = true
+      WHERE slug = ${slug} AND status = 'published'
       LIMIT 1
     `;
     return row ?? null;
@@ -75,10 +78,10 @@ export async function getContentBlocks(tag: string): Promise<ContentRow[]> {
   try {
     const rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, external_url,
+             published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
       FROM cms_content
-      WHERE ${tag} = ANY(tags) AND published = true
+      WHERE ${tag} = ANY(tags) AND status = 'published'
       ORDER BY display_order ASC, published_at DESC
     `;
     return rows;
@@ -96,12 +99,12 @@ export async function getPageBlocks(page: string): Promise<ContentRow[]> {
   try {
     const rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, external_url,
+             published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
       FROM cms_content
       WHERE content_type = 'page_block'
         AND ${page} = ANY(tags)
-        AND published = true
+        AND status = 'published'
       ORDER BY display_order ASC, created_at ASC
     `;
     return rows;
@@ -152,10 +155,10 @@ export async function getPublishedContentByTypes(contentTypes: string[], limit?:
   try {
     const rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, external_url,
+             published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
       FROM cms_content
-      WHERE content_type = ANY(${contentTypes}) AND published = true
+      WHERE content_type = ANY(${contentTypes}) AND status = 'published'
       ORDER BY display_order ASC, published_at DESC
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;

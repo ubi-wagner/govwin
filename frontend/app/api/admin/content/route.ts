@@ -133,22 +133,23 @@ export async function POST(request: Request) {
     const excerpt = typeof body.excerpt === 'string' ? body.excerpt.trim() || null : null;
     const author = typeof body.author === 'string' ? body.author.trim() || null : null;
     const tags = Array.isArray(body.tags) ? body.tags.filter((t: unknown) => typeof t === 'string') : [];
-    const published = typeof body.published === 'boolean' ? body.published : false;
+    const validStatuses = ['draft', 'pending', 'published', 'private', 'archived'];
+    const status = typeof body.status === 'string' && validStatuses.includes(body.status) ? body.status : 'draft';
+    const published = status === 'published';
     const featuredImage = typeof body.featuredImage === 'string' ? body.featuredImage.trim() || null : null;
     const externalUrl = typeof body.externalUrl === 'string' ? body.externalUrl.trim() || null : null;
     const displayOrder = typeof body.displayOrder === 'number' ? body.displayOrder : 0;
     const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
 
-    const publishedAt = published ? new Date() : null;
-
     const [row] = await sql<{ id: string }[]>`
       INSERT INTO cms_content (
         slug, title, content_type, body, excerpt, author, tags,
-        published, published_at, featured_image, external_url,
+        published, status, published_at, featured_image, external_url,
         display_order, metadata, created_by
       ) VALUES (
         ${slug}, ${title}, ${contentType}, ${articleBody}, ${excerpt},
-        ${author}, ${tags}, ${published}, ${publishedAt},
+        ${author}, ${tags}, ${published}, ${status},
+        ${published ? sql`now()` : sql`NULL`},
         ${featuredImage}, ${externalUrl}, ${displayOrder},
         ${JSON.stringify(metadata)}::jsonb, ${userId}
       )
@@ -160,10 +161,11 @@ export async function POST(request: Request) {
         author = EXCLUDED.author,
         tags = EXCLUDED.tags,
         published = EXCLUDED.published,
+        status = EXCLUDED.status,
         published_at = CASE
-          WHEN EXCLUDED.published = true AND cms_content.published_at IS NULL
+          WHEN EXCLUDED.status = 'published' AND cms_content.published_at IS NULL
           THEN now()
-          WHEN EXCLUDED.published = false THEN NULL
+          WHEN EXCLUDED.status != 'published' THEN NULL
           ELSE cms_content.published_at
         END,
         featured_image = EXCLUDED.featured_image,

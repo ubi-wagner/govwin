@@ -9,11 +9,21 @@ type ContentRow = {
   title: string;
   contentType: string;
   published: boolean;
+  status: string;
   publishedAt: Date | null;
   author: string | null;
   tags: string[];
   externalUrl: string | null;
+  featuredImage: string | null;
   updatedAt: Date;
+};
+
+const STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
+  draft: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
+  pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
+  published: { bg: 'bg-green-100', text: 'text-green-700', label: 'Published' },
+  private: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Private' },
+  archived: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Archived' },
 };
 
 export default async function ContentPage() {
@@ -28,11 +38,12 @@ export default async function ContentPage() {
   let rows: ContentRow[] = [];
   try {
     rows = await sql<ContentRow[]>`
-      SELECT id, slug, title, content_type, published, published_at,
-             author, tags, external_url, updated_at
+      SELECT id, slug, title, content_type, published,
+             COALESCE(status, CASE WHEN published THEN 'published' ELSE 'draft' END) AS status,
+             published_at, author, tags, external_url, featured_image, updated_at
       FROM cms_content
       ORDER BY updated_at DESC
-      LIMIT 50
+      LIMIT 200
     `;
   } catch (e) {
     console.error('[admin/content] query failed:', e);
@@ -44,8 +55,10 @@ export default async function ContentPage() {
         <div>
           <h1 className="text-2xl font-bold">Content Management</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {rows.length} articles &middot;{' '}
-            {rows.filter((r) => r.published).length} published
+            {rows.length} items &middot;{' '}
+            {rows.filter((r) => r.status === 'published').length} published &middot;{' '}
+            {rows.filter((r) => r.status === 'draft').length} draft &middot;{' '}
+            {rows.filter((r) => r.status === 'archived').length} archived
           </p>
         </div>
         <Link
@@ -87,15 +100,14 @@ export default async function ContentPage() {
                     {row.contentType.replace('_', ' ')}
                   </td>
                   <td className="px-4 py-3">
-                    {row.published ? (
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                        Published
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
-                        Draft
-                      </span>
-                    )}
+                    {(() => {
+                      const badge = STATUS_BADGES[row.status] ?? STATUS_BADGES.draft;
+                      return (
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.bg} ${badge.text}`}>
+                          {badge.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{row.author ?? '—'}</td>
                   <td className="px-4 py-3">
