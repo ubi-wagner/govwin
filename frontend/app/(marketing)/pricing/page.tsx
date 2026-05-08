@@ -145,8 +145,26 @@ export default async function Page() {
           title="Eric is available when you need him"
           subtitle="Monthly minutes included. Additional time on demand."
         />
-        <div className="mt-12 max-w-md mx-auto">
+        <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           <PricingTier {...expertTier} />
+          <PricingTier
+            label="Pre-Paid Consulting"
+            name="Expert Consulting"
+            price="$500"
+            period="/ hour"
+            description="Deep-dive strategy sessions with Eric. Pre-paid in 1-hour increments, up to 10 hours per purchase. For teams that need more than the included monthly minutes."
+            features={[
+              'Pursuit / no-pursuit deep analysis',
+              'Competitive positioning strategy',
+              'Agency-specific capture planning',
+              'Pre-submission red team review',
+              'Proposal architecture and outlining',
+              'Post-debrief win/loss analysis',
+              'Purchase 1–10 hours per transaction',
+            ]}
+            cta={{ label: 'Purchase Hours', href: '/apply' }}
+            highlighted={false}
+          />
         </div>
       </Section>
 

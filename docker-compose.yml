@@ -55,8 +55,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3000}
     container_name: govtech_frontend
