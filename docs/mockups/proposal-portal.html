@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proposal Portal — RFP Pipeline</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fb; color: #1a1a2e; }
+
+  /* ─── Layout ─────────────────────────────────────────── */
+  .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #0f1629; color: #fff; padding: 20px 0; z-index: 10; }
+  .sidebar a { display: block; padding: 8px 24px; color: #94a3b8; font-size: 13px; text-decoration: none; }
+  .sidebar a:hover, .sidebar a.active { color: #fff; background: rgba(255,255,255,0.08); }
+  .sidebar .brand { padding: 0 24px 20px; font-size: 15px; font-weight: 700; color: #60a5fa; }
+  .sidebar .section-label { padding: 16px 24px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
+  .main { margin-left: 220px; }
+
+  /* ─── Top Bar ────────────────────────────────────────── */
+  .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar .meta { font-size: 12px; color: #64748b; }
+  .topbar .meta span { margin-left: 16px; }
+
+  /* ─── View Switcher ──────────────────────────────────── */
+  .view-switcher { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; gap: 0; }
+  .view-switcher button { padding: 12px 20px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; }
+  .view-switcher button.active { color: #2563eb; border-bottom-color: #2563eb; }
+  .view-switcher button:hover { color: #1e40af; }
+
+  /* ─── Content ────────────────────────────────────────── */
+  .content { padding: 24px 28px; max-width: 1200px; }
+
+  /* ─── Stage Bar ──────────────────────────────────────── */
+  .stage-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .stage-steps { display: flex; align-items: center; gap: 0; }
+  .stage-step { display: flex; align-items: center; gap: 8px; }
+  .stage-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+  .stage-dot.done { background: #10b981; color: #fff; }
+  .stage-dot.current { background: #2563eb; color: #fff; box-shadow: 0 0 0 4px rgba(37,99,235,0.2); }
+  .stage-dot.upcoming { background: #e2e8f0; color: #94a3b8; }
+  .stage-label { font-size: 12px; font-weight: 500; margin-right: 16px; }
+  .stage-connector { width: 40px; height: 2px; background: #e2e8f0; margin: 0 4px; }
+  .stage-connector.done { background: #10b981; }
+  .stage-actions { display: flex; gap: 8px; align-items: center; }
+  .stage-actions .deadline { font-size: 12px; color: #ef4444; font-weight: 500; }
+
+  /* ─── Tabs ───────────────────────────────────────────── */
+  .tab-bar { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
+  .tab-bar button { padding: 10px 18px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; }
+  .tab-bar button.active { color: #2563eb; border-bottom-color: #2563eb; }
+
+  /* ─── Cards ──────────────────────────────────────────── */
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+
+  /* ─── Volume Section ─────────────────────────────────── */
+  .volume { margin-bottom: 20px; }
+  .volume-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #f1f5f9; border-radius: 8px 8px 0 0; border: 1px solid #e2e8f0; cursor: pointer; }
+  .volume-header h3 { font-size: 13px; font-weight: 600; margin: 0; color: #334155; }
+  .volume-header .progress { font-size: 11px; color: #64748b; }
+  .volume-body { border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; }
+
+  .artifact-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; gap: 12px; }
+  .artifact-row:last-child { border-bottom: none; }
+  .artifact-row:hover { background: #f8fafc; }
+  .artifact-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+  .artifact-icon.docx { background: #dbeafe; color: #2563eb; }
+  .artifact-icon.xlsx { background: #d1fae5; color: #059669; }
+  .artifact-icon.pptx { background: #fde68a; color: #d97706; }
+  .artifact-icon.pdf { background: #fee2e2; color: #dc2626; }
+  .artifact-icon.form { background: #e0e7ff; color: #4f46e5; }
+  .artifact-info { flex: 1; min-width: 0; }
+  .artifact-info .title { font-size: 13px; font-weight: 500; }
+  .artifact-info .meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .artifact-assignee { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .avatar { width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .avatar.blue { background: #3b82f6; }
+  .avatar.green { background: #10b981; }
+  .avatar.purple { background: #8b5cf6; }
+  .avatar.orange { background: #f59e0b; }
+  .artifact-status { flex-shrink: 0; }
+
+  /* ─── Status Badges ──────────────────────────────────── */
+  .badge { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge.draft { background: #dbeafe; color: #2563eb; }
+  .badge.complete { background: #d1fae5; color: #059669; }
+  .badge.empty { background: #f1f5f9; color: #94a3b8; }
+  .badge.review { background: #fef3c7; color: #d97706; }
+  .badge.locked { background: #e0e7ff; color: #4f46e5; }
+
+  /* ─── Page Progress ──────────────────────────────────── */
+  .page-bar { width: 80px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+  .page-bar .fill { height: 100%; border-radius: 3px; }
+  .page-bar .fill.ok { background: #10b981; }
+  .page-bar .fill.warn { background: #f59e0b; }
+  .page-bar .fill.over { background: #ef4444; }
+
+  /* ─── Team Panel ─────────────────────────────────────── */
+  .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .team-member { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .team-member .info { flex: 1; }
+  .team-member .name { font-size: 13px; font-weight: 600; }
+  .team-member .email { font-size: 11px; color: #94a3b8; }
+  .team-member .role-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .role-badge.admin { background: #fee2e2; color: #dc2626; }
+  .role-badge.contributor { background: #dbeafe; color: #2563eb; }
+  .role-badge.external { background: #f3e8ff; color: #7c3aed; }
+
+  /* ─── Access Matrix ──────────────────────────────────── */
+  .access-matrix { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .access-matrix th { text-align: left; padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b; }
+  .access-matrix td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+  .access-matrix .perm { display: inline-block; width: 18px; height: 18px; border-radius: 4px; text-align: center; line-height: 18px; font-size: 9px; font-weight: 700; }
+  .perm.edit { background: #dbeafe; color: #2563eb; }
+  .perm.comment { background: #fef3c7; color: #d97706; }
+  .perm.view { background: #f1f5f9; color: #94a3b8; }
+  .perm.none { background: #fff; border: 1px solid #e2e8f0; color: #e2e8f0; }
+
+  /* ─── Dropbox ────────────────────────────────────────── */
+  .dropbox { border: 2px dashed #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; margin-top: 12px; cursor: pointer; }
+  .dropbox:hover { border-color: #93c5fd; background: #f0f7ff; }
+  .file-list { margin-top: 8px; }
+  .file-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+  .file-item .icon { font-size: 14px; }
+
+  /* ─── Buttons ────────────────────────────────────────── */
+  .btn { padding: 8px 16px; font-size: 12px; font-weight: 600; border: none; border-radius: 6px; cursor: pointer; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-outline { background: #fff; color: #2563eb; border: 1px solid #2563eb; }
+  .btn-success { background: #10b981; color: #fff; }
+  .btn-danger { background: #fff; color: #ef4444; border: 1px solid #ef4444; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+  .btn-ghost { background: none; color: #64748b; border: 1px solid #e2e8f0; }
+
+  /* ─── Compliance Checklist ───────────────────────────── */
+  .checklist-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
+  .check { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+  .check.pass { background: #d1fae5; color: #059669; }
+  .check.fail { background: #fee2e2; color: #dc2626; }
+  .check.pending { background: #f1f5f9; color: #94a3b8; }
+
+  /* ─── AI Panel ───────────────────────────────────────── */
+  .ai-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ai-btn { padding: 8px 14px; font-size: 11px; font-weight: 500; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .ai-btn:hover { background: #f8fafc; border-color: #93c5fd; }
+  .ai-btn .sparkle { color: #8b5cf6; }
+
+  /* ─── Hidden panels ──────────────────────────────────── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ─── Contributor view ───────────────────────────────── */
+  .my-section { border-left: 3px solid #2563eb; padding-left: 12px; margin-bottom: 12px; }
+  .view-only { border-left: 3px solid #e2e8f0; padding-left: 12px; margin-bottom: 12px; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="brand">RFP Pipeline</div>
+  <div class="section-label">Portal</div>
+  <a href="#">Dashboard</a>
+  <a href="#">Spotlights</a>
+  <a href="#" class="active">Proposals</a>
+  <a href="#">Library</a>
+  <a href="#">Team</a>
+  <a href="#">Billing</a>
+  <div class="section-label">Account</div>
+  <a href="#">Profile</a>
+  <a href="#">Settings</a>
+</div>
+
+<div class="main">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div>
+      <h1>AF251-001: Advanced RF Sensing for Contested Environments</h1>
+      <div class="meta">
+        <span>SBIR Phase I</span>
+        <span>•</span>
+        <span>Department of the Air Force</span>
+        <span>•</span>
+        <span>BAA SBIR 25.1</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-outline btn-sm">Export Package</button>
+      <button class="btn btn-primary btn-sm">Save All</button>
+    </div>
+  </div>
+
+  <!-- View Switcher (role simulation) -->
+  <div class="view-switcher">
+    <button class="active" onclick="showView('admin')">👑 Admin View</button>
+    <button onclick="showView('contributor')">👤 Contributor View (John)</button>
+    <button onclick="showView('external')">🔗 External View (Dr. Smith)</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- ADMIN VIEW                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="view-admin" class="content panel active">
+
+    <!-- Stage Bar -->
+    <div class="stage-bar">
+      <div class="stage-steps">
+        <div class="stage-step">
+          <div class="stage-dot done">✓</div>
+          <span class="stage-label">Draft</span>
+        </div>
+        <div class="stage-connector done"></div>
+        <div class="stage-step">
+          <div class="stage-dot current">2</div>
+          <span class="stage-label">Review</span>
+        </div>
+        <div class="stage-connector"></div>
+        <div class="stage-step">
+          <div class="stage-dot upcoming">3</div>
+          <span class="stage-label">Final</span>
+        </div>
+      </div>
+      <div class="stage-actions">
+        <span class="deadline">⏰ Due: May 15, 2026 (8 days)</span>
+        <button class="btn btn-success btn-sm">Advance to Final →</button>
+      </div>
+    </div>
+
+    <!-- Admin Tabs -->
+    <div class="tab-bar">
+      <button class="active" onclick="showTab('artifacts')">Artifacts</button>
+      <button onclick="showTab('team')">Team & Access</button>
+      <button onclick="showTab('compliance')">Compliance</button>
+      <button onclick="showTab('ai')">AI & Library</button>
+    </div>
+
+    <!-- ─── Artifacts Tab ─────────────────────────────────── -->
+    <div id="tab-artifacts" class="panel active">
+
+      <!-- Volume 1: Technical -->
+      <div class="volume">
+        <div class="volume-header">
+          <h3>📄 Volume 1: Technical Volume</h3>
+          <span class="progress">3 of 4 complete • 14/15 pages</span>
+        </div>
+        <div class="volume-body">
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Technical Proposal</div>
+              <div class="meta">15 page limit • TNR 10pt • Last edit: 2 hours ago</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar blue">JD</div>
+              <span style="font-size:11px; color:#64748b;">John D.</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="page-bar"><div class="fill warn" style="width:93%"></div></div>
+              <span style="font-size:11px; color:#f59e0b; font-weight:600;">14/15</span>
+            </div>
+            <span class="badge review">Review</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Cover Page</div>
+              <div class="meta">1 page • Auto-populated from profile</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar orange">EW</div>
+              <span style="font-size:11px; color:#64748b;">You</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge complete">Complete</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Key Personnel Bios</div>
+              <div class="meta">No page limit • 3 bios needed</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar green">SK</div>
+              <div class="avatar purple" style="margin-left:-12px;">MS</div>
+              <span style="font-size:11px; color:#64748b;">Sarah, Mike</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge draft">Draft</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Facilities & Equipment</div>
+              <div class="meta">No page limit • Not started</div>
+            </div>
+            <div class="artifact-assignee">
+              <span style="font-size:11px; color:#cbd5e1;">Unassigned</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge empty">Empty</span>
+            <button class="btn btn-ghost btn-sm">Assign</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume 2: Cost -->
+      <div class="volume">
+        <div class="volume-header">
+          <h3>📊 Volume 2: Cost Volume</h3>
+          <span class="progress">1 of 2 complete</span>
+        </div>
+        <div class="volume-body">
+          <div class="artifact-row">
+            <div class="artifact-icon xlsx">XLS</div>
+            <div class="artifact-info">
+              <div class="title">Cost Spreadsheet</div>
+              <div class="meta">4 sheets • Formulas auto-calculate overhead, G&A, fee</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar orange">EW</div>
+              <span style="font-size:11px; color:#64748b;">You</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge complete">Complete</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Budget Justification</div>
+              <div class="meta">No page limit • Narrative for each cost line</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar orange">EW</div>
+              <span style="font-size:11px; color:#64748b;">You</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge draft">Draft</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume 3: Supporting -->
+      <div class="volume">
+        <div class="volume-header">
+          <h3>📎 Volume 3: Supporting Documents</h3>
+          <span class="progress">1 of 3 complete</span>
+        </div>
+        <div class="volume-body">
+          <div class="artifact-row">
+            <div class="artifact-icon docx">DOC</div>
+            <div class="artifact-info">
+              <div class="title">Past Performance Narratives</div>
+              <div class="meta">3 contracts required • Template loaded</div>
+            </div>
+            <div class="artifact-assignee">
+              <div class="avatar green">SK</div>
+              <span style="font-size:11px; color:#64748b;">Sarah</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge draft">Draft</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon form">FORM</div>
+            <div class="artifact-info">
+              <div class="title">SBIR/STTR Funding Agreement Certification</div>
+              <div class="meta">Required form • Auto-filled from company profile</div>
+            </div>
+            <div class="artifact-assignee">
+              <span style="font-size:11px; color:#10b981;">✓ Auto-filled</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge complete">Complete</span>
+            <button class="btn btn-ghost btn-sm">Review</button>
+          </div>
+
+          <div class="artifact-row">
+            <div class="artifact-icon pdf">PDF</div>
+            <div class="artifact-info">
+              <div class="title">Company Commercialization Report</div>
+              <div class="meta">Generated from SBIR.gov • Upload or generate</div>
+            </div>
+            <div class="artifact-assignee">
+              <span style="font-size:11px; color:#cbd5e1;">Needs upload</span>
+            </div>
+            <div style="width:80px;"></div>
+            <span class="badge empty">Missing</span>
+            <button class="btn btn-primary btn-sm">Upload</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dropboxes -->
+      <div class="card" style="margin-top:8px;">
+        <h3>📦 Team Dropboxes</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+          <div style="border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div class="avatar blue">JD</div>
+              <span style="font-size:12px; font-weight:600;">John's Files</span>
+              <span style="font-size:10px; color:#94a3b8; margin-left:auto;">3 files</span>
+            </div>
+            <div class="file-list">
+              <div class="file-item"><span class="icon">📄</span> john_resume_v3.docx</div>
+              <div class="file-item"><span class="icon">📄</span> rf_sensor_paper.pdf</div>
+              <div class="file-item"><span class="icon">📄</span> test_data_summary.xlsx</div>
+            </div>
+          </div>
+          <div style="border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div class="avatar green">SK</div>
+              <span style="font-size:12px; font-weight:600;">Sarah's Files</span>
+              <span style="font-size:10px; color:#94a3b8; margin-left:auto;">1 file</span>
+            </div>
+            <div class="file-list">
+              <div class="file-item"><span class="icon">📄</span> past_perf_navy_contract.docx</div>
+            </div>
+          </div>
+          <div style="border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div class="avatar purple">DS</div>
+              <span style="font-size:12px; font-weight:600;">Dr. Smith's Files</span>
+              <span style="font-size:10px; color:#94a3b8; margin-left:auto;">2 files</span>
+            </div>
+            <div class="file-list">
+              <div class="file-item"><span class="icon">📄</span> smith_cv.pdf</div>
+              <div class="file-item"><span class="icon">📄</span> lab_capabilities.docx</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Team & Access Tab ─────────────────────────────── -->
+    <div id="tab-team" class="panel">
+      <div class="card">
+        <h3>Team Members <button class="btn btn-primary btn-sm" style="margin-left:auto;">+ Invite</button></h3>
+        <div class="team-grid">
+          <div class="team-member">
+            <div class="avatar orange" style="width:36px;height:36px;font-size:13px;">EW</div>
+            <div class="info">
+              <div class="name">Eric Wagner</div>
+              <div class="email">eric@rfppipeline.com</div>
+            </div>
+            <span class="role-badge admin">Admin</span>
+          </div>
+          <div class="team-member">
+            <div class="avatar blue" style="width:36px;height:36px;font-size:13px;">JD</div>
+            <div class="info">
+              <div class="name">John Doe</div>
+              <div class="email">john@acmetech.com</div>
+            </div>
+            <span class="role-badge contributor">Contributor</span>
+          </div>
+          <div class="team-member">
+            <div class="avatar green" style="width:36px;height:36px;font-size:13px;">SK</div>
+            <div class="info">
+              <div class="name">Sarah Kim</div>
+              <div class="email">sarah@acmetech.com</div>
+            </div>
+            <span class="role-badge contributor">Contributor</span>
+          </div>
+          <div class="team-member">
+            <div class="avatar purple" style="width:36px;height:36px;font-size:13px;">DS</div>
+            <div class="info">
+              <div class="name">Dr. James Smith</div>
+              <div class="email">jsmith@university.edu</div>
+            </div>
+            <span class="role-badge external">External</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Access Matrix</h3>
+        <table class="access-matrix">
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Eric (Admin)</th>
+              <th>John</th>
+              <th>Sarah</th>
+              <th>Dr. Smith</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Technical Proposal</td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm comment">C</span></td>
+              <td><span class="perm view">V</span></td>
+            </tr>
+            <tr>
+              <td>Cover Page</td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm view">V</span></td>
+              <td><span class="perm none">—</span></td>
+              <td><span class="perm none">—</span></td>
+            </tr>
+            <tr>
+              <td>Key Personnel Bios</td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm view">V</span></td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm edit">E</span></td>
+            </tr>
+            <tr>
+              <td>Cost Spreadsheet</td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm none">—</span></td>
+              <td><span class="perm none">—</span></td>
+              <td><span class="perm none">—</span></td>
+            </tr>
+            <tr>
+              <td>Past Performance</td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm comment">C</span></td>
+              <td><span class="perm edit">E</span></td>
+              <td><span class="perm none">—</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="font-size:11px; color:#94a3b8; margin-top:8px;">E = Edit &nbsp; C = Comment &nbsp; V = View only &nbsp; — = No access. Click any cell to change.</p>
+      </div>
+    </div>
+
+    <!-- ─── Compliance Tab ─────────────────────────────────── -->
+    <div id="tab-compliance" class="panel">
+      <div class="card">
+        <h3>Compliance Checklist — AF251-001</h3>
+        <div class="checklist-item"><div class="check pass">✓</div> Technical Volume ≤ 15 pages <span style="color:#10b981; font-size:11px; margin-left:auto;">14 pages</span></div>
+        <div class="checklist-item"><div class="check pass">✓</div> Font: Times New Roman 10pt</div>
+        <div class="checklist-item"><div class="check pass">✓</div> Margins: 1" all sides</div>
+        <div class="checklist-item"><div class="check pass">✓</div> Line spacing: 1.0 (single)</div>
+        <div class="checklist-item"><div class="check pass">✓</div> Header: topic number + company name</div>
+        <div class="checklist-item"><div class="check pass">✓</div> Footer: company name + page N of M</div>
+        <div class="checklist-item"><div class="check pass">✓</div> Cost volume submitted as spreadsheet</div>
+        <div class="checklist-item"><div class="check pass">✓</div> PI is primary employee (≥51% effort)</div>
+        <div class="checklist-item"><div class="check fail">✗</div> Company Commercialization Report <span style="color:#ef4444; font-size:11px; margin-left:auto;">Missing — upload required</span></div>
+        <div class="checklist-item"><div class="check pass">✓</div> SBIR Certification form signed</div>
+        <div class="checklist-item"><div class="check pending">?</div> TABA plan (optional) <span style="color:#94a3b8; font-size:11px; margin-left:auto;">Not included</span></div>
+        <div class="checklist-item"><div class="check pass">✓</div> SBC work share ≥ 67% <span style="color:#10b981; font-size:11px; margin-left:auto;">85%</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Source RFP Documents</h3>
+        <div class="artifact-row" style="border:none; padding:8px 0;">
+          <div class="artifact-icon pdf">PDF</div>
+          <div class="artifact-info">
+            <div class="title">SBIR 25.1 BAA Preface</div>
+            <div class="meta">87 pages • Uploaded Apr 15</div>
+          </div>
+          <button class="btn btn-ghost btn-sm">View PDF</button>
+        </div>
+        <div class="artifact-row" style="border:none; padding:8px 0;">
+          <div class="artifact-icon pdf">PDF</div>
+          <div class="artifact-info">
+            <div class="title">AF251-001 Topic Description</div>
+            <div class="meta">2 pages • Extracted from DSIP</div>
+          </div>
+          <button class="btn btn-ghost btn-sm">View PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── AI & Library Tab ───────────────────────────────── -->
+    <div id="tab-ai" class="panel">
+      <div class="card">
+        <h3>✨ AI Drafting</h3>
+        <p style="font-size:13px; color:#64748b; margin-bottom:12px;">Use Claude to draft content using your library atoms + RFP requirements.</p>
+        <div class="ai-actions">
+          <button class="ai-btn"><span class="sparkle">✦</span> Draft All Empty Sections</button>
+          <button class="ai-btn"><span class="sparkle">✦</span> Draft Technical Approach</button>
+          <button class="ai-btn"><span class="sparkle">✦</span> Generate Cover Page</button>
+          <button class="ai-btn"><span class="sparkle">✦</span> Auto-fill Certifications</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📚 Library Atoms Available</h3>
+        <p style="font-size:13px; color:#64748b; margin-bottom:12px;">Content from your library ranked by relevance to this topic.</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
+          <div style="border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
+            <div style="font-size:11px; font-weight:600; color:#2563eb;">Technical Approach</div>
+            <div style="font-size:11px; color:#94a3b8;">12 atoms • 3 from winning proposals</div>
+          </div>
+          <div style="border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
+            <div style="font-size:11px; font-weight:600; color:#10b981;">Key Personnel</div>
+            <div style="font-size:11px; color:#94a3b8;">8 atoms • 4 bios ready</div>
+          </div>
+          <div style="border:1px solid #e2e8f0; border-radius:6px; padding:10px;">
+            <div style="font-size:11px; font-weight:600; color:#f59e0b;">Past Performance</div>
+            <div style="font-size:11px; color:#94a3b8;">5 atoms • 2 from awarded contracts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- CONTRIBUTOR VIEW                                            -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="view-contributor" class="content panel">
+
+    <!-- Stage Bar (simplified) -->
+    <div class="stage-bar">
+      <div class="stage-steps">
+        <div class="stage-step">
+          <div class="stage-dot done">✓</div>
+          <span class="stage-label">Draft</span>
+        </div>
+        <div class="stage-connector done"></div>
+        <div class="stage-step">
+          <div class="stage-dot current">2</div>
+          <span class="stage-label">Review</span>
+        </div>
+        <div class="stage-connector"></div>
+        <div class="stage-step">
+          <div class="stage-dot upcoming">3</div>
+          <span class="stage-label">Final</span>
+        </div>
+      </div>
+      <div class="stage-actions">
+        <span class="deadline">⏰ Due: May 15, 2026 (8 days)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📝 My Assignments</h3>
+
+      <div class="my-section">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div>
+            <span style="font-size:14px; font-weight:600;">Technical Proposal</span>
+            <span class="badge review" style="margin-left:8px;">Review</span>
+          </div>
+          <button class="btn btn-primary btn-sm">Open Editor →</button>
+        </div>
+        <div style="font-size:12px; color:#94a3b8; display:flex; gap:16px; align-items:center;">
+          <span>14 of 15 pages</span>
+          <div class="page-bar" style="width:100px;"><div class="fill warn" style="width:93%"></div></div>
+          <span>Last edited 2 hours ago</span>
+          <span>3 comments pending</span>
+        </div>
+      </div>
+
+      <div class="my-section">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div>
+            <span style="font-size:14px; font-weight:600;">Key Personnel — My Bio</span>
+            <span class="badge draft" style="margin-left:8px;">Draft</span>
+          </div>
+          <button class="btn btn-primary btn-sm">Open Editor →</button>
+        </div>
+        <div style="font-size:12px; color:#94a3b8;">Template loaded • Fill in your qualifications and experience</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📦 My Dropbox</h3>
+      <div class="file-list">
+        <div class="file-item"><span class="icon">📄</span> john_resume_v3.docx <span style="color:#94a3b8; margin-left:auto; font-size:11px;">Uploaded yesterday</span></div>
+        <div class="file-item"><span class="icon">📄</span> rf_sensor_paper.pdf <span style="color:#94a3b8; margin-left:auto; font-size:11px;">Uploaded 3 days ago</span></div>
+        <div class="file-item"><span class="icon">📊</span> test_data_summary.xlsx <span style="color:#94a3b8; margin-left:auto; font-size:11px;">Uploaded 3 days ago</span></div>
+      </div>
+      <div class="dropbox">
+        📁 Drop files here or click to upload
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="color:#94a3b8;">👁 Other Sections (View/Comment Only)</h3>
+
+      <div class="view-only">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <span style="font-size:13px; font-weight:500;">Cover Page</span>
+            <span style="font-size:10px; color:#94a3b8; margin-left:8px;">View only</span>
+          </div>
+          <button class="btn btn-ghost btn-sm">View</button>
+        </div>
+      </div>
+
+      <div class="view-only">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <span style="font-size:13px; font-weight:500;">Past Performance</span>
+            <span style="font-size:10px; color:#f59e0b; margin-left:8px;">Can comment</span>
+          </div>
+          <button class="btn btn-ghost btn-sm">View & Comment</button>
+        </div>
+      </div>
+
+      <div style="font-size:12px; color:#cbd5e1; padding:8px 0 0 15px;">
+        Cost Spreadsheet — <em>No access</em><br>
+        Budget Justification — <em>No access</em>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- EXTERNAL COLLABORATOR VIEW                                  -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div id="view-external" class="content panel">
+
+    <!-- Stage Bar (minimal) -->
+    <div class="stage-bar">
+      <div class="stage-steps">
+        <div class="stage-step">
+          <div class="stage-dot done">✓</div>
+          <span class="stage-label">Draft</span>
+        </div>
+        <div class="stage-connector done"></div>
+        <div class="stage-step">
+          <div class="stage-dot current">2</div>
+          <span class="stage-label">Review</span>
+        </div>
+        <div class="stage-connector"></div>
+        <div class="stage-step">
+          <div class="stage-dot upcoming">3</div>
+          <span class="stage-label">Final</span>
+        </div>
+      </div>
+      <div class="stage-actions">
+        <span class="deadline">⏰ Due: May 15, 2026 (8 days)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🔗 Shared With Me</h3>
+      <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">You were invited by Eric Wagner as an external collaborator.</p>
+
+      <div class="my-section" style="border-left-color:#8b5cf6;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <div>
+            <span style="font-size:14px; font-weight:600;">Key Personnel — My Bio</span>
+            <span class="badge draft" style="margin-left:8px;">Draft</span>
+            <span style="font-size:10px; color:#10b981; margin-left:8px;">✏️ Can edit</span>
+          </div>
+          <button class="btn btn-primary btn-sm">Open Editor →</button>
+        </div>
+        <div style="font-size:12px; color:#94a3b8;">Fill in your qualifications, education, and relevant experience</div>
+      </div>
+
+      <div class="view-only">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <span style="font-size:13px; font-weight:500;">Technical Proposal</span>
+            <span style="font-size:10px; color:#f59e0b; margin-left:8px;">View + comment</span>
+          </div>
+          <button class="btn btn-ghost btn-sm">View & Comment</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📦 My Dropbox</h3>
+      <div class="file-list">
+        <div class="file-item"><span class="icon">📄</span> smith_cv.pdf <span style="color:#94a3b8; margin-left:auto; font-size:11px;">Uploaded today</span></div>
+        <div class="file-item"><span class="icon">📄</span> lab_capabilities.docx <span style="color:#94a3b8; margin-left:auto; font-size:11px;">Uploaded today</span></div>
+      </div>
+      <div class="dropbox">
+        📁 Drop files here or click to upload
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showView(view) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  if (view === 'admin') {
+    document.getElementById('tab-artifacts').classList.add('active');
+  }
+  document.querySelectorAll('.view-switcher button').forEach((b, i) => {
+    b.classList.toggle('active',
+      (view === 'admin' && i === 0) ||
+      (view === 'contributor' && i === 1) ||
+      (view === 'external' && i === 2)
+    );
+  });
+}
+
+function showTab(tab) {
+  document.querySelectorAll('#view-admin .panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-bar button').forEach((b, i) => {
+    const tabs = ['artifacts', 'team', 'compliance', 'ai'];
+    b.classList.toggle('active', tabs[i] === tab);
+  });
+}
+</script>
+
+</body>
+</html>
