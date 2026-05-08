@@ -86,41 +86,64 @@ export async function GET(
 
   // ---------- Build and execute query ----------
     // Build dynamic filter fragments
-    const filters = [sql`tenant_id = ${tenantId}::uuid`];
+    const filters = [sql`lu.tenant_id = ${tenantId}::uuid`];
 
     if (category) {
-      filters.push(sql`category = ${category}`);
+      filters.push(sql`lu.category = ${category}`);
     }
     if (status) {
-      filters.push(sql`status = ${status}`);
+      filters.push(sql`lu.status = ${status}`);
     }
     if (tagsParam) {
       const tags = tagsParam.split(',').map((t) => t.trim()).filter(Boolean);
       if (tags.length > 0) {
-        filters.push(sql`tags && ${sql.array(tags)}`);
+        filters.push(sql`lu.tags && ${sql.array(tags)}`);
       }
     }
     if (q) {
-      filters.push(sql`content ILIKE ${'%' + q.replace(/[%_\\]/g, '\\$&') + '%'}`);
+      filters.push(sql`lu.content ILIKE ${'%' + q.replace(/[%_\\]/g, '\\$&') + '%'}`);
+    }
+
+    // ---------- Source type filter ----------
+    const sourceFilter = url.searchParams.get('source');
+    if (sourceFilter && ['upload', 'harvest', 'ai', 'manual'].includes(sourceFilter)) {
+      filters.push(sql`lu.source_type = ${sourceFilter}`);
+    }
+
+    // ---------- Outcome filter ----------
+    const outcomeFilter = url.searchParams.get('outcome');
+    if (outcomeFilter && ['pending', 'awarded', 'rejected', 'withdrawn'].includes(outcomeFilter)) {
+      filters.push(sql`lu.outcome = ${outcomeFilter}`);
     }
 
     const where = filters.reduce(
       (acc, fragment, i) => (i === 0 ? fragment : sql`${acc} AND ${fragment}`),
     );
 
+    // ---------- Sort ----------
+    const sortParam = url.searchParams.get('sort');
+    const validSorts = ['outcome_score', 'created_at', 'usage_count'];
+    const sortColumn = sortParam && validSorts.includes(sortParam) ? sortParam : 'outcome_score';
+
     let total: number;
     let units: Record<string, unknown>[];
     try {
       const [countResult] = await sql<{ count: string }[]>`
-        SELECT count(*)::text AS count FROM library_units WHERE ${where}
+        SELECT count(*)::text AS count FROM library_units lu WHERE ${where}
       `;
       total = parseInt(countResult.count, 10);
 
       units = await sql`
-        SELECT *
-        FROM library_units
+        SELECT lu.*,
+               p.title AS proposal_title
+        FROM library_units lu
+        LEFT JOIN proposals p ON lu.original_proposal_id = p.id
         WHERE ${where}
-        ORDER BY outcome_score DESC NULLS LAST, usage_count DESC, created_at DESC
+        ORDER BY
+          ${sortColumn === 'usage_count' ? sql`lu.usage_count DESC NULLS LAST` :
+            sortColumn === 'created_at' ? sql`lu.created_at DESC` :
+            sql`lu.outcome_score DESC NULLS LAST`},
+          lu.created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `;
