@@ -1,8 +1,323 @@
-export default function Page() {
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
+import { sql } from '@/lib/db';
+import Link from 'next/link';
+
+export const dynamic = 'force-dynamic';
+
+interface Props {
+  params: Promise<{ tenantId: string }>;
+}
+
+function statusBadge(status: string) {
+  const styles: Record<string, string> = {
+    active: 'bg-green-100 text-green-700',
+    suspended: 'bg-yellow-100 text-yellow-700',
+    churned: 'bg-red-100 text-red-700',
+    trial: 'bg-blue-100 text-blue-700',
+    none: 'bg-gray-100 text-gray-500',
+  };
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Tenant Details</h1>
-      <p className="text-gray-500 mt-2">Coming soon</p>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      {status}
+    </span>
+  );
+}
+
+export default async function TenantDetailPage({ params }: Props) {
+  const { tenantId } = await params;
+
+  const session = await auth();
+  if (!session?.user) redirect('/login');
+
+  const role = (session.user as { role?: string }).role;
+  if (role !== 'master_admin' && role !== 'rfp_admin') redirect('/admin');
+
+  // ── Load tenant ───────────────────────────────────────────────────
+  interface TenantRow {
+    id: string;
+    name: string;
+    slug: string;
+    legalName: string | null;
+    website: string | null;
+    status: string;
+    productTier: string;
+    subscriptionStatus: string;
+    billingEmail: string | null;
+    stripeCustomerId: string | null;
+    trialEndsAt: Date | null;
+    createdAt: Date;
+  }
+
+  let tenant: TenantRow | null = null;
+  try {
+    const [row] = await sql<TenantRow[]>`
+      SELECT id, name, slug, legal_name, website, status, product_tier,
+             subscription_status, billing_email, stripe_customer_id,
+             trial_ends_at, created_at
+      FROM tenants
+      WHERE id = ${tenantId}
+    `;
+    tenant = row ?? null;
+  } catch (e) {
+    console.error('[admin/tenants/detail] tenant query failed', e);
+  }
+
+  if (!tenant) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Tenant Not Found</h1>
+        <Link href="/admin/tenants" className="text-sm text-blue-600 hover:underline">Back to tenants</Link>
+      </div>
+    );
+  }
+
+  // ── Load users ────────────────────────────────────────────────────
+  interface UserRow {
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+  }
+
+  let users: UserRow[] = [];
+  try {
+    users = await sql<UserRow[]>`
+      SELECT id, name, email, role, is_active, last_login_at, created_at
+      FROM users
+      WHERE tenant_id = ${tenantId}
+      ORDER BY created_at ASC
+    `;
+  } catch (e) {
+    console.error('[admin/tenants/detail] users query failed', e);
+  }
+
+  // ── Counts ────────────────────────────────────────────────────────
+  let proposalCount = 0;
+  let libraryCount = 0;
+  let purchaseTotal = 0;
+
+  try {
+    const [row] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId}
+    `;
+    proposalCount = parseInt(row?.count ?? '0', 10);
+  } catch (e) {
+    console.error('[admin/tenants/detail] proposals count failed', e);
+  }
+
+  try {
+    const [row] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM library_units WHERE tenant_id = ${tenantId}
+    `;
+    libraryCount = parseInt(row?.count ?? '0', 10);
+  } catch (e) {
+    console.error('[admin/tenants/detail] library count failed', e);
+  }
+
+  try {
+    const [row] = await sql<{ total: string }[]>`
+      SELECT COALESCE(SUM(amount_cents), 0)::text AS total FROM purchases WHERE tenant_id = ${tenantId} AND status = 'completed'
+    `;
+    purchaseTotal = parseInt(row?.total ?? '0', 10);
+  } catch (e) {
+    console.error('[admin/tenants/detail] purchase total failed', e);
+  }
+
+  // ── Recent events ─────────────────────────────────────────────────
+  interface EventRow {
+    id: string;
+    namespace: string;
+    type: string;
+    phase: string;
+    actorEmail: string | null;
+    createdAt: Date;
+  }
+
+  let events: EventRow[] = [];
+  try {
+    events = await sql<EventRow[]>`
+      SELECT id, namespace, type, phase, actor_email, created_at
+      FROM system_events
+      WHERE tenant_id = ${tenantId}
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
+  } catch (e) {
+    console.error('[admin/tenants/detail] events query failed', e);
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Link href="/admin/tenants" className="text-xs text-blue-600 hover:underline mb-2 inline-block">
+            &larr; All Tenants
+          </Link>
+          <h1 className="text-2xl font-bold">{tenant.name}</h1>
+          <p className="text-sm text-gray-500 mt-1 font-mono">{tenant.slug}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {statusBadge(tenant.status)}
+          {statusBadge(tenant.subscriptionStatus)}
+        </div>
+      </div>
+
+      {/* Info cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase font-medium">Users</p>
+          <p className="text-2xl font-bold mt-1">{users.length}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase font-medium">Proposals</p>
+          <p className="text-2xl font-bold mt-1">{proposalCount}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase font-medium">Library Atoms</p>
+          <p className="text-2xl font-bold mt-1">{libraryCount}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-xs text-gray-500 uppercase font-medium">Revenue</p>
+          <p className="text-2xl font-bold mt-1">${(purchaseTotal / 100).toFixed(2)}</p>
+        </div>
+      </div>
+
+      {/* Company details */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
+        <h2 className="text-lg font-semibold mb-4">Company Details</h2>
+        <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+          <div>
+            <dt className="text-gray-500">Legal Name</dt>
+            <dd className="font-medium text-gray-900 mt-0.5">{tenant.legalName ?? '-'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Website</dt>
+            <dd className="font-medium text-gray-900 mt-0.5">
+              {tenant.website ? (
+                <a href={tenant.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {tenant.website}
+                </a>
+              ) : '-'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Billing Email</dt>
+            <dd className="font-medium text-gray-900 mt-0.5">{tenant.billingEmail ?? '-'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Product Tier</dt>
+            <dd className="font-medium text-gray-900 mt-0.5 capitalize">{tenant.productTier}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Stripe Customer</dt>
+            <dd className="font-mono text-xs text-gray-600 mt-0.5">{tenant.stripeCustomerId ?? '-'}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Trial Ends</dt>
+            <dd className="font-medium text-gray-900 mt-0.5">
+              {tenant.trialEndsAt ? new Date(tenant.trialEndsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Created</dt>
+            <dd className="font-medium text-gray-900 mt-0.5">
+              {new Date(tenant.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Portal Link</dt>
+            <dd className="mt-0.5">
+              <Link href={`/portal/${tenant.slug}/dashboard`} className="text-blue-600 hover:underline text-xs">
+                /portal/{tenant.slug}/dashboard
+              </Link>
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Users */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Users ({users.length})</h2>
+          {users.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No users.</p>
+          ) : (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Role</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.map((u) => (
+                    <tr key={u.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-gray-900">{u.name ?? u.email}</div>
+                        <div className="text-xs text-gray-400">{u.email}</div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          u.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {u.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Recent events */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+          {events.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No events recorded.</p>
+          ) : (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Event</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Actor</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {events.map((ev) => (
+                    <tr key={ev.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <span className="text-xs font-medium text-indigo-600">
+                          {ev.namespace}.{ev.type}
+                        </span>
+                        <span className="ml-1 text-xs text-gray-400">{ev.phase}</span>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{ev.actorEmail ?? '-'}</td>
+                      <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                        {new Date(ev.createdAt).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
