@@ -54,31 +54,34 @@ export async function GET(request: Request) {
   //    curator verify/correct action wrote a memory row tagged with
   //    the solicitation's namespace. Now we surface those values.
   if (namespace) {
-    // Prefix match: "DOD:unknown:SBIR:" matches Phase1 and Phase2
-    // cycles. Strip the last segment to get the prefix.
-    const parts = namespace.split(':');
-    const prefix = parts.length >= 3
-      ? parts.slice(0, -1).join(':') + ':'
-      : namespace;
+    try {
+      const parts = namespace.split(':');
+      const prefix = parts.length >= 3
+        ? parts.slice(0, -1).join(':') + ':'
+        : namespace;
+      const escapedPrefix = prefix.replace(/[%_\\]/g, '\\$&');
 
-    type MemRow = { value: string | null; createdAt: Date };
-    const memRows = await sql<MemRow[]>`
-      SELECT metadata->>'value' AS value, created_at
-      FROM episodic_memories
-      WHERE agent_role = 'curator'
-        AND memory_type = 'decision'
-        AND namespace LIKE ${prefix + '%'}
-        AND metadata->>'variable_name' = ${variableName}
-      ORDER BY created_at DESC
-      LIMIT 10
-    `;
+      type MemRow = { value: string | null; createdAt: Date };
+      const memRows = await sql<MemRow[]>`
+        SELECT metadata->>'value' AS value, created_at
+        FROM episodic_memories
+        WHERE agent_role = 'curator'
+          AND memory_type = 'decision'
+          AND namespace LIKE ${escapedPrefix + '%'}
+          AND metadata->>'variable_name' = ${variableName}
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
 
-    for (const row of memRows) {
-      const v = row.value?.toString().trim();
-      if (v && !seen.has(v.toLowerCase())) {
-        suggestions.push(v);
-        seen.add(v.toLowerCase());
+      for (const row of memRows) {
+        const v = row.value?.toString().trim();
+        if (v && !seen.has(v.toLowerCase())) {
+          suggestions.push(v);
+          seen.add(v.toLowerCase());
+        }
       }
+    } catch (err) {
+      console.error('[compliance-suggest] memory query failed', err);
     }
   }
 

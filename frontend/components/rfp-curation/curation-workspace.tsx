@@ -6,6 +6,7 @@ import { useTool } from '@/lib/hooks/use-tool';
 import { PdfViewer, type TextSelection } from './pdf-viewer';
 import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
+import { TopicComplianceManager } from './topic-compliance-manager';
 
 interface Solicitation {
   id: string;
@@ -181,6 +182,7 @@ export function CurationWorkspace({
   const [editValue, setEditValue] = useState<string>('');
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
+  const [showTopicCompliance, setShowTopicCompliance] = useState(false);
   const [extractedPasteText, setExtractedPasteText] = useState('');
   const [topicsList, setTopicsList] = useState(topics);
 
@@ -662,6 +664,18 @@ export function CurationWorkspace({
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {topicsList.length > 0 && (
+                  <button
+                    onClick={() => setShowTopicCompliance(!showTopicCompliance)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded border ${
+                      showTopicCompliance
+                        ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                  >
+                    {showTopicCompliance ? 'Hide Compliance' : 'Manage Compliance'}
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     try {
@@ -774,6 +788,15 @@ export function CurationWorkspace({
               </ul>
             )}
           </div>
+
+          {/* Topic Compliance Manager — toggled by "Manage Compliance" button */}
+          {showTopicCompliance && topicsList.length > 0 && (
+            <TopicComplianceManager
+              solicitationId={sol.id}
+              topics={topicsList}
+              onClose={() => setShowTopicCompliance(false)}
+            />
+          )}
 
           {showAddTopic && (
             <AddTopicModal
@@ -1128,11 +1151,9 @@ export function CurationWorkspace({
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           ci.proposalStage === 'submitted' ? 'bg-emerald-100 text-emerald-800' :
                           ci.proposalStage === 'final' ? 'bg-green-100 text-green-800' :
-                          ci.proposalStage === 'gold_team' ? 'bg-yellow-100 text-yellow-800' :
-                          ci.proposalStage === 'red_team' ? 'bg-red-100 text-red-800' :
-                          ci.proposalStage === 'pink_team' ? 'bg-pink-100 text-pink-800' :
+                          ci.proposalStage === 'review' ? 'bg-yellow-100 text-yellow-800' :
                           ci.proposalStage === 'draft' ? 'bg-blue-100 text-blue-800' :
-                          ci.proposalStage === 'outline' ? 'bg-indigo-100 text-indigo-800' :
+                          ci.proposalStage === 'archived' ? 'bg-gray-200 text-gray-600' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {ci.proposalStage.replace(/_/g, ' ')}

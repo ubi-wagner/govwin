@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const validTypes = ['blog_post', 'resource', 'guide', 'announcement', 'faq'];
+    const validTypes = ['blog_post', 'resource', 'guide', 'announcement', 'faq', 'testimonial', 'team_member', 'social_post', 'page_block'];
     if (!validTypes.includes(contentType)) {
       return NextResponse.json(
         { error: `Invalid contentType. Must be one of: ${validTypes.join(', ')}`, code: 'VALIDATION_ERROR' },
@@ -135,6 +135,8 @@ export async function POST(request: Request) {
     const tags = Array.isArray(body.tags) ? body.tags.filter((t: unknown) => typeof t === 'string') : [];
     const published = typeof body.published === 'boolean' ? body.published : false;
     const featuredImage = typeof body.featuredImage === 'string' ? body.featuredImage.trim() || null : null;
+    const externalUrl = typeof body.externalUrl === 'string' ? body.externalUrl.trim() || null : null;
+    const displayOrder = typeof body.displayOrder === 'number' ? body.displayOrder : 0;
     const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
 
     const publishedAt = published ? new Date() : null;
@@ -142,11 +144,13 @@ export async function POST(request: Request) {
     const [row] = await sql<{ id: string }[]>`
       INSERT INTO cms_content (
         slug, title, content_type, body, excerpt, author, tags,
-        published, published_at, featured_image, metadata, created_by
+        published, published_at, featured_image, external_url,
+        display_order, metadata, created_by
       ) VALUES (
         ${slug}, ${title}, ${contentType}, ${articleBody}, ${excerpt},
         ${author}, ${tags}, ${published}, ${publishedAt},
-        ${featuredImage}, ${JSON.stringify(metadata)}::jsonb, ${userId}
+        ${featuredImage}, ${externalUrl}, ${displayOrder},
+        ${JSON.stringify(metadata)}::jsonb, ${userId}
       )
       ON CONFLICT (slug) DO UPDATE SET
         title = EXCLUDED.title,
@@ -163,6 +167,8 @@ export async function POST(request: Request) {
           ELSE cms_content.published_at
         END,
         featured_image = EXCLUDED.featured_image,
+        external_url = EXCLUDED.external_url,
+        display_order = EXCLUDED.display_order,
         metadata = EXCLUDED.metadata,
         updated_at = now()
       RETURNING id

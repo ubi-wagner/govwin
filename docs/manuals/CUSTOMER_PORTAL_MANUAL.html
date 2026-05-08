@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFP Pipeline — Customer Portal Manual</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1a1a2e;
+      background: #f5f6fa;
+      line-height: 1.7;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: #0a1628;
+      color: #ffffff;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      border-bottom: 4px solid #2563eb;
+    }
+    .site-header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+    .site-header p { color: #94a3b8; margin-top: 0.5rem; font-size: 1.05rem; }
+    .site-header .badge {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Container ── */
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* ── Intro Box ── */
+    .intro-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .intro-box h2 { font-size: 1.1rem; color: #0a1628; margin-bottom: 0.75rem; }
+    .intro-box p { margin-bottom: 0.5rem; }
+    .intro-box code {
+      background: #f1f5f9;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.95rem;
+      color: #2563eb;
+    }
+
+    /* ── Table of Contents ── */
+    .toc {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .toc h2 {
+      font-size: 1.15rem;
+      color: #0a1628;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #2563eb;
+    }
+    .toc ol { padding-left: 1.25rem; }
+    .toc li { margin-bottom: 0.4rem; }
+    .toc a { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+    .toc .sub-items { list-style-type: disc; padding-left: 1.25rem; margin-top: 0.25rem; }
+    .toc .sub-items li { font-size: 0.92rem; color: #475569; }
+    .toc .sub-items a { font-weight: 400; }
+
+    /* ── Sections ── */
+    .section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      color: #0a1628;
+      margin-bottom: 0.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #2563eb;
+    }
+    .section h3 {
+      font-size: 1.15rem;
+      color: #1e40af;
+      margin-top: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .section h4 {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    .section p { margin-bottom: 0.75rem; }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step-counter; list-style: none; padding: 0; margin: 1rem 0; }
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding: 0.75rem 0 0.75rem 3.25rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0.7rem;
+      width: 2.25rem;
+      height: 2.25rem;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .steps li strong { display: block; color: #0a1628; }
+    .steps li em, .steps li .expected {
+      display: block;
+      color: #6b7280;
+      font-style: italic;
+      font-size: 0.92rem;
+      margin-top: 0.25rem;
+    }
+    .steps li .url {
+      display: inline-block;
+      background: #f1f5f9;
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #2563eb;
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+
+    /* ── Tip & Warning Boxes ── */
+    .tip, .warning {
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+    }
+    .tip {
+      background: #ecfdf5;
+      border-left: 4px solid #10b981;
+    }
+    .tip::before {
+      content: "Tip: ";
+      font-weight: 700;
+      color: #047857;
+    }
+    .warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+    }
+    .warning::before {
+      content: "Important: ";
+      font-weight: 700;
+      color: #b45309;
+    }
+
+    /* ── Definition List / Info Grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.35rem 1rem;
+      margin: 0.75rem 0;
+      font-size: 0.95rem;
+    }
+    .info-grid dt { font-weight: 600; color: #374151; }
+    .info-grid dd { color: #4b5563; }
+
+    /* ── Simple Table ── */
+    .simple-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    .simple-table th {
+      background: #0a1628;
+      color: #ffffff;
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    .simple-table td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .simple-table tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Sidebar Nav Reference ── */
+    .nav-ref {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .nav-ref ul { padding-left: 1.25rem; margin: 0; }
+    .nav-ref li { margin-bottom: 0.3rem; font-size: 0.95rem; }
+
+    /* ── Status Badges (inline) ── */
+    .badge-inline {
+      display: inline-block;
+      padding: 0.1rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+    .badge-green { background: #d1fae5; color: #065f46; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-gray { background: #f1f5f9; color: #475569; }
+
+    /* ── Separator ── */
+    .divider {
+      border: none;
+      border-top: 2px solid #e2e8f0;
+      margin: 2.5rem 0;
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      .site-header { background: #0a1628 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .container { max-width: 100%; padding: 0 1cm; }
+      .section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+      .steps li { page-break-inside: avoid; }
+      .toc { page-break-after: always; }
+      a { color: #2563eb !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- HEADER                                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <h1>RFP Pipeline — Customer Portal Manual</h1>
+  <p>Step-by-step guide for company administrators and team members</p>
+  <span class="badge">Role: Customer (Company Admin)</span>
+</header>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- INTRO                                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="intro-box">
+  <h2>Welcome to RFP Pipeline</h2>
+  <p>RFP Pipeline helps you find, build, and submit winning proposals for government contracts. This manual walks you through everything step by step.</p>
+  <p><strong>Your login URL:</strong> <code>{BASE_URL}/login</code></p>
+  <p>Replace <code>{BASE_URL}</code> everywhere in this guide with the actual web address you were given (for example, <code>https://app.rfppipeline.com</code>).</p>
+  <p><strong>Your credentials:</strong> Check your welcome email for your email address and temporary password.</p>
+  <p><strong>Your company slug:</strong> This is a short version of your company name used in web addresses (for example, <code>acme-defense</code>). You will see it referred to as <code>{slug}</code> in this guide. It was included in your welcome email.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS                                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<nav class="toc" id="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#getting-started">Getting Started (First-Time Login)</a></li>
+    <li><a href="#library">Building Your Content Library (Do This First!)</a>
+      <ul class="sub-items">
+        <li><a href="#why-library">Why Your Library Matters</a></li>
+        <li><a href="#upload-docs">Uploading Documents</a></li>
+        <li><a href="#atomizing">Atomizing Your Documents</a></li>
+        <li><a href="#reviewing-atoms">Reviewing Your Atoms</a></li>
+      </ul>
+    </li>
+    <li><a href="#spotlight">Browsing Spotlight (Finding Opportunities)</a>
+      <ul class="sub-items">
+        <li><a href="#spotlight-list">The Spotlight Feed</a></li>
+        <li><a href="#spotlight-detail">Viewing Opportunity Details</a></li>
+        <li><a href="#pinning">Pinning an Opportunity</a></li>
+      </ul>
+    </li>
+    <li><a href="#build-proposal">Building a Proposal</a></li>
+    <li><a href="#workspace">The Proposal Workspace (Your Main Work Area)</a>
+      <ul class="sub-items">
+        <li><a href="#artifacts-tab">Artifacts Tab</a></li>
+        <li><a href="#team-tab">Team &amp; Access Tab</a></li>
+        <li><a href="#compliance-tab">Compliance Tab</a></li>
+        <li><a href="#ai-tab">AI &amp; Library Tab</a></li>
+      </ul>
+    </li>
+    <li><a href="#canvas-editor">Editing in the Canvas Editor</a>
+      <ul class="sub-items">
+        <li><a href="#editing-text">Editing Text</a></li>
+        <li><a href="#ai-revision">Using AI Revision Tools</a></li>
+        <li><a href="#comments">Adding Comments</a></li>
+        <li><a href="#saving">Saving Your Work</a></li>
+      </ul>
+    </li>
+    <li><a href="#manage-team">Managing Your Team</a>
+      <ul class="sub-items">
+        <li><a href="#invite-member">Inviting a Team Member</a></li>
+        <li><a href="#set-permissions">Setting Permissions</a></li>
+        <li><a href="#dropboxes">Dropboxes (File Uploads from Team Members)</a></li>
+      </ul>
+    </li>
+    <li><a href="#stages">Advancing Through Stages</a></li>
+    <li><a href="#download">Downloading Your Proposal</a></li>
+    <li><a href="#after-submission">After Submission</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 1. GETTING STARTED                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="getting-started">
+  <h2>1. Getting Started (First-Time Login)</h2>
+  <p>You received a welcome email with a temporary password. Here is how to log in for the first time and set your own password.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Open your web browser</strong> (Chrome, Edge, or Firefox recommended).
+      <em class="expected">Your browser opens.</em>
+    </li>
+    <li>
+      <strong>In the address bar, type your login address and press Enter.</strong>
+      <span class="url">{BASE_URL}/login</span>
+      <em class="expected">You see a login page with two boxes: "Email" and "Password."</em>
+    </li>
+    <li>
+      <strong>Type your email address</strong> (the one from your welcome email) in the Email box.
+      <em class="expected">Your email appears in the box.</em>
+    </li>
+    <li>
+      <strong>Type the temporary password</strong> (from your welcome email) in the Password box.
+      <em class="expected">Dots or circles appear (the password is hidden for security).</em>
+    </li>
+    <li>
+      <strong>Click "Sign In."</strong>
+      <em class="expected">Because this is your first login, the system takes you to a "Change Password" page instead of the dashboard. This is normal and expected.</em>
+    </li>
+    <li>
+      <strong>Type a new password</strong> in the "New Password" box. Your new password must be at least 12 characters long.
+      <em class="expected">A strength indicator may appear. Make sure your password is long enough.</em>
+    </li>
+    <li>
+      <strong>Type the same new password again</strong> in the "Confirm Password" box.
+      <em class="expected">Both password fields match.</em>
+    </li>
+    <li>
+      <strong>Click "Change Password" or "Submit."</strong>
+      <em class="expected">Your password is updated. The page changes and you are now on your company's portal dashboard.</em>
+    </li>
+  </ol>
+
+  <div class="warning">Write down your new password and store it somewhere safe. If you forget it, you will need to contact your RFP Pipeline administrator to reset it.</div>
+
+  <div class="tip">Your dashboard address looks like this: <code>{BASE_URL}/portal/{slug}/dashboard</code>. You can bookmark it for quick access in the future.</div>
+
+  <h3>Your Portal Dashboard</h3>
+  <p>The dashboard is your home page. It shows:</p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li>Your company name in the top-left corner</li>
+    <li>A sidebar menu on the left for navigating the portal</li>
+    <li>Pinned opportunities (opportunities you have saved to track)</li>
+    <li>Active proposals (proposals you are working on)</li>
+    <li>Upcoming deadlines (submission due dates that are approaching)</li>
+  </ul>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 2. CONTENT LIBRARY                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="library">
+  <h2>2. Building Your Content Library (Do This First!)</h2>
+
+  <h3 id="why-library">Why Your Library Matters</h3>
+  <p>Your content library is the foundation for everything else. It stores your company's best writing &mdash; your capability statements, team biographies, past performance write-ups, and technical descriptions.</p>
+  <p><strong>When you build a proposal later, the AI uses your library to write drafts that sound like YOUR company</strong>, not generic boilerplate. The more you upload, the better your AI-generated proposals will be.</p>
+
+  <div class="warning">We strongly recommend uploading your documents to the library BEFORE starting any proposals. Without library content, the AI will have nothing to work with.</div>
+
+  <h3 id="upload-docs">Uploading Documents</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Library" in the left sidebar.</strong>
+      <span class="url">{BASE_URL}/portal/{slug}/library</span>
+      <em class="expected">The Library page opens. If this is your first time, it will be empty.</em>
+    </li>
+    <li>
+      <strong>Click "Upload Documents"</strong> (or you can drag files from your computer directly onto the page).
+      <em class="expected">An upload area appears. You may see a dotted rectangle where you can drop files.</em>
+    </li>
+    <li>
+      <strong>Select the files you want to upload.</strong> You can upload multiple files at once. Accepted file types are:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Word documents (.docx)</li>
+        <li>PDFs (.pdf)</li>
+        <li>PowerPoint presentations (.pptx)</li>
+        <li>Excel spreadsheets (.xlsx)</li>
+        <li>Text files (.txt)</li>
+      </ul>
+      <em class="expected">The file names appear in the upload area with progress bars.</em>
+    </li>
+    <li>
+      <strong>Wait for all uploads to complete.</strong>
+      <em class="expected">Each file shows a checkmark or "Complete" status when finished.</em>
+    </li>
+  </ol>
+
+  <h4>What to Upload</h4>
+  <p>Upload as many of these as you have:</p>
+  <table class="simple-table">
+    <thead>
+      <tr><th>Document Type</th><th>Why It Helps</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Capability Statement</td><td>The AI uses this to describe what your company does and why you are qualified.</td></tr>
+      <tr><td>Team Resumes / Bios</td><td>The AI uses these to fill in the "Key Personnel" sections of proposals.</td></tr>
+      <tr><td>Past Performance Reports</td><td>The AI uses these to write about projects you have successfully completed.</td></tr>
+      <tr><td>Technical Papers or White Papers</td><td>The AI uses these to draft detailed technical approaches.</td></tr>
+      <tr><td>Previous Winning Proposals</td><td>These are the best source material &mdash; the AI can reuse proven, winning language.</td></tr>
+      <tr><td>Commercialization Plans</td><td>The AI uses these for Phase II proposals that require a commercialization strategy.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip">The more documents you upload, the better the AI gets at writing proposals that sound authentically like your company. Even uploading 3-5 key documents makes a big difference.</div>
+
+  <h3 id="atomizing">Atomizing Your Documents</h3>
+  <p>"Atomizing" is the process of breaking your documents into small, reusable building blocks called "atoms." Each paragraph, biography, and project description becomes a separate, searchable piece that the AI can use when drafting proposals.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>After uploading your documents, click "Atomize All"</strong> (or click "Atomize" next to each individual document).
+      <em class="expected">A progress indicator appears. The system is reading through your documents and breaking them into pieces. This may take a few minutes depending on how many files you uploaded.</em>
+    </li>
+    <li>
+      <strong>Wait for atomization to complete.</strong>
+      <em class="expected">The atom count next to each document updates from 0 to a number (for example, a 10-page document might produce 20-40 atoms).</em>
+    </li>
+  </ol>
+
+  <div class="tip">You only need to atomize each document once. If you upload a newer version of the same document, atomize the new version and archive the old one.</div>
+
+  <h3 id="reviewing-atoms">Reviewing Your Atoms</h3>
+  <p>After atomizing, you can review how the system categorized your content.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on a document in your library</strong> to see its atoms.
+      <em class="expected">You see a list of atoms, each showing a short excerpt of text and a category label.</em>
+    </li>
+    <li>
+      <strong>Look at the category labels.</strong> Each atom is automatically assigned a category:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><span class="badge-inline badge-blue">Technical Approach</span> &mdash; descriptions of how you solve problems</li>
+        <li><span class="badge-inline badge-blue">Key Personnel</span> &mdash; bios and qualifications of your team</li>
+        <li><span class="badge-inline badge-blue">Past Performance</span> &mdash; descriptions of successful projects</li>
+        <li><span class="badge-inline badge-blue">Corporate Overview</span> &mdash; general company information</li>
+        <li><span class="badge-inline badge-blue">Commercialization</span> &mdash; market and business strategy content</li>
+      </ul>
+      <em class="expected">Most atoms should have the correct category. If one is wrong, you can change it.</em>
+    </li>
+    <li>
+      <strong>To change a category,</strong> click on the category label next to an atom and select the correct one from the dropdown.
+      <em class="expected">The category updates immediately.</em>
+    </li>
+    <li>
+      <strong>(Optional) Add tags</strong> to atoms for easier searching later. For example, you might tag a past performance atom with the contract name or agency.
+      <em class="expected">Tags appear next to the atom.</em>
+    </li>
+    <li>
+      <strong>(Optional) Archive atoms</strong> that are outdated or irrelevant by clicking "Archive."
+      <em class="expected">Archived atoms are hidden from the main list and will not be used in AI drafting.</em>
+    </li>
+  </ol>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 3. SPOTLIGHT                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="spotlight">
+  <h2>3. Browsing Spotlight (Finding Opportunities)</h2>
+  <p>Spotlight is where you discover government opportunities that may be a good fit for your company. These opportunities have been reviewed and curated by the RFP Pipeline team.</p>
+
+  <h3 id="spotlight-list">The Spotlight Feed</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Spotlights" in the left sidebar.</strong>
+      <span class="url">{BASE_URL}/portal/{slug}/spotlights</span>
+      <em class="expected">You see a list of opportunity cards, each showing a government contract opportunity.</em>
+    </li>
+    <li>
+      <strong>Look at the information on each card:</strong>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><strong>Title</strong> &mdash; the name of the opportunity or research topic</li>
+        <li><strong>Agency</strong> &mdash; which government agency posted it (e.g., Department of Defense, NSF)</li>
+        <li><strong>Close Date</strong> &mdash; the deadline to submit a proposal (this is critical!)</li>
+        <li><strong>Program Type</strong> &mdash; what kind of opportunity it is (e.g., SBIR Phase I, STTR, BAA)</li>
+      </ul>
+      <em class="expected">You can see multiple opportunity cards, each with the information listed above.</em>
+    </li>
+  </ol>
+
+  <h3 id="spotlight-detail">Viewing Opportunity Details</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on any opportunity card to see the full details.</strong>
+      <em class="expected">The detail page opens, showing everything about this opportunity:</em>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Full topic description &mdash; what the government is looking for</li>
+        <li>Compliance summary &mdash; page limits, font rules, margin requirements</li>
+        <li>Evaluation criteria &mdash; how proposals will be judged (if available)</li>
+        <li>Point of contact &mdash; who to ask questions to at the agency</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Read through the details carefully.</strong> Ask yourself: "Does my company have the expertise and experience to do this work?"
+      <em class="expected">You have enough information to decide whether to pursue this opportunity.</em>
+    </li>
+  </ol>
+
+  <h3 id="pinning">Pinning an Opportunity</h3>
+  <p>"Pinning" saves an opportunity to your dashboard so you can track it and get deadline reminders.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>On the opportunity detail page, click the "Pin" button.</strong>
+      <em class="expected">The button changes to show "Pinned" (it may change color or show a filled pin icon). This opportunity is now saved to your dashboard.</em>
+    </li>
+    <li>
+      <strong>Go back to your dashboard</strong> (click "Dashboard" in the sidebar).
+      <span class="url">{BASE_URL}/portal/{slug}/dashboard</span>
+      <em class="expected">Your pinned opportunity appears in the "Pinned Topics" or "My Topics" section of your dashboard.</em>
+    </li>
+  </ol>
+
+  <div class="tip">Pin every opportunity you are interested in, even if you are not sure yet. You can always unpin later. Pinned opportunities give you deadline reminders so you never miss a submission date.</div>
+
+  <div class="warning">Pay close attention to the Close Date on each opportunity. Government deadlines are strict &mdash; late submissions are almost never accepted.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 4. BUILD PROPOSAL                                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="build-proposal">
+  <h2>4. Building a Proposal</h2>
+  <p>When you have decided to pursue an opportunity, you create a proposal workspace for it. This is where your team will write, review, and finalize the proposal.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Go to a pinned opportunity</strong> (either from your dashboard or from Spotlights).
+      <em class="expected">The opportunity detail page opens.</em>
+    </li>
+    <li>
+      <strong>Click the "Build Proposal" button.</strong>
+      <em class="expected">You may be taken to a payment page (depending on your account type). If so, complete the payment. If your account includes proposal access, the workspace is created immediately.</em>
+    </li>
+    <li>
+      <strong>If you see a payment page:</strong>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Review the price</li>
+        <li>Enter your payment information</li>
+        <li>Click "Pay" or "Subscribe"</li>
+      </ul>
+      <em class="expected">After payment, you are redirected to your new proposal workspace.</em>
+    </li>
+    <li>
+      <strong>Your proposal workspace opens.</strong>
+      <span class="url">{BASE_URL}/portal/{slug}/proposals/{proposalId}</span>
+      <em class="expected">You see your new proposal workspace. It already has sections set up based on what the government requires (for example, Technical Approach, Key Personnel, Past Performance, Cost Breakdown). All sections show a status of "Empty" &mdash; this is normal.</em>
+    </li>
+  </ol>
+
+  <div class="tip">The sections in your proposal were automatically created from the RFP requirements. They include the correct page limits and formatting rules, so you do not have to figure that out yourself.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 5. WORKSPACE                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="workspace">
+  <h2>5. The Proposal Workspace (Your Main Work Area)</h2>
+  <p>The proposal workspace is where you and your team spend most of your time. It is organized into tabs across the top. Here is what each tab does.</p>
+
+  <!-- 5a. Artifacts -->
+  <h3 id="artifacts-tab">Artifacts Tab</h3>
+  <p>This is the main view. It shows all the volumes and sections of your proposal, organized the way the government expects them.</p>
+
+  <p>You will see your proposal organized into <strong>volumes</strong> (like chapters in a book):</p>
+
+  <div class="nav-ref">
+    <ul>
+      <li><strong>Volume 1: Technical Volume</strong>
+        <ul>
+          <li>Technical Approach (5 pages) &mdash; <span class="badge-inline badge-gray">Empty</span></li>
+          <li>Key Personnel (3 pages) &mdash; <span class="badge-inline badge-gray">Empty</span></li>
+          <li>Past Performance (3 pages) &mdash; <span class="badge-inline badge-gray">Empty</span></li>
+        </ul>
+      </li>
+      <li><strong>Volume 2: Cost Volume</strong>
+        <ul>
+          <li>Cost Breakdown (4 pages) &mdash; <span class="badge-inline badge-gray">Empty</span></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <p>Each section shows:</p>
+  <table class="simple-table">
+    <thead>
+      <tr><th>Information</th><th>What It Means</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Title</td><td>The name of the section (e.g., "Technical Approach")</td></tr>
+      <tr><td>Assigned Person</td><td>Who is responsible for writing this section</td></tr>
+      <tr><td>Page Count</td><td>How many pages you have written out of the allowed maximum</td></tr>
+      <tr><td>Status Badge</td><td>Current status of the section (see below)</td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Status badges and what they mean:</strong></p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li><span class="badge-inline badge-gray">Empty</span> &mdash; Nothing written yet.</li>
+    <li><span class="badge-inline badge-blue">Draft</span> &mdash; Work in progress. Content has been written or AI-drafted but needs more work.</li>
+    <li><span class="badge-inline badge-yellow">Review</span> &mdash; Ready for someone to review and give feedback.</li>
+    <li><span class="badge-inline badge-green">Complete</span> &mdash; This section is finished.</li>
+  </ul>
+
+  <p>To open a section for editing, click "Open" next to the section name. This opens the Canvas Editor (covered in Section 6).</p>
+
+  <!-- 5b. Team & Access -->
+  <h3 id="team-tab">Team &amp; Access Tab</h3>
+  <p>This tab lets you invite team members and control who can see and edit each section. See <a href="#manage-team">Section 7: Managing Your Team</a> for detailed instructions.</p>
+
+  <!-- 5c. Compliance -->
+  <h3 id="compliance-tab">Compliance Tab</h3>
+  <p>This tab shows your compliance checklist &mdash; every formatting and content requirement from the government solicitation.</p>
+
+  <p>Each requirement shows a status indicator:</p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li><span class="badge-inline badge-green">Green check</span> &mdash; This requirement is met. You are in compliance.</li>
+    <li><span class="badge-inline badge-red">Red X</span> &mdash; This requirement is NOT met. You need to fix this before submitting.</li>
+    <li><span class="badge-inline badge-yellow">Yellow ?</span> &mdash; This requirement is optional or could not be automatically checked.</li>
+  </ul>
+
+  <div class="tip">Check the Compliance tab regularly as you work on your proposal. Aim for all green checks before moving to the Final stage.</div>
+
+  <!-- 5d. AI & Library -->
+  <h3 id="ai-tab">AI &amp; Library Tab</h3>
+  <p>This is where the AI helps you write. The AI uses the documents you uploaded to your Content Library (Section 2) to draft proposal sections.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Draft All Empty Sections."</strong>
+      <em class="expected">The AI begins writing initial drafts for every section that is currently empty. A progress indicator shows which sections are being drafted. This may take several minutes.</em>
+    </li>
+    <li>
+      <strong>Wait for drafting to complete.</strong>
+      <em class="expected">Each section's status changes from "Empty" to "Draft." The sections now contain AI-written content based on your library documents.</em>
+    </li>
+    <li>
+      <strong>Review each drafted section.</strong> Click "Open" on any section to read what the AI wrote.
+      <em class="expected">You see proposal text that uses language from your own documents &mdash; your capability statement, your team bios, your past performance descriptions. It is NOT generic text.</em>
+    </li>
+  </ol>
+
+  <div class="warning">AI drafts are a starting point, not a finished product. Always review, edit, and improve the AI-generated content before submitting your proposal.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 6. CANVAS EDITOR                                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="canvas-editor">
+  <h2>6. Editing in the Canvas Editor</h2>
+  <p>The Canvas Editor is where you write and refine each section of your proposal. It shows your content exactly as it will look in the final document &mdash; same fonts, same margins, same page layout.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Open" on any section</strong> from the Artifacts tab.
+      <em class="expected">The Canvas Editor opens. You see a document layout that looks like a printed page &mdash; with headers, footers, margins, and formatted text.</em>
+    </li>
+  </ol>
+
+  <p>What you see in the editor:</p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li><strong>Headers and footers</strong> are pre-set from the compliance rules. You do not need to add these yourself.</li>
+    <li><strong>Page count</strong> shows in the corner (for example, "3 of 5 pages"). If the number is <span class="badge-inline badge-green">green</span>, you are within the page limit. If it is <span class="badge-inline badge-red">red</span>, you are over the limit and need to shorten your content.</li>
+    <li><strong>Font and margins</strong> match the government's requirements exactly.</li>
+  </ul>
+
+  <h3 id="editing-text">Editing Text</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on any text block</strong> in the document to start editing.
+      <em class="expected">A cursor appears in the text. You can now type, delete, or change the content.</em>
+    </li>
+    <li>
+      <strong>Type your changes.</strong>
+      <em class="expected">The text updates as you type. The page count adjusts in real time.</em>
+    </li>
+    <li>
+      <strong>To format text</strong> (bold, italic, bullet lists), use the toolbar at the top of the editor or standard keyboard shortcuts (Ctrl+B for bold, Ctrl+I for italic).
+      <em class="expected">The formatting is applied to the selected text.</em>
+    </li>
+  </ol>
+
+  <h3 id="ai-revision">Using AI Revision Tools</h3>
+  <p>The AI can help you improve individual paragraphs. Here is how:</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Select a paragraph</strong> by clicking and dragging your mouse over it (or triple-click to select an entire paragraph).
+      <em class="expected">The paragraph is highlighted. A small toolbar or menu of quick actions appears.</em>
+    </li>
+    <li>
+      <strong>Choose an AI action:</strong>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><strong>"Make shorter"</strong> &mdash; the AI condenses the paragraph by about 30%, keeping the key points. Great for when you are over the page limit.</li>
+        <li><strong>"Add metrics"</strong> &mdash; the AI adds specific numbers, percentages, and quantitative data to make your claims more concrete.</li>
+        <li><strong>"Fix compliance"</strong> &mdash; the AI adjusts the paragraph to better meet the RFP requirements and evaluation criteria.</li>
+        <li><strong>"Replace from Library"</strong> &mdash; the AI finds a better version of this content from your uploaded library documents and swaps it in.</li>
+      </ul>
+      <em class="expected">The AI rewrites the paragraph according to your chosen action. The new text replaces the old text.</em>
+    </li>
+    <li>
+      <strong>Review the AI's changes.</strong> If you like them, move on. If not, press Ctrl+Z (or Cmd+Z on Mac) to undo and try a different action.
+      <em class="expected">The text reverts to the previous version.</em>
+    </li>
+  </ol>
+
+  <div class="tip">"Replace from Library" is especially powerful if you uploaded previous winning proposals. It can swap in proven, winning language from your past submissions.</div>
+
+  <h3 id="comments">Adding Comments</h3>
+  <p>Comments let you leave notes for your team members on specific parts of the proposal.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on the section or paragraph</strong> where you want to leave a comment.
+      <em class="expected">The text or section is selected.</em>
+    </li>
+    <li>
+      <strong>Click the comment button</strong> (usually a speech bubble icon in the toolbar or right-click menu).
+      <em class="expected">A comment box appears.</em>
+    </li>
+    <li>
+      <strong>Type your comment</strong> (for example, "We need to add our DoD Secret clearance info here").
+      <em class="expected">Your text appears in the comment box.</em>
+    </li>
+    <li>
+      <strong>Click "Submit" or press Enter to post the comment.</strong>
+      <em class="expected">The comment appears in a sidebar panel. It shows your name, the time, and is linked to the spot in the document where you placed it.</em>
+    </li>
+    <li>
+      <strong>To resolve a comment</strong> (mark it as done), click "Resolve" on the comment.
+      <em class="expected">The comment is marked as resolved and fades or disappears from the active list.</em>
+    </li>
+  </ol>
+
+  <h3 id="saving">Saving Your Work</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Save" in the top-right corner</strong> of the editor after each editing session.
+      <em class="expected">A brief confirmation appears (such as "Saved" or a checkmark). Your work is saved. The version number increases by one.</em>
+    </li>
+  </ol>
+
+  <div class="warning">Always save before closing the editor or navigating away. Unsaved changes will be lost.</div>
+
+  <div class="tip">The editor keeps a version history. If you need to go back to an earlier version, look for a "Version History" dropdown in the editor toolbar.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 7. MANAGE TEAM                                              -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="manage-team">
+  <h2>7. Managing Your Team</h2>
+  <p>You can invite other people to help with your proposal. There are two types of team members:</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Role</th><th>Who Is This?</th><th>What Can They Do?</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Contributor</strong></td>
+        <td>An employee or close team member at your company</td>
+        <td>Edit assigned sections, upload files, add comments</td>
+      </tr>
+      <tr>
+        <td><strong>External</strong></td>
+        <td>An outside expert, subcontractor, or consultant</td>
+        <td>Only access sections you specifically share with them. Cannot see the full proposal.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 id="invite-member">Inviting a Team Member</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>In your proposal workspace, click the "Team &amp; Access" tab.</strong>
+      <em class="expected">The team management panel opens, showing the current team (which is just you so far).</em>
+    </li>
+    <li>
+      <strong>Click "Invite" or "Add Team Member."</strong>
+      <em class="expected">An invite form appears.</em>
+    </li>
+    <li>
+      <strong>Enter their email address.</strong>
+      <em class="expected">The email appears in the field.</em>
+    </li>
+    <li>
+      <strong>Enter their name.</strong>
+      <em class="expected">The name appears in the field.</em>
+    </li>
+    <li>
+      <strong>Choose their role:</strong> select "Contributor" (for internal team) or "External" (for outside collaborators).
+      <em class="expected">The role is selected.</em>
+    </li>
+    <li>
+      <strong>Select which sections they can work on.</strong> Check the boxes next to the sections you want them to access.
+      <em class="expected">The sections are selected.</em>
+    </li>
+    <li>
+      <strong>Click "Send Invite."</strong>
+      <em class="expected">The person is added to the team list. They receive an email with a temporary password and a link to access the proposal.</em>
+    </li>
+  </ol>
+
+  <div class="tip">Each invited person only sees the sections you give them access to. An external consultant helping with your Technical Approach will never see your Cost Breakdown, for example.</div>
+
+  <h3 id="set-permissions">Setting Permissions</h3>
+  <p>For each section, you can set what each team member is allowed to do:</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Permission Level</th><th>What They Can Do</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Edit</strong></td><td>Write, change, and save content in this section</td></tr>
+      <tr><td><strong>Comment</strong></td><td>Read the section and leave comments, but cannot change the text</td></tr>
+      <tr><td><strong>View</strong></td><td>Read the section only. Cannot comment or edit.</td></tr>
+      <tr><td><strong>No Access</strong></td><td>Cannot see this section at all</td></tr>
+    </tbody>
+  </table>
+
+  <ol class="steps">
+    <li>
+      <strong>In the Team &amp; Access tab, find the permission grid.</strong> It shows team members as rows and sections as columns.
+      <em class="expected">You see a grid with dropdown menus or radio buttons at each intersection.</em>
+    </li>
+    <li>
+      <strong>For each team member, set the permission for each section</strong> by clicking the dropdown and choosing Edit, Comment, View, or No Access.
+      <em class="expected">The permission is saved immediately.</em>
+    </li>
+  </ol>
+
+  <h3 id="dropboxes">Dropboxes (File Uploads from Team Members)</h3>
+  <p>Every team member gets their own personal "dropbox" &mdash; a place to upload files related to the proposal (resumes, data, images, reference documents).</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Look for the "Dropboxes" area</strong> in the workspace (it may be at the bottom of the Artifacts tab or in the Team tab).
+      <em class="expected">You see a list of dropboxes, one for each team member.</em>
+    </li>
+    <li>
+      <strong>Click on any person's dropbox</strong> to see what they uploaded.
+      <em class="expected">You see a list of files with names, sizes, and upload dates.</em>
+    </li>
+    <li>
+      <strong>Click on a file to download or preview it.</strong>
+      <em class="expected">The file opens or downloads to your computer.</em>
+    </li>
+  </ol>
+
+  <div class="tip">Ask each team member to upload their materials (resumes, data, supporting documents) to their dropbox. This keeps everything organized in one place instead of scattered across emails.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 8. STAGES                                                   -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="stages">
+  <h2>8. Advancing Through Stages</h2>
+  <p>Your proposal goes through a series of stages, like checkpoints. You choose how many stages you want when you start (between 2 and 4).</p>
+
+  <h3>The Stages</h3>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Stage</th><th>What Happens</th><th>Who Can Edit?</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Draft</strong></td>
+        <td>The writing stage. Everyone is creating and editing content.</td>
+        <td>Anyone with Edit permission</td>
+      </tr>
+      <tr>
+        <td><strong>Review</strong> (optional)</td>
+        <td>Internal review. Team members read and leave comments. Edits are limited.</td>
+        <td>Reviewers can comment; editors may still make changes</td>
+      </tr>
+      <tr>
+        <td><strong>Final</strong></td>
+        <td>The proposal is locked. No more changes. Ready for download and submission.</td>
+        <td>Nobody &mdash; the workspace is locked</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>How to Advance to the Next Stage</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>In your proposal workspace, look for the stage indicator</strong> (usually near the top of the page). It shows your current stage and a progress bar.
+      <em class="expected">You see something like: "Current Stage: Draft" with a progress bar showing your position.</em>
+    </li>
+    <li>
+      <strong>When your team is ready to move on, click "Advance to [Next Stage]"</strong> (for example, "Advance to Review" or "Advance to Final").
+      <em class="expected">A confirmation dialog may appear. Click "Yes" or "Confirm" to proceed.</em>
+    </li>
+    <li>
+      <strong>The stage updates.</strong>
+      <em class="expected">The stage badge changes to show the new stage. If you advanced to Final, the workspace locks automatically &mdash; all editing is disabled.</em>
+    </li>
+  </ol>
+
+  <div class="warning">Moving to the "Final" stage locks the entire workspace. Make sure everyone has finished their edits before advancing.</div>
+
+  <h3>Emergency Unlock</h3>
+  <p>If you advance to Final but realize you need to make a change:</p>
+
+  <ol class="steps">
+    <li>
+      <strong>You get ONE chance to unlock the workspace.</strong> Look for an "Unlock for Edits" button.
+      <em class="expected">The workspace unlocks temporarily. You have a 7-day window to make changes.</em>
+    </li>
+    <li>
+      <strong>After 7 days, the workspace locks again permanently.</strong>
+      <em class="expected">If you need to unlock again after using your one chance, you must contact the RFP Pipeline support team.</em>
+    </li>
+  </ol>
+
+  <div class="warning">Use the emergency unlock only if absolutely necessary. Plan ahead and get all edits done before advancing to Final.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 9. DOWNLOAD                                                 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="download">
+  <h2>9. Downloading Your Proposal</h2>
+  <p>Once your proposal is at the Final stage (locked), you can download it as formatted documents ready for submission to the government.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Go to your proposal workspace.</strong>
+      <span class="url">{BASE_URL}/portal/{slug}/proposals/{proposalId}</span>
+      <em class="expected">The workspace shows "Final" as the current stage, and the workspace is locked (no editing allowed).</em>
+    </li>
+    <li>
+      <strong>Click "Export Package"</strong> (or "Download" / "Export").
+      <em class="expected">The system generates your proposal documents. This may take a moment.</em>
+    </li>
+    <li>
+      <strong>Save the downloaded files to your computer.</strong>
+      <em class="expected">You receive one or more files (Word documents, PowerPoint presentations, or spreadsheets, depending on the solicitation requirements). The files download to your usual downloads folder.</em>
+    </li>
+    <li>
+      <strong>Open the files to verify them.</strong>
+      <em class="expected">Each document is formatted exactly according to the government's requirements &mdash; correct fonts, correct margins, correct page counts, correct headers and footers.</em>
+    </li>
+  </ol>
+
+  <div class="tip">You can download your proposal multiple times. The download button does not disappear after the first use.</div>
+
+  <div class="warning">Before submitting to the government, always open each file and do a final visual check. Make sure all text is present, formatting looks correct, and page counts are within limits.</div>
+
+  <h3>What to Check in Your Downloaded Files</h3>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Check This</th><th>Why It Matters</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Font (e.g., Times New Roman 10pt)</td><td>Wrong font = immediate disqualification with some agencies</td></tr>
+      <tr><td>Margins (e.g., 1 inch all sides)</td><td>Wrong margins can change your page count or get you disqualified</td></tr>
+      <tr><td>Page count (e.g., 15 pages max)</td><td>Going over the page limit usually means extra pages will not be read</td></tr>
+      <tr><td>Headers and footers</td><td>Many agencies require specific information in the header or footer</td></tr>
+      <tr><td>All sections present</td><td>Make sure no section was accidentally left blank</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 10. AFTER SUBMISSION                                        -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="after-submission">
+  <h2>10. After Submission</h2>
+  <p>After you submit your proposal to the government agency (outside of this platform), come back here to record the outcome.</p>
+
+  <h3>Recording Your Outcome</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Go to your proposal workspace.</strong>
+      <span class="url">{BASE_URL}/portal/{slug}/proposals/{proposalId}</span>
+      <em class="expected">Your completed proposal workspace opens.</em>
+    </li>
+    <li>
+      <strong>Click "Record Outcome."</strong>
+      <em class="expected">A dialog or form appears asking for the result.</em>
+    </li>
+    <li>
+      <strong>Select the outcome:</strong>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><strong>Awarded</strong> &mdash; you won the contract</li>
+        <li><strong>Rejected</strong> &mdash; your proposal was not selected</li>
+        <li><strong>Withdrawn</strong> &mdash; you decided not to submit, or withdrew your proposal</li>
+      </ul>
+      <em class="expected">The outcome is recorded.</em>
+    </li>
+  </ol>
+
+  <h3>Why Recording Outcomes Matters</h3>
+  <p><strong>If you select "Awarded":</strong> Your content from this proposal gets marked as "winning" in your library. In the future, when the AI drafts new proposals, it will <strong>prefer your winning content over everything else</strong>. This means your future proposals get better and better over time.</p>
+  <p><strong>If you select "Rejected":</strong> The content is still saved and usable, but the AI will look for winning content first.</p>
+
+  <div class="tip">Recording outcomes &mdash; especially wins &mdash; is one of the most valuable things you can do. It teaches the AI which of your writing is most effective.</div>
+
+  <h3>Your Content Stays Forever</h3>
+  <p>All your library content, proposal drafts, and uploaded documents remain in your account permanently. You can always go back and reference previous proposals, reuse content, or learn from past submissions.</p>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 11. TROUBLESHOOTING                                         -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="troubleshooting">
+  <h2>11. Troubleshooting</h2>
+  <p>If something is not working, check this list for common problems and solutions.</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>What You See</th><th>What Is Probably Wrong</th><th>What to Do</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>The login page does not accept my temporary password</td>
+        <td>The password may have been typed incorrectly, or it may have expired</td>
+        <td>Check your welcome email for the exact password (copy and paste it if possible). If it still does not work, contact your RFP Pipeline administrator and ask them to reset your password.</td>
+      </tr>
+      <tr>
+        <td>After changing my password, I land on a blank page</td>
+        <td>The page may not have fully loaded after the password change</td>
+        <td>Type your portal address in the address bar: <code>{BASE_URL}/portal/{slug}/dashboard</code> and press Enter.</td>
+      </tr>
+      <tr>
+        <td>The Spotlights page is empty (no opportunities shown)</td>
+        <td>No opportunities have been published yet by the administrator</td>
+        <td>This is normal if the system is new. Check back in a day or two. Contact your administrator if you expected to see opportunities.</td>
+      </tr>
+      <tr>
+        <td>File upload does not work (nothing happens or error appears)</td>
+        <td>The file may be too large or in an unsupported format</td>
+        <td>Make sure your file is a .docx, .pdf, .pptx, .xlsx, or .txt file. Try a smaller file first. If all files fail, contact your administrator.</td>
+      </tr>
+      <tr>
+        <td>"Atomize" button does nothing or errors</td>
+        <td>The document processing service may be temporarily unavailable</td>
+        <td>Wait a few minutes and try again. If it still does not work, contact your administrator.</td>
+      </tr>
+      <tr>
+        <td>AI drafting produces empty or very short sections</td>
+        <td>Your library may not have enough content for the AI to work with</td>
+        <td>Upload more documents to your library and atomize them, then try drafting again.</td>
+      </tr>
+      <tr>
+        <td>The Canvas Editor shows a blank page</td>
+        <td>The section may not have any content yet</td>
+        <td>Go back to the AI &amp; Library tab and click "Draft All Empty Sections" to generate initial content. Then try opening the section again.</td>
+      </tr>
+      <tr>
+        <td>Page count is red (over the limit)</td>
+        <td>Your section has too much content</td>
+        <td>Select paragraphs and use the "Make shorter" AI tool to condense your text. Remove less important content.</td>
+      </tr>
+      <tr>
+        <td>I cannot edit a section (everything is grayed out)</td>
+        <td>Either the proposal is locked (Final stage), or you do not have Edit permission for this section</td>
+        <td>Check the stage indicator. If it says "Final," the proposal is locked. If the stage is "Draft," ask your company admin to give you Edit permission for this section.</td>
+      </tr>
+      <tr>
+        <td>"Build Proposal" button gives an error</td>
+        <td>Payment processing may not be set up, or there may be a temporary issue</td>
+        <td>Try again in a few minutes. If it persists, contact your administrator and let them know you received an error when trying to build a proposal.</td>
+      </tr>
+      <tr>
+        <td>My invited team member cannot log in</td>
+        <td>Their temporary password may have been entered incorrectly</td>
+        <td>Ask them to check their email for the invite. If they still cannot log in, contact your administrator to reset their password.</td>
+      </tr>
+      <tr>
+        <td>Export/download fails or produces a broken file</td>
+        <td>There may be a temporary system issue, or a section may have corrupted content</td>
+        <td>Try downloading again. If the problem persists, contact your administrator.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warning">When contacting support, always include: (1) what page you were on (copy the address from your browser's address bar), (2) what you clicked, (3) what happened (or did not happen), and (4) the approximate time.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- QUICK REFERENCE: ALL PORTAL PAGES                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Quick Reference: All Portal Pages</h2>
+  <p>Bookmark these for quick access. Replace <code>{BASE_URL}</code> with your actual web address and <code>{slug}</code> with your company slug.</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Page</th><th>Address</th><th>How to Get There</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Dashboard</td><td><code>{BASE_URL}/portal/{slug}/dashboard</code></td><td>Click "Dashboard" in sidebar</td></tr>
+      <tr><td>Spotlights</td><td><code>{BASE_URL}/portal/{slug}/spotlights</code></td><td>Click "Spotlights" in sidebar</td></tr>
+      <tr><td>Library</td><td><code>{BASE_URL}/portal/{slug}/library</code></td><td>Click "Library" in sidebar</td></tr>
+      <tr><td>Library Upload</td><td><code>{BASE_URL}/portal/{slug}/library/upload</code></td><td>Click "Upload" from Library page</td></tr>
+      <tr><td>Proposals</td><td><code>{BASE_URL}/portal/{slug}/proposals</code></td><td>Click "Proposals" in sidebar</td></tr>
+      <tr><td>Proposal Workspace</td><td><code>{BASE_URL}/portal/{slug}/proposals/{proposalId}</code></td><td>Click on a proposal from the list</td></tr>
+      <tr><td>Team</td><td><code>{BASE_URL}/portal/{slug}/team</code></td><td>Click "Team" in sidebar</td></tr>
+      <tr><td>Settings</td><td><code>{BASE_URL}/portal/{slug}/profile</code></td><td>Click "Settings" in sidebar</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- WORKFLOW SUMMARY                                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Your Workflow at a Glance</h2>
+  <p>Here is the recommended order for using RFP Pipeline, from start to finish:</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Step</th><th>What to Do</th><th>How Long It Takes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Log in and set your password</td><td>2 minutes</td></tr>
+      <tr><td>2</td><td>Upload documents to your Library</td><td>10-30 minutes</td></tr>
+      <tr><td>3</td><td>Atomize your documents</td><td>5-15 minutes (system does the work)</td></tr>
+      <tr><td>4</td><td>Browse Spotlight for opportunities</td><td>15-30 minutes</td></tr>
+      <tr><td>5</td><td>Pin interesting opportunities</td><td>1 minute each</td></tr>
+      <tr><td>6</td><td>Build a proposal for your best opportunity</td><td>5 minutes</td></tr>
+      <tr><td>7</td><td>Let AI draft all sections</td><td>10-20 minutes (system does the work)</td></tr>
+      <tr><td>8</td><td>Invite team members and assign sections</td><td>10 minutes</td></tr>
+      <tr><td>9</td><td>Edit and refine each section</td><td>Hours to days (your main work)</td></tr>
+      <tr><td>10</td><td>Review compliance checklist</td><td>15 minutes</td></tr>
+      <tr><td>11</td><td>Advance to Final and download</td><td>5 minutes</td></tr>
+      <tr><td>12</td><td>Submit to the government (outside this platform)</td><td>Varies</td></tr>
+      <tr><td>13</td><td>Record outcome (awarded, rejected, or withdrawn)</td><td>1 minute</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /container -->
+
+<footer class="site-footer">
+  <p>RFP Pipeline &mdash; Customer Portal Manual</p>
+  <p>For support, contact your company administrator or the RFP Pipeline support team.</p>
+</footer>
+
+</body>
+</html>

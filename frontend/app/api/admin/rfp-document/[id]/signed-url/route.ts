@@ -33,19 +33,19 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   const { id } = await ctx.params;
 
-  const rows = await sql<{ storageKey: string; originalFilename: string }[]>`
-    SELECT storage_key, original_filename
-    FROM solicitation_documents
-    WHERE id = ${id}::uuid
-  `;
-  if (rows.length === 0) {
-    return NextResponse.json(
-      { error: 'Document not found', code: 'NOT_FOUND' },
-      { status: 404 },
-    );
-  }
-
   try {
+    const rows = await sql<{ storageKey: string; originalFilename: string }[]>`
+      SELECT storage_key, original_filename
+      FROM solicitation_documents
+      WHERE id = ${id}::uuid
+    `;
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { error: 'Document not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
     const url = await getSignedGetUrl(rows[0].storageKey, 15 * 60);
     return NextResponse.json({ data: { url, filename: rows[0].originalFilename } });
   } catch (err) {

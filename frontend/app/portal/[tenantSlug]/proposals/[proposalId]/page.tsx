@@ -2,22 +2,12 @@ import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 
 interface Props {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
-
-const STAGE_ORDER = [
-  'outline',
-  'draft',
-  'pink_team',
-  'red_team',
-  'gold_team',
-  'final',
-  'submitted',
-  'archived',
-] as const;
 
 export default async function ProposalWorkspacePage({ params }: Props) {
   const { tenantSlug, proposalId } = await params;
@@ -47,6 +37,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     title: string;
     stage: string;
     isLocked: boolean;
+    lockCount: number;
+    downloadCount: number;
+    unlockDeadline: string | null;
+    gateConfig: string[];
     createdAt: Date;
     opportunityId: string;
     solicitationId: string | null;
@@ -66,6 +60,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         p.title,
         p.stage,
         p.is_locked,
+        p.lock_count,
+        p.download_count,
+        p.unlock_deadline,
+        p.gate_config,
         p.created_at,
         p.opportunity_id,
         p.solicitation_id,
@@ -88,6 +86,27 @@ export default async function ProposalWorkspacePage({ params }: Props) {
 
   if (!proposal) notFound();
 
+  // ── Resolve user access ───────────────────────────────────────────
+  let access;
+  try {
+    access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+  } catch (e) {
+    console.error('[portal/proposals/workspace] access resolver error:', e);
+    access = {
+      role: 'external' as const,
+      editableSections: [],
+      commentableSections: [],
+      viewableSections: [],
+      canUpload: false,
+      canAdvance: false,
+      canManageTeam: false,
+      canExport: false,
+      lockCount: proposal.lockCount || 0,
+      isLocked: proposal.isLocked,
+      unlockDeadline: proposal.unlockDeadline,
+    };
+  }
+
   // ── Load sections ──────────────────────────────────────────────────
   let sections: {
     id: string;
@@ -97,6 +116,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     pageAllocation: number | null;
     version: number;
     nodeCount: number;
+    assignedTo: string | null;
   }[] = [];
 
   try {
@@ -108,6 +128,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.status,
         ps.page_allocation,
         ps.version,
+        ps.assigned_to,
         CASE
           WHEN ps.content IS NOT NULL AND ps.content::text != 'null' AND ps.content::text != ''
           THEN (
@@ -130,10 +151,99 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     console.error('[portal/proposals/workspace] sections query error:', e);
   }
 
-  // ── Compute stage index for the progress indicator ─────────────────
-  const currentStageIndex = STAGE_ORDER.indexOf(
-    proposal.stage as (typeof STAGE_ORDER)[number],
-  );
+  // ── Load collaborators ─────────────────────────────────────────────
+  let collaborators: {
+    id: string;
+    userId: string | null;
+    email: string;
+    name: string | null;
+    role: string;
+    assignedSections: string[];
+    dropboxEnabled: boolean;
+    invitedAt: string;
+    acceptedAt: string | null;
+  }[] = [];
+
+  try {
+    collaborators = await sql<typeof collaborators>`
+      SELECT
+        id, user_id, email, name, role,
+        assigned_sections, dropbox_enabled,
+        invited_at, accepted_at
+      FROM proposal_collaborators
+      WHERE proposal_id = ${proposalId}
+      ORDER BY invited_at ASC
+    `;
+  } catch (e) {
+    console.error('[portal/proposals/workspace] collaborators query error:', e);
+  }
+
+  // Load stage access for collaborators
+  let stageAccessRows: {
+    collaboratorId: string;
+    stage: string;
+    permission: string;
+    artifactTypes: string[];
+  }[] = [];
+
+  try {
+    stageAccessRows = await sql<typeof stageAccessRows>`
+      SELECT collaborator_id, stage, permission, artifact_types
+      FROM collaborator_stage_access
+      WHERE proposal_id = ${proposalId}
+        AND access_revoked_at IS NULL
+    `;
+  } catch (e) {
+    console.error('[portal/proposals/workspace] stage access query error:', e);
+  }
+
+  const stageAccessByCollab = new Map<string, typeof stageAccessRows>();
+  for (const row of stageAccessRows) {
+    const existing = stageAccessByCollab.get(row.collaboratorId) || [];
+    existing.push(row);
+    stageAccessByCollab.set(row.collaboratorId, existing);
+  }
+
+  const collaboratorsWithAccess = collaborators.map((c) => ({
+    ...c,
+    stageAccess: stageAccessByCollab.get(c.id) || [],
+  }));
+
+  // ── Load compliance ────────────────────────────────────────────────
+  let compliance: {
+    items?: Array<{
+      id?: string;
+      requirement?: string;
+      status?: string;
+      details?: string | null;
+      label?: string;
+      met?: boolean;
+      value?: string;
+    }>;
+    source?: string;
+  } | null = null;
+  try {
+    const matrix = await sql<{
+      id: string;
+      requirement: string;
+      status: string;
+      details: string | null;
+      sectionId: string | null;
+    }[]>`
+      SELECT id, requirement, status, details, section_id
+      FROM proposal_compliance_matrix
+      WHERE proposal_id = ${proposalId}
+      ORDER BY requirement ASC
+    `;
+    if (matrix.length > 0) {
+      compliance = { items: matrix, source: 'database' };
+    }
+  } catch (e) {
+    console.error('[portal/proposals/workspace] compliance query error:', e);
+  }
+
+  // ── Compute derived data ──────────────────────────────────────────
+  const gateConfig = (proposal.gateConfig || ['draft', 'final']) as string[];
 
   const hasEmptySections = sections.some(
     (s) => s.status === 'empty' || s.nodeCount === 0,
@@ -147,10 +257,35 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       })
     : null;
 
+  // Map sections with per-user permission
+  const sectionsWithPermission = sections.map((s) => {
+    let permission: 'edit' | 'comment' | 'view' | 'none' = 'none';
+    if (access.role === 'admin') {
+      permission = 'edit';
+    } else if (access.editableSections.includes(s.id)) {
+      permission = 'edit';
+    } else if (access.commentableSections.includes(s.id)) {
+      permission = 'comment';
+    } else if (access.viewableSections.includes(s.id)) {
+      permission = 'view';
+    }
+    return {
+      id: s.id,
+      sectionNumber: s.sectionNumber,
+      title: s.title,
+      status: s.status,
+      pageAllocation: s.pageAllocation,
+      version: s.version,
+      nodeCount: s.nodeCount,
+      permission,
+      assignedTo: s.assignedTo,
+    };
+  });
+
   return (
     <div>
       {/* ── Proposal Header ───────────────────────────────────────────── */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 truncate">
@@ -181,60 +316,30 @@ export default async function ProposalWorkspacePage({ params }: Props) {
             </div>
           </div>
         </div>
-
-        {/* ── Stage Progress ──────────────────────────────────────────── */}
-        <div className="mt-6">
-          <div className="flex items-center gap-1">
-            {STAGE_ORDER.filter((s) => s !== 'archived').map((stage, idx) => {
-              const isActive = idx === currentStageIndex;
-              const isComplete = idx < currentStageIndex;
-              const label = stage
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase());
-
-              return (
-                <div key={stage} className="flex items-center gap-1">
-                  <div
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      isActive
-                        ? 'bg-indigo-600 text-white'
-                        : isComplete
-                          ? 'bg-indigo-100 text-indigo-700'
-                          : 'bg-gray-100 text-gray-400'
-                    }`}
-                  >
-                    {label}
-                  </div>
-                  {idx < STAGE_ORDER.length - 2 && (
-                    <div
-                      className={`w-4 h-0.5 ${
-                        isComplete ? 'bg-indigo-300' : 'bg-gray-200'
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       {/* ── Workspace Client Component ────────────────────────────────── */}
       <ProposalWorkspace
         proposalId={proposalId}
         tenantSlug={tenantSlug}
-        sections={sections.map((s) => ({
-          id: s.id,
-          sectionNumber: s.sectionNumber,
-          title: s.title,
-          status: s.status,
-          pageAllocation: s.pageAllocation,
-          version: s.version,
-          nodeCount: s.nodeCount,
-        }))}
+        sections={sectionsWithPermission}
         hasEmptySections={hasEmptySections}
         proposalStage={proposal.stage}
         isLocked={proposal.isLocked}
+        userRole={access.role}
+        currentUserId={sessionUser.id}
+        collaborators={collaboratorsWithAccess}
+        compliance={compliance}
+        dropboxFiles={[]}
+        gateConfig={gateConfig}
+        lockCount={proposal.lockCount || 0}
+        downloadCount={proposal.downloadCount || 0}
+        unlockDeadline={proposal.unlockDeadline}
+        canAdvance={access.canAdvance}
+        canUpload={access.canUpload}
+        canExport={access.canExport}
+        canManageTeam={access.canManageTeam}
+        closeDate={proposal.closeDate?.toISOString() ?? null}
       />
     </div>
   );

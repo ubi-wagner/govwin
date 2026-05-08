@@ -74,7 +74,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       : sql``;
 
     const queryFilter = input.query
-      ? sql`AND content ILIKE ${'%' + input.query + '%'}`
+      ? sql`AND content ILIKE ${'%' + input.query.replace(/[%_\\]/g, '\\$&') + '%'}`
       : sql``;
 
     const limitVal = input.limit;

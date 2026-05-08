@@ -41,7 +41,20 @@ export async function GET() {
       LIMIT 20
     `;
 
-    return NextResponse.json({ data: { sources, recentActivity } });
+    const recentDiffs = await sql`
+      SELECT sd.id, sd.profile_id, sd.summary, sd.severity,
+             sd.is_meaningful, sd.created_at,
+             sp.name AS source_name,
+             sr.name AS region_name
+      FROM source_diffs sd
+      JOIN source_profiles sp ON sp.id = sd.profile_id
+      LEFT JOIN source_regions sr ON sr.id = sd.region_id
+      WHERE sd.is_meaningful = true
+      ORDER BY sd.created_at DESC
+      LIMIT 20
+    `;
+
+    return NextResponse.json({ data: { sources, recentActivity, recentDiffs } });
   } catch (e) {
     console.error('[api/admin/sources GET] error:', e);
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });

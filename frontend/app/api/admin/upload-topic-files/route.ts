@@ -57,13 +57,19 @@ export async function POST(request: Request) {
   }
 
   // Verify solicitation exists + get its primary opportunity for path generation
-  const solRows = await sql<{ id: string; opportunityId: string | null }[]>`
-    SELECT id, opportunity_id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-  `;
-  if (solRows.length === 0) {
-    return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+  let oppId: string;
+  try {
+    const solRows = await sql<{ id: string; opportunityId: string | null }[]>`
+      SELECT id, opportunity_id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+    `;
+    if (solRows.length === 0) {
+      return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    oppId = solRows[0].opportunityId ?? solicitationId;
+  } catch (err) {
+    console.error('[upload-topic-files] solicitation lookup failed', err);
+    return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
   }
-  const oppId = solRows[0].opportunityId ?? solicitationId;
 
   const files: File[] = [];
   for (const entry of formData.getAll('files')) {
@@ -81,9 +87,15 @@ export async function POST(request: Request) {
     const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
 
     // Check for global duplicate
-    const dupeCheck = await sql<{ id: string }[]>`
-      SELECT id FROM solicitation_documents WHERE content_hash = ${hash}
-    `;
+    let dupeCheck: { id: string }[];
+    try {
+      dupeCheck = await sql<{ id: string }[]>`
+        SELECT id FROM solicitation_documents WHERE content_hash = ${hash}
+      `;
+    } catch (err) {
+      console.error('[upload-topic-files] duplicate check failed', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (dupeCheck.length > 0) {
       // Skip silently — already uploaded
       continue;
@@ -110,24 +122,30 @@ export async function POST(request: Request) {
         metadata: { 'original-filename': displayName, 'topic-number': topicNumber ?? '' },
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[upload-topic-files] S3 put failed', { key: storageKey, err: err instanceof Error ? err.message : String(err) });
       return NextResponse.json(
-        { error: `Storage failed for ${displayName}: ${msg}`, code: 'STORAGE_ERROR' },
+        { error: 'File storage failed', code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
 
-    const docRows = await sql<{ id: string }[]>`
-      INSERT INTO solicitation_documents
-        (solicitation_id, document_type, original_filename, storage_key,
-         file_size, content_type, content_hash, uploaded_by,
-         metadata)
-      VALUES
-        (${solicitationId}::uuid, 'topic', ${displayName}, ${storageKey},
-         ${file.size}, ${file.type || null}, ${hash}, ${userId ?? null}::uuid,
-         ${JSON.stringify({ parsed_topic_number: topicNumber, parsed_title: title })}::jsonb)
-      RETURNING id
-    `;
+    let docRows: { id: string }[];
+    try {
+      docRows = await sql<{ id: string }[]>`
+        INSERT INTO solicitation_documents
+          (solicitation_id, document_type, original_filename, storage_key,
+           file_size, content_type, content_hash, uploaded_by,
+           metadata)
+        VALUES
+          (${solicitationId}::uuid, 'topic', ${displayName}, ${storageKey},
+           ${file.size}, ${file.type || null}, ${hash}, ${userId ?? null}::uuid,
+           ${JSON.stringify({ parsed_topic_number: topicNumber, parsed_title: title })}::jsonb)
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[upload-topic-files] document insert failed', err);
+      return NextResponse.json({ error: 'Failed to record document', code: 'DB_ERROR' }, { status: 500 });
+    }
     uploaded.push({
       documentId: docRows[0].id,
       topicNumber,

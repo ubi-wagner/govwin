@@ -1,9 +1,311 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { randomUUID } from 'crypto';
+import { emitEventSingle, userActor } from '@/lib/events';
+import bcrypt from 'bcryptjs';
 
-export async function GET() {
-  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+interface RouteContext {
+  params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
-export async function POST(request: Request) {
-  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+/**
+ * GET /api/portal/[tenantSlug]/proposals/[proposalId]/collaborators
+ *
+ * List all collaborators with their access levels and assigned sections.
+ * Auth: tenant_user or higher with tenant access.
+ */
+export async function GET(_request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string }[]>`
+      SELECT id FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    const collaborators = await sql<{
+      id: string;
+      userId: string | null;
+      email: string;
+      name: string | null;
+      role: string;
+      assignedSections: string[];
+      dropboxEnabled: boolean;
+      invitedAt: string;
+      acceptedAt: string | null;
+    }[]>`
+      SELECT
+        pc.id,
+        pc.user_id,
+        pc.email,
+        pc.name,
+        pc.role,
+        pc.assigned_sections,
+        pc.dropbox_enabled,
+        pc.invited_at,
+        pc.accepted_at
+      FROM proposal_collaborators pc
+      WHERE pc.proposal_id = ${proposalId}
+      ORDER BY pc.invited_at ASC
+    `;
+
+    // Load stage access for each collaborator
+    const accessRows = await sql<{
+      collaboratorId: string;
+      stage: string;
+      permission: string;
+      artifactTypes: string[];
+    }[]>`
+      SELECT collaborator_id, stage, permission, artifact_types
+      FROM collaborator_stage_access
+      WHERE proposal_id = ${proposalId}
+        AND access_revoked_at IS NULL
+    `;
+
+    type AccessRow = { collaboratorId: string; stage: string; permission: string; artifactTypes: string[] };
+    const accessByCollaborator = new Map<string, AccessRow[]>();
+    for (const row of accessRows) {
+      const existing = accessByCollaborator.get(row.collaboratorId) || [];
+      existing.push(row);
+      accessByCollaborator.set(row.collaboratorId, existing);
+    }
+
+    const data = collaborators.map((c) => ({
+      id: c.id,
+      userId: c.userId,
+      email: c.email,
+      name: c.name,
+      role: c.role,
+      assignedSections: c.assignedSections || [],
+      dropboxEnabled: c.dropboxEnabled,
+      invitedAt: c.invitedAt,
+      acceptedAt: c.acceptedAt,
+      stageAccess: accessByCollaborator.get(c.id) || [],
+    }));
+
+    return NextResponse.json({ data });
+  } catch (e) {
+    console.error('[api/portal/proposals/collaborators] GET error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/portal/[tenantSlug]/proposals/[proposalId]/collaborators
+ *
+ * Invite a collaborator to the proposal.
+ * Auth: tenant_admin only.
+ *
+ * Body: { email, name, role, assignedSections, permission }
+ */
+export async function POST(request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      email?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Parse body
+    let body: {
+      email?: unknown;
+      name?: unknown;
+      role?: unknown;
+      assignedSections?: unknown;
+      permission?: unknown;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const collabRole = typeof body.role === 'string' ? body.role : 'contributor';
+    const assignedSections = Array.isArray(body.assignedSections) ? body.assignedSections : [];
+    const permission = typeof body.permission === 'string' ? body.permission : 'view';
+
+    if (!email || !email.includes('@')) {
+      return NextResponse.json({ error: 'Valid email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (!['contributor', 'external'].includes(collabRole)) {
+      return NextResponse.json({ error: 'Role must be contributor or external', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (!['view', 'comment', 'edit'].includes(permission)) {
+      return NextResponse.json({ error: 'Permission must be view, comment, or edit', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string; stage: string; gateConfig: string[] }[]>`
+      SELECT id, stage, gate_config FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // Check if collaborator already exists
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM proposal_collaborators
+      WHERE proposal_id = ${proposalId} AND email = ${email}
+      LIMIT 1
+    `;
+    if (existing) {
+      return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
+    }
+
+    // Check if user exists, create if not
+    let [existingUser] = await sql<{ id: string; tenantId: string | null }[]>`
+      SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
+    `;
+
+    let isNewUser = false;
+    if (!existingUser) {
+      isNewUser = true;
+      const tempPassword = randomUUID().slice(0, 12);
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
+
+      const [newUser] = await sql<{ id: string }[]>`
+        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
+        VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
+        RETURNING id
+      `;
+      existingUser = { id: newUser.id, tenantId: tenantId };
+    }
+
+    // Create collaborator record
+    const [collaborator] = await sql<{ id: string }[]>`
+      INSERT INTO proposal_collaborators (
+        proposal_id, user_id, email, name, role, invited_by,
+        assigned_sections, dropbox_enabled
+      )
+      VALUES (
+        ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
+        ${collabRole}, ${sessionUser.id},
+        ${sql.array(assignedSections)}, true
+      )
+      RETURNING id
+    `;
+
+    // Create stage access for current stage
+    const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+    for (const stage of gates) {
+      await sql`
+        INSERT INTO collaborator_stage_access (
+          collaborator_id, proposal_id, stage, permission, granted_by
+        )
+        VALUES (
+          ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+        )
+      `;
+    }
+
+    // Emit event
+    const correlationId = randomUUID();
+    await emitEventSingle({
+      namespace: 'proposal',
+      type: 'proposal.collaborator_invited',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: {
+        correlationId,
+        tenantId,
+        tenantSlug,
+        proposalId,
+        collaboratorId: collaborator.id,
+        email,
+        name,
+        role: collabRole,
+        permission,
+        isNewUser,
+      },
+    });
+
+    return NextResponse.json({
+      data: {
+        id: collaborator.id,
+        userId: existingUser.id,
+        email,
+        name,
+        role: collabRole,
+        assignedSections,
+        permission,
+        isNewUser,
+      },
+    });
+  } catch (e) {
+    console.error('[api/portal/proposals/collaborators] POST error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
 }

@@ -1,11 +1,18 @@
 import Link from 'next/link';
+import { getPublishedContentByTypes } from '@/lib/cms';
+import ResourcesFilter from '@/components/marketing/resources-filter';
 
 export const metadata = {
   title: 'Resources — RFP Pipeline',
   description: 'Blog, guides, federal R&D funding insights, and links to your RFP portals.',
 };
 
-export default function ResourcesPage() {
+// Revalidate every 60 seconds so published changes show up quickly
+export const revalidate = 60;
+
+export default async function ResourcesPage() {
+  const allContent = await getPublishedContentByTypes(['resource', 'guide', 'blog_post']);
+
   return (
     <>
       <section className="bg-cream-50">
@@ -20,7 +27,7 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      {/* Programs grid — dynamic CMS container */}
+      {/* Programs grid — static reference */}
       <section className="bg-white border-t border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <h2 className="font-display text-2xl font-bold text-navy-900 mb-8">Programs We Cover</h2>
@@ -42,56 +49,27 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      {/* Blog / Insights — CMS dynamic container */}
+      {/* Dynamic content from CMS */}
       <section className="bg-cream-50 border-t border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div className="flex items-center justify-between mb-8">
             <h2 className="font-display text-2xl font-bold text-navy-900">Latest Insights</h2>
-            <span className="text-xs text-navy-400 uppercase tracking-wider">CMS-powered &middot; Coming soon</span>
           </div>
-          {/* CMS content container — each card will be rendered from a CMS entry */}
-          <div className="grid md:grid-cols-3 gap-6" id="cms-blog-grid">
-            {[
-              {
-                date: 'Jun 2026',
-                title: 'DoD SBIR 26.1: What changed from 25.2',
-                preview: 'Topic analysis, compliance shifts, and what your team should know before the next cycle opens.',
-                tag: 'Analysis',
-              },
-              {
-                date: 'Jun 2026',
-                title: 'STTR vs. SBIR: choosing the right vehicle',
-                preview: 'When to partner with a research institution and when to go it alone. Decision framework for small businesses.',
-                tag: 'Guide',
-              },
-              {
-                date: 'May 2026',
-                title: 'Compliance matrix deep-dive: page limits that kill proposals',
-                preview: 'The #1 compliance failure is exceeding page limits. Here\'s how the smart shops avoid it.',
-                tag: 'Compliance',
-              },
-            ].map((post) => (
-              <article key={post.title} className="bg-white border border-cream-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow">
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs text-brand-500 font-semibold uppercase tracking-wider">{post.tag}</span>
-                    <span className="text-xs text-navy-400">{post.date}</span>
-                  </div>
-                  <h3 className="font-display font-bold text-navy-900">{post.title}</h3>
-                  <p className="mt-2 text-sm text-navy-600 leading-relaxed">{post.preview}</p>
-                </div>
-              </article>
-            ))}
-          </div>
+
+          {allContent.length === 0 ? (
+            <p className="text-navy-500 text-center py-12">Resources coming soon.</p>
+          ) : (
+            <ResourcesFilter content={JSON.parse(JSON.stringify(allContent))} />
+          )}
         </div>
       </section>
 
-      {/* Subscriber portal links — CMS dynamic container */}
+      {/* Subscriber portal links */}
       <section className="bg-white border-t border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <h2 className="font-display text-2xl font-bold text-navy-900 mb-3">Subscriber Portals</h2>
           <p className="text-sm text-navy-500 mb-8">Logged-in subscribers access their portals via the dashboard.</p>
-          <div className="grid md:grid-cols-2 gap-6" id="cms-portal-links">
+          <div className="grid md:grid-cols-2 gap-6">
             <div className="p-6 border border-cream-200 rounded-lg bg-cream-50">
               <h3 className="font-display font-bold text-navy-900">Spotlight Dashboard</h3>
               <p className="mt-2 text-sm text-navy-600">Your ranked opportunity feed, deadline reminders, and pinned topics.</p>

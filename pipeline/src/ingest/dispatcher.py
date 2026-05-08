@@ -18,6 +18,7 @@ import asyncpg
 from ingest.sam_gov import SamGovIngester
 from ingest.sbir_gov import SbirGovIngester
 from ingest.grants_gov import GrantsGovIngester
+from ingest.dsip import DsipIngester
 
 log = logging.getLogger("pipeline.dispatcher")
 
@@ -26,6 +27,7 @@ INGESTERS = {
     "sam_gov": SamGovIngester,
     "sbir_gov": SbirGovIngester,
     "grants_gov": GrantsGovIngester,
+    "dsip": DsipIngester,
 }
 
 
@@ -116,8 +118,11 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
     Routes by pipeline_jobs.kind:
       - 'ingest'              → ingester (sam_gov, sbir_gov, grants_gov)
       - 'shred_solicitation'  → shredder.runner.shred_solicitation
+      - 'scout_source'        → source scout (single source or all due)
 
     For shred jobs, metadata must contain 'solicitation_id' (UUID str).
+    For scout jobs, metadata may contain 'source_id' (UUID str); if
+    absent, scouts all sources where auto_crawl is enabled and due.
     """
     # Atomically claim the next pending job
     job = await conn.fetchrow(
@@ -157,6 +162,8 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
     try:
         if kind == "shred_solicitation":
             await _run_shred_job(conn, job_id, metadata)
+        elif kind == "scout_source":
+            await _run_scout_job(conn, job_id, metadata)
         else:  # default: 'ingest'
             await _run_ingest_job(conn, job_id, source, metadata)
     except Exception as e:
@@ -273,6 +280,73 @@ async def _run_shred_job(
         json.dumps(result),
     )
     log.info("shred job %s completed: %s", job_id, result.get("status"))
+
+    # Emit the finder.rfp.shredded lifecycle event so downstream systems
+    # (scoring, spotlight, customer notifications) can react.
+    if result.get("status") == "ai_analyzed":
+        import uuid as _uuid
+        try:
+            await conn.execute(
+                """
+                INSERT INTO system_events
+                  (id, namespace, type, phase, actor_type, actor_id,
+                   payload, created_at)
+                VALUES ($1, 'finder', 'rfp.shredded', 'single',
+                        'pipeline', 'dispatcher',
+                        $2::jsonb, now())
+                """,
+                _uuid.uuid4(),
+                json.dumps({
+                    "solicitation_id": solicitation_id,
+                    "job_id": str(job_id),
+                    "status": result.get("status"),
+                    "sections": result.get("sections", 0),
+                    "compliance_matches": result.get("compliance_matches", 0),
+                    "namespace": result.get("namespace"),
+                }),
+            )
+        except Exception as e:
+            log.error("failed to emit rfp.shredded event for job %s: %s", job_id, e)
+
+
+async def _run_scout_job(
+    conn: asyncpg.Connection,
+    job_id: Any,
+    metadata: dict,
+) -> None:
+    """Execute a scout_source job.
+
+    If metadata contains 'source_id', scouts that single source.
+    Otherwise, scouts all sources where auto_crawl is enabled and due.
+    """
+    # Lazy import so the dispatcher can be imported without the scout
+    # worker and its httpx/anthropic dependencies being fully wired.
+    from workers.source_scout import scout_source, scout_all_due
+
+    source_id = metadata.get("source_id")
+
+    if source_id:
+        result = await scout_source(conn, source_id)
+    else:
+        result = await scout_all_due(conn)
+
+    status = "failed" if result.get("error") else "completed"
+
+    await conn.execute(
+        """
+        UPDATE pipeline_jobs
+        SET status = $2,
+            completed_at = now(),
+            result = $3::jsonb
+        WHERE id = $1
+        """,
+        job_id,
+        status,
+        json.dumps(result),
+    )
+    log.info("scout job %s %s: %s", job_id, status, {
+        k: v for k, v in result.items() if k != "results"
+    })
 
 
 async def run_consumer_loop(

@@ -1,0 +1,297 @@
+import { sql } from '@/lib/db';
+
+/**
+ * Resolved compliance data for a topic, after merging:
+ *   topic override -> solicitation baseline -> system defaults.
+ */
+export interface ResolvedCompliance {
+  compliance: Record<string, unknown>;
+  volumes: Array<{
+    volumeName: string;
+    volumeNumber: number;
+    items: Array<Record<string, unknown>>;
+  }>;
+}
+
+/**
+ * System defaults applied when neither topic nor solicitation specifies a value.
+ * These are conservative fallbacks — the real rules should come from the
+ * solicitation or topic level.
+ */
+const SYSTEM_DEFAULTS: Record<string, unknown> = {
+  page_limit_technical: null,
+  page_limit_cost: null,
+  font_family: 'Times New Roman',
+  font_size: '12pt',
+  margins: '1 inch all sides',
+  line_spacing: '1.0',
+  header_required: false,
+  footer_required: false,
+  submission_format: null,
+  images_tables_allowed: true,
+  slides_allowed: false,
+  taba_allowed: null,
+  cost_sharing_required: false,
+  pi_must_be_employee: null,
+  itar_required: false,
+};
+
+/**
+ * Resolves the full compliance + volumes for a topic by merging:
+ *   1. Topic-level override (solicitation_compliance WHERE topic_id = topicId)
+ *   2. Solicitation baseline (solicitation_compliance WHERE topic_id IS NULL)
+ *   3. System defaults (hardcoded above)
+ *
+ * For volumes, topic-specific volumes fully replace solicitation-level volumes.
+ * If no topic-specific volumes exist, solicitation-level volumes are used.
+ *
+ * @param topicId - The opportunities.id for the topic
+ * @returns Merged compliance record and resolved volume list
+ */
+export async function resolveTopicCompliance(topicId: string): Promise<ResolvedCompliance> {
+  // ── 1. Get the topic's solicitation_id ──────────────────────────────
+  const [topic] = await sql<{ solicitationId: string | null }[]>`
+    SELECT solicitation_id FROM opportunities WHERE id = ${topicId}
+  `;
+
+  if (!topic?.solicitationId) {
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  }
+
+  const solicitationId = topic.solicitationId;
+
+  // ── 2. Fetch compliance rows (baseline + topic override) ────────────
+  // Returns 0-2 rows: one with topic_id IS NULL (baseline), one with topic_id = topicId (override)
+  const complianceRows = await sql<Array<Record<string, unknown>>>`
+    SELECT *
+    FROM solicitation_compliance
+    WHERE solicitation_id = ${solicitationId}
+      AND (topic_id IS NULL OR topic_id = ${topicId})
+    ORDER BY topic_id NULLS FIRST
+  `;
+
+  const baselineRow = complianceRows.find((r: Record<string, unknown>) => r.topicId === null) ?? null;
+  const topicRow = complianceRows.find((r: Record<string, unknown>) => r.topicId === topicId) ?? null;
+
+  // ── 3. Merge compliance: topic -> baseline -> defaults ──────────────
+  // Fields where the topic row has a non-null value override the baseline.
+  // Fields where the baseline has a non-null value override system defaults.
+  const compliance = mergeCompliance(SYSTEM_DEFAULTS, baselineRow, topicRow);
+
+  // ── 4. Fetch volumes (topic-specific first, fall back to solicitation) ─
+  const volumes = await resolveVolumes(solicitationId, topicId);
+
+  return { compliance, volumes };
+}
+
+/**
+ * Three-layer merge for compliance fields.
+ * The merge only considers "known" compliance columns from solicitation_compliance.
+ * Topic fields win over baseline; baseline wins over defaults.
+ * A null/undefined value in a higher layer means "inherit from parent".
+ */
+function mergeCompliance(
+  defaults: Record<string, unknown>,
+  baseline: Record<string, unknown> | null,
+  topicOverride: Record<string, unknown> | null,
+): Record<string, unknown> {
+  // Columns from solicitation_compliance that participate in the merge.
+  // Excludes meta-columns like id, solicitation_id, topic_id, verified_by, etc.
+  const mergeableKeys = [
+    'pageLimitTechnical',
+    'pageLimitCost',
+    'pageLimitOther',
+    'fontFamily',
+    'fontSize',
+    'margins',
+    'lineSpacing',
+    'headerRequired',
+    'headerFormat',
+    'footerRequired',
+    'footerFormat',
+    'submissionFormat',
+    'imagesTablesAllowed',
+    'slidesAllowed',
+    'slideLimit',
+    'slideOrder',
+    'requiredSections',
+    'requiredDocuments',
+    'evaluationCriteria',
+    'tabaAllowed',
+    'indirectRateCap',
+    'partnerMaxPct',
+    'costSharingRequired',
+    'costVolumeFormat',
+    'piMustBeEmployee',
+    'piUniversityAllowed',
+    'clearanceRequired',
+    'itarRequired',
+    'farClauses',
+    'customVariables',
+  ];
+
+  // Map from camelCase to snake_case for system defaults lookup
+  const camelToSnake: Record<string, string> = {
+    pageLimitTechnical: 'page_limit_technical',
+    pageLimitCost: 'page_limit_cost',
+    fontFamily: 'font_family',
+    fontSize: 'font_size',
+    margins: 'margins',
+    lineSpacing: 'line_spacing',
+    headerRequired: 'header_required',
+    headerFormat: 'header_format',
+    footerRequired: 'footer_required',
+    footerFormat: 'footer_format',
+    submissionFormat: 'submission_format',
+    imagesTablesAllowed: 'images_tables_allowed',
+    slidesAllowed: 'slides_allowed',
+    tabaAllowed: 'taba_allowed',
+    costSharingRequired: 'cost_sharing_required',
+    piMustBeEmployee: 'pi_must_be_employee',
+    itarRequired: 'itar_required',
+  };
+
+  const result: Record<string, unknown> = {};
+
+  for (const key of mergeableKeys) {
+    // Topic override wins if present and non-null
+    if (topicOverride && topicOverride[key] !== null && topicOverride[key] !== undefined) {
+      result[key] = topicOverride[key];
+      continue;
+    }
+
+    // Baseline wins if present and non-null
+    if (baseline && baseline[key] !== null && baseline[key] !== undefined) {
+      result[key] = baseline[key];
+      continue;
+    }
+
+    // System default (keyed by snake_case)
+    const snakeKey = camelToSnake[key];
+    if (snakeKey && snakeKey in defaults) {
+      result[key] = defaults[snakeKey];
+    }
+  }
+
+  // Merge custom_variables deeply: topic custom vars overlay baseline custom vars
+  if (baseline?.customVariables || topicOverride?.customVariables) {
+    const baseCustom = (baseline?.customVariables ?? {}) as Record<string, unknown>;
+    const topicCustom = (topicOverride?.customVariables ?? {}) as Record<string, unknown>;
+    result.customVariables = { ...baseCustom, ...topicCustom };
+  }
+
+  return result;
+}
+
+/**
+ * Resolve volumes for a topic.
+ *
+ * Strategy: if topic-specific volumes exist (topic_id = topicId), use those exclusively.
+ * Otherwise fall back to solicitation-level volumes (topic_id IS NULL).
+ *
+ * Within each level, volumes are ordered by volume_number, and each volume
+ * includes its required items.
+ */
+async function resolveVolumes(
+  solicitationId: string,
+  topicId: string,
+): Promise<ResolvedCompliance['volumes']> {
+  // Check for topic-specific volumes first
+  const [topicVolumeCount] = await sql<{ count: string }[]>`
+    SELECT COUNT(*)::text AS count
+    FROM solicitation_volumes
+    WHERE solicitation_id = ${solicitationId}
+      AND topic_id = ${topicId}
+  `;
+
+  const hasTopicVolumes = parseInt(topicVolumeCount.count, 10) > 0;
+
+  // Fetch the applicable volumes
+  const volumeRows = hasTopicVolumes
+    ? await sql<{
+        id: string;
+        volumeNumber: number;
+        volumeName: string;
+      }[]>`
+        SELECT id, volume_number, volume_name
+        FROM solicitation_volumes
+        WHERE solicitation_id = ${solicitationId}
+          AND topic_id = ${topicId}
+        ORDER BY volume_number ASC
+      `
+    : await sql<{
+        id: string;
+        volumeNumber: number;
+        volumeName: string;
+      }[]>`
+        SELECT id, volume_number, volume_name
+        FROM solicitation_volumes
+        WHERE solicitation_id = ${solicitationId}
+          AND topic_id IS NULL
+        ORDER BY volume_number ASC
+      `;
+
+  if (volumeRows.length === 0) {
+    return [];
+  }
+
+  // Fetch all required items for these volumes in one query
+  const volumeIds = volumeRows.map((v: { id: string; volumeNumber: number; volumeName: string }) => v.id);
+  const itemRows = await sql<{
+    volumeId: string;
+    itemNumber: number;
+    itemName: string;
+    itemType: string;
+    required: boolean;
+    pageLimit: number | null;
+    slideLimit: number | null;
+    fontFamily: string | null;
+    fontSize: string | null;
+    margins: string | null;
+    lineSpacing: string | null;
+    headerFormat: string | null;
+    footerFormat: string | null;
+    requiredSections: unknown;
+    formatRules: unknown;
+    customFields: unknown;
+  }[]>`
+    SELECT volume_id, item_number, item_name, item_type, required,
+           page_limit, slide_limit, font_family, font_size, margins,
+           line_spacing, header_format, footer_format,
+           required_sections, format_rules, custom_fields
+    FROM volume_required_items
+    WHERE volume_id = ANY(${volumeIds})
+    ORDER BY item_number ASC
+  `;
+
+  // Group items by volume
+  type ItemRow = (typeof itemRows)[number];
+  const itemsByVolume = new Map<string, ItemRow[]>();
+  for (const item of itemRows) {
+    const existing = itemsByVolume.get(item.volumeId) ?? [];
+    existing.push(item);
+    itemsByVolume.set(item.volumeId, existing);
+  }
+
+  return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string }) => ({
+    volumeName: vol.volumeName,
+    volumeNumber: vol.volumeNumber,
+    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; fontFamily: string | null; fontSize: string | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown }) => ({
+      itemNumber: item.itemNumber,
+      itemName: item.itemName,
+      itemType: item.itemType,
+      required: item.required,
+      pageLimit: item.pageLimit,
+      slideLimit: item.slideLimit,
+      fontFamily: item.fontFamily,
+      fontSize: item.fontSize,
+      margins: item.margins,
+      lineSpacing: item.lineSpacing,
+      headerFormat: item.headerFormat,
+      footerFormat: item.footerFormat,
+      requiredSections: item.requiredSections,
+      formatRules: item.formatRules,
+      customFields: item.customFields,
+    })),
+  }));
+}

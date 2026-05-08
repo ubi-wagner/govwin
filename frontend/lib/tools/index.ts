@@ -56,6 +56,8 @@ import { librarySaveAtomTool } from './library-save-atom';
 // Canvas document system: proposal drafting + library search
 import { proposalDraftSectionTool } from './proposal-draft-section';
 import { librarySearchAtomsTool } from './library-search-atoms';
+// Source Scout: HITL-guided web monitoring
+import { sourceScoutTool } from './source-scout';
 
 // ─── Registration (side effects on import) ─────────────────────────
 
@@ -89,6 +91,10 @@ register(volumeAddRequiredItemTool);
 register(volumeUpdateRequiredItemTool);
 register(volumeDeleteRequiredItemTool);
 register(librarySaveAtomTool);
+register(proposalDraftSectionTool);
+register(librarySearchAtomsTool);
+// Source Scout
+register(sourceScoutTool);
 
 // Re-export common surface so callers can import from a single path.
 export {

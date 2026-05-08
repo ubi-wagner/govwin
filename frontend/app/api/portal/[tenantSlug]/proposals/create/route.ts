@@ -4,6 +4,9 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
+import { resolveTopicCompliance } from '@/lib/compliance-resolver';
+import { putObject, copyObject } from '@/lib/storage/s3-client';
+import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -64,6 +67,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     const hasAccess = await verifyTenantAccess(userId, role, tenantId);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Stripe gate — founding cohort bypass
+    // When Stripe is live, check for a valid purchase or active subscription
+    // before allowing proposal creation. For now, all tenant_admins can create.
+    const FOUNDING_COHORT_BYPASS = true; // Set to false when Stripe billing is enforced
+    if (!FOUNDING_COHORT_BYPASS) {
+      return NextResponse.json(
+        { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
+        { status: 402 },
+      );
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -153,52 +167,35 @@ export async function POST(request: Request, ctx: RouteContext) {
         ${topicId},
         ${topic.solicitationId},
         ${proposalTitle},
-        'outline'
+        'draft'
       )
       RETURNING id
     `;
 
-    // ── Find required items from the solicitation's volumes ──────────
-    // When productType is set, map to phase filter for applies_to_phase
-    const phaseFilter = productType === 'proposal_phase1'
-      ? 'phase_1'
-      : productType === 'proposal_phase2'
-        ? 'phase_2'
-        : null;
+    // ── Resolve compliance + volumes via topic -> solicitation -> defaults chain ─
+    const resolved = await resolveTopicCompliance(topicId);
 
-    const requiredItems = phaseFilter
-      ? await sql<{
-          id: string;
-          itemNumber: number;
-          itemName: string;
-          itemType: string;
-          volumeId: string;
-          pageLimit: number | null;
-        }[]>`
-          SELECT vri.id, vri.item_number, vri.item_name, vri.item_type,
-                 vri.volume_id, vri.page_limit
-          FROM volume_required_items vri
-          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
-          WHERE sv.solicitation_id = ${topic.solicitationId}
-            AND (sv.applies_to_phase IS NULL OR sv.applies_to_phase = '{}' OR ${phaseFilter} = ANY(sv.applies_to_phase))
-            AND (vri.applies_to_phase IS NULL OR vri.applies_to_phase = '{}' OR ${phaseFilter} = ANY(vri.applies_to_phase))
-          ORDER BY sv.volume_number ASC, vri.item_number ASC
-        `
-      : await sql<{
-          id: string;
-          itemNumber: number;
-          itemName: string;
-          itemType: string;
-          volumeId: string;
-          pageLimit: number | null;
-        }[]>`
-          SELECT vri.id, vri.item_number, vri.item_name, vri.item_type,
-                 vri.volume_id, vri.page_limit
-          FROM volume_required_items vri
-          JOIN solicitation_volumes sv ON sv.id = vri.volume_id
-          WHERE sv.solicitation_id = ${topic.solicitationId}
-          ORDER BY sv.volume_number ASC, vri.item_number ASC
-        `;
+    // Flatten resolved volumes into a requiredItems list for section creation.
+    // Each item gets a synthetic section number based on volume + item ordering.
+    const requiredItems: Array<{
+      itemNumber: number;
+      itemName: string;
+      itemType: string;
+      pageLimit: number | null;
+    }> = [];
+
+    let globalItemIndex = 0;
+    for (const vol of resolved.volumes) {
+      for (const item of vol.items) {
+        globalItemIndex++;
+        requiredItems.push({
+          itemNumber: globalItemIndex,
+          itemName: item.itemName as string,
+          itemType: item.itemType as string,
+          pageLimit: (item.pageLimit as number) ?? null,
+        });
+      }
+    }
 
     // ── Create proposal_sections from required items ─────────────────
     // Build merge-field variables for template interpolation
@@ -243,8 +240,6 @@ export async function POST(request: Request, ctx: RouteContext) {
             // Set metadata IDs linking this document to the proposal structure
             templateDoc.metadata.proposal_id = proposal.id;
             templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-            templateDoc.metadata.volume_id = item.volumeId;
-            templateDoc.metadata.required_item_id = item.id;
             templateDoc.metadata.created_at = new Date().toISOString();
             templateDoc.metadata.last_modified_at = new Date().toISOString();
             templateDoc.metadata.last_modified_by = userId;
@@ -282,6 +277,79 @@ export async function POST(request: Request, ctx: RouteContext) {
       sectionCount = 1;
     }
 
+    // ── Provision S3 artifacts (non-blocking — failure is logged, not fatal) ─
+    let docsCopied = 0;
+    try {
+      // 1. Freeze compliance snapshot
+      const complianceSnapshot = JSON.stringify(resolved.compliance, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'compliance.json'),
+        body: Buffer.from(complianceSnapshot),
+        contentType: 'application/json',
+        metadata: { 'snapshot-type': 'compliance', 'source-solicitation': topic.solicitationId ?? '' },
+      });
+
+      // 2. Save volumes structure
+      const volumesSnapshot = JSON.stringify(resolved.volumes, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'volumes.json'),
+        body: Buffer.from(volumesSnapshot),
+        contentType: 'application/json',
+      });
+
+      // 3. Copy RFP documents to customer sandbox
+      const solDocs = await sql<{
+        id: string;
+        storageKey: string;
+        originalFilename: string;
+        documentType: string;
+        isPrimary: boolean;
+      }[]>`
+        SELECT id, storage_key, original_filename, document_type, is_primary
+        FROM solicitation_documents
+        WHERE solicitation_id = ${topic.solicitationId}::uuid
+        ORDER BY is_primary DESC, created_at ASC
+      `;
+
+      for (const doc of solDocs) {
+        try {
+          await copyObject({
+            sourceKey: doc.storageKey,
+            destKey: customerProposalPath(tenantSlug, proposal.id, `rfp/${doc.originalFilename}`),
+          });
+          docsCopied++;
+        } catch (copyErr) {
+          console.error('[api/portal/proposals/create] rfp doc copy failed', {
+            docId: doc.id,
+            sourceKey: doc.storageKey,
+            err: copyErr instanceof Error ? copyErr.message : String(copyErr),
+          });
+        }
+      }
+
+      // 4. Save topic metadata snapshot
+      const topicSnapshot = JSON.stringify({
+        topicNumber: topic.topicNumber,
+        title: topic.title,
+        agency: topic.agency,
+        programType: topic.programType,
+        solicitationNumber: topic.solicitationNumber,
+        snapshotAt: new Date().toISOString(),
+      }, null, 2);
+      await putObject({
+        key: customerProposalPath(tenantSlug, proposal.id, 'topic.json'),
+        body: Buffer.from(topicSnapshot),
+        contentType: 'application/json',
+      });
+    } catch (artifactErr) {
+      // Artifact provisioning is enrichment — DB rows are the critical path.
+      // Log the warning but do not fail the proposal creation.
+      console.error('[api/portal/proposals/create] artifact provisioning warning', {
+        proposalId: proposal.id,
+        err: artifactErr instanceof Error ? artifactErr.message : String(artifactErr),
+      });
+    }
+
     // ── End event ─────────────────────────────────────────────────────
     await emitEventEnd(eventId, {
       result: {
@@ -290,6 +358,12 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalId: proposal.id,
         sectionCount,
         title: proposalTitle,
+        artifactsProvisioned: {
+          compliance: true,
+          volumes: true,
+          rfpDocuments: docsCopied,
+          topicMetadata: true,
+        },
       },
     });
 

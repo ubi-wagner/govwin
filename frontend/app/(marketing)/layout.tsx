@@ -23,6 +23,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/about" className="hover:text-brand-600 transition-colors">About</Link>
             <Link href="/value" className="hover:text-brand-600 transition-colors">Value</Link>
             <Link href="/resources" className="hover:text-brand-600 transition-colors">Resources</Link>
+            <Link href="/blog" className="hover:text-brand-600 transition-colors">Blog</Link>
             <Link href="/infosec" className="hover:text-brand-600 transition-colors">Security</Link>
             <Link
               href="/apply"

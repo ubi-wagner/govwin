@@ -60,11 +60,21 @@ async def main() -> None:
 
     # Import here so the logging config above is already set
     from ingest.dispatcher import run_consumer_loop
+    from workflows.processor import run_workflow_processor
 
-    await run_consumer_loop(
-        database_url=DATABASE_URL,
-        shutdown_event=shutdown_event,
-        tick_interval=60,
+    # Run the ingester consumer loop and workflow processor concurrently.
+    # Both manage their own DB connections and respect shutdown_event.
+    await asyncio.gather(
+        run_consumer_loop(
+            database_url=DATABASE_URL,
+            shutdown_event=shutdown_event,
+            tick_interval=60,
+        ),
+        run_workflow_processor(
+            database_url=DATABASE_URL,
+            shutdown_event=shutdown_event,
+            poll_interval=10,
+        ),
     )
 
     log.info("Pipeline worker stopped.")

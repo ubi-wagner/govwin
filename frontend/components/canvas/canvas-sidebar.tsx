@@ -8,27 +8,35 @@
 import { useState } from 'react';
 import type { CanvasDocument, CanvasNode, NodeEdit, estimatePageCount } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
+import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 
 interface Props {
   document: CanvasDocument;
   selectedNode: CanvasNode | null;
+  /** Current section category slug for library search (e.g. 'technical_approach') */
+  sectionCategory?: string;
   onAddNode: (type: CanvasNode['type'], after?: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
   onAcceptNode: (nodeId: string) => void;
   onRevertNode: (nodeId: string) => void;
+  /** Replace a node's content with a library atom */
+  onReplaceFromLibrary?: (nodeId: string, atom: LibraryAtomCandidate) => void;
 }
 
 export function CanvasSidebar({
   document: doc,
   selectedNode,
+  sectionCategory,
   onAddNode,
   onDeleteNode,
   onMoveNode,
   onAcceptNode,
   onRevertNode,
+  onReplaceFromLibrary,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add'>('compliance');
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
   const pageEstimate = Math.max(1, Math.ceil(doc.nodes.length / 8));
   const maxPages = doc.canvas.max_pages;
@@ -162,7 +170,28 @@ export function CanvasSidebar({
               <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
               <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
               <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
+              {onReplaceFromLibrary && (
+                <button
+                  onClick={() => setShowLibraryPicker((prev) => !prev)}
+                  className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
+                >
+                  Replace from Library
+                </button>
+              )}
             </div>
+
+            {/* Library picker — shown when "Replace from Library" is clicked */}
+            {showLibraryPicker && onReplaceFromLibrary && (
+              <LibraryPicker
+                category={sectionCategory ?? selectedNode.type}
+                query={getNodeText(selectedNode).slice(0, 200) || undefined}
+                onSelect={(atom) => {
+                  onReplaceFromLibrary(selectedNode.id, atom);
+                  setShowLibraryPicker(false);
+                }}
+                onClose={() => setShowLibraryPicker(false)}
+              />
+            )}
 
             {selectedNode.library_tags && selectedNode.library_tags.length > 0 && (
               <div>

@@ -19,6 +19,7 @@ logger = logging.getLogger('cms.events')
 _task: asyncio.Task | None = None
 _last_processed_at: object | None = None
 POLL_INTERVAL = int(os.getenv('EVENT_POLL_INTERVAL', '10'))
+ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
 
 
 async def start_event_listener():
@@ -101,13 +102,10 @@ async def _process_new_events():
         logger.warning(f'Cannot fetch system_events: {e}')
         return
 
-    # Events already handled by frontend direct sends — skip to avoid duplicates.
-    # Remove these once CRM is the sole email sender.
-    FRONTEND_HANDLED = {
-        ('identity', 'tenant.created'),
-        ('identity', 'application.rejected'),
-        ('identity', 'application.submitted'),
-    }
+    # Events that should still be skipped by the CRM because they are
+    # handled inline by the frontend (e.g. during the same request).
+    # As we migrate all email sending to the CRM, this set should shrink.
+    FRONTEND_HANDLED: set[tuple[str, str]] = set()
 
     for event in events:
         _last_processed_at = event['created_at']
@@ -115,6 +113,16 @@ async def _process_new_events():
         etype = event.get('type', '')
 
         if (ns, etype) in FRONTEND_HANDLED:
+            continue
+
+        # Handle workflow NOTIFY steps directly — these events carry the
+        # template name and recipient info in their payload so we don't
+        # need to match against automation_rules.
+        if ns == 'system' and etype == 'notification.requested':
+            try:
+                await _handle_notification_requested(event)
+            except Exception as e:
+                logger.error(f'notification.requested handling failed: {e}')
             continue
 
         for rule in rules:
@@ -190,27 +198,187 @@ async def _execute_rule(rule, col_names: set, event):
             await _do_action('send_email', config, payload, event)
 
 
+async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) -> str | None:
+    """
+    Resolve a recipient email address from the event payload.
+
+    The ``to_field`` value in automation_rules tells us *where* in the payload
+    the recipient identifier lives.  It might already be an email address, or
+    it might be a userId / tenantId that we need to look up.
+
+    Supported patterns:
+      - "result.userId"   → look up user email by id
+      - "payload.tenantId" → look up billing_email from tenants, fall back to
+                             the tenant admin's email
+      - "payload.contactEmail" → direct email from payload
+      - Any dotted path  → traverse the payload dict
+    """
+    # Walk the dotted path to get the raw value
+    parts = to_field.split('.')
+    obj: dict = {**payload, 'result': payload, 'payload': payload}
+    raw_value = None
+    for part in parts:
+        if isinstance(obj, dict):
+            obj = obj.get(part, {})  # type: ignore[assignment]
+        else:
+            break
+    if isinstance(obj, str) and obj:
+        raw_value = obj
+
+    if not raw_value:
+        # Fall back: check common fields
+        raw_value = payload.get('contactEmail') or payload.get('email')
+        if raw_value:
+            return raw_value
+        return None
+
+    # If it looks like an email, return it directly
+    if '@' in raw_value:
+        return raw_value
+
+    # Otherwise treat it as an ID and look it up
+    pool = get_event_pool()
+    if not pool:
+        return None
+
+    try:
+        # Try as user ID first
+        row = await pool.fetchrow(
+            'SELECT email FROM users WHERE id = $1::uuid',
+            raw_value,
+        )
+        if row:
+            return row['email']
+
+        # Try as tenant ID — get billing_email or the tenant admin's email
+        row = await pool.fetchrow(
+            '''SELECT COALESCE(t.billing_email, u.email) AS email
+               FROM tenants t
+               LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
+               WHERE t.id = $1::uuid
+               LIMIT 1''',
+            raw_value,
+        )
+        if row and row['email']:
+            return row['email']
+    except Exception as e:
+        logger.warning(f'Failed to resolve recipient from {to_field}={raw_value}: {e}')
+
+    return None
+
+
+async def _handle_notification_requested(event) -> None:
+    """Handle a ``system:notification.requested`` event emitted by a workflow
+    NOTIFY step.
+
+    The event payload contains:
+      - template: template name to render
+      - channel: delivery channel ("email" for V1)
+      - tenant_id / user_id / to_role: recipient identifiers
+      - additional fields forwarded as template context
+    """
+    payload = event.get('payload')
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except (json.JSONDecodeError, TypeError):
+            payload = {}
+    if not payload:
+        logger.warning('notification.requested event has no payload, skipping')
+        return
+
+    channel = payload.get('channel', 'email')
+    if channel != 'email':
+        logger.info(f'notification.requested channel={channel} not supported in V1, skipping')
+        return
+
+    template_name = payload.get('template', '')
+    if not template_name:
+        logger.warning('notification.requested event has no template, skipping')
+        return
+
+    # Render the template
+    html = render_template(template_name, payload)
+    if not html:
+        logger.warning(f'No template rendered for "{template_name}" in notification.requested, skipping')
+        return
+
+    # Resolve recipient
+    to_email = None
+
+    # Check for admin-targeted notifications (to_role = rfp_admin)
+    to_role = payload.get('to_role')
+    if to_role in ('rfp_admin', 'master_admin'):
+        to_email = ADMIN_EMAIL
+    else:
+        # Try to resolve from user_id or tenant_id
+        for field in ('user_id', 'tenant_id'):
+            val = payload.get(field)
+            if val:
+                resolved = await _resolve_recipient_email(
+                    f'payload.{field}', payload, event
+                )
+                if resolved:
+                    to_email = resolved
+                    break
+
+    # Fall back to direct email fields in the payload
+    if not to_email:
+        to_email = payload.get('contactEmail') or payload.get('email') or payload.get('to')
+    if not to_email:
+        logger.warning(f'No recipient resolved for notification.requested template="{template_name}", skipping')
+        return
+
+    subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
+
+    result = await send_email(
+        to=to_email,
+        subject=subject,
+        html=html,
+    )
+    logger.info(f'notification.requested: sent "{template_name}" to {to_email}: {result}')
+
+
 async def _do_action(action_type: str, config: dict, payload: dict, event):
     if action_type == 'send_email':
         template_name = config.get('template', '')
+        subject = config.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
         html = render_template(template_name, payload)
-        if html:
+        if not html:
+            logger.warning(f'No template rendered for "{template_name}", skipping send')
+            return
+
+        # Resolve recipient: use to_field from config, then fall back to payload fields
+        to_email = None
+        to_field = config.get('to_field')
+        if to_field:
+            to_email = await _resolve_recipient_email(to_field, payload, event)
+        if not to_email:
             to_email = payload.get('contactEmail') or config.get('to')
-            if to_email:
-                result = await send_email(
-                    to=to_email,
-                    subject=f"RFP Pipeline — {template_name.replace('_', ' ').title()}",
-                    html=html,
-                )
-                logger.info(f'Sent email to {to_email}: {result}')
+        if not to_email:
+            logger.warning(f'No recipient resolved for template "{template_name}", skipping')
+            return
+
+        result = await send_email(
+            to=to_email,
+            subject=subject,
+            html=html,
+        )
+        logger.info(f'Sent email "{template_name}" to {to_email}: {result}')
 
     elif action_type == 'notify_admin':
-        to_email = config.get('to', 'eric@rfppipeline.com')
-        html = render_template('admin_notification', {**payload, 'event_type': event.get('type', '')})
+        to_email = config.get('to', ADMIN_EMAIL)
+        admin_template = config.get('template', 'admin_notification')
+        subject = config.get('subject', f"[RFP Admin] {event.get('type', 'event')}")
+
+        html = render_template(admin_template, {**payload, 'event_type': event.get('type', '')})
+        if not html:
+            # Fall back to generic admin_notification template
+            html = render_template('admin_notification', {**payload, 'event_type': event.get('type', '')})
         if html:
             result = await send_email(
                 to=to_email,
-                subject=f"[RFP Admin] {event.get('type', 'event')}",
+                subject=f"[RFP Admin] {subject}",
                 html=html,
             )
             logger.info(f'Notified admin {to_email}: {result}')

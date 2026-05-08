@@ -222,6 +222,25 @@ export function customerPath(p: CustomerPathInput): string {
 }
 
 /**
+ * Simple path builder for files stored inside a customer's proposal folder.
+ * Unlike `customerPath` (which uses a kind discriminator for structured assets),
+ * this helper allows arbitrary filenames — useful for provisioning snapshots
+ * (compliance.json, volumes.json, topic.json) and RFP document copies.
+ *
+ * @param tenantSlug - Validated tenant slug
+ * @param proposalId - UUID of the proposal
+ * @param filename   - Relative path/filename within the proposal folder (e.g. "rfp/doc.pdf")
+ */
+export function customerProposalPath(tenantSlug: string, proposalId: string, filename: string): string {
+  assertTenantSlug(tenantSlug);
+  assertUuid(proposalId, 'proposal id');
+  if (!filename || filename.includes('..')) {
+    throw new Error(`[storage/paths] invalid proposal filename: ${JSON.stringify(filename)}`);
+  }
+  return `customers/${tenantSlug}/proposals/${proposalId}/${filename}`;
+}
+
+/**
  * Guard helper — throws if a key does not belong to the given tenant.
  * Use at the boundary of any operation that takes a user-supplied
  * object key and must enforce tenant isolation.

@@ -21,6 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
           <a href="/admin/content" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">CMS Content</a>
+          <a href="/admin/templates" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Templates</a>
           <a href="/admin/storage" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">S3 Storage</a>
         </nav>
         <div className="text-xs text-gray-600 mt-4">

@@ -12,6 +12,7 @@ type ContentRow = {
   publishedAt: Date | null;
   author: string | null;
   tags: string[];
+  externalUrl: string | null;
   updatedAt: Date;
 };
 
@@ -28,7 +29,7 @@ export default async function ContentPage() {
   try {
     rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, published, published_at,
-             author, tags, updated_at
+             author, tags, external_url, updated_at
       FROM cms_content
       ORDER BY updated_at DESC
       LIMIT 50

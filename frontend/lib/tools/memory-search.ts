@@ -74,7 +74,7 @@ export const memorySearchTool = defineTool<Input, Output>({
       );
     }
 
-    const pattern = `%${input.query}%`;
+    const pattern = `%${input.query.replace(/[%_\\]/g, '\\$&')}%`;
     const hits: MemoryHit[] = [];
     const countByType = { episodic: 0, semantic: 0, procedural: 0 };
 

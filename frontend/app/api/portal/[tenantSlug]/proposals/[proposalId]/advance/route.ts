@@ -9,42 +9,15 @@ interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
-const VALID_STAGES = [
-  'outline',
-  'draft',
-  'pink_team',
-  'red_team',
-  'gold_team',
-  'final',
-  'submitted',
-] as const;
-
-type Stage = (typeof VALID_STAGES)[number];
-
-/** Allowed forward transitions: current → next. */
-const VALID_TRANSITIONS: Record<string, string> = {
-  outline: 'draft',
-  draft: 'pink_team',
-  pink_team: 'red_team',
-  red_team: 'gold_team',
-  gold_team: 'final',
-  final: 'submitted',
-};
-
-/** Stages that lock the workspace on entry. */
-const LOCKING_STAGES: ReadonlySet<string> = new Set(['final', 'submitted']);
-
-function isValidStage(s: unknown): s is Stage {
-  return typeof s === 'string' && (VALID_STAGES as readonly string[]).includes(s);
-}
-
 /**
  * POST /api/portal/[tenantSlug]/proposals/[proposalId]/advance
  *
- * Advances a proposal to the next stage in the Color Team pipeline.
+ * Advances a proposal to the next gate in its configurable gate_config.
+ * Replaces the old 7-stage Color Team pipeline.
  * Auth: tenant_admin or higher.
  *
- * Body: { targetStage: string, notes?: string }
+ * Body: { targetStage?: string, notes?: string }
+ * If targetStage is omitted, advances to the next gate automatically.
  */
 export async function POST(request: Request, ctx: RouteContext) {
   try {
@@ -66,7 +39,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
-    // Only tenant_admin or higher can advance stages
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -84,23 +56,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { targetStage?: unknown; notes?: unknown };
+    let body: { targetStage?: unknown; notes?: unknown } = {};
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
+      // No body is acceptable — will auto-advance to next gate
     }
 
-    if (!isValidStage(body.targetStage)) {
-      return NextResponse.json({ error: 'Invalid target stage', code: 'VALIDATION_ERROR' }, { status: 400 });
-    }
-
-    const targetStage: Stage = body.targetStage;
     const notes = typeof body.notes === 'string' ? body.notes : null;
 
     // ── Load current proposal ────────────────────────────────────────
-    const [proposal] = await sql<{ id: string; stage: string; title: string }[]>`
-      SELECT id, stage, title FROM proposals
+    const [proposal] = await sql<{
+      id: string;
+      stage: string;
+      title: string;
+      gateConfig: string[];
+      lockCount: number;
+    }[]>`
+      SELECT id, stage, title, gate_config, lock_count FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
       LIMIT 1
@@ -110,24 +83,48 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // ── Validate transition ──────────────────────────────────────────
-    const allowedNext = VALID_TRANSITIONS[proposal.stage];
-    if (allowedNext !== targetStage) {
+    // ── Determine next stage from gate_config ────────────────────────
+    const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+    const currentIndex = gates.indexOf(proposal.stage);
+
+    if (currentIndex === -1) {
       return NextResponse.json(
-        { error: `Cannot advance from '${proposal.stage}' to '${targetStage}'`, code: 'VALIDATION_ERROR' },
+        { error: `Current stage '${proposal.stage}' is not in gate config`, code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
+    if (currentIndex >= gates.length - 1) {
+      return NextResponse.json(
+        { error: 'Already at the final gate, cannot advance further', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
+    const targetStage = typeof body.targetStage === 'string'
+      ? body.targetStage
+      : gates[currentIndex + 1];
+
+    // Validate the target is the next gate
+    const expectedNext = gates[currentIndex + 1];
+    if (targetStage !== expectedNext) {
+      return NextResponse.json(
+        { error: `Cannot advance from '${proposal.stage}' to '${targetStage}'. Next gate is '${expectedNext}'.`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
 
     const previousStage = proposal.stage;
-    const shouldLock = LOCKING_STAGES.has(targetStage);
+    const shouldLock = targetStage === 'final';
 
     // ── Update proposal stage ────────────────────────────────────────
     if (shouldLock) {
       await sql`
         UPDATE proposals
         SET stage = ${targetStage},
-            is_locked = true
+            is_locked = true,
+            lock_count = lock_count + 1,
+            last_locked_at = now()
         WHERE id = ${proposalId}
       `;
     } else {
@@ -159,6 +156,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         previousStage,
         targetStage,
         locked: shouldLock,
+        lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
         notes: notes ?? undefined,
       },
     });
@@ -167,6 +165,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       data: {
         stage: targetStage,
         previousStage,
+        locked: shouldLock,
+        lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
         ...(shouldLock ? { lockedAt: new Date().toISOString() } : {}),
       },
     });
