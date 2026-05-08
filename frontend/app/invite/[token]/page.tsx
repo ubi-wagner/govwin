@@ -1,7 +1,16 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+
+interface InviteInfo {
+  inviterName: string | null;
+  inviterEmail: string | null;
+  proposalTitle: string | null;
+  companyName: string | null;
+  email: string;
+  alreadyAccepted: boolean;
+}
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -13,6 +22,26 @@ export default function AcceptInvitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(true);
+
+  // Fetch invite details on mount
+  useEffect(() => {
+    async function fetchInviteInfo() {
+      try {
+        const res = await fetch(`/api/invite?token=${encodeURIComponent(token)}`);
+        if (res.ok) {
+          const json = await res.json();
+          setInviteInfo(json.data ?? null);
+        }
+      } catch {
+        // Non-critical — form still works without invite details
+      } finally {
+        setLoadingInfo(false);
+      }
+    }
+    fetchInviteInfo();
+  }, [token]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -68,7 +97,7 @@ export default function AcceptInvitePage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
           <div className="w-12 h-12 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl mb-4">
-            ✓
+            &#10003;
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Invite Accepted</h1>
           <p className="text-sm text-gray-500">
@@ -79,14 +108,62 @@ export default function AcceptInvitePage() {
     );
   }
 
+  if (inviteInfo?.alreadyAccepted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Invite Already Accepted</h1>
+          <p className="text-sm text-gray-500 mb-4">
+            This invitation has already been accepted. You can sign in to access the workspace.
+          </p>
+          <a
+            href="/login"
+            className="inline-block px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Go to Login
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8">
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold text-gray-900 mb-2">Accept Invitation</h1>
-          <p className="text-sm text-gray-500">
-            Set your password to access the proposal workspace.
-          </p>
+          {loadingInfo ? (
+            <p className="text-sm text-gray-400">Loading invitation details...</p>
+          ) : inviteInfo ? (
+            <div className="space-y-1">
+              {inviteInfo.inviterName && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">{inviteInfo.inviterName}</span>
+                  {inviteInfo.inviterEmail && (
+                    <span className="text-gray-400"> ({inviteInfo.inviterEmail})</span>
+                  )}
+                  {' '}invited you to collaborate
+                </p>
+              )}
+              {inviteInfo.proposalTitle && (
+                <p className="text-sm text-gray-600">
+                  Proposal: <span className="font-medium">{inviteInfo.proposalTitle}</span>
+                </p>
+              )}
+              {inviteInfo.companyName && (
+                <p className="text-sm text-gray-600">
+                  Company: <span className="font-medium">{inviteInfo.companyName}</span>
+                </p>
+              )}
+              <p className="text-xs text-gray-400 mt-2">
+                Your email: {inviteInfo.email}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Set your password to access the proposal workspace.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

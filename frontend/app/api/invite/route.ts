@@ -5,6 +5,64 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
 
 /**
+ * GET /api/invite?token=<id>
+ *
+ * Fetch invite details (who invited, which proposal, company name).
+ * No auth required — the token itself is the credential.
+ */
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const token = searchParams.get('token')?.trim() ?? '';
+
+    if (!token) {
+      return NextResponse.json({ error: 'Token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    const [row] = await sql<{
+      email: string;
+      acceptedAt: string | null;
+      inviterName: string | null;
+      inviterEmail: string | null;
+      proposalTitle: string | null;
+      companyName: string | null;
+    }[]>`
+      SELECT
+        pc.email,
+        pc.accepted_at,
+        inv.name AS inviter_name,
+        inv.email AS inviter_email,
+        p.title AS proposal_title,
+        t.name AS company_name
+      FROM proposal_collaborators pc
+      LEFT JOIN users inv ON inv.id = pc.invited_by
+      LEFT JOIN proposals p ON p.id = pc.proposal_id
+      LEFT JOIN tenants t ON t.id = p.tenant_id
+      WHERE pc.id = ${token}
+      LIMIT 1
+    `;
+
+    if (!row) {
+      return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      data: {
+        email: row.email,
+        inviterName: row.inviterName,
+        inviterEmail: row.inviterEmail,
+        proposalTitle: row.proposalTitle,
+        companyName: row.companyName,
+        alreadyAccepted: !!row.acceptedAt,
+      },
+    });
+  } catch (e) {
+    console.error('[api/invite] GET error:', e);
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
+  }
+}
+
+/**
  * POST /api/invite
  *
  * Accept an invite and set password.
