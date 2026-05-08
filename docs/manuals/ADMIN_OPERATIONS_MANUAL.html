@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFP Pipeline — Admin Operations Manual</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #1a1a2e;
+      background: #f5f6fa;
+      line-height: 1.7;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: #0a1628;
+      color: #ffffff;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      border-bottom: 4px solid #2563eb;
+    }
+    .site-header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+    .site-header p { color: #94a3b8; margin-top: 0.5rem; font-size: 1.05rem; }
+    .site-header .badge {
+      display: inline-block;
+      background: #2563eb;
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Container ── */
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* ── Intro Box ── */
+    .intro-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .intro-box h2 { font-size: 1.1rem; color: #0a1628; margin-bottom: 0.75rem; }
+    .intro-box p { margin-bottom: 0.5rem; }
+    .intro-box code {
+      background: #f1f5f9;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.95rem;
+      color: #2563eb;
+    }
+
+    /* ── Table of Contents ── */
+    .toc {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .toc h2 {
+      font-size: 1.15rem;
+      color: #0a1628;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #2563eb;
+    }
+    .toc ol { padding-left: 1.25rem; }
+    .toc li { margin-bottom: 0.4rem; }
+    .toc a { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+    .toc .sub-items { list-style-type: disc; padding-left: 1.25rem; margin-top: 0.25rem; }
+    .toc .sub-items li { font-size: 0.92rem; color: #475569; }
+    .toc .sub-items a { font-weight: 400; }
+
+    /* ── Sections ── */
+    .section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .section h2 {
+      font-size: 1.5rem;
+      color: #0a1628;
+      margin-bottom: 0.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #2563eb;
+    }
+    .section h3 {
+      font-size: 1.15rem;
+      color: #1e40af;
+      margin-top: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .section h4 {
+      font-size: 1rem;
+      color: #475569;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    .section p { margin-bottom: 0.75rem; }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step-counter; list-style: none; padding: 0; margin: 1rem 0; }
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding: 0.75rem 0 0.75rem 3.25rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0.7rem;
+      width: 2.25rem;
+      height: 2.25rem;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .steps li strong { display: block; color: #0a1628; }
+    .steps li em, .steps li .expected {
+      display: block;
+      color: #6b7280;
+      font-style: italic;
+      font-size: 0.92rem;
+      margin-top: 0.25rem;
+    }
+    .steps li .url {
+      display: inline-block;
+      background: #f1f5f9;
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #2563eb;
+      margin-top: 0.25rem;
+      word-break: break-all;
+    }
+
+    /* ── Tip & Warning Boxes ── */
+    .tip, .warning {
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+    }
+    .tip {
+      background: #ecfdf5;
+      border-left: 4px solid #10b981;
+    }
+    .tip::before {
+      content: "Tip: ";
+      font-weight: 700;
+      color: #047857;
+    }
+    .warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+    }
+    .warning::before {
+      content: "Important: ";
+      font-weight: 700;
+      color: #b45309;
+    }
+
+    /* ── Definition List / Info Grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.35rem 1rem;
+      margin: 0.75rem 0;
+      font-size: 0.95rem;
+    }
+    .info-grid dt { font-weight: 600; color: #374151; }
+    .info-grid dd { color: #4b5563; }
+
+    /* ── Simple Table ── */
+    .simple-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    .simple-table th {
+      background: #0a1628;
+      color: #ffffff;
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    .simple-table td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .simple-table tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Sidebar Nav Reference ── */
+    .nav-ref {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+    .nav-ref ul { padding-left: 1.25rem; margin: 0; }
+    .nav-ref li { margin-bottom: 0.3rem; font-size: 0.95rem; }
+
+    /* ── Separator ── */
+    .divider {
+      border: none;
+      border-top: 2px solid #e2e8f0;
+      margin: 2.5rem 0;
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      .site-header { background: #0a1628 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .container { max-width: 100%; padding: 0 1cm; }
+      .section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+      .steps li { page-break-inside: avoid; }
+      .toc { page-break-after: always; }
+      a { color: #2563eb !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- HEADER                                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <h1>RFP Pipeline — Admin Operations Manual</h1>
+  <p>Step-by-step guide for the system administrator</p>
+  <span class="badge">Role: Administrator (Eric)</span>
+</header>
+
+<div class="container">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- INTRO                                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="intro-box">
+  <h2>Before You Begin</h2>
+  <p>This manual walks you through every task you will perform as the RFP Pipeline administrator. Follow the numbered steps exactly. After each step, check that the <em>expected result</em> matches what you see on screen.</p>
+  <p><strong>Your login URL:</strong> <code>{BASE_URL}/login</code></p>
+  <p>Replace <code>{BASE_URL}</code> everywhere in this guide with the actual web address you were given (for example, <code>https://app.rfppipeline.com</code>).</p>
+  <p><strong>Your credentials:</strong> Use the admin email and password provided to you separately.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS                                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<nav class="toc" id="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#getting-started">Getting Started</a>
+      <ul class="sub-items">
+        <li><a href="#logging-in">Logging In</a></li>
+        <li><a href="#dashboard-overview">The Admin Dashboard</a></li>
+        <li><a href="#sidebar-nav">The Sidebar Navigation</a></li>
+      </ul>
+    </li>
+    <li><a href="#source-monitoring">Setting Up Source Monitoring</a>
+      <ul class="sub-items">
+        <li><a href="#sources-overview">The Sources Hub</a></li>
+        <li><a href="#add-region">Adding a Region</a></li>
+        <li><a href="#auto-crawl">Enabling Auto-Crawl</a></li>
+        <li><a href="#manual-scout">Triggering a Manual Scout</a></li>
+      </ul>
+    </li>
+    <li><a href="#upload-rfp">Uploading and Processing an RFP</a></li>
+    <li><a href="#curate-rfp">Curating an RFP (The Full Workflow)</a>
+      <ul class="sub-items">
+        <li><a href="#claim-sol">Claiming the Solicitation</a></li>
+        <li><a href="#pdf-viewer">Using the PDF Viewer</a></li>
+        <li><a href="#compliance-vars">Tagging Compliance Variables</a></li>
+        <li><a href="#compliance-matrix">The Compliance Matrix</a></li>
+        <li><a href="#volumes">Adding Volumes</a></li>
+        <li><a href="#volume-items">Adding Required Items to Each Volume</a></li>
+        <li><a href="#topics">Managing Topics</a></li>
+        <li><a href="#topic-compliance">Topic Compliance Presets</a></li>
+        <li><a href="#review-approve">Reviewing and Approving</a></li>
+        <li><a href="#push-spotlight">Pushing to Spotlight</a></li>
+      </ul>
+    </li>
+    <li><a href="#applications">Managing Applications</a></li>
+    <li><a href="#monitoring">Monitoring the System</a>
+      <ul class="sub-items">
+        <li><a href="#event-stream">Event Stream</a></li>
+        <li><a href="#pipeline-jobs">Pipeline Jobs</a></li>
+        <li><a href="#system-health">System Health</a></li>
+      </ul>
+    </li>
+    <li><a href="#templates">Templates</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 1. GETTING STARTED                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="getting-started">
+  <h2>1. Getting Started</h2>
+
+  <!-- 1a. Logging In -->
+  <h3 id="logging-in">Logging In</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Open your web browser</strong> (Chrome, Edge, or Firefox recommended).
+      <em class="expected">Your browser opens.</em>
+    </li>
+    <li>
+      <strong>In the address bar, type your login address and press Enter.</strong>
+      <span class="url">{BASE_URL}/login</span>
+      <em class="expected">You see a login page with two boxes: one for "Email" and one for "Password."</em>
+    </li>
+    <li>
+      <strong>Type your admin email address</strong> in the Email box.
+      <em class="expected">Your email appears in the box.</em>
+    </li>
+    <li>
+      <strong>Type your admin password</strong> in the Password box.
+      <em class="expected">Dots or circles appear (the password is hidden).</em>
+    </li>
+    <li>
+      <strong>Click the "Sign In" button.</strong>
+      <em class="expected">The page changes. You are now on the Admin Dashboard.</em>
+    </li>
+  </ol>
+
+  <div class="warning">If you see the login page again after clicking "Sign In," your email or password may be wrong. Double-check both and try again. If it still does not work, contact your technical support person.</div>
+
+  <!-- 1b. Dashboard Overview -->
+  <h3 id="dashboard-overview">The Admin Dashboard</h3>
+  <p>The dashboard is your home base. It shows you the health of the entire system at a glance.</p>
+  <span class="url">{BASE_URL}/admin/dashboard</span>
+
+  <p>At the top, you will see <strong>eight colored stat cards</strong>. Here is what each one means:</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Card Name</th><th>What It Tells You</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Active Solicitations</td><td>How many government opportunities are currently being worked on.</td></tr>
+      <tr><td>Pending Applications</td><td>How many companies have applied and are waiting for your approval.</td></tr>
+      <tr><td>Topics Published</td><td>How many individual topics are live and visible to customers.</td></tr>
+      <tr><td>Proposals in Progress</td><td>How many proposal workspaces are currently being used by customers.</td></tr>
+      <tr><td>Active Tenants</td><td>How many approved companies have accounts on the platform.</td></tr>
+      <tr><td>Library Documents</td><td>Total number of documents uploaded across all customer libraries.</td></tr>
+      <tr><td>Pipeline Jobs</td><td>How many automated background tasks are running or queued.</td></tr>
+      <tr><td>Recent Events</td><td>How many actions have been recorded in the last 24 hours.</td></tr>
+    </tbody>
+  </table>
+
+  <p>Below the stat cards, you will see:</p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li><strong>Recent Event Stream</strong> &mdash; a live feed of the most recent actions in the system (uploads, logins, approvals, etc.)</li>
+    <li><strong>Pending Action Alerts</strong> &mdash; items that need your attention right now (unclaimed RFPs, pending applications)</li>
+  </ul>
+
+  <div class="tip">Check the dashboard every morning. If "Pending Applications" is greater than zero, you have companies waiting for approval.</div>
+
+  <!-- 1c. Sidebar Nav -->
+  <h3 id="sidebar-nav">The Sidebar Navigation</h3>
+  <p>On the left side of every admin page, you will see a sidebar menu. Here is what each item does:</p>
+
+  <div class="nav-ref">
+    <h4>Operations</h4>
+    <ul>
+      <li><strong>Dashboard</strong> &mdash; your home page with stats and alerts</li>
+      <li><strong>Applications</strong> &mdash; review and approve/reject new company applications</li>
+      <li><strong>RFP Curation</strong> &mdash; upload, tag, and prepare government opportunities for customers</li>
+      <li><strong>Tenants</strong> &mdash; view and manage approved companies</li>
+      <li><strong>Purchases</strong> &mdash; view all proposal purchases made by customers</li>
+    </ul>
+  </div>
+
+  <div class="nav-ref">
+    <h4>Intelligence</h4>
+    <ul>
+      <li><strong>Sources</strong> &mdash; manage government websites the system monitors for new opportunities</li>
+    </ul>
+  </div>
+
+  <div class="nav-ref">
+    <h4>Monitoring</h4>
+    <ul>
+      <li><strong>Event Stream</strong> &mdash; see a detailed log of everything happening in the system</li>
+      <li><strong>Pipeline</strong> &mdash; check on background processing jobs (document shredding, scoring)</li>
+      <li><strong>System Health</strong> &mdash; check that all parts of the system are running</li>
+    </ul>
+  </div>
+
+  <div class="nav-ref">
+    <h4>Content</h4>
+    <ul>
+      <li><strong>CMS Content</strong> &mdash; manage content pages (if applicable)</li>
+      <li><strong>Storage</strong> &mdash; browse uploaded files and documents</li>
+    </ul>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 2. SOURCE MONITORING                                        -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="source-monitoring">
+  <h2>2. Setting Up Source Monitoring</h2>
+  <p>The system can automatically watch government websites for new opportunities. You set this up in the <strong>Sources Hub</strong>.</p>
+
+  <h3 id="sources-overview">The Sources Hub</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Sources" in the left sidebar</strong> (under the Intelligence section).
+      <span class="url">{BASE_URL}/admin/sources</span>
+      <em class="expected">You see the Sources Hub page with a list of government sources.</em>
+    </li>
+    <li>
+      <strong>Look at the list of pre-configured sources.</strong> You should see these:
+      <em class="expected">Six source cards appear: DSIP, AFWERX, xTech, NSF, SAM.gov, and Defense SBIR.</em>
+    </li>
+  </ol>
+
+  <p>Here is what each source is:</p>
+  <table class="simple-table">
+    <thead>
+      <tr><th>Source Name</th><th>What It Is</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>DSIP</td><td>Defense SBIR/STTR Innovation Portal &mdash; the main hub for military small business research topics.</td></tr>
+      <tr><td>AFWERX</td><td>Air Force innovation program &mdash; posts challenges and technology needs.</td></tr>
+      <tr><td>xTech</td><td>Army technology competition program &mdash; posts open technology challenges.</td></tr>
+      <tr><td>NSF</td><td>National Science Foundation &mdash; non-defense SBIR/STTR topics for science and engineering.</td></tr>
+      <tr><td>SAM.gov</td><td>The federal government's official contract opportunities website &mdash; posts all public solicitations.</td></tr>
+      <tr><td>Defense SBIR</td><td>The SBIR.gov website &mdash; central listing of all DoD SBIR/STTR solicitations.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="add-region">Adding a Region</h3>
+  <p>A "region" tells the system which specific part of a website to watch. For example, you might want it to watch the "Active Topics" page on DSIP.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on the source you want to configure</strong> (for example, click "DSIP").
+      <em class="expected">The source detail page opens. You see the source name, description, and a list of regions (which may be empty).</em>
+    </li>
+    <li>
+      <strong>Click the "Add Region" button.</strong>
+      <em class="expected">A form appears with three fields to fill in.</em>
+    </li>
+    <li>
+      <strong>Fill in the Region Name.</strong> Type: <code>Active Topics</code>
+      <em class="expected">The text appears in the Name field.</em>
+    </li>
+    <li>
+      <strong>Select the Type.</strong> Choose: <code>listing</code> from the dropdown.
+      <em class="expected">"listing" appears as the selected type.</em>
+    </li>
+    <li>
+      <strong>Fill in the Context Description.</strong> Type: <code>This page lists active BAA topics. Alert me when new topic numbers appear.</code>
+      <em class="expected">Your description appears in the field. This tells the system what to look for when it checks this page.</em>
+    </li>
+    <li>
+      <strong>Click "Save" or "Add."</strong>
+      <em class="expected">The new region appears in the regions list. You can see the name "Active Topics" with the type "listing" next to it.</em>
+    </li>
+  </ol>
+
+  <div class="tip">The Context Description is like instructions for the system. Write it in plain English, describing what the page contains and what changes you care about.</div>
+
+  <h3 id="auto-crawl">Enabling Auto-Crawl</h3>
+  <p>Auto-crawl tells the system to check this source automatically on a schedule.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>On the source detail page, find the Auto-Crawl toggle switch.</strong>
+      <em class="expected">You see a toggle (slider) switch, currently in the "off" position.</em>
+    </li>
+    <li>
+      <strong>Click the toggle to turn it ON.</strong>
+      <em class="expected">The toggle slides to the "on" position (usually turns blue or green).</em>
+    </li>
+    <li>
+      <strong>Set the schedule.</strong> Select "Daily" and pick a time, such as <code>6:00 AM</code>.
+      <em class="expected">The schedule shows "Daily at 6:00 AM." The system will now check this source every day at that time.</em>
+    </li>
+  </ol>
+
+  <h3 id="manual-scout">Triggering a Manual Scout</h3>
+  <p>You do not have to wait for the schedule. You can check a source right now.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>On the source detail page, click the "Scout Now" button.</strong>
+      <em class="expected">A brief message appears confirming the scout job has been started (for example, a small notification at the top or bottom of the page).</em>
+    </li>
+    <li>
+      <strong>Go back to the Sources Hub.</strong> Click "Sources" in the sidebar.
+      <span class="url">{BASE_URL}/admin/sources</span>
+      <em class="expected">You see the Sources Hub. Look at the "Recent Changes" feed at the bottom. If the scout found any new or changed pages, they appear here.</em>
+    </li>
+  </ol>
+
+  <div class="warning">The scout may take a minute or two to finish. If you do not see results right away, wait a moment and refresh the page.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 3. UPLOAD RFP                                               -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="upload-rfp">
+  <h2>3. Uploading and Processing an RFP</h2>
+  <p>When you have a government solicitation document (usually a PDF), you upload it here so the system can process it.</p>
+
+  <div class="warning">Have your PDF file ready on your computer before starting. Common files look like: <code>DoD 25.2 SBIR BAA FULL.pdf</code></div>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "RFP Curation" in the left sidebar</strong> (under Operations).
+      <em class="expected">The RFP Curation list page opens, showing any existing solicitations.</em>
+    </li>
+    <li>
+      <strong>Click "Upload" at the top of the page.</strong>
+      <span class="url">{BASE_URL}/admin/rfp-curation/upload</span>
+      <em class="expected">An upload form appears with a file selector and metadata fields.</em>
+    </li>
+    <li>
+      <strong>Click "Choose File" (or "Browse").</strong>
+      <em class="expected">Your computer's file browser opens.</em>
+    </li>
+    <li>
+      <strong>Find and select your PDF file,</strong> then click "Open."
+      <em class="expected">The file name appears next to the Choose File button (for example, "DoD 25.2 SBIR BAA FULL.pdf").</em>
+    </li>
+    <li>
+      <strong>Fill in the Title field.</strong> Type a clear name, such as: <code>DoD SBIR 25.2 BAA Preface</code>
+      <em class="expected">The title appears in the field.</em>
+    </li>
+    <li>
+      <strong>Fill in the Agency field.</strong> Type: <code>Department of Defense</code>
+      <em class="expected">The agency name appears in the field.</em>
+    </li>
+    <li>
+      <strong>Select the Program Type</strong> from the dropdown. Choose the appropriate type (for example, <code>SBIR Phase I</code>).
+      <em class="expected">The program type is selected.</em>
+    </li>
+    <li>
+      <strong>Click "Upload" or "Submit."</strong>
+      <em class="expected">You see a progress bar or spinning indicator. After a few seconds, the page changes to show the curation workspace for your new solicitation.</em>
+    </li>
+  </ol>
+
+  <h3>What Happens Automatically After Upload</h3>
+  <p>Once you upload a PDF, the system does several things behind the scenes:</p>
+  <ul style="padding-left: 1.25rem; margin-bottom: 0.75rem;">
+    <li><strong>Text extraction</strong> &mdash; the system reads all the text from the PDF so it can be searched and analyzed.</li>
+    <li><strong>Topic detection</strong> &mdash; the system tries to identify individual topics or requirements within the document.</li>
+    <li><strong>Compliance extraction</strong> &mdash; the system looks for formatting requirements (page limits, fonts, margins).</li>
+  </ul>
+
+  <div class="tip">These automatic processes may take a few minutes. You can start curating immediately &mdash; the extracted data will appear as it becomes available.</div>
+
+  <h3>Finding Your Uploaded RFP</h3>
+  <ol class="steps">
+    <li>
+      <strong>Click "RFP Curation" in the sidebar</strong> to go back to the list.
+      <span class="url">{BASE_URL}/admin/rfp-curation</span>
+      <em class="expected">Your newly uploaded solicitation appears in the list, likely near the top. Its status will show as "unclaimed" or "new."</em>
+    </li>
+  </ol>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 4. CURATING AN RFP                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="curate-rfp">
+  <h2>4. Curating an RFP (The Full Workflow)</h2>
+  <p>Curation is the most important part of your job. You will take a raw uploaded document and turn it into a structured, ready-to-use opportunity for customers. This section walks you through the entire process.</p>
+
+  <div class="warning">You must have already uploaded an RFP (Section 3) before starting this section.</div>
+
+  <!-- 4a. Claim -->
+  <h3 id="claim-sol">Step A: Claiming the Solicitation</h3>
+  <p>Claiming means "I am working on this one." It prevents other admins from editing the same solicitation at the same time.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>From the RFP Curation list, click on the solicitation you uploaded.</strong>
+      <em class="expected">The curation workspace opens. You see tabs across the top: Documents, Topics, Compliance, and Customer Interest.</em>
+    </li>
+    <li>
+      <strong>Click the "Claim" button</strong> (usually near the top of the page).
+      <em class="expected">The button changes (it may disappear or change to say "Claimed by you"). Your name now appears as the curator of this solicitation.</em>
+    </li>
+  </ol>
+
+  <!-- 4b. PDF Viewer -->
+  <h3 id="pdf-viewer">Step B: Using the PDF Viewer</h3>
+  <p>While curating, you will need to read through the PDF. The built-in viewer has helpful tools.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click the "Documents" tab</strong> in the curation workspace.
+      <em class="expected">You see a list of documents attached to this solicitation. Your uploaded PDF should be listed here.</em>
+    </li>
+    <li>
+      <strong>Click on the PDF to open it in the viewer.</strong>
+      <em class="expected">The PDF opens in a viewer panel. You can see the document pages.</em>
+    </li>
+    <li>
+      <strong>Use the search box</strong> (usually a magnifying glass icon) to find specific text in the document.
+      <em class="expected">Matching text is highlighted throughout the document.</em>
+    </li>
+    <li>
+      <strong>Use the page jump</strong> (type a page number) to go directly to a specific page.
+      <em class="expected">The viewer jumps to that page.</em>
+    </li>
+    <li>
+      <strong>Check if a Table of Contents</strong> is available in the sidebar of the viewer.
+      <em class="expected">If the PDF has bookmarks, you can click them to jump to specific sections.</em>
+    </li>
+  </ol>
+
+  <div class="tip">Keep the PDF viewer open on one side while you fill in compliance variables. This lets you read the requirements and enter them at the same time.</div>
+
+  <!-- 4c. Compliance Variables -->
+  <h3 id="compliance-vars">Step C: Tagging Compliance Variables</h3>
+  <p>Compliance variables are the formatting rules that the government requires in proposals (page limits, fonts, margins, etc.). You find these in the PDF and tag them in the system.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click the "Compliance" tab</strong> in the curation workspace.
+      <em class="expected">The compliance variables panel opens. You see fields for different formatting rules.</em>
+    </li>
+    <li>
+      <strong>In the PDF viewer, find the section about proposal formatting requirements.</strong> Look for phrases like "page limitations," "font requirements," or "format instructions."
+      <em class="expected">You locate the formatting rules in the PDF.</em>
+    </li>
+    <li>
+      <strong>Select the relevant text in the PDF</strong> by clicking and dragging your mouse over it.
+      <em class="expected">The text is highlighted. A small popup or side panel may appear asking you to choose a variable type.</em>
+    </li>
+    <li>
+      <strong>Choose the variable type</strong> (for example, "Page Limit") and <strong>enter the value</strong> (for example, <code>15</code>).
+      <em class="expected">The variable is saved. You can see it listed in the compliance panel.</em>
+    </li>
+    <li>
+      <strong>Repeat for other formatting requirements.</strong> Common ones include:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Page Limit: e.g., <code>15</code></li>
+        <li>Font: e.g., <code>Times New Roman 10pt</code></li>
+        <li>Margins: e.g., <code>1 inch all sides</code></li>
+        <li>Submission Format: e.g., <code>PDF via email</code></li>
+        <li>Line Spacing: e.g., <code>Single-spaced</code></li>
+      </ul>
+      <em class="expected">Each variable appears in the compliance panel as you add it.</em>
+    </li>
+  </ol>
+
+  <!-- 4d. Compliance Matrix -->
+  <h3 id="compliance-matrix">The Compliance Matrix</h3>
+  <p>After you tag compliance variables, they form a <strong>compliance matrix</strong> &mdash; a summary of all the formatting rules for this solicitation. This matrix will be automatically applied to customer proposals later.</p>
+
+  <dl class="info-grid">
+    <dt>Page Limits</dt><dd>Maximum number of pages allowed for each volume</dd>
+    <dt>Font Requirements</dt><dd>The exact font name and size to use</dd>
+    <dt>Margins</dt><dd>How much blank space to leave around the edges of each page</dd>
+    <dt>Submission Format</dt><dd>How the final proposal must be submitted (PDF, Word, etc.)</dd>
+    <dt>Headers/Footers</dt><dd>What must appear at the top and bottom of each page</dd>
+  </dl>
+
+  <!-- 4e. Volumes -->
+  <h3 id="volumes">Step D: Adding Volumes</h3>
+  <p>Most government proposals require multiple "volumes" &mdash; separate documents that each cover a different aspect. For example, one volume for the technical plan, another for the budget.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>In the curation workspace, find the "Volumes" section</strong> (this may be within the Compliance tab or a separate area).
+      <em class="expected">You see an area to add volumes. It may be empty or have a placeholder.</em>
+    </li>
+    <li>
+      <strong>Click "Add Volume."</strong>
+      <em class="expected">A form appears to name the new volume.</em>
+    </li>
+    <li>
+      <strong>Type the volume name:</strong> <code>Technical Volume</code>
+      <em class="expected">The name appears in the field.</em>
+    </li>
+    <li>
+      <strong>Click "Save" or "Add."</strong>
+      <em class="expected">The volume appears in the list as Volume 1: Technical Volume.</em>
+    </li>
+    <li>
+      <strong>Click "Add Volume" again.</strong>
+      <em class="expected">Another form appears.</em>
+    </li>
+    <li>
+      <strong>Type:</strong> <code>Cost Volume</code> <strong>and save.</strong>
+      <em class="expected">Volume 2: Cost Volume appears in the list.</em>
+    </li>
+    <li>
+      <strong>(Optional) Add a third volume:</strong> <code>Supporting Documents</code> <strong>and save.</strong>
+      <em class="expected">Volume 3: Supporting Documents appears in the list.</em>
+    </li>
+  </ol>
+
+  <!-- 4f. Volume Items -->
+  <h3 id="volume-items">Step E: Adding Required Items to Each Volume</h3>
+  <p>Each volume contains specific items that the customer must include in their proposal. You add these based on what the solicitation requires.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click on "Technical Volume"</strong> to expand or open it.
+      <em class="expected">You see the volume detail view, with an area to add required items.</em>
+    </li>
+    <li>
+      <strong>Click "Add Required Item."</strong>
+      <em class="expected">A form appears with fields for the item details.</em>
+    </li>
+    <li>
+      <strong>Fill in the first item:</strong>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Item Name: <code>Technical Approach</code></li>
+        <li>Page Limit: <code>5</code></li>
+        <li>Format Type: <code>document</code> (if available)</li>
+      </ul>
+      <strong>Then click "Save."</strong>
+      <em class="expected">The item appears under the Technical Volume: "1. Technical Approach (5 pages)."</em>
+    </li>
+    <li>
+      <strong>Add a second item:</strong> Name: <code>Key Personnel</code>, Page Limit: <code>3</code>. Save.
+      <em class="expected">"2. Key Personnel (3 pages)" appears.</em>
+    </li>
+    <li>
+      <strong>Add a third item:</strong> Name: <code>Past Performance</code>, Page Limit: <code>3</code>. Save.
+      <em class="expected">"3. Past Performance (3 pages)" appears.</em>
+    </li>
+    <li>
+      <strong>Now click on "Cost Volume"</strong> and add:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Item Name: <code>Cost Breakdown</code></li>
+        <li>Page Limit: <code>4</code></li>
+      </ul>
+      Save the item.
+      <em class="expected">"1. Cost Breakdown (4 pages)" appears under Cost Volume.</em>
+    </li>
+  </ol>
+
+  <div class="tip">These required items become the section structure of the customer's proposal. Take your time to match them exactly to what the solicitation requires.</div>
+
+  <!-- 4g. Topics -->
+  <h3 id="topics">Step F: Managing Topics</h3>
+  <p>Topics are the specific research subjects within a solicitation. For example, a DoD SBIR solicitation might have 200+ topics across different military branches.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click the "Topics" tab</strong> in the curation workspace.
+      <em class="expected">You see a list of topics. If the system already extracted topics automatically, they appear here. Otherwise, the list is empty.</em>
+    </li>
+    <li>
+      <strong>Review auto-extracted topics</strong> (if any). Each topic shows:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Topic Number (e.g., "AF251-0001")</li>
+        <li>Title (e.g., "Advanced Radar Signal Processing")</li>
+        <li>Technology Focus Areas (e.g., "Sensors, Signal Processing")</li>
+      </ul>
+      <em class="expected">The auto-extracted topic information matches what is in the PDF.</em>
+    </li>
+    <li>
+      <strong>To add a topic manually:</strong> Click "Add Topic."
+      <em class="expected">A form appears with fields for topic number, title, and other details.</em>
+    </li>
+    <li>
+      <strong>Fill in the topic details and click "Save."</strong>
+      <em class="expected">The new topic appears in the list.</em>
+    </li>
+    <li>
+      <strong>Click on any topic to see its full detail page.</strong>
+      <em class="expected">The topic detail page opens, showing the complete description, focus areas, and point of contact information (if available).</em>
+    </li>
+  </ol>
+
+  <div class="tip">You can also paste topics from the DSIP website or other source documents. The system will try to parse them automatically.</div>
+
+  <!-- 4h. Topic Compliance -->
+  <h3 id="topic-compliance">Step G: Topic Compliance Presets</h3>
+  <p>Instead of setting compliance rules for each topic one by one, you can apply a preset that fills in standard formatting requirements automatically.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Select the topics you want to apply the preset to</strong> (for example, all Phase I topics). You can click checkboxes next to each topic.
+      <em class="expected">The selected topics are highlighted or checked.</em>
+    </li>
+    <li>
+      <strong>Click "Apply Preset."</strong>
+      <em class="expected">A dropdown or dialog appears showing available presets.</em>
+    </li>
+    <li>
+      <strong>Select the preset:</strong> <code>DoD SBIR Phase I Standard</code>
+      <em class="expected">The preset is applied. Each selected topic now has the standard Phase I formatting rules (typically: 15-page technical volume, Times New Roman 10pt, 1-inch margins).</em>
+    </li>
+  </ol>
+
+  <!-- 4i. Review & Approve -->
+  <h3 id="review-approve">Step H: Reviewing and Approving</h3>
+  <p>Before making an opportunity visible to customers, it should be reviewed.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>When you have finished all curation work,</strong> go back to the main curation workspace view.
+      <em class="expected">You see the full solicitation with all volumes, items, topics, and compliance variables filled in.</em>
+    </li>
+    <li>
+      <strong>Click "Request Review"</strong> if another admin needs to check your work.
+      <em class="expected">The status changes to "Review Requested." If there is another admin, they will be notified.</em>
+    </li>
+    <li>
+      <strong>Click "Approve"</strong> (you can do this yourself if you are the only admin).
+      <em class="expected">The status changes to "Approved." A green badge or checkmark appears.</em>
+    </li>
+  </ol>
+
+  <!-- 4j. Push to Spotlight -->
+  <h3 id="push-spotlight">Step I: Pushing to Spotlight</h3>
+  <p>This is the final step in curation. "Pushing to Spotlight" makes the opportunity visible to customers in their Spotlight feed.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click the "Push to Spotlight" button.</strong>
+      <em class="expected">The status changes to "Pushed." A confirmation message appears. The topics from this solicitation are now live and visible to all approved customers.</em>
+    </li>
+  </ol>
+
+  <div class="warning">Once you push to Spotlight, customers can see and interact with these topics. Double-check that all information is correct before pushing.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 5. APPLICATIONS                                             -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="applications">
+  <h2>5. Managing Applications</h2>
+  <p>When a company wants to use RFP Pipeline, they fill out an application. You review and approve or reject these applications.</p>
+
+  <h3>Reviewing a New Application</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Applications" in the left sidebar</strong> (under Operations).
+      <span class="url">{BASE_URL}/admin/applications</span>
+      <em class="expected">You see a list of applications. New ones show as "Pending" with an orange or yellow badge.</em>
+    </li>
+    <li>
+      <strong>Click on a pending application to open it.</strong>
+      <em class="expected">The application detail page opens. You see all the information the company submitted:</em>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Company name</li>
+        <li>Contact email</li>
+        <li>NAICS codes (industry classification codes)</li>
+        <li>Company website</li>
+        <li>Company description</li>
+        <li>SBIR experience (how many awards they have won)</li>
+      </ul>
+    </li>
+    <li>
+      <strong>Review the information.</strong> Does the company seem like a legitimate government contractor?
+      <em class="expected">You have enough information to make an accept/reject decision.</em>
+    </li>
+  </ol>
+
+  <h3>Accepting an Application</h3>
+
+  <ol class="steps" style="counter-reset: step-counter 3;">
+    <li>
+      <strong>Click the "Accept" button.</strong>
+      <em class="expected">The system does several things automatically:</em>
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>Creates a new company account (called a "tenant")</li>
+        <li>Creates a user account for the contact person</li>
+        <li>Generates a temporary password</li>
+        <li>Sends a welcome email to the contact person with their login details</li>
+      </ul>
+      <em class="expected">The application status changes to "Accepted."</em>
+    </li>
+    <li>
+      <strong>Note the temporary password</strong> (if shown) and the company's account name (the "slug"). You may need to share these with the customer.
+      <em class="expected">You see the new tenant information, including the slug (like "acme-defense-solutions").</em>
+    </li>
+  </ol>
+
+  <h3>Rejecting an Application</h3>
+
+  <ol class="steps" style="counter-reset: step-counter 5;">
+    <li>
+      <strong>If the application does not meet your criteria, click "Reject."</strong>
+      <em class="expected">The application status changes to "Rejected." No account is created.</em>
+    </li>
+  </ol>
+
+  <div class="tip">You can always view accepted applications later to check on their tenant status. Go to "Tenants" in the sidebar to see all approved companies.</div>
+
+  <h3>Verifying a New Tenant Was Created</h3>
+
+  <ol class="steps" style="counter-reset: step-counter 6;">
+    <li>
+      <strong>Click "Tenants" in the left sidebar.</strong>
+      <span class="url">{BASE_URL}/admin/tenants</span>
+      <em class="expected">You see a list of all company accounts. The newly accepted company should appear here.</em>
+    </li>
+    <li>
+      <strong>Click on the new tenant to open its detail page.</strong>
+      <em class="expected">You see the company's details: name, slug, website, status, and a list of users associated with the account.</em>
+    </li>
+  </ol>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 6. MONITORING                                               -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="monitoring">
+  <h2>6. Monitoring the System</h2>
+  <p>These pages help you make sure everything is running smoothly. Check them if something seems wrong, or as part of a daily routine.</p>
+
+  <!-- 6a. Event Stream -->
+  <h3 id="event-stream">Event Stream</h3>
+  <p>The Event Stream is a log of every important action that happens in the system. Think of it as a security camera recording for the software.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Event Stream" in the left sidebar</strong> (under Monitoring).
+      <span class="url">{BASE_URL}/admin/events</span>
+      <em class="expected">You see a list of recent events, with the newest at the top. Each event shows a timestamp, a type, and who did it.</em>
+    </li>
+    <li>
+      <strong>Look at the event types.</strong> Common ones include:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><code>rfp.uploaded</code> &mdash; an RFP was uploaded</li>
+        <li><code>solicitation.approved</code> &mdash; a solicitation was approved</li>
+        <li><code>solicitation.pushed</code> &mdash; an opportunity was pushed to Spotlight</li>
+        <li><code>application.submitted</code> &mdash; a company applied</li>
+        <li><code>application.accepted</code> &mdash; a company was approved</li>
+        <li><code>user.logged_in</code> &mdash; someone logged in</li>
+        <li><code>proposal.created</code> &mdash; a customer started a proposal</li>
+        <li><code>section.saved</code> &mdash; a customer saved proposal content</li>
+      </ul>
+      <em class="expected">You can follow the trail of activity across the system.</em>
+    </li>
+    <li>
+      <strong>To filter events,</strong> use the filter controls at the top of the page. You can filter by:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><strong>Category</strong> &mdash; such as "finder" (admin actions), "capture" (customer actions), "proposal" (proposal activity)</li>
+        <li><strong>Date range</strong> &mdash; see events from a specific time period</li>
+      </ul>
+      <em class="expected">The list updates to show only matching events.</em>
+    </li>
+  </ol>
+
+  <div class="tip">If a customer reports a problem, use the Event Stream to see what actions they took. Filter by their company name or email to find their events.</div>
+
+  <!-- 6b. Pipeline Jobs -->
+  <h3 id="pipeline-jobs">Pipeline Jobs</h3>
+  <p>Pipeline Jobs are background tasks that the system runs automatically, such as processing uploaded documents or scoring opportunities.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "Pipeline" in the left sidebar</strong> (under Monitoring).
+      <span class="url">{BASE_URL}/admin/pipeline</span>
+      <em class="expected">You see a list of jobs with their status: "Running," "Completed," or "Failed."</em>
+    </li>
+    <li>
+      <strong>Check the scheduled ingesters.</strong> You should see:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li>SAM.gov &mdash; runs daily</li>
+        <li>SBIR.gov &mdash; runs weekly</li>
+        <li>DSIP &mdash; runs daily (if you configured it in Section 2)</li>
+      </ul>
+      <em class="expected">Each ingester shows its schedule and when it last ran.</em>
+    </li>
+    <li>
+      <strong>Look for any "Failed" jobs.</strong>
+      <em class="expected">If a job failed, click on it to see what went wrong. Report failures to your technical support person.</em>
+    </li>
+  </ol>
+
+  <div class="warning">If you see many failed jobs, something may be wrong with the system. Check System Health (below) and contact your technical support person.</div>
+
+  <!-- 6c. System Health -->
+  <h3 id="system-health">System Health</h3>
+  <p>This page shows whether all the parts of the system are working.</p>
+
+  <ol class="steps">
+    <li>
+      <strong>Click "System Health" in the left sidebar</strong> (under Monitoring), or navigate to:
+      <span class="url">{BASE_URL}/admin/system</span>
+      <em class="expected">You see a page showing the status of different system components.</em>
+    </li>
+    <li>
+      <strong>Check that all services show "Online"</strong> (usually with a green dot or checkmark).
+      <em class="expected">All services are green/online. If any show red/offline, contact your technical support person immediately.</em>
+    </li>
+    <li>
+      <strong>Check the database connection.</strong>
+      <em class="expected">It should show "Healthy" or "Connected."</em>
+    </li>
+    <li>
+      <strong>Check storage.</strong>
+      <em class="expected">The file storage service should show as accessible.</em>
+    </li>
+    <li>
+      <strong>Check the error count.</strong>
+      <em class="expected">This should be zero or very low. A high error count means something needs attention.</em>
+    </li>
+  </ol>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 7. TEMPLATES                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="templates">
+  <h2>7. Templates</h2>
+  <p>Templates define how proposal documents are formatted. They control things like page size, fonts, margins, and pre-built section structures.</p>
+
+  <h3>Browsing Templates</h3>
+
+  <ol class="steps">
+    <li>
+      <strong>Look for a "Templates" option in the sidebar or within the RFP Curation area.</strong>
+      <em class="expected">You see a list of available templates.</em>
+    </li>
+    <li>
+      <strong>Look at the available templates.</strong> Common ones include:
+      <ul style="padding-left: 1.25rem; margin-top: 0.25rem;">
+        <li><strong>Letter Standard</strong> &mdash; standard letter-sized document (8.5" x 11")</li>
+        <li><strong>SBIR Phase I</strong> &mdash; formatted specifically for DoD SBIR Phase I proposals</li>
+        <li><strong>SBIR Phase II</strong> &mdash; formatted for Phase II proposals</li>
+        <li><strong>Slide CSO</strong> &mdash; presentation format for CSO (Commercial Solutions Opening) proposals</li>
+      </ul>
+      <em class="expected">Each template shows its name, format type, and a brief description.</em>
+    </li>
+    <li>
+      <strong>Click on a template to preview it.</strong>
+      <em class="expected">You see the template details: page dimensions, margins, font settings, header/footer format, and any pre-built sections.</em>
+    </li>
+  </ol>
+
+  <h3>How Templates Connect to Proposals</h3>
+  <p>When a customer purchases a proposal workspace, the system automatically applies the correct template based on the solicitation type you selected during curation. You do not need to manually assign templates &mdash; the system matches them automatically.</p>
+
+  <dl class="info-grid">
+    <dt>SBIR Phase I solicitation</dt><dd>Uses the "SBIR Phase I" template</dd>
+    <dt>SBIR Phase II solicitation</dt><dd>Uses the "SBIR Phase II" template</dd>
+    <dt>CSO/Other solicitation</dt><dd>Uses the "Slide CSO" or "Letter Standard" template</dd>
+  </dl>
+
+  <div class="tip">If a solicitation has unusual formatting requirements that do not match any template, you can override the compliance rules when curating the RFP (Section 4, Step C).</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 8. TROUBLESHOOTING                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section" id="troubleshooting">
+  <h2>8. Troubleshooting</h2>
+  <p>If something is not working as expected, check this list for common problems and solutions.</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>What You See</th><th>What Is Probably Wrong</th><th>What to Do</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>After clicking "Sign In," you land back on the login page</td>
+        <td>Your email or password is incorrect, or your session expired</td>
+        <td>Clear your browser cookies (Settings &gt; Privacy &gt; Clear Cookies), then try logging in again with the correct credentials</td>
+      </tr>
+      <tr>
+        <td>Dashboard shows 0 for all numbers</td>
+        <td>The database may not be connected, or the system was just set up with no data</td>
+        <td>Go to System Health and check the database connection. If it shows "offline," contact your technical support person.</td>
+      </tr>
+      <tr>
+        <td>File upload fails (nothing happens after clicking Upload)</td>
+        <td>The file storage service may not be configured correctly</td>
+        <td>Contact your technical support person. Tell them: "File upload is failing. Please check the storage service configuration."</td>
+      </tr>
+      <tr>
+        <td>After uploading a PDF, topics never appear</td>
+        <td>The background processing service may be down</td>
+        <td>Go to Pipeline Jobs and check for failed jobs. Also check System Health. Contact technical support if the service is offline.</td>
+      </tr>
+      <tr>
+        <td>You pushed to Spotlight but customers say they do not see the topics</td>
+        <td>The topics may not be properly linked to the solicitation</td>
+        <td>Go back to the curation workspace, click the Topics tab, and verify topics are listed. If they are, contact technical support.</td>
+      </tr>
+      <tr>
+        <td>Events are not showing up in the Event Stream</td>
+        <td>The event recording system may have an issue</td>
+        <td>Contact your technical support person. Tell them: "Events are not appearing in the admin event stream."</td>
+      </tr>
+      <tr>
+        <td>A customer says they cannot log in</td>
+        <td>Their temporary password may have expired or they may be entering it incorrectly</td>
+        <td>Go to Tenants, find their company, and check their user account. You may need to reset their password.</td>
+      </tr>
+      <tr>
+        <td>The page loads but looks broken (no styling, things overlapping)</td>
+        <td>Your browser may need a refresh, or there may be a network issue</td>
+        <td>Press Ctrl+Shift+R (or Cmd+Shift+R on Mac) to do a hard refresh. If it persists, try a different browser.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warning">When contacting technical support, always include: (1) what page you were on (copy the URL from your browser's address bar), (2) what you clicked, (3) what happened (or did not happen), and (4) the approximate time it occurred.</div>
+</div>
+
+<hr class="divider">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- QUICK REFERENCE: ALL ADMIN PAGES                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Quick Reference: All Admin Pages</h2>
+  <p>Bookmark these for quick access. Replace <code>{BASE_URL}</code> with your actual web address.</p>
+
+  <table class="simple-table">
+    <thead>
+      <tr><th>Page</th><th>Address</th><th>Sidebar Section</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Dashboard</td><td><code>{BASE_URL}/admin/dashboard</code></td><td>Operations</td></tr>
+      <tr><td>Applications</td><td><code>{BASE_URL}/admin/applications</code></td><td>Operations</td></tr>
+      <tr><td>RFP Curation</td><td><code>{BASE_URL}/admin/rfp-curation</code></td><td>Operations</td></tr>
+      <tr><td>Upload RFP</td><td><code>{BASE_URL}/admin/rfp-curation/upload</code></td><td>Operations</td></tr>
+      <tr><td>Tenants</td><td><code>{BASE_URL}/admin/tenants</code></td><td>Operations</td></tr>
+      <tr><td>Purchases</td><td><code>{BASE_URL}/admin/purchases</code></td><td>Operations</td></tr>
+      <tr><td>Sources</td><td><code>{BASE_URL}/admin/sources</code></td><td>Intelligence</td></tr>
+      <tr><td>Event Stream</td><td><code>{BASE_URL}/admin/events</code></td><td>Monitoring</td></tr>
+      <tr><td>Pipeline Jobs</td><td><code>{BASE_URL}/admin/pipeline</code></td><td>Monitoring</td></tr>
+      <tr><td>System Health</td><td><code>{BASE_URL}/admin/system</code></td><td>Monitoring</td></tr>
+      <tr><td>CMS Content</td><td><code>{BASE_URL}/admin/content</code></td><td>Content</td></tr>
+      <tr><td>Storage</td><td><code>{BASE_URL}/admin/storage</code></td><td>Content</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /container -->
+
+<footer class="site-footer">
+  <p>RFP Pipeline &mdash; Admin Operations Manual</p>
+  <p>For technical support, contact your system administrator.</p>
+</footer>
+
+</body>
+</html>
