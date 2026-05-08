@@ -177,34 +177,32 @@ export async function POST(request: Request, ctx: RouteContext) {
       .map((atom) => atom.nodes.map(getNodeText).join('\n'))
       .join('\n\n');
 
-    // Update the parent unit with the full extracted text and metadata
+    // Mark the parent unit as seminal and update with full extracted text + metadata
     await sql`
       UPDATE library_units
       SET content = ${fullText.slice(0, 100000)},
           status = 'approved',
+          is_seminal = true,
+          source_filename = ${sourceFilename},
+          source_storage_key = ${storageKey},
+          document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
           updated_at = now()
       WHERE id = ${unit.id}::uuid
     `;
     atomized++;
 
-    // Create child atoms
+    // Create child atoms with structured storage
     for (const atom of importResult.atoms) {
       const atomContent = atom.nodes.map(getNodeText).join('\n').trim();
       if (!atomContent) continue;
 
-      const atomMetadata = {
-        parent_unit_id: unit.id,
-        source_filename: importResult.sourceFilename,
-        atom_type: getAtomType(atom),
-        heading_text: atom.headingText,
-        char_offset: atom.charOffset,
-        canvas_nodes: atom.nodes,
-        document_metadata: importResult.metadata,
-      };
+      const atomType = getAtomType(atom);
 
       const [row] = await sql<{ id: string }[]>`
         INSERT INTO library_units
-          (tenant_id, content, category, tags, status, source_type, source_id, parent_unit_id)
+          (tenant_id, content, category, tags, status, source_type, source_id,
+           parent_unit_id, canvas_nodes, document_metadata, source_filename,
+           source_storage_key, heading_text, char_offset, char_length)
         VALUES
           (${tenantId}::uuid,
            ${atomContent.slice(0, 50000)},
@@ -212,8 +210,15 @@ export async function POST(request: Request, ctx: RouteContext) {
            ${sql.array(atom.suggestedTags)}::text[],
            'draft',
            'upload',
-           ${JSON.stringify(atomMetadata)},
-           ${unit.id}::uuid)
+           ${atomType},
+           ${unit.id}::uuid,
+           ${JSON.stringify(atom.nodes)}::jsonb,
+           ${JSON.stringify(importResult.metadata)}::jsonb,
+           ${importResult.sourceFilename},
+           ${storageKey},
+           ${atom.headingText},
+           ${atom.charOffset},
+           ${atom.charLength})
         RETURNING id
       `;
 

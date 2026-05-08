@@ -1,7 +1,8 @@
 /**
  * GET    /api/portal/[tenantSlug]/library/[unitId]  — Fetch one library unit
  * PATCH  /api/portal/[tenantSlug]/library/[unitId]  — Update a library unit
- * DELETE /api/portal/[tenantSlug]/library/[unitId]  — Delete a library unit
+ * DELETE /api/portal/[tenantSlug]/library/[unitId]  — Delete a library unit (blocked for seminal)
+ * POST   /api/portal/[tenantSlug]/library/[unitId]  — Re-atomize a seminal document
  */
 
 import { NextResponse } from 'next/server';
@@ -9,7 +10,14 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle } from '@/lib/events';
+import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { getObjectBuffer } from '@/lib/storage/s3-client';
+import { readDocx } from '@/lib/import/docx-reader';
+import { readPptx } from '@/lib/import/pptx-reader';
+import { readPdf } from '@/lib/import/pdf-reader';
+import { readText } from '@/lib/import/text-reader';
+import type { ImportResult } from '@/lib/import/types';
+import type { CanvasNode, HeadingContent, TextBlockContent, ListContent } from '@/lib/types/canvas-document';
 
 type RouteParams = { params: Promise<{ tenantSlug: string; unitId: string }> };
 
@@ -148,6 +156,44 @@ export async function PATCH(
         { status: 400 },
       );
     }
+
+    // Validate status transition: fetch current status
+    try {
+      const [current] = await sql<{ status: string }[]>`
+        SELECT status FROM library_units
+        WHERE id = ${ctx.unitId}::uuid AND tenant_id = ${ctx.tenantId}::uuid
+      `;
+      if (!current) {
+        return NextResponse.json(
+          { error: 'Library unit not found', code: 'NOT_FOUND' },
+          { status: 404 },
+        );
+      }
+
+      const from = current.status;
+      const to = body.status;
+      // Allowed transitions:
+      //   approved -> archived, archived -> approved, draft -> approved,
+      //   approved -> draft, any -> archived, archived -> approved
+      const allowed =
+        to === 'archived' ||                         // any -> archived
+        (from === 'archived' && to === 'approved') || // restore
+        (from === 'draft' && to === 'approved') ||    // accept
+        (from === 'approved' && to === 'draft');      // send back
+      if (!allowed) {
+        return NextResponse.json(
+          { error: `Cannot transition from '${from}' to '${to}'`, code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
+      }
+    } catch (err) {
+      console.error('[library/unit/patch] Status transition check failed', err);
+      return NextResponse.json(
+        { error: 'Failed to validate status transition', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
+
     updates.push(sql`status = ${body.status}`);
   }
 
@@ -208,6 +254,26 @@ export async function DELETE(
   if ('error' in ctx) return ctx.error;
 
   try {
+    // Check if this is a seminal unit — seminal units cannot be deleted
+    const [unit] = await sql<{ isSeminal: boolean | null }[]>`
+      SELECT is_seminal FROM library_units
+      WHERE id = ${ctx.unitId}::uuid AND tenant_id = ${ctx.tenantId}::uuid
+    `;
+
+    if (!unit) {
+      return NextResponse.json(
+        { error: 'Library unit not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    if (unit.isSeminal) {
+      return NextResponse.json(
+        { error: 'Cannot delete original documents. Archive them instead.', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
     const result = await sql`
       DELETE FROM library_units
       WHERE id = ${ctx.unitId}::uuid AND tenant_id = ${ctx.tenantId}::uuid
@@ -236,4 +302,234 @@ export async function DELETE(
       { status: 500 },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// POST — Re-atomize a seminal document
+// ---------------------------------------------------------------------------
+
+export async function POST(
+  request: Request,
+  routeParams: RouteParams,
+) {
+  const ctx = await authorize(request, routeParams, 'tenant_admin');
+  if ('error' in ctx) return ctx.error;
+
+  // Parse body
+  let body: { action?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
+
+  if (body.action !== 'reatomize') {
+    return NextResponse.json(
+      { error: 'Unknown action. Supported: reatomize', code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    // 1. Fetch the seminal unit
+    const [unit] = await sql<{
+      id: string;
+      isSeminal: boolean | null;
+      sourceStorageKey: string | null;
+      sourceFilename: string | null;
+      tenantId: string;
+    }[]>`
+      SELECT id, is_seminal, source_storage_key, source_filename, tenant_id
+      FROM library_units
+      WHERE id = ${ctx.unitId}::uuid AND tenant_id = ${ctx.tenantId}::uuid
+    `;
+
+    if (!unit) {
+      return NextResponse.json(
+        { error: 'Library unit not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    if (!unit.isSeminal) {
+      return NextResponse.json(
+        { error: 'Re-atomization is only available for original (seminal) documents', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (!unit.sourceStorageKey) {
+      return NextResponse.json(
+        { error: 'No source file stored for this document', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    // 2. Start event
+    const eventId = await emitEventStart({
+      namespace: 'library',
+      type: 'document.reatomized',
+      actor: userActor(ctx.userId),
+      tenantId: ctx.tenantId,
+      payload: { unitId: ctx.unitId },
+    });
+
+    // 3. Archive all existing child atoms
+    await sql`
+      UPDATE library_units
+      SET status = 'archived', updated_at = now()
+      WHERE parent_unit_id = ${ctx.unitId}::uuid
+        AND tenant_id = ${ctx.tenantId}::uuid
+        AND status != 'archived'
+    `;
+
+    // 4. Re-read the original file from S3
+    let fileBytes: Buffer | null = null;
+    try {
+      fileBytes = (await getObjectBuffer(unit.sourceStorageKey)) as Buffer | null;
+    } catch (err) {
+      console.error(`[reatomize] S3 fetch failed for ${unit.sourceStorageKey}`, err);
+      await emitEventEnd(eventId, { result: { error: 'S3 fetch failed' } });
+      return NextResponse.json(
+        { error: 'Failed to retrieve original file from storage', code: 'STORAGE_ERROR' },
+        { status: 500 },
+      );
+    }
+
+    if (!fileBytes || fileBytes.length === 0) {
+      await emitEventEnd(eventId, { result: { error: 'Empty file' } });
+      return NextResponse.json(
+        { error: 'Original file is empty or missing', code: 'STORAGE_ERROR' },
+        { status: 500 },
+      );
+    }
+
+    // 5. Determine format and re-run the reader
+    const filename = unit.sourceFilename ?? 'document';
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+
+    let importResult: ImportResult;
+    try {
+      switch (ext) {
+        case 'docx':
+        case 'doc':
+          importResult = await readDocx(fileBytes, filename);
+          break;
+        case 'pptx':
+        case 'ppt':
+          importResult = await readPptx(fileBytes, filename);
+          break;
+        case 'pdf':
+          importResult = await readPdf(fileBytes, filename);
+          break;
+        case 'txt':
+        case 'md':
+          importResult = await readText(fileBytes, filename);
+          break;
+        default:
+          importResult = await readText(fileBytes, filename);
+          break;
+      }
+    } catch (err) {
+      console.error(`[reatomize] Reader failed for ${unit.sourceStorageKey}`, err);
+      await emitEventEnd(eventId, { result: { error: 'Reader failed' } });
+      return NextResponse.json(
+        { error: 'Document re-processing failed', code: 'PROCESSING_ERROR' },
+        { status: 500 },
+      );
+    }
+
+    // 6. Build full text and update the parent
+    const fullText = importResult.atoms
+      .map((atom) => atom.nodes.map(getNodeText).join('\n'))
+      .join('\n\n');
+
+    await sql`
+      UPDATE library_units
+      SET content = ${fullText.slice(0, 100000)},
+          document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
+          updated_at = now()
+      WHERE id = ${ctx.unitId}::uuid
+    `;
+
+    // 7. Create new child atoms
+    let atomsCreated = 0;
+    for (const atom of importResult.atoms) {
+      const atomContent = atom.nodes.map(getNodeText).join('\n').trim();
+      if (!atomContent) continue;
+
+      const atomType = getAtomType(atom);
+
+      await sql`
+        INSERT INTO library_units
+          (tenant_id, content, category, tags, status, source_type, source_id,
+           parent_unit_id, canvas_nodes, document_metadata, source_filename,
+           source_storage_key, heading_text, char_offset, char_length)
+        VALUES
+          (${ctx.tenantId}::uuid,
+           ${atomContent.slice(0, 50000)},
+           ${atom.suggestedCategory},
+           ${sql.array(atom.suggestedTags)}::text[],
+           'draft',
+           'upload',
+           ${atomType},
+           ${ctx.unitId}::uuid,
+           ${JSON.stringify(atom.nodes)}::jsonb,
+           ${JSON.stringify(importResult.metadata)}::jsonb,
+           ${importResult.sourceFilename},
+           ${unit.sourceStorageKey},
+           ${atom.headingText},
+           ${atom.charOffset},
+           ${atom.charLength})
+      `;
+      atomsCreated++;
+    }
+
+    await emitEventEnd(eventId, {
+      result: { atomsCreated, sourceFilename: filename },
+    });
+
+    return NextResponse.json({
+      data: {
+        reatomized: true,
+        atomsCreated,
+        sourceFilename: filename,
+      },
+    });
+  } catch (err) {
+    console.error('[library/unit/reatomize] Unexpected error', err);
+    return NextResponse.json(
+      { error: 'Re-atomization failed', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers (duplicated from atomize route for independence)
+// ---------------------------------------------------------------------------
+
+/** Extract plain text from a CanvasNode for content storage. */
+function getNodeText(node: CanvasNode): string {
+  if (!node.content) return '';
+  switch (node.type) {
+    case 'heading': return (node.content as HeadingContent).text;
+    case 'text_block': return (node.content as TextBlockContent).text;
+    case 'bulleted_list':
+    case 'numbered_list':
+      return (node.content as ListContent).items.map((i) => i.text).join('\n');
+    default: return '';
+  }
+}
+
+/** Determine the primary type of an atom based on its node composition. */
+function getAtomType(atom: { nodes: CanvasNode[] }): string {
+  if (atom.nodes.length === 0) return 'empty';
+  const types = atom.nodes.map((n) => n.type);
+  if (types.includes('heading')) return 'section';
+  if (types.some((t) => t === 'bulleted_list' || t === 'numbered_list')) return 'list';
+  return 'paragraph';
 }

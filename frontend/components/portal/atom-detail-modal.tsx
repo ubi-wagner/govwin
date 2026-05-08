@@ -1,6 +1,14 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import type {
+  CanvasNode,
+  HeadingContent,
+  TextBlockContent,
+  ListContent,
+  TableContent,
+  TableCell as TableCellType,
+} from '@/lib/types/canvas-document';
 
 const CATEGORIES = [
   'general',
@@ -45,6 +53,16 @@ export interface LibraryUnit {
   proposalTitle: string | null;
   createdAt: string;
   updatedAt: string;
+  // New structured fields from migration 030
+  canvasNodes: CanvasNode[] | null;
+  documentMetadata: Record<string, unknown> | null;
+  sourceFilename: string | null;
+  sourceStorageKey: string | null;
+  headingText: string | null;
+  charOffset: number | null;
+  charLength: number | null;
+  isSeminal: boolean | null;
+  parentUnitId: string | null;
 }
 
 interface AtomDetailModalProps {
@@ -68,7 +86,9 @@ export default function AtomDetailModal({
   const [editTags, setEditTags] = useState(unit.tags.join(', '));
   const [editStatus, setEditStatus] = useState(unit.status);
   const [saving, setSaving] = useState(false);
+  const [reatomizing, setReatomizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState(unit.status);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -128,6 +148,52 @@ export default function AtomDetailModal({
     [tenantSlug, unit.id, editTags, onUpdated],
   );
 
+  const handleReatomize = useCallback(async () => {
+    setReatomizing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/library/${unit.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reatomize' }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Re-atomization failed' }));
+        setError(data.error ?? 'Re-atomization failed');
+        return;
+      }
+      onUpdated();
+    } catch {
+      setError('Network error');
+    } finally {
+      setReatomizing(false);
+    }
+  }, [tenantSlug, unit.id, onUpdated]);
+
+  const handleStatusChange = useCallback(async (newStatus: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/library/${unit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Status change failed' }));
+        setError(data.error ?? 'Status change failed');
+        return;
+      }
+      setCurrentStatus(newStatus);
+      setEditStatus(newStatus);
+      onUpdated();
+    } catch {
+      setError('Network error');
+    } finally {
+      setSaving(false);
+    }
+  }, [tenantSlug, unit.id, onUpdated]);
+
   const sourceLabel = getSourceLabel(unit.sourceType);
   const outcomeLabel = getOutcomeLabel(unit.outcome);
   const scoreColor = getScoreColor(unit.outcomeScore);
@@ -148,9 +214,16 @@ export default function AtomDetailModal({
               </span>
             )}
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 truncate">
-                {formatCategory(unit.category)}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 truncate">
+                  {formatCategory(unit.category)}
+                </h2>
+                {unit.isSeminal && (
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
+                    Seminal (Original Document)
+                  </span>
+                )}
+              </div>
               {unit.subcategory && (
                 <p className="text-xs text-gray-500">{unit.subcategory}</p>
               )}
@@ -195,6 +268,10 @@ export default function AtomDetailModal({
                 rows={10}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+            ) : unit.canvasNodes && unit.canvasNodes.length > 0 ? (
+              <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 max-h-64 overflow-y-auto space-y-2">
+                <MiniCanvasPreview nodes={unit.canvasNodes} />
+              </div>
             ) : (
               <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
                 {unit.content}
@@ -302,6 +379,20 @@ export default function AtomDetailModal({
                 <span className="text-gray-500 text-xs">Usage Count</span>
                 <p className="text-gray-700 mt-0.5">{unit.usageCount} proposal{unit.usageCount !== 1 ? 's' : ''}</p>
               </div>
+              {unit.sourceFilename && (
+                <div className="col-span-2">
+                  <span className="text-gray-500 text-xs">Source File</span>
+                  <p className="text-gray-700 mt-0.5 font-mono text-xs truncate" title={unit.sourceFilename}>
+                    {unit.sourceFilename}
+                  </p>
+                </div>
+              )}
+              {unit.headingText && (
+                <div className="col-span-2">
+                  <span className="text-gray-500 text-xs">Section Heading</span>
+                  <p className="text-gray-700 mt-0.5 font-medium">{unit.headingText}</p>
+                </div>
+              )}
               {unit.originalProposalId && (
                 <div className="col-span-2">
                   <span className="text-gray-500 text-xs">Original Proposal</span>
@@ -365,10 +456,39 @@ export default function AtomDetailModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="text-xs text-gray-400">
-            ID: {unit.id}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">ID: {unit.id}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Archive / Restore buttons */}
+            {!isEditing && currentStatus !== 'archived' && (
+              <button
+                onClick={() => handleStatusChange('archived')}
+                disabled={saving}
+                className="px-3 py-1.5 text-sm font-medium text-amber-700 border border-amber-300 rounded hover:bg-amber-50 disabled:opacity-50"
+              >
+                Archive
+              </button>
+            )}
+            {!isEditing && currentStatus === 'archived' && (
+              <button
+                onClick={() => handleStatusChange('approved')}
+                disabled={saving}
+                className="px-3 py-1.5 text-sm font-medium text-green-700 border border-green-300 rounded hover:bg-green-50 disabled:opacity-50"
+              >
+                Restore
+              </button>
+            )}
+            {/* Re-atomize button for seminal units */}
+            {!isEditing && unit.isSeminal && (
+              <button
+                onClick={handleReatomize}
+                disabled={reatomizing}
+                className="px-3 py-1.5 text-sm font-medium text-indigo-700 border border-indigo-300 rounded hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {reatomizing ? 'Re-atomizing...' : 'Re-atomize'}
+              </button>
+            )}
             {isEditing ? (
               <>
                 <button
@@ -412,6 +532,129 @@ export default function AtomDetailModal({
       </div>
     </div>
   );
+}
+
+// --- Mini Canvas Preview (renders CanvasNodes as rich content) ---
+
+function MiniCanvasPreview({ nodes }: { nodes: CanvasNode[] }) {
+  return (
+    <>
+      {nodes.map((node) => (
+        <MiniNodeRenderer key={node.id} node={node} />
+      ))}
+    </>
+  );
+}
+
+function MiniNodeRenderer({ node }: { node: CanvasNode }) {
+  if (!node.content) return null;
+
+  switch (node.type) {
+    case 'heading': {
+      const c = node.content as HeadingContent;
+      const Tag = c.level === 1 ? 'h3' : c.level === 2 ? 'h4' : 'h5';
+      const sizes = { h3: 'text-base font-bold', h4: 'text-sm font-semibold', h5: 'text-sm font-medium' };
+      return <Tag className={`${sizes[Tag]} text-gray-900 mt-2`}>{c.text}</Tag>;
+    }
+    case 'text_block': {
+      const c = node.content as TextBlockContent;
+      if (!c.inline_formats || c.inline_formats.length === 0) {
+        return <p className="text-sm text-gray-700 leading-relaxed">{c.text}</p>;
+      }
+      return <p className="text-sm text-gray-700 leading-relaxed">{renderFormattedText(c)}</p>;
+    }
+    case 'bulleted_list': {
+      const c = node.content as ListContent;
+      return (
+        <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5 ml-2">
+          {c.items.map((item, i) => (
+            <li key={i} style={{ marginLeft: `${(item.indent_level ?? 0) * 16}px` }}>
+              {item.text}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    case 'numbered_list': {
+      const c = node.content as ListContent;
+      return (
+        <ol className="list-decimal list-inside text-sm text-gray-700 space-y-0.5 ml-2">
+          {c.items.map((item, i) => (
+            <li key={i} style={{ marginLeft: `${(item.indent_level ?? 0) * 16}px` }}>
+              {item.text}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+    case 'table': {
+      const c = node.content as TableContent;
+      const cellText = (cell: string | TableCellType): string =>
+        typeof cell === 'string' ? cell : cell.text;
+      return (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs border border-gray-200">
+            <thead>
+              <tr className="bg-gray-100">
+                {c.headers.map((h, i) => (
+                  <th key={i} className="px-2 py-1 text-left font-medium text-gray-600 border-b border-gray-200">
+                    {cellText(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {c.rows.map((row, ri) => (
+                <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-2 py-1 text-gray-700 border-b border-gray-100">
+                      {cellText(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+function renderFormattedText(content: TextBlockContent): React.ReactNode[] {
+  const { text, inline_formats } = content;
+  if (!inline_formats || inline_formats.length === 0) return [text];
+
+  // Sort formats by start position
+  const sorted = [...inline_formats].sort((a, b) => a.start - b.start);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+
+  for (let i = 0; i < sorted.length; i++) {
+    const f = sorted[i];
+    // Text before this format
+    if (f.start > cursor) {
+      parts.push(text.slice(cursor, f.start));
+    }
+    const formattedText = text.slice(f.start, f.start + f.length);
+    const cls =
+      f.format === 'bold' ? 'font-bold' :
+      f.format === 'italic' ? 'italic' :
+      f.format === 'underline' ? 'underline' :
+      f.format === 'superscript' ? 'align-super text-[0.7em]' :
+      f.format === 'subscript' ? 'align-sub text-[0.7em]' : '';
+    parts.push(<span key={`${f.start}-${f.format}`} className={cls}>{formattedText}</span>);
+    cursor = f.start + f.length;
+  }
+
+  // Remaining text
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
 }
 
 // --- Helper components ---
