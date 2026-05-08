@@ -13,6 +13,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
+import { emitEventSingle, userActor } from '@/lib/events';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -143,46 +144,45 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Generate export ──────────────────────────────────────────────
+    let buffer: ArrayBuffer;
+
     if (format === 'pptx') {
       const { exportToPptx } = await import('@/lib/export/pptx-exporter');
-      const buffer = await exportToPptx(doc, vars);
-      return new NextResponse(new Uint8Array(buffer), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'Content-Disposition': `attachment; filename="${title}.pptx"`,
-          'Content-Length': String(buffer.length),
-        },
-      });
-    }
-
-    if (format === 'xlsx') {
+      buffer = await exportToPptx(doc, vars);
+    } else if (format === 'xlsx') {
       const { exportToXlsx } = await import('@/lib/export/xlsx-exporter');
-      const buffer = await exportToXlsx(doc, vars);
-      return new NextResponse(new Uint8Array(buffer), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="${title}.xlsx"`,
-          'Content-Length': String(buffer.length),
-        },
-      });
+      buffer = await exportToXlsx(doc, vars);
+    } else {
+      buffer = await exportToDocx(doc, vars);
     }
 
-    // Default: docx
-    const buffer = await exportToDocx(doc, vars);
+    // ── Emit event ──────────────────────────────────────────────────
+    await emitEventSingle({
+      namespace: 'proposal',
+      type: 'section.exported',
+      actor: userActor(sessionUser.id, sessionUser.email ?? undefined),
+      tenantId,
+      payload: { proposalId, sectionId, format, title },
+    });
+
+    const contentTypes: Record<string, string> = {
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${title}.docx"`,
-        'Content-Length': String(buffer.length),
+        'Content-Type': contentTypes[format],
+        'Content-Disposition': `attachment; filename="${title}.${format}"`,
+        'Content-Length': String(buffer.byteLength),
       },
     });
   } catch (err) {
     console.error('[api/portal/proposals/sections/export] error:', err);
     return NextResponse.json(
-      { error: `Export failed: ${err instanceof Error ? err.message : String(err)}`, code: 'DB_ERROR' },
+      { error: 'Export failed', code: 'DB_ERROR' },
       { status: 500 },
     );
   }

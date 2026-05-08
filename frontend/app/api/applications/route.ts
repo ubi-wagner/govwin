@@ -81,62 +81,61 @@ export async function POST(request: Request) {
     input.companyWebsite = 'https://' + input.companyWebsite.replace(/^\/\//, '');
   }
 
-  // Check if this email already belongs to an existing user
-  const existingUser = await sql<{ id: string }[]>`
-    SELECT id FROM users WHERE LOWER(email) = ${input.contactEmail.toLowerCase()} LIMIT 1
-  `;
-  if (existingUser.length > 0) {
-    return NextResponse.json({
-      error: 'An account with this email already exists. Log in at /login or email eric@rfppipeline.com for help.',
-      code: 'EMAIL_EXISTS_USER',
-    }, { status: 409 });
-  }
-
-  // Domain-match check: prevent duplicate company applications
-  const emailDomain = input.contactEmail.split('@')[1]?.toLowerCase();
-  const commonDomains = new Set([
-    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
-    'icloud.com', 'protonmail.com', 'mail.com', 'live.com', 'me.com',
-    'msn.com', 'ymail.com', 'comcast.net', 'att.net', 'verizon.net',
-  ]);
-
-  if (emailDomain && !commonDomains.has(emailDomain)) {
-    // Check applications table
-    const existingApp = await sql<{ contactName: string; contactEmail: string; status: string }[]>`
-      SELECT contact_name, contact_email, status FROM applications
-      WHERE LOWER(contact_email) LIKE ${'%@' + emailDomain}
-        AND LOWER(contact_email) != ${input.contactEmail.toLowerCase()}
-      LIMIT 1
-    `;
-
-    if (existingApp.length > 0) {
-      const existing = existingApp[0];
-      return NextResponse.json({
-        error: `It looks like someone from your organization (${existing.contactName}, ${existing.contactEmail}) has already ${existing.status === 'pending' ? 'applied' : 'been accepted'}. RFP Pipeline allows one administrator per company. Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
-        code: 'DOMAIN_MATCH',
-      }, { status: 409 });
-    }
-
-    // Check users table too (already onboarded)
-    const existingDomainUser = await sql<{ name: string; email: string }[]>`
-      SELECT name, email FROM users
-      WHERE LOWER(email) LIKE ${'%@' + emailDomain}
-      LIMIT 1
-    `;
-
-    if (existingDomainUser.length > 0) {
-      const existing = existingDomainUser[0];
-      return NextResponse.json({
-        error: `Your organization already has an account on RFP Pipeline (administrator: ${existing.name}, ${existing.email}). Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
-        code: 'DOMAIN_MATCH_USER',
-      }, { status: 409 });
-    }
-  }
-
-  // Pull loose metadata we don't promote to named columns
-  const userAgent = request.headers.get('user-agent')?.slice(0, 500) ?? null;
-
   try {
+    // Check if this email already belongs to an existing user
+    const existingUser = await sql<{ id: string }[]>`
+      SELECT id FROM users WHERE LOWER(email) = ${input.contactEmail.toLowerCase()} LIMIT 1
+    `;
+    if (existingUser.length > 0) {
+      return NextResponse.json({
+        error: 'An account with this email already exists. Log in at /login or email eric@rfppipeline.com for help.',
+        code: 'EMAIL_EXISTS_USER',
+      }, { status: 409 });
+    }
+
+    // Domain-match check: prevent duplicate company applications
+    const emailDomain = input.contactEmail.split('@')[1]?.toLowerCase();
+    const commonDomains = new Set([
+      'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
+      'icloud.com', 'protonmail.com', 'mail.com', 'live.com', 'me.com',
+      'msn.com', 'ymail.com', 'comcast.net', 'att.net', 'verizon.net',
+    ]);
+
+    if (emailDomain && !commonDomains.has(emailDomain)) {
+      // Check applications table
+      const existingApp = await sql<{ contactName: string; contactEmail: string; status: string }[]>`
+        SELECT contact_name, contact_email, status FROM applications
+        WHERE LOWER(contact_email) LIKE ${'%@' + emailDomain}
+          AND LOWER(contact_email) != ${input.contactEmail.toLowerCase()}
+        LIMIT 1
+      `;
+
+      if (existingApp.length > 0) {
+        const existing = existingApp[0];
+        return NextResponse.json({
+          error: `It looks like someone from your organization (${existing.contactName}, ${existing.contactEmail}) has already ${existing.status === 'pending' ? 'applied' : 'been accepted'}. RFP Pipeline allows one administrator per company. Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
+          code: 'DOMAIN_MATCH',
+        }, { status: 409 });
+      }
+
+      // Check users table too (already onboarded)
+      const existingDomainUser = await sql<{ name: string; email: string }[]>`
+        SELECT name, email FROM users
+        WHERE LOWER(email) LIKE ${'%@' + emailDomain}
+        LIMIT 1
+      `;
+
+      if (existingDomainUser.length > 0) {
+        const existing = existingDomainUser[0];
+        return NextResponse.json({
+          error: `Your organization already has an account on RFP Pipeline (administrator: ${existing.name}, ${existing.email}). Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
+          code: 'DOMAIN_MATCH_USER',
+        }, { status: 409 });
+      }
+    }
+
+    // Pull loose metadata we don't promote to named columns
+    const userAgent = request.headers.get('user-agent')?.slice(0, 500) ?? null;
     const rows = await sql<{ id: string }[]>`
       INSERT INTO applications (
         contact_email, contact_name, contact_title, contact_phone,

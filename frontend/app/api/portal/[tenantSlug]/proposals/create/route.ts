@@ -167,7 +167,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         ${topicId},
         ${topic.solicitationId},
         ${proposalTitle},
-        'outline'
+        'draft'
       )
       RETURNING id
     `;

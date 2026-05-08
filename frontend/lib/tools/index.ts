@@ -91,6 +91,8 @@ register(volumeAddRequiredItemTool);
 register(volumeUpdateRequiredItemTool);
 register(volumeDeleteRequiredItemTool);
 register(librarySaveAtomTool);
+register(proposalDraftSectionTool);
+register(librarySearchAtomsTool);
 // Source Scout
 register(sourceScoutTool);
 

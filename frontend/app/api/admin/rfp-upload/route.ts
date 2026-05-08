@@ -195,16 +195,25 @@ export async function POST(request: Request) {
 
   // Check all hashes at once against the global document store
   const hashes = fileBuffers.map((fb) => fb.hash);
-  const dupeRows = await sql<
-    { contentHash: string; originalFilename: string; solicitationId: string; solTitle: string | null }[]
-  >`
-    SELECT sd.content_hash, sd.original_filename, sd.solicitation_id,
-           COALESCE(cs.solicitation_title, o.title) AS sol_title
-    FROM solicitation_documents sd
-    LEFT JOIN curated_solicitations cs ON cs.id = sd.solicitation_id
-    LEFT JOIN opportunities o ON o.id = cs.opportunity_id
-    WHERE sd.content_hash = ANY(${hashes}::text[])
-  `;
+  let dupeRows: { contentHash: string; originalFilename: string; solicitationId: string; solTitle: string | null }[];
+  try {
+    dupeRows = await sql<
+      { contentHash: string; originalFilename: string; solicitationId: string; solTitle: string | null }[]
+    >`
+      SELECT sd.content_hash, sd.original_filename, sd.solicitation_id,
+             COALESCE(cs.solicitation_title, o.title) AS sol_title
+      FROM solicitation_documents sd
+      LEFT JOIN curated_solicitations cs ON cs.id = sd.solicitation_id
+      LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+      WHERE sd.content_hash = ANY(${hashes}::text[])
+    `;
+  } catch (err) {
+    console.error('[rfp-upload] duplicate check query failed', err);
+    return NextResponse.json(
+      { error: 'Failed to check for duplicate files', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
 
   if (dupeRows.length > 0) {
     const first = dupeRows[0];
@@ -241,20 +250,29 @@ export async function POST(request: Request) {
 
   if (existingSolId) {
     // Attach-to-existing: look up the solicitation to get its opportunity_id
-    const solRows = await sql<{ id: string; opportunityId: string }[]>`
-      SELECT cs.id, cs.opportunity_id
-      FROM curated_solicitations cs
-      WHERE cs.id = ${existingSolId}::uuid
-    `;
-    if (solRows.length === 0) {
-      await emitEventEnd(eventId, { error: { message: 'Solicitation not found', code: 'NOT_FOUND' } });
+    try {
+      const solRows = await sql<{ id: string; opportunityId: string }[]>`
+        SELECT cs.id, cs.opportunity_id
+        FROM curated_solicitations cs
+        WHERE cs.id = ${existingSolId}::uuid
+      `;
+      if (solRows.length === 0) {
+        await emitEventEnd(eventId, { error: { message: 'Solicitation not found', code: 'NOT_FOUND' } });
+        return NextResponse.json(
+          { error: 'Solicitation not found', code: 'NOT_FOUND' },
+          { status: 404 },
+        );
+      }
+      solId = solRows[0].id;
+      oppRowId = solRows[0].opportunityId;
+    } catch (err) {
+      console.error('[rfp-upload] solicitation lookup failed', err);
+      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
       return NextResponse.json(
-        { error: 'Solicitation not found', code: 'NOT_FOUND' },
-        { status: 404 },
+        { error: 'Failed to look up solicitation', code: 'DB_ERROR' },
+        { status: 500 },
       );
     }
-    solId = solRows[0].id;
-    oppRowId = solRows[0].opportunityId;
   } else {
     // ── New solicitation flow ─────────────────────────────────────────
     if (!meta) {
@@ -365,7 +383,7 @@ export async function POST(request: Request) {
       console.error('[rfp-upload] S3 put failed', { key: storageKey, err: errMsg, stack: err instanceof Error ? err.stack : undefined });
       await emitEventEnd(eventId, { error: { message: `S3 put failed: ${errMsg}`, code: 'STORAGE_ERROR' } });
       return NextResponse.json(
-        { error: `Storage upload failed for ${fb.displayName}: ${errMsg}`, code: 'STORAGE_ERROR' },
+        { error: 'Storage upload failed', code: 'STORAGE_ERROR' },
         { status: 500 },
       );
     }
