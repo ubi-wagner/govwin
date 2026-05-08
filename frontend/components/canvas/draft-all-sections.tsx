@@ -18,6 +18,39 @@ import { useState } from 'react';
 import { useTool } from '@/lib/hooks/use-tool';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
+// ─── Section title → library category mapping ────────────────────────
+// When searching the library for relevant atoms, we map common RFP
+// section titles to canonical library categories so the search returns
+// atoms from the same domain regardless of naming differences.
+
+const SECTION_CATEGORY_MAP: Record<string, string> = {
+  'technical proposal': 'technical_approach',
+  'technical approach': 'technical_approach',
+  'technical volume': 'technical_approach',
+  'key personnel': 'key_personnel',
+  'personnel': 'key_personnel',
+  'staffing plan': 'key_personnel',
+  'past performance': 'past_performance',
+  'relevant experience': 'past_performance',
+  'corporate experience': 'past_performance',
+  'commercialization': 'commercialization',
+  'commercialization plan': 'commercialization',
+  'commercialization strategy': 'commercialization',
+  'facilities': 'facilities',
+  'facilities and equipment': 'facilities',
+  'equipment': 'facilities',
+  'management approach': 'management_approach',
+  'management plan': 'management_approach',
+  'cost proposal': 'cost_proposal',
+  'cost volume': 'cost_proposal',
+  'budget': 'cost_proposal',
+};
+
+function sectionToCategory(title: string): string {
+  const normalized = title.toLowerCase().trim();
+  return SECTION_CATEGORY_MAP[normalized] ?? normalized.replace(/\s+/g, '_');
+}
+
 interface Section {
   id: string;
   title: string;
@@ -66,7 +99,7 @@ export function DraftAllSections({
         // atoms even when category slugs don't match exactly.
         let libraryAtoms: Array<{ id: string; content: string; category: string; tags?: string[] }> = [];
         try {
-          const categorySlug = sec.title.toLowerCase().replace(/\s+/g, '_');
+          const categorySlug = sectionToCategory(sec.title);
           const libResult = await invoke<{
             atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
             total: number;

@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, isMasterAdmin } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { harvestProposalToLibrary } from '@/lib/proposal-harvest';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -113,12 +114,25 @@ export async function POST(_request: Request, ctx: RouteContext) {
       },
     });
 
+    // Harvest accepted content to library on first lock only.
+    // This populates the tenant's library with atoms from the submitted
+    // proposal, enabling the learning loop for future drafts.
+    let harvestResult: { atomsHarvested: number; atomsSkipped: number } | null = null;
+    if (newLockCount === 1) {
+      try {
+        harvestResult = await harvestProposalToLibrary(tenantId, proposalId, sessionUser.id);
+      } catch (err) {
+        console.error('[lock] harvest failed (non-fatal)', err);
+      }
+    }
+
     return NextResponse.json({
       data: {
         locked: true,
         lockCount: newLockCount,
         lockedAt: new Date().toISOString(),
         downloadAvailable: true,
+        harvest: harvestResult,
       },
     });
   } catch (e) {
