@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { sql } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
@@ -15,7 +16,7 @@ interface RouteContext {
   params: Promise<{ proposalId: string; sectionId: string }>;
 }
 
-export async function POST(request: Request, _ctx: RouteContext) {
+export async function POST(request: Request, ctx: RouteContext) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
@@ -25,6 +26,26 @@ export async function POST(request: Request, _ctx: RouteContext) {
   const role = isRole(sessionUser.role) ? sessionUser.role : null;
   if (role !== 'master_admin' && role !== 'rfp_admin') {
     return NextResponse.json({ error: 'Admin access required', code: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  const { proposalId } = await ctx.params;
+
+  // Download gate: check lock status
+  try {
+    const [proposal] = await sql<{ lockCount: number; isLocked: boolean }[]>`
+      SELECT lock_count, is_locked FROM proposals WHERE id = ${proposalId} LIMIT 1
+    `;
+    if (proposal && !(proposal.lockCount >= 1 && proposal.isLocked)) {
+      return NextResponse.json(
+        { error: 'Downloads available after final review and lock', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+    if (proposal) {
+      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+    }
+  } catch (gateErr) {
+    console.error('[admin/export] download gate check error:', gateErr);
   }
 
   const body = await request.json();

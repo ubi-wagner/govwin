@@ -91,9 +91,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
+    // ── Verify proposal belongs to tenant + download gate ──────────
+    const [proposal] = await sql<{ id: string; lockCount: number; isLocked: boolean; stage: string }[]>`
+      SELECT id, lock_count, is_locked, stage FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
       LIMIT 1
@@ -103,6 +103,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
+      );
+    }
+
+    // Download gate: must be locked at final stage with at least one lock
+    if (!(proposal.lockCount >= 1 && proposal.isLocked)) {
+      return NextResponse.json(
+        { error: 'Downloads available after final review and lock', code: 'FORBIDDEN' },
+        { status: 403 },
       );
     }
 
@@ -126,6 +134,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       company_name: (tenant as { name?: string }).name ?? 'Your Company',
       topic_number: doc.metadata?.title ?? 'TBD',
     };
+
+    // ── Increment download count ────────────────────────────────────
+    try {
+      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+    } catch (countErr) {
+      console.error('[api/portal/proposals/sections/export] download_count increment error:', countErr);
+    }
 
     // ── Generate export ──────────────────────────────────────────────
     if (format === 'pptx') {

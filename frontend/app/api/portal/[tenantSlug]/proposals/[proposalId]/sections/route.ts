@@ -1,9 +1,128 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 
-export async function GET() {
-  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+interface RouteContext {
+  params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
-export async function POST(request: Request) {
-  return NextResponse.json({ error: 'Not implemented' }, { status: 501 });
+/**
+ * GET /api/portal/[tenantSlug]/proposals/[proposalId]/sections
+ *
+ * List sections filtered by current user's access level.
+ * Admin sees all, contributors see assigned + viewable, external sees shared only.
+ * Each section includes: id, title, status, pageLimit, permission.
+ */
+export async function GET(_request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string }[]>`
+      SELECT id FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // Get user's access level
+    const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+
+    // Load all sections
+    const allSections = await sql<{
+      id: string;
+      sectionNumber: string;
+      title: string;
+      status: string;
+      pageAllocation: number | null;
+      version: number;
+      assignedTo: string | null;
+    }[]>`
+      SELECT
+        id, section_number, title, status,
+        page_allocation, version, assigned_to
+      FROM proposal_sections
+      WHERE proposal_id = ${proposalId}
+      ORDER BY section_number ASC
+    `;
+
+    // Map sections with per-user permission
+    const sections = allSections.map((section) => {
+      let permission: 'edit' | 'comment' | 'view' | 'none' = 'none';
+
+      if (access.role === 'admin') {
+        permission = 'edit';
+      } else if (access.editableSections.includes(section.id)) {
+        permission = 'edit';
+      } else if (access.commentableSections.includes(section.id)) {
+        permission = 'comment';
+      } else if (access.viewableSections.includes(section.id)) {
+        permission = 'view';
+      }
+
+      return {
+        id: section.id,
+        sectionNumber: section.sectionNumber,
+        title: section.title,
+        status: section.status,
+        pageLimit: section.pageAllocation,
+        version: section.version,
+        assignedTo: section.assignedTo,
+        permission,
+      };
+    });
+
+    // Filter: for non-admins, include sections they have some access to
+    // but mark hidden sections as 'none' permission (still in list for UI)
+    const data = access.role === 'admin'
+      ? sections
+      : sections.map((s) => ({
+          ...s,
+          // Non-admins see the title but not content for 'none' sections
+          ...(s.permission === 'none' ? { status: 'hidden' } : {}),
+        }));
+
+    return NextResponse.json({
+      data: {
+        sections: data,
+        userRole: access.role,
+      },
+    });
+  } catch (e) {
+    console.error('[api/portal/proposals/sections] GET error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
 }
