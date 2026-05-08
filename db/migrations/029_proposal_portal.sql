@@ -4,8 +4,16 @@
 
 -- Simplify stage model from 7 fixed stages to 2-4 configurable gates
 ALTER TABLE proposals DROP CONSTRAINT IF EXISTS proposals_stage_check;
-ALTER TABLE proposals ADD CONSTRAINT proposals_stage_check
-  CHECK (stage IN ('draft','review','final','submitted','archived'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'proposals' AND constraint_name = 'proposals_stage_check'
+  ) THEN
+    ALTER TABLE proposals ADD CONSTRAINT proposals_stage_check
+      CHECK (stage IN ('draft','review','final','submitted','archived'));
+  END IF;
+END $$;
 
 -- Default existing color-team stages to 'draft'
 UPDATE proposals SET stage = 'draft'

@@ -3,11 +3,27 @@
 
 -- ── Step 1: Add status column ───────────────────────────────────────────
 ALTER TABLE cms_content
-  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'pending', 'published', 'private', 'archived'));
+  ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
 
 -- Backfill from existing published boolean
-UPDATE cms_content SET status = 'published' WHERE published = true AND status = 'draft';
+UPDATE cms_content SET status = 'published' WHERE published = true AND (status IS NULL OR status = 'draft');
+UPDATE cms_content SET status = 'draft' WHERE status IS NULL;
+
+-- Now add the check constraint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'cms_content' AND constraint_name = 'cms_content_status_check'
+  ) THEN
+    ALTER TABLE cms_content ADD CONSTRAINT cms_content_status_check
+      CHECK (status IN ('draft', 'pending', 'published', 'private', 'archived'));
+  END IF;
+
+  -- Set NOT NULL after backfill
+  ALTER TABLE cms_content ALTER COLUMN status SET NOT NULL;
+  ALTER TABLE cms_content ALTER COLUMN status SET DEFAULT 'draft';
+END $$;
 
 -- ── Step 2: Index for status queries ────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_cms_content_status ON cms_content(status);

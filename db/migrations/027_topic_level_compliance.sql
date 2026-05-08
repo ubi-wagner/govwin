@@ -26,7 +26,19 @@ ALTER TABLE solicitation_volumes
 -- The old unique constraint is (solicitation_id, volume_number) from 012.
 -- We need to widen it to include topic_id so the same volume_number can
 -- exist for different topics under the same solicitation.
-DROP INDEX IF EXISTS solicitation_volumes_solicitation_id_volume_number_key;
+-- Note: must drop the CONSTRAINT (not the index) because the index backs
+-- the UNIQUE table constraint created in 012.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'solicitation_volumes'
+      AND constraint_name = 'solicitation_volumes_solicitation_id_volume_number_key'
+  ) THEN
+    ALTER TABLE solicitation_volumes
+      DROP CONSTRAINT solicitation_volumes_solicitation_id_volume_number_key;
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_volumes_sol_topic_num
   ON solicitation_volumes (solicitation_id, COALESCE(topic_id, '00000000-0000-0000-0000-000000000000'), volume_number);
