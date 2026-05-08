@@ -63,12 +63,14 @@ async function run() {
 
     console.log(`[migrate] applying ${file}...`);
     try {
-      await sql.unsafe(content);
-      await sql`
-        INSERT INTO _migration_history (filename, checksum)
-        VALUES (${file}, ${checksum})
-        ON CONFLICT (filename) DO UPDATE SET applied_at = NOW(), checksum = ${checksum}
-      `;
+      await sql.begin(async (tx) => {
+        await tx.unsafe(content);
+        await tx`
+          INSERT INTO _migration_history (filename, checksum)
+          VALUES (${file}, ${checksum})
+          ON CONFLICT (filename) DO UPDATE SET applied_at = NOW(), checksum = ${checksum}
+        `;
+      });
       applied++;
       console.log(`[migrate] ✓ ${file}`);
     } catch (err) {

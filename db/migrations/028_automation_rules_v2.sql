@@ -13,6 +13,9 @@
 -- system_events and matches against automation_rules.
 -- =============================================================================
 
+-- Unique constraint so ON CONFLICT works for idempotent seeding
+CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_rules_name ON automation_rules(name);
+
 INSERT INTO automation_rules (name, description, trigger_namespace, trigger_type, action_type, action_config, is_active)
 VALUES
   (
@@ -57,4 +60,4 @@ VALUES
     '{"subject": "Customer pinned a topic", "template": "admin_notification", "include_payload": true}'::jsonb,
     true
   )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
