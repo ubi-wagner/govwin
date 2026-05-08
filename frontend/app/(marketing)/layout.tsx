@@ -3,6 +3,7 @@ import { Wordmark } from '@/components/marketing/wordmark';
 import Tracker from '@/components/analytics/tracker';
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+  // Migrations run automatically on deploy via entrypoint.sh → migrate.mjs
   return (
     <div className="min-h-screen flex flex-col">
       <Tracker />
