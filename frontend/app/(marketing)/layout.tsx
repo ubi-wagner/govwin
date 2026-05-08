@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { Wordmark } from '@/components/marketing/wordmark';
+import Tracker from '@/components/analytics/tracker';
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
+      <Tracker />
       {/* Top bar — launch notice */}
       <div className="bg-navy-900 text-center py-2 px-4">
         <p className="text-xs text-cream-200 tracking-wide">
           <span className="text-citrus font-semibold uppercase tracking-widest">Now Accepting Applications</span>
           <span className="mx-2 text-navy-500">&middot;</span>
-          Founding Cohort &middot; Platform launches June 2026
+          Founding Cohort &middot; Platform launches July 2026
           <Link href="/apply" className="ml-3 text-citrus hover:text-citrus-300 underline">
             Apply
           </Link>

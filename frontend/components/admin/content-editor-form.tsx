@@ -14,6 +14,14 @@ const CONTENT_TYPES = [
   { value: 'page_block', label: 'Page Block' },
 ] as const;
 
+const STATUSES = [
+  { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700', description: 'Not visible anywhere' },
+  { value: 'pending', label: 'Pending Review', color: 'bg-yellow-100 text-yellow-800', description: 'Awaiting approval' },
+  { value: 'published', label: 'Published', color: 'bg-green-100 text-green-800', description: 'Visible on public site' },
+  { value: 'private', label: 'Private', color: 'bg-blue-100 text-blue-800', description: 'Admin-only, not public' },
+  { value: 'archived', label: 'Archived', color: 'bg-purple-100 text-purple-800', description: 'Preserved but hidden' },
+] as const;
+
 interface ExistingContent {
   id: string;
   slug: string;
@@ -24,6 +32,7 @@ interface ExistingContent {
   author: string;
   tags: string[];
   published: boolean;
+  status?: string;
   featuredImage: string;
   externalUrl: string;
   displayOrder: number;
@@ -59,7 +68,8 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
   const [externalUrl, setExternalUrl] = useState(existing?.externalUrl ?? '');
   const [featuredImage, setFeaturedImage] = useState(existing?.featuredImage ?? '');
   const [displayOrder, setDisplayOrder] = useState(existing?.displayOrder ?? 0);
-  const [published, setPublished] = useState(existing?.published ?? false);
+  const [status, setStatus] = useState(existing?.status ?? (existing?.published ? 'published' : 'draft'));
+  const published = status === 'published';
   const [metadata, setMetadata] = useState(JSON.stringify(existing?.metadata ?? {}, null, 2));
 
   const [saving, setSaving] = useState(false);
@@ -157,6 +167,7 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
           author: author.trim() || null,
           tags: parsedTags,
           published,
+          status,
           featuredImage: featuredImage.trim() || null,
           externalUrl: externalUrl.trim() || null,
           displayOrder,
@@ -395,31 +406,28 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
           </div>
         )}
 
-        {/* Published toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={published}
-            onClick={() => setPublished(!published)}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-              published ? 'bg-green-500' : 'bg-gray-300'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                published ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          <span className="text-sm font-medium text-gray-700">
-            {published ? 'Published' : 'Draft'}
-          </span>
-          {published && (
-            <span className="text-xs text-gray-400">
-              Will be visible on the public site
-            </span>
-          )}
+        {/* Status selector */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+          <div className="flex flex-wrap gap-2">
+            {STATUSES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setStatus(s.value)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                  status === s.value
+                    ? `${s.color} border-current ring-2 ring-offset-1`
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-400">
+            {STATUSES.find((s) => s.value === status)?.description}
+          </p>
         </div>
 
         {/* Preview toggle */}

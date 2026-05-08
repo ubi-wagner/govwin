@@ -6,6 +6,9 @@ import {
   FeatureGrid,
   CtaSection,
 } from '@/components/marketing/section-layout';
+import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+
+export const revalidate = 60;
 
 export const metadata = {
   title: 'How It Works — RFP Pipeline',
@@ -97,15 +100,35 @@ const guardrails = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  const blocks = await getPageBlocks('how-it-works');
+  const lookup = buildLookup(blocks, 'how-it-works');
+  const hero = single(lookup['hero']);
+  const cmsSteps = many(lookup['steps']);
+  const cmsGuardrails = many(lookup['guardrails']);
+  const ctaBlock = single(lookup['cta']);
+
+  const resolvedSteps = cmsSteps.length > 0
+    ? cmsSteps.map((s: ContentRow) => ({
+        number: (s.metadata as { number?: string })?.number ?? '',
+        title: s.title,
+        body: s.body,
+        details: (s.metadata as { details?: string[] })?.details ?? [],
+      }))
+    : steps;
+
+  const resolvedGuardrails = cmsGuardrails.length > 0
+    ? cmsGuardrails.map((g: ContentRow) => ({ title: g.title, body: g.body }))
+    : guardrails;
+
   return (
     <>
       <Hero
-        eyebrow="How It Works"
-        headline={<>From application to <span className="text-brand-400">submitted proposal</span></>}
-        subheadline="A single workflow that starts with a qualifying application and ends with a compliant, expert-curated proposal ready to submit. Every step is designed for small businesses that can't afford to waste time on opportunities that won't convert."
-        primaryCta={{ label: 'Apply Now', href: '/apply' }}
-        secondaryCta={{ label: 'See Pricing', href: '/pricing' }}
+        eyebrow={hero?.excerpt ?? 'How It Works'}
+        headline={hero?.title ?? <>From application to <span className="text-brand-400">submitted proposal</span></>}
+        subheadline={hero?.body ?? "A single workflow that starts with a qualifying application and ends with a compliant, expert-curated proposal ready to submit. Every step is designed for small businesses that can't afford to waste time on opportunities that won't convert."}
+        primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
+        secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See Pricing', href: '/pricing' }}
       />
 
       <Section variant="white">
@@ -116,7 +139,7 @@ export default function Page() {
         />
         <div className="mt-16 max-w-3xl mx-auto relative">
           <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-brand-100" aria-hidden />
-          {steps.map((step) => (
+          {resolvedSteps.map((step) => (
             <ProcessStep key={step.number} {...step} />
           ))}
         </div>
@@ -129,15 +152,15 @@ export default function Page() {
           subtitle="Federal R&D buyers care about data security, provenance, and compliance. We designed for that audience from day one."
         />
         <div className="mt-12">
-          <FeatureGrid columns={3} items={guardrails} />
+          <FeatureGrid columns={3} items={resolvedGuardrails} />
         </div>
       </Section>
 
       <CtaSection
-        eyebrow="Ready to apply?"
-        headline="Founding cohort is limited to 20 small businesses"
-        subheadline="Applications reviewed weekly. $299/month after acceptance. Cancel anytime."
-        cta={{ label: 'Start Your Application', href: '/apply' }}
+        eyebrow={ctaBlock?.excerpt ?? 'Ready to apply?'}
+        headline={ctaBlock?.title ?? 'Founding cohort is limited to 20 small businesses'}
+        subheadline={ctaBlock?.body ?? 'Applications reviewed weekly. $299/month after acceptance. Cancel anytime.'}
+        cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Start Your Application', href: '/apply' }}
       />
     </>
   );

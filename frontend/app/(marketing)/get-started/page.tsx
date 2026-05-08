@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+
+export const revalidate = 60;
 
 export const metadata = {
   title: 'Get Started — RFP Pipeline',
@@ -42,17 +45,21 @@ const PLANS = [
   },
 ] as const;
 
-export default function Page() {
+export default async function Page() {
+  const blocks = await getPageBlocks('get-started');
+  const lookup = buildLookup(blocks, 'get-started');
+  const hero = single(lookup['hero']);
+  const bottom = single(lookup['bottom']);
+
   return (
     <div className="bg-gray-50">
       <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
         <div className="text-center max-w-3xl mx-auto">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-navy-800">
-            Choose your plan
+            {hero?.title ?? 'Choose your plan'}
           </h1>
           <p className="mt-4 text-lg text-gray-600">
-            Start with a 14-day free trial on either plan. No credit card
-            required. Cancel anytime.
+            {hero?.body ?? 'Start with a 14-day free trial on either plan. No credit card required. Cancel anytime.'}
           </p>
         </div>
 
@@ -64,23 +71,13 @@ export default function Page() {
 
         <div className="mt-16 max-w-2xl mx-auto text-center">
           <h2 className="font-display text-2xl font-semibold text-navy-800">
-            Need something different?
+            {bottom?.title ?? 'Need something different?'}
           </h2>
           <p className="mt-3 text-gray-600">
-            Proposal portals are $999 per Phase I and $2,500 per Phase II,
-            purchased one at a time from inside the Finder. Pipeline
-            subscribers get workspace access included — Finder-only
-            subscribers pay per proposal.
+            {bottom?.body ?? 'Proposal portals are $999 per Phase I and $2,500 per Phase II, purchased one at a time from inside the Finder. Pipeline subscribers get workspace access included — Finder-only subscribers pay per proposal.'}
           </p>
           <p className="mt-6 text-sm text-gray-500">
-            Questions about plans or volume pricing?{' '}
-            <Link
-              href="/about"
-              className="text-brand-700 hover:underline font-medium"
-            >
-              Get in touch
-            </Link>
-            .
+            {(bottom?.metadata as { note?: string })?.note ?? <>Questions about plans or volume pricing?{' '}<Link href="/about" className="text-brand-700 hover:underline font-medium">Get in touch</Link>.</>}
           </p>
         </div>
       </div>
