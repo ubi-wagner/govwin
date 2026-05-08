@@ -210,7 +210,18 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   }));
 
   // ── Load compliance ────────────────────────────────────────────────
-  let compliance: { items?: unknown[]; source?: string } | null = null;
+  let compliance: {
+    items?: Array<{
+      id?: string;
+      requirement?: string;
+      status?: string;
+      details?: string | null;
+      label?: string;
+      met?: boolean;
+      value?: string;
+    }>;
+    source?: string;
+  } | null = null;
   try {
     const matrix = await sql<{
       id: string;

@@ -108,12 +108,19 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     // ── Update ──────────────────────────────────────────────────────
     // Build dynamic update using postgres.js tagged template
+    const autoCrawlVal = values.autoCrawlEnabled != null ? Boolean(values.autoCrawlEnabled) : null;
+    const crawlCronVal = values.crawlCron != null ? String(values.crawlCron) : null;
+    const adminNotesProvided = 'adminNotes' in values;
+    const adminNotesVal = adminNotesProvided ? (values.adminNotes != null ? String(values.adminNotes) : null) : null;
+    const visitInstructionsProvided = 'visitInstructions' in values;
+    const visitInstructionsVal = visitInstructionsProvided ? (values.visitInstructions != null ? String(values.visitInstructions) : null) : null;
+
     await sql`
       UPDATE source_profiles SET
-        auto_crawl_enabled = COALESCE(${values.autoCrawlEnabled ?? null}::boolean, auto_crawl_enabled),
-        crawl_cron = COALESCE(${values.crawlCron ?? null}::text, crawl_cron),
-        admin_notes = CASE WHEN ${values.adminNotes !== undefined} THEN ${values.adminNotes ?? null}::text ELSE admin_notes END,
-        visit_instructions = CASE WHEN ${values.visitInstructions !== undefined} THEN ${values.visitInstructions ?? null}::text ELSE visit_instructions END,
+        auto_crawl_enabled = COALESCE(${autoCrawlVal}::boolean, auto_crawl_enabled),
+        crawl_cron = COALESCE(${crawlCronVal}::text, crawl_cron),
+        admin_notes = CASE WHEN ${adminNotesProvided}::boolean THEN ${adminNotesVal}::text ELSE admin_notes END,
+        visit_instructions = CASE WHEN ${visitInstructionsProvided}::boolean THEN ${visitInstructionsVal}::text ELSE visit_instructions END,
         updated_at = now()
       WHERE id = ${profileId}::uuid
     `;

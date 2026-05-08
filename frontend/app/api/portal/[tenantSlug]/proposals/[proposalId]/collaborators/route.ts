@@ -95,7 +95,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
         AND access_revoked_at IS NULL
     `;
 
-    const accessByCollaborator = new Map<string, typeof accessRows>();
+    type AccessRow = { collaboratorId: string; stage: string; permission: string; artifactTypes: string[] };
+    const accessByCollaborator = new Map<string, AccessRow[]>();
     for (const row of accessRows) {
       const existing = accessByCollaborator.get(row.collaboratorId) || [];
       existing.push(row);

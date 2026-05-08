@@ -265,7 +265,8 @@ async function resolveVolumes(
   `;
 
   // Group items by volume
-  const itemsByVolume = new Map<string, typeof itemRows>();
+  type ItemRow = (typeof itemRows)[number];
+  const itemsByVolume = new Map<string, ItemRow[]>();
   for (const item of itemRows) {
     const existing = itemsByVolume.get(item.volumeId) ?? [];
     existing.push(item);

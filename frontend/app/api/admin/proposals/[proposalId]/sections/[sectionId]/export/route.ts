@@ -67,7 +67,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    let buffer: ArrayBuffer;
+    let buffer: Buffer;
 
     if (format === 'pptx') {
       const { exportToPptx } = await import('@/lib/export/pptx-exporter');
@@ -97,7 +97,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       headers: {
         'Content-Type': contentTypes[format],
         'Content-Disposition': `attachment; filename="${title}.${format}"`,
-        'Content-Length': String(buffer.byteLength),
+        'Content-Length': String(buffer.length),
       },
     });
   } catch (err) {
