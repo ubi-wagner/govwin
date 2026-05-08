@@ -106,7 +106,7 @@ export default async function Page() {
   const ctaBlock = single(lookup['cta']);
 
   const resolvedCredentials = cmsCredentials.length > 0
-    ? cmsCredentials.map((c: ContentRow) => ({ title: c.title, body: c.body }))
+    ? cmsCredentials.map((c: ContentRow) => ({ title: c.title, body: c.body, image: c.featuredImage ?? undefined, icon: (c.metadata as { icon?: string })?.icon, href: (c.metadata as { href?: string })?.href }))
     : credentials;
 
   const resolvedTimeline = cmsTimeline.length > 0

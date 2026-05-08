@@ -82,13 +82,13 @@ export default async function Page() {
   const ctaBlock = single(lookup['cta']);
 
   const resolvedIsolation = cmsIsolation.length > 0
-    ? cmsIsolation.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    ? cmsIsolation.map((b: ContentRow) => ({ title: b.title, body: b.body, image: b.featuredImage ?? undefined, icon: (b.metadata as { icon?: string })?.icon, href: (b.metadata as { href?: string })?.href }))
     : isolationLayers;
   const resolvedContracts = cmsContracts.length > 0
-    ? cmsContracts.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    ? cmsContracts.map((b: ContentRow) => ({ title: b.title, body: b.body, image: b.featuredImage ?? undefined, icon: (b.metadata as { icon?: string })?.icon, href: (b.metadata as { href?: string })?.href }))
     : contracts;
   const resolvedInfra = cmsInfra.length > 0
-    ? cmsInfra.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    ? cmsInfra.map((b: ContentRow) => ({ title: b.title, body: b.body, image: b.featuredImage ?? undefined, icon: (b.metadata as { icon?: string })?.icon, href: (b.metadata as { href?: string })?.href }))
     : infrastructure;
 
   return (

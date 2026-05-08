@@ -131,6 +131,9 @@ export interface FeatureItem {
   title: string;
   body: string;
   number?: string;
+  image?: string;
+  icon?: string;
+  href?: string;
 }
 
 export interface FeatureGridProps {
@@ -143,24 +146,42 @@ export function FeatureGrid({ columns = 3, items, variant = 'bordered' }: Featur
   const gridCols = columns === 2 ? 'md:grid-cols-2' : columns === 4 ? 'sm:grid-cols-2 md:grid-cols-4' : 'md:grid-cols-3';
   return (
     <div className={`grid gap-6 md:gap-8 ${gridCols}`}>
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className={
-            variant === 'bordered'
-              ? 'p-6 rounded-lg border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all'
-              : 'p-6'
-          }
-        >
-          {item.number && (
-            <span className="text-5xl font-bold text-brand-100 font-display block">{item.number}</span>
-          )}
-          <h3 className={`font-display text-xl font-semibold text-navy-800 ${item.number ? 'mt-2' : ''}`}>
-            {item.title}
-          </h3>
-          <p className="mt-3 text-gray-600 leading-relaxed">{item.body}</p>
-        </div>
-      ))}
+      {items.map((item, i) => {
+        const cardClass = variant === 'bordered'
+          ? `rounded-lg border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all overflow-hidden ${item.href ? 'cursor-pointer' : ''}`
+          : `overflow-hidden ${item.href ? 'cursor-pointer' : ''}`;
+
+        const inner = (
+          <>
+            {item.image && (
+              <img src={item.image} alt={item.title} className="w-full h-40 object-cover" />
+            )}
+            <div className={variant === 'bordered' ? 'p-6' : 'p-6'}>
+              {item.icon && !item.image && (
+                <span className="text-3xl mb-3 block">{item.icon}</span>
+              )}
+              {item.number && (
+                <span className="text-5xl font-bold text-brand-100 font-display block">{item.number}</span>
+              )}
+              <h3 className={`font-display text-xl font-semibold text-navy-800 ${item.number ? 'mt-2' : ''}`}>
+                {item.title}
+              </h3>
+              <p className="mt-3 text-gray-600 leading-relaxed">{item.body}</p>
+            </div>
+          </>
+        );
+
+        if (item.href) {
+          const isExternal = item.href.startsWith('http');
+          return isExternal ? (
+            <a key={i} href={item.href} target="_blank" rel="noopener noreferrer" className={cardClass}>{inner}</a>
+          ) : (
+            <Link key={i} href={item.href} className={cardClass}>{inner}</Link>
+          );
+        }
+
+        return <div key={i} className={cardClass}>{inner}</div>;
+      })}
     </div>
   );
 }

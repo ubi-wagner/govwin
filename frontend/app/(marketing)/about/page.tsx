@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
+import { CmsCard } from '@/components/marketing/cms-card';
 
 export const revalidate = 60;
 
@@ -42,12 +43,19 @@ export default async function AboutPage() {
             const label = 'excerpt' in p ? (p as { excerpt: string | null }).excerpt : ('label' in p ? (p as { label: string }).label : '');
             const heading = 'title' in p ? (p as { title: string }).title : ('heading' in p ? (p as { heading: string }).heading : '');
             const body = (p as { body: string }).body;
+            const meta = 'metadata' in p ? (p as { metadata: Record<string, unknown> }).metadata : {};
+            const image = 'featuredImage' in p ? (p as { featuredImage: string | null }).featuredImage : null;
             return (
-              <div key={i} className="p-8 bg-cream-50 border border-cream-200 rounded-xl">
-                <p className="text-xs text-brand-500 uppercase tracking-widest mb-2 font-semibold">{label}</p>
-                <h3 className="font-display text-2xl font-bold text-navy-900">{heading}</h3>
-                <p className="mt-4 text-navy-600 leading-relaxed">{body}</p>
-              </div>
+              <CmsCard
+                key={i}
+                image={image}
+                icon={meta?.icon as string | undefined}
+                href={meta?.href as string | undefined}
+                label={label ?? undefined}
+                title={heading}
+                body={body}
+                className="bg-cream-50 border border-cream-200 rounded-xl"
+              />
             );
           })}
         </div>

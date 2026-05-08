@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { CmsCard } from '@/components/marketing/cms-card';
 
 export const revalidate = 60;
 
@@ -27,7 +28,7 @@ export default async function FeaturesPage() {
   const ctaBlock = single(lookup['cta']);
 
   const features = cmsFeatures.length > 0
-    ? cmsFeatures.map((f: ContentRow) => ({ heading: f.title, description: f.body }))
+    ? cmsFeatures.map((f: ContentRow) => ({ heading: f.title, description: f.body, image: f.featuredImage, icon: (f.metadata as { icon?: string })?.icon, href: (f.metadata as { href?: string })?.href }))
     : DEFAULT_FEATURES;
 
   return (
@@ -48,10 +49,15 @@ export default async function FeaturesPage() {
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="grid md:grid-cols-2 gap-8">
             {features.map((feature, i) => (
-              <div key={i} className="p-8 bg-cream-50 border border-cream-200 rounded-xl">
-                <h3 className="font-display text-xl font-bold text-navy-900 mb-3">{feature.heading}</h3>
-                <p className="text-navy-600 leading-relaxed">{feature.description}</p>
-              </div>
+              <CmsCard
+                key={i}
+                image={'image' in feature ? (feature as { image?: string | null }).image : null}
+                icon={'icon' in feature ? (feature as { icon?: string }).icon : undefined}
+                href={'href' in feature ? (feature as { href?: string }).href : undefined}
+                title={feature.heading}
+                body={feature.description}
+                className="bg-cream-50 border border-cream-200 rounded-xl"
+              />
             ))}
           </div>
         </div>
