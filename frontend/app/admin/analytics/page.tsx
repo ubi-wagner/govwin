@@ -100,6 +100,99 @@ export default async function AnalyticsPage() {
     console.error('[admin/analytics] events by day failed', e);
   }
 
+  // ── Visitor Traffic Metrics ───────────────────────────────────────
+  const [
+    visitors24h,
+    pageViews24h,
+    visitors7d,
+    pageViews7d,
+  ] = await Promise.all([
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(DISTINCT session_id) FROM visitor_sessions WHERE created_at > NOW() - INTERVAL '24 hours'`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM page_views WHERE created_at > NOW() - INTERVAL '24 hours'`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(DISTINCT session_id) FROM visitor_sessions WHERE created_at > NOW() - INTERVAL '7 days'`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM page_views WHERE created_at > NOW() - INTERVAL '7 days'`),
+  ]);
+
+  // ── Top pages (7d) ────────────────────────────────────────────────
+  interface PageRow { pagePath: string; views: number }
+  let topPages: PageRow[] = [];
+  try {
+    topPages = await sql<PageRow[]>`
+      SELECT page_path AS "pagePath", COUNT(*)::int AS views
+      FROM page_views
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      GROUP BY page_path
+      ORDER BY views DESC
+      LIMIT 10
+    `;
+  } catch (e) {
+    console.error('[admin/analytics] top pages query failed', e);
+  }
+
+  // ── Top referrers (7d) ────────────────────────────────────────────
+  interface ReferrerRow { referrer: string; count: number }
+  let topReferrers: ReferrerRow[] = [];
+  try {
+    topReferrers = await sql<ReferrerRow[]>`
+      SELECT referrer, COUNT(*)::int AS count
+      FROM page_views
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND referrer IS NOT NULL AND referrer != ''
+      GROUP BY referrer
+      ORDER BY count DESC
+      LIMIT 5
+    `;
+  } catch (e) {
+    console.error('[admin/analytics] top referrers query failed', e);
+  }
+
+  // ── Device breakdown (7d) ─────────────────────────────────────────
+  interface DeviceRow { deviceType: string; count: number }
+  let deviceBreakdown: DeviceRow[] = [];
+  try {
+    deviceBreakdown = await sql<DeviceRow[]>`
+      SELECT device_type AS "deviceType", COUNT(*)::int AS count
+      FROM visitor_sessions
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND device_type IS NOT NULL
+      GROUP BY device_type
+      ORDER BY count DESC
+    `;
+  } catch (e) {
+    console.error('[admin/analytics] device breakdown query failed', e);
+  }
+
+  // ── Average time on page (7d) ─────────────────────────────────────
+  let avgDuration = -1;
+  try {
+    const [row] = await sql<{ avg: string }[]>`
+      SELECT COALESCE(ROUND(AVG(duration_ms)), 0)::text AS avg
+      FROM page_views
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND duration_ms IS NOT NULL AND duration_ms > 0
+    `;
+    avgDuration = parseInt(row?.avg ?? '0', 10);
+  } catch (e) {
+    console.error('[admin/analytics] avg duration query failed', e);
+  }
+
+  // ── UTM campaign breakdown (7d) ───────────────────────────────────
+  interface UtmRow { utmCampaign: string; count: number }
+  let utmCampaigns: UtmRow[] = [];
+  try {
+    utmCampaigns = await sql<UtmRow[]>`
+      SELECT utm_campaign AS "utmCampaign", COUNT(*)::int AS count
+      FROM page_views
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND utm_campaign IS NOT NULL AND utm_campaign != ''
+      GROUP BY utm_campaign
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+  } catch (e) {
+    console.error('[admin/analytics] utm campaign query failed', e);
+  }
+
   const formatVal = (v: number) => (v === -1 ? 'N/A' : v.toLocaleString());
 
   return (
@@ -193,6 +286,99 @@ export default async function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Visitor Traffic Section ──────────────────────────────────── */}
+      <hr className="my-10 border-gray-200" />
+      <header className="mb-6">
+        <h2 className="text-xl font-bold">Visitor Traffic</h2>
+        <p className="text-sm text-gray-500 mt-1">Page views and session analytics</p>
+      </header>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <MetricCard label="Unique Visitors (24h)" value={formatVal(visitors24h)} />
+        <MetricCard label="Page Views (24h)" value={formatVal(pageViews24h)} />
+        <MetricCard label="Unique Visitors (7d)" value={formatVal(visitors7d)} />
+        <MetricCard label="Page Views (7d)" value={formatVal(pageViews7d)} />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        <MetricCard
+          label="Avg. Time on Page (7d)"
+          value={avgDuration === -1 ? 'N/A' : avgDuration === 0 ? '0s' : `${(avgDuration / 1000).toFixed(1)}s`}
+        />
+        {deviceBreakdown.map((d) => (
+          <MetricCard
+            key={d.deviceType}
+            label={`${d.deviceType.charAt(0).toUpperCase() + d.deviceType.slice(1)} Visitors (7d)`}
+            value={formatVal(d.count)}
+          />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Top Pages */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6 lg:col-span-2">
+          <h3 className="text-lg font-semibold mb-4">Top Pages (7 days)</h3>
+          {topPages.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No page view data yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {topPages.map((p) => {
+                const maxViews = Math.max(...topPages.map((x) => x.views), 1);
+                const widthPct = Math.max((p.views / maxViews) * 100, 2);
+                return (
+                  <div key={p.pagePath} className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600 w-48 flex-shrink-0 truncate" title={p.pagePath}>
+                      {p.pagePath}
+                    </span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full"
+                        style={{ width: `${widthPct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-gray-700 w-12 text-right">{p.views}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Top Referrers */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">Top Referrers (7 days)</h3>
+          {topReferrers.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No referrer data yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {topReferrers.map((r) => (
+                <div key={r.referrer} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 truncate max-w-[200px]" title={r.referrer}>
+                    {r.referrer}
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* UTM Campaign Breakdown */}
+      {utmCampaigns.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
+          <h3 className="text-lg font-semibold mb-4">UTM Campaigns (7 days)</h3>
+          <div className="space-y-3">
+            {utmCampaigns.map((u) => (
+              <div key={u.utmCampaign} className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">{u.utmCampaign}</span>
+                <span className="text-sm font-bold text-gray-900">{u.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,9 @@ import {
   FeatureGrid,
   CtaSection,
 } from '@/components/marketing/section-layout';
+import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+
+export const revalidate = 60;
 
 export const metadata = {
   title: 'Eric Wagner — Founder & Expert | RFP Pipeline',
@@ -94,14 +97,34 @@ const timeline = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  const blocks = await getPageBlocks('the-expert');
+  const lookup = buildLookup(blocks, 'the-expert');
+  const hero = single(lookup['hero']);
+  const cmsCredentials = many(lookup['credentials']);
+  const cmsTimeline = many(lookup['timeline']);
+  const ctaBlock = single(lookup['cta']);
+
+  const resolvedCredentials = cmsCredentials.length > 0
+    ? cmsCredentials.map((c: ContentRow) => ({ title: c.title, body: c.body }))
+    : credentials;
+
+  const resolvedTimeline = cmsTimeline.length > 0
+    ? cmsTimeline.map((t: ContentRow) => ({
+        period: (t.metadata as { period?: string })?.period ?? '',
+        role: t.title,
+        company: t.excerpt ?? '',
+        body: t.body,
+      }))
+    : timeline;
+
   return (
     <>
       <Hero
         variant="light"
-        eyebrow="Your Expert"
-        headline={<>Eric Wagner</>}
-        subheadline="Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $300M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups."
+        eyebrow={hero?.excerpt ?? 'Your Expert'}
+        headline={hero?.title ?? <>Eric Wagner</>}
+        subheadline={hero?.body ?? "Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $300M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups."}
       />
 
       {/* Intro */}
@@ -160,7 +183,7 @@ export default function Page() {
           subtitle="The track record behind every RFP Pipeline curation decision."
         />
         <div className="mt-12">
-          <FeatureGrid columns={2} items={credentials} />
+          <FeatureGrid columns={2} items={resolvedCredentials} />
         </div>
       </Section>
 
@@ -171,7 +194,7 @@ export default function Page() {
           subtitle="Every step has been about turning innovative technology into commercial outcomes, often through federal funding."
         />
         <div className="mt-12 max-w-4xl mx-auto">
-          {timeline.map((entry, i) => (
+          {resolvedTimeline.map((entry, i) => (
             <div key={i} className="relative pl-8 pb-10 border-l-2 border-brand-100 last:border-l-0 last:pb-0">
               <div className="absolute left-[-9px] top-0 w-4 h-4 bg-brand-500 rounded-full border-4 border-white" />
               <div className="text-sm font-semibold text-brand-600">{entry.period}</div>
@@ -236,10 +259,10 @@ export default function Page() {
       </Section>
 
       <CtaSection
-        eyebrow="Ready to work together?"
-        headline="I'm taking 20 founding members. Apply if you're serious."
-        subheadline="If you're commercializing innovative technology and want non-dilutive federal R&D funding, let's talk."
-        cta={{ label: 'Apply Now', href: '/apply' }}
+        eyebrow={ctaBlock?.excerpt ?? "Ready to work together?"}
+        headline={ctaBlock?.title ?? "I'm taking 20 founding members. Apply if you're serious."}
+        subheadline={ctaBlock?.body ?? "If you're commercializing innovative technology and want non-dilutive federal R&D funding, let's talk."}
+        cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Apply Now', href: '/apply' }}
       />
     </>
   );

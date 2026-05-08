@@ -5,6 +5,9 @@ import {
   FeatureGrid,
   CtaSection,
 } from '@/components/marketing/section-layout';
+import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+
+export const revalidate = 60;
 
 export const metadata = {
   title: 'Security & Data Isolation — RFP Pipeline',
@@ -69,15 +72,33 @@ const infrastructure = [
   },
 ];
 
-export default function Page() {
+export default async function Page() {
+  const blocks = await getPageBlocks('security');
+  const lookup = buildLookup(blocks, 'security');
+  const hero = single(lookup['hero']);
+  const cmsIsolation = many(lookup['isolation']);
+  const cmsContracts = many(lookup['contracts']);
+  const cmsInfra = many(lookup['infrastructure']);
+  const ctaBlock = single(lookup['cta']);
+
+  const resolvedIsolation = cmsIsolation.length > 0
+    ? cmsIsolation.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    : isolationLayers;
+  const resolvedContracts = cmsContracts.length > 0
+    ? cmsContracts.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    : contracts;
+  const resolvedInfra = cmsInfra.length > 0
+    ? cmsInfra.map((b: ContentRow) => ({ title: b.title, body: b.body }))
+    : infrastructure;
+
   return (
     <>
       <Hero
         variant="dark"
-        eyebrow="Security & Data Isolation"
-        headline={<>Federal-grade isolation. <br /><span className="text-brand-400">No cross-contamination, ever.</span></>}
-        subheadline="Federal R&D customers have unique security needs — and we designed for that audience from day one. Every customer gets isolated AI, isolated storage, isolated processing. Your data never touches another customer's workspace."
-        primaryCta={{ label: 'Apply Now', href: '/apply' }}
+        eyebrow={hero?.excerpt ?? "Security & Data Isolation"}
+        headline={hero?.title ?? <>Federal-grade isolation. <br /><span className="text-brand-400">No cross-contamination, ever.</span></>}
+        subheadline={hero?.body ?? "Federal R&D customers have unique security needs — and we designed for that audience from day one. Every customer gets isolated AI, isolated storage, isolated processing. Your data never touches another customer's workspace."}
+        primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
       />
 
       <Section variant="white">
@@ -87,7 +108,7 @@ export default function Page() {
           subtitle="Not a policy promise — a technical architecture. Each layer is independently enforced, so a bug in one layer cannot compromise the others."
         />
         <div className="mt-12">
-          <FeatureGrid columns={2} items={isolationLayers} />
+          <FeatureGrid columns={2} items={resolvedIsolation} />
         </div>
       </Section>
 
@@ -97,7 +118,7 @@ export default function Page() {
           title="What we promise about your data"
         />
         <div className="mt-12">
-          <FeatureGrid columns={2} items={contracts} />
+          <FeatureGrid columns={2} items={resolvedContracts} />
         </div>
       </Section>
 
@@ -108,7 +129,7 @@ export default function Page() {
           subtitle="Built on mature, auditable open-source components. Deployed via immutable containers with traceable change control."
         />
         <div className="mt-12">
-          <FeatureGrid columns={2} items={infrastructure} />
+          <FeatureGrid columns={2} items={resolvedInfra} />
         </div>
       </Section>
 
@@ -148,10 +169,10 @@ export default function Page() {
       </Section>
 
       <CtaSection
-        eyebrow="Questions about security?"
-        headline="Ask Eric directly"
-        subheadline="If your situation has specific security requirements, reach out during the application process. We'll tell you honestly whether we're a fit today or what we'd need to build to become one."
-        cta={{ label: 'Start an Application', href: '/apply' }}
+        eyebrow={ctaBlock?.excerpt ?? "Questions about security?"}
+        headline={ctaBlock?.title ?? "Ask Eric directly"}
+        subheadline={ctaBlock?.body ?? "If your situation has specific security requirements, reach out during the application process. We'll tell you honestly whether we're a fit today or what we'd need to build to become one."}
+        cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Start an Application', href: '/apply' }}
       />
     </>
   );

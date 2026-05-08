@@ -5,6 +5,9 @@ import {
   PricingTier,
   CtaSection,
 } from '@/components/marketing/section-layout';
+import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+
+export const revalidate = 60;
 
 export const metadata = {
   title: 'Pricing — RFP Pipeline',
@@ -89,17 +92,27 @@ const expertTier = {
   highlighted: false,
 };
 
-export default function Page() {
+export default async function Page() {
+  const blocks = await getPageBlocks('pricing');
+  const lookup = buildLookup(blocks, 'pricing');
+  const hero = single(lookup['hero']);
+  const ctaBlock = single(lookup['cta']);
+  const cmsFaqs = many(lookup['faqs']);
+
+  const resolvedFaqs = cmsFaqs.length > 0
+    ? cmsFaqs.map((f: ContentRow) => ({ q: f.title, a: f.body }))
+    : faqs;
+
   return (
     <>
       <Hero
         variant="light"
-        eyebrow="Simple, Transparent Pricing"
-        headline={<>One subscription. <br /><span className="text-brand-700">Per-proposal portals.</span> <br />No surprises.</>}
-        subheadline="We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you."
-        primaryCta={{ label: 'Apply Now', href: '/apply' }}
-        secondaryCta={{ label: 'See How It Works', href: '/how-it-works' }}
-        note="$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."
+        eyebrow={hero?.excerpt ?? "Simple, Transparent Pricing"}
+        headline={hero?.title ?? <>One subscription. <br /><span className="text-brand-700">Per-proposal portals.</span> <br />No surprises.</>}
+        subheadline={hero?.body ?? "We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you."}
+        primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
+        secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See How It Works', href: '/how-it-works' }}
+        note={(hero?.metadata as { note?: string })?.note ?? "$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
       />
 
       <Section variant="white">
@@ -143,7 +156,7 @@ export default function Page() {
           align="center"
         />
         <div className="mt-12 max-w-3xl mx-auto space-y-6">
-          {faqs.map((faq, i) => (
+          {resolvedFaqs.map((faq, i) => (
             <div key={i} className="p-6 bg-white rounded-lg border border-gray-200">
               <h3 className="font-display font-semibold text-navy-800">{faq.q}</h3>
               <p className="mt-3 text-gray-600 leading-relaxed">{faq.a}</p>
@@ -153,11 +166,11 @@ export default function Page() {
       </Section>
 
       <CtaSection
-        eyebrow="Ready to start?"
-        headline="Apply now, launch your pipeline this month"
-        subheadline="Applications reviewed weekly by Eric. Accepted applicants onboard within days."
-        cta={{ label: 'Apply for Founding Cohort', href: '/apply' }}
-        note="Limited to 20 founding members for the initial cohort."
+        eyebrow={ctaBlock?.excerpt ?? "Ready to start?"}
+        headline={ctaBlock?.title ?? "Apply now, launch your pipeline this month"}
+        subheadline={ctaBlock?.body ?? "Applications reviewed weekly by Eric. Accepted applicants onboard within days."}
+        cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Apply for Founding Cohort', href: '/apply' }}
+        note={(ctaBlock?.metadata as { note?: string })?.note ?? "Limited to 20 founding members for the initial cohort."}
       />
     </>
   );
