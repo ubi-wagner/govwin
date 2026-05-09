@@ -61,12 +61,12 @@ export default async function LibraryReviewPage({
   }
 
   // ---------- Load draft atoms ----------
-  // The metadata column may not exist on the base table. Try with it first;
+  // The document_metadata column may not exist on the base table. Try with it first;
   // fall back to a query without it.
   let rows: DraftRow[] = [];
   try {
     rows = await sql<DraftRow[]>`
-      SELECT id, content, category, tags, confidence, metadata
+      SELECT id, content, category, tags, confidence, document_metadata AS metadata
       FROM library_units
       WHERE tenant_id = ${tenantId}::uuid
         AND status = 'draft'
@@ -75,7 +75,7 @@ export default async function LibraryReviewPage({
       LIMIT 200
     `;
   } catch {
-    // metadata column likely doesn't exist — query without it
+    // document_metadata column likely doesn't exist — query without it
     try {
       rows = await sql<DraftRow[]>`
         SELECT id, content, category, tags, confidence

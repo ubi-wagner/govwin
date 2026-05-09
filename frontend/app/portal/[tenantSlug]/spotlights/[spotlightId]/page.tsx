@@ -87,14 +87,15 @@ export default async function SpotlightDetailPage({ params }: Props) {
     agency: string | null;
     topicBranch: string | null;
     programType: string | null;
-    phase: string | null;
+    phaseType: string | null;
     closeDate: string | null;
     postedDate: string | null;
     solicitationNumber: string | null;
     topicNumber: string | null;
     topicStatus: string | null;
     techFocusAreas: string[];
-    fundingAmount: number | null;
+    estimatedValueMin: number | null;
+    estimatedValueMax: number | null;
     pocName: string | null;
     pocEmail: string | null;
     solicitationType: string | null;
@@ -167,14 +168,21 @@ export default async function SpotlightDetailPage({ params }: Props) {
   let complianceVars: ComplianceRow[] = [];
 
   try {
-    complianceVars = await sql<ComplianceRow[]>`
-      SELECT variable_name, value, source_page, source_excerpt
+    const [row] = await sql<Record<string, unknown>[]>`
+      SELECT sc.*
       FROM solicitation_compliance sc
       JOIN curated_solicitations cs ON cs.id = sc.solicitation_id
       WHERE cs.opportunity_id = ${spotlightId}::uuid
-      ORDER BY variable_name
-      LIMIT 50
+      LIMIT 1
     `;
+    if (row) {
+      const skip = new Set(['id', 'solicitationId', 'topicId', 'verifiedBy', 'verifiedAt', 'createdAt', 'updatedAt']);
+      for (const [key, val] of Object.entries(row)) {
+        if (skip.has(key) || val == null) continue;
+        const display = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        complianceVars.push({ variableName: key, value: display, sourcePage: null, sourceExcerpt: null });
+      }
+    }
   } catch (e) {
     console.error('[spotlight-detail] compliance query failed', e);
   }
@@ -240,9 +248,9 @@ export default async function SpotlightDetailPage({ params }: Props) {
               {opportunity.programType}
             </span>
           )}
-          {opportunity.phase && (
+          {opportunity.phaseType && (
             <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded bg-purple-50 text-purple-700">
-              Phase {opportunity.phase}
+              Phase {opportunity.phaseType}
             </span>
           )}
           {opportunity.namespace && (
@@ -298,9 +306,9 @@ export default async function SpotlightDetailPage({ params }: Props) {
           proposalId={existingProposalId}
           proposalStage={existingProposalStage}
           productType={
-            opportunity.phase === '1' || opportunity.phase === 'I'
+            opportunity.phaseType === '1' || opportunity.phaseType === 'I'
               ? 'proposal_phase1'
-              : opportunity.phase === '2' || opportunity.phase === 'II'
+              : opportunity.phaseType === '2' || opportunity.phaseType === 'II'
                 ? 'proposal_phase2'
                 : null
           }
@@ -349,10 +357,14 @@ export default async function SpotlightDetailPage({ params }: Props) {
           {/* Funding */}
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">
-              Funding Amount
+              Estimated Value
             </h3>
             <p className="text-sm text-gray-900">
-              {formatCurrency(opportunity.fundingAmount)}
+              {formatCurrency(opportunity.estimatedValueMin)}
+              {opportunity.estimatedValueMax != null &&
+                opportunity.estimatedValueMax !== opportunity.estimatedValueMin && (
+                  <> &ndash; {formatCurrency(opportunity.estimatedValueMax)}</>
+                )}
             </p>
           </div>
 

@@ -1,6 +1,6 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-04-29 (post pre-launch audit)
+**Last updated:** 2026-05-09 (full-stack stability audit)
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -10,7 +10,7 @@ that have been caught and fixed.
 
 ## 1. Database Schema Quick Reference
 
-The schema is defined across 24 migration files (000-023). These are the
+The schema is defined across 36 migration files (000-035). These are the
 tables most frequently queried and the exact column names. **Do NOT guess
 column names. Look them up here.**
 
@@ -41,12 +41,17 @@ curated_solicitations
   curated_by, approved_by, pushed_at, dismissed_reason, phase_like,
   ai_extracted, ai_confidence, ai_similar_to, ai_similarity_score,
   full_text, full_text_tsv, annotations, created_at, updated_at
-  + review_requested_for (009), priority (009), metadata (009)
+  + review_requested_for (009)
   + solicitation_type, solicitation_title, solicitation_number (013)
+  + round_number, round_label (015)
+  GOTCHA: NO "priority" or "metadata" columns (those are on pipeline_jobs)
 
 proposals
   id, tenant_id, opportunity_id, solicitation_id, title, stage,
   stripe_payment_id, is_locked, created_at, updated_at
+  + gate_config (JSONB), lock_count, download_count,
+    last_locked_at, last_unlocked_at, unlock_deadline (029)
+  GOTCHA: stage CHECK changed in 029 to: draft, review, final, submitted, archived
 
 proposal_sections
   id, proposal_id, section_number, title, content (TEXT), page_allocation,
@@ -65,6 +70,9 @@ proposal_stage_history
 purchases
   id, tenant_id, opportunity_id, proposal_id, stripe_session_id,
   stripe_payment_intent, product_type, amount_cents, status, created_at
+  + metadata (JSONB) (035)
+  GOTCHA: product_type CHECK includes: finder_subscription, proposal_phase1,
+          proposal_phase2, expert_consulting (035)
 ```
 
 ### Solicitation Structure (012_volumes_documents.sql)
@@ -92,8 +100,69 @@ solicitation_documents
   id, solicitation_id, document_type, original_filename, storage_key,
   file_size, content_type, page_count, extracted_text, extracted_at,
   uploaded_by, metadata, created_at, updated_at
-  + content_hash, round_number, round_label (015)
+  + content_hash (015)
   + is_primary, document_label (021)
+  GOTCHA: document_type CHECK includes 'topic' (015+021 fix)
+```
+
+### Automation & CMS (019, 028, 031, 034)
+
+```
+automation_rules
+  id, name, description, is_active, trigger_namespace, trigger_type,
+  action_type, action_config, created_by, created_at, updated_at
+  GOTCHA: action_type includes BOTH old (log_only, queue_notification,
+          queue_job, emit_event) AND new (send_email, notify_admin,
+          webhook, update_status) values
+
+automation_log
+  id, rule_id, trigger_event_id, action_type, status, result,
+  error_message, executed_at
+
+cms_content
+  id, slug (UNIQUE), title, content_type, body, excerpt, author,
+  tags, published, published_at, featured_image, external_url,
+  display_order, metadata, created_by, created_at, updated_at
+  + content_type expanded in 031: blog_post, resource, guide,
+    announcement, faq, testimonial, team_member, social_post, page_block
+```
+
+### Source Scout (025)
+
+```
+source_profiles
+  id, name, url, description, auto_crawl_enabled, crawl_cron,
+  last_crawled_at, created_at, updated_at
+
+source_regions
+  id, profile_id, css_selector, label, guidance, created_at
+
+source_snapshots
+  id, profile_id, content_hash, storage_key, created_at
+
+source_diffs
+  id, profile_id, from_snapshot_id, to_snapshot_id, diff_summary,
+  significance, storage_key, created_at
+```
+
+### Compliance Presets (027)
+
+```
+compliance_presets
+  id, name, description, agency, program_type, variables (JSONB),
+  created_by, created_at, updated_at
+  GOTCHA: solicitation_compliance and solicitation_volumes both got
+          + topic_id (027) for topic-level compliance
+```
+
+### Proposal Portal Extensions (029)
+
+```
+proposal_collaborators
+  + assigned_sections UUID[], dropbox_enabled BOOLEAN (029)
+
+collaborator_stage_access
+  id, collaborator_id, proposal_id, stage, permission, created_at
 ```
 
 ### Topics Are Opportunities
@@ -108,7 +177,7 @@ SELECT * FROM opportunities WHERE solicitation_id = ${solId}::uuid
 ```
 
 NOT: `SELECT * FROM opportunity_topics` (does not exist)
-NOT: `SELECT * FROM solicitation_topics` (exists in baseline but unused)
+NOT: `SELECT * FROM solicitation_topics` (dropped in 035)
 
 ---
 
@@ -322,6 +391,35 @@ Portal proposal events used `capture.*` namespace but should use
 
 **Rule:** Check the namespace rules in section 3 above before emitting.
 
+### Mistake 9: Migration schema conflicts (12-hour outage, May 2026)
+Migration 001 created `automation_rules` with one schema. Migration 019
+created it again with a completely different schema using IF NOT EXISTS
+(no-op). Then 019 tried to CREATE INDEX on columns that didn't exist →
+crash. Container restart-looped for 12 hours.
+
+**Rule:** NEVER use CREATE TABLE IF NOT EXISTS to "redefine" a table.
+Use ALTER TABLE ADD COLUMN IF NOT EXISTS to evolve existing tables.
+
+### Mistake 10: CHECK constraint drift
+Migration 021 dropped `'topic'` from `document_type` CHECK. Upload code
+still inserted `'topic'` → constraint violation crash.
+
+**Rule:** When modifying a CHECK constraint, grep the codebase for all
+values being inserted into that column before removing any.
+
+### Mistake 11: solicitation_compliance is NOT an EAV table
+The table has individual columns (page_limit_technical, font_family, etc.),
+NOT variable_name/value rows. Code that queries `SELECT variable_name,
+value FROM solicitation_compliance` crashes.
+
+**Rule:** Always verify the table structure in section 1 before writing
+queries. solicitation_compliance uses per-variable columns.
+
+### Mistake 12: proposal_compliance_matrix column names
+The columns are `requirement_text` and `notes`, NOT `requirement` and
+`details`. postgres.js camelCase transform means results use
+`requirementText` and `notes`.
+
 ---
 
 ## 5. Project Architecture Quick Reference
@@ -351,11 +449,12 @@ Portal proposal events used `capture.*` namespace but should use
 - 4 presets: letter_standard, letter_sbir_phase1, letter_sbir_phase2, slide_cso
 - Stored as JSON string in `proposal_sections.content` (TEXT column)
 
-### Proposal Stages
+### Proposal Stages (updated in migration 029)
 ```
-outline → draft → pink_team → red_team → gold_team → final → submitted
+draft → review → final → submitted → archived
 ```
 Workspace auto-locks on `final` and `submitted`.
+Gate config is stored as JSONB array in `proposals.gate_config`.
 
 ### Deployment
 - Single environment: `main` branch → Railway production auto-deploy

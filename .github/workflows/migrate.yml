@@ -3,15 +3,10 @@ name: Run Database Migrations
 # Runs pending migrations against production and/or staging databases.
 # Supports both the main app DB (db/migrations/) and the CRM DB (services/cms/db/).
 #
-# Triggered automatically on push to main when migration files change,
-# or manually via workflow_dispatch with environment + database selectors.
+# Manual-only — migrations run automatically via entrypoint.sh on Railway deploy.
+# Use this workflow for ad-hoc runs against production/staging.
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - 'db/migrations/**'
-      - 'services/cms/db/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -47,8 +42,7 @@ jobs:
     name: Main DB → Production
     runs-on: ubuntu-latest
     if: >-
-      (github.event_name == 'push') ||
-      (github.event.inputs.environment != 'staging' && github.event.inputs.database != 'crm')
+      github.event.inputs.environment != 'staging' && github.event.inputs.database != 'crm'
     steps:
       - uses: actions/checkout@v5
       - name: Install PostgreSQL client
@@ -103,8 +97,7 @@ jobs:
     name: CRM DB → Production
     runs-on: ubuntu-latest
     if: >-
-      (github.event_name == 'push') ||
-      (github.event.inputs.environment != 'staging' && github.event.inputs.database != 'main')
+      github.event.inputs.environment != 'staging' && github.event.inputs.database != 'main'
     steps:
       - uses: actions/checkout@v5
       - name: Install PostgreSQL client

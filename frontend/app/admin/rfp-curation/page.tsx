@@ -26,29 +26,35 @@ export default async function RFPCurationPage() {
     postedDate: Date | null;
   };
 
-  const rows = await sql<Row[]>`
-    SELECT
-      cs.id AS solicitation_id,
-      cs.opportunity_id,
-      cs.status,
-      cs.namespace,
-      cs.claimed_by,
-      cs.claimed_at,
-      cs.curated_by,
-      cs.approved_by,
-      cs.created_at,
-      o.title,
-      o.source,
-      o.agency,
-      o.office,
-      o.program_type,
-      o.close_date,
-      o.posted_date
-    FROM curated_solicitations cs
-    JOIN opportunities o ON o.id = cs.opportunity_id
-    ORDER BY cs.created_at DESC
-    LIMIT 100
-  `;
+  let rows: Row[] = [];
+  try {
+    rows = await sql<Row[]>`
+      SELECT
+        cs.id AS solicitation_id,
+        cs.opportunity_id,
+        cs.status,
+        cs.namespace,
+        cs.claimed_by,
+        cs.claimed_at,
+        cs.curated_by,
+        cs.approved_by,
+        cs.created_at,
+        o.title,
+        o.source,
+        o.agency,
+        o.office,
+        o.program_type,
+        o.close_date,
+        o.posted_date
+      FROM curated_solicitations cs
+      JOIN opportunities o ON o.id = cs.opportunity_id
+      ORDER BY cs.created_at DESC
+      LIMIT 100
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e; // re-throw NEXT_REDIRECT
+    console.error('[admin/rfp-curation] query failed:', e);
+  }
 
   const items = rows.map((r) => ({
     solicitationId: r.solicitationId,

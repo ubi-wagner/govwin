@@ -18,18 +18,25 @@ export default async function Page({ params }: Props) {
   const userName = (session.user as { name?: string }).name ?? session.user.email ?? 'Unknown';
 
   // Load the proposal section's canvas content (if it exists)
-  const sectionRows = await sql<{
+  let sectionRows: {
     id: string;
     title: string | null;
     content: unknown;
     status: string;
     proposalId: string;
-  }[]>`
-    SELECT id, title, content, status, proposal_id
-    FROM proposal_sections
-    WHERE id = ${sectionId}::uuid
-      AND proposal_id = ${proposalId}::uuid
-  `;
+  }[] = [];
+  try {
+    sectionRows = await sql<typeof sectionRows>`
+      SELECT id, title, content, status, proposal_id
+      FROM proposal_sections
+      WHERE id = ${sectionId}::uuid
+        AND proposal_id = ${proposalId}::uuid
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    console.error('[admin/proposals/section] query failed:', e);
+    notFound();
+  }
 
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];
