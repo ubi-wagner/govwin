@@ -16,8 +16,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONN = process.env.DATABASE_URL;
 
 if (!CONN) {
-  console.error('[migrate] DATABASE_URL not set — skipping migrations');
-  process.exit(0);
+  console.error('[migrate] FATAL: DATABASE_URL not set — cannot run migrations');
+  process.exit(1);
 }
 
 const sql = postgres(CONN, { max: 1, idle_timeout: 5 });
@@ -84,7 +84,8 @@ async function run() {
   await sql.end();
 }
 
-run().catch(err => {
+run().catch(async (err) => {
   console.error('[migrate] fatal:', err);
+  try { await sql.end(); } catch { /* ignore */ }
   process.exit(1);
 });
