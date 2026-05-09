@@ -1,17 +1,36 @@
 -- =============================================================================
 -- Migration 028 — Seed automation_rules for new event types
 --
--- Adds rules for key lifecycle notifications:
---   - Welcome email on application accepted (capture bus)
---   - Proposal workspace ready notification
---   - New RFP uploaded admin alert
---   - Source Scout change detected admin alert
---   - Proposal stage advanced notification
---   - Customer topic pinned admin alert
---
--- These rules are consumed by the CMS event_listener which polls
--- system_events and matches against automation_rules.
+-- Bridge: ensures automation_rules has the columns added by 019's schema
+-- (description, trigger_namespace, trigger_type, is_active, created_by,
+-- updated_at) in case 019 was applied before the bridge code was added.
 -- =============================================================================
+
+-- Bridge columns from 019 schema (safe if they already exist)
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS trigger_namespace TEXT NOT NULL DEFAULT '';
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS trigger_type TEXT NOT NULL DEFAULT '';
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id);
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- Widen action_type CHECK to accept both old (001) and new (019) values
+ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
+ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
+  CHECK (action_type IN ('log_only','queue_notification','queue_job','emit_event',
+                         'send_email','notify_admin','webhook','update_status'));
+
+-- Bridge columns for automation_log
+ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS action_type TEXT NOT NULL DEFAULT '';
+ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'success';
+ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS error_message TEXT;
+ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS executed_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- Indexes from 019 (safe if they already exist)
+CREATE INDEX IF NOT EXISTS idx_automation_rules_trigger
+  ON automation_rules (trigger_namespace, trigger_type) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_automation_log_rule
+  ON automation_log (rule_id, executed_at DESC);
 
 -- Unique constraint so ON CONFLICT works for idempotent seeding
 CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_rules_name ON automation_rules(name);
