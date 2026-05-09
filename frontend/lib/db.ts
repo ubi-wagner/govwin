@@ -37,14 +37,6 @@ export const sql = postgres(DATABASE_URL, {
   onnotice: () => {},
 });
 
-// pg Pool for NextAuth adapter
-import { Pool } from 'pg';
-export const pool = new Pool({
-  connectionString: DATABASE_URL,
-  max: 5,
-});
-pool.on('error', (err) => console.error('[db] Pool error:', err));
-
 export async function getTenantBySlug(slug: string) {
   try {
     const [tenant] = await sql`SELECT id, slug, name, status, product_tier FROM tenants WHERE slug = ${slug} AND status != 'suspended'`;

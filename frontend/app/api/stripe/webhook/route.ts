@@ -96,7 +96,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Insert the purchase record
   await sql`
-    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status, metadata)
+    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
     VALUES (
       ${tenantId},
       ${opportunityId},
@@ -104,8 +104,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       ${paymentIntent},
       ${productType},
       ${amountCents},
-      'completed',
-      ${JSON.stringify(quantity > 1 ? { quantity, hours: quantity } : {})}::jsonb
+      'completed'
     )
   `;
 

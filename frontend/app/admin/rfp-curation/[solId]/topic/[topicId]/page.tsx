@@ -16,16 +16,23 @@ export default async function Page({ params }: Props) {
 
   const { solId, topicId } = await params;
 
-  const topicRows = await sql<Record<string, unknown>[]>`
-    SELECT o.id, o.source, o.title, o.topic_number, o.topic_branch, o.topic_status,
-           o.tech_focus_areas, o.close_date, o.posted_date, o.description,
-           o.poc_name, o.poc_email, o.solicitation_id,
-           cs.solicitation_title, cs.namespace, cs.status AS solicitation_status
-    FROM opportunities o
-    LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
-    WHERE o.id = ${topicId}::uuid
-      AND o.solicitation_id = ${solId}::uuid
-  `;
+  let topicRows: Record<string, unknown>[] = [];
+  try {
+    topicRows = await sql<Record<string, unknown>[]>`
+      SELECT o.id, o.source, o.title, o.topic_number, o.topic_branch, o.topic_status,
+             o.tech_focus_areas, o.close_date, o.posted_date, o.description,
+             o.poc_name, o.poc_email, o.solicitation_id,
+             cs.solicitation_title, cs.namespace, cs.status AS solicitation_status
+      FROM opportunities o
+      LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
+      WHERE o.id = ${topicId}::uuid
+        AND o.solicitation_id = ${solId}::uuid
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    console.error('[admin/rfp-curation/topic] query failed:', e);
+    notFound();
+  }
   if (topicRows.length === 0) notFound();
   const r = topicRows[0];
 

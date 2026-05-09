@@ -10,7 +10,7 @@ ALTER TABLE solicitation_documents
   ADD CONSTRAINT solicitation_documents_document_type_check
   CHECK (document_type IN (
     'source','rfp','nofo','instructions','amendment','qa',
-    'template','supporting','attachment','other'
+    'template','supporting','attachment','topic','other'
   ));
 
 -- Primary flag — one document per solicitation should be the main RFP/BAA/NOFO

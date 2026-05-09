@@ -73,15 +73,15 @@ export async function GET(_request: Request, ctx: RouteContext) {
       try {
         const matrix = await sql<{
           id: string;
-          requirement: string;
+          requirementText: string;
           status: string;
-          details: string | null;
+          notes: string | null;
           sectionId: string | null;
         }[]>`
-          SELECT id, requirement, status, details, section_id
+          SELECT id, requirement_text, status, notes, section_id
           FROM proposal_compliance_matrix
           WHERE proposal_id = ${proposalId}
-          ORDER BY requirement ASC
+          ORDER BY requirement_text ASC
         `;
         compliance = { items: matrix, source: 'database' };
       } catch (dbErr) {

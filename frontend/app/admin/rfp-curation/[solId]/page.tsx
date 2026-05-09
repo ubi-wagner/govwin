@@ -13,37 +13,10 @@ export default async function CurationWorkspacePage({ params }: Props) {
 
   const { solId } = await params;
 
-  const solRows = await sql<Record<string, unknown>[]>`
-    SELECT
-      cs.id, cs.opportunity_id, cs.status, cs.namespace,
-      cs.claimed_by, cs.claimed_at, cs.curated_by, cs.approved_by,
-      cs.review_requested_for, cs.phase_like, cs.ai_extracted,
-      cs.ai_confidence, cs.full_text, cs.annotations AS annotations_inline,
-      cs.pushed_at, cs.dismissed_reason, cs.created_at, cs.updated_at,
-      o.title, o.source, o.source_id, o.agency, o.office, o.program_type,
-      o.solicitation_number, o.naics_codes, o.set_aside_type,
-      o.close_date, o.posted_date, o.description
-    FROM curated_solicitations cs
-    JOIN opportunities o ON o.id = cs.opportunity_id
-    WHERE cs.id = ${solId}::uuid
-  `;
-
-  if (solRows.length === 0) notFound();
-  const r = solRows[0];
-
-  const compRows = await sql<Record<string, unknown>[]>`
-    SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid
-  `;
-  const compliance = compRows.length > 0 ? compRows[0] : null;
-
-  const triageRows = await sql<{ id: string; action: string; actorId: string; notes: string | null; createdAt: Date }[]>`
-    SELECT id, action, actor_id, notes, created_at
-    FROM triage_actions WHERE solicitation_id = ${solId}::uuid
-    ORDER BY created_at ASC
-  `;
-
-  // Topics under this solicitation (the pursuable units — what customers pin)
-  const topicRows = await sql<{
+  let solRows: Record<string, unknown>[] = [];
+  let compRows: Record<string, unknown>[] = [];
+  let triageRows: { id: string; action: string; actorId: string; notes: string | null; createdAt: Date }[] = [];
+  let topicRows: {
     id: string;
     topicNumber: string | null;
     title: string;
@@ -52,18 +25,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
     techFocusAreas: string[] | null;
     closeDate: Date | null;
     isActive: boolean;
-  }[]>`
-    SELECT id, topic_number, title, topic_branch, topic_status,
-           tech_focus_areas, close_date, is_active
-    FROM opportunities
-    WHERE solicitation_id = ${solId}::uuid
-    ORDER BY
-      CASE WHEN topic_number IS NULL THEN 1 ELSE 0 END,
-      topic_number ASC
-  `;
-
-  // Linked source documents (uploaded files on this solicitation)
-  const docRows = await sql<{
+  }[] = [];
+  let docRows: {
     id: string;
     documentType: string;
     originalFilename: string;
@@ -73,16 +36,8 @@ export default async function CurationWorkspacePage({ params }: Props) {
     extractedAt: Date | null;
     isPrimary: boolean;
     createdAt: Date;
-  }[]>`
-    SELECT id, document_type, original_filename, storage_key,
-           file_size, content_type, extracted_at, is_primary, created_at
-    FROM solicitation_documents
-    WHERE solicitation_id = ${solId}::uuid
-    ORDER BY is_primary DESC, created_at ASC
-  `;
-
-  // Volumes with their required items (joined in one query)
-  const volumeRows = await sql<{
+  }[] = [];
+  let volumeRows: {
     volumeId: string;
     volumeNumber: number;
     volumeName: string;
@@ -107,44 +62,103 @@ export default async function CurationWorkspacePage({ params }: Props) {
       appliesToPhase: string[] | null;
       verifiedBy: string | null;
     }> | null;
-  }[]>`
-    SELECT
-      v.id AS volume_id,
-      v.volume_number,
-      v.volume_name,
-      v.volume_format,
-      v.description,
-      v.special_requirements,
-      v.applies_to_phase,
-      COALESCE(
-        (
-          SELECT json_agg(
-            json_build_object(
-              'id', i.id,
-              'itemNumber', i.item_number,
-              'itemName', i.item_name,
-              'itemType', i.item_type,
-              'required', i.required,
-              'pageLimit', i.page_limit,
-              'slideLimit', i.slide_limit,
-              'fontFamily', i.font_family,
-              'fontSize', i.font_size,
-              'margins', i.margins,
-              'lineSpacing', i.line_spacing,
-              'headerFormat', i.header_format,
-              'footerFormat', i.footer_format,
-              'appliesToPhase', i.applies_to_phase,
-              'verifiedBy', i.verified_by
-            ) ORDER BY i.item_number
-          )
-          FROM volume_required_items i WHERE i.volume_id = v.id
-        ),
-        '[]'::json
-      ) AS items
-    FROM solicitation_volumes v
-    WHERE v.solicitation_id = ${solId}::uuid
-    ORDER BY v.volume_number ASC
-  `;
+  }[] = [];
+
+  try {
+    solRows = await sql<Record<string, unknown>[]>`
+      SELECT
+        cs.id, cs.opportunity_id, cs.status, cs.namespace,
+        cs.claimed_by, cs.claimed_at, cs.curated_by, cs.approved_by,
+        cs.review_requested_for, cs.phase_like, cs.ai_extracted,
+        cs.ai_confidence, cs.full_text, cs.annotations AS annotations_inline,
+        cs.pushed_at, cs.dismissed_reason, cs.created_at, cs.updated_at,
+        o.title, o.source, o.source_id, o.agency, o.office, o.program_type,
+        o.solicitation_number, o.naics_codes, o.set_aside_type,
+        o.close_date, o.posted_date, o.description
+      FROM curated_solicitations cs
+      JOIN opportunities o ON o.id = cs.opportunity_id
+      WHERE cs.id = ${solId}::uuid
+    `;
+
+    if (solRows.length === 0) notFound();
+
+    compRows = await sql<Record<string, unknown>[]>`
+      SELECT * FROM solicitation_compliance WHERE solicitation_id = ${solId}::uuid
+    `;
+
+    triageRows = await sql<{ id: string; action: string; actorId: string; notes: string | null; createdAt: Date }[]>`
+      SELECT id, action, actor_id, notes, created_at
+      FROM triage_actions WHERE solicitation_id = ${solId}::uuid
+      ORDER BY created_at ASC
+    `;
+
+    // Topics under this solicitation (the pursuable units — what customers pin)
+    topicRows = await sql<typeof topicRows>`
+      SELECT id, topic_number, title, topic_branch, topic_status,
+             tech_focus_areas, close_date, is_active
+      FROM opportunities
+      WHERE solicitation_id = ${solId}::uuid
+      ORDER BY
+        CASE WHEN topic_number IS NULL THEN 1 ELSE 0 END,
+        topic_number ASC
+    `;
+
+    // Linked source documents (uploaded files on this solicitation)
+    docRows = await sql<typeof docRows>`
+      SELECT id, document_type, original_filename, storage_key,
+             file_size, content_type, extracted_at, is_primary, created_at
+      FROM solicitation_documents
+      WHERE solicitation_id = ${solId}::uuid
+      ORDER BY is_primary DESC, created_at ASC
+    `;
+
+    // Volumes with their required items (joined in one query)
+    volumeRows = await sql<typeof volumeRows>`
+      SELECT
+        v.id AS volume_id,
+        v.volume_number,
+        v.volume_name,
+        v.volume_format,
+        v.description,
+        v.special_requirements,
+        v.applies_to_phase,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', i.id,
+                'itemNumber', i.item_number,
+                'itemName', i.item_name,
+                'itemType', i.item_type,
+                'required', i.required,
+                'pageLimit', i.page_limit,
+                'slideLimit', i.slide_limit,
+                'fontFamily', i.font_family,
+                'fontSize', i.font_size,
+                'margins', i.margins,
+                'lineSpacing', i.line_spacing,
+                'headerFormat', i.header_format,
+                'footerFormat', i.footer_format,
+                'appliesToPhase', i.applies_to_phase,
+                'verifiedBy', i.verified_by
+              ) ORDER BY i.item_number
+            )
+            FROM volume_required_items i WHERE i.volume_id = v.id
+          ),
+          '[]'::json
+        ) AS items
+      FROM solicitation_volumes v
+      WHERE v.solicitation_id = ${solId}::uuid
+      ORDER BY v.volume_number ASC
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e; // re-throw NEXT_REDIRECT / notFound
+    console.error('[admin/rfp-curation/workspace] queries failed:', e);
+    notFound();
+  }
+
+  const r = solRows[0];
+  const compliance = compRows.length > 0 ? compRows[0] : null;
 
   const solicitation = {
     id: r.id as string,
@@ -178,16 +192,21 @@ export default async function CurationWorkspacePage({ params }: Props) {
 
   const userLookup: Record<string, { name: string; email: string | null }> = {};
   if (actorIds.size > 0) {
-    const userRows = await sql<{ id: string; name: string | null; email: string }[]>`
-      SELECT id, name, email FROM users WHERE id = ANY(${Array.from(actorIds)}::uuid[])
-    `;
-    for (const u of userRows) {
-      userLookup[u.id] = { name: u.name ?? u.email, email: u.email };
+    try {
+      const userRows = await sql<{ id: string; name: string | null; email: string }[]>`
+        SELECT id, name, email FROM users WHERE id = ANY(${Array.from(actorIds)}::uuid[])
+      `;
+      for (const u of userRows) {
+        userLookup[u.id] = { name: u.name ?? u.email, email: u.email };
+      }
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'digest' in e) throw e;
+      console.error('[admin/rfp-curation/workspace] user lookup query failed:', e);
     }
   }
 
   // Related system_events (tool invocations, compliance saves, etc.)
-  const eventRows = await sql<{
+  let eventRows: {
     id: string;
     type: string;
     phase: string;
@@ -195,17 +214,23 @@ export default async function CurationWorkspacePage({ params }: Props) {
     actorEmail: string | null;
     payload: Record<string, unknown> | null;
     createdAt: Date;
-  }[]>`
-    SELECT id, type, phase, actor_id, actor_email, payload, created_at
-    FROM system_events
-    WHERE namespace = 'finder'
-      AND (
-        payload->>'solicitationId' = ${solId}
-        OR payload->>'solicitation_id' = ${solId}
-      )
-    ORDER BY created_at DESC
-    LIMIT 100
-  `;
+  }[] = [];
+  try {
+    eventRows = await sql<typeof eventRows>`
+      SELECT id, type, phase, actor_id, actor_email, payload, created_at
+      FROM system_events
+      WHERE namespace = 'finder'
+        AND (
+          payload->>'solicitationId' = ${solId}
+          OR payload->>'solicitation_id' = ${solId}
+        )
+      ORDER BY created_at DESC
+      LIMIT 100
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    console.error('[admin/rfp-curation/workspace] events query failed:', e);
+  }
 
   const triageHistory = triageRows.map((t) => ({
     id: t.id,
@@ -325,18 +350,24 @@ export default async function CurationWorkspacePage({ params }: Props) {
   }
 
   // Persisted annotations (compliance tags on the source PDF)
-  const annotationRows = await sql<{
+  let annotationRows: {
     id: string;
     kind: string;
     complianceVariableName: string | null;
     sourceLocation: { page?: number } | null;
     payload: { excerpt?: string } | null;
-  }[]>`
-    SELECT id, kind, compliance_variable_name, source_location, payload
-    FROM solicitation_annotations
-    WHERE solicitation_id = ${solId}::uuid
-    ORDER BY created_at ASC
-  `;
+  }[] = [];
+  try {
+    annotationRows = await sql<typeof annotationRows>`
+      SELECT id, kind, compliance_variable_name, source_location, payload
+      FROM solicitation_annotations
+      WHERE solicitation_id = ${solId}::uuid
+      ORDER BY created_at ASC
+    `;
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e;
+    console.error('[admin/rfp-curation/workspace] annotations query failed:', e);
+  }
   const initialAnnotations = annotationRows
     .map((a) => ({
       id: a.id,
