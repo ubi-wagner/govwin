@@ -1,12 +1,20 @@
 -- =============================================================================
 -- Migration 028 — Seed automation_rules for new event types
 --
--- Bridge: ensures automation_rules has the columns added by 019's schema
--- (description, trigger_namespace, trigger_type, is_active, created_by,
--- updated_at) in case 019 was applied before the bridge code was added.
+-- Bridge: reconciles 001_baseline schema (trigger_bus, trigger_events, enabled)
+-- with 019 schema (trigger_namespace, trigger_type, is_active). Relaxes old
+-- NOT NULL constraints, adds missing columns, then seeds rules.
 -- =============================================================================
 
--- Bridge columns from 019 schema (safe if they already exist)
+-- ── Step 1: Relax old 001_baseline columns so INSERTs without them don't crash
+ALTER TABLE automation_rules ALTER COLUMN trigger_bus DROP NOT NULL;
+ALTER TABLE automation_rules ALTER COLUMN trigger_bus SET DEFAULT '';
+ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_trigger_bus_check;
+
+ALTER TABLE automation_rules ALTER COLUMN trigger_events DROP NOT NULL;
+ALTER TABLE automation_rules ALTER COLUMN trigger_events SET DEFAULT '{}';
+
+-- ── Step 2: Add 019 schema columns (safe if they already exist)
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS trigger_namespace TEXT NOT NULL DEFAULT '';
@@ -14,25 +22,25 @@ ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS trigger_type TEXT NOT NULL
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id);
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
--- Widen action_type CHECK to accept both old (001) and new (019) values
+-- ── Step 3: Widen action_type CHECK to accept both old and new values
 ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
 ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
   CHECK (action_type IN ('log_only','queue_notification','queue_job','emit_event',
                          'send_email','notify_admin','webhook','update_status'));
 
--- Bridge columns for automation_log
+-- ── Step 4: Bridge automation_log columns
 ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS action_type TEXT NOT NULL DEFAULT '';
 ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'success';
 ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS error_message TEXT;
 ALTER TABLE automation_log ADD COLUMN IF NOT EXISTS executed_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
--- Indexes from 019 (safe if they already exist)
+-- ── Step 5: Indexes (safe if they already exist)
 CREATE INDEX IF NOT EXISTS idx_automation_rules_trigger
   ON automation_rules (trigger_namespace, trigger_type) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_automation_log_rule
   ON automation_log (rule_id, executed_at DESC);
 
--- Unique constraint so ON CONFLICT works for idempotent seeding
+-- ── Step 6: Unique constraint for ON CONFLICT
 CREATE UNIQUE INDEX IF NOT EXISTS idx_automation_rules_name ON automation_rules(name);
 
 INSERT INTO automation_rules (name, description, trigger_namespace, trigger_type, action_type, action_config, is_active)
