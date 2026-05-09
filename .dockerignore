@@ -1,0 +1,18 @@
+# Heavy directories not needed by frontend build
+frontend/node_modules/
+frontend/.next/
+pipeline/
+services/
+docs/
+scripts/
+.git/
+
+# Sensitive files
+**/.env*
+**/credentials*
+**/*.pem
+
+# Build artifacts
+**/__pycache__/
+**/*.pyc
+**/*.log

@@ -1,10 +1,18 @@
 -- Add more content types for marketing page blocks
 ALTER TABLE cms_content DROP CONSTRAINT IF EXISTS cms_content_content_type_check;
-ALTER TABLE cms_content ADD CONSTRAINT cms_content_content_type_check
-  CHECK (content_type IN (
-    'blog_post', 'resource', 'guide', 'announcement', 'faq',
-    'testimonial', 'team_member', 'social_post', 'page_block'
-  ));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'cms_content' AND constraint_name = 'cms_content_content_type_check'
+  ) THEN
+    ALTER TABLE cms_content ADD CONSTRAINT cms_content_content_type_check
+      CHECK (content_type IN (
+        'blog_post', 'resource', 'guide', 'announcement', 'faq',
+        'testimonial', 'team_member', 'social_post', 'page_block'
+      ));
+  END IF;
+END $$;
 
 -- External URL for resources that link out
 ALTER TABLE cms_content

@@ -26,7 +26,19 @@ ALTER TABLE solicitation_volumes
 -- The old unique constraint is (solicitation_id, volume_number) from 012.
 -- We need to widen it to include topic_id so the same volume_number can
 -- exist for different topics under the same solicitation.
-DROP INDEX IF EXISTS solicitation_volumes_solicitation_id_volume_number_key;
+-- Note: must drop the CONSTRAINT (not the index) because the index backs
+-- the UNIQUE table constraint created in 012.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'solicitation_volumes'
+      AND constraint_name = 'solicitation_volumes_solicitation_id_volume_number_key'
+  ) THEN
+    ALTER TABLE solicitation_volumes
+      DROP CONSTRAINT solicitation_volumes_solicitation_id_volume_number_key;
+  END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_volumes_sol_topic_num
   ON solicitation_volumes (solicitation_id, COALESCE(topic_id, '00000000-0000-0000-0000-000000000000'), volume_number);
@@ -51,6 +63,10 @@ CREATE TABLE IF NOT EXISTS compliance_presets (
   created_by      UUID REFERENCES users(id),
   created_at      TIMESTAMPTZ DEFAULT now()
 );
+
+-- Unique constraint so ON CONFLICT works for idempotent seeding
+CREATE UNIQUE INDEX IF NOT EXISTS idx_compliance_presets_name_phase
+  ON compliance_presets (name, phase_type);
 
 -- Seed common presets
 INSERT INTO compliance_presets (name, phase_type, program_type, is_system, compliance_data, volumes_data)
@@ -87,4 +103,4 @@ VALUES
     '{"page_limit_technical": 40, "font_family": "Times New Roman", "font_size": "12pt", "margins": "1 inch all sides", "line_spacing": "1.0", "submission_format": "DSIP Volume Upload", "header_required": true, "footer_required": true}'::jsonb,
     '[{"volume_name": "Technical Volume", "volume_number": 1, "items": [{"item_name": "Technical Proposal", "item_type": "word_doc", "page_limit": 40}, {"item_name": "Equivalent Phase I Report", "item_type": "word_doc", "page_limit": 10}]}, {"volume_name": "Cost Volume", "volume_number": 2, "items": [{"item_name": "Cost Proposal", "item_type": "spreadsheet"}]}, {"volume_name": "Supporting Documents", "volume_number": 3, "items": [{"item_name": "Phase I Equivalent Documentation", "item_type": "pdf"}, {"item_name": "Letters of Support", "item_type": "pdf"}]}]'::jsonb
   )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name, phase_type) DO NOTHING;
