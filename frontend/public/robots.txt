@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /portal
+Disallow: /api
+Disallow: /login
+Disallow: /change-password
+Disallow: /dashboard
+Disallow: /invite
+
+Sitemap: https://www.rfppipeline.com/sitemap.xml
