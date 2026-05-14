@@ -76,6 +76,9 @@ export default function AdminFileManager() {
   const [dragOver, setDragOver] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [renamingKey, setRenamingKey] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Load listing ───────────────────────────────────────────────────
@@ -214,13 +217,44 @@ export default function AdminFileManager() {
     }
   };
 
+  // ── Rename handler ─────────────────────────────────────────────────
+  const handleRename = async (oldKey: string, newName: string) => {
+    const isFolder = oldKey.endsWith('/');
+    const parts = oldKey.replace(/\/$/, '').split('/');
+    parts[parts.length - 1] = newName;
+    const newKey = parts.join('/') + (isFolder ? '/' : '');
+    if (oldKey === newKey) return;
+    try {
+      const res = await fetch('/api/admin/storage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rename', oldKey, newKey }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? 'Rename failed');
+      }
+      await loadListing(currentPrefix);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Rename failed');
+    }
+  };
+
+  // ── Bulk download handler ─────────────────────────────────────────
+  const handleBulkDownload = async () => {
+    for (const key of selectedKeys) {
+      if (key.endsWith('/')) continue;
+      await handleDownload(key);
+    }
+  };
+
   // ── Create folder ──────────────────────────────────────────────────
   const handleCreateFolder = async () => {
-    const name = newFolderName.trim().replace(/\/+$/, '');
+    const name = newFolderName.trim().replace(/\/+$/, '').replace(/^\/+/, '');
     if (!name) return;
-    // Validate: no slashes, no dots-only, reasonable characters
-    if (/[/\\]/.test(name) || name === '.' || name === '..') {
-      setError('Invalid folder name');
+    const segments = name.split('/').filter(Boolean);
+    if (segments.some(s => s === '.' || s === '..' || /[\\]/.test(s))) {
+      setError('Invalid folder path');
       return;
     }
     setUploading(true);
@@ -276,6 +310,8 @@ export default function AdminFileManager() {
   // ── Navigation ────────────────────────────────────────────────────
   const navigateTo = (prefix: string) => {
     setCurrentPrefix(prefix);
+    setSelectedKeys(new Set());
+    setRenamingKey(null);
   };
 
   const rootPrefix = getRootPrefix(currentPrefix);
@@ -433,7 +469,7 @@ export default function AdminFileManager() {
                 setNewFolderName('');
               }
             }}
-            placeholder="Folder name"
+            placeholder="Folder name or path (e.g. sttr-phase1/dod/afwerx)"
             className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
@@ -472,6 +508,51 @@ export default function AdminFileManager() {
         </div>
       )}
 
+      {/* Bulk actions bar */}
+      {selectedKeys.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <span className="text-blue-800 font-medium">{selectedKeys.size} selected</span>
+          <button
+            type="button"
+            onClick={handleBulkDownload}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+          >
+            Download Selected
+          </button>
+          {writable && (
+            <button
+              type="button"
+              onClick={async () => {
+                const fileKeys = Array.from(selectedKeys).filter(k => !k.endsWith('/'));
+                if (fileKeys.length === 0) return;
+                if (!window.confirm(`Delete ${fileKeys.length} file(s)? This cannot be undone.`)) return;
+                for (const key of fileKeys) {
+                  try {
+                    await fetch('/api/admin/storage', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ key }),
+                    });
+                  } catch { /* continue */ }
+                }
+                setSelectedKeys(new Set());
+                await loadListing(currentPrefix);
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+            >
+              Delete Selected
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setSelectedKeys(new Set())}
+            className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-white"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Listing table */}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Loading...</div>
@@ -480,6 +561,24 @@ export default function AdminFileManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b">
+                <th className="px-2 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={
+                      (prefixes.length + objects.length) > 0 &&
+                      selectedKeys.size === prefixes.length + objects.length
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const all = new Set([...prefixes, ...objects.map(o => o.key)]);
+                        setSelectedKeys(all);
+                      } else {
+                        setSelectedKeys(new Set());
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-700">
                   Name
                 </th>
@@ -489,42 +588,84 @@ export default function AdminFileManager() {
                 <th className="text-left px-4 py-3 font-medium text-gray-700 w-44">
                   Last Modified
                 </th>
-                <th className="text-right px-4 py-3 font-medium text-gray-700 w-40">
+                <th className="text-right px-4 py-3 font-medium text-gray-700 w-48">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {/* Folders */}
-              {prefixes.map((prefix) => (
-                <tr key={prefix} className="hover:bg-gray-50">
+              {prefixes.map((pfx) => (
+                <tr key={pfx} className={`hover:bg-gray-50 ${selectedKeys.has(pfx) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(pfx)}
+                      onChange={(e) => {
+                        const next = new Set(selectedKeys);
+                        if (e.target.checked) next.add(pfx);
+                        else next.delete(pfx);
+                        setSelectedKeys(next);
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => navigateTo(prefix)}
-                      className="flex items-center gap-2 text-blue-600 hover:underline font-medium"
-                    >
-                      <svg
-                        className="w-4 h-4 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
+                    {renamingKey === pfx ? (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                        </svg>
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && renameValue.trim()) {
+                              handleRename(pfx, renameValue.trim());
+                              setRenamingKey(null);
+                            }
+                            if (e.key === 'Escape') setRenamingKey(null);
+                          }}
+                          className="flex-1 px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                        <button type="button" onClick={() => { if (renameValue.trim()) { handleRename(pfx, renameValue.trim()); setRenamingKey(null); } }} className="text-xs text-blue-600 hover:underline">Save</button>
+                        <button type="button" onClick={() => setRenamingKey(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => navigateTo(pfx)}
+                        className="flex items-center gap-2 text-blue-600 hover:underline font-medium"
                       >
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                      </svg>
-                      {displayName(prefix)}
-                    </button>
+                        <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                        </svg>
+                        {displayName(pfx)}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-400">-</td>
                   <td className="px-4 py-3 text-gray-400">-</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right space-x-3">
                     {writable && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(prefix)}
-                        className="text-red-600 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { setRenamingKey(pfx); setRenameValue(displayName(pfx)); }}
+                          className="text-gray-600 hover:underline text-xs"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(pfx)}
+                          className="text-red-600 hover:underline text-xs"
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -532,24 +673,51 @@ export default function AdminFileManager() {
 
               {/* Files */}
               {objects.map((obj) => (
-                <tr key={obj.key} className="hover:bg-gray-50">
+                <tr key={obj.key} className={`hover:bg-gray-50 ${selectedKeys.has(obj.key) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(obj.key)}
+                      onChange={(e) => {
+                        const next = new Set(selectedKeys);
+                        if (e.target.checked) next.add(obj.key);
+                        else next.delete(obj.key);
+                        setSelectedKeys(next);
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    {renamingKey === obj.key ? (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && renameValue.trim()) {
+                              handleRename(obj.key, renameValue.trim());
+                              setRenamingKey(null);
+                            }
+                            if (e.key === 'Escape') setRenamingKey(null);
+                          }}
+                          className="flex-1 px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
                         />
-                      </svg>
-                      <span className="text-gray-900">{displayName(obj.key)}</span>
-                    </div>
+                        <button type="button" onClick={() => { if (renameValue.trim()) { handleRename(obj.key, renameValue.trim()); setRenamingKey(null); } }} className="text-xs text-blue-600 hover:underline">Save</button>
+                        <button type="button" onClick={() => setRenamingKey(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-gray-900">{displayName(obj.key)}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {humanSize(obj.size)}
@@ -566,13 +734,22 @@ export default function AdminFileManager() {
                       Download
                     </button>
                     {writable && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(obj.key)}
-                        className="text-red-600 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { setRenamingKey(obj.key); setRenameValue(displayName(obj.key)); }}
+                          className="text-gray-600 hover:underline text-xs"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(obj.key)}
+                          className="text-red-600 hover:underline text-xs"
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -582,7 +759,7 @@ export default function AdminFileManager() {
               {prefixes.length === 0 && objects.length === 0 && (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-12 text-center text-gray-400"
                   >
                     This folder is empty. Upload files or create a sub-folder.
