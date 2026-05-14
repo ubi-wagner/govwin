@@ -10,10 +10,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/admin/rfp-curation" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">RFP Curation</a>
           <a href="/admin/tenants" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Tenants</a>
           <a href="/admin/billing" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Billing</a>
+          <a href="/admin/analytics" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Analytics</a>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Monitoring</span>
           <a href="/admin/events" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Event Stream</a>
           <a href="/admin/pipeline" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Pipeline Jobs</a>
+          <a href="/admin/process" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Process Monitor</a>
           <a href="/admin/system" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">System Health</a>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Intelligence</span>

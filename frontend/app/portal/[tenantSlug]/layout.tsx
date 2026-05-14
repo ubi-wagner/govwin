@@ -76,6 +76,9 @@ export default async function PortalLayout({
             <a href={`${basePath}/proposals`} className="hover:text-brand-300">
               Proposals
             </a>
+            <a href={`${basePath}/activity`} className="hover:text-brand-300">
+              Activity
+            </a>
             <a href={`${basePath}/team`} className="hover:text-brand-300">
               Team
             </a>
