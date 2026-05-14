@@ -83,8 +83,8 @@ export function UploadForm() {
 
   const handleFiles = useCallback((newFiles: FileList | File[]) => {
     const arr = Array.from(newFiles);
-    // Allow replacing the entire set (not appending) — clearer UX
-    setFiles(arr);
+    // Append new files to the existing set so users can add in batches
+    setFiles(prev => [...prev, ...arr]);
     setError(null);
     if (arr.length > 0) {
       autofillFromFilename(arr[0]);
@@ -92,7 +92,14 @@ export function UploadForm() {
   }, [autofillFromFilename]);
 
   const removeFile = useCallback(
-    (idx: number) => setFiles((prev) => prev.filter((_, i) => i !== idx)),
+    (idx: number) => {
+      setFiles((prev) => prev.filter((_, i) => i !== idx));
+      setPrimaryIndex((prev) => {
+        if (idx === prev) return 0;
+        if (idx < prev) return prev - 1;
+        return prev;
+      });
+    },
     [],
   );
 
@@ -131,6 +138,7 @@ export function UploadForm() {
     data.set('closeDate', String(new FormData(form).get('closeDate') ?? ''));
     data.set('postedDate', String(new FormData(form).get('postedDate') ?? ''));
     data.set('description', String(new FormData(form).get('description') ?? ''));
+    data.set('primaryIndex', String(primaryIndex));
     for (const f of files) data.append('files', f);
 
     try {
@@ -295,10 +303,22 @@ export function UploadForm() {
                   key={`${f.name}-${idx}`}
                   className="flex items-center justify-between bg-white border border-gray-200 rounded px-3 py-2"
                 >
-                  <span className="text-sm text-gray-700 truncate">
-                    <span className="inline-block w-12 text-xs text-gray-400">
-                      {idx === 0 ? 'source' : `att ${idx}`}
-                    </span>
+                  <span className="text-sm text-gray-700 truncate flex items-center gap-2">
+                    <label
+                      className="flex items-center gap-1 cursor-pointer shrink-0"
+                      title={idx === primaryIndex ? 'Primary document' : 'Set as primary'}
+                    >
+                      <input
+                        type="radio"
+                        name="primaryFile"
+                        checked={idx === primaryIndex}
+                        onChange={() => setPrimaryIndex(idx)}
+                        className="accent-yellow-500"
+                      />
+                      <span className={`text-xs ${idx === primaryIndex ? 'text-yellow-600 font-medium' : 'text-gray-400'}`}>
+                        {idx === primaryIndex ? 'primary' : `att ${idx}`}
+                      </span>
+                    </label>
                     {f.name}
                     <span className="ml-2 text-xs text-gray-400">
                       ({(f.size / 1024 / 1024).toFixed(2)} MB)
@@ -307,7 +327,7 @@ export function UploadForm() {
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="text-xs text-red-600 hover:text-red-800"
+                    className="text-xs text-red-600 hover:text-red-800 shrink-0 ml-2"
                   >
                     Remove
                   </button>
