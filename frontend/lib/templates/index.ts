@@ -51,7 +51,9 @@ export function resolveTemplateKey(
   itemType: string,
 ): string | null {
   let key: string | null = null;
-  if (itemType === 'slide_deck') {
+  if (programType === 'sbir_phase_1' && (itemType === 'cost' || itemType === 'cost_volume')) {
+    key = 'dod-sbir-phase1-cost';
+  } else if (itemType === 'slide_deck') {
     if (programType === 'cso') key = 'dod-cso-phase1-briefing';
   } else if (itemType === 'word_doc' || itemType === 'pdf' || itemType === 'text') {
     if (programType === 'sbir_phase_1') key = 'dod-sbir-phase1-technical';

@@ -45,12 +45,29 @@ function formatDate(iso: string | null): string {
   });
 }
 
-const ROOT_PREFIX = 'rfp-admin/';
+const TOP_LEVEL_PREFIXES = [
+  { prefix: 'rfp-admin/', label: 'Curation Files', writable: true },
+  { prefix: 'rfp-pipeline/', label: 'Pipeline Artifacts', writable: false },
+  { prefix: 'customers/', label: 'Customer Storage', writable: false },
+  { prefix: 'reference/', label: 'Reference Library', writable: true },
+] as const;
+
+/** Determine the root prefix for the current path. */
+function getRootPrefix(path: string): string {
+  const entry = TOP_LEVEL_PREFIXES.find(p => path.startsWith(p.prefix));
+  return entry?.prefix ?? TOP_LEVEL_PREFIXES[0].prefix;
+}
+
+/** Determine whether the current path is writable. */
+function isWritablePrefix(path: string): boolean {
+  const entry = TOP_LEVEL_PREFIXES.find(p => path.startsWith(p.prefix));
+  return entry?.writable ?? false;
+}
 
 // ── Component ────────────────────────────────────────────────────────
 
 export default function AdminFileManager() {
-  const [currentPrefix, setCurrentPrefix] = useState(ROOT_PREFIX);
+  const [currentPrefix, setCurrentPrefix] = useState<string>(TOP_LEVEL_PREFIXES[0].prefix);
   const [objects, setObjects] = useState<S3Object[]>([]);
   const [prefixes, setPrefixes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -261,15 +278,18 @@ export default function AdminFileManager() {
     setCurrentPrefix(prefix);
   };
 
+  const rootPrefix = getRootPrefix(currentPrefix);
+  const writable = isWritablePrefix(currentPrefix);
+
   const goUp = () => {
-    if (currentPrefix === ROOT_PREFIX) return;
+    if (currentPrefix === rootPrefix) return;
     // Remove trailing slash, then strip last segment
     const trimmed = currentPrefix.slice(0, -1);
     const parentEnd = trimmed.lastIndexOf('/');
-    const parent = parentEnd >= 0 ? trimmed.slice(0, parentEnd + 1) : ROOT_PREFIX;
+    const parent = parentEnd >= 0 ? trimmed.slice(0, parentEnd + 1) : rootPrefix;
     // Ensure we never go above root
-    if (!parent.startsWith(ROOT_PREFIX)) {
-      setCurrentPrefix(ROOT_PREFIX);
+    if (!parent.startsWith(rootPrefix)) {
+      setCurrentPrefix(rootPrefix);
     } else {
       setCurrentPrefix(parent);
     }
@@ -289,8 +309,29 @@ export default function AdminFileManager() {
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Upload zone */}
-      <div
+      {/* Prefix tabs */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {TOP_LEVEL_PREFIXES.map((p) => (
+          <button
+            key={p.prefix}
+            type="button"
+            onClick={() => setCurrentPrefix(p.prefix)}
+            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+              rootPrefix === p.prefix
+                ? 'bg-white border border-b-white border-gray-200 -mb-px text-blue-700'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {p.label}
+            {!p.writable && (
+              <span className="ml-1.5 text-xs text-gray-400">(read-only)</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Upload zone — only shown for writable prefixes */}
+      {writable && <div
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -326,7 +367,7 @@ export default function AdminFileManager() {
         <p className="text-xs text-gray-400 mt-2">
           Uploading to: {currentPrefix}
         </p>
-      </div>
+      </div>}
 
       {/* Breadcrumbs + navigation */}
       <div className="flex items-center justify-between">
@@ -349,7 +390,7 @@ export default function AdminFileManager() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {currentPrefix !== ROOT_PREFIX && (
+          {currentPrefix !== rootPrefix && (
             <button
               type="button"
               onClick={goUp}
@@ -358,13 +399,15 @@ export default function AdminFileManager() {
               Back
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowNewFolder(!showNewFolder)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
-          >
-            New Folder
-          </button>
+          {writable && (
+            <button
+              type="button"
+              onClick={() => setShowNewFolder(!showNewFolder)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
+            >
+              New Folder
+            </button>
+          )}
           <button
             type="button"
             onClick={() => loadListing(currentPrefix)}
@@ -377,7 +420,7 @@ export default function AdminFileManager() {
       </div>
 
       {/* New folder form */}
-      {showNewFolder && (
+      {writable && showNewFolder && (
         <div className="flex items-center gap-2 p-3 bg-gray-50 rounded border">
           <input
             type="text"
@@ -474,13 +517,15 @@ export default function AdminFileManager() {
                   <td className="px-4 py-3 text-gray-400">-</td>
                   <td className="px-4 py-3 text-gray-400">-</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(prefix)}
-                      className="text-red-600 hover:underline text-xs"
-                    >
-                      Delete
-                    </button>
+                    {writable && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(prefix)}
+                        className="text-red-600 hover:underline text-xs"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -520,13 +565,15 @@ export default function AdminFileManager() {
                     >
                       Download
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(obj.key)}
-                      className="text-red-600 hover:underline text-xs"
-                    >
-                      Delete
-                    </button>
+                    {writable && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(obj.key)}
+                        className="text-red-600 hover:underline text-xs"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

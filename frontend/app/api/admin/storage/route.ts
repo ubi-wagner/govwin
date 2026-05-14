@@ -1,17 +1,23 @@
 /**
- * /api/admin/storage — S3 file manager for the rfp-admin/ prefix.
+ * /api/admin/storage — S3 file manager for multiple prefixes.
  *
- * GET    ?prefix=rfp-admin/…          → list objects + sub-prefixes
- * GET    ?download=rfp-admin/…/key    → presigned download URL (300s)
- * POST   multipart (file + prefix)    → upload file
- * DELETE  { key }                     → delete object
+ * Supported prefixes:
+ *   Writable (CRUD):  rfp-admin/, reference/
+ *   Read-only (list + download): rfp-pipeline/, customers/
+ *
+ * GET    ?prefix=…                    → list objects + sub-prefixes
+ * GET    ?download=…/key              → presigned download URL (300s)
+ * POST   multipart (file + prefix)    → upload file (writable prefixes only)
+ * PUT    { filename, prefix }         → presigned upload URL (writable only)
+ * PATCH  { key }                      → confirm upload + auto-ingest (writable only)
+ * DELETE { key }                      → delete object/folder (writable only)
  *
  * Auth: master_admin or rfp_admin only.
  */
 
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { ListObjectsV2Command, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
@@ -20,6 +26,13 @@ import { s3, BUCKET, putObject, getSignedGetUrl } from '@/lib/storage/s3-client'
 
 const ADMIN_PREFIX = 'rfp-admin/';
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB — SBIR award files are 300MB+
+
+/** Prefixes that support full CRUD (upload, delete, create folder). */
+const WRITABLE_PREFIXES = ['rfp-admin/', 'reference/'];
+/** Prefixes that are read-only (list + download only). */
+const READ_ONLY_PREFIXES = ['rfp-pipeline/', 'customers/'];
+/** All allowed prefixes (readable). */
+const ALL_PREFIXES = [...WRITABLE_PREFIXES, ...READ_ONLY_PREFIXES];
 
 // Next.js route segment config — allow large uploads and long processing
 export const maxDuration = 120; // seconds (for large CSV ingest)
@@ -30,7 +43,11 @@ function isAdminRole(role: string | undefined): boolean {
 }
 
 function prefixIsValid(prefix: string): boolean {
-  return prefix.startsWith(ADMIN_PREFIX);
+  return ALL_PREFIXES.some(p => prefix.startsWith(p));
+}
+
+function prefixIsWritable(prefix: string): boolean {
+  return WRITABLE_PREFIXES.some(p => prefix.startsWith(p));
 }
 
 // ── GET — list objects or generate presigned download URL ─────────────
@@ -58,7 +75,7 @@ export async function GET(request: NextRequest) {
     if (downloadKey) {
       if (!prefixIsValid(downloadKey)) {
         return NextResponse.json(
-          { error: 'Key must start with rfp-admin/', code: 'VALIDATION_ERROR' },
+          { error: 'Key must start with an allowed prefix', code: 'VALIDATION_ERROR' },
           { status: 400 },
         );
       }
@@ -70,7 +87,7 @@ export async function GET(request: NextRequest) {
     const prefix = searchParams.get('prefix') || ADMIN_PREFIX;
     if (!prefixIsValid(prefix)) {
       return NextResponse.json(
-        { error: 'Prefix must start with rfp-admin/', code: 'VALIDATION_ERROR' },
+        { error: 'Prefix must start with an allowed prefix', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -152,10 +169,10 @@ export async function POST(request: NextRequest) {
     }
 
     const prefix = String(formData.get('prefix') || ADMIN_PREFIX);
-    if (!prefixIsValid(prefix)) {
+    if (!prefixIsWritable(prefix)) {
       return NextResponse.json(
-        { error: 'Prefix must start with rfp-admin/', code: 'VALIDATION_ERROR' },
-        { status: 400 },
+        { error: 'Uploads are only allowed to writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' },
+        { status: 403 },
       );
     }
 
@@ -258,8 +275,8 @@ export async function PUT(request: NextRequest) {
     }
 
     const prefix = body.prefix || ADMIN_PREFIX;
-    if (!prefixIsValid(prefix)) {
-      return NextResponse.json({ error: 'Prefix must start with rfp-admin/', code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (!prefixIsWritable(prefix)) {
+      return NextResponse.json({ error: 'Uploads are only allowed to writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
@@ -296,8 +313,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    if (!body.key || !prefixIsValid(body.key)) {
-      return NextResponse.json({ error: 'Invalid key', code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (!body.key || !prefixIsWritable(body.key)) {
+      return NextResponse.json({ error: 'Invalid key or read-only prefix', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // Verify the object actually exists in S3
@@ -403,14 +420,33 @@ export async function DELETE(request: NextRequest) {
         { status: 422 },
       );
     }
-    if (!prefixIsValid(key)) {
+    if (!prefixIsWritable(key)) {
       return NextResponse.json(
-        { error: 'Key must start with rfp-admin/', code: 'VALIDATION_ERROR' },
-        { status: 400 },
+        { error: 'Deletes are only allowed on writable prefixes (rfp-admin/, reference/)', code: 'FORBIDDEN' },
+        { status: 403 },
       );
     }
 
-    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    // If deleting a folder, delete all contents first
+    if (key.endsWith('/')) {
+      const listCmd = new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: key,
+      });
+      const listRes = await s3.send(listCmd);
+      const contents = listRes.Contents ?? [];
+      if (contents.length > 0) {
+        await s3.send(new DeleteObjectsCommand({
+          Bucket: BUCKET,
+          Delete: {
+            Objects: contents.map(o => ({ Key: o.Key! })),
+            Quiet: true,
+          },
+        }));
+      }
+    } else {
+      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    }
 
     await emitEventSingle({
       namespace: 'system',
