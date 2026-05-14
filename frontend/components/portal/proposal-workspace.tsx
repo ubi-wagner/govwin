@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { DraftAllSections } from '@/components/canvas/draft-all-sections';
 import { ProposalAdminPanel } from './proposal-admin-panel';
 import { ProposalContributorView } from './proposal-contributor-view';
+import { ProposalTimeline } from './proposal-timeline';
 import { StageControl } from './stage-control';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
@@ -82,6 +83,18 @@ interface ProposalWorkspaceProps {
   canExport: boolean;
   canManageTeam: boolean;
   closeDate?: string | null;
+  proposalEvents: Array<{
+    id: string;
+    namespace: string;
+    type: string;
+    phase: string;
+    actorType: string | null;
+    actorEmail: string | null;
+    payload: Record<string, unknown> | null;
+    error: Record<string, unknown> | null;
+    durationMs: number | null;
+    createdAt: string;
+  }>;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; dotColor: string }> = {
@@ -113,10 +126,12 @@ export function ProposalWorkspace({
   canExport,
   canManageTeam,
   closeDate,
+  proposalEvents,
 }: ProposalWorkspaceProps) {
   const router = useRouter();
   const [sections, setSections] = useState(initialSections);
   const [showDrafter, setShowDrafter] = useState(hasEmptySections && userRole === 'admin');
+  const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'timeline'>('workspace');
 
   const handleSectionDrafted = useCallback(
     (sectionId: string, nodes: CanvasNode[]) => {
@@ -155,6 +170,37 @@ export function ProposalWorkspace({
         canExport={canExport}
         closeDate={closeDate}
       />
+
+      {/* Workspace-level tab bar */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {([
+          { key: 'workspace' as const, label: 'Workspace' },
+          { key: 'timeline' as const, label: 'Timeline' },
+        ]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setWorkspaceTab(tab.key)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              workspaceTab === tab.key
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-500 border-transparent hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── Timeline Tab ────────────────────────────────────────────── */}
+      {workspaceTab === 'timeline' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Proposal Activity Timeline</h3>
+          <ProposalTimeline events={proposalEvents} />
+        </div>
+      )}
+
+      {/* ─── Workspace Tab ───────────────────────────────────────────── */}
+      {workspaceTab === 'workspace' && <>
 
       {/* Draft All Sections (admin only) */}
       {userRole === 'admin' && showDrafter && emptySectionCount > 0 && !isLocked && (
@@ -219,6 +265,8 @@ export function ProposalWorkspace({
       <div className="text-xs text-gray-400 mt-4">
         Current stage: {proposalStage.replace(/_/g, ' ')} &middot; Role: {userRole}
       </div>
+
+      </>}
     </div>
   );
 }

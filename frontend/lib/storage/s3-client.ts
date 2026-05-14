@@ -19,6 +19,7 @@ import {
   HeadBucketCommand,
   DeleteObjectCommand,
   CopyObjectCommand,
+  ListObjectsV2Command,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -183,4 +184,32 @@ export async function pingS3(): Promise<{ ok: true; bucket: string } | { ok: fal
   } catch (e) {
     return { ok: false, error: String(e) };
   }
+}
+
+/**
+ * List objects and common prefixes under a given S3 prefix.
+ * Used by the admin file manager to browse the bucket.
+ */
+export async function listObjects(prefix: string, delimiter = '/'): Promise<{
+  objects: Array<{ key: string; size: number; lastModified: Date | null }>;
+  prefixes: string[];
+}> {
+  if (!s3 || !BUCKET) return { objects: [], prefixes: [] };
+  const cmd = new ListObjectsV2Command({
+    Bucket: BUCKET,
+    Prefix: prefix,
+    Delimiter: delimiter,
+  });
+  const res = await s3.send(cmd);
+  const objects = (res.Contents ?? [])
+    .filter(o => o.Key && o.Key !== prefix)
+    .map(o => ({
+      key: o.Key!,
+      size: o.Size ?? 0,
+      lastModified: o.LastModified ?? null,
+    }));
+  const prefixes = (res.CommonPrefixes ?? [])
+    .map(p => p.Prefix!)
+    .filter(Boolean);
+  return { objects, prefixes };
 }

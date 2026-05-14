@@ -242,6 +242,60 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     console.error('[portal/proposals/workspace] compliance query error:', e);
   }
 
+  // ── Load proposal events (timeline) ────────────────────────────────
+  let proposalEvents: {
+    id: string;
+    namespace: string;
+    type: string;
+    phase: string;
+    actorType: string | null;
+    actorEmail: string | null;
+    payload: Record<string, unknown> | null;
+    error: Record<string, unknown> | null;
+    durationMs: number | null;
+    createdAt: string;
+  }[] = [];
+
+  try {
+    const eventRows = await sql<{
+      id: string;
+      namespace: string;
+      type: string;
+      phase: string;
+      actor_type: string | null;
+      actor_email: string | null;
+      payload: Record<string, unknown> | null;
+      error: Record<string, unknown> | null;
+      duration_ms: number | null;
+      created_at: Date;
+    }[]>`
+      SELECT id, namespace, type, phase, actor_type, actor_email,
+             payload, error, duration_ms, created_at
+      FROM system_events
+      WHERE tenant_id = ${tenantId}
+        AND (
+          (payload->>'proposal_id' = ${proposalId})
+          OR (payload->>'proposalId' = ${proposalId})
+        )
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    proposalEvents = eventRows.map(r => ({
+      id: r.id,
+      namespace: r.namespace,
+      type: r.type,
+      phase: r.phase,
+      actorType: r.actor_type,
+      actorEmail: r.actor_email,
+      payload: r.payload,
+      error: r.error,
+      durationMs: r.duration_ms,
+      createdAt: r.created_at.toISOString(),
+    }));
+  } catch (e) {
+    console.error('[portal/proposals/workspace] events query error:', e);
+  }
+
   // ── Compute derived data ──────────────────────────────────────────
   const gateConfig = (proposal.gateConfig || ['draft', 'final']) as string[];
 
@@ -340,6 +394,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         canExport={access.canExport}
         canManageTeam={access.canManageTeam}
         closeDate={proposal.closeDate?.toISOString() ?? null}
+        proposalEvents={proposalEvents}
       />
     </div>
   );
