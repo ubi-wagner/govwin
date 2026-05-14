@@ -176,6 +176,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Folder creation: zero-byte file with trailing slash = S3 folder marker
+    const isFolderMarker =
+      file.size === 0 &&
+      (file.type === 'application/x-directory' || file.name.endsWith('/'));
+
+    if (isFolderMarker) {
+      const folderName = file.name.replace(/\\/g, '/').replace(/\/+$/, '').split('/').pop()?.trim();
+      if (!folderName || folderName === '.' || folderName === '..') {
+        return NextResponse.json(
+          { error: 'Invalid folder name', code: 'VALIDATION_ERROR' },
+          { status: 422 },
+        );
+      }
+      const cleanPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+      const folderKey = `${cleanPrefix}${folderName}/`;
+      await putObject({
+        key: folderKey,
+        body: Buffer.alloc(0),
+        contentType: 'application/x-directory',
+        metadata: { 'created-by': userId },
+      });
+      return NextResponse.json({ data: { key: folderKey, folder: true } });
+    }
+
     // Sanitize filename: strip directory components, keep original name
     const originalName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).trim();
     if (!originalName) {
