@@ -317,7 +317,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// ── PATCH — confirm a direct S3 upload + trigger auto-ingest ─────────
+// ── PATCH — confirm upload OR rename ─────────────────────────────────
 export async function PATCH(request: NextRequest) {
   try {
     const session = await auth();
@@ -330,13 +330,61 @@ export async function PATCH(request: NextRequest) {
     }
     const userId = (session.user as { id?: string }).id ?? 'unknown';
 
-    let body: { key: string };
+    let body: { key?: string; action?: string; oldKey?: string; newKey?: string };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // ── Rename action ──────────────────────────────────────────────
+    if (body.action === 'rename') {
+      const { oldKey, newKey } = body;
+      if (!oldKey || !newKey) {
+        return NextResponse.json({ error: 'oldKey and newKey are required', code: 'VALIDATION_ERROR' }, { status: 422 });
+      }
+      if (!prefixIsWritable(oldKey) || !prefixIsWritable(newKey)) {
+        return NextResponse.json({ error: 'Rename only allowed on writable prefixes', code: 'FORBIDDEN' }, { status: 403 });
+      }
+      if (oldKey === newKey) {
+        return NextResponse.json({ data: { renamed: true, oldKey, newKey } });
+      }
+
+      const { copyObject, deleteObject } = await import('@/lib/storage/s3-client');
+
+      const isFolder = oldKey.endsWith('/');
+      if (isFolder) {
+        const listCmd = new ListObjectsV2Command({ Bucket: BUCKET, Prefix: oldKey });
+        const listRes = await s3.send(listCmd);
+        const contents = listRes.Contents ?? [];
+        for (const obj of contents) {
+          if (!obj.Key) continue;
+          const suffix = obj.Key.slice(oldKey.length);
+          await copyObject({ sourceKey: obj.Key, destKey: `${newKey}${suffix}` });
+        }
+        if (contents.length > 0) {
+          await s3.send(new DeleteObjectsCommand({
+            Bucket: BUCKET,
+            Delete: { Objects: contents.map(o => ({ Key: o.Key! })), Quiet: true },
+          }));
+        }
+      } else {
+        await copyObject({ sourceKey: oldKey, destKey: newKey });
+        await deleteObject(oldKey);
+      }
+
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'file.renamed',
+        actor: { type: 'user', id: userId },
+        tenantId: null,
+        payload: { correlationId: randomUUID(), oldKey, newKey, isFolder },
+      });
+
+      return NextResponse.json({ data: { renamed: true, oldKey, newKey } });
+    }
+
+    // ── Confirm upload (default PATCH action) ──────────────────────
     if (!body.key || !prefixIsWritable(body.key)) {
       return NextResponse.json({ error: 'Invalid key or read-only prefix', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
