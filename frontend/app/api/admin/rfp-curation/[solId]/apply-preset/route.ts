@@ -168,6 +168,27 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     const cd = complianceData;
 
+    // Dual-fallback reads: accept both snake_case and camelCase keys
+    // so copy-from-topic (camelCase) and presets (snake_case) both work.
+    const pageLimitTechnical = (cd.page_limit_technical ?? cd.pageLimitTechnical ?? null) as number | null;
+    const pageLimitCost = (cd.page_limit_cost ?? cd.pageLimitCost ?? null) as number | null;
+    const fontFamily = (cd.font_family ?? cd.fontFamily ?? null) as string | null;
+    const fontSize = (cd.font_size ?? cd.fontSize ?? null) as string | null;
+    const margins = (cd.margins ?? null) as string | null;
+    const lineSpacing = (cd.line_spacing ?? cd.lineSpacing ?? null) as string | null;
+    const headerRequired = (cd.header_required ?? cd.headerRequired ?? null) as boolean | null;
+    const headerFormat = (cd.header_format ?? cd.headerFormat ?? null) as string | null;
+    const footerRequired = (cd.footer_required ?? cd.footerRequired ?? null) as boolean | null;
+    const footerFormat = (cd.footer_format ?? cd.footerFormat ?? null) as string | null;
+    const submissionFormat = (cd.submission_format ?? cd.submissionFormat ?? null) as string | null;
+    const slidesAllowed = (cd.slides_allowed ?? cd.slidesAllowed ?? null) as boolean | null;
+    const slideLimit = (cd.slide_limit ?? cd.slideLimit ?? null) as number | null;
+    const tabaAllowed = (cd.taba_allowed ?? cd.tabaAllowed ?? null) as boolean | null;
+    const piMustBeEmployee = (cd.pi_must_be_employee ?? cd.piMustBeEmployee ?? null) as boolean | null;
+    const partnerMaxPct = (cd.partner_max_pct ?? cd.partnerMaxPct ?? null) as number | null;
+    const clearanceRequired = (cd.clearance_required ?? cd.clearanceRequired ?? null) as string | null;
+    const itarRequired = (cd.itar_required ?? cd.itarRequired ?? null) as boolean | null;
+
     for (const topicId of topicIds) {
       // 1. Upsert solicitation_compliance for this topic
       // Check if a row exists for this topic
@@ -179,24 +200,24 @@ export async function POST(request: Request, ctx: RouteContext) {
       if (existing.length > 0) {
         await sql`
           UPDATE solicitation_compliance SET
-            page_limit_technical = ${(cd.page_limit_technical as number) ?? null},
-            page_limit_cost = ${(cd.page_limit_cost as number) ?? null},
-            font_family = ${(cd.font_family as string) ?? null},
-            font_size = ${(cd.font_size as string) ?? null},
-            margins = ${(cd.margins as string) ?? null},
-            line_spacing = ${(cd.line_spacing as string) ?? null},
-            header_required = ${(cd.header_required as boolean) ?? false},
-            header_format = ${(cd.header_format as string) ?? null},
-            footer_required = ${(cd.footer_required as boolean) ?? false},
-            footer_format = ${(cd.footer_format as string) ?? null},
-            submission_format = ${(cd.submission_format as string) ?? null},
-            slides_allowed = ${(cd.slides_allowed as boolean) ?? false},
-            slide_limit = ${(cd.slide_limit as number) ?? null},
-            taba_allowed = ${(cd.taba_allowed as boolean) ?? null},
-            pi_must_be_employee = ${(cd.pi_must_be_employee as boolean) ?? null},
-            partner_max_pct = ${(cd.partner_max_pct as number) ?? null},
-            clearance_required = ${(cd.clearance_required as string) ?? null},
-            itar_required = ${(cd.itar_required as boolean) ?? false},
+            page_limit_technical = ${pageLimitTechnical},
+            page_limit_cost = ${pageLimitCost},
+            font_family = ${fontFamily},
+            font_size = ${fontSize},
+            margins = ${margins},
+            line_spacing = ${lineSpacing},
+            header_required = ${headerRequired ?? false},
+            header_format = ${headerFormat},
+            footer_required = ${footerRequired ?? false},
+            footer_format = ${footerFormat},
+            submission_format = ${submissionFormat},
+            slides_allowed = ${slidesAllowed ?? false},
+            slide_limit = ${slideLimit},
+            taba_allowed = ${tabaAllowed},
+            pi_must_be_employee = ${piMustBeEmployee},
+            partner_max_pct = ${partnerMaxPct},
+            clearance_required = ${clearanceRequired},
+            itar_required = ${itarRequired ?? false},
             verified_by = ${user.id ?? null},
             verified_at = now(),
             updated_at = now()
@@ -215,24 +236,24 @@ export async function POST(request: Request, ctx: RouteContext) {
             verified_by, verified_at
           ) VALUES (
             ${solId}::uuid, ${topicId}::uuid,
-            ${(cd.page_limit_technical as number) ?? null},
-            ${(cd.page_limit_cost as number) ?? null},
-            ${(cd.font_family as string) ?? null},
-            ${(cd.font_size as string) ?? null},
-            ${(cd.margins as string) ?? null},
-            ${(cd.line_spacing as string) ?? null},
-            ${(cd.header_required as boolean) ?? false},
-            ${(cd.header_format as string) ?? null},
-            ${(cd.footer_required as boolean) ?? false},
-            ${(cd.footer_format as string) ?? null},
-            ${(cd.submission_format as string) ?? null},
-            ${(cd.slides_allowed as boolean) ?? false},
-            ${(cd.slide_limit as number) ?? null},
-            ${(cd.taba_allowed as boolean) ?? null},
-            ${(cd.pi_must_be_employee as boolean) ?? null},
-            ${(cd.partner_max_pct as number) ?? null},
-            ${(cd.clearance_required as string) ?? null},
-            ${(cd.itar_required as boolean) ?? false},
+            ${pageLimitTechnical},
+            ${pageLimitCost},
+            ${fontFamily},
+            ${fontSize},
+            ${margins},
+            ${lineSpacing},
+            ${headerRequired ?? false},
+            ${headerFormat},
+            ${footerRequired ?? false},
+            ${footerFormat},
+            ${submissionFormat},
+            ${slidesAllowed ?? false},
+            ${slideLimit},
+            ${tabaAllowed},
+            ${piMustBeEmployee},
+            ${partnerMaxPct},
+            ${clearanceRequired},
+            ${itarRequired ?? false},
             ${user.id ?? null},
             now()
           )

@@ -50,6 +50,7 @@ export function UploadForm() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [primaryIndex, setPrimaryIndex] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [agency, setAgency] = useState('');
   const [office, setOffice] = useState('');

@@ -156,6 +156,11 @@ const COMPLIANCE_FIELDS = [
   { key: 'fontFamily', label: 'Font Family', type: 'text' },
   { key: 'fontSize', label: 'Font Size', type: 'text' },
   { key: 'margins', label: 'Margins', type: 'text' },
+  { key: 'lineSpacing', label: 'Line Spacing', type: 'text' },
+  { key: 'headerRequired', label: 'Header Required', type: 'bool' },
+  { key: 'headerFormat', label: 'Header Format', type: 'text' },
+  { key: 'footerRequired', label: 'Footer Required', type: 'bool' },
+  { key: 'footerFormat', label: 'Footer Format', type: 'text' },
   { key: 'submissionFormat', label: 'Submission Format', type: 'text' },
   { key: 'slidesAllowed', label: 'Slides Allowed', type: 'bool' },
   { key: 'slideLimit', label: 'Slide Limit', type: 'int' },
@@ -668,6 +673,70 @@ export function CurationWorkspace({
             onDocumentsChanged={() => router.refresh()}
           />
 
+          {/* PDF Viewer (side-by-side source) — or text fallback */}
+          {sourcePdf ? (
+            <div className="border rounded-lg overflow-hidden relative">
+              <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
+                <h2 className="text-sm font-semibold text-gray-700">
+                  Source Document — {sourcePdf.originalFilename}
+                  {annotations.length > 0 && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                      {annotations.length} tag{annotations.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </h2>
+                <span className="text-xs text-gray-400">
+                  Select text to tag as a compliance variable
+                </span>
+              </div>
+              <PdfViewer
+                ref={pdfViewerRef}
+                documentId={sourcePdf.id}
+                onTextSelect={handleTextSelect}
+                highlights={annotations.map((a) => ({
+                  id: a.id,
+                  pageNumber: a.pageNumber,
+                  sourceExcerpt: a.sourceExcerpt,
+                  variableName: a.complianceVariableName,
+                }))}
+                width={650}
+              />
+              {textSelection && (
+                <TagPopover
+                  selectedText={textSelection.text}
+                  pageNumber={textSelection.pageNumber}
+                  anchor={textSelection.anchor}
+                  position={textSelection.rect}
+                  variables={variableCatalog}
+                  onTag={handleTag}
+                  onClose={() => setTextSelection(null)}
+                />
+              )}
+            </div>
+          ) : sol.fullText ? (
+            <div className="border rounded-lg p-4">
+              <h2 className="text-lg font-semibold mb-3">Source Text</h2>
+              <div className="max-h-96 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
+                {sol.fullText.slice(0, 10000)}
+                {sol.fullText.length > 10000 && (
+                  <div className="mt-2 text-gray-400 italic">
+                    ... truncated ({(sol.fullText.length / 1000).toFixed(0)}K chars total)
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="border rounded-lg p-4 text-center py-16 bg-gray-50">
+              <p className="text-gray-400">No source document uploaded yet.</p>
+              <a
+                href="/admin/rfp-curation/upload"
+                className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Upload an RFP
+              </a>
+            </div>
+          )}
+
           {/* Topics — the pursuable units under this solicitation */}
           <div id="section-topics" className="border rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
@@ -883,70 +952,6 @@ export function CurationWorkspace({
             </div>
           )}
 
-          {/* PDF Viewer (side-by-side source) — or text fallback */}
-          {sourcePdf ? (
-            <div className="border rounded-lg overflow-hidden relative">
-              <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b">
-                <h2 className="text-sm font-semibold text-gray-700">
-                  Source Document — {sourcePdf.originalFilename}
-                  {annotations.length > 0 && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                      {annotations.length} tag{annotations.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </h2>
-                <span className="text-xs text-gray-400">
-                  Select text to tag as a compliance variable
-                </span>
-              </div>
-              <PdfViewer
-                ref={pdfViewerRef}
-                documentId={sourcePdf.id}
-                onTextSelect={handleTextSelect}
-                highlights={annotations.map((a) => ({
-                  id: a.id,
-                  pageNumber: a.pageNumber,
-                  sourceExcerpt: a.sourceExcerpt,
-                  variableName: a.complianceVariableName,
-                }))}
-                width={650}
-              />
-              {textSelection && (
-                <TagPopover
-                  selectedText={textSelection.text}
-                  pageNumber={textSelection.pageNumber}
-                  anchor={textSelection.anchor}
-                  position={textSelection.rect}
-                  variables={variableCatalog}
-                  onTag={handleTag}
-                  onClose={() => setTextSelection(null)}
-                />
-              )}
-            </div>
-          ) : sol.fullText ? (
-            <div className="border rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-3">Source Text</h2>
-              <div className="max-h-96 overflow-y-auto text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
-                {sol.fullText.slice(0, 10000)}
-                {sol.fullText.length > 10000 && (
-                  <div className="mt-2 text-gray-400 italic">
-                    ... truncated ({(sol.fullText.length / 1000).toFixed(0)}K chars total)
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="border rounded-lg p-4 text-center py-16 bg-gray-50">
-              <p className="text-gray-400">No source document uploaded yet.</p>
-              <a
-                href="/admin/rfp-curation/upload"
-                className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Upload an RFP
-              </a>
-            </div>
-          )}
-
           {/* Description */}
           {sol.description && (
             <div className="border rounded-lg p-4">
@@ -957,7 +962,7 @@ export function CurationWorkspace({
         </div>
 
         {/* Right sidebar: Compliance Matrix + Metadata + History */}
-        <div className="space-y-6">
+        <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
           {/* Compliance Matrix */}
           <div id="section-compliance" className="border rounded-lg p-4">
             <h2 className="text-lg font-semibold mb-3">Compliance Matrix</h2>
