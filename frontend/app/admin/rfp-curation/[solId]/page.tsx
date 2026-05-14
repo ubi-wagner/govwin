@@ -389,6 +389,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
       initialAnnotations={initialAnnotations}
       customerInterest={customerInterest}
       currentUserId={session.user.id ?? ''}
+      userLookup={userLookup}
     />
   );
 }

@@ -24,13 +24,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'rfp_admin required', code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
+  }
   const solicitationId = body?.solicitationId;
-  if (!solicitationId) {
+  if (!solicitationId || typeof solicitationId !== 'string') {
     return NextResponse.json({ error: 'solicitationId required', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
-  const result = await extractTopicsForSolicitation(solicitationId);
-
-  return NextResponse.json({ data: result });
+  try {
+    const result = await extractTopicsForSolicitation(solicitationId);
+    return NextResponse.json({ data: result });
+  } catch (err) {
+    console.error('[extract-topics] extraction failed:', err);
+    return NextResponse.json({ error: 'Topic extraction failed', code: 'DB_ERROR' }, { status: 500 });
+  }
 }

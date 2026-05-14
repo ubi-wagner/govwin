@@ -134,6 +134,7 @@ interface Props {
   initialAnnotations: InitialAnnotation[];
   customerInterest: CustomerInterestItem[];
   currentUserId: string;
+  userLookup?: Record<string, { name: string; email: string | null }>;
 }
 
 const STATUS_FLOW: Record<string, string[]> = {
@@ -172,6 +173,7 @@ function snakeCase(s: string): string {
 export function CurationWorkspace({
   solicitation, compliance, triageHistory, activityEvents,
   topics, documents, volumes, initialAnnotations, customerInterest, currentUserId,
+  userLookup,
 }: Props) {
   const { invoke, loading, error } = useTool();
   const router = useRouter();
@@ -184,6 +186,7 @@ export function CurationWorkspace({
   const [showBulkAddTopics, setShowBulkAddTopics] = useState(false);
   const [showTopicCompliance, setShowTopicCompliance] = useState(false);
   const [extractedPasteText, setExtractedPasteText] = useState('');
+  const [extractingTopics, setExtractingTopics] = useState(false);
   const [topicsList, setTopicsList] = useState(topics);
 
   // Keep local topicsList in sync with server-provided topics after
@@ -431,9 +434,20 @@ export function CurationWorkspace({
           setSol((s) => ({ ...s, status: 'dismissed' }));
           break;
         }
-        case 'start_curation':
+        case 'start_curation': {
+          const resp = await fetch(`/api/admin/rfp-curation/${sol.id}/triage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'skip_shredder' }),
+          });
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert((err as { error?: string }).error ?? 'Failed to start curation');
+            return;
+          }
           setSol((s) => ({ ...s, status: 'curation_in_progress' }));
           break;
+        }
         case 'request_review':
           await invoke('solicitation.request_review', { solicitationId: sol.id });
           setSol((s) => ({ ...s, status: 'review_requested', curatedBy: currentUserId }));
@@ -498,6 +512,12 @@ export function CurationWorkspace({
     }
   };
 
+  // AI-extracted sections from the shredder
+  const aiData = sol.aiExtracted as {
+    sections?: Array<{ key: string; title: string; summary: string }>;
+    compliance_matches?: Array<{ variable_name: string; value: unknown; confidence: number }>;
+  } | null;
+
   // Merge AI-suggested (named columns) with human-verified (custom_variables)
   function getComplianceValue(camelKey: string): {
     value: unknown;
@@ -558,12 +578,6 @@ export function CurationWorkspace({
     }
     return { value: null, source: null, sourceExcerpt: null, sourcePage: null, documentName: null, anchor: null };
   }
-
-  // AI-extracted sections from the shredder
-  const aiData = sol.aiExtracted as {
-    sections?: Array<{ key: string; title: string; summary: string }>;
-    compliance_matches?: Array<{ variable_name: string; value: unknown; confidence: number }>;
-  } | null;
 
   return (
     <div className="max-w-6xl">
@@ -677,7 +691,9 @@ export function CurationWorkspace({
                   </button>
                 )}
                 <button
+                  disabled={extractingTopics}
                   onClick={async () => {
+                    setExtractingTopics(true);
                     try {
                       const resp = await fetch('/api/admin/extract-topics', {
                         method: 'POST',
@@ -700,11 +716,13 @@ export function CurationWorkspace({
                       setShowBulkAddTopics(true);
                     } catch {
                       alert('Failed to extract topics from the PDF.');
+                    } finally {
+                      setExtractingTopics(false);
                     }
                   }}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded"
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Extract Topics
+                  {extractingTopics ? 'Extracting...' : 'Extract Topics'}
                 </button>
                 <button
                   onClick={() => setShowBulkAddTopics(true)}
@@ -970,7 +988,7 @@ export function CurationWorkspace({
                                 if (e.key === 'Enter') handleSaveVariable(field.key);
                                 if (e.key === 'Escape') { setEditingVar(null); setEditValue(''); }
                               }}
-                              className="w-32 text-sm border rounded px-2 py-1"
+                              className="flex-1 text-sm border rounded px-2 py-1"
                               autoFocus
                             />
                             <button
@@ -1062,15 +1080,15 @@ export function CurationWorkspace({
               </div>
               <div>
                 <dt className="text-gray-500">Claimed By</dt>
-                <dd>{sol.claimedBy ?? '—'}</dd>
+                <dd>{sol.claimedBy ? (userLookup?.[sol.claimedBy]?.name ?? sol.claimedBy) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Curated By</dt>
-                <dd>{sol.curatedBy ?? '—'}</dd>
+                <dd>{sol.curatedBy ? (userLookup?.[sol.curatedBy]?.name ?? sol.curatedBy) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Approved By</dt>
-                <dd>{sol.approvedBy ?? '—'}</dd>
+                <dd>{sol.approvedBy ? (userLookup?.[sol.approvedBy]?.name ?? sol.approvedBy) : '—'}</dd>
               </div>
             </dl>
           </div>
@@ -1988,6 +2006,12 @@ function VolumesPanel({
     if (!confirm('Delete this required item?')) return;
     try {
       await invoke('volume.delete_required_item', { itemId });
+      setVolumes((prev) =>
+        prev.map((v) => ({
+          ...v,
+          items: v.items ? v.items.filter((i: { id: string }) => i.id !== itemId) : v.items,
+        }))
+      );
       router.refresh();
     } catch {
       /* surfaced via useTool error */

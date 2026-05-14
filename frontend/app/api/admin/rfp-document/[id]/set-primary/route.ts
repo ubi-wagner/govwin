@@ -49,18 +49,12 @@ export async function POST(_req: Request, ctx: RouteContext) {
   }
 
   const doc = docRows[0];
-    // Clear all primary flags for this solicitation, then set the new one
+    // Atomically set the primary flag on the target and clear it from others
+    const docId = id;
     await sql`
       UPDATE solicitation_documents
-      SET is_primary = false
+      SET is_primary = (id = ${docId}::uuid)
       WHERE solicitation_id = ${doc.solicitationId}::uuid
-        AND is_primary = true
-    `;
-
-    await sql`
-      UPDATE solicitation_documents
-      SET is_primary = true
-      WHERE id = ${id}::uuid
     `;
 
     const userId = (session.user as { id?: string }).id;
