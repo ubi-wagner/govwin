@@ -158,6 +158,7 @@ async def _execute_notify(
     conn: asyncpg.Connection,
     action: str,
     inputs: dict[str, Any],
+    trigger_event: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute a notification step by emitting a system event.
 
@@ -188,6 +189,10 @@ async def _execute_notify(
         "template": template,
         **{k: v for k, v in inputs.items() if k not in ("channel",)},
     }
+
+    # Include the trigger event ID so the CMS can cross-reference for dedup
+    if trigger_event and trigger_event.get("id"):
+        notification_payload["trigger_event_id"] = str(trigger_event["id"])
 
     # Emit a system event that the CRM event_listener will pick up
     try:
@@ -238,6 +243,7 @@ async def _execute_step(
     conn: asyncpg.Connection,
     step: Any,
     inputs: dict[str, Any],
+    trigger_event: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Dispatch a single workflow step by its type."""
     if step.step_type == StepType.ACTION:
@@ -247,7 +253,7 @@ async def _execute_step(
         return await _execute_ai_invoke(conn, step.action, inputs)
 
     if step.step_type == StepType.NOTIFY:
-        return await _execute_notify(conn, step.action, inputs)
+        return await _execute_notify(conn, step.action, inputs, trigger_event=trigger_event)
 
     if step.step_type == StepType.HITL_WAIT:
         log.info(
@@ -310,7 +316,7 @@ async def _run_workflow(
         inputs = resolve_inputs(step.input_map, event, step_results)
 
         try:
-            result = await _execute_step(conn, step, inputs)
+            result = await _execute_step(conn, step, inputs, trigger_event=event)
             step_results[step.name] = result
 
             await emit_event(

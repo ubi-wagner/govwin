@@ -186,16 +186,87 @@ async def _execute_rule(rule, col_names: set, event):
     # Get action type
     action_type = rule.get('action_type') or config.get('type', '')
 
+    rule_id = rule.get('id')
+    event_id = event.get('id')
+
     # If actions is a list of action objects, process each
     if isinstance(config, list):
         for action in config:
-            await _do_action(action.get('type', ''), action, payload, event)
+            act_type = action.get('type', '')
+            try:
+                # Dedup check
+                if act_type in ('send_email', 'notify_admin') and pool:
+                    if await _check_dedup(pool, event_id, act_type):
+                        logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
+                        continue
+                await _do_action(act_type, action, payload, event)
+                if pool:
+                    await _log_rule_execution(pool, rule_id, event_id, act_type, 'success',
+                                              result={'action': act_type})
+            except Exception as e:
+                logger.error(f'Rule action {act_type} failed for {event_id}: {e}')
+                if pool:
+                    await _log_rule_execution(pool, rule_id, event_id, act_type, 'error',
+                                              error_message=str(e))
     elif action_type:
-        await _do_action(action_type, config, payload, event)
+        try:
+            # Dedup check
+            if action_type in ('send_email', 'notify_admin') and pool:
+                if await _check_dedup(pool, event_id, action_type):
+                    logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
+                    return
+            await _do_action(action_type, config, payload, event)
+            if pool:
+                await _log_rule_execution(pool, rule_id, event_id, action_type, 'success',
+                                          result={'action': action_type})
+        except Exception as e:
+            logger.error(f'Rule action {action_type} failed for {event_id}: {e}')
+            if pool:
+                await _log_rule_execution(pool, rule_id, event_id, action_type, 'error',
+                                          error_message=str(e))
     else:
         # Try to infer action from the config structure
         if config.get('template') or config.get('to'):
-            await _do_action('send_email', config, payload, event)
+            inferred_type = 'send_email'
+            try:
+                if pool:
+                    if await _check_dedup(pool, event_id, inferred_type):
+                        logger.info("Skipping duplicate action %s for event %s", inferred_type, event_id)
+                        return
+                await _do_action(inferred_type, config, payload, event)
+                if pool:
+                    await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'success',
+                                              result={'action': inferred_type})
+            except Exception as e:
+                logger.error(f'Rule action {inferred_type} failed for {event_id}: {e}')
+                if pool:
+                    await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'error',
+                                              error_message=str(e))
+
+
+async def _log_rule_execution(conn, rule_id, trigger_event_id, action_type, status, result=None, error_message=None):
+    """Insert a row into automation_log to record a rule execution."""
+    try:
+        await conn.execute("""
+            INSERT INTO automation_log (rule_id, trigger_event_id, action_type, status, result, error_message)
+            VALUES ($1::uuid, $2::uuid, $3, $4, $5::jsonb, $6)
+        """, rule_id, str(trigger_event_id) if trigger_event_id else None,
+            action_type, status,
+            json.dumps(result) if result else None,
+            error_message)
+    except Exception as e:
+        logger.error(f'[_log_rule_execution] Failed to log rule execution: {e}')
+
+
+async def _check_dedup(conn, trigger_event_id, action_type):
+    """Check if this action was already executed for this event recently."""
+    row = await conn.fetchrow("""
+        SELECT id FROM automation_log
+        WHERE trigger_event_id = $1::uuid AND action_type = $2 AND status = 'success'
+          AND executed_at > NOW() - INTERVAL '5 minutes'
+        LIMIT 1
+    """, str(trigger_event_id), action_type)
+    return row is not None
 
 
 async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) -> str | None:
@@ -287,6 +358,8 @@ async def _handle_notification_requested(event) -> None:
         logger.warning('notification.requested event has no payload, skipping')
         return
 
+    pool = get_event_pool()
+
     channel = payload.get('channel', 'email')
     if channel != 'email':
         logger.info(f'notification.requested channel={channel} not supported in V1, skipping')
@@ -331,12 +404,29 @@ async def _handle_notification_requested(event) -> None:
 
     subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
 
+    # Check for dedup using trigger_event_id from the workflow NOTIFY step
+    trigger_event_id = payload.get('trigger_event_id')
+    if trigger_event_id and pool:
+        if await _check_dedup(pool, trigger_event_id, 'send_email'):
+            logger.info("Skipping duplicate notification.requested for trigger event %s", trigger_event_id)
+            return
+
     result = await send_email(
         to=to_email,
         subject=subject,
         html=html,
     )
     logger.info(f'notification.requested: sent "{template_name}" to {to_email}: {result}')
+
+    # Log to automation_log for dedup cross-referencing
+    if trigger_event_id and pool:
+        try:
+            await _log_rule_execution(
+                pool, None, trigger_event_id, 'send_email', 'success',
+                result={'action': 'send_email', 'template': template_name, 'recipient': to_email,
+                        'source': 'notification.requested'})
+        except Exception as e:
+            logger.error(f'Failed to log notification.requested to automation_log: {e}')
 
 
 async def _do_action(action_type: str, config: dict, payload: dict, event):
