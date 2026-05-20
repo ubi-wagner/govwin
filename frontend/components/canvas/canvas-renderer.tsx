@@ -202,6 +202,7 @@ function NodeRenderer({
     marginLeft: node.style.indent ? node.style.indent * scale : undefined,
     paddingTop: (node.style.space_before ?? 4) * scale,
     paddingBottom: (node.style.space_after ?? 4) * scale,
+    color: node.style.color ?? undefined,
   };
 
   return (
@@ -255,6 +256,14 @@ function HeadingNode({ content, scale, readOnly, onUpdate, isSelected }: {
           <option value={2}>H2</option>
           <option value={3}>H3</option>
         </select>
+        <input
+          type="text"
+          value={content.numbering ?? ''}
+          onChange={(e) => onUpdate({ ...content, numbering: e.target.value || undefined })}
+          placeholder="#"
+          className="w-10 text-xs border rounded px-1 py-0.5 text-center text-gray-500"
+          title="Section numbering (e.g., 1.1)"
+        />
         <input
           type="text"
           value={content.text}
@@ -427,6 +436,27 @@ function ListNode({ content, ordered, readOnly, onUpdate, isSelected }: {
               className="flex-1 text-sm border-0 border-b border-gray-200 bg-transparent outline-none focus:border-blue-400 py-0.5"
             />
             <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const items = [...content.items];
+                items[i] = { ...items[i], indent_level: Math.max(0, (items[i].indent_level ?? 0) - 1) };
+                onUpdate({ ...content, items });
+              }}
+              className="text-gray-400 hover:text-gray-600 text-xs px-0.5"
+              title="Outdent"
+              disabled={(content.items[i].indent_level ?? 0) === 0}
+            >{'<'}</button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const items = [...content.items];
+                items[i] = { ...items[i], indent_level: (items[i].indent_level ?? 0) + 1 };
+                onUpdate({ ...content, items });
+              }}
+              className="text-gray-400 hover:text-gray-600 text-xs px-0.5"
+              title="Indent"
+            >{'>'}</button>
+            <button
               onClick={(e) => { e.stopPropagation(); const items = content.items.filter((_, j) => j !== i); onUpdate({ ...content, items: items.length > 0 ? items : [{ text: '' }] }); }}
               className="text-red-400 hover:text-red-600 text-xs px-1"
               title="Remove item"
@@ -546,6 +576,27 @@ function ImageNode({ content, readOnly, onUpdate, isSelected }: {
               placeholder="Caption"
               className="text-xs border rounded px-2 py-1 w-full max-w-xs"
             />
+            <div className="flex items-center gap-2 mt-1">
+              <label className="text-[10px] text-gray-400">W:</label>
+              <input
+                type="number"
+                value={content.width || ''}
+                onChange={(e) => onUpdate({ ...content, width: parseInt(e.target.value) || 400 })}
+                className="w-16 text-xs border rounded px-1 py-0.5"
+                min="50"
+                max="2000"
+              />
+              <label className="text-[10px] text-gray-400">H:</label>
+              <input
+                type="number"
+                value={content.height || ''}
+                onChange={(e) => onUpdate({ ...content, height: parseInt(e.target.value) || 300 })}
+                className="w-16 text-xs border rounded px-1 py-0.5"
+                min="50"
+                max="2000"
+              />
+              <span className="text-[10px] text-gray-400">px</span>
+            </div>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="text-xs text-blue-600 hover:underline"
@@ -677,6 +728,13 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
     onUpdate({ ...content, rows });
   };
 
+  const deleteCol = (colIndex: number) => {
+    if (content.headers.length <= 1) return;
+    const headers = content.headers.filter((_, i) => i !== colIndex);
+    const rows = content.rows.map(row => row.filter((_, i) => i !== colIndex));
+    onUpdate({ ...content, headers, rows });
+  };
+
   if (isSelected && !readOnly) {
     return (
       <div className="my-2">
@@ -687,8 +745,17 @@ function TableNode({ content, readOnly, onUpdate, isSelected }: {
                 const cell = resolveTableCell(h);
                 return (
                   <th key={i} className={`text-left font-semibold ${cellBorder}`}>
-                    <input type="text" value={cell.text} onChange={(e) => updateHeader(i, e.target.value)}
-                      className="w-full bg-transparent border-0 outline-none font-semibold text-sm" />
+                    <div className="flex flex-col">
+                      <input type="text" value={cell.text} onChange={(e) => updateHeader(i, e.target.value)}
+                        className="w-full bg-transparent border-0 outline-none font-semibold text-sm" />
+                      {content.headers.length > 1 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteCol(i); }}
+                          className="text-[9px] text-red-400 hover:text-red-600 leading-none self-center mt-0.5"
+                          title="Delete column"
+                        >x</button>
+                      )}
+                    </div>
                   </th>
                 );
               })}

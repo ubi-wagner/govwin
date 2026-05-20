@@ -176,7 +176,11 @@ function nodeToDocx(
 
     case 'text_block': {
       const c = node.content as TextBlockContent;
-      const runs = createFormattedRuns(c, font, size);
+      const runs = createFormattedRuns(c, font, size, {
+        color: node.style.color,
+        bold: node.style.weight === 'bold',
+        italic: node.style.style === 'italic',
+      });
       return [new Paragraph({
         alignment,
         indent: node.style.indent ? { left: node.style.indent * 20 } : undefined,
@@ -319,9 +323,14 @@ function createFormattedRuns(
   content: TextBlockContent,
   font: string,
   size: number,
+  nodeStyle?: { color?: string; bold?: boolean; italic?: boolean },
 ): TextRun[] {
+  const defaultColor = nodeStyle?.color?.replace('#', '') || undefined;
+  const defaultBold = nodeStyle?.bold || undefined;
+  const defaultItalic = nodeStyle?.italic || undefined;
+
   if (!content.inline_formats || content.inline_formats.length === 0) {
-    return [new TextRun({ text: content.text, font, size })];
+    return [new TextRun({ text: content.text, font, size, color: defaultColor, bold: defaultBold, italics: defaultItalic })];
   }
 
   const text = content.text;
@@ -359,11 +368,12 @@ function createFormattedRuns(
       text: segText,
       font,
       size,
-      bold: isBold || undefined,
-      italics: isItalic || undefined,
+      bold: isBold || defaultBold || undefined,
+      italics: isItalic || defaultItalic || undefined,
       underline: isUnderline ? {} : undefined,
       superScript: isSuperscript || undefined,
       subScript: isSubscript || undefined,
+      color: defaultColor,
     }));
   }
 
