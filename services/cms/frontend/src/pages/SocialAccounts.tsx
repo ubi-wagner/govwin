@@ -4,11 +4,14 @@ import { api } from '../lib/api'
 interface SocialAccount {
   id: string
   platform: string
-  handle: string
-  display_name: string
+  account_name: string
+  platform_account_id: string | null
   status: string
-  followers: number
+  tenant_id: string | null
+  token_expires_at: string | null
+  metadata: Record<string, unknown>
   created_at: string
+  updated_at: string
 }
 
 const platformColors: Record<string, string> = {
@@ -58,10 +61,12 @@ export default function SocialAccounts() {
                   {a.status}
                 </span>
               </div>
-              <div className="font-medium text-slate-900">{a.display_name}</div>
-              <div className="text-sm text-gray-500">@{a.handle}</div>
-              {a.followers != null && (
-                <div className="text-xs text-gray-400 mt-2">{a.followers.toLocaleString()} followers</div>
+              <div className="font-medium text-slate-900">{a.account_name}</div>
+              {a.platform_account_id && (
+                <div className="text-sm text-gray-500">{a.platform_account_id}</div>
+              )}
+              {a.token_expires_at && (
+                <div className="text-xs text-gray-400 mt-2">Token expires: {new Date(a.token_expires_at).toLocaleDateString()}</div>
               )}
             </div>
           ))}

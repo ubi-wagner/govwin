@@ -4,17 +4,16 @@ import { api } from '../lib/api'
 interface SocialPost {
   id: string
   platform: string
-  account_id: string
-  content: string
+  social_account_id: string
+  post_text: string
+  media_urls: string[]
+  link_url: string | null
   status: string
   scheduled_at: string | null
-  published_at: string | null
+  posted_at: string | null
+  engagement_data: Record<string, unknown> | null
+  error_message: string | null
   created_at: string
-  metrics: {
-    likes?: number
-    shares?: number
-    comments?: number
-  } | null
 }
 
 const statusColors: Record<string, string> = {

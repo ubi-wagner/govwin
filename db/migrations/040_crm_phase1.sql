@@ -10,7 +10,12 @@
 -- live in the CMS Postgres database. See CMS migration 006.
 -- =============================================================================
 
--- 0. Extend action_type CHECK to support CRM automation actions
+-- 0a. Extend pipeline_jobs.kind CHECK to support AI draft/review jobs
+ALTER TABLE pipeline_jobs DROP CONSTRAINT IF EXISTS pipeline_jobs_kind_check;
+ALTER TABLE pipeline_jobs ADD CONSTRAINT pipeline_jobs_kind_check
+    CHECK (kind IN ('ingest', 'shred_solicitation', 'scout_source', 'draft_section', 'review_section'));
+
+-- 0b. Extend action_type CHECK to support CRM automation actions
 ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
 ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
     CHECK (action_type IN ('log_only','queue_notification','queue_job','emit_event',

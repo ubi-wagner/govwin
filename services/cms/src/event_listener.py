@@ -33,7 +33,7 @@ async def send_email(to: str, subject: str, html: str) -> dict:
             subject=subject,
             body_html=html,
         )
-        return {'provider': 'gmail', 'messageId': result.get('message_id')}
+        return {'provider': 'gmail', 'message_id': result.get('message_id')}
     except Exception as e:
         logger.error('send_email failed: %s', e)
         return {'provider': 'gmail', 'error': str(e)}

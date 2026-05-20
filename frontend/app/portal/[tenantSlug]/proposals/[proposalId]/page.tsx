@@ -262,12 +262,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       namespace: string;
       type: string;
       phase: string;
-      actor_type: string | null;
-      actor_email: string | null;
+      actorType: string | null;
+      actorEmail: string | null;
       payload: Record<string, unknown> | null;
       error: Record<string, unknown> | null;
-      duration_ms: number | null;
-      created_at: Date;
+      durationMs: number | null;
+      createdAt: Date;
     }[]>`
       SELECT id, namespace, type, phase, actor_type, actor_email,
              payload, error, duration_ms, created_at
@@ -285,12 +285,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       namespace: r.namespace,
       type: r.type,
       phase: r.phase,
-      actorType: r.actor_type,
-      actorEmail: r.actor_email,
+      actorType: r.actorType,
+      actorEmail: r.actorEmail,
       payload: r.payload,
       error: r.error,
-      durationMs: r.duration_ms,
-      createdAt: r.created_at.toISOString(),
+      durationMs: r.durationMs,
+      createdAt: r.createdAt.toISOString(),
     }));
   } catch (e) {
     console.error('[portal/proposals/workspace] events query error:', e);

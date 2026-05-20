@@ -1,13 +1,33 @@
 import { useEffect, useState, useCallback } from 'react'
 import { api } from '../lib/api'
 
+interface OutboxSend {
+  recipient_email: string
+  recipient_name: string | null
+  subject: string
+  body_html: string | null
+  body_text: string | null
+  template_id: string | null
+  campaign_id: string | null
+  tenant_id: string | null
+  user_id: string | null
+  send_status: string
+  original_subject: string | null
+  was_modified: boolean
+  account_id: string | null
+}
+
 interface OutboxItem {
   id: string
-  to_email: string
-  subject: string
+  send_id: string
   status: string
-  campaign_id: string
-  scheduled_at: string
+  claimed_by: string | null
+  claimed_by_name: string | null
+  priority: number
+  category: string | null
+  recipient_preview: string | null
+  subject_preview: string | null
+  send: OutboxSend
   created_at: string
 }
 
@@ -30,7 +50,11 @@ export default function EmailOutbox() {
   async function handleAction(id: string, action: 'approve' | 'reject') {
     setActionLoading(id)
     try {
-      await api.patch(`/email/outbox/${id}`, { status: action === 'approve' ? 'approved' : 'rejected' })
+      if (action === 'approve') {
+        await api.post(`/email/outbox/${id}/approve`, { approved_by: 'cms_admin' })
+      } else {
+        await api.post(`/email/outbox/${id}/reject`, { rejected_by: 'cms_admin', reason: 'Rejected from outbox UI' })
+      }
       setItems((prev) => prev.filter((i) => i.id !== id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed')
@@ -67,12 +91,15 @@ export default function EmailOutbox() {
             <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-medium text-slate-900">{item.subject}</div>
-                  <div className="text-sm text-gray-500 mt-1">To: {item.to_email}</div>
-                  {item.scheduled_at && (
-                    <div className="text-xs text-gray-400 mt-1">
-                      Scheduled: {new Date(item.scheduled_at).toLocaleString()}
-                    </div>
+                  <div className="font-medium text-slate-900">{item.send?.subject ?? item.subject_preview}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    To: {item.send ? `${item.send.recipient_name ?? ''} <${item.send.recipient_email}>` : item.recipient_preview}
+                  </div>
+                  {item.category && (
+                    <div className="text-xs text-gray-400 mt-1">Category: {item.category}</div>
+                  )}
+                  {item.claimed_by_name && (
+                    <div className="text-xs text-blue-500 mt-1">Claimed by: {item.claimed_by_name}</div>
                   )}
                 </div>
                 <div className="flex gap-2">

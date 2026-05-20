@@ -57,6 +57,12 @@ CREATE INDEX IF NOT EXISTS idx_email_sends_trigger_metadata
     ON email_sends ((trigger_metadata->>'namespace'))
     WHERE trigger_metadata != '{}';
 
+-- Extend reply_intent to include trigger-based classifications
+ALTER TABLE email_engagement DROP CONSTRAINT IF EXISTS email_engagement_reply_intent_check;
+ALTER TABLE email_engagement ADD CONSTRAINT email_engagement_reply_intent_check
+    CHECK (reply_intent IN ('question', 'interest', 'complaint', 'unsubscribe',
+                            'out_of_office', 'decline', 'help_request', 'feedback', 'urgent', 'other', NULL));
+
 -- =============================================================================
 -- SEED TEMPLATES — Common outreach and response scenarios
 -- =============================================================================

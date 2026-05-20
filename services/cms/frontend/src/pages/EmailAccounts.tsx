@@ -3,10 +3,10 @@ import { api } from '../lib/api'
 
 interface EmailAccount {
   id: string
-  email: string
-  provider: string
+  email_address: string
   display_name: string
-  status: string
+  account_type: string
+  is_active: boolean
   created_at: string
 }
 
@@ -51,14 +51,14 @@ export default function EmailAccounts() {
             <tbody className="divide-y divide-gray-100">
               {accounts.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{a.email}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900">{a.email_address}</td>
                   <td className="px-4 py-3 text-gray-600">{a.display_name}</td>
-                  <td className="px-4 py-3 text-gray-600">{a.provider}</td>
+                  <td className="px-4 py-3 text-gray-600">{a.account_type}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                      a.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      a.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                     }`}>
-                      {a.status}
+                      {a.is_active ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(a.created_at).toLocaleDateString()}</td>
