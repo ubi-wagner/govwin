@@ -1,5 +1,5 @@
 """
-RFP Pipeline — Main Worker Process
+RFP Pipeline — Main Worker Process (v2.1)
 
 Runs the ingester cron dispatcher + job consumer loop. Polls
 pipeline_schedules every 60 seconds for due jobs, inserts
