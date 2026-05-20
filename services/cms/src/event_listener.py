@@ -239,7 +239,7 @@ async def _execute_rule(rule, col_names: set, event):
         except Exception as e:
             logger.error(f'Rule action {action_type} failed for {event_id}: {e}')
             if pool:
-                await _log_rule_execution(pool, rule_id, event_id, action_type, 'error',
+                await _log_rule_execution(pool, rule_id, event_id, action_type, 'failed',
                                           error_message=str(e))
     else:
         # Try to infer action from the config structure
@@ -257,7 +257,7 @@ async def _execute_rule(rule, col_names: set, event):
             except Exception as e:
                 logger.error(f'Rule action {inferred_type} failed for {event_id}: {e}')
                 if pool:
-                    await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'error',
+                    await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'failed',
                                               error_message=str(e))
 
 
@@ -519,7 +519,7 @@ async def _action_enroll_drip(config: dict, payload: dict, event):
             elif tenant_id:
                 row = await shared_pool.fetchrow(
                     '''SELECT COALESCE(t.billing_email, u.email) as email,
-                              COALESCE(u.name, t.company_name) as name
+                              COALESCE(u.name, t.name) as name
                        FROM tenants t
                        LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
                        WHERE t.id = $1::uuid LIMIT 1''',
