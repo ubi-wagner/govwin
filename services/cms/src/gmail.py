@@ -1,4 +1,10 @@
-"""Gmail API via OAuth2 refresh token."""
+"""Gmail API via OAuth2 refresh token.
+
+DEPRECATED: This module uses personal OAuth2 credentials (refresh token flow).
+New code should use workers/gmail_client.py which authenticates via Google Workspace
+domain-wide delegation with a service account. This module is still used by
+event_listener.py and will be migrated in a future pass.
+"""
 import asyncio
 import base64
 import logging

@@ -19,10 +19,26 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .models.database import init_db, close_db, init_event_bridge, close_event_bridge
 from .routers import health, email, content
+from .routers.media import router as media_router
 from .event_listener import start_event_listener, stop_event_listener
+from .middleware.auth import APIKeyMiddleware
+from .workers.content_generator import generation_loop
+from .workers.email_queue import queue_loop
+from .workers.email_sweep import sweep_loop
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger('cms')
+
+
+async def _run_worker(name: str, coro):
+    """Run a worker loop with crash isolation — log errors, don't propagate."""
+    try:
+        await coro()
+    except asyncio.CancelledError:
+        logger.info('Worker %s cancelled', name)
+    except Exception:
+        logger.exception('Worker %s crashed', name)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,9 +48,21 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_event_bridge()
     await start_event_listener()
+
+    # Launch background worker loops
+    worker_tasks = [
+        asyncio.create_task(_run_worker('content_generator', generation_loop)),
+        asyncio.create_task(_run_worker('email_queue', queue_loop)),
+        asyncio.create_task(_run_worker('email_sweep', sweep_loop)),
+    ]
     logger.info('CMS-CRM service ready (env=%s)', env)
+
     yield
+
     logger.info('CMS-CRM service shutting down...')
+    for t in worker_tasks:
+        t.cancel()
+    await asyncio.gather(*worker_tasks, return_exceptions=True)
     await stop_event_listener()
     await close_event_bridge()
     await close_db()
@@ -43,7 +71,9 @@ app = FastAPI(title="RFP Pipeline CMS-CRM", version="1.0.0", lifespan=lifespan)
 
 origins = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(APIKeyMiddleware)
 
 app.include_router(health.router, tags=["health"])
 app.include_router(email.router, prefix="/api/email", tags=["email"])
 app.include_router(content.router, prefix="/api/content", tags=["content"])
+app.include_router(media_router, prefix="/api/media", tags=["media"])

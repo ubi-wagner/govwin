@@ -51,7 +51,7 @@ async def emit_event(
                         (namespace, type, phase, actor_type, actor_id, payload)
                     VALUES ($1, $2, 'single', $3, $4, $5::jsonb)
                     """,
-                    'cms',
+                    'system',
                     event_type,
                     'user' if user_id else 'system',
                     user_id or 'cms_service',
