@@ -1,9 +1,8 @@
 """
 Social media management API routes.
 
-CRUD for social accounts and posts. These read/write to Main Postgres
-via the event bridge pool (social_accounts and social_posts tables
-are in Main Postgres).
+CRUD for social accounts and posts. These tables live in the CMS Postgres
+database (migrated from Main Postgres in CMS migration 006).
 """
 import asyncio
 import json
@@ -14,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from ..models.database import get_event_pool
+from ..models.database import get_pool
 from ..models.events import emit_event
 
 logger = logging.getLogger('cms.social')
@@ -26,12 +25,12 @@ def _fire_event(event_type: str, **kwargs):
     asyncio.create_task(emit_event(event_type, entity_type='social', **kwargs))
 
 
-def _get_shared_pool():
-    """Get the shared DB pool, raising 503 if unavailable."""
-    pool = get_event_pool()
-    if not pool:
-        raise HTTPException(503, 'Shared database not connected')
-    return pool
+def _get_cms_pool():
+    """Get the CMS DB pool, raising 503 if unavailable."""
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(503, 'CMS database not connected')
 
 
 # ── Pydantic Models ────────────────────────────────────────────────
@@ -86,7 +85,7 @@ async def list_accounts(
     tenant_id: str | None = Query(None),
 ):
     """List connected social accounts with optional filters."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         conditions = []
         params = []
@@ -130,7 +129,7 @@ async def list_accounts(
 @router.post('/accounts', status_code=201)
 async def create_account(body: SocialAccountCreate):
     """Register a new social media account."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         valid_platforms = ('linkedin', 'twitter', 'facebook', 'instagram')
         if body.platform not in valid_platforms:
@@ -171,7 +170,7 @@ async def create_account(body: SocialAccountCreate):
 @router.patch('/accounts/{account_id}')
 async def update_account(account_id: str, body: SocialAccountUpdate):
     """Update a social account (token refresh, status change, etc.)."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         updates = []
         params = []
@@ -227,7 +226,7 @@ async def list_posts(
     offset: int = Query(0, ge=0),
 ):
     """List social posts with filters."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         conditions = []
         params = []
@@ -262,7 +261,7 @@ async def list_posts(
 @router.post('/posts', status_code=201)
 async def create_post(body: SocialPostCreate):
     """Create or schedule a social media post."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         # Validate the account exists
         account = await pool.fetchrow(
@@ -322,7 +321,7 @@ async def create_post(body: SocialPostCreate):
 @router.post('/posts/{post_id}/publish')
 async def publish_post(post_id: str):
     """Publish a post now (override schedule). Sets scheduled_at to now and status to scheduled."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         now = datetime.now(timezone.utc)
 
@@ -361,7 +360,7 @@ async def publish_post(post_id: str):
 @router.patch('/posts/{post_id}')
 async def update_post(post_id: str, body: SocialPostUpdate):
     """Update post text, schedule, or status."""
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     try:
         post = await pool.fetchrow(
             'SELECT id, status FROM social_posts WHERE id = $1',

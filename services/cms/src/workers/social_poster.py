@@ -7,7 +7,7 @@ Runs as an async background loop:
   3. On success: update status='posted', store platform_post_id
   4. On failure: retry up to 3 times, then mark as 'failed'
 
-Social posts and accounts live in Main Postgres (shared DB / event bridge pool).
+Social posts and accounts live in CMS Postgres (local pool).
 """
 import asyncio
 import json
@@ -15,7 +15,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from ..models.database import get_event_pool
+from ..models.database import get_pool
 from ..models.events import emit_event
 
 logger = logging.getLogger('cms.social_poster')
@@ -110,14 +110,15 @@ PLATFORM_ADAPTERS = {
 
 async def process_scheduled_posts() -> int:
     """Process posts that are due for publishing. Returns count processed."""
-    shared_pool = get_event_pool()
-    if not shared_pool:
+    try:
+        cms_pool = get_pool()
+    except RuntimeError:
         return 0
 
     now = datetime.now(timezone.utc)
 
     # Lock a batch of scheduled posts that are due
-    rows = await shared_pool.fetch(
+    rows = await cms_pool.fetch(
         '''UPDATE social_posts SET status = 'posting', updated_at = $1
            WHERE id IN (
                SELECT id FROM social_posts
@@ -142,7 +143,7 @@ async def process_scheduled_posts() -> int:
 
         try:
             # Look up the social account for credentials
-            account = await shared_pool.fetchrow(
+            account = await cms_pool.fetchrow(
                 'SELECT * FROM social_accounts WHERE id = $1',
                 post['social_account_id'],
             )
@@ -166,7 +167,7 @@ async def process_scheduled_posts() -> int:
             result = await adapter(account, dict(post))
 
             # Success — update post
-            await shared_pool.execute(
+            await cms_pool.execute(
                 '''UPDATE social_posts
                    SET status = 'posted', posted_at = $1,
                        platform_post_id = $2, error_message = NULL, updated_at = $1
@@ -191,7 +192,7 @@ async def process_scheduled_posts() -> int:
 
         except NotImplementedError as e:
             # Platform not yet implemented — don't retry, mark as failed
-            await shared_pool.execute(
+            await cms_pool.execute(
                 '''UPDATE social_posts
                    SET status = 'failed', error_message = $1, updated_at = $2
                    WHERE id = $3''',
@@ -206,7 +207,7 @@ async def process_scheduled_posts() -> int:
             if retry_count < MAX_RETRIES:
                 # Reschedule for retry
                 retry_at = now + timedelta(minutes=RETRY_DELAY_MINUTES)
-                await shared_pool.execute(
+                await cms_pool.execute(
                     '''UPDATE social_posts
                        SET status = 'scheduled', retry_count = $1,
                            scheduled_at = $2, error_message = $3, updated_at = $4
@@ -216,7 +217,7 @@ async def process_scheduled_posts() -> int:
                 logger.info(f'Post {post_id} rescheduled for retry {retry_count}/{MAX_RETRIES} at {retry_at}')
             else:
                 # Max retries exceeded — mark as failed
-                await shared_pool.execute(
+                await cms_pool.execute(
                     '''UPDATE social_posts
                        SET status = 'failed', retry_count = $1,
                            error_message = $2, updated_at = $3

@@ -430,10 +430,13 @@ async def _handle_notification_requested(event) -> None:
 
 
 async def _action_create_todo(config: dict, payload: dict, event):
-    """Create an admin_todo in the shared DB."""
-    shared_pool = get_event_pool()
-    if not shared_pool:
-        logger.warning('Cannot create todo: shared database not connected')
+    """Create an admin_todo in CMS Postgres."""
+    from .models.database import get_pool as get_cms_pool
+
+    try:
+        cms_pool = get_cms_pool()
+    except RuntimeError:
+        logger.warning('Cannot create todo: CMS database not connected')
         return
 
     title_template = config.get('title_template', 'New TODO')
@@ -442,7 +445,7 @@ async def _action_create_todo(config: dict, payload: dict, event):
     except (KeyError, IndexError):
         title = title_template
 
-    await shared_pool.execute(
+    await cms_pool.execute(
         '''INSERT INTO admin_todos
                (title, todo_type, priority, related_entity_type,
                 related_entity_id, metadata)
@@ -558,9 +561,12 @@ async def _action_enroll_drip(config: dict, payload: dict, event):
 
 async def _action_distribute_social(config: dict, payload: dict, event):
     """Create social posts for connected accounts based on config platforms."""
-    shared_pool = get_event_pool()
-    if not shared_pool:
-        logger.warning('Cannot distribute social: shared database not connected')
+    from .models.database import get_pool as get_cms_pool
+
+    try:
+        cms_pool = get_cms_pool()
+    except RuntimeError:
+        logger.warning('Cannot distribute social: CMS database not connected')
         return
 
     platforms = config.get('platforms', [])
@@ -585,7 +591,7 @@ async def _action_distribute_social(config: dict, payload: dict, event):
     for platform in platforms:
         try:
             # Find active accounts for this platform
-            accounts = await shared_pool.fetch(
+            accounts = await cms_pool.fetch(
                 '''SELECT id FROM social_accounts
                    WHERE platform = $1 AND status = 'active'
                    ORDER BY created_at''',
@@ -593,7 +599,7 @@ async def _action_distribute_social(config: dict, payload: dict, event):
             )
 
             for account in accounts:
-                await shared_pool.execute(
+                await cms_pool.execute(
                     '''INSERT INTO social_posts
                            (content_id, social_account_id, platform, post_text,
                             link_url, scheduled_at, status)

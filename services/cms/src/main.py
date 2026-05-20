@@ -22,6 +22,7 @@ from .routers import health, email, content
 from .routers.media import router as media_router
 from .routers.social import router as social_router
 from .routers.drip import router as drip_router
+from .routers.todos import router as todos_router
 from .event_listener import start_event_listener, stop_event_listener
 from .middleware.auth import APIKeyMiddleware
 from .workers.content_generator import generation_loop
@@ -87,3 +88,4 @@ app.include_router(content.router, prefix="/api/content", tags=["content"])
 app.include_router(media_router, prefix="/api/media", tags=["media"])
 app.include_router(social_router, prefix="/api/social", tags=["social"])
 app.include_router(drip_router, prefix="/api/drip", tags=["drip"])
+app.include_router(todos_router, prefix="/api/todos", tags=["todos"])
