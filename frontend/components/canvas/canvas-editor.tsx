@@ -10,6 +10,7 @@
 
 import { useState, useCallback } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
+import type { LibraryAtomCandidate } from './library-picker';
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
@@ -203,6 +204,34 @@ function CanvasEditorInner({
     updateDoc((prev) => ({ ...prev, canvas }));
   }, [updateDoc]);
 
+  const handleReplaceFromLibrary = useCallback((nodeId: string, atom: LibraryAtomCandidate) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          content: { text: atom.content } as any,
+          provenance: {
+            ...n.provenance,
+            source: 'library' as const,
+            library_unit_id: atom.id,
+          },
+          history: [
+            ...n.history,
+            {
+              actor_id: actorId,
+              actor_name: actorName,
+              action: 'replaced' as const,
+              timestamp: new Date().toISOString(),
+              comment: `Replaced with library atom: ${atom.category}`,
+            },
+          ],
+        };
+      }),
+    }));
+  }, [updateDoc, actorId, actorName]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
@@ -338,6 +367,7 @@ function CanvasEditorInner({
         onMoveNode={handleMoveNode}
         onAcceptNode={handleAcceptNode}
         onRevertNode={handleRevertNode}
+        onReplaceFromLibrary={handleReplaceFromLibrary}
         onUpdateNodeStyle={handleUpdateNodeStyle}
         onUpdateCanvas={handleUpdateCanvas}
       />

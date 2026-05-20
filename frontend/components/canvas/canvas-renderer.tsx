@@ -28,6 +28,7 @@ import type {
   FootnoteContent,
   UrlContent,
 } from '@/lib/types/canvas-document';
+import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 
 interface Props {
   document: CanvasDocument;
@@ -74,6 +75,11 @@ export function CanvasRenderer({
           transformOrigin: 'top center',
         }}
       >
+        {/* Watermark overlay — behind content */}
+        {statusToWatermark(metadata.status) && (
+          <WatermarkOverlay text={statusToWatermark(metadata.status)!} />
+        )}
+
         {/* Header */}
         {canvas.header && (
           <div
@@ -216,6 +222,16 @@ function NodeRenderer({
         <span className={`absolute -top-2 -right-1 text-[9px] px-1 py-0.5 rounded ${provenanceBadge}`}>
           {node.provenance.source.replace('_', ' ')}
         </span>
+      )}
+
+      {/* Change indicator — show who last edited */}
+      {node.history.length > 0 && (
+        <div className="absolute -bottom-2 right-0">
+          <ChangeIndicator
+            history={node.history}
+            compact={!isSelected}
+          />
+        </div>
       )}
 
       {/* Type-specific rendering */}
