@@ -14,6 +14,7 @@ import type {
   CanvasNode,
   TableContent,
   TableCell as TableCellType,
+  TableCellStyle,
 } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
 
@@ -352,6 +353,70 @@ export function SheetEditor({
     }));
   }, [sheets, updateDoc]);
 
+  // ─── Cell formatting helpers ────────────────────────────────────────
+
+  function getActiveCellStyle(): TableCellStyle | null {
+    if (!activeCell || !currentSheet) return null;
+    const { row, col } = activeCell;
+    let cellVal: string | TableCellType;
+    if (row === -1) {
+      cellVal = currentSheet.content.headers[col];
+    } else {
+      cellVal = currentSheet.content.rows[row]?.[col];
+    }
+    if (!cellVal || typeof cellVal === 'string') return null;
+    return cellVal.style ?? null;
+  }
+
+  function updateCellStyle(stylePatch: Partial<TableCellStyle>) {
+    if (!activeCell || !currentSheet || readOnly) return;
+    const { row, col } = activeCell;
+
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== currentSheet.nodeId) return n;
+        const tc = n.content as TableContent;
+
+        if (row === -1) {
+          // Header cell
+          const headers = tc.headers.map((h, i) => {
+            if (i !== col) return h;
+            const cell: TableCellType = typeof h === 'string' ? { text: h } : { ...h };
+            cell.style = { ...(cell.style || {}), ...stylePatch };
+            return cell;
+          });
+          return { ...n, content: { ...tc, headers } };
+        } else {
+          // Data cell
+          const rows = tc.rows.map((r, ri) => {
+            if (ri !== row) return r;
+            return r.map((c, ci) => {
+              if (ci !== col) return c;
+              const cell: TableCellType = typeof c === 'string' ? { text: c } : { ...c };
+              cell.style = { ...(cell.style || {}), ...stylePatch };
+              return cell;
+            });
+          });
+          return { ...n, content: { ...tc, rows } };
+        }
+      }),
+    }));
+  }
+
+  function toggleCellBold() {
+    const current = getActiveCellStyle();
+    updateCellStyle({ bold: !current?.bold });
+  }
+
+  function setCellAlignment(align: 'left' | 'center' | 'right') {
+    updateCellStyle({ alignment: align });
+  }
+
+  function setCellBg(bg: string | undefined) {
+    updateCellStyle({ bg });
+  }
+
   // ─── Save / Export ─────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
@@ -554,6 +619,91 @@ export function SheetEditor({
         </div>
       </div>
 
+      {/* ── Format bar ── */}
+      {!readOnly && (
+        <div className="flex items-center gap-1 px-3 py-1 border-b bg-gray-50 flex-shrink-0 text-xs">
+          {/* Bold */}
+          <button
+            onClick={() => toggleCellBold()}
+            className={`px-2 py-1 font-bold border rounded ${
+              getActiveCellStyle()?.bold ? 'bg-blue-100 border-blue-300 text-blue-700' : 'border-gray-200 hover:bg-gray-100'
+            }`}
+            title="Bold"
+          >B</button>
+
+          {/* Alignment */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          {(['left', 'center', 'right'] as const).map(align => (
+            <button
+              key={align}
+              onClick={() => setCellAlignment(align)}
+              className={`px-2 py-1 border rounded ${
+                getActiveCellStyle()?.alignment === align ? 'bg-blue-100 border-blue-300' : 'border-gray-200 hover:bg-gray-100'
+              }`}
+              title={`Align ${align}`}
+            >
+              {align === 'left' ? '⇤' : align === 'right' ? '⇥' : '⇔'}
+            </button>
+          ))}
+
+          {/* Background color */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Fill:</label>
+          <input
+            type="color"
+            value={getActiveCellStyle()?.bg || '#ffffff'}
+            onChange={(e) => setCellBg(e.target.value === '#ffffff' ? undefined : e.target.value)}
+            className="w-6 h-6 border rounded cursor-pointer"
+            title="Cell background color"
+          />
+          {getActiveCellStyle()?.bg && (
+            <button onClick={() => setCellBg(undefined)} className="text-[10px] text-red-500 hover:underline">clear</button>
+          )}
+
+          {/* Font size */}
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <label className="text-[10px] text-gray-500">Size:</label>
+          <select
+            value={doc.canvas.font_default.size}
+            onChange={(e) => {
+              updateDoc(prev => ({
+                ...prev,
+                canvas: {
+                  ...prev.canvas,
+                  font_default: { ...prev.canvas.font_default, size: parseInt(e.target.value) || 11 },
+                },
+              }));
+            }}
+            className="text-xs border rounded px-1 py-0.5"
+          >
+            {[8, 9, 10, 11, 12, 14, 16, 18, 20, 24].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {/* Font family */}
+          <select
+            value={doc.canvas.font_default.family}
+            onChange={(e) => {
+              updateDoc(prev => ({
+                ...prev,
+                canvas: {
+                  ...prev.canvas,
+                  font_default: { ...prev.canvas.font_default, family: e.target.value },
+                },
+              }));
+            }}
+            className="text-xs border rounded px-1 py-0.5"
+          >
+            <option value="Calibri">Calibri</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Helvetica">Helvetica</option>
+            <option value="Courier New">Courier New</option>
+          </select>
+        </div>
+      )}
+
       {/* ── Grid ── */}
       <div className="flex-1 overflow-auto">
         <table className="border-collapse w-full">
@@ -613,6 +763,11 @@ export function SheetEditor({
                         ? 'outline outline-2 outline-blue-500 bg-blue-50'
                         : ''
                     }`}
+                    style={{
+                      backgroundColor: !isActive && typeof h !== 'string' && h?.style?.bg ? h.style.bg : undefined,
+                      fontWeight: typeof h !== 'string' && h?.style?.bold ? 'bold' : undefined,
+                      textAlign: (typeof h !== 'string' && h?.style?.alignment as React.CSSProperties['textAlign']) ?? undefined,
+                    }}
                     onClick={() => setActiveCell({ row: -1, col: ci })}
                     onKeyDown={(e) => handleCellKeyDown(e, -1, ci)}
                     tabIndex={isActive ? 0 : -1}
