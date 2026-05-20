@@ -12,6 +12,7 @@ import { useState, useCallback } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, CanvasRules } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
+import { SlideEditor } from './slide-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 
 interface Props {
@@ -55,6 +56,7 @@ export function CanvasEditor({
   const [dirty, setDirty] = useState(false);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
 
   const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument) => {
     setDoc((prev) => {
@@ -236,14 +238,27 @@ export function CanvasEditor({
           </div>
         </div>
 
-        <CanvasRenderer
-          document={doc}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={setSelectedNodeId}
-          onUpdateNode={handleUpdateNode}
-          variables={variables}
-          readOnly={readOnly}
-        />
+        {isSlideFormat ? (
+          <SlideEditor
+            document={doc}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onUpdateNode={handleUpdateNode}
+            onAddNode={handleAddNode}
+            onDeleteNode={handleDeleteNode}
+            variables={variables}
+            readOnly={readOnly}
+          />
+        ) : (
+          <CanvasRenderer
+            document={doc}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onUpdateNode={handleUpdateNode}
+            variables={variables}
+            readOnly={readOnly}
+          />
+        )}
       </div>
 
       {/* Sidebar */}

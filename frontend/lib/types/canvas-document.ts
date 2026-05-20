@@ -20,7 +20,7 @@ export interface FontSpec {
 
 // ─── Canvas rules (from volume_required_items) ──────────────────────
 
-export type CanvasFormat = 'letter' | 'slide_16_9' | 'slide_4_3' | 'custom';
+export type CanvasFormat = 'letter' | 'slide_16_9' | 'slide_4_3' | 'custom' | 'spreadsheet';
 
 export interface CanvasRules {
   format: CanvasFormat;
@@ -75,6 +75,15 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     font_default: { family: 'Arial', size: 18 },
     line_spacing: 1.2,
     max_pages: null, max_slides: 25,
+  },
+  spreadsheet: {
+    format: 'spreadsheet' as CanvasFormat,
+    width: 1200, height: 800,
+    margins: { top: 0, right: 0, bottom: 0, left: 0 },
+    header: null, footer: null,
+    font_default: { family: 'Calibri', size: 11 },
+    line_spacing: 1.0,
+    max_pages: null, max_slides: null,
   },
 };
 

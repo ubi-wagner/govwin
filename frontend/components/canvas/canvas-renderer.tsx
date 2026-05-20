@@ -13,7 +13,7 @@
  *   - Click-to-select for node editing
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -222,7 +222,7 @@ function NodeRenderer({
       {node.type === 'text_block' && <TextBlockNode content={node.content as TextBlockContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'bulleted_list' && <ListNode content={node.content as ListContent} ordered={false} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'numbered_list' && <ListNode content={node.content as ListContent} ordered={true} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
-      {node.type === 'image' && <ImageNode content={node.content as ImageContent} />}
+      {node.type === 'image' && <ImageNode content={node.content as ImageContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'table' && <TableNode content={node.content as TableContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'caption' && <CaptionNode content={node.content as CaptionContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'footnote' && <FootnoteNode content={node.content as FootnoteContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
@@ -452,16 +452,165 @@ function ListNode({ content, ordered, readOnly, onUpdate, isSelected }: {
   );
 }
 
-function ImageNode({ content }: { content: ImageContent }) {
+function ImageNode({ content, readOnly, onUpdate, isSelected }: {
+  content: ImageContent; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load presigned URL when we have a storage_key
+  useEffect(() => {
+    if (content.storage_key) {
+      fetch(`/api/admin/storage?download=${encodeURIComponent(content.storage_key)}`)
+        .then(res => res.json())
+        .then(json => {
+          if (json.data?.url) setImageUrl(json.data.url);
+        })
+        .catch(() => {});
+    }
+  }, [content.storage_key]);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/admin/documents/upload-image', {
+        method: 'POST',
+        body: form,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const json = await res.json();
+      const { storageKey, url } = json.data;
+      setImageUrl(url);
+
+      // Get image dimensions
+      const img = new window.Image();
+      img.onload = () => {
+        onUpdate({
+          ...content,
+          storage_key: storageKey,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          alt_text: content.alt_text || file.name,
+        });
+      };
+      img.onerror = () => {
+        onUpdate({
+          ...content,
+          storage_key: storageKey,
+          alt_text: content.alt_text || file.name,
+        });
+      };
+      img.src = url;
+    } catch (err) {
+      console.error('Image upload failed:', err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Has image -- show it
+  if (content.storage_key && imageUrl) {
+    return (
+      <div className="text-center py-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={content.alt_text || 'Image'}
+          style={{
+            maxWidth: Math.min(content.width || 400, 500),
+            maxHeight: Math.min(content.height || 300, 400),
+            objectFit: 'contain',
+          }}
+          className="inline-block rounded"
+        />
+        {content.caption && (
+          <p className="text-xs text-gray-500 mt-1 italic">{content.caption}</p>
+        )}
+        {isSelected && !readOnly && (
+          <div className="mt-2 space-y-1">
+            <input
+              type="text"
+              value={content.alt_text || ''}
+              onChange={(e) => onUpdate({ ...content, alt_text: e.target.value })}
+              placeholder="Alt text"
+              className="text-xs border rounded px-2 py-1 w-full max-w-xs"
+            />
+            <input
+              type="text"
+              value={content.caption || ''}
+              onChange={(e) => onUpdate({ ...content, caption: e.target.value })}
+              placeholder="Caption"
+              className="text-xs border rounded px-2 py-1 w-full max-w-xs"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Replace image
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // No image -- show upload zone or placeholder
   return (
     <div className="text-center py-2">
-      <div
-        className="inline-block bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-gray-400 text-sm"
-        style={{ width: Math.min(content.width, 400), height: Math.min(content.height, 300) }}
-      >
-        {content.alt_text || 'Image placeholder'}
-      </div>
-      {content.caption && (
+      {isSelected && !readOnly ? (
+        <div className="inline-block">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="border-2 border-dashed border-gray-300 rounded-lg px-8 py-6 text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+            style={{ width: Math.min(content.width || 400, 400), minHeight: 120 }}
+          >
+            {uploading ? 'Uploading...' : 'Click to upload image'}
+          </button>
+          <div className="mt-2 space-y-1">
+            <input
+              type="text"
+              value={content.alt_text || ''}
+              onChange={(e) => onUpdate({ ...content, alt_text: e.target.value })}
+              placeholder="Alt text"
+              className="text-xs border rounded px-2 py-1 w-full max-w-xs"
+            />
+            <input
+              type="text"
+              value={content.caption || ''}
+              onChange={(e) => onUpdate({ ...content, caption: e.target.value })}
+              placeholder="Caption"
+              className="text-xs border rounded px-2 py-1 w-full max-w-xs"
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          className="inline-block bg-gray-100 border border-gray-200 rounded flex items-center justify-center text-gray-400 text-sm"
+          style={{ width: Math.min(content.width || 400, 400), height: Math.min(content.height || 300, 200) }}
+        >
+          {content.alt_text || 'Image placeholder'}
+        </div>
+      )}
+      {content.caption && !isSelected && (
         <p className="text-xs text-gray-500 mt-1 italic">{content.caption}</p>
       )}
     </div>
