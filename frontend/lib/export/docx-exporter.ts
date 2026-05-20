@@ -110,6 +110,22 @@ export async function exportToDocx(
   }
 
   const document = new Document({
+    numbering: {
+      config: [{
+        reference: 'default-numbering',
+        levels: Array.from({ length: 9 }, (_, i) => ({
+          level: i,
+          format: 'decimal' as const,
+          text: `%${i + 1}.`,
+          alignment: 'start' as const,
+          style: {
+            paragraph: {
+              indent: { left: 720 * (i + 1), hanging: 360 },
+            },
+          },
+        })),
+      }],
+    },
     sections: [{
       properties: {
         page: {

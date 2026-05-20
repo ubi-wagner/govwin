@@ -186,12 +186,16 @@ export function SheetEditor({
     const content: TableContent = { ...currentSheet.content };
 
     if (editingCell.row === -1) {
-      // Editing header
+      // Editing header — preserve existing cell styles
       const newHeaders = [...content.headers];
-      newHeaders[editingCell.col] = editValue;
+      const existing = newHeaders[editingCell.col];
+      const styledCell = typeof existing === 'string'
+        ? editValue
+        : { ...existing, text: editValue };
+      newHeaders[editingCell.col] = styledCell;
       updateNodeContent(currentSheet.nodeId, { ...content, headers: newHeaders });
     } else {
-      // Editing data cell
+      // Editing data cell — preserve existing cell styles
       const newRows = content.rows.map((r) => [...r]);
       // Ensure row exists
       while (newRows.length <= editingCell.row) {
@@ -201,7 +205,11 @@ export function SheetEditor({
       while (newRows[editingCell.row].length <= editingCell.col) {
         newRows[editingCell.row].push('');
       }
-      newRows[editingCell.row][editingCell.col] = editValue;
+      const existing = newRows[editingCell.row][editingCell.col];
+      const styledCell = typeof existing === 'string'
+        ? editValue
+        : { ...existing, text: editValue };
+      newRows[editingCell.row][editingCell.col] = styledCell;
       updateNodeContent(currentSheet.nodeId, { ...content, rows: newRows });
     }
 

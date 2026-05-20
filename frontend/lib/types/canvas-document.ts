@@ -85,6 +85,15 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
     line_spacing: 1.0,
     max_pages: null, max_slides: null,
   },
+  custom: {
+    format: 'custom' as CanvasFormat,
+    width: 612, height: 792,
+    margins: { top: 72, right: 72, bottom: 72, left: 72 },
+    header: null, footer: null,
+    font_default: { family: 'Times New Roman', size: 12 },
+    line_spacing: 1.15,
+    max_pages: null, max_slides: null,
+  },
 };
 
 // ─── Node types ─────────────────────────────────────────────────────
