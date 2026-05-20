@@ -11,9 +11,9 @@ import logging
 import os
 import uuid
 
-from .models.database import get_event_pool
+from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
-from .templates import render_template
+from .templates import render_template, render_db_template, build_trigger_metadata
 
 logger = logging.getLogger('cms.events')
 
@@ -750,11 +750,64 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
             logger.warning(f'No recipient resolved for template "{template_name}", skipping')
             return
 
+        # Check if the template has trigger_config (DB template with triggers)
+        trigger_metadata = {}
+        try:
+            cms_pool = _get_cms_pool()
+            db_template = await cms_pool.fetchrow(
+                '''SELECT id, slug, trigger_config, response_map, profile_variables, template_category
+                   FROM email_templates WHERE slug = $1 AND is_active = TRUE''',
+                template_name,
+            )
+            if db_template and db_template.get('trigger_config'):
+                import json as _json
+                trigger_config = db_template['trigger_config']
+                if isinstance(trigger_config, str):
+                    trigger_config = _json.loads(trigger_config)
+                if trigger_config:
+                    trigger_metadata = build_trigger_metadata(
+                        template={
+                            'trigger_config': trigger_config,
+                            'response_map': db_template.get('response_map') or {},
+                            'id': db_template['id'],
+                            'slug': db_template['slug'],
+                        },
+                        send_context={
+                            'send_id': '',  # will be updated after send record creation
+                            'tenant_id': payload.get('tenantId') or payload.get('tenant_id'),
+                            'campaign_id': config.get('campaign_id'),
+                            'template_id': str(db_template['id']),
+                        },
+                    )
+        except Exception as trig_err:
+            logger.error(f'[send_email] Error building trigger metadata: {trig_err}')
+
         result = await send_email(
             to=to_email,
             subject=subject,
             html=html,
         )
+
+        # If we have trigger metadata, store it on the email_send record
+        if trigger_metadata and result.get('message_id'):
+            try:
+                import json as _json
+                cms_pool = _get_cms_pool()
+                # Find the email_send record by gmail_message_id
+                send_row = await cms_pool.fetchrow(
+                    'SELECT id FROM email_sends WHERE gmail_message_id = $1',
+                    result.get('message_id'),
+                )
+                if send_row:
+                    trigger_metadata['send_id'] = str(send_row['id'])
+                    await cms_pool.execute(
+                        'UPDATE email_sends SET trigger_metadata = $1::jsonb WHERE id = $2',
+                        _json.dumps(trigger_metadata), send_row['id'],
+                    )
+                    logger.info(f'Stored trigger metadata on send {send_row["id"]}')
+            except Exception as store_err:
+                logger.error(f'[send_email] Error storing trigger metadata: {store_err}')
+
         logger.info(f'Sent email "{template_name}" to {to_email}: {result}')
 
     elif action_type == 'notify_admin':

@@ -51,6 +51,10 @@ class TemplateCreate(BaseModel):
     body_text: str = ''
     variables: list[dict] = []
     tags: list[str] = []
+    trigger_config: dict = {}
+    response_map: dict = {}
+    profile_variables: list[str] = []
+    template_category: str = 'outreach'
 
 
 class TemplateUpdate(BaseModel):
@@ -63,6 +67,10 @@ class TemplateUpdate(BaseModel):
     variables: list[dict] | None = None
     tags: list[str] | None = None
     is_active: bool | None = None
+    trigger_config: dict | None = None
+    response_map: dict | None = None
+    profile_variables: list[str] | None = None
+    template_category: str | None = None
 
 
 class TemplateDraftRequest(BaseModel):
@@ -91,8 +99,25 @@ class TemplateOut(BaseModel):
     tags: list[str]
     version: int
     is_active: bool
+    trigger_config: dict = {}
+    response_map: dict = {}
+    profile_variables: list[str] = []
+    template_category: str = 'outreach'
     created_at: datetime
     updated_at: datetime
+
+
+class TemplatePreviewRequest(BaseModel):
+    """Preview a template with sample data."""
+    sample_profile: dict = {}
+    sample_context: dict = {}
+
+
+class TemplateTestSendRequest(BaseModel):
+    """Send a test email with a rendered template."""
+    to_email: EmailStr
+    sample_profile: dict = {}
+    sample_context: dict = {}
 
 
 # ── Campaigns ────────────────────────────────────────────────────
