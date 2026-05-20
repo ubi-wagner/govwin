@@ -12,6 +12,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/admin/billing" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Billing</a>
           <a href="/admin/analytics" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Analytics</a>
 
+          <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">CRM</span>
+          <a href="/admin/crm" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">CRM Dashboard</a>
+          <a href="/admin/crm/leads" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Leads</a>
+          <a href="/admin/crm/campaigns" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Campaigns</a>
+          <a href="/admin/crm/support" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Support</a>
+          <a href="/admin/crm/social" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Social</a>
+          <a href="/admin/crm/todos" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">TODOs</a>
+
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Monitoring</span>
           <a href="/admin/events" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Event Stream</a>
           <a href="/admin/pipeline" className="px-2 py-1.5 rounded hover:bg-navy-800 hover:text-brand-300">Pipeline Jobs</a>
