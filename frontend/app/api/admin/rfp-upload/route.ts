@@ -507,10 +507,3 @@ export async function POST(request: Request) {
   );
 }
 
-// Next.js 15: opt into streaming body handling so large multipart doesn't
-// hit the default 4.5MB memory buffer.
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

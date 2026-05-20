@@ -12,9 +12,8 @@ from fastapi import APIRouter, HTTPException, Query
 from ..models.database import get_pool
 from ..models.events import emit_event
 from ..models.schemas import (
-    PostCreate, PostUpdate, PostOut, WorkflowAction,
-    GenerationRequest, GenerationOut, GenerationAction,
-    ReviewOut,
+    PostCreate, PostUpdate, WorkflowAction,
+    GenerationRequest, GenerationAction,
 )
 
 logger = logging.getLogger('cms.content')

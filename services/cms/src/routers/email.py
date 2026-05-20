@@ -20,12 +20,11 @@ def _fire_event(event_type: str, **kwargs):
     """Fire-and-forget event emission."""
     asyncio.create_task(emit_event(event_type, entity_type='email', **kwargs))
 from ..models.email_schemas import (
-    AccountCreate, AccountUpdate, AccountOut,
-    TemplateCreate, TemplateUpdate, TemplateDraftRequest, TemplateOut,
+    AccountCreate, AccountUpdate,
+    TemplateCreate, TemplateUpdate, TemplateDraftRequest,
     TemplatePreviewRequest, TemplateTestSendRequest,
-    CampaignCreate, CampaignUpdate, CampaignAction, CampaignOut,
-    SendCreate, SendOut,
-    EngagementOut, ThreadOut,
+    CampaignCreate, CampaignUpdate, CampaignAction,
+    SendCreate,
     OutboxClaim, OutboxModify, OutboxApprove, OutboxBulkApprove, OutboxReject,
 )
 

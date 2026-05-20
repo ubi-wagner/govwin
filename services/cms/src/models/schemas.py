@@ -35,35 +35,6 @@ class PostUpdate(BaseModel):
     featured_image_id: str | None = None
 
 
-class PostOut(BaseModel):
-    id: str
-    slug: str
-    title: str
-    excerpt: str | None
-    body: str
-    body_format: str
-    category: str
-    tags: list[str]
-    status: str
-    author_id: str | None
-    author_name: str | None
-    featured_image_id: str | None
-    featured_image_url: str | None
-    generation_id: str | None
-    generated_by_model: str | None
-    generation_prompt: str | None
-    reviewed_by: str | None
-    reviewed_at: datetime | None
-    review_notes: str | None
-    published_at: datetime | None
-    published_by: str | None
-    meta_title: str | None
-    meta_description: str | None
-    version: int
-    created_at: datetime
-    updated_at: datetime
-
-
 # ── Workflow Actions ─────────────────────────────────────────────
 
 class WorkflowAction(BaseModel):
@@ -92,41 +63,10 @@ class GenerationRequest(BaseModel):
     tenant_id: str | None = None
 
 
-class GenerationOut(BaseModel):
-    id: str
-    prompt: str
-    category: str
-    model: str
-    temperature: float
-    status: str
-    generated_title: str | None
-    generated_excerpt: str | None
-    generated_body: str | None
-    generated_tags: list[str]
-    post_id: str | None
-    error_message: str | None
-    retry_count: int
-    created_at: datetime
-    completed_at: datetime | None
-
-
 class GenerationAction(BaseModel):
     action: str  # accept, reject, retry
-    generation_id: str
     user_id: str
     notes: str | None = None
-
-
-# ── Reviews ──────────────────────────────────────────────────────
-
-class ReviewOut(BaseModel):
-    id: str
-    post_id: str
-    action: str
-    reviewer_id: str
-    notes: str | None
-    version_at_review: int
-    created_at: datetime
 
 
 # ── Media ────────────────────────────────────────────────────────
@@ -154,12 +94,3 @@ class MediaUpdate(BaseModel):
     usage: str | None = None
 
 
-# ── Generic ──────────────────────────────────────────────────────
-
-class ErrorResponse(BaseModel):
-    error: str
-
-
-class SuccessResponse(BaseModel):
-    data: dict | list | None = None
-    message: str | None = None

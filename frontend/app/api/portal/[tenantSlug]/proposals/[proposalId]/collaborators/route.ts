@@ -230,7 +230,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!existingUser) {
       isNewUser = true;
       const tempPassword = randomUUID().slice(0, 12);
-      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
       const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
       const [newUser] = await sql<{ id: string }[]>`

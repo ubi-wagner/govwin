@@ -124,6 +124,30 @@ INSERT INTO email_templates (
     ARRAY['company_name', 'contact_name'],
     ARRAY['drip', 'welcome', 'onboarding'],
     'onboarding'
+),
+(
+    'customer-help-response',
+    'Customer Help Response',
+    'Re: {{original_subject}}',
+    '<p>Hi {{contact_name}},</p><p>Thank you for reaching out! I want to make sure we get this resolved for you quickly.</p><p>{{ai_response}}</p><p>If you need immediate assistance, you can reach our support team directly at support@rfppipeline.com.</p><p>Best regards,<br>RFP Pipeline Team</p>',
+    'response',
+    '{"namespace": "capture", "type": "customer.help_response", "auto_response_enabled": false}',
+    '{}',
+    ARRAY['contact_name', 'original_subject', 'ai_response'],
+    ARRAY['response', 'customer', 'help'],
+    'onboarding'
+),
+(
+    'lead-generic-followup',
+    'Lead Generic Follow-up',
+    'Re: Government Contracting Opportunities for {{company_name}}',
+    '<p>Hi {{contact_name}},</p><p>Thank you for getting back to us regarding government contracting opportunities for {{company_name}}.</p><p>I''d be happy to discuss this further. Would you have time for a brief call this week? We can walk through how our platform helps companies like yours discover and win more contracts.</p><p>Best regards,<br>RFP Pipeline Team</p>',
+    'response',
+    '{"namespace": "capture", "type": "lead.generic_followup", "auto_response_enabled": false}',
+    '{}',
+    ARRAY['company_name', 'contact_name'],
+    ARRAY['response', 'lead', 'followup'],
+    'campaign'
 )
 ON CONFLICT (slug) DO NOTHING;
 

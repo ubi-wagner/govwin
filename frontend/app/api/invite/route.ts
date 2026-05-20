@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     }
 
     // Set the password on the user and mark temp_password as false
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     if (collaborator.userId) {
       await sql`

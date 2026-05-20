@@ -6,13 +6,13 @@ import postgres from 'postgres';
 // build container). Skip the guard during the build phase; the
 // runtime guard still fires when NEXT_PHASE is absent/runtime.
 const _isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
-if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production' && !_isBuildPhase) {
-  throw new Error('DATABASE_URL is required in production');
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL && !_isBuildPhase) {
+  throw new Error('DATABASE_URL environment variable is required');
 }
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
-
-export const sql = postgres(DATABASE_URL, {
+export const sql = postgres(DATABASE_URL!, {
   max: 10,
   idle_timeout: 30,
   connect_timeout: 10,
