@@ -42,7 +42,25 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
   }
 }
 
-export function CanvasEditor({
+export function CanvasEditor(props: Props) {
+  // Delegate to SheetEditor for spreadsheet format
+  if (props.initialDocument.canvas.format === 'spreadsheet') {
+    return (
+      <SheetEditor
+        initialDocument={props.initialDocument}
+        onSave={props.onSave}
+        onExport={props.onExport}
+        actorId={props.actorId}
+        actorName={props.actorName}
+        readOnly={props.readOnly}
+      />
+    );
+  }
+
+  return <CanvasEditorInner {...props} />;
+}
+
+function CanvasEditorInner({
   initialDocument,
   onSave,
   onExport,
@@ -51,20 +69,6 @@ export function CanvasEditor({
   actorId,
   actorName,
 }: Props) {
-  // Delegate to SheetEditor for spreadsheet format
-  if (initialDocument.canvas.format === 'spreadsheet') {
-    return (
-      <SheetEditor
-        initialDocument={initialDocument}
-        onSave={onSave}
-        onExport={onExport}
-        actorId={actorId}
-        actorName={actorName}
-        readOnly={readOnly}
-      />
-    );
-  }
-
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
