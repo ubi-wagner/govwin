@@ -47,13 +47,72 @@ Admin > Document Builder (`/admin/documents`)
 - **Click any node** to select it (blue border)
 - **Text blocks**: click to edit, use the toolbar for **B** (Bold), *I* (Italic), U (Underline), x^2 (Superscript), x_2 (Subscript)
   - Select text first, then click a format button to toggle it
-- **Headings**: click to edit text, use dropdown to change level (H1/H2/H3)
-- **Lists**: edit items inline, click **+ Add item** to append, click **x** to remove
-- **Tables**: click cells to edit, use **+ Row** / **+ Column** to expand, **x** to delete rows
-- **Images**: click to upload, then edit alt text and caption below the image
-- **Captions**: pick prefix (Figure/Table/Chart), set number, edit text
+- **Headings**: click to edit text, use dropdown to change level (H1/H2/H3), enter section numbering (e.g., "1.1")
+- **Lists**: edit items inline, click **+ Add item** to append, click **x** to remove, use **<** / **>** arrows to outdent/indent items
+- **Tables**: click cells to edit, **+ Row** / **+ Column** to expand, **x** on rows to delete, **x** below column letters to delete columns
+- **Images**: click to upload, edit alt text and caption, set width/height (px) for resize
+- **Captions**: pick prefix (Figure/Table/Chart/Exhibit), set number, edit text
 - **Footnotes**: edit marker and text
 - **Links**: edit URL and display text
+
+### Formatting a Node (Sidebar > Node Tab)
+
+Select any node, then open the **Node** tab in the sidebar. Below the action buttons you'll see the **Format** section:
+
+**Text Alignment**
+- 4 buttons: Left (default), Center, Right, Justify
+- Active alignment is highlighted blue
+- Alignment exports to DOCX and renders in WYSIWYG
+
+**Font Override**
+- **Family** dropdown: Times New Roman, Arial, Calibri, Georgia, Helvetica, Courier New
+- **Size** input: 6-72pt (leave blank for document default)
+- These override the document-level font set in Settings
+
+**Bold / Italic (Node-Level)**
+- **B** toggle: makes the entire node bold
+- **I** toggle: makes the entire node italic
+- These are node-level (apply to whole block), separate from the inline B/I/U in the text toolbar
+
+**Text Color**
+- Color picker: click the swatch to open the browser color picker
+- Shows current hex value (e.g., #FF0000)
+- **reset** link: removes color override, returns to default black
+- Color exports to DOCX
+
+**Spacing**
+- **Space Before**: padding above the node (in points, 0-72)
+- **Space After**: padding below the node (in points, 0-72)
+- Leave blank for auto (default 4pt)
+
+**Indent**
+- Left indent in pixels (0-200, step 20)
+- Useful for block quotes or nested content
+
+### Inline Formatting (Text Blocks Only)
+
+When editing a text block, a formatting toolbar appears above the textarea:
+
+| Button | What it does | Shortcut |
+|--------|-------------|----------|
+| **B** | Bold selected text | Select text, click B |
+| *I* | Italic selected text | Select text, click I |
+| U | Underline selected text | Select text, click U |
+| x^2 | Superscript (e.g., citations) | Select text, click |
+| x_2 | Subscript (e.g., chemical formulas) | Select text, click |
+
+**How to apply formatting:**
+1. Click a text block to enter edit mode
+2. Select the text you want to format (click and drag in the textarea)
+3. Click a format button — the format is applied to the selection
+4. The char range indicator shows which characters are selected
+5. Click the same button again on the same selection to toggle it off
+
+**How formatting works internally:**
+- Formats are stored as `{ format, start, length }` ranges on the text
+- Multiple formats can overlap (e.g., bold + italic on the same text)
+- Formatted text renders with proper HTML tags in the WYSIWYG view
+- All formats export correctly to DOCX (Word)
 
 ### Moving and Deleting
 
