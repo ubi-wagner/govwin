@@ -20,11 +20,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from .models.database import init_db, close_db, init_event_bridge, close_event_bridge
 from .routers import health, email, content
 from .routers.media import router as media_router
+from .routers.social import router as social_router
+from .routers.drip import router as drip_router
 from .event_listener import start_event_listener, stop_event_listener
 from .middleware.auth import APIKeyMiddleware
 from .workers.content_generator import generation_loop
 from .workers.email_queue import queue_loop
 from .workers.email_sweep import sweep_loop
+from .workers.campaign_executor import executor_loop
+from .workers.drip_engine import drip_loop
+from .workers.social_poster import social_loop
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL', 'INFO'))
 logger = logging.getLogger('cms')
@@ -54,6 +59,9 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_run_worker('content_generator', generation_loop)),
         asyncio.create_task(_run_worker('email_queue', queue_loop)),
         asyncio.create_task(_run_worker('email_sweep', sweep_loop)),
+        asyncio.create_task(_run_worker('campaign_executor', executor_loop)),
+        asyncio.create_task(_run_worker('drip_engine', drip_loop)),
+        asyncio.create_task(_run_worker('social_poster', social_loop)),
     ]
     logger.info('CMS-CRM service ready (env=%s)', env)
 
@@ -77,3 +85,5 @@ app.include_router(health.router, tags=["health"])
 app.include_router(email.router, prefix="/api/email", tags=["email"])
 app.include_router(content.router, prefix="/api/content", tags=["content"])
 app.include_router(media_router, prefix="/api/media", tags=["media"])
+app.include_router(social_router, prefix="/api/social", tags=["social"])
+app.include_router(drip_router, prefix="/api/drip", tags=["drip"])

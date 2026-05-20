@@ -195,7 +195,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -211,7 +211,7 @@ async def _execute_rule(rule, col_names: set, event):
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -429,8 +429,206 @@ async def _handle_notification_requested(event) -> None:
             logger.error(f'Failed to log notification.requested to automation_log: {e}')
 
 
+async def _action_create_todo(config: dict, payload: dict, event):
+    """Create an admin_todo in the shared DB."""
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning('Cannot create todo: shared database not connected')
+        return
+
+    title_template = config.get('title_template', 'New TODO')
+    try:
+        title = title_template.format(**payload)
+    except (KeyError, IndexError):
+        title = title_template
+
+    await shared_pool.execute(
+        '''INSERT INTO admin_todos
+               (title, todo_type, priority, related_entity_type,
+                related_entity_id, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)''',
+        title,
+        config.get('todo_type', 'general'),
+        config.get('priority', 'medium'),
+        event.get('namespace'),
+        event.get('id'),
+        json.dumps(payload),
+    )
+    logger.info(f'Created admin todo: "{title}" (type={config.get("todo_type", "general")})')
+
+
+async def _action_enroll_drip(config: dict, payload: dict, event):
+    """Enroll a recipient in a drip campaign."""
+    from .models.database import get_pool as get_cms_pool
+
+    cms_pool = get_cms_pool()
+    campaign_name = config.get('campaign')
+    if not campaign_name:
+        logger.warning('enroll_drip action has no campaign specified')
+        return
+
+    # Look up campaign by name in CMS DB
+    campaign = await cms_pool.fetchrow(
+        "SELECT id FROM email_campaigns WHERE name ILIKE $1 AND campaign_type = 'drip' LIMIT 1",
+        campaign_name.replace('%', r'\%').replace('_', r'\_'),
+    )
+    if not campaign:
+        logger.warning(f'Drip campaign "{campaign_name}" not found in CMS DB')
+        return
+
+    campaign_id = campaign['id']
+
+    # Resolve recipient email from event payload
+    recipient_email = (
+        payload.get('contactEmail')
+        or payload.get('email')
+        or payload.get('billing_email')
+    )
+    if not recipient_email:
+        # Try to resolve from tenant_id or user_id
+        shared_pool = get_event_pool()
+        if shared_pool:
+            user_id = payload.get('user_id') or payload.get('userId')
+            tenant_id = payload.get('tenant_id') or payload.get('tenantId')
+            if user_id:
+                row = await shared_pool.fetchrow(
+                    'SELECT email, name FROM users WHERE id = $1::uuid', user_id
+                )
+                if row:
+                    recipient_email = row['email']
+            elif tenant_id:
+                row = await shared_pool.fetchrow(
+                    '''SELECT COALESCE(t.billing_email, u.email) as email,
+                              COALESCE(u.name, t.company_name) as name
+                       FROM tenants t
+                       LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
+                       WHERE t.id = $1::uuid LIMIT 1''',
+                    tenant_id
+                )
+                if row:
+                    recipient_email = row['email']
+
+    if not recipient_email:
+        logger.warning(f'enroll_drip: no recipient email resolved from event payload')
+        return
+
+    recipient_name = payload.get('name') or payload.get('company_name') or ''
+    tenant_id_val = payload.get('tenant_id') or payload.get('tenantId')
+
+    # Check for existing active enrollment
+    existing = await cms_pool.fetchrow(
+        '''SELECT id FROM drip_enrollments
+           WHERE campaign_id = $1 AND recipient_email = $2 AND status = 'active'
+           LIMIT 1''',
+        campaign_id, recipient_email,
+    )
+    if existing:
+        logger.info(f'enroll_drip: {recipient_email} already enrolled in campaign "{campaign_name}"')
+        return
+
+    # Compute next_send_at from first step
+    from datetime import timedelta
+    first_step = await cms_pool.fetchrow(
+        'SELECT delay_hours FROM drip_sequences WHERE campaign_id = $1 ORDER BY step_number ASC LIMIT 1',
+        campaign_id,
+    )
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    if first_step:
+        next_send_at = now + timedelta(hours=first_step['delay_hours'] or 0)
+    else:
+        next_send_at = now
+
+    await cms_pool.execute(
+        '''INSERT INTO drip_enrollments
+               (campaign_id, tenant_id, recipient_email, recipient_name,
+                next_send_at, metadata)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)''',
+        campaign_id,
+        tenant_id_val,
+        recipient_email,
+        recipient_name,
+        next_send_at,
+        json.dumps(payload),
+    )
+
+    logger.info(f'Enrolled {recipient_email} in drip campaign "{campaign_name}" (next_send_at={next_send_at})')
+
+
+async def _action_distribute_social(config: dict, payload: dict, event):
+    """Create social posts for connected accounts based on config platforms."""
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning('Cannot distribute social: shared database not connected')
+        return
+
+    platforms = config.get('platforms', [])
+    if not platforms:
+        logger.warning('distribute_social action has no platforms specified')
+        return
+
+    # Build post content from event payload
+    title = payload.get('title') or payload.get('diff_summary') or ''
+    body = payload.get('excerpt') or payload.get('body', '')[:280] or title
+    link_url = payload.get('url') or payload.get('link_url') or ''
+    content_id = payload.get('entity_id') or payload.get('content_id')
+
+    if not body:
+        logger.warning('distribute_social: no content to post')
+        return
+
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    scheduled_at = now + timedelta(minutes=5)  # 5-minute review window
+
+    for platform in platforms:
+        try:
+            # Find active accounts for this platform
+            accounts = await shared_pool.fetch(
+                '''SELECT id FROM social_accounts
+                   WHERE platform = $1 AND status = 'active'
+                   ORDER BY created_at''',
+                platform,
+            )
+
+            for account in accounts:
+                await shared_pool.execute(
+                    '''INSERT INTO social_posts
+                           (content_id, social_account_id, platform, post_text,
+                            link_url, scheduled_at, status)
+                       VALUES ($1, $2, $3, $4, $5, $6, 'scheduled')''',
+                    content_id if content_id else None,
+                    account['id'],
+                    platform,
+                    body[:3000],
+                    link_url or None,
+                    scheduled_at,
+                )
+
+            if accounts:
+                logger.info(f'Created {len(accounts)} social post(s) for {platform}')
+            else:
+                logger.info(f'No active {platform} accounts found for social distribution')
+
+        except Exception as e:
+            logger.error(f'distribute_social: error creating {platform} posts: {e}')
+
+
 async def _do_action(action_type: str, config: dict, payload: dict, event):
-    if action_type == 'send_email':
+    if action_type == 'create_todo':
+        await _action_create_todo(config, payload, event)
+        return
+
+    elif action_type == 'enroll_drip':
+        await _action_enroll_drip(config, payload, event)
+        return
+
+    elif action_type == 'distribute_social':
+        await _action_distribute_social(config, payload, event)
+        return
+
+    elif action_type == 'send_email':
         template_name = config.get('template', '')
         subject = config.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
         html = render_template(template_name, payload)
