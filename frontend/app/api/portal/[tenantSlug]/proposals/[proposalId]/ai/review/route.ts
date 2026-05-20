@@ -1,15 +1,14 @@
 /**
  * POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/review
  *
- * Run AI quality/compliance review on a proposal section. Claude evaluates
- * the section content against the RFP requirements and compliance matrix,
- * returning scores, suggestions, and specific improvement recommendations.
+ * Queue AI review jobs for proposal sections. For each section with content,
+ * create a pipeline job that will evaluate quality and compliance via Claude.
  *
- * Body: { sectionId: string, reviewType?: 'quality' | 'compliance' | 'both' }
+ * Body: { sectionId?: string, reviewType?: 'quality' | 'compliance' | 'both' }
+ *   - If sectionId provided, only review that one section
+ *   - If omitted, queue review for all sections with content
  *
  * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-12): Implement AI review with Claude.
  */
 
 import { NextResponse } from 'next/server';
@@ -84,13 +83,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    if (!body.sectionId || typeof body.sectionId !== 'string') {
-      return NextResponse.json(
-        { error: 'sectionId (string) is required', code: 'VALIDATION_ERROR' },
-        { status: 400 },
-      );
-    }
-
     const reviewType = body.reviewType ?? 'both';
     if (!['quality', 'compliance', 'both'].includes(reviewType)) {
       return NextResponse.json(
@@ -100,27 +92,104 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement AI review
-    //
-    // 1. Verify proposal + section belong to tenant
-    // 2. Fetch section content (canvas JSON or plain text)
-    // 3. Fetch compliance requirements for this proposal's solicitation
-    // 4. Build review prompt asking Claude to evaluate:
-    //    - Quality: clarity, specificity, persuasiveness, page budget usage
-    //    - Compliance: does each requirement have an addressed response?
-    // 5. Call Claude (Sonnet for analysis)
-    // 6. Parse structured response into review object:
-    //    { overallScore: 0-100, qualityScore, complianceScore,
-    //      issues: [{type, severity, location, description, suggestion}],
-    //      strengths: [string], improvements: [string] }
-    // 7. Optionally save as proposal_comments with user_id = 'ai-reviewer'
-    // 8. Emit proposal:section.reviewed event
-    // 9. Return { data: review }
+    try {
+      // Verify proposal belongs to this tenant
+      const [proposal] = await sql<{
+        id: string;
+        title: string;
+        solicitationId: string | null;
+      }[]>`
+        SELECT id, title, solicitation_id
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-12',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      if (!proposal) {
+        return NextResponse.json(
+          { error: 'Proposal not found', code: 'NOT_FOUND' },
+          { status: 404 },
+        );
+      }
+
+      // Fetch sections to review
+      let sections: { id: string; title: string; content: string | null; status: string }[];
+      if (body.sectionId) {
+        sections = await sql<{ id: string; title: string; content: string | null; status: string }[]>`
+          SELECT id, title, content, status
+          FROM proposal_sections
+          WHERE id = ${body.sectionId} AND proposal_id = ${proposalId}
+        `;
+        if (sections.length === 0) {
+          return NextResponse.json(
+            { error: 'Section not found', code: 'NOT_FOUND' },
+            { status: 404 },
+          );
+        }
+      } else {
+        // All sections with content
+        sections = await sql<{ id: string; title: string; content: string | null; status: string }[]>`
+          SELECT id, title, content, status
+          FROM proposal_sections
+          WHERE proposal_id = ${proposalId}
+            AND content IS NOT NULL
+          ORDER BY section_number ASC
+        `;
+      }
+
+      // Filter to only sections that actually have content
+      const reviewable = sections.filter((s) => s.content !== null && s.content.length > 0);
+
+      if (reviewable.length === 0) {
+        return NextResponse.json({
+          data: { sections_queued: 0, message: 'No sections with content to review' },
+        });
+      }
+
+      // Queue review jobs
+      let sectionsQueued = 0;
+      for (const section of reviewable) {
+        const jobPayload = JSON.stringify({
+          kind: 'review_section',
+          section_id: section.id,
+          proposal_id: proposalId,
+          tenant_id: tenantId,
+          section_title: section.title,
+          solicitation_id: proposal.solicitationId,
+          review_type: reviewType,
+          content_length: section.content?.length ?? 0,
+        });
+
+        await sql`
+          INSERT INTO pipeline_jobs (source, run_type, status, result)
+          VALUES ('ai_review', 'section', 'pending', ${jobPayload}::jsonb)
+        `;
+
+        sectionsQueued++;
+      }
+
+      // Emit event
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.review_requested',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: {
+          proposalId,
+          sectionsQueued,
+          reviewType,
+        },
+      });
+
+      return NextResponse.json({
+        data: { sections_queued: sectionsQueued },
+      });
+    } catch (dbErr) {
+      console.error('[portal/proposals/ai/review] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'AI review queuing failed', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/proposals/ai/review] error:', err);
     return NextResponse.json(

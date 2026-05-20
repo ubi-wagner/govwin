@@ -37,24 +37,59 @@ export async function GET() {
       );
     }
 
-    // TODO: Implement pipeline monitoring
-    //
-    // 1. Job counts by status:
-    //    SELECT status, count(*)::int AS count FROM pipeline_jobs GROUP BY status
-    //
-    // 2. Recent jobs (last 20):
-    //    SELECT id, job_type, status, priority, metadata, created_at, started_at, completed_at,
-    //           EXTRACT(EPOCH FROM (completed_at - started_at))::int AS duration_seconds
-    //    FROM pipeline_jobs ORDER BY created_at DESC LIMIT 20
-    //
-    // 3. Schedule status:
-    //    SELECT id, name, source_type, cron_expression, is_active, last_run_at, next_run_at
-    //    FROM pipeline_schedules ORDER BY name
+    // 1. Job counts by status
+    const jobCounts = await sql<{ status: string; count: number }[]>`
+      SELECT status, count(*)::int AS count
+      FROM pipeline_jobs
+      GROUP BY status
+    `;
+
+    // 2. Recent jobs (last 50)
+    const recentJobs = await sql<{
+      id: string;
+      source: string;
+      runType: string;
+      status: string;
+      workerId: string | null;
+      result: unknown;
+      error: string | null;
+      startedAt: string | null;
+      completedAt: string | null;
+      createdAt: string;
+      durationSeconds: number | null;
+    }[]>`
+      SELECT id, source, run_type, status, worker_id,
+             result, error, started_at, completed_at, created_at,
+             EXTRACT(EPOCH FROM (completed_at - started_at))::int AS duration_seconds
+      FROM pipeline_jobs
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+
+    // 3. Schedule status
+    const schedules = await sql<{
+      id: string;
+      source: string;
+      runType: string;
+      cronExpression: string;
+      enabled: boolean;
+      lastRunAt: string | null;
+      nextRunAt: string | null;
+      createdAt: string;
+    }[]>`
+      SELECT id, source, run_type, cron_expression, enabled,
+             last_run_at, next_run_at, created_at
+      FROM pipeline_schedules
+      ORDER BY source
+    `;
 
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-20',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        jobCounts,
+        recentJobs,
+        schedules,
+      },
+    });
   } catch (err) {
     console.error('[admin/pipeline] error:', err);
     return NextResponse.json(

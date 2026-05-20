@@ -6,9 +6,7 @@
  * Each has filters (program_types, agencies, naics_codes, keywords) and shows
  * a count of matching scored items.
  *
- * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-06): Implement spotlight CRUD.
+ * Auth: tenant_user or above for GET, tenant_admin or above for POST.
  */
 
 import { NextResponse } from 'next/server';
@@ -73,21 +71,36 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement spotlight listing
-    //
-    // SELECT s.id, s.name, s.filters, s.created_at, s.updated_at,
-    //        (SELECT count(*)::int FROM tenant_pipeline_items tpi
-    //         JOIN opportunities o ON o.id = tpi.opportunity_id
-    //         WHERE tpi.tenant_id = s.tenant_id
-    //           AND <apply s.filters against o columns>) AS item_count
-    // FROM spotlights s
-    // WHERE s.tenant_id = ${tenantId}::uuid
-    // ORDER BY s.created_at DESC
+    try {
+      // spotlights table: id, tenant_id, name, description, naics_codes[],
+      //   keywords[], agencies[], program_types[], min_score, is_active,
+      //   created_at, updated_at
+      const spotlights = await sql`
+        SELECT
+          s.id,
+          s.name,
+          s.description,
+          s.naics_codes,
+          s.keywords,
+          s.agencies,
+          s.program_types,
+          s.min_score,
+          s.is_active,
+          s.created_at,
+          s.updated_at
+        FROM spotlights s
+        WHERE s.tenant_id = ${tenantId}::uuid
+        ORDER BY s.created_at DESC
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-06',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      return NextResponse.json({ data: { spotlights } });
+    } catch (dbErr) {
+      console.error('[portal/spotlights] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to query spotlights', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/spotlights] error:', err);
     return NextResponse.json(
@@ -152,12 +165,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     // ── Input validation ─────────────────────────────────────────
     let body: {
       name?: string;
-      filters?: {
-        program_types?: string[];
-        agencies?: string[];
-        naics_codes?: string[];
-        keywords?: string[];
-      };
+      description?: string;
+      program_types?: string[];
+      agencies?: string[];
+      naics_codes?: string[];
+      keywords?: string[];
+      min_score?: number;
     };
     try {
       body = await request.json();
@@ -176,19 +189,53 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement spotlight creation
-    //
-    // INSERT INTO spotlights (id, tenant_id, name, filters, created_at, updated_at)
-    // VALUES (gen_random_uuid(), ${tenantId}::uuid, ${body.name}, ${JSON.stringify(body.filters)}::jsonb, now(), now())
-    // RETURNING id, name, filters, created_at
-    //
-    // Emit event:
-    // await emitEventSingle({ namespace: 'capture', type: 'spotlight.created', ... })
+    try {
+      const programTypes = Array.isArray(body.program_types) ? body.program_types : [];
+      const agencies = Array.isArray(body.agencies) ? body.agencies : [];
+      const naicsCodes = Array.isArray(body.naics_codes) ? body.naics_codes : [];
+      const keywords = Array.isArray(body.keywords) ? body.keywords : [];
+      const minScore = typeof body.min_score === 'number' ? body.min_score : 0;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-06',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      const [spotlight] = await sql<{
+        id: string;
+        name: string;
+        createdAt: string;
+      }[]>`
+        INSERT INTO spotlights (
+          tenant_id, name, description, program_types, agencies,
+          naics_codes, keywords, min_score
+        ) VALUES (
+          ${tenantId}::uuid,
+          ${body.name},
+          ${body.description ?? null},
+          ${sql.array(programTypes)},
+          ${sql.array(agencies)},
+          ${sql.array(naicsCodes)},
+          ${sql.array(keywords)},
+          ${minScore}
+        )
+        RETURNING id, name, created_at
+      `;
+
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'spotlight.created',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { spotlightId: spotlight.id, name: body.name },
+      });
+
+      return NextResponse.json(
+        { data: { id: spotlight.id, name: spotlight.name, created_at: spotlight.createdAt } },
+        { status: 201 },
+      );
+    } catch (dbErr) {
+      console.error('[portal/spotlights/create] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to create spotlight', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/spotlights/create] error:', err);
     return NextResponse.json(

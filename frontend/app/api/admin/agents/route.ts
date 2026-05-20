@@ -37,29 +37,59 @@ export async function GET() {
       );
     }
 
-    // TODO: Implement agent monitoring
-    //
-    // 1. Task queue summary:
-    //    SELECT status, count(*)::int AS count
-    //    FROM agent_task_queue GROUP BY status
-    //
-    // 2. Tasks by agent role:
-    //    SELECT agent_role, status, count(*)::int AS count
-    //    FROM agent_task_queue GROUP BY agent_role, status
-    //
-    // 3. Memory counts by type:
-    //    SELECT agent_role, memory_type, count(*)::int AS count
-    //    FROM agent_memories GROUP BY agent_role, memory_type
-    //
-    // 4. Recent failures (last 10):
-    //    SELECT id, agent_role, tool_name, error_message, created_at
-    //    FROM agent_task_queue WHERE status = 'failed'
-    //    ORDER BY created_at DESC LIMIT 10
+    // 1. Task queue summary by status
+    const taskCounts = await sql<{ status: string; count: number }[]>`
+      SELECT status, count(*)::int AS count
+      FROM agent_task_queue
+      GROUP BY status
+    `;
+
+    // 2. Tasks by agent role and status
+    const tasksByRole = await sql<{ agentRole: string; status: string; count: number }[]>`
+      SELECT agent_role, status, count(*)::int AS count
+      FROM agent_task_queue
+      GROUP BY agent_role, status
+      ORDER BY agent_role, status
+    `;
+
+    // 3. Recent failures (last 10)
+    const recentFailures = await sql<{
+      id: string;
+      agentRole: string;
+      taskType: string;
+      error: string | null;
+      createdAt: string;
+    }[]>`
+      SELECT id, agent_role, task_type, error, created_at
+      FROM agent_task_queue
+      WHERE status = 'failed'
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+
+    // 4. Recent tool invocation events (from system_events)
+    const recentToolEvents = await sql<{
+      id: string;
+      type: string;
+      phase: string;
+      payload: unknown;
+      createdAt: string;
+    }[]>`
+      SELECT id, type, phase, payload, created_at
+      FROM system_events
+      WHERE namespace = 'tool'
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
 
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-21',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        taskCounts,
+        tasksByRole,
+        recentFailures,
+        recentToolEvents,
+      },
+    });
   } catch (err) {
     console.error('[admin/agents] error:', err);
     return NextResponse.json(

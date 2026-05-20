@@ -59,35 +59,126 @@ async def create_drafts_from_scout(
             "sourceName": "Air Force CSO Portal",
         }
     """
-    # TODO: Implement draft solicitation creation from scout data
-    #
-    # Implementation steps:
-    # 1. Validate inputs — region_results must be a non-empty list
-    #
-    # 2. For each region_result:
-    #    a. For each opportunity in region_result["opportunities"]:
-    #       i.  Check for existing opportunity by title + agency dedup:
-    #             SELECT id FROM opportunities
-    #             WHERE title = $1 AND agency = $2
-    #             LIMIT 1
-    #
-    #       ii. If not found, INSERT into opportunities:
-    #             INSERT INTO opportunities (
-    #                 id, source, source_id, title, agency, description,
-    #                 program_type, is_active, created_at, updated_at
-    #             ) VALUES (...)
-    #             Source should be 'source_scout'
-    #
-    #       iii. CREATE curated_solicitations row:
-    #             INSERT INTO curated_solicitations (
-    #                 id, opportunity_id, namespace, status,
-    #                 full_text, created_at, updated_at
-    #             ) VALUES (..., 'draft', ...)
-    #
-    # 3. Track counts: created, updated (content changed), skipped (duplicate)
-    #
-    # 4. Return summary dict
+    source_uuid = uuid.UUID(source_id)
 
-    raise NotImplementedError(
-        "create_drafts_from_scout() action not yet implemented — see inline TODO"
-    )
+    # 1. Validate inputs
+    if not region_results or not isinstance(region_results, list):
+        return {
+            "draftsCreated": 0,
+            "draftsUpdated": 0,
+            "duplicatesSkipped": 0,
+            "sourceId": source_id,
+            "sourceName": source_name or "",
+            "reason": "no_region_results",
+        }
+
+    drafts_created = 0
+    drafts_updated = 0
+    duplicates_skipped = 0
+
+    # 2. Process each region result
+    for region in region_results:
+        opportunities = region.get("opportunities", [])
+        if not opportunities:
+            continue
+
+        for opp in opportunities:
+            title = (opp.get("title") or "").strip()[:500]
+            agency = (opp.get("agency") or source_name or "").strip()[:200]
+            description = (opp.get("description") or "")[:5000]
+            close_date_str = opp.get("close_date")
+
+            if not title:
+                continue
+
+            # Dedup by title + agency
+            existing = await conn.fetchrow(
+                """SELECT id FROM opportunities
+                   WHERE title = $1 AND agency = $2
+                   LIMIT 1""",
+                title,
+                agency,
+            )
+
+            if existing:
+                # Check if curated_solicitation already exists for this opp
+                existing_sol = await conn.fetchval(
+                    """SELECT id FROM curated_solicitations
+                       WHERE opportunity_id = $1
+                       LIMIT 1""",
+                    existing["id"],
+                )
+                if existing_sol:
+                    duplicates_skipped += 1
+                    continue
+
+                # Opportunity exists but no solicitation — create one
+                opp_id = existing["id"]
+            else:
+                # Create new opportunity
+                opp_id = uuid.uuid4()
+                source_id_val = opp.get("url") or f"scout-{source_id}-{uuid.uuid4().hex[:8]}"
+
+                close_date = None
+                if close_date_str:
+                    try:
+                        from datetime import datetime
+                        close_date = datetime.fromisoformat(
+                            close_date_str.replace("Z", "+00:00")
+                        )
+                    except (ValueError, AttributeError):
+                        pass
+
+                try:
+                    await conn.execute(
+                        """INSERT INTO opportunities
+                             (id, source, source_id, title, agency,
+                              description, program_type, close_date,
+                              is_active, created_at, updated_at)
+                           VALUES ($1, 'source_scout', $2, $3, $4, $5,
+                                   $6, $7, true, now(), now())""",
+                        opp_id,
+                        source_id_val[:500],
+                        title,
+                        agency,
+                        description,
+                        opp.get("program_type"),
+                        close_date,
+                    )
+                except Exception as e:
+                    log.error(
+                        "failed to create opportunity from scout for '%s': %s",
+                        title, e,
+                    )
+                    continue
+
+            # 3. Create curated_solicitations row with status='new' for admin review
+            #    Note: curated_solicitations status CHECK does not include 'draft'
+            #    — use 'new' which is the initial status in the workflow.
+            sol_id = uuid.uuid4()
+            namespace = f"scout:{source_name or source_id}"[:100]
+            try:
+                await conn.execute(
+                    """INSERT INTO curated_solicitations
+                         (id, opportunity_id, namespace, status, full_text,
+                          created_at, updated_at)
+                       VALUES ($1, $2, $3, 'new', $4, now(), now())""",
+                    sol_id,
+                    opp_id,
+                    namespace,
+                    description[:50000] if description else None,
+                )
+                drafts_created += 1
+            except Exception as e:
+                log.error(
+                    "failed to create curated_solicitation from scout for '%s': %s",
+                    title, e,
+                )
+
+    return {
+        "draftsCreated": drafts_created,
+        "draftsUpdated": drafts_updated,
+        "duplicatesSkipped": duplicates_skipped,
+        "sourceId": source_id,
+        "sourceName": source_name or "",
+    }

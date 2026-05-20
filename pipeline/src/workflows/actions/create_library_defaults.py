@@ -73,27 +73,51 @@ async def create_default_categories(
     Returns:
         {"categoriesCreated": N, "categoriesSkipped": M}
     """
-    # TODO: Implement default category creation
-    #
-    # Implementation steps:
-    # 1. Verify tenant exists:
-    #      SELECT id FROM tenants WHERE id = $1
-    #
-    # 2. Check existing categories for this tenant:
-    #      SELECT DISTINCT category FROM library_units WHERE tenant_id = $1
-    #
-    # 3. For each DEFAULT_CATEGORIES entry not already present,
-    #    insert a seed library_unit with source_type='system':
-    #      INSERT INTO library_units (
-    #          id, tenant_id, category, title, content, source_type,
-    #          status, created_at, updated_at
-    #      ) VALUES ($1, $2, $3, $4, $5, 'system', 'approved', now(), now())
-    #
-    #    The seed unit acts as a category marker. Users will add real
-    #    content units into these categories over time.
-    #
-    # 4. Return summary
+    tenant_uuid = uuid.UUID(tenant_id)
 
-    raise NotImplementedError(
-        "create_default_categories() action not yet implemented — see inline TODO"
+    # 1. Verify tenant exists
+    tenant_row = await conn.fetchval(
+        "SELECT id FROM tenants WHERE id = $1",
+        tenant_uuid,
     )
+    if tenant_row is None:
+        return {"status": "skipped", "reason": "tenant_not_found"}
+
+    # 2. Check existing categories for this tenant
+    existing_rows = await conn.fetch(
+        "SELECT DISTINCT category FROM library_units WHERE tenant_id = $1",
+        tenant_uuid,
+    )
+    existing_categories = {row["category"] for row in existing_rows}
+
+    # 3. For each default category not already present, insert a seed
+    #    library_unit. source_type='ai' is the closest valid option for
+    #    system-generated content (CHECK constraint allows: manual, upload,
+    #    harvest, ai). The seed unit acts as a category marker — users
+    #    add real content units into these categories over time.
+    created = 0
+    skipped = 0
+    for cat in DEFAULT_CATEGORIES:
+        if cat["name"] in existing_categories:
+            skipped += 1
+            continue
+        try:
+            await conn.execute(
+                """INSERT INTO library_units
+                     (id, tenant_id, category, heading_text, content,
+                      source_type, status, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, 'ai', 'approved', now(), now())""",
+                uuid.uuid4(),
+                tenant_uuid,
+                cat["name"],
+                cat["name"],
+                cat["description"],
+            )
+            created += 1
+        except Exception as e:
+            log.warning(
+                "failed to create default category '%s' for tenant %s: %s",
+                cat["name"], tenant_id, e,
+            )
+
+    return {"categoriesCreated": created, "categoriesSkipped": skipped}

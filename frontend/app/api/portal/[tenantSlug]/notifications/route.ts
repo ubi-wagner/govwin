@@ -1,12 +1,10 @@
 /**
  * GET /api/portal/[tenantSlug]/notifications — Notification feed for tenant user
  *
- * Returns notifications from system_events where the payload targets this
- * tenant or user. Supports pagination and marking as read.
+ * Returns notifications derived from system_events where the tenant_id matches
+ * and namespace is in the customer-visible set. Supports pagination.
  *
  * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-10): Implement notification feed query.
  */
 
 import { NextResponse } from 'next/server';
@@ -70,35 +68,47 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Parse query params ───────────────────────────────────────
     const url = new URL(request.url);
-    const rawLimit = parseInt(url.searchParams.get('limit') ?? '20', 10);
-    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 20 : rawLimit), 100);
+    const rawLimit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
     const rawOffset = parseInt(url.searchParams.get('offset') ?? '0', 10);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement notification feed
-    //
-    // Query system_events for notification-type events targeting this tenant:
-    //
-    // SELECT se.id, se.namespace, se.type, se.payload, se.created_at
-    // FROM system_events se
-    // WHERE se.namespace = 'system'
-    //   AND se.type = 'notification.requested'
-    //   AND (
-    //     se.tenant_id = ${tenantId}::uuid
-    //     OR se.payload->>'tenant_id' = ${tenantId}
-    //     OR se.payload->>'user_id' = ${sessionUser.id}
-    //   )
-    // ORDER BY se.created_at DESC
-    // LIMIT ${limit} OFFSET ${offset}
-    //
-    // For V2: add a dedicated notifications table with read/unread tracking
-    // per user. For V1, all notifications for the tenant are shown.
+    try {
+      const notifications = await sql<{
+        id: string;
+        type: string;
+        namespace: string;
+        payload: Record<string, unknown>;
+        createdAt: string;
+      }[]>`
+        SELECT id, type, namespace, payload, created_at
+        FROM system_events
+        WHERE tenant_id = ${tenantId}::uuid
+          AND namespace IN ('proposal', 'capture', 'library')
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-10',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      const items = notifications.map((n) => ({
+        id: n.id,
+        type: n.type,
+        namespace: n.namespace,
+        title: (n.payload as Record<string, unknown>)?.title ?? n.type,
+        summary: (n.payload as Record<string, unknown>)?.summary ?? null,
+        created_at: n.createdAt,
+        is_read: false, // V1: no per-user read tracking; all shown as unread
+      }));
+
+      return NextResponse.json({ data: { notifications: items } });
+    } catch (dbErr) {
+      console.error('[portal/notifications] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to query notifications', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/notifications] error:', err);
     return NextResponse.json(

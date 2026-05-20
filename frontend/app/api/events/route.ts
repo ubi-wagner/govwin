@@ -1,15 +1,14 @@
 /**
- * GET  /api/events — Server-Sent Events stream for real-time dashboard updates
+ * GET  /api/events — Recent events for the authenticated user (polling-based V1)
  * POST /api/events — Emit a system event (admin only)
  *
- * SSE endpoint that streams new system_events to connected clients.
- * Used by admin dashboard and portal for live updates.
- *
- * Auth: any authenticated user. Events are filtered by role:
+ * GET returns recent system_events (last 5 minutes) filtered by role:
  *   - admin roles see all events
  *   - tenant roles see only their tenant's events
  *
- * V1 TODO (P2-27): Implement SSE stream.
+ * POST allows admin to manually emit events for testing/tooling.
+ *
+ * Auth: any authenticated user for GET, rfp_admin+ for POST.
  */
 
 import { NextResponse } from 'next/server';
@@ -41,40 +40,53 @@ export async function GET(request: Request) {
       );
     }
 
-    // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement SSE event stream
-    //
-    // Option A: Polling-based SSE (simpler, V1)
-    //   const stream = new ReadableStream({
-    //     async start(controller) {
-    //       let lastId = 0;
-    //       const interval = setInterval(async () => {
-    //         const events = await sql`
-    //           SELECT id, namespace, type, phase, payload, created_at
-    //           FROM system_events
-    //           WHERE id > ${lastId}
-    //             [AND tenant_id = ${sessionUser.tenantId}::uuid] -- for tenant roles
-    //           ORDER BY id ASC LIMIT 10
-    //         `;
-    //         for (const event of events) {
-    //           controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
-    //           lastId = event.id;
-    //         }
-    //       }, 2000);
-    //       request.signal.addEventListener('abort', () => clearInterval(interval));
-    //     },
-    //   });
-    //   return new Response(stream, {
-    //     headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-    //   });
-    //
-    // Option B: pg_notify-based SSE (instant, V2)
-    //   Use LISTEN on the system_events_notify channel
+    // ── Parse query params ───────────────────────────────────────
+    const url = new URL(request.url);
+    const rawMinutes = parseInt(url.searchParams.get('minutes') ?? '5', 10);
+    const minutes = Math.min(Math.max(1, isNaN(rawMinutes) ? 5 : rawMinutes), 60);
+    const rawLimit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 200);
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-27',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    // ── Business logic ───────────────────────────────────────────
+    try {
+      const isAdmin = hasRoleAtLeast(role, 'rfp_admin');
+
+      let events;
+      if (isAdmin) {
+        // Admin sees all events
+        events = await sql`
+          SELECT id, namespace, type, phase, actor_type, actor_id,
+                 tenant_id, payload, error, duration_ms, created_at
+          FROM system_events
+          WHERE created_at > now() - make_interval(mins => ${minutes})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
+      } else {
+        // Tenant users see only their tenant's events
+        const tenantId = sessionUser.tenantId;
+        if (!tenantId) {
+          return NextResponse.json({ data: { events: [] } });
+        }
+        events = await sql`
+          SELECT id, namespace, type, phase, actor_type, actor_id,
+                 tenant_id, payload, error, duration_ms, created_at
+          FROM system_events
+          WHERE tenant_id = ${tenantId}::uuid
+            AND created_at > now() - make_interval(mins => ${minutes})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
+      }
+
+      return NextResponse.json({ data: { events } });
+    } catch (dbErr) {
+      console.error('[events/stream] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Event query failed', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[events/stream] error:', err);
     return NextResponse.json(
@@ -107,15 +119,64 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: Implement manual event emission (for admin testing)
-    // Parse body: { namespace, type, payload }
-    // Insert into system_events
-    // Return { data: { eventId } }
+    // ── Parse body ───────────────────────────────────────────────
+    let body: {
+      namespace?: string;
+      type?: string;
+      payload?: Record<string, unknown>;
+      tenantId?: string | null;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body', code: 'INVALID_BODY' },
+        { status: 400 },
+      );
+    }
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-27',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    if (!body.namespace || typeof body.namespace !== 'string') {
+      return NextResponse.json(
+        { error: 'namespace (string) is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+    if (!body.type || typeof body.type !== 'string') {
+      return NextResponse.json(
+        { error: 'type (string) is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    // ── Insert event ─────────────────────────────────────────────
+    try {
+      const [event] = await sql<{ id: string }[]>`
+        INSERT INTO system_events (
+          namespace, type, phase, actor_type, actor_id,
+          tenant_id, payload
+        ) VALUES (
+          ${body.namespace},
+          ${body.type},
+          'single',
+          'user',
+          ${sessionUser.id ?? 'unknown'},
+          ${body.tenantId ?? null},
+          ${JSON.stringify(body.payload ?? {})}::jsonb
+        )
+        RETURNING id
+      `;
+
+      return NextResponse.json(
+        { data: { eventId: event.id } },
+        { status: 201 },
+      );
+    } catch (dbErr) {
+      console.error('[events/emit] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Event emission failed', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[events/emit] error:', err);
     return NextResponse.json(

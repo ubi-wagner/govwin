@@ -1,14 +1,12 @@
 /**
- * GET  /api/portal/[tenantSlug]/uploads — List uploaded files
+ * GET  /api/portal/[tenantSlug]/uploads — List uploaded library units
  * POST /api/portal/[tenantSlug]/uploads — Upload a file to S3 + create library_unit
  *
  * Handles file uploads for tenant library. Files are stored in S3 under
- * customers/{tenantId}/uploads/ and a library_units row is created with
+ * customers/{tenantSlug}/uploads/ and a library_units row is created with
  * source_type='upload'.
  *
  * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-09): Implement file upload and listing.
  */
 
 import { NextResponse } from 'next/server';
@@ -71,16 +69,32 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    // TODO: List uploaded library units for this tenant
-    // SELECT id, title, category, source_type, status, created_at
-    // FROM library_units
-    // WHERE tenant_id = ${tenantId}::uuid AND source_type = 'upload'
-    // ORDER BY created_at DESC
+    // ── Business logic ───────────────────────────────────────────
+    try {
+      const uploads = await sql`
+        SELECT
+          id,
+          source_filename AS filename,
+          category,
+          source_type,
+          status,
+          source_storage_key AS storage_key,
+          created_at
+        FROM library_units
+        WHERE tenant_id = ${tenantId}::uuid
+          AND source_type = 'upload'
+        ORDER BY created_at DESC
+        LIMIT 200
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-09',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      return NextResponse.json({ data: { uploads } });
+    } catch (dbErr) {
+      console.error('[portal/uploads/list] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to list uploads', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/uploads/list] error:', err);
     return NextResponse.json(
@@ -141,23 +155,107 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // TODO: Implement file upload
-    //
-    // 1. Parse multipart/form-data from request
-    // 2. Validate file type (PDF, DOCX, TXT, XLSX)
-    // 3. Upload to S3: customers/{tenantId}/uploads/{uuid}/{filename}
-    // 4. Create library_units row:
-    //    INSERT INTO library_units (
-    //      id, tenant_id, title, content, source_type, status,
-    //      storage_key, original_filename, created_at, updated_at
-    //    ) VALUES (...)
-    // 5. Emit library:unit.uploaded event
-    // 6. Return { data: { id, title, storageKey } }
+    // ── Parse multipart form data ────────────────────────────────
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid form data', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-09',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    const file = formData.get('file') as File | null;
+    if (!file) {
+      return NextResponse.json(
+        { error: 'file is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const category = (formData.get('category') as string) || 'general';
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'File type not allowed. Accepted: PDF, DOCX, TXT, XLSX', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large (max 50 MB)', code: 'TOO_LARGE' },
+        { status: 413 },
+      );
+    }
+
+    // ── Upload to S3 ─────────────────────────────────────────────
+    try {
+      const { randomUUID } = await import('crypto');
+      const fileId = randomUUID();
+      const storageKey = `customers/${tenantSlug}/uploads/${fileId}/${file.name}`;
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      const { putObject } = await import('@/lib/storage/s3-client');
+      await putObject({
+        key: storageKey,
+        body: fileBuffer,
+        contentType: file.type,
+        metadata: { 'uploaded-by': sessionUser.id },
+      });
+
+      // ── Create library_unit row ──────────────────────────────────
+      const content = `Uploaded file: ${file.name}`;
+      const [unit] = await sql<{ id: string }[]>`
+        INSERT INTO library_units (
+          tenant_id, content, category, source_type, status,
+          source_filename, source_storage_key
+        ) VALUES (
+          ${tenantId}::uuid,
+          ${content},
+          ${category},
+          'upload',
+          'draft',
+          ${file.name},
+          ${storageKey}
+        )
+        RETURNING id
+      `;
+
+      // ── Emit event ─────────────────────────────────────────────────
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'unit.uploaded',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: {
+          unitId: unit.id,
+          filename: file.name,
+          contentType: file.type,
+          sizeBytes: file.size,
+          storageKey,
+        },
+      });
+
+      return NextResponse.json(
+        { data: { id: unit.id, filename: file.name, storageKey } },
+        { status: 201 },
+      );
+    } catch (uploadErr) {
+      console.error('[portal/uploads/create] upload error:', uploadErr);
+      return NextResponse.json(
+        { error: 'Upload failed', code: 'STORAGE_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/uploads/create] error:', err);
     return NextResponse.json(

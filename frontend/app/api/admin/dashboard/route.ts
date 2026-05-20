@@ -5,8 +5,6 @@
  * revenue (sum purchases), recent events, pipeline job stats.
  *
  * Auth: master_admin or rfp_admin.
- *
- * V1 TODO (P2-19): Implement real aggregation queries.
  */
 
 import { NextResponse } from 'next/server';
@@ -38,35 +36,99 @@ export async function GET() {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement admin dashboard queries
-    //
-    // 1. Tenant counts:
-    //    SELECT count(*)::int AS total,
-    //           count(*) FILTER (WHERE status = 'active')::int AS active,
-    //           count(*) FILTER (WHERE subscription_status = 'active')::int AS subscribed
-    //    FROM tenants
-    //
-    // 2. Proposal counts by stage:
-    //    SELECT stage, count(*)::int AS count FROM proposals GROUP BY stage
-    //
-    // 3. Revenue:
-    //    SELECT sum(amount_cents)::bigint AS total_cents,
-    //           count(*)::int AS purchase_count
-    //    FROM purchases WHERE status = 'completed'
-    //
-    // 4. Recent events (last 20):
-    //    SELECT id, namespace, type, phase, payload, created_at
-    //    FROM system_events ORDER BY created_at DESC LIMIT 20
-    //
-    // 5. Pipeline stats:
-    //    SELECT status, count(*)::int AS count FROM pipeline_jobs GROUP BY status
-    //
-    // Return { data: { tenants, proposals, revenue, recentEvents, pipeline } }
+    try {
+      // 1. Tenant counts
+      const [tenantStats] = await sql<{
+        total: string;
+        active: string;
+        subscribed: string;
+      }[]>`
+        SELECT
+          count(*)::text AS total,
+          count(*) FILTER (WHERE status = 'active')::text AS active,
+          count(*) FILTER (WHERE subscription_status = 'active')::text AS subscribed
+        FROM tenants
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-19',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      // 2. Proposal counts by stage
+      const proposalsByStage = await sql<{ stage: string; count: string }[]>`
+        SELECT stage, count(*)::text AS count
+        FROM proposals
+        GROUP BY stage
+      `;
+
+      // Total proposals
+      const totalProposals = proposalsByStage.reduce(
+        (sum, row) => sum + parseInt(row.count, 10),
+        0,
+      );
+
+      // 3. Total solicitations
+      const [solicitationStats] = await sql<{ total: string }[]>`
+        SELECT count(*)::text AS total FROM curated_solicitations
+      `;
+
+      // 4. Revenue
+      const [revenueStats] = await sql<{
+        totalCents: string | null;
+        purchaseCount: string;
+      }[]>`
+        SELECT
+          sum(amount_cents)::text AS total_cents,
+          count(*)::text AS purchase_count
+        FROM purchases
+        WHERE status = 'completed'
+      `;
+
+      // 5. Recent events (top 10)
+      const recentEvents = await sql`
+        SELECT id, namespace, type, phase, actor_type, actor_id,
+               tenant_id, payload, created_at
+        FROM system_events
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+
+      // 6. Pipeline job stats
+      const pipelineStats = await sql<{ status: string; count: string }[]>`
+        SELECT status, count(*)::text AS count
+        FROM pipeline_jobs
+        GROUP BY status
+      `;
+
+      return NextResponse.json({
+        data: {
+          tenants: {
+            total: parseInt(tenantStats.total, 10),
+            active: parseInt(tenantStats.active, 10),
+            subscribed: parseInt(tenantStats.subscribed, 10),
+          },
+          proposals: {
+            total: totalProposals,
+            by_stage: Object.fromEntries(
+              proposalsByStage.map((r) => [r.stage, parseInt(r.count, 10)]),
+            ),
+          },
+          solicitations: {
+            total: parseInt(solicitationStats.total, 10),
+          },
+          revenue: {
+            total_cents: parseInt(revenueStats.totalCents ?? '0', 10),
+            purchase_count: parseInt(revenueStats.purchaseCount, 10),
+          },
+          recent_events: recentEvents,
+          pipeline: Object.fromEntries(
+            pipelineStats.map((r) => [r.status, parseInt(r.count, 10)]),
+          ),
+        },
+      });
+    } catch (dbErr) {
+      console.error('[admin/dashboard] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Dashboard query failed', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[admin/dashboard] error:', err);
     return NextResponse.json(

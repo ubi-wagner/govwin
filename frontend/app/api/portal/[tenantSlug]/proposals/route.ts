@@ -6,8 +6,6 @@
  * title, section count, created_at. Filterable by stage.
  *
  * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-05): Implement the SQL query below.
  */
 
 import { NextResponse } from 'next/server';
@@ -73,8 +71,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── Parse query params ───────────────────────────────────────
     const url = new URL(request.url);
     const stageFilter = url.searchParams.get('stage');
-    const rawLimit = parseInt(url.searchParams.get('limit') ?? '50', 10);
-    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 200);
+    const sort = url.searchParams.get('sort') ?? 'updated_desc';
+    const rawLimit = parseInt(url.searchParams.get('limit') ?? '20', 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 20 : rawLimit), 200);
     const rawOffset = parseInt(url.searchParams.get('offset') ?? '0', 10);
     const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
@@ -86,24 +85,58 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement proposal list query
-    //
-    // SELECT p.id, p.title, p.stage, p.is_locked, p.created_at, p.updated_at,
-    //        o.title AS opportunity_title, o.agency, o.close_date,
-    //        (SELECT count(*)::int FROM proposal_sections WHERE proposal_id = p.id) AS section_count
-    // FROM proposals p
-    // LEFT JOIN opportunities o ON o.id = p.opportunity_id
-    // WHERE p.tenant_id = ${tenantId}::uuid
-    //   [AND p.stage = ${stageFilter}]
-    // ORDER BY p.updated_at DESC
-    // LIMIT ${limit} OFFSET ${offset}
-    //
-    // Also return total count for pagination.
+    try {
+      const filters = [sql`p.tenant_id = ${tenantId}::uuid`];
+      if (stageFilter) {
+        filters.push(sql`p.stage = ${stageFilter}`);
+      }
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-05',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      const where = filters.reduce(
+        (acc, fragment, i) => (i === 0 ? fragment : sql`${acc} AND ${fragment}`),
+      );
+
+      // Count
+      const [countResult] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM proposals p WHERE ${where}
+      `;
+      const total = parseInt(countResult.count, 10);
+
+      // Sort order
+      const orderClause =
+        sort === 'created_asc' ? sql`p.created_at ASC` :
+        sort === 'created_desc' ? sql`p.created_at DESC` :
+        sort === 'updated_asc' ? sql`p.updated_at ASC` :
+        sql`p.updated_at DESC`;
+
+      // Main query
+      const proposals = await sql`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.is_locked,
+          p.created_at,
+          p.updated_at,
+          o.title AS solicitation_title,
+          o.agency,
+          o.close_date,
+          (SELECT count(*)::int FROM proposal_sections WHERE proposal_id = p.id) AS section_count
+        FROM proposals p
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE ${where}
+        ORDER BY ${orderClause}
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
+
+      return NextResponse.json({ data: { proposals, total } });
+    } catch (dbErr) {
+      console.error('[portal/proposals] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to query proposals', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/proposals] error:', err);
     return NextResponse.json(
@@ -113,9 +146,9 @@ export async function GET(request: Request, ctx: RouteContext) {
   }
 }
 
-export async function POST(request: Request, ctx: RouteContext) {
-  return NextResponse.json({
-    error: 'Use /proposals/create endpoint',
-    code: 'NOT_IMPLEMENTED',
-  }, { status: 501 });
+export async function POST(_request: Request, _ctx: RouteContext) {
+  return NextResponse.json(
+    { error: 'Use /proposals/create endpoint', code: 'NOT_IMPLEMENTED' },
+    { status: 501 },
+  );
 }

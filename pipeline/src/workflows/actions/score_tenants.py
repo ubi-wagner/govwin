@@ -15,6 +15,7 @@ See pipeline/src/scoring/engine.py for the scoring algorithm.
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any, Optional
 
 import asyncpg
@@ -51,37 +52,190 @@ async def match_tenants(
             "avgScore": 0.73,
         }
     """
-    # TODO: Implement tenant-opportunity scoring
-    #
-    # Implementation steps:
-    # 1. Fetch the solicitation + opportunity metadata:
-    #      SELECT cs.id, o.naics_codes, o.agency, o.program_type,
-    #             cs.solicitation_type
-    #      FROM curated_solicitations cs
-    #      JOIN opportunities o ON o.id = cs.opportunity_id
-    #      WHERE cs.id = $1
-    #
-    # 2. Fetch all eligible tenants:
-    #      SELECT t.id, t.slug, tp.naics_codes, tp.tech_focus_areas,
-    #             tp.agency_preferences
-    #      FROM tenants t
-    #      JOIN tenant_profiles tp ON tp.tenant_id = t.id
-    #      WHERE t.status = 'active'
-    #        AND t.subscription_status IN ('active', 'trialing')
-    #
-    # 3. For each tenant, compute score using ScoringEngine:
-    #      from scoring.engine import ScoringEngine
-    #      engine = ScoringEngine()
-    #      score = engine.score_opportunity_for_tenant(tenant, solicitation)
-    #
-    # 4. Upsert tenant_pipeline_items:
-    #      INSERT INTO tenant_pipeline_items (tenant_id, opportunity_id, score, ...)
-    #      ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET score = ...
-    #
-    # 5. Collect tenant IDs with score above notification threshold (e.g., 0.5)
-    #
-    # 6. Return result dict with tenantIds list
+    sol_uuid = uuid.UUID(solicitation_id)
 
-    raise NotImplementedError(
-        "match_tenants() action not yet implemented — see inline TODO for steps"
+    # 1. Fetch the solicitation + opportunity metadata
+    sol = await conn.fetchrow(
+        """SELECT cs.id, cs.opportunity_id, o.naics_codes, o.agency,
+                  o.program_type, o.set_aside_type, o.close_date,
+                  o.title, o.keywords
+           FROM curated_solicitations cs
+           JOIN opportunities o ON o.id = cs.opportunity_id
+           WHERE cs.id = $1""",
+        sol_uuid,
     )
+    if sol is None:
+        return {"status": "skipped", "reason": "solicitation_not_found"}
+
+    opportunity_id = sol["opportunity_id"]
+
+    # 2. Fetch all eligible tenants with profiles
+    profiles = await conn.fetch(
+        """SELECT t.id AS tenant_id, t.slug, t.subscription_status,
+                  tp.naics_codes, tp.keywords, tp.agency_priorities,
+                  tp.set_aside_types, tp.technology_focus,
+                  tp.research_areas, tp.target_agencies, tp.min_surface_score
+           FROM tenants t
+           JOIN tenant_profiles tp ON tp.tenant_id = t.id
+           WHERE t.status = 'active'
+             AND t.subscription_status IN ('active', 'trialing')"""
+    )
+
+    if not profiles:
+        return {
+            "tenantIds": [],
+            "tenantsScored": 0,
+            "tenantsNotified": 0,
+            "avgScore": 0,
+        }
+
+    # 3. Score each tenant and upsert pipeline items
+    notification_threshold = 50
+    tenant_ids_above_threshold: list[str] = []
+    total_score_sum = 0
+    tenants_scored = 0
+
+    for profile in profiles:
+        scores = _calculate_match_scores(sol, profile)
+        total_score = scores["total_score"]
+
+        # Skip tenants below their configured minimum surface score
+        min_score = profile["min_surface_score"] or 40
+        if total_score < min_score:
+            continue
+
+        tenants_scored += 1
+        total_score_sum += total_score
+
+        # Upsert into tenant_pipeline_items
+        await conn.execute(
+            """INSERT INTO tenant_pipeline_items
+                 (tenant_id, opportunity_id, total_score,
+                  naics_score, keyword_score, agency_score,
+                  set_aside_score, type_score, timeline_score,
+                  matched_keywords, pursuit_status)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unreviewed')
+               ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
+                 total_score = $3,
+                 naics_score = $4,
+                 keyword_score = $5,
+                 agency_score = $6,
+                 set_aside_score = $7,
+                 type_score = $8,
+                 timeline_score = $9,
+                 matched_keywords = $10,
+                 updated_at = now()""",
+            profile["tenant_id"],
+            opportunity_id,
+            scores["total_score"],
+            scores["naics_score"],
+            scores["keyword_score"],
+            scores["agency_score"],
+            scores["set_aside_score"],
+            scores["type_score"],
+            scores["timeline_score"],
+            scores["matched_keywords"],
+        )
+
+        if total_score >= notification_threshold:
+            tenant_ids_above_threshold.append(str(profile["tenant_id"]))
+
+    avg_score = round(total_score_sum / tenants_scored, 2) if tenants_scored else 0
+
+    return {
+        "tenantIds": tenant_ids_above_threshold,
+        "tenantsScored": tenants_scored,
+        "tenantsNotified": len(tenant_ids_above_threshold),
+        "avgScore": avg_score,
+    }
+
+
+def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
+    """Compute multi-factor match score between a solicitation and tenant profile.
+
+    Scoring factors (total max 100):
+      - NAICS overlap:       0-30 points
+      - Keyword overlap:     0-25 points
+      - Agency preference:   0-20 points
+      - Set-aside match:     0-10 points
+      - Program type match:  0-10 points
+      - Timeline proximity:  0-5  points
+
+    Returns dict with individual scores, total, and matched keywords.
+    """
+    # NAICS overlap (max 30 points)
+    sol_naics = set(sol["naics_codes"] or [])
+    profile_naics = set(profile["naics_codes"] or [])
+    naics_overlap = sol_naics & profile_naics
+    if sol_naics and profile_naics:
+        naics_score = min(int(len(naics_overlap) / max(len(sol_naics), 1) * 30), 30)
+    else:
+        naics_score = 0
+
+    # Keyword overlap (max 25 points)
+    sol_keywords = set(k.lower() for k in (sol.get("keywords") or []))
+    profile_keywords = set(k.lower() for k in (profile["keywords"] or []))
+    # Also check technology_focus text against solicitation keywords
+    tech_focus = (profile["technology_focus"] or "").lower()
+    research_areas = set(r.lower() for r in (profile["research_areas"] or []))
+
+    matched_kw: list[str] = []
+    for kw in sol_keywords:
+        if kw in profile_keywords or kw in tech_focus or kw in research_areas:
+            matched_kw.append(kw)
+    # Also check profile keywords against sol title
+    sol_title_lower = (sol["title"] or "").lower()
+    for kw in profile_keywords:
+        if kw in sol_title_lower and kw not in matched_kw:
+            matched_kw.append(kw)
+
+    keyword_score = min(len(matched_kw) * 5, 25)
+
+    # Agency preference (max 20 points)
+    sol_agency = (sol["agency"] or "").strip()
+    profile_agencies = set(a.strip() for a in (profile["agency_priorities"] or []))
+    profile_target_agencies = set(a.strip() for a in (profile["target_agencies"] or []))
+    all_preferred = profile_agencies | profile_target_agencies
+    agency_score = 20 if sol_agency and sol_agency in all_preferred else 0
+
+    # Set-aside match (max 10 points)
+    sol_set_aside = (sol["set_aside_type"] or "").strip()
+    profile_set_asides = set(s.strip() for s in (profile["set_aside_types"] or []))
+    set_aside_score = 10 if sol_set_aside and sol_set_aside in profile_set_asides else 0
+
+    # Program type match (max 10 points)
+    sol_program = (sol["program_type"] or "").strip()
+    type_score = 10 if sol_program else 0  # base score if program_type is set
+
+    # Timeline proximity (max 5 points) — closer deadlines score higher
+    timeline_score = 0
+    if sol["close_date"]:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        close_date = sol["close_date"]
+        if hasattr(close_date, 'tzinfo') and close_date.tzinfo is None:
+            close_date = close_date.replace(tzinfo=timezone.utc)
+        days_until_close = (close_date - now).days
+        if 0 < days_until_close <= 30:
+            timeline_score = 5
+        elif 30 < days_until_close <= 60:
+            timeline_score = 3
+        elif 60 < days_until_close <= 90:
+            timeline_score = 1
+
+    total_score = min(
+        naics_score + keyword_score + agency_score
+        + set_aside_score + type_score + timeline_score,
+        100,
+    )
+
+    return {
+        "total_score": total_score,
+        "naics_score": naics_score,
+        "keyword_score": keyword_score,
+        "agency_score": agency_score,
+        "set_aside_score": set_aside_score,
+        "type_score": type_score,
+        "timeline_score": timeline_score,
+        "matched_keywords": matched_kw[:20],  # cap array size
+    }

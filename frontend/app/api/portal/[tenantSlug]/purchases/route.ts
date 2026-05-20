@@ -2,11 +2,9 @@
  * GET /api/portal/[tenantSlug]/purchases — Tenant purchase history
  *
  * Returns purchases for tenant: product_type, amount, status, created_at.
- * Joins with proposals for proposal title.
+ * Joins with proposals for proposal title and opportunities for opportunity title.
  *
  * Auth: tenant_admin or above with tenant access.
- *
- * V1 TODO (P2-08): Implement purchase history query.
  */
 
 import { NextResponse } from 'next/server';
@@ -69,23 +67,33 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement purchase history query
-    //
-    // SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
-    //        pu.stripe_session_id, pu.created_at,
-    //        p.title AS proposal_title,
-    //        o.title AS opportunity_title
-    // FROM purchases pu
-    // LEFT JOIN proposals p ON p.id = pu.proposal_id
-    // LEFT JOIN opportunities o ON o.id = pu.opportunity_id
-    // WHERE pu.tenant_id = ${tenantId}::uuid
-    // ORDER BY pu.created_at DESC
-    // LIMIT 50
+    try {
+      const purchases = await sql`
+        SELECT
+          pu.id,
+          pu.product_type,
+          pu.amount_cents,
+          pu.status,
+          pu.stripe_session_id,
+          pu.created_at,
+          p.title AS proposal_title,
+          o.title AS opportunity_title
+        FROM purchases pu
+        LEFT JOIN proposals p ON p.id = pu.proposal_id
+        LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+        WHERE pu.tenant_id = ${tenantId}::uuid
+        ORDER BY pu.created_at DESC
+        LIMIT 100
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-08',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      return NextResponse.json({ data: { purchases } });
+    } catch (dbErr) {
+      console.error('[portal/purchases] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Failed to query purchases', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/purchases] error:', err);
     return NextResponse.json(

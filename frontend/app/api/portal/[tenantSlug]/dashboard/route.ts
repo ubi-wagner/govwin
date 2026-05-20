@@ -1,12 +1,10 @@
 /**
  * GET /api/portal/[tenantSlug]/dashboard
  *
- * Returns tenant dashboard stats: proposal counts by stage, recent activity,
- * library unit count, upcoming deadlines, and subscription status.
+ * Returns tenant dashboard stats: proposal counts, matched opportunities,
+ * library unit count, team members, recent proposals, and recent activity.
  *
  * Auth: tenant_user or above with tenant access.
- *
- * V1 TODO (P2-01): Implement the SQL queries below.
  */
 
 import { NextResponse } from 'next/server';
@@ -70,38 +68,109 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement dashboard queries
-    //
-    // 1. Proposal counts by stage:
-    //    SELECT stage, count(*)::int AS count
-    //    FROM proposals WHERE tenant_id = ${tenantId}::uuid
-    //    GROUP BY stage
-    //
-    // 2. Recent activity (last 10 events for this tenant):
-    //    SELECT id, namespace, type, payload, created_at
-    //    FROM system_events
-    //    WHERE tenant_id = ${tenantId}::uuid
-    //    ORDER BY created_at DESC LIMIT 10
-    //
-    // 3. Library unit count:
-    //    SELECT count(*)::int AS count
-    //    FROM library_units WHERE tenant_id = ${tenantId}::uuid
-    //
-    // 4. Upcoming deadlines (opportunities with close_date in next 30 days):
-    //    SELECT o.title, o.close_date, o.agency
-    //    FROM opportunities o
-    //    JOIN tenant_pipeline_items tpi ON tpi.opportunity_id = o.id
-    //    WHERE tpi.tenant_id = ${tenantId}::uuid
-    //      AND o.close_date > now()
-    //      AND o.close_date < now() + interval '30 days'
-    //    ORDER BY o.close_date ASC LIMIT 5
-    //
-    // 5. Subscription status from tenant row
+    try {
+      // Fetch full tenant row for dashboard header
+      const [tenantRow] = await sql<{
+        name: string;
+        slug: string;
+        productTier: string | null;
+        subscriptionStatus: string | null;
+        lifecycleStage: string | null;
+      }[]>`
+        SELECT name, slug, product_tier, subscription_status, lifecycle_stage
+        FROM tenants WHERE id = ${tenantId}::uuid
+      `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-01',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      // Active proposals count (stage != 'archived')
+      const [proposalCount] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM proposals
+        WHERE tenant_id = ${tenantId}::uuid AND stage != 'archived'
+      `;
+
+      // Matched opportunities count
+      const [opportunityCount] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM tenant_pipeline_items
+        WHERE tenant_id = ${tenantId}::uuid
+      `;
+
+      // Library units count
+      const [libraryCount] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM library_units
+        WHERE tenant_id = ${tenantId}::uuid
+      `;
+
+      // Team members count
+      const [teamCount] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM users
+        WHERE tenant_id = ${tenantId}::uuid AND is_active = true
+      `;
+
+      // Recent proposals (top 5)
+      const recentProposals = await sql<{
+        id: string;
+        title: string;
+        stage: string;
+        updatedAt: string;
+      }[]>`
+        SELECT id, title, stage, updated_at
+        FROM proposals
+        WHERE tenant_id = ${tenantId}::uuid
+        ORDER BY updated_at DESC
+        LIMIT 5
+      `;
+
+      // Recent activity (top 10 system_events)
+      const recentActivity = await sql<{
+        type: string;
+        payload: Record<string, unknown>;
+        createdAt: string;
+      }[]>`
+        SELECT type, payload, created_at
+        FROM system_events
+        WHERE tenant_id = ${tenantId}::uuid
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+
+      const activityItems = recentActivity.map((e) => ({
+        type: e.type,
+        description: (e.payload as Record<string, unknown>)?.title
+          ?? (e.payload as Record<string, unknown>)?.summary
+          ?? e.type,
+        created_at: e.createdAt,
+      }));
+
+      return NextResponse.json({
+        data: {
+          tenant: {
+            name: tenantRow?.name ?? null,
+            slug: tenantRow?.slug ?? tenantSlug,
+            tier: tenantRow?.productTier ?? null,
+            subscription_status: tenantRow?.subscriptionStatus ?? null,
+            lifecycle_stage: tenantRow?.lifecycleStage ?? null,
+          },
+          stats: {
+            active_proposals: parseInt(proposalCount.count, 10),
+            matched_opportunities: parseInt(opportunityCount.count, 10),
+            library_units: parseInt(libraryCount.count, 10),
+            team_members: parseInt(teamCount.count, 10),
+          },
+          recent_proposals: recentProposals.map((p) => ({
+            id: p.id,
+            title: p.title,
+            stage: p.stage,
+            updated_at: p.updatedAt,
+          })),
+          recent_activity: activityItems,
+        },
+      });
+    } catch (dbErr) {
+      console.error('[portal/dashboard] DB error:', dbErr);
+      return NextResponse.json(
+        { error: 'Dashboard query failed', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
   } catch (err) {
     console.error('[portal/dashboard] error:', err);
     return NextResponse.json(
