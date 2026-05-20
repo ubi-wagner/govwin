@@ -8,10 +8,12 @@ Runs as an async background loop:
   4. Queue uninterpreted replies for Claude classification
   5. Update thread state and emit automation events
   6. Auto-draft trigger-based responses for HITL review
+  7. Detect content generation requests via email
 """
 import asyncio
 import json
 import logging
+import uuid as uuid_mod
 from datetime import datetime, timezone
 
 from ..models.database import get_pool, get_event_pool
@@ -32,6 +34,69 @@ def _fire_event(event_type: str, **kwargs):
 logger = logging.getLogger('cms.email_sweep')
 
 SWEEP_INTERVAL = 300  # 5 minutes default
+
+# ── Content Request Detection ─────────────────────────────────────────
+CONTENT_REQUEST_ADDRESSES = {'content@rfppipeline.com', 'blog@rfppipeline.com'}
+CONTENT_REQUEST_SUBJECT_PREFIX = '[CONTENT REQUEST]'
+
+
+async def _check_content_request(message_headers: dict, body_text: str, pool) -> bool:
+    """Check if an email is a content generation request and process it.
+
+    Content requests are detected by:
+      - Email sent TO a known content request address
+      - Subject line starting with [CONTENT REQUEST]
+
+    Returns True if the email was handled as a content request.
+    """
+    to_addr = message_headers.get('to', '').lower()
+    subject = message_headers.get('subject', '')
+
+    is_content_request = (
+        any(addr in to_addr for addr in CONTENT_REQUEST_ADDRESSES)
+        or subject.upper().startswith(CONTENT_REQUEST_SUBJECT_PREFIX)
+    )
+
+    if not is_content_request:
+        return False
+
+    # Extract category from subject if present
+    category = 'blog_post'
+    subject_upper = subject.upper()
+    if '[TIP]' in subject_upper:
+        category = 'tip'
+    elif '[GUIDE]' in subject_upper:
+        category = 'guide'
+    elif '[RESOURCE]' in subject_upper:
+        category = 'resource'
+
+    # Clean up subject for prompt
+    clean_subject = subject
+    for prefix in ['[CONTENT REQUEST]', '[TIP]', '[GUIDE]', '[RESOURCE]', 'Re:', 'Fwd:']:
+        clean_subject = clean_subject.replace(prefix, '').strip()
+
+    gen_id = str(uuid_mod.uuid4())
+    try:
+        await pool.execute(
+            """INSERT INTO cms_generations (id, prompt, category, source_type, source_content, status)
+               VALUES ($1::uuid, $2, $3, 'email', $4, 'pending')""",
+            gen_id, clean_subject or (body_text[:200] if body_text else 'Content request via email'),
+            category, body_text or '',
+        )
+    except Exception as e:
+        logger.error(f'[content_request] Failed to create generation from email: {e}')
+        return False
+
+    await emit_event(
+        'content_pipeline.generation.requested_via_email',
+        entity_type='generation',
+        entity_id=gen_id,
+        diff_summary=f'Content request via email: {clean_subject[:80]}',
+        payload={'category': category, 'source': 'email_sweep'},
+    )
+
+    logger.info(f'Content request detected from email, created generation {gen_id}')
+    return True
 
 
 async def sweep_account(account_id: str, email_address: str, history_id: str | None) -> str | None:
@@ -77,6 +142,15 @@ async def sweep_account(account_id: str, email_address: str, history_id: str | N
                 # Skip messages we sent ourselves
                 if email_address.lower() in from_addr.lower():
                     continue
+
+                # Check if this is a content generation request email
+                # (before normal reply matching so it gets routed to generation)
+                try:
+                    is_content_req = await _check_content_request(headers, body_text, pool)
+                    if is_content_req:
+                        continue
+                except Exception as content_err:
+                    logger.error(f'[sweep] Content request check error for {msg_id}: {content_err}')
 
                 # Try to match to an existing send via thread ID or in-reply-to
                 matched_send = None

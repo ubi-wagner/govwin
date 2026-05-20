@@ -83,6 +83,13 @@ class GenerationRequest(BaseModel):
     system_prompt: str | None = None
     user_id: str
     user_email: str | None = None
+    # Multi-input generation fields
+    source_type: str = 'prompt'  # prompt, url, email, screenshot, repackage
+    source_url: str | None = None
+    source_email_id: str | None = None  # email_sends ID for email-driven generation
+    source_content: str | None = None  # raw content to repackage
+    attachments: list[str] | None = None  # media IDs for screenshots/docs
+    tenant_id: str | None = None
 
 
 class GenerationOut(BaseModel):

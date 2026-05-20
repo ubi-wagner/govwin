@@ -324,16 +324,33 @@ async def list_generations(status: str | None = Query(None), limit: int = Query(
 
 @router.post('/generations', status_code=201)
 async def create_generation(body: GenerationRequest):
-    """Create a new AI content generation request."""
+    """Create a new AI content generation request.
+
+    Supports multiple source types via the source_type field:
+      - prompt: standard text prompt (default)
+      - url: fetch URL content as source material
+      - email: use email thread as source material
+      - screenshot: use attached images with Claude vision
+      - repackage: rewrite existing content for our audience
+    """
     pool = get_pool()
     try:
         row = await pool.fetchrow(
             """
-            INSERT INTO cms_generations (prompt, category, model, temperature, system_prompt, status, requested_by)
-            VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+            INSERT INTO cms_generations (prompt, category, model, temperature, system_prompt,
+                                         requested_by, requested_by_email,
+                                         source_type, source_url, source_email_id, source_content,
+                                         attachments, tenant_id,
+                                         status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7,
+                    $8, $9, $10::uuid, $11,
+                    $12, $13::uuid, 'pending')
             RETURNING *
             """,
-            body.prompt, body.category, body.model, body.temperature, body.system_prompt, body.user_id,
+            body.prompt, body.category, body.model, body.temperature, body.system_prompt,
+            body.user_id, body.user_email,
+            body.source_type, body.source_url, body.source_email_id, body.source_content,
+            body.attachments or [], body.tenant_id,
         )
 
         await emit_event(
@@ -341,13 +358,79 @@ async def create_generation(body: GenerationRequest):
             entity_type='generation',
             entity_id=str(row['id']),
             user_id=body.user_id,
-            diff_summary=f'AI generation requested: model={body.model}, category={body.category}',
+            diff_summary=f'AI generation requested: model={body.model}, category={body.category}, source={body.source_type}',
+            payload={'source_type': body.source_type, 'category': body.category},
         )
 
         return {'data': dict(row)}
     except Exception as e:
         logger.error(f'[POST /generations] Error: {e}')
         raise HTTPException(500, 'Failed to create generation request')
+
+
+@router.post('/generations/from-url', status_code=201)
+async def generate_from_url(
+    url: str = Query(...),
+    prompt: str = Query(''),
+    category: str = Query('blog_post'),
+    user_id: str = Query(...),
+):
+    """Shortcut: create a generation request from a URL source.
+
+    Pre-validates the URL and creates a generation with source_type='url'.
+    The content generator worker will fetch and extract the URL content.
+    """
+    if not url.startswith(('http://', 'https://')):
+        raise HTTPException(400, 'URL must start with http:// or https://')
+
+    gen_body = GenerationRequest(
+        prompt=prompt or f'Generate content based on this source: {url}',
+        category=category,
+        user_id=user_id,
+        source_type='url',
+        source_url=url,
+    )
+    return await create_generation(gen_body)
+
+
+@router.post('/generations/from-email/{send_id}', status_code=201)
+async def generate_from_email(
+    send_id: str,
+    prompt: str = Query(''),
+    category: str = Query('blog_post'),
+    user_id: str = Query(...),
+):
+    """Create a generation request from an email send/thread.
+
+    Fetches the email content and creates a generation with source_type='email'.
+    """
+    pool = get_pool()
+
+    try:
+        send = await pool.fetchrow('SELECT * FROM email_sends WHERE id = $1::uuid', send_id)
+    except Exception as e:
+        logger.error(f'[POST /generations/from-email/{send_id}] DB error: {e}')
+        raise HTTPException(500, 'Failed to fetch email send')
+
+    if not send:
+        raise HTTPException(404, 'Email send not found')
+
+    # Build the source content from the email
+    source_content = (
+        f"From: {send.get('recipient_email', 'unknown')}\n"
+        f"Subject: {send.get('subject', '')}\n\n"
+        f"{send.get('body_text') or send.get('body_html', '')}"
+    )
+
+    gen_body = GenerationRequest(
+        prompt=prompt or f"Generate content based on this email thread about: {send.get('subject', '')}",
+        category=category,
+        user_id=user_id,
+        source_type='email',
+        source_email_id=send_id,
+        source_content=source_content,
+    )
+    return await create_generation(gen_body)
 
 
 @router.post('/generations/{gen_id}/action')

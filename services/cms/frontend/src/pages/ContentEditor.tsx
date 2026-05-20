@@ -15,7 +15,25 @@ interface Post extends PostForm {
   status: string
 }
 
+type SourceType = 'prompt' | 'url' | 'screenshot' | 'repackage'
+
+interface GenerationForm {
+  prompt: string
+  category: string
+  source_type: SourceType
+  source_url: string
+  source_content: string
+  user_id: string
+}
+
 const emptyForm: PostForm = { title: '', body: '', excerpt: '', tags: '', category: '' }
+
+const SOURCE_TYPE_OPTIONS: { value: SourceType; label: string }[] = [
+  { value: 'prompt', label: 'Write from scratch' },
+  { value: 'url', label: 'Generate from URL' },
+  { value: 'screenshot', label: 'Upload screenshot' },
+  { value: 'repackage', label: 'Repackage content' },
+]
 
 export default function ContentEditor() {
   const { id } = useParams()
@@ -26,6 +44,19 @@ export default function ContentEditor() {
   const [loading, setLoading] = useState(isEditing)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // AI generation state
+  const [showGenerate, setShowGenerate] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [genForm, setGenForm] = useState<GenerationForm>({
+    prompt: '',
+    category: 'tip',
+    source_type: 'prompt',
+    source_url: '',
+    source_content: '',
+    user_id: '',
+  })
+  const [genResult, setGenResult] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -43,6 +74,11 @@ export default function ContentEditor() {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  function handleGenChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    setGenForm((prev) => ({ ...prev, [name]: value }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -63,6 +99,34 @@ export default function ContentEditor() {
     }
   }
 
+  async function handleGenerate(e: React.FormEvent) {
+    e.preventDefault()
+    setGenerating(true)
+    setError('')
+    setGenResult(null)
+    try {
+      const payload: Record<string, unknown> = {
+        prompt: genForm.prompt,
+        category: genForm.category,
+        source_type: genForm.source_type,
+        user_id: genForm.user_id || 'cms-ui',
+      }
+      if (genForm.source_type === 'url' && genForm.source_url) {
+        payload.source_url = genForm.source_url
+      }
+      if (genForm.source_type === 'repackage' && genForm.source_content) {
+        payload.source_content = genForm.source_content
+      }
+
+      const result = await api.post<{ data: { id: string; status: string } }>('/content/generations', payload)
+      setGenResult(`Generation request created (ID: ${result.data.id}, status: ${result.data.status}). It will be processed by the AI worker.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Generation request failed')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   if (loading) return <div className="text-gray-500">Loading post...</div>
 
   return (
@@ -75,6 +139,115 @@ export default function ContentEditor() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
       )}
 
+      {genResult && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">{genResult}</div>
+      )}
+
+      {/* AI Generation Panel */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowGenerate(!showGenerate)}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+        >
+          {showGenerate ? 'Hide AI Generator' : 'Generate with AI'}
+        </button>
+
+        {showGenerate && (
+          <form onSubmit={handleGenerate} className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Source Type</label>
+              <select
+                name="source_type"
+                value={genForm.source_type}
+                onChange={handleGenChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                {SOURCE_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {genForm.source_type === 'url' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
+                <input
+                  name="source_url"
+                  value={genForm.source_url}
+                  onChange={handleGenChange}
+                  type="url"
+                  placeholder="https://example.com/article"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+            )}
+
+            {genForm.source_type === 'screenshot' && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded text-sm">
+                Screenshot upload is handled via the Media API. Upload your screenshot first,
+                then include the media ID in a direct API call to POST /api/content/generations
+                with source_type &quot;screenshot&quot; and the attachment IDs in the &quot;attachments&quot; field.
+              </div>
+            )}
+
+            {genForm.source_type === 'repackage' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content to Repackage</label>
+                <textarea
+                  name="source_content"
+                  value={genForm.source_content}
+                  onChange={handleGenChange}
+                  rows={8}
+                  placeholder="Paste the existing content (article, report, etc.) that you want repackaged..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Instructions / Prompt</label>
+              <textarea
+                name="prompt"
+                value={genForm.prompt}
+                onChange={handleGenChange}
+                rows={3}
+                required
+                placeholder="Describe what you want the AI to generate..."
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                name="category"
+                value={genForm.category}
+                onChange={handleGenChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="tip">Tip</option>
+                <option value="announcement">Announcement</option>
+                <option value="product_update">Product Update</option>
+                <option value="guide">Guide</option>
+                <option value="resource">Resource</option>
+                <option value="case_study">Case Study</option>
+                <option value="blog_post">Blog Post</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={generating}
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 text-sm"
+            >
+              {generating ? 'Submitting...' : 'Submit Generation Request'}
+            </button>
+          </form>
+        )}
+      </div>
+
+      {/* Post Editor Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
