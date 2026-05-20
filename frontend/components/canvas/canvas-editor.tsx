@@ -9,9 +9,12 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { CanvasDocument, CanvasNode, NodeType } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
+import type { LibraryAtomCandidate } from './library-picker';
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
+import { SlideEditor } from './slide-editor';
+import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 
 interface Props {
@@ -22,6 +25,12 @@ interface Props {
   readOnly?: boolean;
   actorId: string;
   actorName: string;
+  /** Proposal ID — enables AI revision and comments when present */
+  proposalId?: string;
+  /** Section ID — included for context */
+  sectionId?: string;
+  /** Tenant slug — enables comments API when present */
+  tenantSlug?: string;
 }
 
 function defaultContent(type: NodeType): CanvasNode['content'] {
@@ -40,7 +49,25 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
   }
 }
 
-export function CanvasEditor({
+export function CanvasEditor(props: Props) {
+  // Delegate to SheetEditor for spreadsheet format
+  if (props.initialDocument.canvas.format === 'spreadsheet') {
+    return (
+      <SheetEditor
+        initialDocument={props.initialDocument}
+        onSave={props.onSave}
+        onExport={props.onExport}
+        actorId={props.actorId}
+        actorName={props.actorName}
+        readOnly={props.readOnly}
+      />
+    );
+  }
+
+  return <CanvasEditorInner {...props} />;
+}
+
+function CanvasEditorInner({
   initialDocument,
   onSave,
   onExport,
@@ -48,21 +75,31 @@ export function CanvasEditor({
   readOnly = false,
   actorId,
   actorName,
+  proposalId,
+  sectionId,
+  tenantSlug,
 }: Props) {
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
 
   const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument) => {
     setDoc((prev) => {
       const next = updater(prev);
-      next.metadata.last_modified_at = new Date().toISOString();
-      next.metadata.last_modified_by = actorId;
-      next.metadata.version_number = prev.metadata.version_number + 1;
-      return next;
+      return {
+        ...next,
+        metadata: {
+          ...next.metadata,
+          last_modified_at: new Date().toISOString(),
+          last_modified_by: actorId,
+          version_number: prev.metadata.version_number + 1,
+        },
+      };
     });
     setDirty(true);
   }, [actorId]);
@@ -159,11 +196,77 @@ export function CanvasEditor({
     }));
   }, [updateDoc, actorId, actorName]);
 
+  const handleUpdateNodeStyle = useCallback((nodeId: string, style: Partial<NodeStyle>) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          style: { ...n.style, ...style },
+        };
+      }),
+    }));
+  }, [updateDoc]);
+
+  const handleUpdateCanvas = useCallback((canvas: CanvasRules) => {
+    updateDoc((prev) => ({ ...prev, canvas }));
+  }, [updateDoc]);
+
+  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content']) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          content: newContent,
+          provenance: { ...n.provenance, source: 'ai_draft' as const, drafted_at: new Date().toISOString() },
+          history: [
+            ...n.history,
+            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), comment: 'AI revision' },
+          ],
+        };
+      }),
+    }));
+  }, [updateDoc, actorId, actorName]);
+
+  const handleReplaceFromLibrary = useCallback((nodeId: string, atom: LibraryAtomCandidate) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          content: { text: atom.content } as any,
+          provenance: {
+            ...n.provenance,
+            source: 'library' as const,
+            library_unit_id: atom.id,
+          },
+          history: [
+            ...n.history,
+            {
+              actor_id: actorId,
+              actor_name: actorName,
+              action: 'replaced' as const,
+              timestamp: new Date().toISOString(),
+              comment: `Replaced with library atom: ${atom.category}`,
+            },
+          ],
+        };
+      }),
+    }));
+  }, [updateDoc, actorId, actorName]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(doc);
       setDirty(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -190,16 +293,31 @@ export function CanvasEditor({
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>
           <div className="flex items-center gap-2">
+            {saveError && (
+              <span className="text-xs text-red-600 mr-2">{saveError}</span>
+            )}
             {onExport && (doc.canvas.format === 'letter' || doc.canvas.format === 'custom') && (
               <>
                 <button
-                  onClick={() => onExport(doc, 'docx')}
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'docx');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
                   className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
                 >
                   Export .docx
                 </button>
                 <button
-                  onClick={() => onExport(doc, 'pdf')}
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'pdf');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
                   className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
                 >
                   Export .pdf
@@ -208,7 +326,13 @@ export function CanvasEditor({
             )}
             {onExport && (doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3') && (
               <button
-                onClick={() => onExport(doc, 'pptx')}
+                onClick={async () => {
+                  try {
+                    await onExport(doc, 'pptx');
+                  } catch (err) {
+                    setSaveError(err instanceof Error ? err.message : 'Export failed');
+                  }
+                }}
                 className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
               >
                 Export .pptx
@@ -216,7 +340,13 @@ export function CanvasEditor({
             )}
             {onExport && doc.nodes.some((n) => n.type === 'table') && (
               <button
-                onClick={() => onExport(doc, 'xlsx')}
+                onClick={async () => {
+                  try {
+                    await onExport(doc, 'xlsx');
+                  } catch (err) {
+                    setSaveError(err instanceof Error ? err.message : 'Export failed');
+                  }
+                }}
                 className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
               >
                 Export .xlsx
@@ -232,14 +362,27 @@ export function CanvasEditor({
           </div>
         </div>
 
-        <CanvasRenderer
-          document={doc}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={setSelectedNodeId}
-          onUpdateNode={handleUpdateNode}
-          variables={variables}
-          readOnly={readOnly}
-        />
+        {isSlideFormat ? (
+          <SlideEditor
+            document={doc}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onUpdateNode={handleUpdateNode}
+            onAddNode={handleAddNode}
+            onDeleteNode={handleDeleteNode}
+            variables={variables}
+            readOnly={readOnly}
+          />
+        ) : (
+          <CanvasRenderer
+            document={doc}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            onUpdateNode={handleUpdateNode}
+            variables={variables}
+            readOnly={readOnly}
+          />
+        )}
       </div>
 
       {/* Sidebar */}
@@ -251,6 +394,12 @@ export function CanvasEditor({
         onMoveNode={handleMoveNode}
         onAcceptNode={handleAcceptNode}
         onRevertNode={handleRevertNode}
+        onReplaceFromLibrary={handleReplaceFromLibrary}
+        onUpdateNodeStyle={handleUpdateNodeStyle}
+        onUpdateCanvas={handleUpdateCanvas}
+        onReviseNode={handleReviseNode}
+        proposalId={proposalId}
+        tenantSlug={tenantSlug}
       />
     </div>
   );

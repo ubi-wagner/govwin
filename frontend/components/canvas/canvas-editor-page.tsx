@@ -54,7 +54,10 @@ export function CanvasEditorPage({
   }, [saveUrl]);
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {
-    const resp = await fetch(`/api/admin/proposals/${proposalId}/sections/${sectionId}/export`, {
+    const exportUrl = tenantSlug
+      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
+      : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
+    const resp = await fetch(exportUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document: doc, format }),
@@ -71,7 +74,7 @@ export function CanvasEditorPage({
     });
     a.click();
     URL.revokeObjectURL(url);
-  }, [proposalId, sectionId]);
+  }, [proposalId, sectionId, tenantSlug]);
 
   return (
     <div className="h-screen flex flex-col">
@@ -92,6 +95,9 @@ export function CanvasEditorPage({
           actorId={actorId}
           actorName={actorName}
           readOnly={readOnly}
+          proposalId={proposalId}
+          sectionId={sectionId}
+          tenantSlug={tenantSlug}
           variables={{
             company_name: 'Your Company',
             topic_number: 'TBD',

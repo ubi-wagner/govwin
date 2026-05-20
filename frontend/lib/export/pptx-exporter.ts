@@ -208,14 +208,65 @@ function addNodeToSlide(
       if (!c.text) return 0.1;
       const lineCount = Math.ceil(c.text.length / 80);
       const h = Math.min(Math.max(0.4, lineCount * 0.3), maxH);
-      slide.addText(c.text, {
-        x, y, w, h,
-        fontSize,
-        fontFace: font,
-        color: '444444',
-        valign: 'top',
-        wrap: true,
-      });
+      const formats = c.inline_formats ?? [];
+
+      if (formats.length === 0) {
+        // Simple text, no inline formatting
+        slide.addText(c.text, {
+          x, y, w, h,
+          fontSize,
+          fontFace: font,
+          color: '444444',
+          valign: 'top',
+          wrap: true,
+        });
+      } else {
+        // Build formatted text runs using boundary-point algorithm
+        const boundaries = new Set<number>();
+        boundaries.add(0);
+        boundaries.add(c.text.length);
+        for (const f of formats) {
+          boundaries.add(f.start);
+          boundaries.add(f.start + f.length);
+        }
+        const points = [...boundaries].sort((a, b) => a - b);
+
+        const runs: PptxGenJS.TextProps[] = [];
+        for (let i = 0; i < points.length - 1; i++) {
+          const segStart = points[i];
+          const segEnd = points[i + 1];
+          if (segStart >= segEnd) continue;
+
+          const segText = c.text.slice(segStart, segEnd);
+          const active = formats.filter(
+            (f) => f.start <= segStart && f.start + f.length >= segEnd,
+          );
+
+          const opts: PptxGenJS.TextPropsOptions = {
+            fontSize,
+            fontFace: font,
+            color: '444444',
+          };
+
+          for (const f of active) {
+            switch (f.format) {
+              case 'bold': opts.bold = true; break;
+              case 'italic': opts.italic = true; break;
+              case 'underline': opts.underline = { style: 'sng' } as PptxGenJS.TextPropsOptions['underline']; break;
+              case 'superscript': opts.superscript = true; break;
+              case 'subscript': opts.subscript = true; break;
+            }
+          }
+
+          runs.push({ text: segText, options: opts });
+        }
+
+        slide.addText(runs, {
+          x, y, w, h,
+          valign: 'top',
+          wrap: true,
+        });
+      }
       return h + 0.1;
     }
 
