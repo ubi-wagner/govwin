@@ -117,16 +117,25 @@ export function CanvasRenderer({
           )}
 
           {nodes.map((node) => (
-            <NodeRenderer
-              key={node.id}
-              node={node}
-              isSelected={selectedNodeId === node.id}
-              onSelect={() => onSelectNode(node.id)}
-              onUpdate={(content) => onUpdateNode(node.id, content)}
-              scale={scale}
-              fontDefault={canvas.font_default}
-              readOnly={readOnly}
-            />
+            node.type === 'toc' ? (
+              <TocRenderer
+                key={node.id}
+                nodes={nodes}
+                isSelected={selectedNodeId === node.id}
+                onSelect={() => onSelectNode(node.id)}
+              />
+            ) : (
+              <NodeRenderer
+                key={node.id}
+                node={node}
+                isSelected={selectedNodeId === node.id}
+                onSelect={() => onSelectNode(node.id)}
+                onUpdate={(content) => onUpdateNode(node.id, content)}
+                scale={scale}
+                fontDefault={canvas.font_default}
+                readOnly={readOnly}
+              />
+            )
           ))}
         </div>
 
@@ -164,6 +173,48 @@ export function CanvasRenderer({
         <span>&middot;</span>
         <span>v{metadata.version_number}</span>
       </div>
+    </div>
+  );
+}
+
+// ─── TOC renderer — scans document headings ────────────────────────
+
+function TocRenderer({ nodes, isSelected, onSelect }: {
+  nodes: CanvasNode[];
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const headings = nodes
+    .filter((n) => n.type === 'heading')
+    .map((n) => {
+      const content = n.content as HeadingContent;
+      return { level: content.level, text: content.text, numbering: content.numbering };
+    });
+
+  const borderClass = isSelected
+    ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
+    : 'hover:ring-1 hover:ring-gray-200';
+
+  return (
+    <div
+      className={`relative rounded px-1 cursor-pointer transition-all py-2 ${borderClass}`}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+    >
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Table of Contents</div>
+      {headings.length === 0 ? (
+        <div className="text-xs text-gray-400 italic">No headings in document. Add Heading nodes to populate the TOC.</div>
+      ) : (
+        <div className="space-y-1">
+          {headings.map((h, i) => (
+            <div key={i} className="text-sm" style={{ paddingLeft: (h.level - 1) * 20 }}>
+              <span className="text-gray-500">{h.numbering ? `${h.numbering} ` : ''}</span>
+              <span className={h.level === 1 ? 'font-semibold text-gray-800' : h.level === 2 ? 'font-medium text-gray-700' : 'text-gray-600'}>
+                {h.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -246,7 +297,7 @@ function NodeRenderer({
       {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
       {node.type === 'spacer' && <div className="h-8" />}
-      {node.type === 'toc' && <div className="text-xs text-gray-400 italic py-2">[Table of Contents — auto-generated on export]</div>}
+      {/* toc nodes are rendered by TocRenderer at the parent level */}
     </div>
   );
 }

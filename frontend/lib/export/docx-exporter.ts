@@ -105,7 +105,7 @@ export async function exportToDocx(
   // Build children from nodes
   const children: (Paragraph | Table)[] = [];
   for (const node of nodes) {
-    const elements = nodeToDocx(node, canvas.font_default, canvas.line_spacing);
+    const elements = nodeToDocx(node, canvas.font_default, canvas.line_spacing, nodes);
     children.push(...elements);
   }
 
@@ -165,6 +165,7 @@ function nodeToDocx(
   node: CanvasNode,
   fontDefault: { family: string; size: number },
   lineSpacing: number,
+  allNodes: CanvasNode[],
 ): (Paragraph | Table)[] {
   const font = node.style.family ?? fontDefault.family;
   const size = (node.style.size ?? fontDefault.size) * 2;
@@ -315,10 +316,44 @@ function nodeToDocx(
     case 'spacer':
       return [new Paragraph({ spacing: { after: 200 }, children: [] })];
 
-    case 'toc':
-      return [new Paragraph({
-        children: [new TextRun({ text: '[Table of Contents]', italics: true, color: '999999', font, size })],
-      })];
+    case 'toc': {
+      const headings = allNodes
+        .filter((n) => n.type === 'heading')
+        .map((n) => {
+          const hc = n.content as HeadingContent;
+          return { level: hc.level, text: hc.text, numbering: hc.numbering };
+        });
+
+      const tocParagraphs: Paragraph[] = [
+        new Paragraph({
+          children: [new TextRun({ text: 'Table of Contents', bold: true, font, size: fontDefault.size * 2 + 4 })],
+          spacing: { after: 200 },
+        }),
+      ];
+
+      for (const h of headings) {
+        const indent = (h.level - 1) * 720; // 0.5 inch per level
+        const prefix = h.numbering ? `${h.numbering} ` : '';
+        tocParagraphs.push(new Paragraph({
+          children: [new TextRun({
+            text: `${prefix}${h.text}`,
+            font,
+            size: h.level === 1 ? fontDefault.size * 2 + 2 : fontDefault.size * 2,
+            bold: h.level === 1,
+          })],
+          indent: { left: indent },
+          spacing: { before: h.level === 1 ? 120 : 40, after: 40 },
+        }));
+      }
+
+      if (headings.length === 0) {
+        tocParagraphs.push(new Paragraph({
+          children: [new TextRun({ text: '(No headings)', italics: true, color: '999999', font, size: fontDefault.size * 2 })],
+        }));
+      }
+
+      return tocParagraphs;
+    }
 
     case 'image':
       return [new Paragraph({
