@@ -13,7 +13,7 @@
  *   - Click-to-select for node editing
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -218,15 +218,15 @@ function NodeRenderer({
       )}
 
       {/* Type-specific rendering */}
-      {node.type === 'heading' && <HeadingNode content={node.content as HeadingContent} scale={scale} />}
+      {node.type === 'heading' && <HeadingNode content={node.content as HeadingContent} scale={scale} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'text_block' && <TextBlockNode content={node.content as TextBlockContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
-      {node.type === 'bulleted_list' && <ListNode content={node.content as ListContent} ordered={false} />}
-      {node.type === 'numbered_list' && <ListNode content={node.content as ListContent} ordered={true} />}
+      {node.type === 'bulleted_list' && <ListNode content={node.content as ListContent} ordered={false} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
+      {node.type === 'numbered_list' && <ListNode content={node.content as ListContent} ordered={true} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'image' && <ImageNode content={node.content as ImageContent} />}
-      {node.type === 'table' && <TableNode content={node.content as TableContent} />}
-      {node.type === 'caption' && <CaptionNode content={node.content as CaptionContent} />}
-      {node.type === 'footnote' && <FootnoteNode content={node.content as FootnoteContent} />}
-      {node.type === 'url' && <UrlNode content={node.content as UrlContent} />}
+      {node.type === 'table' && <TableNode content={node.content as TableContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
+      {node.type === 'caption' && <CaptionNode content={node.content as CaptionContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
+      {node.type === 'footnote' && <FootnoteNode content={node.content as FootnoteContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
+      {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
       {node.type === 'spacer' && <div className="h-8" />}
       {node.type === 'toc' && <div className="text-xs text-gray-400 italic py-2">[Table of Contents — auto-generated on export]</div>}
@@ -236,13 +236,38 @@ function NodeRenderer({
 
 // ─── Node-type components ───────────────────────────────────────────
 
-function HeadingNode({ content, scale }: { content: HeadingContent; scale: number }) {
+function HeadingNode({ content, scale, readOnly, onUpdate, isSelected }: {
+  content: HeadingContent; scale: number; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
   const sizes = { 1: 18, 2: 14, 3: 12 };
+  const fontSize = `${(sizes[content.level] ?? 14) * scale}pt`;
+
+  if (isSelected && !readOnly) {
+    return (
+      <div className="flex items-center gap-2" style={{ fontSize }}>
+        <select
+          value={content.level}
+          onChange={(e) => onUpdate({ ...content, level: Number(e.target.value) as 1 | 2 | 3 })}
+          className="text-xs border rounded px-1 py-0.5 bg-white"
+        >
+          <option value={1}>H1</option>
+          <option value={2}>H2</option>
+          <option value={3}>H3</option>
+        </select>
+        <input
+          type="text"
+          value={content.text}
+          onChange={(e) => onUpdate({ ...content, text: e.target.value })}
+          className="flex-1 font-bold border-0 bg-transparent outline-none"
+          style={{ fontFamily: 'inherit', fontSize: 'inherit' }}
+          autoFocus
+        />
+      </div>
+    );
+  }
   return (
-    <div
-      className="font-bold"
-      style={{ fontSize: `${(sizes[content.level] ?? 14) * scale}pt` }}
-    >
+    <div className="font-bold" style={{ fontSize }}>
       {content.numbering && <span className="mr-2">{content.numbering}</span>}
       {content.text}
     </div>
@@ -318,21 +343,103 @@ function TextBlockNode({
   onUpdate: (c: CanvasNode['content']) => void;
   isSelected: boolean;
 }) {
+  const [selStart, setSelStart] = useState(0);
+  const [selEnd, setSelEnd] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyFormat = (format: 'bold' | 'italic' | 'underline' | 'superscript' | 'subscript') => {
+    if (selStart === selEnd) return;
+    const existing = content.inline_formats ?? [];
+    const existingIdx = existing.findIndex(
+      f => f.format === format && f.start === selStart && f.length === (selEnd - selStart)
+    );
+    if (existingIdx >= 0) {
+      const updated = existing.filter((_, i) => i !== existingIdx);
+      onUpdate({ ...content, inline_formats: updated });
+    } else {
+      const updated = [...existing, { format, start: selStart, length: selEnd - selStart }];
+      onUpdate({ ...content, inline_formats: updated });
+    }
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(selStart, selEnd);
+      }
+    }, 0);
+  };
+
+  const handleSelect = () => {
+    if (textareaRef.current) {
+      setSelStart(textareaRef.current.selectionStart);
+      setSelEnd(textareaRef.current.selectionEnd);
+    }
+  };
+
   if (isSelected && !readOnly) {
     return (
-      <textarea
-        value={content.text}
-        onChange={(e) => onUpdate({ ...content, text: e.target.value })}
-        className="w-full resize-none border-0 bg-transparent outline-none"
-        style={{ minHeight: '3em', fontFamily: 'inherit', fontSize: 'inherit' }}
-        autoFocus
-      />
+      <div>
+        <div className="flex items-center gap-0.5 mb-1 p-1 bg-gray-50 rounded border border-gray-200">
+          <button type="button" onClick={() => applyFormat('bold')} className="px-2 py-0.5 text-xs font-bold hover:bg-gray-200 rounded" title="Bold">B</button>
+          <button type="button" onClick={() => applyFormat('italic')} className="px-2 py-0.5 text-xs italic hover:bg-gray-200 rounded" title="Italic">I</button>
+          <button type="button" onClick={() => applyFormat('underline')} className="px-2 py-0.5 text-xs underline hover:bg-gray-200 rounded" title="Underline">U</button>
+          <span className="w-px h-4 bg-gray-300 mx-1" />
+          <button type="button" onClick={() => applyFormat('superscript')} className="px-2 py-0.5 text-xs hover:bg-gray-200 rounded" title="Superscript">x<sup>2</sup></button>
+          <button type="button" onClick={() => applyFormat('subscript')} className="px-2 py-0.5 text-xs hover:bg-gray-200 rounded" title="Subscript">x<sub>2</sub></button>
+          {selStart !== selEnd && (
+            <span className="ml-2 text-[10px] text-gray-400">chars {selStart}-{selEnd}</span>
+          )}
+        </div>
+        <textarea
+          ref={textareaRef}
+          value={content.text}
+          onChange={(e) => onUpdate({ ...content, text: e.target.value })}
+          onSelect={handleSelect}
+          onMouseUp={handleSelect}
+          onKeyUp={handleSelect}
+          className="w-full resize-none border-0 bg-transparent outline-none"
+          style={{ minHeight: '3em', fontFamily: 'inherit', fontSize: 'inherit' }}
+          autoFocus
+        />
+      </div>
     );
   }
   return <p className="whitespace-pre-wrap">{renderFormattedText(content)}</p>;
 }
 
-function ListNode({ content, ordered }: { content: ListContent; ordered: boolean }) {
+function ListNode({ content, ordered, readOnly, onUpdate, isSelected }: {
+  content: ListContent; ordered: boolean; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
+  if (isSelected && !readOnly) {
+    return (
+      <div className="space-y-1 pl-4">
+        {content.items.map((item, i) => (
+          <div key={i} className="flex items-center gap-1" style={{ marginLeft: (item.indent_level ?? 0) * 20 }}>
+            <span className="text-gray-400 text-xs w-4">{ordered ? `${i + 1}.` : '•'}</span>
+            <input
+              type="text"
+              value={item.text}
+              onChange={(e) => {
+                const items = [...content.items];
+                items[i] = { ...items[i], text: e.target.value };
+                onUpdate({ ...content, items });
+              }}
+              className="flex-1 text-sm border-0 border-b border-gray-200 bg-transparent outline-none focus:border-blue-400 py-0.5"
+            />
+            <button
+              onClick={(e) => { e.stopPropagation(); const items = content.items.filter((_, j) => j !== i); onUpdate({ ...content, items: items.length > 0 ? items : [{ text: '' }] }); }}
+              className="text-red-400 hover:text-red-600 text-xs px-1"
+              title="Remove item"
+            >x</button>
+          </div>
+        ))}
+        <button
+          onClick={(e) => { e.stopPropagation(); onUpdate({ ...content, items: [...content.items, { text: '' }] }); }}
+          className="text-xs text-blue-600 hover:underline ml-4"
+        >+ Add item</button>
+      </div>
+    );
+  }
   const Tag = ordered ? 'ol' : 'ul';
   return (
     <Tag className={`${ordered ? 'list-decimal' : 'list-disc'} pl-6 space-y-1`}>
@@ -380,13 +487,90 @@ function tableBorderClass(borderStyle?: 'none' | 'single' | 'double'): string {
   return 'border border-gray-300';
 }
 
-function TableNode({ content }: { content: TableContent }) {
+function TableNode({ content, readOnly, onUpdate, isSelected }: {
+  content: TableContent; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
   const outerBorder = tableBorderClass(content.border_style);
   const cellBorder = content.border_style === 'none'
     ? 'px-2 py-1'
     : content.border_style === 'double'
     ? 'border-2 border-double border-gray-400 px-2 py-1'
     : 'border border-gray-300 px-2 py-1';
+
+  const updateHeader = (i: number, text: string) => {
+    const headers = [...content.headers];
+    const cell = resolveTableCell(headers[i]);
+    headers[i] = { ...cell, text };
+    onUpdate({ ...content, headers });
+  };
+
+  const updateCell = (ri: number, ci: number, text: string) => {
+    const rows = content.rows.map(r => [...r]);
+    const cell = resolveTableCell(rows[ri][ci]);
+    rows[ri][ci] = { ...cell, text };
+    onUpdate({ ...content, rows });
+  };
+
+  const addRow = () => {
+    const newRow = content.headers.map(() => '' as string | TableCellType);
+    onUpdate({ ...content, rows: [...content.rows, newRow] });
+  };
+
+  const addCol = () => {
+    const headers = [...content.headers, `Column ${content.headers.length + 1}`] as typeof content.headers;
+    const rows = content.rows.map(row => [...row, '']);
+    onUpdate({ ...content, headers, rows });
+  };
+
+  const deleteRow = (ri: number) => {
+    const rows = content.rows.filter((_, i) => i !== ri);
+    onUpdate({ ...content, rows });
+  };
+
+  if (isSelected && !readOnly) {
+    return (
+      <div className="my-2">
+        <table className={`w-full border-collapse text-sm ${outerBorder || 'border border-gray-300'}`}>
+          <thead>
+            <tr className="bg-gray-50">
+              {content.headers.map((h, i) => {
+                const cell = resolveTableCell(h);
+                return (
+                  <th key={i} className={`text-left font-semibold ${cellBorder}`}>
+                    <input type="text" value={cell.text} onChange={(e) => updateHeader(i, e.target.value)}
+                      className="w-full bg-transparent border-0 outline-none font-semibold text-sm" />
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {content.rows.map((row, ri) => (
+              <tr key={ri}>
+                {row.map((c, ci) => {
+                  const cell = resolveTableCell(c);
+                  return (
+                    <td key={ci} className={cellBorder}>
+                      <input type="text" value={cell.text} onChange={(e) => updateCell(ri, ci, e.target.value)}
+                        className="w-full bg-transparent border-0 outline-none text-sm" />
+                    </td>
+                  );
+                })}
+                <td className="px-1">
+                  <button onClick={(e) => { e.stopPropagation(); deleteRow(ri); }} className="text-red-400 hover:text-red-600 text-xs">x</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="flex gap-2 mt-1">
+          <button onClick={(e) => { e.stopPropagation(); addRow(); }} className="text-xs text-blue-600 hover:underline">+ Row</button>
+          <button onClick={(e) => { e.stopPropagation(); addCol(); }} className="text-xs text-blue-600 hover:underline">+ Column</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <table className={`w-full border-collapse text-sm my-2 ${outerBorder || 'border border-gray-300'}`}>
@@ -395,17 +579,7 @@ function TableNode({ content }: { content: TableContent }) {
           {content.headers.map((h, i) => {
             const cell = resolveTableCell(h);
             const styleProps = tableCellStyleProps(cell.style, content.header_style);
-            return (
-              <th
-                key={i}
-                className={`text-left font-semibold ${cellBorder}`}
-                style={styleProps}
-                rowSpan={cell.rowSpan}
-                colSpan={cell.colSpan}
-              >
-                {cell.text}
-              </th>
-            );
+            return (<th key={i} className={`text-left font-semibold ${cellBorder}`} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{cell.text}</th>);
           })}
         </tr>
       </thead>
@@ -415,17 +589,7 @@ function TableNode({ content }: { content: TableContent }) {
             {row.map((c, ci) => {
               const cell = resolveTableCell(c);
               const styleProps = tableCellStyleProps(cell.style);
-              return (
-                <td
-                  key={ci}
-                  className={cellBorder}
-                  style={styleProps}
-                  rowSpan={cell.rowSpan}
-                  colSpan={cell.colSpan}
-                >
-                  {cell.text}
-                </td>
-              );
+              return (<td key={ci} className={cellBorder} style={styleProps} rowSpan={cell.rowSpan} colSpan={cell.colSpan}>{cell.text}</td>);
             })}
           </tr>
         ))}
@@ -434,7 +598,26 @@ function TableNode({ content }: { content: TableContent }) {
   );
 }
 
-function CaptionNode({ content }: { content: CaptionContent }) {
+function CaptionNode({ content, readOnly, onUpdate, isSelected }: {
+  content: CaptionContent; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
+  if (isSelected && !readOnly) {
+    return (
+      <div className="flex items-center gap-2 text-sm italic text-center">
+        <select value={content.prefix} onChange={(e) => onUpdate({ ...content, prefix: e.target.value as CaptionContent['prefix'] })}
+          className="text-xs border rounded px-1 py-0.5 bg-white">
+          <option value="Figure">Figure</option>
+          <option value="Table">Table</option>
+          <option value="Chart">Chart</option>
+        </select>
+        <input type="number" value={content.number} onChange={(e) => onUpdate({ ...content, number: parseInt(e.target.value) || 1 })}
+          className="w-12 text-xs border rounded px-1 py-0.5" />
+        <input type="text" value={content.text} onChange={(e) => onUpdate({ ...content, text: e.target.value })}
+          className="flex-1 border-0 bg-transparent outline-none italic" autoFocus />
+      </div>
+    );
+  }
   return (
     <p className="text-sm italic text-center">
       <span className="font-semibold">{content.prefix} {content.number}:</span> {content.text}
@@ -442,7 +625,20 @@ function CaptionNode({ content }: { content: CaptionContent }) {
   );
 }
 
-function FootnoteNode({ content }: { content: FootnoteContent }) {
+function FootnoteNode({ content, readOnly, onUpdate, isSelected }: {
+  content: FootnoteContent; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
+  if (isSelected && !readOnly) {
+    return (
+      <div className="text-xs text-gray-500 border-t border-gray-200 pt-1 mt-2 flex items-start gap-1">
+        <input type="text" value={content.marker} onChange={(e) => onUpdate({ ...content, marker: e.target.value })}
+          className="w-8 border rounded px-1 py-0.5 text-xs font-semibold" />
+        <input type="text" value={content.text} onChange={(e) => onUpdate({ ...content, text: e.target.value })}
+          className="flex-1 border-0 bg-transparent outline-none text-xs" autoFocus />
+      </div>
+    );
+  }
   return (
     <p className="text-xs text-gray-500 border-t border-gray-200 pt-1 mt-2">
       <sup className="font-semibold">{content.marker}</sup> {content.text}
@@ -450,7 +646,26 @@ function FootnoteNode({ content }: { content: FootnoteContent }) {
   );
 }
 
-function UrlNode({ content }: { content: UrlContent }) {
+function UrlNode({ content, readOnly, onUpdate, isSelected }: {
+  content: UrlContent; readOnly: boolean;
+  onUpdate: (c: CanvasNode['content']) => void; isSelected: boolean;
+}) {
+  if (isSelected && !readOnly) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-12">URL:</label>
+          <input type="url" value={content.href} onChange={(e) => onUpdate({ ...content, href: e.target.value })}
+            className="flex-1 text-xs border rounded px-2 py-1" />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 w-12">Text:</label>
+          <input type="text" value={content.display_text} onChange={(e) => onUpdate({ ...content, display_text: e.target.value })}
+            className="flex-1 text-xs border rounded px-2 py-1" />
+        </div>
+      </div>
+    );
+  }
   return (
     <a href={content.href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
       {content.display_text}

@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import type { CanvasDocument, CanvasNode, NodeEdit, estimatePageCount } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeEdit, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 
@@ -22,6 +22,8 @@ interface Props {
   onRevertNode: (nodeId: string) => void;
   /** Replace a node's content with a library atom */
   onReplaceFromLibrary?: (nodeId: string, atom: LibraryAtomCandidate) => void;
+  /** Update canvas-level settings (margins, font, etc.) */
+  onUpdateCanvas?: (canvas: CanvasRules) => void;
 }
 
 export function CanvasSidebar({
@@ -34,8 +36,9 @@ export function CanvasSidebar({
   onAcceptNode,
   onRevertNode,
   onReplaceFromLibrary,
+  onUpdateCanvas,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add'>('compliance');
+  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'settings'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
   const pageEstimate = Math.max(1, Math.ceil(doc.nodes.length / 8));
@@ -50,7 +53,7 @@ export function CanvasSidebar({
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 text-xs">
-        {(['compliance', 'node', 'add'] as const).map((tab) => (
+        {(['compliance', 'node', 'add', 'settings'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -252,6 +255,191 @@ export function CanvasSidebar({
                   <span className="text-gray-700">{item.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Settings tab ───────────────────────────────────── */}
+        {activeTab === 'settings' && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Page Layout</h3>
+
+            {/* Margins */}
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Margins (inches)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-400">Top</label>
+                  <input type="number" step="0.25" min="0" max="3"
+                    value={doc.canvas.margins.top / 72}
+                    onChange={(e) => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      margins: { ...doc.canvas.margins, top: parseFloat(e.target.value) * 72 }
+                    })}
+                    className="w-full text-xs border rounded px-2 py-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400">Bottom</label>
+                  <input type="number" step="0.25" min="0" max="3"
+                    value={doc.canvas.margins.bottom / 72}
+                    onChange={(e) => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      margins: { ...doc.canvas.margins, bottom: parseFloat(e.target.value) * 72 }
+                    })}
+                    className="w-full text-xs border rounded px-2 py-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400">Left</label>
+                  <input type="number" step="0.25" min="0" max="3"
+                    value={doc.canvas.margins.left / 72}
+                    onChange={(e) => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      margins: { ...doc.canvas.margins, left: parseFloat(e.target.value) * 72 }
+                    })}
+                    className="w-full text-xs border rounded px-2 py-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400">Right</label>
+                  <input type="number" step="0.25" min="0" max="3"
+                    value={doc.canvas.margins.right / 72}
+                    onChange={(e) => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      margins: { ...doc.canvas.margins, right: parseFloat(e.target.value) * 72 }
+                    })}
+                    className="w-full text-xs border rounded px-2 py-1" />
+                </div>
+              </div>
+            </div>
+
+            {/* Font */}
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Default Font</label>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={doc.canvas.font_default.family}
+                  onChange={(e) => onUpdateCanvas?.({
+                    ...doc.canvas,
+                    font_default: { ...doc.canvas.font_default, family: e.target.value }
+                  })}
+                  className="text-xs border rounded px-2 py-1">
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Calibri">Calibri</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Courier New">Courier New</option>
+                </select>
+                <div className="flex items-center gap-1">
+                  <input type="number" step="1" min="6" max="24"
+                    value={doc.canvas.font_default.size}
+                    onChange={(e) => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      font_default: { ...doc.canvas.font_default, size: parseInt(e.target.value) || 12 }
+                    })}
+                    className="w-16 text-xs border rounded px-2 py-1" />
+                  <span className="text-xs text-gray-400">pt</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Line Spacing */}
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">Line Spacing</label>
+              <select
+                value={doc.canvas.line_spacing}
+                onChange={(e) => onUpdateCanvas?.({
+                  ...doc.canvas,
+                  line_spacing: parseFloat(e.target.value)
+                })}
+                className="w-full text-xs border rounded px-2 py-1">
+                <option value="1.0">Single (1.0)</option>
+                <option value="1.15">1.15</option>
+                <option value="1.5">1.5</option>
+                <option value="2.0">Double (2.0)</option>
+              </select>
+            </div>
+
+            {/* Page/Slide Limit */}
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">
+                {doc.canvas.format.startsWith('slide') ? 'Slide Limit' : 'Page Limit'}
+              </label>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" max="999"
+                  value={doc.canvas.format.startsWith('slide') ? (doc.canvas.max_slides ?? 0) : (doc.canvas.max_pages ?? 0)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    if (doc.canvas.format.startsWith('slide')) {
+                      onUpdateCanvas?.({ ...doc.canvas, max_slides: val || null });
+                    } else {
+                      onUpdateCanvas?.({ ...doc.canvas, max_pages: val || null });
+                    }
+                  }}
+                  className="w-20 text-xs border rounded px-2 py-1" />
+                <span className="text-xs text-gray-400">(0 = unlimited)</span>
+              </div>
+            </div>
+
+            {/* Header */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-600">Header</label>
+                {!doc.canvas.header ? (
+                  <button
+                    onClick={() => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      header: { template: '{company_name}', height: 36, font: { family: doc.canvas.font_default.family, size: 10 } }
+                    })}
+                    className="text-[10px] text-blue-600 hover:underline">+ Add header</button>
+                ) : (
+                  <button
+                    onClick={() => onUpdateCanvas?.({ ...doc.canvas, header: null })}
+                    className="text-[10px] text-red-500 hover:underline">Remove</button>
+                )}
+              </div>
+              {doc.canvas.header && (
+                <input type="text"
+                  value={doc.canvas.header.template}
+                  onChange={(e) => onUpdateCanvas?.({
+                    ...doc.canvas,
+                    header: { ...doc.canvas.header!, template: e.target.value }
+                  })}
+                  placeholder="e.g. {company_name} — {topic_number}"
+                  className="w-full text-xs border rounded px-2 py-1" />
+              )}
+            </div>
+
+            {/* Footer */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-600">Footer</label>
+                {!doc.canvas.footer ? (
+                  <button
+                    onClick={() => onUpdateCanvas?.({
+                      ...doc.canvas,
+                      footer: { template: 'Page {n} of {N}', height: 36, font: { family: doc.canvas.font_default.family, size: 10 } }
+                    })}
+                    className="text-[10px] text-blue-600 hover:underline">+ Add footer</button>
+                ) : (
+                  <button
+                    onClick={() => onUpdateCanvas?.({ ...doc.canvas, footer: null })}
+                    className="text-[10px] text-red-500 hover:underline">Remove</button>
+                )}
+              </div>
+              {doc.canvas.footer && (
+                <input type="text"
+                  value={doc.canvas.footer.template}
+                  onChange={(e) => onUpdateCanvas?.({
+                    ...doc.canvas,
+                    footer: { ...doc.canvas.footer!, template: e.target.value }
+                  })}
+                  placeholder="e.g. Page {n} of {N}"
+                  className="w-full text-xs border rounded px-2 py-1" />
+              )}
+            </div>
+
+            <div className="text-[10px] text-gray-400 pt-2 border-t">
+              Variables: {'{company_name}'}, {'{topic_number}'}, {'{pi_name}'}, {'{n}'} (page), {'{N}'} (total)
             </div>
           </div>
         )}

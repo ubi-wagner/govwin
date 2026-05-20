@@ -129,13 +129,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const canvasRules = CANVAS_PRESETS[preset];
-    if (!canvasRules) {
-      return NextResponse.json(
-        { error: `Invalid preset: ${preset}. Valid: ${Object.keys(CANVAS_PRESETS).join(', ')}`, code: 'VALIDATION_ERROR' },
-        { status: 400 },
-      );
-    }
+    const canvasRules = CANVAS_PRESETS[preset] ?? CANVAS_PRESETS.letter_standard;
 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();

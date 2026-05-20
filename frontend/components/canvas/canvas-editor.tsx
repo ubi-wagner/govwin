@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { CanvasDocument, CanvasNode, NodeType } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeType, CanvasRules } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { CanvasSidebar } from './canvas-sidebar';
@@ -159,6 +159,10 @@ export function CanvasEditor({
     }));
   }, [updateDoc, actorId, actorName]);
 
+  const handleUpdateCanvas = useCallback((canvas: CanvasRules) => {
+    updateDoc((prev) => ({ ...prev, canvas }));
+  }, [updateDoc]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
@@ -251,6 +255,7 @@ export function CanvasEditor({
         onMoveNode={handleMoveNode}
         onAcceptNode={handleAcceptNode}
         onRevertNode={handleRevertNode}
+        onUpdateCanvas={handleUpdateCanvas}
       />
     </div>
   );

@@ -36,6 +36,11 @@ const PRESETS = [
     label: 'CSO Slide Deck',
     description: '16:9, Arial 18pt, 25 slide limit',
   },
+  {
+    key: 'custom',
+    label: 'Custom',
+    description: 'Start blank — set your own margins, font, and layout in the editor',
+  },
 ] as const;
 
 function formatPresetLabel(preset: string): string {
