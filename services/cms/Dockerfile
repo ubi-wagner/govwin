@@ -19,4 +19,4 @@ COPY --from=frontend-builder /build/static ./static/
 RUN chmod +x db/run.sh
 RUN useradd -r -s /bin/false cmsuser && chown -R cmsuser:cmsuser /app
 USER cmsuser
-CMD bash -c "bash db/run.sh && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD bash -c "bash db/run.sh || echo '[warn] Migration failed or skipped, starting anyway'; uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"

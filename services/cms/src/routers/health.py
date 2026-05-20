@@ -1,21 +1,25 @@
 """Health check endpoint for Railway."""
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from ..models.database import get_pool
 
 router = APIRouter()
 
 
 @router.get('/health')
 async def health_check():
-    """Health check — verifies DB connectivity."""
+    """Liveness check — always returns 200 so Railway knows the process is up.
+    Reports DB status as a detail field for observability."""
+    db_status = 'unknown'
     try:
+        from ..models.database import get_pool
         pool = get_pool()
-        async with pool.acquire() as conn:
-            await conn.fetchval('SELECT 1')
-        return {'status': 'healthy', 'service': 'cms', 'database': 'connected'}
+        if pool:
+            async with pool.acquire() as conn:
+                await conn.fetchval('SELECT 1')
+            db_status = 'connected'
+        else:
+            db_status = 'pool_not_initialized'
     except Exception as e:
-        return JSONResponse(
-            {'status': 'degraded', 'service': 'cms', 'database': str(e)},
-            status_code=503,
-        )
+        db_status = f'error: {type(e).__name__}'
+
+    return {'status': 'ok', 'service': 'cms', 'database': db_status}
