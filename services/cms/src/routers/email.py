@@ -349,9 +349,9 @@ async def preview_template(template_id: str, body: TemplatePreviewRequest):
         # Merge sample profile into context
         context = {**body.sample_context, **body.sample_profile}
 
-        subject = render_jinja2(row['subject_template'], context)
+        subject = render_jinja2(row['subject_template'], context, text_mode=True)
         body_html = render_jinja2(row['body_html'], context)
-        body_text = render_jinja2(row['body_text'], context) if row['body_text'] else ''
+        body_text = render_jinja2(row['body_text'], context, text_mode=True) if row.get('body_text') else ''
 
         # Wrap in layout for preview
         full_html = _layout(body_html)
@@ -712,23 +712,20 @@ async def create_send(body: SendCreate):
         body_text = body.body_text or ''
 
         if body.template_id and not (body.subject and body.body_html):
-            template = await pool.fetchrow(
+            template_row = await pool.fetchrow(
                 'SELECT subject_template, body_html, body_text FROM email_templates WHERE id = $1 AND is_active = TRUE',
                 uuid.UUID(body.template_id),
             )
-            if not template:
+            if not template_row:
                 raise HTTPException(404, 'Template not found or inactive')
 
-            # Render template variables
-            subject = subject or template['subject_template']
-            body_html = body_html or template['body_html']
-            body_text = body_text or template['body_text']
+            from ..templates import render_jinja2
 
-            for var_name, var_value in body.template_variables.items():
-                placeholder = '{{' + var_name + '}}'
-                subject = subject.replace(placeholder, str(var_value))
-                body_html = body_html.replace(placeholder, str(var_value))
-                body_text = body_text.replace(placeholder, str(var_value))
+            # Render template variables via Jinja2 (handles escaping)
+            variables = body.template_variables or {}
+            subject = subject or render_jinja2(template_row['subject_template'], variables, text_mode=True)
+            body_html = body_html or render_jinja2(template_row['body_html'], variables)
+            body_text = body_text or (render_jinja2(template_row['body_text'], variables, text_mode=True) if template_row.get('body_text') else '')
 
         if not subject:
             raise HTTPException(400, 'Subject is required (provide directly or via template)')

@@ -265,8 +265,18 @@ async def post_action(post_id: str, body: WorkflowAction):
                 )
 
         # Event emission outside transaction (fire-and-forget)
+        EVENT_TYPE_MAP = {
+            'submit_review': 'submitted_for_review',
+            'approve': 'approved',
+            'reject': 'rejected',
+            'publish': 'published',
+            'unpublish': 'unpublished',
+            'archive': 'archived',
+            'revert': 'reverted',
+        }
+        event_action = EVENT_TYPE_MAP.get(action, action)
         await emit_event(
-            f'content_pipeline.post.{action.replace("submit_review", "submitted_for_review")}',
+            f'content_pipeline.post.{event_action}',
             entity_id=post_id,
             user_id=body.user_id,
             diff_summary=f'Post {action.replace("_", " ")}: "{post["title"]}"',
@@ -320,8 +330,8 @@ async def revise_post(post_id: str, body: dict):
             messages=[{
                 'role': 'user',
                 'content': (
-                    f'Instruction: {instruction}\n\n'
-                    f'Current content:\n{current_body}'
+                    f'<instruction>{instruction}</instruction>\n\n'
+                    f'<content>\n{current_body}\n</content>'
                 ),
             }],
         )
@@ -558,12 +568,20 @@ async def generation_action(gen_id: str, body: GenerationAction):
 
             row = await pool.fetchrow(
                 """
-                INSERT INTO cms_generations (prompt, category, model, temperature, system_prompt, status, requested_by, retry_count)
-                VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+                INSERT INTO cms_generations (prompt, category, model, temperature, system_prompt,
+                    source_type, source_url, source_email_id, source_content, attachments,
+                    status, requested_by, retry_count)
+                VALUES ($1, $2, $3, $4, $5,
+                    $6, $7, $8, $9, $10,
+                    'pending', $11, $12)
                 RETURNING *
                 """,
                 gen['prompt'], gen['category'], gen['model'], gen['temperature'],
-                gen['system_prompt'], body.user_id, gen['retry_count'] + 1,
+                gen['system_prompt'],
+                gen.get('source_type', 'prompt'), gen.get('source_url'),
+                gen.get('source_email_id'), gen.get('source_content'),
+                gen.get('attachments') or [],
+                body.user_id, gen['retry_count'] + 1,
             )
             await emit_event('content_pipeline.generation.retry_requested', entity_type='generation',
                 entity_id=str(row['id']), user_id=body.user_id,

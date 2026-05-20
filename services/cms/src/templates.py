@@ -255,7 +255,10 @@ def render_jinja2(template_body: str, context: dict, *, text_mode: bool = False)
         # Fallback: simple string replacement for {{var}} patterns
         result = template_body
         for key, val in context.items():
-            result = result.replace('{{' + key + '}}', str(val) if val is not None else '')
+            replacement = str(val) if val is not None else ''
+            if not text_mode:
+                replacement = _esc(replacement)
+            result = result.replace('{{' + key + '}}', replacement)
         return result
     except Exception as e:
         logger.error(f'[render_jinja2] Unexpected error: {e}')
@@ -458,6 +461,15 @@ async def resolve_profile_variables(
     if not profile_variables or not shared_pool:
         return {}
 
+    import uuid as uuid_mod
+
+    _tenant_uuid = None
+    if tenant_id:
+        try:
+            _tenant_uuid = uuid_mod.UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
+        except (ValueError, AttributeError):
+            pass
+
     result = {var: '' for var in profile_variables}
 
     try:
@@ -465,11 +477,11 @@ async def resolve_profile_variables(
         tenant_fields = {'company_name', 'lifecycle_stage', 'tier', 'application_date'}
         needs_tenant = bool(tenant_fields & set(profile_variables))
 
-        if needs_tenant and tenant_id:
+        if needs_tenant and _tenant_uuid:
             tenant_row = await shared_pool.fetchrow(
                 '''SELECT name, lifecycle_stage, product_tier, created_at
                    FROM tenants WHERE id = $1''',
-                tenant_id,
+                _tenant_uuid,
             )
             if tenant_row:
                 if 'company_name' in profile_variables:
@@ -500,23 +512,23 @@ async def resolve_profile_variables(
                     result['contact_email'] = user_row['email'] or ''
 
         # Resolve aggregate fields
-        if 'active_proposals' in profile_variables and tenant_id:
+        if 'active_proposals' in profile_variables and _tenant_uuid:
             try:
                 count = await shared_pool.fetchval(
                     '''SELECT COUNT(*) FROM proposals
                        WHERE tenant_id = $1 AND stage NOT IN ('archived')''',
-                    tenant_id,
+                    _tenant_uuid,
                 )
                 result['active_proposals'] = str(count or 0)
             except Exception:
                 result['active_proposals'] = '0'
 
-        if 'matched_opportunities' in profile_variables and tenant_id:
+        if 'matched_opportunities' in profile_variables and _tenant_uuid:
             try:
                 count = await shared_pool.fetchval(
                     '''SELECT COUNT(*) FROM tenant_pipeline_items
                        WHERE tenant_id = $1''',
-                    tenant_id,
+                    _tenant_uuid,
                 )
                 result['matched_opportunities'] = str(count or 0)
             except Exception:

@@ -78,8 +78,8 @@ async def _check_content_request(message_headers: dict, body_text: str, pool) ->
     gen_id = str(uuid_mod.uuid4())
     try:
         await pool.execute(
-            """INSERT INTO cms_generations (id, prompt, category, source_type, source_content, status)
-               VALUES ($1::uuid, $2, $3, 'email', $4, 'pending')""",
+            """INSERT INTO cms_generations (id, prompt, category, source_type, source_content, model, temperature, status)
+               VALUES ($1::uuid, $2, $3, 'email', $4, 'claude-sonnet-4-20250514', 0.7, 'pending')""",
             gen_id, clean_subject or (body_text[:200] if body_text else 'Content request via email'),
             category, body_text or '',
         )
@@ -103,6 +103,7 @@ async def sweep_account(account_id: str, email_address: str, history_id: str | N
     """
     Sweep a single account's inbox. Returns new history_id for incremental sync.
     """
+    account_uuid = uuid_mod.UUID(account_id)
     pool = get_pool()
     shared_pool = get_event_pool()
     now = datetime.now(timezone.utc)
@@ -197,7 +198,7 @@ async def sweep_account(account_id: str, email_address: str, history_id: str | N
 
                 # Update thread
                 await _update_thread_on_reply(
-                    pool, account_id, gmail_thread_id,
+                    pool, account_uuid, gmail_thread_id,
                     matched_send, from_addr, subject, now,
                 )
 
@@ -230,7 +231,7 @@ async def sweep_account(account_id: str, email_address: str, history_id: str | N
         # Update account sweep state
         await pool.execute(
             'UPDATE email_accounts SET last_sweep_at = $1, sweep_history_id = $2, updated_at = $1 WHERE id = $3',
-            now, new_history_id, account_id,
+            now, new_history_id, account_uuid,
         )
 
         return new_history_id

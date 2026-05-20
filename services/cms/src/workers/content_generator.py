@@ -47,8 +47,7 @@ async def _fetch_url_content(url: str) -> dict:
     async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
         resp = await client.get(url, headers={'User-Agent': 'RFPPipeline/1.0'})
         resp.raise_for_status()
-
-    html = resp.text
+        html = resp.text
     # Extract title
     title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.I)
     title = title_match.group(1).strip() if title_match else ''

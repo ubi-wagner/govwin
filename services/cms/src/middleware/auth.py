@@ -34,11 +34,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             if path.startswith('/cms') and not path.startswith('/cms/assets'):
                 api_key = os.getenv('CMS_API_KEY', '')
                 if api_key:
+                    is_dev = os.getenv('RAILWAY_ENVIRONMENT_NAME', 'local') == 'local'
                     response.set_cookie(
                         _CMS_COOKIE,
                         _sign_cookie(api_key),
                         httponly=True,
                         samesite='strict',
+                        secure=not is_dev,
                         max_age=86400,
                     )
             return response

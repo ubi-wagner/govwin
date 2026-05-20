@@ -15,7 +15,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const json = await res.json()
   // Backend wraps responses in { data: ... } — unwrap for callers
   if (json && typeof json === 'object' && 'data' in json) {
-    return json.data as T
+    const { data, ...rest } = json
+    // If there are sibling fields (e.g. count), attach as _meta on array data
+    if (Object.keys(rest).length > 0 && Array.isArray(data)) {
+      const result = data as any
+      result._meta = rest
+      return result as T
+    }
+    return data as T
   }
   return json as T
 }

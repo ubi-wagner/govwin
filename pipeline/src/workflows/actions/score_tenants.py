@@ -210,8 +210,9 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     set_aside_score = 10 if sol_set_aside and sol_set_aside in profile_set_asides else 0
 
     # Program type match (max 10 points)
-    sol_program = (sol["program_type"] or "").strip()
-    type_score = 10 if sol_program else 0  # base score if program_type is set
+    # No program_preferences column exists in tenant_profiles yet,
+    # so no comparison is possible — award 0 until profile data exists.
+    type_score = 0
 
     # Timeline proximity (max 5 points) — closer deadlines score higher
     timeline_score = 0
