@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { CanvasDocument, CanvasNode, NodeType, CanvasRules } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
@@ -186,6 +186,19 @@ function CanvasEditorInner({
     }));
   }, [updateDoc, actorId, actorName]);
 
+  const handleUpdateNodeStyle = useCallback((nodeId: string, style: Partial<NodeStyle>) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          style: { ...n.style, ...style },
+        };
+      }),
+    }));
+  }, [updateDoc]);
+
   const handleUpdateCanvas = useCallback((canvas: CanvasRules) => {
     updateDoc((prev) => ({ ...prev, canvas }));
   }, [updateDoc]);
@@ -325,6 +338,7 @@ function CanvasEditorInner({
         onMoveNode={handleMoveNode}
         onAcceptNode={handleAcceptNode}
         onRevertNode={handleRevertNode}
+        onUpdateNodeStyle={handleUpdateNodeStyle}
         onUpdateCanvas={handleUpdateCanvas}
       />
     </div>

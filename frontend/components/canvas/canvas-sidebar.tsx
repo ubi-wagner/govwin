@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import type { CanvasDocument, CanvasNode, NodeEdit, CanvasRules } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 
@@ -22,6 +22,8 @@ interface Props {
   onRevertNode: (nodeId: string) => void;
   /** Replace a node's content with a library atom */
   onReplaceFromLibrary?: (nodeId: string, atom: LibraryAtomCandidate) => void;
+  /** Update per-node style overrides (alignment, font, spacing, etc.) */
+  onUpdateNodeStyle?: (nodeId: string, style: Partial<NodeStyle>) => void;
   /** Update canvas-level settings (margins, font, etc.) */
   onUpdateCanvas?: (canvas: CanvasRules) => void;
 }
@@ -36,6 +38,7 @@ export function CanvasSidebar({
   onAcceptNode,
   onRevertNode,
   onReplaceFromLibrary,
+  onUpdateNodeStyle,
   onUpdateCanvas,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'settings'>('compliance');
@@ -194,6 +197,165 @@ export function CanvasSidebar({
                 }}
                 onClose={() => setShowLibraryPicker(false)}
               />
+            )}
+
+            {/* ── Format ──────────────────────────────────── */}
+            {onUpdateNodeStyle && (
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Format</h3>
+
+                {/* Alignment — 4 buttons in a row */}
+                <div className="mb-3">
+                  <label className="text-[10px] text-gray-400 block mb-1">Alignment</label>
+                  <div className="flex gap-0.5">
+                    {(['left', 'center', 'right', 'justify'] as const).map(align => (
+                      <button
+                        key={align}
+                        onClick={() => onUpdateNodeStyle(selectedNode.id, { alignment: align })}
+                        className={`flex-1 py-1 text-xs border rounded capitalize ${
+                          selectedNode.style.alignment === align
+                            ? 'bg-blue-100 border-blue-300 text-blue-700'
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {align === 'left' ? '←' : align === 'right' ? '→' : align === 'center' ? '↔' : '⇔'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Font family + size — side by side */}
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-1">Font</label>
+                    <select
+                      value={selectedNode.style.family ?? ''}
+                      onChange={(e) => onUpdateNodeStyle(selectedNode.id, { family: e.target.value || undefined })}
+                      className="w-full text-xs border rounded px-1.5 py-1"
+                    >
+                      <option value="">Default</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Arial">Arial</option>
+                      <option value="Calibri">Calibri</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Helvetica">Helvetica</option>
+                      <option value="Courier New">Courier New</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-1">Size</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="6"
+                        max="72"
+                        step="1"
+                        value={selectedNode.style.size ?? ''}
+                        onChange={(e) => onUpdateNodeStyle(selectedNode.id, {
+                          size: e.target.value ? parseInt(e.target.value) : undefined
+                        })}
+                        placeholder="--"
+                        className="w-full text-xs border rounded px-1.5 py-1"
+                      />
+                      <span className="text-[10px] text-gray-400">pt</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bold + Italic toggles */}
+                <div className="mb-3">
+                  <label className="text-[10px] text-gray-400 block mb-1">Style</label>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => onUpdateNodeStyle(selectedNode.id, {
+                        weight: selectedNode.style.weight === 'bold' ? 'normal' : 'bold'
+                      })}
+                      className={`px-3 py-1 text-xs font-bold border rounded ${
+                        selectedNode.style.weight === 'bold' ? 'bg-blue-100 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >B</button>
+                    <button
+                      onClick={() => onUpdateNodeStyle(selectedNode.id, {
+                        style: selectedNode.style.style === 'italic' ? 'normal' : 'italic'
+                      })}
+                      className={`px-3 py-1 text-xs italic border rounded ${
+                        selectedNode.style.style === 'italic' ? 'bg-blue-100 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >I</button>
+                  </div>
+                </div>
+
+                {/* Text color */}
+                <div className="mb-3">
+                  <label className="text-[10px] text-gray-400 block mb-1">Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedNode.style.color || '#000000'}
+                      onChange={(e) => onUpdateNodeStyle(selectedNode.id, { color: e.target.value })}
+                      className="w-6 h-6 border rounded cursor-pointer"
+                    />
+                    <span className="text-[10px] text-gray-500">{selectedNode.style.color || 'default'}</span>
+                    {selectedNode.style.color && (
+                      <button
+                        onClick={() => onUpdateNodeStyle(selectedNode.id, { color: undefined })}
+                        className="text-[10px] text-red-500 hover:underline"
+                      >reset</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Spacing */}
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-1">Space Before</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="72"
+                      step="2"
+                      value={selectedNode.style.space_before ?? ''}
+                      onChange={(e) => onUpdateNodeStyle(selectedNode.id, {
+                        space_before: e.target.value ? parseInt(e.target.value) : undefined
+                      })}
+                      placeholder="auto"
+                      className="w-full text-xs border rounded px-1.5 py-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-1">Space After</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="72"
+                      step="2"
+                      value={selectedNode.style.space_after ?? ''}
+                      onChange={(e) => onUpdateNodeStyle(selectedNode.id, {
+                        space_after: e.target.value ? parseInt(e.target.value) : undefined
+                      })}
+                      placeholder="auto"
+                      className="w-full text-xs border rounded px-1.5 py-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Indent */}
+                <div className="mb-3">
+                  <label className="text-[10px] text-gray-400 block mb-1">Indent (px)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="200"
+                    step="20"
+                    value={selectedNode.style.indent ?? ''}
+                    onChange={(e) => onUpdateNodeStyle(selectedNode.id, {
+                      indent: e.target.value ? parseInt(e.target.value) : undefined
+                    })}
+                    placeholder="0"
+                    className="w-full text-xs border rounded px-1.5 py-1"
+                  />
+                </div>
+              </div>
             )}
 
             {selectedNode.library_tags && selectedNode.library_tags.length > 0 && (
