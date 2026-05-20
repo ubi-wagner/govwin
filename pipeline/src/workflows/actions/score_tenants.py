@@ -55,10 +55,12 @@ async def match_tenants(
     sol_uuid = uuid.UUID(solicitation_id)
 
     # 1. Fetch the solicitation + opportunity metadata
+    #    Note: opportunities table has no 'keywords' column; use
+    #    tech_focus_areas (added in migration 013) instead.
     sol = await conn.fetchrow(
         """SELECT cs.id, cs.opportunity_id, o.naics_codes, o.agency,
                   o.program_type, o.set_aside_type, o.close_date,
-                  o.title, o.keywords
+                  o.title, o.tech_focus_areas, o.description
            FROM curated_solicitations cs
            JOIN opportunities o ON o.id = cs.opportunity_id
            WHERE cs.id = $1""",
@@ -172,21 +174,25 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     else:
         naics_score = 0
 
-    # Keyword overlap (max 25 points)
-    sol_keywords = set(k.lower() for k in (sol.get("keywords") or []))
+    # Keyword / tech focus overlap (max 25 points)
+    #   - opportunities has tech_focus_areas (TEXT[]) not keywords
+    #   - tenant_profiles has keywords (TEXT[]), technology_focus (TEXT),
+    #     research_areas (TEXT[])
+    sol_tech_areas = set(t.lower() for t in (sol.get("tech_focus_areas") or []))
+    sol_description_lower = (sol.get("description") or "").lower()
     profile_keywords = set(k.lower() for k in (profile["keywords"] or []))
-    # Also check technology_focus text against solicitation keywords
     tech_focus = (profile["technology_focus"] or "").lower()
     research_areas = set(r.lower() for r in (profile["research_areas"] or []))
 
     matched_kw: list[str] = []
-    for kw in sol_keywords:
-        if kw in profile_keywords or kw in tech_focus or kw in research_areas:
-            matched_kw.append(kw)
-    # Also check profile keywords against sol title
+    # Check sol tech focus areas against profile keywords/focus
+    for area in sol_tech_areas:
+        if area in profile_keywords or area in tech_focus or area in research_areas:
+            matched_kw.append(area)
+    # Check profile keywords against sol title and description
     sol_title_lower = (sol["title"] or "").lower()
     for kw in profile_keywords:
-        if kw in sol_title_lower and kw not in matched_kw:
+        if kw not in matched_kw and (kw in sol_title_lower or kw in sol_description_lower):
             matched_kw.append(kw)
 
     keyword_score = min(len(matched_kw) * 5, 25)

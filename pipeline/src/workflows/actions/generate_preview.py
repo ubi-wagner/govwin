@@ -100,17 +100,27 @@ async def generate_preview(
     # 4. Upload ZIP to S3
     preview_url = None
     try:
-        from storage.s3_client import put_bytes
-        from storage.paths import customer_proposal_path
+        from storage.s3_client import put_object
+        from storage.paths import CustomerPathInput, customer_path
 
-        key = customer_proposal_path(
-            tenant_id=tenant_id,
-            proposal_id=proposal_id,
-            name="preview.zip",
+        # Fetch tenant slug for the storage path
+        tenant_slug = await conn.fetchval(
+            "SELECT slug FROM tenants WHERE id = $1",
+            proposal["tenant_id"],
         )
-        put_bytes(key=key, data=zip_buffer.getvalue(), content_type="application/zip")
-        preview_url = key
-        log.info("generate_preview: wrote %s (%d bytes)", key, total_bytes)
+        if tenant_slug:
+            key = customer_path(CustomerPathInput(
+                tenant_slug=tenant_slug,
+                kind="proposal-export",
+                proposal_id=proposal_id,
+                name="preview",
+                ext="zip",
+            ))
+            put_object(key=key, body=zip_buffer.getvalue(), content_type="application/zip")
+            preview_url = key
+            log.info("generate_preview: wrote %s (%d bytes)", key, total_bytes)
+        else:
+            log.warning("generate_preview: tenant slug not found for %s", tenant_id)
     except ImportError:
         log.info("generate_preview: storage module unavailable, skipping S3 upload")
     except Exception as e:
