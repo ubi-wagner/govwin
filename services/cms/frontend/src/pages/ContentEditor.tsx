@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import RichTextEditor from '../components/RichTextEditor'
+import AIRevisionPanel from '../components/AIRevisionPanel'
+import StageIndicator from '../components/StageIndicator'
 
 interface PostForm {
   title: string
@@ -42,8 +44,10 @@ export default function ContentEditor() {
   const isEditing = Boolean(id)
 
   const [form, setForm] = useState<PostForm>(emptyForm)
+  const [postStatus, setPostStatus] = useState('draft')
   const [loading, setLoading] = useState(isEditing)
   const [saving, setSaving] = useState(false)
+  const [stageLoading, setStageLoading] = useState(false)
   const [error, setError] = useState('')
 
   // AI generation state
@@ -62,13 +66,16 @@ export default function ContentEditor() {
   useEffect(() => {
     if (!id) return
     api.get<Post>(`/content/posts/${id}`)
-      .then((post) => setForm({
-        title: post.title,
-        body: post.body,
-        excerpt: post.excerpt || '',
-        tags: post.tags || '',
-        category: post.category || '',
-      }))
+      .then((post) => {
+        setForm({
+          title: post.title,
+          body: post.body,
+          excerpt: post.excerpt || '',
+          tags: post.tags || '',
+          category: post.category || '',
+        })
+        setPostStatus(post.status)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -128,6 +135,20 @@ export default function ContentEditor() {
     }
   }
 
+  async function handleStageAction(action: string) {
+    if (!id) return
+    setStageLoading(true)
+    setError('')
+    try {
+      const res = await api.post<{ status: string }>(`/content/posts/${id}/action`, { action })
+      setPostStatus(res.status)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Action failed')
+    } finally {
+      setStageLoading(false)
+    }
+  }
+
   if (loading) return <div className="text-gray-500">Loading post...</div>
 
   return (
@@ -135,6 +156,17 @@ export default function ContentEditor() {
       <h1 className="text-2xl font-bold text-slate-900 mb-6">
         {isEditing ? 'Edit Post' : 'New Post'}
       </h1>
+
+      {isEditing && id && (
+        <div className="mb-6">
+          <StageIndicator
+            status={postStatus}
+            postId={id}
+            onAction={handleStageAction}
+            loading={stageLoading}
+          />
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
@@ -300,6 +332,14 @@ export default function ContentEditor() {
             placeholder="Write your post content here..."
           />
         </div>
+
+        {isEditing && id && form.body && (
+          <AIRevisionPanel
+            postId={id}
+            body={form.body}
+            onRevised={(newBody) => setForm((prev) => ({ ...prev, body: newBody }))}
+          />
+        )}
 
         <div className="flex gap-3">
           <button

@@ -282,6 +282,70 @@ async def post_action(post_id: str, body: WorkflowAction):
         raise HTTPException(500, f'Failed to {action}')
 
 
+# ── AI Revision ───────────────────────────────────────────────────
+
+@router.post('/posts/{post_id}/revise')
+async def revise_post(post_id: str, body: dict):
+    """AI-powered content revision using Claude."""
+    pool = get_pool()
+
+    try:
+        post = await pool.fetchrow('SELECT * FROM cms_posts WHERE id = $1', uuid.UUID(post_id))
+    except Exception as e:
+        logger.error(f'[POST /posts/{post_id}/revise] DB error: {e}')
+        raise HTTPException(500, detail='Failed to fetch post')
+
+    if not post:
+        raise HTTPException(404, detail='Post not found')
+
+    instruction = body.get('instruction', '')
+    current_body = body.get('current_body', post['body'] or '')
+
+    if not instruction:
+        raise HTTPException(400, detail='Revision instruction required')
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic()
+
+        response = await client.messages.create(
+            model='claude-sonnet-4-20250514',
+            max_tokens=4096,
+            temperature=0.3,
+            system=(
+                'You are a content editor for a government contracting platform (SBIR, STTR, BAA, OTA). '
+                'Revise the provided content according to the instruction. '
+                'Return ONLY the revised HTML content — no explanation, no markdown fences, no preamble. '
+                'Maintain the existing HTML structure and formatting.'
+            ),
+            messages=[{
+                'role': 'user',
+                'content': (
+                    f'Instruction: {instruction}\n\n'
+                    f'Current content:\n{current_body}'
+                ),
+            }],
+        )
+
+        revised = response.content[0].text if response.content else current_body
+
+        await emit_event(
+            'content_pipeline.post.revised',
+            entity_type='post',
+            entity_id=post_id,
+            diff_summary=f'AI revision: {instruction[:100]}',
+            payload={'instruction': instruction[:200]},
+        )
+
+        return {'revised_body': revised}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /posts/{post_id}/revise] AI revision failed: {e}')
+        raise HTTPException(500, detail='AI revision failed')
+
+
 # ── Reviews ──────────────────────────────────────────────────────
 
 @router.get('/posts/{post_id}/reviews')

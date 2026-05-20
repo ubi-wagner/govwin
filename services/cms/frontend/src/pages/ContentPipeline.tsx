@@ -14,10 +14,35 @@ interface Post {
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
-  review: 'bg-amber-100 text-amber-700',
-  scheduled: 'bg-blue-100 text-blue-700',
+  in_review: 'bg-amber-100 text-amber-700',
+  approved: 'bg-blue-100 text-blue-700',
   published: 'bg-green-100 text-green-700',
+  rejected: 'bg-red-100 text-red-700',
+  reverted: 'bg-amber-100 text-amber-600',
   archived: 'bg-slate-100 text-slate-600',
+}
+
+const STAGE_ORDER = ['draft', 'in_review', 'approved', 'published']
+
+function MiniStage({ status }: { status: string }) {
+  const currentIndex = STAGE_ORDER.indexOf(status)
+  return (
+    <div className="flex items-center gap-0.5">
+      {STAGE_ORDER.map((stage, i) => {
+        const filled = currentIndex >= i
+        const isCurrent = status === stage
+        return (
+          <div key={stage} className="flex items-center">
+            {i > 0 && <div className={`w-3 h-px ${filled ? 'bg-blue-400' : 'bg-gray-300'}`} />}
+            <div className={`w-2 h-2 rounded-full ${
+              filled ? (isCurrent ? 'bg-blue-600 ring-2 ring-blue-200' : 'bg-blue-400')
+              : 'bg-gray-300'
+            }`} />
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function ContentPipeline() {
@@ -72,9 +97,12 @@ export default function ContentPipeline() {
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-slate-900">{p.title}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusColors[p.status] || 'bg-gray-100 text-gray-600'}`}>
-                      {p.status}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <MiniStage status={p.status} />
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium w-fit ${statusColors[p.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {p.status.replace('_', ' ')}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{p.category}</td>
                   <td className="px-4 py-3 text-gray-600">{p.author}</td>
