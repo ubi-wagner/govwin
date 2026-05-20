@@ -159,8 +159,8 @@ When editing a text block, a formatting toolbar appears above the textarea:
 ### Layout
 
 - **Left panel**: slide thumbnails with numbers
-- **Center**: current slide (dark background, white surface)
-- **Right**: same sidebar as document editor (Add, Node, Settings)
+- **Center**: current slide (dark background, white surface, 16:9 ratio)
+- **Right**: same sidebar as document editor (Add, Node, Format, Settings)
 
 ### Creating Slides
 
@@ -171,6 +171,7 @@ When editing a text block, a formatting toolbar appears above the textarea:
 
 - Click any thumbnail to switch to that slide
 - Current slide has a blue border
+- Slide count shown at bottom of thumbnail panel
 
 ### Editing Slide Content
 
@@ -178,6 +179,14 @@ When editing a text block, a formatting toolbar appears above the textarea:
 - All node types work the same as the document editor
 - Slides use larger default text (Arial 18pt)
 - Footer shows slide number automatically
+
+### Formatting on Slides
+
+The sidebar works identically to the document editor. Select a node on the slide, then use the **Node** tab:
+
+- **Format section**: alignment, font family/size, bold/italic, color, spacing, indent
+- **Inline formatting**: select text in a text block, use B/I/U/super/sub toolbar
+- **All formatting exports to .pptx**
 
 ### Deleting Slides
 
@@ -194,7 +203,8 @@ When editing a text block, a formatting toolbar appears above the textarea:
 
 ### Layout
 
-- **Top**: toolbar with cell reference, formula bar, Save, Export
+- **Top row**: title, status, cell reference, formula bar, Export, Save
+- **Format bar**: Bold, alignment, fill color, font size, font family
 - **Center**: grid with column headers (A, B, C...) and row numbers
 - **Bottom**: sheet tabs
 
@@ -209,6 +219,24 @@ When editing a text block, a formatting toolbar appears above the textarea:
 - **Arrow keys** — navigate between cells
 - **Delete/Backspace** — clear cell and start editing
 - **Formula bar** — shows and edits the active cell's content
+
+### Cell Formatting
+
+Select a cell, then use the format bar above the grid:
+
+| Control | What it does |
+|---------|-------------|
+| **B** | Toggle bold on the active cell |
+| Align buttons | Left / Center / Right alignment |
+| Fill color | Cell background color picker |
+| **clear** | Remove background color |
+| Size dropdown | Change document font size (8-24pt) |
+| Font dropdown | Change document font family |
+
+Cell styles (bold, alignment, background color) are:
+- Applied visually in the grid immediately
+- Preserved across saves
+- Exported to .xlsx
 
 ### Adding Rows and Columns
 
@@ -276,3 +304,53 @@ When editing a text block, a formatting toolbar appears above the textarea:
 7. Add Image — upload a diagram
 8. Continue adding slides...
 9. Save > Export .pptx
+
+---
+
+## Formatting Reference — All Three Editors
+
+### Capabilities by Editor
+
+| Capability | Document | Slides | Spreadsheet |
+|------------|----------|--------|-------------|
+| **Bold** (inline) | Toolbar: select text, click B | Same | N/A |
+| **Italic** (inline) | Toolbar: select text, click I | Same | N/A |
+| **Underline** (inline) | Toolbar: select text, click U | Same | N/A |
+| **Superscript** (inline) | Toolbar: select text, click x^2 | Same | N/A |
+| **Subscript** (inline) | Toolbar: select text, click x_2 | Same | N/A |
+| **Bold** (node-level) | Sidebar > Node > Format > B | Same | Format bar > B (per cell) |
+| **Italic** (node-level) | Sidebar > Node > Format > I | Same | N/A |
+| **Text alignment** | Sidebar > Node > Format | Same | Format bar > align buttons |
+| **Font family** | Sidebar > Node > Format > Font | Same | Format bar > font dropdown |
+| **Font size** | Sidebar > Node > Format > Size | Same | Format bar > size dropdown |
+| **Text color** | Sidebar > Node > Format > Color | Same | N/A |
+| **Cell background** | N/A | N/A | Format bar > Fill color |
+| **Spacing** | Sidebar > Node > Format > Space | Same | N/A |
+| **Indent** | Sidebar > Node > Format > Indent | Same | N/A |
+| **List indent/outdent** | < > arrows per item | Same | N/A |
+| **Heading numbering** | # input next to level | Same | N/A |
+| **Image upload** | Click image node to upload | Same | N/A |
+| **Image resize** | W/H inputs when selected | Same | N/A |
+| **Header/footer** | Settings tab | Same | N/A |
+| **Margins** | Settings tab | Same | N/A |
+| **Save history** | History button in header | Same | Same |
+| **Export** | .docx (.xlsx if tables) | .pptx | .xlsx |
+
+### What Exports to Each Format
+
+| Feature | DOCX | PPTX | XLSX |
+|---------|------|------|------|
+| Bold/Italic/Underline | Yes | Yes | Yes (cell bold) |
+| Superscript/Subscript | Yes | N/A | N/A |
+| Text color | Yes | N/A | N/A |
+| Alignment | Yes | N/A | Yes (cell) |
+| Font family/size | Yes | Yes | Yes |
+| Cell background | Yes (tables) | N/A | Yes |
+| Heading levels | Yes (H1-H3) | Yes (font sizes) | N/A |
+| Lists | Yes (bullets/numbers) | Yes | N/A |
+| Tables | Yes (full) | Yes | Yes (per sheet) |
+| Images | Placeholder text* | Placeholder text* | N/A |
+| Header/footer | Yes (page numbers) | Yes (slide numbers) | N/A |
+| Page breaks | Yes | Yes (slide breaks) | N/A |
+
+*Image embedding in exports is not yet implemented — images upload and display in the editor but export as placeholder text.
