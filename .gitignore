@@ -36,6 +36,9 @@ Thumbs.db
 # Railway / Docker
 .railway/
 
+# CMS build artifacts (built in Docker via multi-stage)
+services/cms/static/
+
 # IDE
 .vscode/
 .idea/
