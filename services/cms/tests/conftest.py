@@ -1,8 +1,12 @@
 """Shared fixtures for CMS service tests."""
+import os
 import sys
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+# Set CMS_API_KEY for tests so the auth middleware doesn't reject requests
+os.environ.setdefault('CMS_API_KEY', 'test-api-key-for-pytest')
 
 # Pre-mock native crypto modules that the google-auth chain requires.
 # In CI and test environments the C extension (_cffi_backend / cryptography Rust)

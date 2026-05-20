@@ -23,13 +23,23 @@ BRAND_NAVY = '#1e293b'
 BRAND_BLUE = '#2563eb'
 BRAND_CREAM = '#faf7f2'
 
-# ── Jinja2 environment ───────────────────────────────────────────
+# ── Jinja2 environments ──────────────────────────────────────────
+# HTML environment: autoescape ON so user-supplied variables are escaped
 _jinja_env = Environment(
     loader=BaseLoader(),
-    autoescape=False,  # HTML templates handle their own escaping
+    autoescape=True,
     variable_start_string='{{',
     variable_end_string='}}',
     undefined=Undefined,  # silently renders undefined as empty string
+)
+
+# Plain-text environment: autoescape OFF for subjects and non-HTML output
+_jinja_env_text = Environment(
+    loader=BaseLoader(),
+    autoescape=False,
+    variable_start_string='{{',
+    variable_end_string='}}',
+    undefined=Undefined,
 )
 
 # Regex for extracting trigger flags from email body
@@ -227,13 +237,18 @@ TEMPLATES = {
 
 # ── Jinja2 Template Rendering ───────────────────────────────────
 
-def render_jinja2(template_body: str, context: dict) -> str:
+def render_jinja2(template_body: str, context: dict, *, text_mode: bool = False) -> str:
     """
     Render a Jinja2 template string with the given context.
     Handles {{variable}} syntax used in DB templates.
+
+    Args:
+        text_mode: If True, use the plain-text Jinja2 env (no HTML escaping).
+                   Use for email subjects and other non-HTML output.
     """
+    env = _jinja_env_text if text_mode else _jinja_env
     try:
-        tmpl = _jinja_env.from_string(template_body)
+        tmpl = env.from_string(template_body)
         return tmpl.render(**context)
     except (TemplateSyntaxError, UndefinedError) as e:
         logger.error(f'[render_jinja2] Template error: {e}')
@@ -270,9 +285,9 @@ async def render_db_template(slug: str, context: dict, pool, profile: dict | Non
         if profile:
             merged.update(profile)
 
-        subject = render_jinja2(row['subject_template'], merged)
+        subject = render_jinja2(row['subject_template'], merged, text_mode=True)
         body_html = render_jinja2(row['body_html'], merged)
-        body_text = render_jinja2(row['body_text'], merged) if row['body_text'] else ''
+        body_text = render_jinja2(row['body_text'], merged, text_mode=True) if row['body_text'] else ''
 
         return {
             'subject': subject,
@@ -426,11 +441,11 @@ async def resolve_profile_variables(
     Fetch customer profile data from Main Postgres via the shared (event bridge) pool.
 
     Resolves known profile fields:
-      - company_name, lifecycle_stage, tier: from tenants table
+      - company_name, lifecycle_stage, tier (product_tier): from tenants table
       - contact_name, contact_email: from users table
       - application_date: from tenants table
-      - active_proposals: count from proposals table
-      - matched_opportunities: count from tenant_opportunities table
+      - active_proposals: count from proposals table (by stage)
+      - matched_opportunities: count from tenant_pipeline_items table
 
     Args:
         profile_variables: list of field names to resolve
@@ -452,7 +467,7 @@ async def resolve_profile_variables(
 
         if needs_tenant and tenant_id:
             tenant_row = await shared_pool.fetchrow(
-                '''SELECT name, lifecycle_stage, tier, created_at
+                '''SELECT name, lifecycle_stage, product_tier, created_at
                    FROM tenants WHERE id = $1''',
                 tenant_id,
             )
@@ -462,7 +477,7 @@ async def resolve_profile_variables(
                 if 'lifecycle_stage' in profile_variables:
                     result['lifecycle_stage'] = tenant_row['lifecycle_stage'] or ''
                 if 'tier' in profile_variables:
-                    result['tier'] = tenant_row['tier'] or ''
+                    result['tier'] = tenant_row['product_tier'] or ''
                 if 'application_date' in profile_variables:
                     result['application_date'] = (
                         tenant_row['created_at'].strftime('%Y-%m-%d')
@@ -489,7 +504,7 @@ async def resolve_profile_variables(
             try:
                 count = await shared_pool.fetchval(
                     '''SELECT COUNT(*) FROM proposals
-                       WHERE tenant_id = $1 AND status NOT IN ('archived', 'withdrawn')''',
+                       WHERE tenant_id = $1 AND stage NOT IN ('archived')''',
                     tenant_id,
                 )
                 result['active_proposals'] = str(count or 0)
@@ -499,7 +514,7 @@ async def resolve_profile_variables(
         if 'matched_opportunities' in profile_variables and tenant_id:
             try:
                 count = await shared_pool.fetchval(
-                    '''SELECT COUNT(*) FROM tenant_opportunities
+                    '''SELECT COUNT(*) FROM tenant_pipeline_items
                        WHERE tenant_id = $1''',
                     tenant_id,
                 )

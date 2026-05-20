@@ -198,6 +198,7 @@ class BaseIngester(ABC):
         Emits finder.ingest.run.start at the beginning and
         finder.ingest.run.end at the end (with totals).
         """
+        self._run_type = run_type
         result = IngestResult(source=self.source, run_type=run_type)
         result.started_at = datetime.now(timezone.utc)
 

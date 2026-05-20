@@ -49,7 +49,7 @@ class OnApplicationAccepted(Workflow):
                 type="user.logged_in",
                 phase="single",
             ),
-            timeout_hours=48,
+            timeout_minutes=2880,
             on_timeout="send_login_reminder",
         ),
     ]

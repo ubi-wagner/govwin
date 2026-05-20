@@ -8,7 +8,7 @@ interface Post {
   body: string
   excerpt: string
   category: string
-  tags: string
+  tags: string | string[]
   author: string
   featured_image: string | null
   status: string
@@ -108,7 +108,7 @@ export default function ContentPreview() {
 
           {post.tags && (
             <div className="mt-8 pt-6 border-t border-gray-100 flex gap-2 flex-wrap">
-              {post.tags.split(',').map((tag) => (
+              {(Array.isArray(post.tags) ? post.tags : post.tags.split(',')).map((tag) => (
                 <span
                   key={tag.trim()}
                   className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"

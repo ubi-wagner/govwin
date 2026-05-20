@@ -76,6 +76,7 @@ function button(text: string, href: string): string {
 
 export function applicationAcceptedEmail(params: {
   contactName: string;
+  contactEmail: string;
   companyName: string;
   tempPassword: string;
   tenantSlug: string;
@@ -83,7 +84,7 @@ export function applicationAcceptedEmail(params: {
 }): { subject: string; html: string } {
   const { contactName, companyName, tempPassword, tenantSlug, loginUrl } = params;
 
-  const subject = `Welcome to RFP Pipeline — ${escapeHtml(companyName)} is approved!`;
+  const subject = `Welcome to RFP Pipeline — ${companyName} is approved!`;
 
   const body = `
 <h2 style="margin:0 0 16px;font-size:20px;color:${BRAND_NAVY};">Congratulations, ${escapeHtml(contactName)}!</h2>
@@ -94,7 +95,7 @@ export function applicationAcceptedEmail(params: {
   <tr>
     <td style="padding:12px 16px;">
       <span style="font-size:13px;color:#64748b;">Email</span><br>
-      <span style="font-size:15px;font-weight:600;color:${BRAND_NAVY};">${escapeHtml(params.contactName)}</span>
+      <span style="font-size:15px;font-weight:600;color:${BRAND_NAVY};">${escapeHtml(params.contactEmail)}</span>
     </td>
   </tr>
   <tr>
@@ -169,7 +170,7 @@ export function welcomeOnboardedEmail(params: {
 }): { subject: string; html: string } {
   const { contactName, companyName, tenantSlug, dashboardUrl } = params;
 
-  const subject = `${escapeHtml(companyName)} is live on RFP Pipeline`;
+  const subject = `${companyName} is live on RFP Pipeline`;
 
   const body = `
 <h2 style="margin:0 0 16px;font-size:20px;color:${BRAND_NAVY};">You're all set, ${escapeHtml(contactName)}!</h2>
@@ -249,7 +250,7 @@ export function spotlightDigestEmail(params: {
 }): { subject: string; html: string } {
   const { contactName, companyName, topics, dashboardUrl } = params;
 
-  const subject = `Your Spotlight: ${topics.length} matched opportunities for ${escapeHtml(companyName)}`;
+  const subject = `Your Spotlight: ${topics.length} matched opportunities for ${companyName}`;
 
   const topicRows = topics
     .map(

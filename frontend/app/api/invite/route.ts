@@ -87,9 +87,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invite token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    if (password.length < 8) {
+    if (password.length < 12) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' },
+        { error: 'Password must be at least 12 characters', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }

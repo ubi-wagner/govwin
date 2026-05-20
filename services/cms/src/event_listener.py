@@ -223,7 +223,7 @@ async def _execute_rule(rule, col_names: set, event):
             except Exception as e:
                 logger.error(f'Rule action {act_type} failed for {event_id}: {e}')
                 if pool:
-                    await _log_rule_execution(pool, rule_id, event_id, act_type, 'error',
+                    await _log_rule_execution(pool, rule_id, event_id, act_type, 'failed',
                                               error_message=str(e))
     elif action_type:
         try:

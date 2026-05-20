@@ -12,7 +12,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || err.detail || res.statusText)
   }
-  return res.json()
+  const json = await res.json()
+  // Backend wraps responses in { data: ... } — unwrap for callers
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data as T
+  }
+  return json as T
 }
 
 export const api = {

@@ -10,6 +10,13 @@
 -- live in the CMS Postgres database. See CMS migration 006.
 -- =============================================================================
 
+-- 0. Extend action_type CHECK to support CRM automation actions
+ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
+ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
+    CHECK (action_type IN ('log_only','queue_notification','queue_job','emit_event',
+                           'send_email','notify_admin','webhook','update_status',
+                           'create_todo','distribute_social','publish_content','enroll_drip'));
+
 -- 1. Lifecycle stage on tenants
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS lifecycle_stage TEXT
   DEFAULT 'customer' CHECK (lifecycle_stage IN ('lead','target','customer','at_risk','churned'));

@@ -36,7 +36,7 @@ async def test_list_todos_empty(mock_db, mock_pool):
     mock_pool.fetch = AsyncMock(return_value=[])
     from src.main import app
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url='http://test') as client:
+    async with AsyncClient(transport=transport, base_url='http://test', headers={'x-cms-api-key': 'test-api-key-for-pytest'}) as client:
         resp = await client.get('/api/todos')
         assert resp.status_code == 200
 
@@ -55,7 +55,7 @@ async def test_create_todo(mock_db, mock_pool):
     mock_pool.fetchrow = AsyncMock(return_value=mock_row)
     from src.main import app
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url='http://test') as client:
+    async with AsyncClient(transport=transport, base_url='http://test', headers={'x-cms-api-key': 'test-api-key-for-pytest'}) as client:
         resp = await client.post('/api/todos', json={
             'title': 'Test Todo',
             'todo_type': 'general',

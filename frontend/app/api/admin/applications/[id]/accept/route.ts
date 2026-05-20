@@ -146,6 +146,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
     const emailContent = applicationAcceptedEmail({
       contactName: app.contactName,
+      contactEmail: app.contactEmail,
       companyName: app.companyName,
       tempPassword: tempPw,
       tenantSlug: slug,

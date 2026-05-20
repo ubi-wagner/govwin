@@ -52,7 +52,7 @@ class OnProposalAdvancedToPinkTeam(Workflow):
                 phase="single",
                 condition=lambda p: p.get("fromStage") == "pink_team",
             ),
-            timeout_hours=72,
+            timeout_minutes=4320,
             on_timeout="send_review_reminder",
         ),
     ]

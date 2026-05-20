@@ -126,8 +126,8 @@ export default function ContentEditor() {
         payload.source_content = genForm.source_content
       }
 
-      const result = await api.post<{ data: { id: string; status: string } }>('/content/generations', payload)
-      setGenResult(`Generation request created (ID: ${result.data.id}, status: ${result.data.status}). It will be processed by the AI worker.`)
+      const result = await api.post<{ id: string; status: string }>('/content/generations', payload)
+      setGenResult(`Generation request created (ID: ${result.id}, status: ${result.status}). It will be processed by the AI worker.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation request failed')
     } finally {
@@ -140,7 +140,7 @@ export default function ContentEditor() {
     setStageLoading(true)
     setError('')
     try {
-      const res = await api.post<{ status: string }>(`/content/posts/${id}/action`, { action })
+      const res = await api.post<{ status: string }>(`/content/posts/${id}/action`, { action, user_id: 'cms-admin' })
       setPostStatus(res.status)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed')
