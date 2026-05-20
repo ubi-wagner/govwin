@@ -162,6 +162,23 @@ function CanvasEditorInner({
     if (selectedNodeId === nodeId) setSelectedNodeId(null);
   }, [updateDoc, selectedNodeId]);
 
+  const handleMoveNodeToIndex = useCallback((nodeId: string, targetIndex: number) => {
+    updateDoc((prev) => {
+      const nodes = [...prev.nodes];
+      const currentIndex = nodes.findIndex(n => n.id === nodeId);
+      if (currentIndex === -1 || currentIndex === targetIndex) return prev;
+
+      // Remove from current position
+      const [removed] = nodes.splice(currentIndex, 1);
+
+      // Insert at target position (adjust if removing shifted the index)
+      const insertAt = targetIndex > currentIndex ? targetIndex - 1 : targetIndex;
+      nodes.splice(insertAt, 0, removed);
+
+      return { ...prev, nodes };
+    });
+  }, [updateDoc]);
+
   const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
     updateDoc((prev) => {
       const nodes = [...prev.nodes];
@@ -451,6 +468,7 @@ function CanvasEditorInner({
             onUpdateNode={handleUpdateNode}
             variables={variables}
             readOnly={readOnly}
+            onMoveNodeToIndex={handleMoveNodeToIndex}
           />
         )}
       </div>
