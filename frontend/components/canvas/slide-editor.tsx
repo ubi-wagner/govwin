@@ -9,7 +9,7 @@
  * area in the center.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, HeadingContent } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 
@@ -74,19 +74,28 @@ export function SlideEditor({
 
   const slides = useMemo(() => splitIntoSlides(doc.nodes), [doc.nodes]);
 
-  // Clamp currentSlide if slides are removed
-  const clampedSlide = Math.min(currentSlide, slides.length - 1);
-  if (clampedSlide !== currentSlide) {
-    setCurrentSlide(Math.max(0, clampedSlide));
-  }
+  // Clamp currentSlide if slides are removed (P10: use useEffect instead of setState during render)
+  useEffect(() => {
+    if (currentSlide >= slides.length) {
+      setCurrentSlide(Math.max(0, slides.length - 1));
+    }
+  }, [slides.length, currentSlide]);
 
-  const currentSlideNodes = slides[Math.max(0, clampedSlide)] ?? [];
+  const clampedSlide = Math.min(currentSlide, Math.max(0, slides.length - 1));
+  const currentSlideNodes = slides[clampedSlide] ?? [];
 
   // Build a synthetic CanvasDocument containing only the current slide's nodes
-  // so we can reuse CanvasRenderer for full editing capability
+  // so we can reuse CanvasRenderer for full editing capability.
+  // Strip header/footer to avoid duplicate chrome (P12, P13).
   const slideDoc: CanvasDocument = useMemo(() => ({
     ...doc,
+    canvas: {
+      ...doc.canvas,
+      header: null,
+      footer: null,
+    },
     nodes: currentSlideNodes,
+    metadata: { ...doc.metadata },
   }), [doc, currentSlideNodes]);
 
   const is16x9 = doc.canvas.format === 'slide_16_9';

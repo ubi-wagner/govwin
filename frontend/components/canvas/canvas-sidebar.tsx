@@ -239,12 +239,14 @@ export function CanvasSidebar({
                 { type: 'text_block' as const, label: 'Paragraph', icon: 'T' },
                 { type: 'bulleted_list' as const, label: 'Bullet List', icon: '•' },
                 { type: 'numbered_list' as const, label: 'Numbered List', icon: '#' },
-                { type: 'image' as const, label: 'Image', icon: '🖼' },
+                { type: 'image' as const, label: 'Image', icon: 'img' },
                 { type: 'table' as const, label: 'Table', icon: '⊞' },
                 { type: 'caption' as const, label: 'Caption', icon: 'C' },
                 { type: 'footnote' as const, label: 'Footnote', icon: '†' },
                 { type: 'page_break' as const, label: 'Page Break', icon: '—' },
                 { type: 'toc' as const, label: 'TOC', icon: '☰' },
+                { type: 'url' as const, label: 'Link', icon: '↗' },
+                { type: 'spacer' as const, label: 'Spacer', icon: '⎵' },
               ].map((item) => (
                 <button
                   key={item.type}

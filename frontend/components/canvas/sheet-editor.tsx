@@ -85,6 +85,9 @@ export function SheetEditor({
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [renamingSheet, setRenamingSheet] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const sheets = useMemo(() => getSheets(doc), [doc]);
 
@@ -105,10 +108,15 @@ export function SheetEditor({
     (updater: (prev: CanvasDocument) => CanvasDocument) => {
       setDoc((prev) => {
         const next = updater(prev);
-        next.metadata.last_modified_at = new Date().toISOString();
-        next.metadata.last_modified_by = actorId;
-        next.metadata.version_number = prev.metadata.version_number + 1;
-        return next;
+        return {
+          ...next,
+          metadata: {
+            ...next.metadata,
+            last_modified_at: new Date().toISOString(),
+            last_modified_by: actorId,
+            version_number: prev.metadata.version_number + 1,
+          },
+        };
       });
       setDirty(true);
     },
@@ -284,9 +292,12 @@ export function SheetEditor({
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(doc);
       setDirty(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -452,9 +463,18 @@ export function SheetEditor({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {saveError && (
+            <span className="text-xs text-red-600 mr-2">{saveError}</span>
+          )}
           {onExport && (
             <button
-              onClick={() => onExport(doc, 'xlsx')}
+              onClick={async () => {
+                try {
+                  await onExport(doc, 'xlsx');
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : 'Export failed');
+                }
+              }}
               className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
             >
               Export .xlsx

@@ -73,6 +73,7 @@ function CanvasEditorInner({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
@@ -80,10 +81,15 @@ function CanvasEditorInner({
   const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument) => {
     setDoc((prev) => {
       const next = updater(prev);
-      next.metadata.last_modified_at = new Date().toISOString();
-      next.metadata.last_modified_by = actorId;
-      next.metadata.version_number = prev.metadata.version_number + 1;
-      return next;
+      return {
+        ...next,
+        metadata: {
+          ...next.metadata,
+          last_modified_at: new Date().toISOString(),
+          last_modified_by: actorId,
+          version_number: prev.metadata.version_number + 1,
+        },
+      };
     });
     setDirty(true);
   }, [actorId]);
@@ -186,9 +192,12 @@ function CanvasEditorInner({
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave(doc);
       setDirty(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -215,16 +224,31 @@ function CanvasEditorInner({
             {dirty && <span className="text-xs text-orange-500">unsaved</span>}
           </div>
           <div className="flex items-center gap-2">
+            {saveError && (
+              <span className="text-xs text-red-600 mr-2">{saveError}</span>
+            )}
             {onExport && (doc.canvas.format === 'letter' || doc.canvas.format === 'custom') && (
               <>
                 <button
-                  onClick={() => onExport(doc, 'docx')}
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'docx');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
                   className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
                 >
                   Export .docx
                 </button>
                 <button
-                  onClick={() => onExport(doc, 'pdf')}
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'pdf');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
                   className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
                 >
                   Export .pdf
@@ -233,7 +257,13 @@ function CanvasEditorInner({
             )}
             {onExport && (doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3') && (
               <button
-                onClick={() => onExport(doc, 'pptx')}
+                onClick={async () => {
+                  try {
+                    await onExport(doc, 'pptx');
+                  } catch (err) {
+                    setSaveError(err instanceof Error ? err.message : 'Export failed');
+                  }
+                }}
                 className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
               >
                 Export .pptx
@@ -241,7 +271,13 @@ function CanvasEditorInner({
             )}
             {onExport && doc.nodes.some((n) => n.type === 'table') && (
               <button
-                onClick={() => onExport(doc, 'xlsx')}
+                onClick={async () => {
+                  try {
+                    await onExport(doc, 'xlsx');
+                  } catch (err) {
+                    setSaveError(err instanceof Error ? err.message : 'Export failed');
+                  }
+                }}
                 className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
               >
                 Export .xlsx
