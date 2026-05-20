@@ -37,6 +37,11 @@ const PRESETS = [
     description: '16:9, Arial 18pt, 25 slide limit',
   },
   {
+    key: 'spreadsheet',
+    label: 'Spreadsheet',
+    description: 'Grid-based spreadsheet with multiple sheets and cell editing',
+  },
+  {
     key: 'custom',
     label: 'Custom',
     description: 'Start blank — set your own margins, font, and layout in the editor',

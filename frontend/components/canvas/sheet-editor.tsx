@@ -1,0 +1,669 @@
+'use client';
+
+/**
+ * Sheet Editor — spreadsheet grid editor for spreadsheet-format documents.
+ *
+ * Replaces the standard CanvasEditor when the document format is 'spreadsheet'.
+ * Each table node in the document represents a worksheet/sheet. Provides cell
+ * editing, sheet tabs, add/remove rows and columns, and a formula bar.
+ */
+
+import { useState, useCallback, useMemo } from 'react';
+import type {
+  CanvasDocument,
+  CanvasNode,
+  TableContent,
+  TableCell as TableCellType,
+} from '@/lib/types/canvas-document';
+import { createNode } from '@/lib/types/canvas-document';
+
+// ─── Types ──────────────────────────────────────────────────────────
+
+interface SheetEditorProps {
+  initialDocument: CanvasDocument;
+  onSave: (doc: CanvasDocument) => Promise<void>;
+  onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => Promise<void>;
+  actorId: string;
+  actorName: string;
+  readOnly?: boolean;
+}
+
+interface CellPosition {
+  row: number; // -1 for header row
+  col: number;
+}
+
+interface SheetInfo {
+  nodeId: string;
+  name: string;
+  content: TableContent;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+function cellText(cell: string | TableCellType): string {
+  return typeof cell === 'string' ? cell : cell.text;
+}
+
+function getSheets(doc: CanvasDocument): SheetInfo[] {
+  const tableNodes = doc.nodes.filter((n) => n.type === 'table');
+  return tableNodes.map((node, i) => {
+    const content = node.content as TableContent;
+    const name = content.sheet_name ?? `Sheet ${i + 1}`;
+    return {
+      nodeId: node.id,
+      name,
+      content,
+    };
+  });
+}
+
+function colLetter(index: number): string {
+  let result = '';
+  let n = index;
+  while (n >= 0) {
+    result = String.fromCharCode(65 + (n % 26)) + result;
+    n = Math.floor(n / 26) - 1;
+  }
+  return result;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export function SheetEditor({
+  initialDocument,
+  onSave,
+  onExport,
+  actorId,
+  actorName,
+  readOnly = false,
+}: SheetEditorProps) {
+  const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
+  const [activeSheet, setActiveSheet] = useState(0);
+  const [activeCell, setActiveCell] = useState<CellPosition | null>(null);
+  const [editingCell, setEditingCell] = useState<CellPosition | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const sheets = useMemo(() => getSheets(doc), [doc]);
+
+  // Ensure activeSheet is within bounds
+  const clampedSheet = Math.min(activeSheet, Math.max(0, sheets.length - 1));
+  if (clampedSheet !== activeSheet && sheets.length > 0) {
+    setActiveSheet(clampedSheet);
+  }
+
+  const currentSheet = sheets[clampedSheet] ?? null;
+  const headers = currentSheet?.content.headers ?? [];
+  const rows = currentSheet?.content.rows ?? [];
+  const colCount = Math.max(headers.length, ...rows.map((r) => r.length), 0);
+
+  // ─── Document mutation helpers ─────────────────────────────────────
+
+  const updateDoc = useCallback(
+    (updater: (prev: CanvasDocument) => CanvasDocument) => {
+      setDoc((prev) => {
+        const next = updater(prev);
+        next.metadata.last_modified_at = new Date().toISOString();
+        next.metadata.last_modified_by = actorId;
+        next.metadata.version_number = prev.metadata.version_number + 1;
+        return next;
+      });
+      setDirty(true);
+    },
+    [actorId],
+  );
+
+  const updateNodeContent = useCallback(
+    (nodeId: string, content: TableContent) => {
+      updateDoc((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) => {
+          if (n.id !== nodeId) return n;
+          return {
+            ...n,
+            content,
+            history: [
+              ...n.history,
+              {
+                actor_id: actorId,
+                actor_name: actorName,
+                action: 'edited' as const,
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        }),
+      }));
+    },
+    [updateDoc, actorId, actorName],
+  );
+
+  // ─── Cell editing ──────────────────────────────────────────────────
+
+  const getCellValue = useCallback(
+    (row: number, col: number): string => {
+      if (!currentSheet) return '';
+      if (row === -1) {
+        const h = currentSheet.content.headers[col];
+        return h != null ? cellText(h) : '';
+      }
+      const r = currentSheet.content.rows[row];
+      if (!r) return '';
+      const c = r[col];
+      return c != null ? cellText(c) : '';
+    },
+    [currentSheet],
+  );
+
+  const startEdit = useCallback(
+    (row: number, col: number, value: string) => {
+      if (readOnly) return;
+      setEditingCell({ row, col });
+      setEditValue(value);
+    },
+    [readOnly],
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditingCell(null);
+    setEditValue('');
+  }, []);
+
+  const commitEdit = useCallback(() => {
+    if (!editingCell || !currentSheet) return;
+
+    const content: TableContent = { ...currentSheet.content };
+
+    if (editingCell.row === -1) {
+      // Editing header
+      const newHeaders = [...content.headers];
+      newHeaders[editingCell.col] = editValue;
+      updateNodeContent(currentSheet.nodeId, { ...content, headers: newHeaders });
+    } else {
+      // Editing data cell
+      const newRows = content.rows.map((r) => [...r]);
+      // Ensure row exists
+      while (newRows.length <= editingCell.row) {
+        newRows.push(new Array(colCount).fill(''));
+      }
+      // Ensure column exists in row
+      while (newRows[editingCell.row].length <= editingCell.col) {
+        newRows[editingCell.row].push('');
+      }
+      newRows[editingCell.row][editingCell.col] = editValue;
+      updateNodeContent(currentSheet.nodeId, { ...content, rows: newRows });
+    }
+
+    setEditingCell(null);
+    setEditValue('');
+  }, [editingCell, currentSheet, editValue, updateNodeContent, colCount]);
+
+  const commitAndMove = useCallback(
+    (dRow: number, dCol: number) => {
+      commitEdit();
+      if (activeCell) {
+        const newRow = activeCell.row + dRow;
+        const newCol = activeCell.col + dCol;
+        // Clamp within bounds
+        const maxRow = rows.length - 1;
+        const maxCol = colCount - 1;
+        if (newCol > maxCol && dCol > 0) {
+          // Wrap to next row
+          setActiveCell({ row: Math.min(newRow + 1, maxRow), col: 0 });
+        } else if (newCol < 0 && dCol < 0) {
+          // Wrap to previous row
+          setActiveCell({ row: Math.max(newRow - 1, -1), col: maxCol });
+        } else {
+          setActiveCell({
+            row: Math.max(-1, Math.min(newRow, maxRow)),
+            col: Math.max(0, Math.min(newCol, maxCol)),
+          });
+        }
+      }
+    },
+    [commitEdit, activeCell, rows.length, colCount],
+  );
+
+  // ─── Structural operations ─────────────────────────────────────────
+
+  const handleAddRow = useCallback(() => {
+    if (!currentSheet || readOnly) return;
+    const content = { ...currentSheet.content };
+    const newRow = new Array(colCount).fill('') as string[];
+    updateNodeContent(currentSheet.nodeId, {
+      ...content,
+      rows: [...content.rows, newRow],
+    });
+  }, [currentSheet, readOnly, colCount, updateNodeContent]);
+
+  const handleAddColumn = useCallback(() => {
+    if (!currentSheet || readOnly) return;
+    const content = { ...currentSheet.content };
+    const colIdx = content.headers.length;
+    const newHeaders = [...content.headers, `Column ${colLetter(colIdx)}`];
+    const newRows = content.rows.map((r) => [...r, '']);
+    updateNodeContent(currentSheet.nodeId, {
+      ...content,
+      headers: newHeaders,
+      rows: newRows,
+    });
+  }, [currentSheet, readOnly, updateNodeContent]);
+
+  const handleAddSheet = useCallback(() => {
+    if (readOnly) return;
+    const sheetNumber = sheets.length + 1;
+    const newTable = createNode({
+      type: 'table',
+      content: {
+        headers: ['Column A', 'Column B', 'Column C'],
+        rows: [
+          ['', '', ''],
+          ['', '', ''],
+          ['', '', ''],
+        ],
+        sheet_name: `Sheet ${sheetNumber}`,
+      } as TableContent,
+      source: 'manual',
+      actorId,
+      actorName,
+    });
+
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: [...prev.nodes, newTable],
+    }));
+
+    setActiveSheet(sheets.length);
+    setActiveCell(null);
+    setEditingCell(null);
+  }, [readOnly, sheets.length, actorId, actorName, updateDoc]);
+
+  // ─── Save / Export ─────────────────────────────────────────────────
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await onSave(doc);
+      setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  }, [doc, onSave]);
+
+  // ─── Keyboard navigation on the grid ──────────────────────────────
+
+  const handleCellKeyDown = useCallback(
+    (e: React.KeyboardEvent, row: number, col: number) => {
+      if (editingCell) return; // Let input handle its own keys
+      if (readOnly) return;
+
+      if (e.key === 'Enter' || e.key === 'F2') {
+        e.preventDefault();
+        startEdit(row, col, getCellValue(row, col));
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        startEdit(row, col, '');
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Start typing into cell
+        startEdit(row, col, e.key);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveCell({ row: Math.min(row + 1, rows.length - 1), col });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveCell({ row: Math.max(row - 1, -1), col });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setActiveCell({ row, col: Math.min(col + 1, colCount - 1) });
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setActiveCell({ row, col: Math.max(col - 1, 0) });
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          setActiveCell({ row, col: Math.max(col - 1, 0) });
+        } else {
+          setActiveCell({ row, col: Math.min(col + 1, colCount - 1) });
+        }
+      }
+    },
+    [editingCell, readOnly, startEdit, getCellValue, rows.length, colCount],
+  );
+
+  // ─── Render ────────────────────────────────────────────────────────
+
+  // If no sheets exist, create a default one
+  if (sheets.length === 0 && !readOnly) {
+    // Trigger creation of a default sheet
+    const defaultTable = createNode({
+      type: 'table',
+      content: {
+        headers: ['Column A', 'Column B', 'Column C', 'Column D'],
+        rows: [
+          ['', '', '', ''],
+          ['', '', '', ''],
+          ['', '', '', ''],
+          ['', '', '', ''],
+          ['', '', '', ''],
+        ],
+        sheet_name: 'Sheet 1',
+      } as TableContent,
+      source: 'manual',
+      actorId,
+      actorName,
+    });
+
+    // Use a microtask to avoid setState during render
+    Promise.resolve().then(() => {
+      updateDoc((prev) => ({
+        ...prev,
+        nodes: [...prev.nodes, defaultTable],
+      }));
+    });
+
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+        Initializing spreadsheet...
+      </div>
+    );
+  }
+
+  if (sheets.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+        No sheets in this spreadsheet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-white flex-shrink-0">
+        {/* Document title */}
+        <h2 className="font-semibold text-sm text-gray-800 truncate max-w-xs">
+          {doc.metadata.title}
+        </h2>
+
+        <span
+          className={`text-xs px-2 py-0.5 rounded ${
+            doc.metadata.status === 'accepted'
+              ? 'bg-green-100 text-green-700'
+              : doc.metadata.status === 'review'
+                ? 'bg-yellow-100 text-yellow-700'
+                : doc.metadata.status === 'ai_drafted'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : 'bg-gray-100 text-gray-600'
+          }`}
+        >
+          {doc.metadata.status.replace('_', ' ')}
+        </span>
+
+        {dirty && <span className="text-xs text-orange-500">unsaved</span>}
+
+        <div className="flex-1" />
+
+        {/* Cell reference */}
+        <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded w-12 text-center">
+          {activeCell
+            ? `${colLetter(activeCell.col)}${activeCell.row === -1 ? 'H' : activeCell.row + 1}`
+            : '-'}
+        </span>
+
+        {/* Formula bar */}
+        <div className="flex items-center border rounded px-2 py-1 w-64">
+          <span className="text-xs text-gray-400 mr-2">fx</span>
+          <input
+            type="text"
+            value={
+              editingCell
+                ? editValue
+                : activeCell
+                  ? getCellValue(activeCell.row, activeCell.col)
+                  : ''
+            }
+            onChange={(e) => {
+              if (activeCell && !readOnly) {
+                setEditValue(e.target.value);
+                if (!editingCell) {
+                  setEditingCell(activeCell);
+                }
+              }
+            }}
+            onBlur={() => {
+              if (editingCell) commitEdit();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitEdit();
+              }
+              if (e.key === 'Escape') {
+                cancelEdit();
+              }
+            }}
+            className="flex-1 text-sm outline-none"
+            placeholder="Select a cell"
+            readOnly={readOnly}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {onExport && (
+            <button
+              onClick={() => onExport(doc, 'xlsx')}
+              className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+            >
+              Export .xlsx
+            </button>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Grid ── */}
+      <div className="flex-1 overflow-auto">
+        <table className="border-collapse w-full">
+          <thead>
+            {/* Column letter headers */}
+            <tr className="bg-gray-100 sticky top-0 z-10">
+              <th className="w-10 min-w-[40px] border border-gray-300 bg-gray-200 text-xs text-gray-500 py-1" />
+              {Array.from({ length: colCount }, (_, ci) => (
+                <th
+                  key={ci}
+                  className="border border-gray-300 bg-gray-200 text-xs text-gray-500 py-1 min-w-[100px]"
+                >
+                  {colLetter(ci)}
+                </th>
+              ))}
+              {!readOnly && (
+                <th className="w-8 border border-gray-300 bg-gray-100">
+                  <button
+                    onClick={handleAddColumn}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                    title="Add column"
+                  >
+                    +
+                  </button>
+                </th>
+              )}
+            </tr>
+
+            {/* Header row from table */}
+            <tr className="bg-gray-50 sticky top-[25px] z-10">
+              <td className="border border-gray-300 bg-gray-200 text-xs text-center text-gray-500 py-1 font-medium">
+                H
+              </td>
+              {Array.from({ length: colCount }, (_, ci) => {
+                const h = headers[ci];
+                const isActive =
+                  activeCell?.row === -1 && activeCell?.col === ci;
+                const isEditing =
+                  editingCell?.row === -1 && editingCell?.col === ci;
+
+                return (
+                  <td
+                    key={ci}
+                    className={`border border-gray-300 px-2 py-1 text-sm font-semibold cursor-default ${
+                      isActive
+                        ? 'outline outline-2 outline-blue-500 bg-blue-50'
+                        : ''
+                    }`}
+                    onClick={() => setActiveCell({ row: -1, col: ci })}
+                    onKeyDown={(e) => handleCellKeyDown(e, -1, ci)}
+                    tabIndex={isActive ? 0 : -1}
+                  >
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={() => commitEdit()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            commitAndMove(1, 0);
+                          }
+                          if (e.key === 'Escape') cancelEdit();
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            commitAndMove(0, e.shiftKey ? -1 : 1);
+                          }
+                        }}
+                        className="w-full bg-transparent outline-none text-sm font-semibold"
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() =>
+                          startEdit(-1, ci, h != null ? cellText(h) : '')
+                        }
+                      >
+                        {h != null ? cellText(h) : ''}
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+              {!readOnly && <td className="border border-gray-300 bg-gray-100" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri}>
+                <td className="border border-gray-300 bg-gray-200 text-xs text-center text-gray-500 py-1">
+                  {ri + 1}
+                </td>
+                {Array.from({ length: colCount }, (_, ci) => {
+                  const c = row[ci];
+                  const isActive =
+                    activeCell?.row === ri && activeCell?.col === ci;
+                  const isEditing =
+                    editingCell?.row === ri && editingCell?.col === ci;
+
+                  return (
+                    <td
+                      key={ci}
+                      className={`border border-gray-300 px-2 py-1 text-sm cursor-default ${
+                        isActive
+                          ? 'outline outline-2 outline-blue-500 bg-blue-50'
+                          : ''
+                      }`}
+                      onClick={() => setActiveCell({ row: ri, col: ci })}
+                      onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
+                      tabIndex={isActive ? 0 : -1}
+                    >
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={() => commitEdit()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              commitAndMove(1, 0);
+                            }
+                            if (e.key === 'Escape') cancelEdit();
+                            if (e.key === 'Tab') {
+                              e.preventDefault();
+                              commitAndMove(0, e.shiftKey ? -1 : 1);
+                            }
+                          }}
+                          className="w-full bg-transparent outline-none text-sm"
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          onDoubleClick={() =>
+                            startEdit(ri, ci, c != null ? cellText(c) : '')
+                          }
+                        >
+                          {c != null ? cellText(c) : ''}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+                {!readOnly && <td className="border border-gray-300 bg-gray-100" />}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Add row button */}
+        {!readOnly && (
+          <button
+            onClick={handleAddRow}
+            className="w-full py-1 text-xs text-blue-600 hover:bg-blue-50 border-t"
+          >
+            + Add Row
+          </button>
+        )}
+      </div>
+
+      {/* ── Sheet tabs ── */}
+      <div className="flex items-center gap-1 border-t bg-gray-50 px-2 py-1 flex-shrink-0">
+        {sheets.map((sheet, i) => (
+          <button
+            key={sheet.nodeId}
+            onClick={() => {
+              setActiveSheet(i);
+              setActiveCell(null);
+              setEditingCell(null);
+            }}
+            className={`px-3 py-1 text-xs rounded-t border ${
+              clampedSheet === i
+                ? 'bg-white border-b-white font-medium'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {sheet.name}
+          </button>
+        ))}
+        {!readOnly && (
+          <button
+            onClick={handleAddSheet}
+            className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+            title="Add sheet"
+          >
+            +
+          </button>
+        )}
+        <div className="flex-1" />
+        <span className="text-[10px] text-gray-400">
+          {sheets.length} sheet{sheets.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}

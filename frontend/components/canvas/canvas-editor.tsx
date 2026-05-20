@@ -13,6 +13,7 @@ import type { CanvasDocument, CanvasNode, NodeType, CanvasRules } from '@/lib/ty
 import { createNode } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
+import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
 
 interface Props {
@@ -50,6 +51,20 @@ export function CanvasEditor({
   actorId,
   actorName,
 }: Props) {
+  // Delegate to SheetEditor for spreadsheet format
+  if (initialDocument.canvas.format === 'spreadsheet') {
+    return (
+      <SheetEditor
+        initialDocument={initialDocument}
+        onSave={onSave}
+        onExport={onExport}
+        actorId={actorId}
+        actorName={actorName}
+        readOnly={readOnly}
+      />
+    );
+  }
+
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
