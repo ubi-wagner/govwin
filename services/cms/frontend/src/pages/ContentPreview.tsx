@@ -101,11 +101,10 @@ export default function ContentPreview() {
             </p>
           )}
 
-          <div className="text-base text-gray-800 leading-relaxed space-y-4 [&>p]:mb-4">
-            {post.body.split('\n\n').map((paragraph, i) => (
-              <p key={i}>{paragraph}</p>
-            ))}
-          </div>
+          <div
+            className="prose prose-sm max-w-none text-gray-800"
+            dangerouslySetInnerHTML={{ __html: post.body }}
+          />
 
           {post.tags && (
             <div className="mt-8 pt-6 border-t border-gray-100 flex gap-2 flex-wrap">
