@@ -86,8 +86,6 @@ export function SheetEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [renamingSheet, setRenamingSheet] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState('');
 
   const sheets = useMemo(() => getSheets(doc), [doc]);
 

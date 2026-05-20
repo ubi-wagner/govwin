@@ -54,9 +54,10 @@ export async function exportToXlsx(
     tableCount++;
     const tc = node.content as TableContent;
 
-    // Derive sheet name from surrounding caption or default
-    const caption = findCaptionFor(nodes, node);
-    const sheetName = sanitizeSheetName(caption ?? `Sheet ${tableCount}`);
+    // Derive sheet name: prefer sheet_name field, then caption, then default
+    const sheetName = sanitizeSheetName(
+      tc.sheet_name ?? findCaptionFor(nodes, node) ?? `Sheet ${tableCount}`
+    );
 
     const ws = workbook.addWorksheet(sheetName);
 
