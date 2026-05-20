@@ -19,7 +19,8 @@ interface SocialPost {
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   scheduled: 'bg-blue-100 text-blue-700',
-  published: 'bg-green-100 text-green-700',
+  posting: 'bg-amber-100 text-amber-700',
+  posted: 'bg-green-100 text-green-700',
   failed: 'bg-red-100 text-red-700',
 }
 
@@ -63,15 +64,16 @@ export default function SocialPosts() {
                       {p.status}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-900 whitespace-pre-wrap line-clamp-3">{p.content}</p>
+                  <p className="text-sm text-slate-900 whitespace-pre-wrap line-clamp-3">{p.post_text}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
                     {p.scheduled_at && <span>Scheduled: {new Date(p.scheduled_at).toLocaleString()}</span>}
-                    {p.published_at && <span>Published: {new Date(p.published_at).toLocaleString()}</span>}
-                    {p.metrics && (
+                    {p.posted_at && <span>Posted: {new Date(p.posted_at).toLocaleString()}</span>}
+                    {p.engagement_data && Object.keys(p.engagement_data).length > 0 && (
                       <span>
-                        {p.metrics.likes ?? 0} likes | {p.metrics.shares ?? 0} shares | {p.metrics.comments ?? 0} comments
+                        {Object.entries(p.engagement_data).map(([k, v]) => `${k}: ${v}`).join(' | ')}
                       </span>
                     )}
+                    {p.error_message && <span className="text-red-500">{p.error_message}</span>}
                   </div>
                 </div>
               </div>

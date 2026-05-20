@@ -4,12 +4,18 @@ import { api } from '../lib/api'
 interface Todo {
   id: string
   title: string
-  description: string
+  description: string | null
+  todo_type: string
   status: string
   priority: string
   assigned_to: string | null
-  due_date: string | null
+  tenant_id: string | null
+  due_at: string | null
+  metadata: Record<string, unknown>
+  created_by: string | null
   created_at: string
+  updated_at: string
+  completed_at: string | null
 }
 
 const statusFilters = ['all', 'open', 'in_progress', 'done'] as const
@@ -19,7 +25,7 @@ const priorityColors: Record<string, string> = {
   low: 'bg-gray-100 text-gray-600',
   medium: 'bg-blue-100 text-blue-700',
   high: 'bg-amber-100 text-amber-700',
-  urgent: 'bg-red-100 text-red-700',
+  critical: 'bg-red-100 text-red-700',
 }
 
 export default function Todos() {
@@ -119,9 +125,14 @@ export default function Todos() {
                       {t.priority}
                     </span>
                   )}
-                  {t.assigned_to && <span className="text-xs text-gray-400">{t.assigned_to}</span>}
-                  {t.due_date && (
-                    <span className="text-xs text-gray-400">Due: {new Date(t.due_date).toLocaleDateString()}</span>
+                  {t.todo_type && (
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                      {t.todo_type}
+                    </span>
+                  )}
+                  {t.assigned_to && <span className="text-xs text-gray-400">Assigned: {t.assigned_to.slice(0, 8)}...</span>}
+                  {t.due_at && (
+                    <span className="text-xs text-gray-400">Due: {new Date(t.due_at).toLocaleDateString()}</span>
                   )}
                 </div>
               </div>
