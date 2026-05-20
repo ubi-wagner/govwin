@@ -9,9 +9,10 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 
 from .models.database import get_event_pool
-from .gmail import send_email
+from .workers.gmail_client import send_email as _gmail_send
 from .templates import render_template
 
 logger = logging.getLogger('cms.events')
@@ -20,6 +21,22 @@ _task: asyncio.Task | None = None
 _last_processed_at: object | None = None
 POLL_INTERVAL = int(os.getenv('EVENT_POLL_INTERVAL', '10'))
 ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
+_SEND_AS = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
+
+
+async def send_email(to: str, subject: str, html: str) -> dict:
+    """Send via service account delegation (gmail_client), matching legacy signature."""
+    try:
+        result = await _gmail_send(
+            delegate_email=_SEND_AS,
+            to_email=to,
+            subject=subject,
+            body_html=html,
+        )
+        return {'provider': 'gmail', 'messageId': result.get('message_id')}
+    except Exception as e:
+        logger.error('send_email failed: %s', e)
+        return {'provider': 'gmail', 'error': str(e)}
 
 
 async def start_event_listener():
@@ -195,7 +212,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -211,7 +228,7 @@ async def _execute_rule(rule, col_names: set, event):
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -621,6 +638,82 @@ async def _action_distribute_social(config: dict, payload: dict, event):
             logger.error(f'distribute_social: error creating {platform} posts: {e}')
 
 
+async def _action_publish_content(config: dict, payload: dict, event):
+    """Push approved CMS content to Main Postgres cms_content table.
+
+    Maps CMS cms_posts fields to Main Postgres cms_content fields.
+    Upserts by slug (unique key).
+    """
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning('publish_content: shared pool not available, skipping')
+        return
+
+    post_id = payload.get('post_id') or config.get('post_id')
+    if not post_id:
+        logger.warning('publish_content: no post_id in payload or config')
+        return
+
+    # Fetch full post from CMS database
+    from .models.database import get_pool as get_cms_pool
+    cms_pool = get_cms_pool()
+
+    rows = await cms_pool.fetch("""
+        SELECT id, slug, title, body, excerpt, status, author_name, author_email,
+               featured_image_url, category, tags, meta_title, meta_description,
+               published_at, published_by, version
+        FROM cms_posts WHERE id = $1
+    """, uuid.UUID(post_id) if isinstance(post_id, str) else post_id)
+
+    if not rows:
+        logger.warning(f'publish_content: post {post_id} not found in CMS DB')
+        return
+
+    post = dict(rows[0])
+
+    if post['status'] != 'published':
+        logger.info(f'publish_content: post status is {post["status"]}, not published — skipping')
+        return
+
+    # Determine content_type from category or config
+    content_type = config.get('content_type', 'blog_post')
+    if post.get('category') == 'page_block':
+        content_type = 'page_block'
+    elif post.get('category') == 'resource':
+        content_type = 'resource'
+    elif post.get('category') == 'guide':
+        content_type = 'guide'
+
+    tags_array = post.get('tags') or []
+
+    # Upsert into Main Postgres cms_content by slug
+    await shared_pool.execute("""
+        INSERT INTO cms_content (slug, title, body, excerpt, content_type, author, tags,
+                                 status, published, published_at, featured_image,
+                                 metadata, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', true, $8, $9, $10, now())
+        ON CONFLICT (slug) DO UPDATE SET
+            title = EXCLUDED.title,
+            body = EXCLUDED.body,
+            excerpt = EXCLUDED.excerpt,
+            content_type = EXCLUDED.content_type,
+            author = EXCLUDED.author,
+            tags = EXCLUDED.tags,
+            status = 'published',
+            published = true,
+            published_at = COALESCE(EXCLUDED.published_at, cms_content.published_at),
+            featured_image = EXCLUDED.featured_image,
+            metadata = EXCLUDED.metadata,
+            updated_at = now()
+    """, post['slug'], post['title'], post['body'], post.get('excerpt'),
+         content_type, post.get('author_name'), tags_array,
+         post.get('published_at'), post.get('featured_image_url'),
+         json.dumps({"cms_post_id": str(post['id']), "cms_version": post.get('version', 1),
+                      "meta_title": post.get('meta_title'), "meta_description": post.get('meta_description')}))
+
+    logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
+
+
 async def _do_action(action_type: str, config: dict, payload: dict, event):
     if action_type == 'create_todo':
         await _action_create_todo(config, payload, event)
@@ -632,6 +725,10 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
 
     elif action_type == 'distribute_social':
         await _action_distribute_social(config, payload, event)
+        return
+
+    elif action_type == 'publish_content':
+        await _action_publish_content(config, payload, event)
         return
 
     elif action_type == 'send_email':

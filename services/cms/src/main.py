@@ -16,6 +16,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from .models.database import init_db, close_db, init_event_bridge, close_event_bridge
 from .routers import health, email, content
@@ -89,3 +92,19 @@ app.include_router(media_router, prefix="/api/media", tags=["media"])
 app.include_router(social_router, prefix="/api/social", tags=["social"])
 app.include_router(drip_router, prefix="/api/drip", tags=["drip"])
 app.include_router(todos_router, prefix="/api/todos", tags=["todos"])
+
+# ── CMS Frontend SPA (static files) ───────────────────────────────
+_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+
+if os.path.isdir(_static_dir):
+    _assets_dir = os.path.join(_static_dir, "assets")
+    if os.path.isdir(_assets_dir):
+        app.mount("/cms/assets", StaticFiles(directory=_assets_dir), name="cms-assets")
+
+    @app.get("/cms")
+    @app.get("/cms/{rest:path}")
+    async def serve_cms_spa(rest: str = ""):
+        index = os.path.join(_static_dir, "index.html")
+        if os.path.isfile(index):
+            return FileResponse(index)
+        return JSONResponse({"error": "CMS frontend not built"}, status_code=404)

@@ -5,5 +5,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY db/ ./db/
+COPY static/ ./static/
 RUN chmod +x db/run.sh
 CMD bash -c "bash db/run.sh && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"
