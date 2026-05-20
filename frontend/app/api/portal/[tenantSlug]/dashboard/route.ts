@@ -87,10 +87,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE tenant_id = ${tenantId}::uuid AND stage != 'archived'
       `;
 
-      // Matched opportunities count
+      // Matched opportunities count (exclude passed/dismissed)
       const [opportunityCount] = await sql<{ count: string }[]>`
         SELECT count(*)::text AS count FROM tenant_pipeline_items
         WHERE tenant_id = ${tenantId}::uuid
+          AND (pursuit_status IS NULL OR pursuit_status NOT IN ('passed', 'dismissed'))
       `;
 
       // Library units count

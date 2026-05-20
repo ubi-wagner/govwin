@@ -160,8 +160,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         });
 
         await sql`
-          INSERT INTO pipeline_jobs (source, run_type, status, result)
-          VALUES ('ai_review', 'section', 'pending', ${jobPayload}::jsonb)
+          INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
+          VALUES ('portal', 'shred_solicitation', 'pending', 5, ${jobPayload}::jsonb)
         `;
 
         sectionsQueued++;
