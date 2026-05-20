@@ -108,13 +108,28 @@ async def process_queue_batch() -> int:
                 send_id,
             )
 
+            # Embed trigger flags if the send has trigger_metadata
+            body_html_to_send = send['body_html'] or ''
+            trigger_metadata = send.get('trigger_metadata')
+            if trigger_metadata:
+                import json as _json
+                if isinstance(trigger_metadata, str):
+                    try:
+                        trigger_metadata = _json.loads(trigger_metadata)
+                    except (ValueError, _json.JSONDecodeError):
+                        trigger_metadata = None
+                if trigger_metadata and isinstance(trigger_metadata, dict) and trigger_metadata != {}:
+                    from ..templates import embed_trigger_flags
+                    body_html_to_send = embed_trigger_flags(body_html_to_send, trigger_metadata)
+                    logger.debug(f'Embedded trigger flags in send {send_id}')
+
             # Send via Gmail
             from .gmail_client import send_email
             result = await send_email(
                 delegate_email=delegate_email,
                 to_email=send['recipient_email'],
                 subject=send['subject'],
-                body_html=send['body_html'] or '',
+                body_html=body_html_to_send,
                 body_text=send['body_text'] or '',
                 from_name=send.get('from_name'),
                 in_reply_to=send['in_reply_to'],

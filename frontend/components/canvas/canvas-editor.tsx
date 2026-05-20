@@ -8,7 +8,7 @@
  * Manages the document state, node CRUD, and save/export actions.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
 import { createNode } from '@/lib/types/canvas-document';
@@ -84,12 +84,22 @@ function CanvasEditorInner({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
+  const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
 
   const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument) => {
     setDoc((prev) => {
+      // Push previous state onto undo stack (limit 50)
+      setUndoStack(stack => {
+        const next = [...stack, prev];
+        return next.length > 50 ? next.slice(-50) : next;
+      });
+      // Clear redo stack on new edit
+      setRedoStack([]);
+
       const next = updater(prev);
       return {
         ...next,
@@ -151,6 +161,23 @@ function CanvasEditorInner({
     }));
     if (selectedNodeId === nodeId) setSelectedNodeId(null);
   }, [updateDoc, selectedNodeId]);
+
+  const handleMoveNodeToIndex = useCallback((nodeId: string, targetIndex: number) => {
+    updateDoc((prev) => {
+      const nodes = [...prev.nodes];
+      const currentIndex = nodes.findIndex(n => n.id === nodeId);
+      if (currentIndex === -1 || currentIndex === targetIndex) return prev;
+
+      // Remove from current position
+      const [removed] = nodes.splice(currentIndex, 1);
+
+      // Insert at target position (adjust if removing shifted the index)
+      const insertAt = targetIndex > currentIndex ? targetIndex - 1 : targetIndex;
+      nodes.splice(insertAt, 0, removed);
+
+      return { ...prev, nodes };
+    });
+  }, [updateDoc]);
 
   const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
     updateDoc((prev) => {
@@ -259,6 +286,50 @@ function CanvasEditorInner({
     }));
   }, [updateDoc, actorId, actorName]);
 
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    setRedoStack(stack => [...stack, doc]);
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack(stack => stack.slice(0, -1));
+    setDoc(prev);
+    setDirty(true);
+  }, [undoStack, doc]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    setUndoStack(stack => [...stack, doc]);
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(stack => stack.slice(0, -1));
+    setDoc(next);
+    setDirty(true);
+  }, [redoStack, doc]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y') && (e.shiftKey || e.key === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
@@ -353,6 +424,22 @@ function CanvasEditorInner({
               </button>
             )}
             <button
+              onClick={handleUndo}
+              disabled={undoStack.length === 0}
+              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={redoStack.length === 0}
+              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
+            >
+              Redo
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving || !dirty}
               className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
@@ -381,6 +468,7 @@ function CanvasEditorInner({
             onUpdateNode={handleUpdateNode}
             variables={variables}
             readOnly={readOnly}
+            onMoveNodeToIndex={handleMoveNodeToIndex}
           />
         )}
       </div>

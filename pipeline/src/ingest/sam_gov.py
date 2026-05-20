@@ -238,7 +238,7 @@ class SamGovIngester(BaseIngester):
         self._api_key: Optional[str] = None
         self._run_type: str = "incremental"
 
-    async def resolve_api_key(self, conn) -> str:
+    async def _resolve_api_key(self, conn) -> str:
         """Resolve SAM.gov API key: DB encrypted value first, env var fallback."""
         if self._api_key:
             return self._api_key

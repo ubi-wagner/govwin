@@ -2,7 +2,7 @@
 Event emission for CMS service.
 
 Events are recorded locally in cms_events, then optionally bridged
-to the shared database's content_events table for automation triggers.
+to the shared database's system_events table for automation triggers.
 """
 import logging
 from .database import get_pool, get_event_pool
@@ -47,16 +47,20 @@ async def emit_event(
             try:
                 await event_pool.execute(
                     """
-                    INSERT INTO content_events (page_key, event_type, user_id, source, diff_summary, metadata)
-                    VALUES ('content_pipeline', $1, $2, 'cms_service', $3, $4::jsonb)
+                    INSERT INTO system_events
+                        (namespace, type, phase, actor_type, actor_id, payload)
+                    VALUES ($1, $2, 'single', $3, $4, $5::jsonb)
                     """,
+                    'system',
                     event_type,
-                    user_id,
-                    diff_summary,
+                    'user' if user_id else 'system',
+                    user_id or 'cms_service',
                     json.dumps({
-                        'actor': {'type': 'user', 'id': user_id or 'system'},
-                        'payload': payload or {},
+                        'entity_type': entity_type,
+                        'entity_id': entity_id,
+                        'diff_summary': diff_summary,
                         'cms_event_id': str(event_id),
+                        **(payload or {}),
                     }),
                 )
                 # Mark as bridged

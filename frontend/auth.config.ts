@@ -35,7 +35,10 @@ import type { NextAuthConfig } from 'next-auth';
 import type { Role } from './lib/rbac';
 
 export const authConfig: NextAuthConfig = {
-  session: { strategy: 'jwt' },
+  session: {
+    strategy: 'jwt',
+    maxAge: 8 * 60 * 60, // 8 hours
+  },
   pages: {
     signIn: '/login',
   },

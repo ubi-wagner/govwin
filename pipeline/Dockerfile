@@ -19,4 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 
+RUN useradd -r -s /bin/false pipeline
+USER pipeline
+
 CMD ["python", "src/main.py"]

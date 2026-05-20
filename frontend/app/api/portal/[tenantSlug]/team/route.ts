@@ -153,7 +153,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // Create new user with temp password
     const tempPassword = randomUUID().slice(0, 12);
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const [newUser] = await sql<{ id: string }[]>`
       INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)

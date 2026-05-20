@@ -1,5 +1,6 @@
 """Health check endpoint for Railway."""
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from ..models.database import get_pool
 
 router = APIRouter()
@@ -14,4 +15,7 @@ async def health_check():
             await conn.fetchval('SELECT 1')
         return {'status': 'healthy', 'service': 'cms', 'database': 'connected'}
     except Exception as e:
-        return {'status': 'degraded', 'service': 'cms', 'database': str(e)}
+        return JSONResponse(
+            {'status': 'degraded', 'service': 'cms', 'database': str(e)},
+            status_code=503,
+        )

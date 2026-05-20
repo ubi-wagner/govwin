@@ -20,11 +20,11 @@ def _fire_event(event_type: str, **kwargs):
     """Fire-and-forget event emission."""
     asyncio.create_task(emit_event(event_type, entity_type='email', **kwargs))
 from ..models.email_schemas import (
-    AccountCreate, AccountUpdate, AccountOut,
-    TemplateCreate, TemplateUpdate, TemplateDraftRequest, TemplateOut,
-    CampaignCreate, CampaignUpdate, CampaignAction, CampaignOut,
-    SendCreate, SendOut,
-    EngagementOut, ThreadOut,
+    AccountCreate, AccountUpdate,
+    TemplateCreate, TemplateUpdate, TemplateDraftRequest,
+    TemplatePreviewRequest, TemplateTestSendRequest,
+    CampaignCreate, CampaignUpdate, CampaignAction,
+    SendCreate,
     OutboxClaim, OutboxModify, OutboxApprove, OutboxBulkApprove, OutboxReject,
 )
 
@@ -155,6 +155,37 @@ async def list_templates(
         raise HTTPException(500, 'Failed to fetch templates')
 
 
+@router.get('/templates/categories')
+async def list_template_categories():
+    """List available template categories with counts."""
+    pool = get_pool()
+    try:
+        rows = await pool.fetch(
+            '''SELECT template_category, COUNT(*) as count
+               FROM email_templates
+               WHERE is_active = TRUE
+               GROUP BY template_category
+               ORDER BY count DESC'''
+        )
+
+        categories = [
+            {'category': r['template_category'] or 'outreach', 'count': r['count']}
+            for r in rows
+        ]
+
+        # Include all valid categories, even with zero count
+        all_categories = ['outreach', 'response', 'drip', 'notification', 'digest', 'system', 'follow_up']
+        existing = {c['category'] for c in categories}
+        for cat in all_categories:
+            if cat not in existing:
+                categories.append({'category': cat, 'count': 0})
+
+        return {'data': categories}
+    except Exception as e:
+        logger.error(f'[GET /templates/categories] Error: {e}')
+        raise HTTPException(500, 'Failed to fetch template categories')
+
+
 @router.get('/templates/{template_id}')
 async def get_template(template_id: str):
     pool = get_pool()
@@ -177,12 +208,16 @@ async def create_template(body: TemplateCreate):
         import json
         row = await pool.fetchrow(
             '''INSERT INTO email_templates (name, slug, description, category,
-                   subject_template, body_html, body_text, variables, tags)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+                   subject_template, body_html, body_text, variables, tags,
+                   trigger_config, response_map, profile_variables, template_category)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9,
+                       $10::jsonb, $11::jsonb, $12, $13)
                RETURNING *''',
             body.name, body.slug, body.description, body.category,
             body.subject_template, body.body_html, body.body_text,
             json.dumps(body.variables), body.tags,
+            json.dumps(body.trigger_config), json.dumps(body.response_map),
+            body.profile_variables, body.template_category,
         )
         return {'data': dict(row)}
     except Exception as e:
@@ -201,12 +236,15 @@ async def update_template(template_id: str, body: TemplateUpdate):
         params = []
         idx = 1
 
+        jsonb_fields = {'variables', 'trigger_config', 'response_map'}
+        array_fields = {'tags', 'profile_variables'}
+
         for field, value in body.model_dump(exclude_none=True).items():
-            if field == 'variables':
-                updates.append(f'variables = ${idx}::jsonb')
+            if field in jsonb_fields:
+                updates.append(f'{field} = ${idx}::jsonb')
                 params.append(json.dumps(value))
-            elif field == 'tags':
-                updates.append(f'tags = ${idx}')
+            elif field in array_fields:
+                updates.append(f'{field} = ${idx}')
                 params.append(value)
             else:
                 updates.append(f'{field} = ${idx}')
@@ -219,7 +257,7 @@ async def update_template(template_id: str, body: TemplateUpdate):
         updates.append(f'updated_at = ${idx}')
         params.append(datetime.now(timezone.utc))
         idx += 1
-        updates.append(f'version = version + 1')
+        updates.append('version = version + 1')
 
         params.append(uuid.UUID(template_id))
         row = await pool.fetchrow(
@@ -290,6 +328,153 @@ async def draft_template_ai(body: TemplateDraftRequest):
     except Exception as e:
         logger.error(f'[POST /templates/draft] Error: {e}')
         raise HTTPException(500, 'Failed to draft template')
+
+
+# ── Template Preview / Test / Categories ─────────────────────────
+
+@router.post('/templates/{template_id}/preview')
+async def preview_template(template_id: str, body: TemplatePreviewRequest):
+    """Preview a template rendered with sample profile and context data."""
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            'SELECT * FROM email_templates WHERE id = $1',
+            uuid.UUID(template_id),
+        )
+        if not row:
+            raise HTTPException(404, 'Template not found')
+
+        from ..templates import render_jinja2, build_trigger_metadata, _layout
+
+        # Merge sample profile into context
+        context = {**body.sample_context, **body.sample_profile}
+
+        subject = render_jinja2(row['subject_template'], context, text_mode=True)
+        body_html = render_jinja2(row['body_html'], context)
+        body_text = render_jinja2(row['body_text'], context, text_mode=True) if row.get('body_text') else ''
+
+        # Wrap in layout for preview
+        full_html = _layout(body_html)
+
+        # Build trigger preview
+        trigger_config = row.get('trigger_config') or {}
+        trigger_preview = None
+        if trigger_config:
+            trigger_preview = build_trigger_metadata(
+                template={
+                    'trigger_config': trigger_config,
+                    'response_map': row.get('response_map') or {},
+                    'id': row['id'],
+                    'slug': row['slug'],
+                },
+                send_context={
+                    'send_id': 'preview-00000000',
+                    'tenant_id': body.sample_context.get('tenant_id'),
+                    'campaign_id': body.sample_context.get('campaign_id'),
+                    'template_id': str(row['id']),
+                },
+            )
+
+        return {
+            'data': {
+                'subject': subject,
+                'body_html': full_html,
+                'body_text': body_text,
+                'resolved_variables': list(context.keys()),
+                'trigger_preview': trigger_preview,
+                'profile_variables': row.get('profile_variables') or [],
+                'template_category': row.get('template_category', 'outreach'),
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /templates/{{id}}/preview] Error: {e}')
+        raise HTTPException(500, 'Failed to preview template')
+
+
+@router.post('/templates/{template_id}/test-send')
+async def test_send_template(template_id: str, body: TemplateTestSendRequest):
+    """
+    Send a test email with a rendered template. Bypasses HITL queue (test only).
+    Embeds trigger flags so the full pipeline can be tested end-to-end.
+    """
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            'SELECT * FROM email_templates WHERE id = $1',
+            uuid.UUID(template_id),
+        )
+        if not row:
+            raise HTTPException(404, 'Template not found')
+
+        from ..templates import render_jinja2, build_trigger_metadata, embed_trigger_flags, _layout
+        from ..workers.gmail_client import send_email as gmail_send
+        import json
+        import os
+
+        # Merge sample profile into context
+        context = {**body.sample_context, **body.sample_profile}
+
+        subject = render_jinja2(row['subject_template'], context)
+        body_html = render_jinja2(row['body_html'], context)
+
+        # Wrap in layout
+        full_html = _layout(body_html)
+
+        # Build and embed trigger flags
+        trigger_config = row.get('trigger_config') or {}
+        if trigger_config:
+            trigger_meta = build_trigger_metadata(
+                template={
+                    'trigger_config': trigger_config,
+                    'response_map': row.get('response_map') or {},
+                    'id': row['id'],
+                    'slug': row['slug'],
+                },
+                send_context={
+                    'send_id': f'test-{uuid.uuid4().hex[:8]}',
+                    'tenant_id': body.sample_context.get('tenant_id'),
+                    'campaign_id': body.sample_context.get('campaign_id'),
+                    'template_id': str(row['id']),
+                },
+            )
+            full_html = embed_trigger_flags(full_html, trigger_meta)
+
+        # Send directly via Gmail (no HITL for test sends)
+        delegate_email = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
+        result = await gmail_send(
+            delegate_email=delegate_email,
+            to_email=body.to_email,
+            subject=f'[TEST] {subject}',
+            body_html=full_html,
+        )
+
+        _fire_event(
+            'email.template.test_sent',
+            entity_id=str(row['id']),
+            diff_summary=f'Test email sent to {body.to_email} for template "{row["name"]}"',
+            payload={
+                'template_id': str(row['id']),
+                'to_email': body.to_email,
+                'gmail_message_id': result.get('message_id'),
+            },
+        )
+
+        return {
+            'data': {
+                'status': 'sent',
+                'to_email': body.to_email,
+                'subject': f'[TEST] {subject}',
+                'gmail_message_id': result.get('message_id'),
+                'gmail_thread_id': result.get('thread_id'),
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[POST /templates/{{id}}/test-send] Error: {e}')
+        raise HTTPException(500, 'Failed to send test email')
 
 
 # ── Campaigns ───────────────────────────────────────────────────
@@ -527,23 +712,20 @@ async def create_send(body: SendCreate):
         body_text = body.body_text or ''
 
         if body.template_id and not (body.subject and body.body_html):
-            template = await pool.fetchrow(
+            template_row = await pool.fetchrow(
                 'SELECT subject_template, body_html, body_text FROM email_templates WHERE id = $1 AND is_active = TRUE',
                 uuid.UUID(body.template_id),
             )
-            if not template:
+            if not template_row:
                 raise HTTPException(404, 'Template not found or inactive')
 
-            # Render template variables
-            subject = subject or template['subject_template']
-            body_html = body_html or template['body_html']
-            body_text = body_text or template['body_text']
+            from ..templates import render_jinja2
 
-            for var_name, var_value in body.template_variables.items():
-                placeholder = '{{' + var_name + '}}'
-                subject = subject.replace(placeholder, str(var_value))
-                body_html = body_html.replace(placeholder, str(var_value))
-                body_text = body_text.replace(placeholder, str(var_value))
+            # Render template variables via Jinja2 (handles escaping)
+            variables = body.template_variables or {}
+            subject = subject or render_jinja2(template_row['subject_template'], variables, text_mode=True)
+            body_html = body_html or render_jinja2(template_row['body_html'], variables)
+            body_text = body_text or (render_jinja2(template_row['body_text'], variables, text_mode=True) if template_row.get('body_text') else '')
 
         if not subject:
             raise HTTPException(400, 'Subject is required (provide directly or via template)')

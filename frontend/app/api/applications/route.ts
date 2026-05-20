@@ -102,10 +102,11 @@ export async function POST(request: Request) {
     ]);
 
     if (emailDomain && !commonDomains.has(emailDomain)) {
+      const safeDomain = emailDomain.replace(/[%_\\]/g, '\\$&');
       // Check applications table
       const existingApp = await sql<{ contactName: string; contactEmail: string; status: string }[]>`
         SELECT contact_name, contact_email, status FROM applications
-        WHERE LOWER(contact_email) LIKE ${'%@' + emailDomain}
+        WHERE LOWER(contact_email) LIKE ${'%@' + safeDomain}
           AND LOWER(contact_email) != ${input.contactEmail.toLowerCase()}
         LIMIT 1
       `;
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
       // Check users table too (already onboarded)
       const existingDomainUser = await sql<{ name: string; email: string }[]>`
         SELECT name, email FROM users
-        WHERE LOWER(email) LIKE ${'%@' + emailDomain}
+        WHERE LOWER(email) LIKE ${'%@' + safeDomain}
         LIMIT 1
       `;
 

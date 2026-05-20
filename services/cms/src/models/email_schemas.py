@@ -16,20 +16,6 @@ class AccountCreate(BaseModel):
     sweep_enabled: bool = False
 
 
-class AccountOut(BaseModel):
-    id: str
-    email_address: str
-    display_name: str
-    account_type: str
-    credentials_type: str
-    is_active: bool
-    daily_send_limit: int
-    sends_today: int
-    sweep_enabled: bool
-    last_sweep_at: datetime | None
-    created_at: datetime
-
-
 class AccountUpdate(BaseModel):
     display_name: str | None = None
     is_active: bool | None = None
@@ -51,6 +37,10 @@ class TemplateCreate(BaseModel):
     body_text: str = ''
     variables: list[dict] = []
     tags: list[str] = []
+    trigger_config: dict = {}
+    response_map: dict = {}
+    profile_variables: list[str] = []
+    template_category: str = 'outreach'
 
 
 class TemplateUpdate(BaseModel):
@@ -63,6 +53,10 @@ class TemplateUpdate(BaseModel):
     variables: list[dict] | None = None
     tags: list[str] | None = None
     is_active: bool | None = None
+    trigger_config: dict | None = None
+    response_map: dict | None = None
+    profile_variables: list[str] | None = None
+    template_category: str | None = None
 
 
 class TemplateDraftRequest(BaseModel):
@@ -77,22 +71,17 @@ class TemplateDraftRequest(BaseModel):
     user_id: str | None = None
 
 
-class TemplateOut(BaseModel):
-    id: str
-    name: str
-    slug: str
-    description: str | None
-    category: str
-    subject_template: str
-    body_html: str
-    body_text: str
-    ai_drafted: bool
-    variables: list
-    tags: list[str]
-    version: int
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+class TemplatePreviewRequest(BaseModel):
+    """Preview a template with sample data."""
+    sample_profile: dict = {}
+    sample_context: dict = {}
+
+
+class TemplateTestSendRequest(BaseModel):
+    """Send a test email with a rendered template."""
+    to_email: EmailStr
+    sample_profile: dict = {}
+    sample_context: dict = {}
 
 
 # ── Campaigns ────────────────────────────────────────────────────
@@ -131,31 +120,6 @@ class CampaignAction(BaseModel):
     user_id: str | None = None
 
 
-class CampaignOut(BaseModel):
-    id: str
-    name: str
-    description: str | None
-    campaign_type: str
-    template_id: str | None
-    account_id: str | None
-    audience_type: str
-    audience_filter: dict
-    status: str
-    scheduled_at: datetime | None
-    cron_expression: str | None
-    started_at: datetime | None
-    completed_at: datetime | None
-    trigger_event: str | None
-    total_sent: int
-    total_delivered: int
-    total_opened: int
-    total_clicked: int
-    total_replied: int
-    total_bounced: int
-    created_at: datetime
-    updated_at: datetime
-
-
 # ── Sends ────────────────────────────────────────────────────────
 
 class SendCreate(BaseModel):
@@ -175,78 +139,9 @@ class SendCreate(BaseModel):
     priority: int = 50
 
 
-class SendOut(BaseModel):
-    id: str
-    campaign_id: str | None
-    template_id: str | None
-    recipient_email: str
-    recipient_name: str | None
-    tenant_id: str | None
-    subject: str
-    status: str
-    gmail_message_id: str | None
-    gmail_thread_id: str | None
-    sent_at: datetime | None
-    error_message: str | None
-    retry_count: int
-    created_at: datetime
-
-
 # ── Engagement ───────────────────────────────────────────────────
 
-class EngagementOut(BaseModel):
-    id: str
-    send_id: str
-    campaign_id: str | None
-    engagement_type: str
-    metadata: dict
-    reply_body: str | None
-    reply_sentiment: str | None
-    reply_intent: str | None
-    reply_interpreted: bool
-    tenant_id: str | None
-    created_at: datetime
-
-
-# ── Threads ──────────────────────────────────────────────────────
-
-class ThreadOut(BaseModel):
-    id: str
-    gmail_thread_id: str
-    recipient_email: str
-    tenant_id: str | None
-    subject: str | None
-    message_count: int
-    last_message_at: datetime | None
-    last_sender: str | None
-    status: str
-    campaign_id: str | None
-    tags: list[str]
-    created_at: datetime
-
-
 # ── Outbox (HITL Approval Queue) ───────────────────────────────
-
-class OutboxItem(BaseModel):
-    """An item in the human review queue."""
-    id: str
-    send_id: str
-    status: str
-    priority: int
-    category: str | None
-    recipient_preview: str | None
-    subject_preview: str | None
-    claimed_by: str | None
-    claimed_by_name: str | None
-    claimed_at: datetime | None
-    reviewed_by: str | None
-    reviewed_at: datetime | None
-    review_notes: str | None
-    created_at: datetime
-    updated_at: datetime
-    # Joined send data (populated by API)
-    send: dict | None = None
-
 
 class OutboxClaim(BaseModel):
     """Claim an outbox item — it sends as YOUR account."""

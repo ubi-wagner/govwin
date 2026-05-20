@@ -87,9 +87,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invite token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    if (password.length < 8) {
+    if (password.length < 12) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters', code: 'VALIDATION_ERROR' },
+        { error: 'Password must be at least 12 characters', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     }
 
     // Set the password on the user and mark temp_password as false
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     if (collaborator.userId) {
       await sql`

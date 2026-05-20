@@ -13,7 +13,7 @@
  *   - Click-to-select for node editing
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -37,6 +37,7 @@ interface Props {
   onUpdateNode: (nodeId: string, content: CanvasNode['content']) => void;
   variables?: Record<string, string>;
   readOnly?: boolean;
+  onMoveNodeToIndex?: (nodeId: string, targetIndex: number) => void;
 }
 
 function substituteVars(template: string, vars: Record<string, string>): string {
@@ -50,8 +51,10 @@ export function CanvasRenderer({
   onUpdateNode,
   variables = {},
   readOnly = false,
+  onMoveNodeToIndex,
 }: Props) {
   const { canvas, nodes, metadata } = doc;
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
 
   const contentWidth = canvas.width - canvas.margins.left - canvas.margins.right;
   const scale = Math.min(1, 750 / canvas.width);
@@ -116,18 +119,56 @@ export function CanvasRenderer({
             </div>
           )}
 
-          {nodes.map((node) => (
-            <NodeRenderer
-              key={node.id}
-              node={node}
-              isSelected={selectedNodeId === node.id}
-              onSelect={() => onSelectNode(node.id)}
-              onUpdate={(content) => onUpdateNode(node.id, content)}
-              scale={scale}
-              fontDefault={canvas.font_default}
-              readOnly={readOnly}
-            />
+          {nodes.map((node, i) => (
+            <React.Fragment key={node.id}>
+              {!readOnly && onMoveNodeToIndex && (
+                <DropZone
+                  onDrop={() => {
+                    if (draggingNodeId) {
+                      onMoveNodeToIndex(draggingNodeId, i);
+                      setDraggingNodeId(null);
+                    }
+                  }}
+                />
+              )}
+              {node.type === 'toc' ? (
+                <TocRenderer
+                  nodes={nodes}
+                  isSelected={selectedNodeId === node.id}
+                  onSelect={() => onSelectNode(node.id)}
+                  readOnly={readOnly}
+                  nodeId={node.id}
+                  isDragging={draggingNodeId === node.id}
+                  onDragStart={() => setDraggingNodeId(node.id)}
+                  onDragEnd={() => setDraggingNodeId(null)}
+                />
+              ) : (
+                <NodeRenderer
+                  node={node}
+                  isSelected={selectedNodeId === node.id}
+                  onSelect={() => onSelectNode(node.id)}
+                  onUpdate={(content) => onUpdateNode(node.id, content)}
+                  scale={scale}
+                  fontDefault={canvas.font_default}
+                  readOnly={readOnly}
+                  isDragging={draggingNodeId === node.id}
+                  onDragStart={() => setDraggingNodeId(node.id)}
+                  onDragEnd={() => setDraggingNodeId(null)}
+                />
+              )}
+            </React.Fragment>
           ))}
+          {/* Final drop zone at the end */}
+          {!readOnly && onMoveNodeToIndex && (
+            <DropZone
+              onDrop={() => {
+                if (draggingNodeId) {
+                  onMoveNodeToIndex(draggingNodeId, nodes.length);
+                  setDraggingNodeId(null);
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Footer */}
@@ -168,6 +209,95 @@ export function CanvasRenderer({
   );
 }
 
+// ─── Drop zone between nodes ────────────────────────────────────────
+
+function DropZone({ onDrop }: { onDrop: () => void }) {
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); onDrop(); }}
+      className={`h-1 -my-0.5 rounded transition-all ${
+        dragOver ? 'h-3 bg-blue-200 border-2 border-dashed border-blue-400' : ''
+      }`}
+    />
+  );
+}
+
+// ─── Drag handle icon ───────────────────────────────────────────────
+
+function DragHandle() {
+  return (
+    <div className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-opacity">
+      <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+        <circle cx="3" cy="2" r="1.5" />
+        <circle cx="9" cy="2" r="1.5" />
+        <circle cx="3" cy="8" r="1.5" />
+        <circle cx="9" cy="8" r="1.5" />
+        <circle cx="3" cy="14" r="1.5" />
+        <circle cx="9" cy="14" r="1.5" />
+      </svg>
+    </div>
+  );
+}
+
+// ─── TOC renderer — scans document headings ────────────────────────
+
+function TocRenderer({ nodes, isSelected, onSelect, readOnly, nodeId, isDragging, onDragStart, onDragEnd }: {
+  nodes: CanvasNode[];
+  isSelected: boolean;
+  onSelect: () => void;
+  readOnly?: boolean;
+  nodeId: string;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
+  const headings = nodes
+    .filter((n) => n.type === 'heading')
+    .map((n) => {
+      const content = n.content as HeadingContent;
+      return { level: content.level, text: content.text, numbering: content.numbering };
+    });
+
+  const borderClass = isSelected
+    ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
+    : 'hover:ring-1 hover:ring-gray-200';
+
+  return (
+    <div
+      className={`relative rounded px-1 cursor-pointer transition-all py-2 group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      draggable={!readOnly}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', nodeId);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+    >
+      {!readOnly && <DragHandle />}
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Table of Contents</div>
+      {headings.length === 0 ? (
+        <div className="text-xs text-gray-400 italic">No headings in document. Add Heading nodes to populate the TOC.</div>
+      ) : (
+        <div className="space-y-1">
+          {headings.map((h, i) => (
+            <div key={i} className="text-sm" style={{ paddingLeft: (h.level - 1) * 20 }}>
+              <span className="text-gray-500">{h.numbering ? `${h.numbering} ` : ''}</span>
+              <span className={h.level === 1 ? 'font-semibold text-gray-800' : h.level === 2 ? 'font-medium text-gray-700' : 'text-gray-600'}>
+                {h.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Per-node renderer ──────────────────────────────────────────────
 
 function NodeRenderer({
@@ -178,6 +308,9 @@ function NodeRenderer({
   scale,
   fontDefault,
   readOnly,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: {
   node: CanvasNode;
   isSelected: boolean;
@@ -186,6 +319,9 @@ function NodeRenderer({
   scale: number;
   fontDefault: { family: string; size: number };
   readOnly: boolean;
+  isDragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const borderClass = isSelected
     ? 'ring-2 ring-blue-400 ring-offset-1 bg-blue-50/30'
@@ -213,10 +349,20 @@ function NodeRenderer({
 
   return (
     <div
-      className={`relative rounded px-1 cursor-pointer transition-all ${borderClass}`}
+      className={`relative rounded px-1 cursor-pointer transition-all group ${borderClass} ${isDragging ? 'opacity-50' : ''}`}
       style={nodeStyle}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      draggable={!readOnly}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', node.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
     >
+      {/* Drag handle */}
+      {!readOnly && <DragHandle />}
+
       {/* Provenance badge */}
       {provenanceBadge && isSelected && (
         <span className={`absolute -top-2 -right-1 text-[9px] px-1 py-0.5 rounded ${provenanceBadge}`}>
@@ -246,7 +392,7 @@ function NodeRenderer({
       {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
       {node.type === 'spacer' && <div className="h-8" />}
-      {node.type === 'toc' && <div className="text-xs text-gray-400 italic py-2">[Table of Contents — auto-generated on export]</div>}
+      {/* toc nodes are rendered by TocRenderer at the parent level */}
     </div>
   );
 }

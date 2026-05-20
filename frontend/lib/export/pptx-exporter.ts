@@ -91,7 +91,7 @@ export async function exportToPptx(
     let curY = BODY_ZONE.y;
 
     for (const node of bodyNodes) {
-      const added = addNodeToSlide(slide, node, canvas, BODY_ZONE.x, curY, bodyW, bodyMaxH - (curY - BODY_ZONE.y), sub);
+      const added = addNodeToSlide(slide, node, canvas, BODY_ZONE.x, curY, bodyW, bodyMaxH - (curY - BODY_ZONE.y), sub, nodes);
       curY += added;
     }
 
@@ -184,6 +184,7 @@ function addNodeToSlide(
   w: number,
   maxH: number,
   sub: (t: string) => string,
+  allNodes: CanvasNode[],
 ): number {
   const font = node.style.family ?? canvas.font_default.family;
   const fontSize = node.style.size ?? canvas.font_default.size;
@@ -392,15 +393,32 @@ function addNodeToSlide(
     case 'spacer':
       return 0.3;
 
-    case 'toc':
-      slide.addText('[Table of Contents]', {
-        x, y, w, h: 0.35,
+    case 'toc': {
+      const allHeadings = allNodes
+        .filter((n) => n.type === 'heading')
+        .map((n) => {
+          const hc = n.content as HeadingContent;
+          return { level: hc.level, text: hc.text, numbering: hc.numbering };
+        });
+
+      const tocText = allHeadings.map((h) => {
+        const indent = '  '.repeat(h.level - 1);
+        const prefix = h.numbering ? `${h.numbering} ` : '';
+        return `${indent}${prefix}${h.text}`;
+      }).join('\n');
+
+      const tocH = Math.min(Math.max(0.4, allHeadings.length * 0.3), maxH);
+
+      slide.addText(tocText || '(No headings)', {
+        x, y, w, h: tocH,
         fontSize: fontSize - 2,
         fontFace: font,
-        italic: true,
-        color: '999999',
+        color: '333333',
+        valign: 'top',
+        wrap: true,
       });
-      return 0.4;
+      return tocH + 0.1;
+    }
 
     default:
       return 0;

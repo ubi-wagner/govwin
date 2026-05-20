@@ -42,7 +42,7 @@ export default async function ContentEditorPage({ params }: RouteContext) {
     try {
       const [row] = await sql<ContentEditRow[]>`
         SELECT id, slug, title, content_type, body, excerpt, author, tags,
-               published, published_at, featured_image, external_url,
+               status, published, published_at, featured_image, external_url,
                display_order, metadata
         FROM cms_content
         WHERE slug = ${contentId}

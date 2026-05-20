@@ -8,7 +8,7 @@
  * editing, sheet tabs, add/remove rows and columns, and a formula bar.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -89,6 +89,8 @@ export function SheetEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [renamingSheet, setRenamingSheet] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
+  const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
 
   const sheets = useMemo(() => getSheets(doc), [doc]);
 
@@ -108,6 +110,14 @@ export function SheetEditor({
   const updateDoc = useCallback(
     (updater: (prev: CanvasDocument) => CanvasDocument) => {
       setDoc((prev) => {
+        // Push previous state onto undo stack (limit 50)
+        setUndoStack(stack => {
+          const next = [...stack, prev];
+          return next.length > 50 ? next.slice(-50) : next;
+        });
+        // Clear redo stack on new edit
+        setRedoStack([]);
+
         const next = updater(prev);
         return {
           ...next,
@@ -425,6 +435,52 @@ export function SheetEditor({
     updateCellStyle({ bg });
   }
 
+  // ─── Undo / Redo ───────────────────────────────────────────────────
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    setRedoStack(stack => [...stack, doc]);
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack(stack => stack.slice(0, -1));
+    setDoc(prev);
+    setDirty(true);
+  }, [undoStack, doc]);
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return;
+    setUndoStack(stack => [...stack, doc]);
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(stack => stack.slice(0, -1));
+    setDoc(next);
+    setDirty(true);
+  }, [redoStack, doc]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y') && (e.shiftKey || e.key === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
   // ─── Save / Export ─────────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
@@ -617,6 +673,22 @@ export function SheetEditor({
               Export .xlsx
             </button>
           )}
+          <button
+            onClick={handleUndo}
+            disabled={undoStack.length === 0}
+            className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
+          >
+            Undo
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={redoStack.length === 0}
+            className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+            title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
+          >
+            Redo
+          </button>
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
