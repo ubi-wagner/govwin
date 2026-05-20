@@ -86,6 +86,8 @@ export function SheetEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [renamingSheet, setRenamingSheet] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const sheets = useMemo(() => getSheets(doc), [doc]);
 
@@ -285,6 +287,70 @@ export function SheetEditor({
     setActiveCell(null);
     setEditingCell(null);
   }, [readOnly, sheets.length, actorId, actorName, updateDoc]);
+
+  // ─── Delete / Rename operations ─────────────────────────────────────
+
+  const handleDeleteRow = useCallback((rowIndex: number) => {
+    const sheet = sheets[clampedSheet];
+    if (!sheet || readOnly) return;
+    const content = sheet.content;
+    if (content.rows.length <= 1) return;
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== sheet.nodeId) return n;
+        const tc = n.content as TableContent;
+        return { ...n, content: { ...tc, rows: tc.rows.filter((_, i) => i !== rowIndex) } };
+      }),
+    }));
+  }, [sheets, clampedSheet, readOnly, updateDoc]);
+
+  const handleDeleteColumn = useCallback((colIndex: number) => {
+    const sheet = sheets[clampedSheet];
+    if (!sheet || readOnly) return;
+    const content = sheet.content;
+    if (content.headers.length <= 1) return;
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== sheet.nodeId) return n;
+        const tc = n.content as TableContent;
+        return {
+          ...n,
+          content: {
+            ...tc,
+            headers: tc.headers.filter((_, i) => i !== colIndex),
+            rows: tc.rows.map(row => row.filter((_, i) => i !== colIndex)),
+          },
+        };
+      }),
+    }));
+  }, [sheets, clampedSheet, readOnly, updateDoc]);
+
+  const handleDeleteSheet = useCallback((sheetIndex: number) => {
+    if (sheets.length <= 1 || readOnly) return;
+    if (!window.confirm(`Delete sheet "${sheets[sheetIndex].name}"?`)) return;
+    const nodeId = sheets[sheetIndex].nodeId;
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.filter(n => n.id !== nodeId),
+    }));
+    if (activeSheet >= sheets.length - 1) {
+      setActiveSheet(Math.max(0, sheets.length - 2));
+    }
+  }, [sheets, readOnly, updateDoc, activeSheet]);
+
+  const commitSheetRename = useCallback((sheetIndex: number, newName: string) => {
+    const sheet = sheets[sheetIndex];
+    if (!sheet || !newName.trim()) return;
+    updateDoc(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(n => {
+        if (n.id !== sheet.nodeId) return n;
+        return { ...n, content: { ...(n.content as TableContent), sheet_name: newName.trim() } };
+      }),
+    }));
+  }, [sheets, updateDoc]);
 
   // ─── Save / Export ─────────────────────────────────────────────────
 
@@ -492,7 +558,7 @@ export function SheetEditor({
       <div className="flex-1 overflow-auto">
         <table className="border-collapse w-full">
           <thead>
-            {/* Column letter headers */}
+            {/* Column letter headers with delete buttons */}
             <tr className="bg-gray-100 sticky top-0 z-10">
               <th className="w-10 min-w-[40px] border border-gray-300 bg-gray-200 text-xs text-gray-500 py-1" />
               {Array.from({ length: colCount }, (_, ci) => (
@@ -500,7 +566,18 @@ export function SheetEditor({
                   key={ci}
                   className="border border-gray-300 bg-gray-200 text-xs text-gray-500 py-1 min-w-[100px]"
                 >
-                  {colLetter(ci)}
+                  <div className="flex items-center justify-center gap-1">
+                    <span>{colLetter(ci)}</span>
+                    {!readOnly && colCount > 1 && (
+                      <button
+                        onClick={() => handleDeleteColumn(ci)}
+                        className="text-[10px] text-gray-400 hover:text-red-500 leading-none"
+                        title="Delete column"
+                      >
+                        x
+                      </button>
+                    )}
+                  </div>
                 </th>
               ))}
               {!readOnly && (
@@ -632,7 +709,20 @@ export function SheetEditor({
                     </td>
                   );
                 })}
-                {!readOnly && <td className="border border-gray-300 bg-gray-100" />}
+                {/* Delete row button */}
+                {!readOnly && (
+                  <td className="border border-gray-300 bg-gray-100 text-center">
+                    {rows.length > 1 && (
+                      <button
+                        onClick={() => handleDeleteRow(ri)}
+                        className="text-[10px] text-gray-400 hover:text-red-500 leading-none px-1"
+                        title="Delete row"
+                      >
+                        x
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -652,21 +742,53 @@ export function SheetEditor({
       {/* ── Sheet tabs ── */}
       <div className="flex items-center gap-1 border-t bg-gray-50 px-2 py-1 flex-shrink-0">
         {sheets.map((sheet, i) => (
-          <button
+          <div
             key={sheet.nodeId}
-            onClick={() => {
-              setActiveSheet(i);
-              setActiveCell(null);
-              setEditingCell(null);
-            }}
-            className={`px-3 py-1 text-xs rounded-t border ${
+            className={`flex items-center gap-0.5 px-3 py-1 text-xs rounded-t border ${
               clampedSheet === i
                 ? 'bg-white border-b-white font-medium'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {sheet.name}
-          </button>
+            {renamingSheet === i ? (
+              <input
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={() => { commitSheetRename(i, renameValue); setRenamingSheet(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { commitSheetRename(i, renameValue); setRenamingSheet(null); }
+                  if (e.key === 'Escape') setRenamingSheet(null);
+                }}
+                className="text-xs border rounded px-1 py-0.5 w-24"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => {
+                  setActiveSheet(i);
+                  setActiveCell(null);
+                  setEditingCell(null);
+                }}
+                onDoubleClick={() => {
+                  if (readOnly) return;
+                  setRenamingSheet(i);
+                  setRenameValue(sheet.name);
+                }}
+              >
+                <span>{sheet.name}</span>
+              </button>
+            )}
+            {!readOnly && sheets.length > 1 && (
+              <button
+                onClick={() => handleDeleteSheet(i)}
+                className="text-[10px] text-gray-400 hover:text-red-500 leading-none ml-1"
+                title="Delete sheet"
+              >
+                x
+              </button>
+            )}
+          </div>
         ))}
         {!readOnly && (
           <button

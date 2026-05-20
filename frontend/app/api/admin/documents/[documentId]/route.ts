@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { putObject, getObjectBuffer, deleteObject } from '@/lib/storage/s3-client';
+import { putObject, getObjectBuffer, deleteObject, listObjects } from '@/lib/storage/s3-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export const dynamic = 'force-dynamic';
@@ -84,7 +84,7 @@ async function checkAdmin(): Promise<
 // ─── GET — load a document ─────────────────────────────────────────────
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
   try {
@@ -97,6 +97,34 @@ export async function GET(
         { error: 'documentId is required', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
+    }
+
+    const { searchParams } = request.nextUrl;
+
+    // If ?history is present, return save history
+    if (searchParams.has('history')) {
+      const historyPrefix = `reference/documents/${documentId}/history/`;
+      const { objects } = await listObjects(historyPrefix, '/');
+      const history = objects.map(o => ({
+        key: o.key,
+        timestamp: parseInt(o.key.split('/').pop()?.replace('.json', '') || '0'),
+        size: o.size,
+      })).sort((a, b) => b.timestamp - a.timestamp);
+      return NextResponse.json({ data: { history } });
+    }
+
+    // If ?version=<key> is present, load a specific history version
+    const versionKey = searchParams.get('version');
+    if (versionKey) {
+      const buf = await getObjectBuffer(versionKey);
+      if (!buf) {
+        return NextResponse.json(
+          { error: 'Version not found', code: 'NOT_FOUND' },
+          { status: 404 },
+        );
+      }
+      const document = JSON.parse(buf.toString('utf8'));
+      return NextResponse.json({ data: { document } });
     }
 
     const docKey = `reference/documents/${documentId}.json`;
@@ -168,8 +196,19 @@ export async function PUT(
       );
     }
 
-    // Save full document to S3
+    // Save previous version to history
     const docKey = `reference/documents/${documentId}.json`;
+    const currentBuf = await getObjectBuffer(docKey);
+    if (currentBuf) {
+      const historyKey = `reference/documents/${documentId}/history/${Date.now()}.json`;
+      await putObject({
+        key: historyKey,
+        body: currentBuf,
+        contentType: 'application/json',
+      });
+    }
+
+    // Save full document to S3
     await putObject({
       key: docKey,
       body: Buffer.from(JSON.stringify(document, null, 2)),
