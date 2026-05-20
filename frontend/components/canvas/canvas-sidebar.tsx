@@ -5,10 +5,12 @@
  * history, and library match suggestions.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
+import { AIRevisionPanel } from './ai-revision-panel';
+import { CommentThread, type NodeComment } from './collaboration';
 
 interface Props {
   document: CanvasDocument;
@@ -26,6 +28,100 @@ interface Props {
   onUpdateNodeStyle?: (nodeId: string, style: Partial<NodeStyle>) => void;
   /** Update canvas-level settings (margins, font, etc.) */
   onUpdateCanvas?: (canvas: CanvasRules) => void;
+  /** Handler for AI revision — replaces a node's content with AI-revised text */
+  onReviseNode?: (nodeId: string, newContent: CanvasNode['content']) => void;
+  /** Proposal ID for AI revision and comments (only available in portal context) */
+  proposalId?: string;
+  /** Tenant slug for comments API (only available in portal context) */
+  tenantSlug?: string;
+}
+
+// ─── Self-contained comments section with data fetching ─────────────
+
+function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; proposalId: string; tenantSlug: string }) {
+  const [comments, setComments] = useState<NodeComment[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchComments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments?nodeId=${encodeURIComponent(nodeId)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean }) => ({
+            id: c.id,
+            actor_id: c.userId,
+            actor_name: c.userName ?? 'Unknown',
+            text: c.text,
+            timestamp: c.createdAt,
+            resolved: c.resolved ?? false,
+          })));
+        }
+      }
+    } catch {
+      // swallow fetch errors — comments are non-critical
+    } finally {
+      setLoading(false);
+    }
+  }, [nodeId, proposalId, tenantSlug]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  const handleAddComment = useCallback(async (text: string) => {
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId, text }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data) {
+          setComments((prev) => [...prev, {
+            id: json.data.id,
+            actor_id: json.data.userId ?? '',
+            actor_name: 'You',
+            text: json.data.text,
+            timestamp: json.data.createdAt,
+            resolved: false,
+          }]);
+        }
+      }
+    } catch {
+      // swallow
+    }
+  }, [nodeId, proposalId, tenantSlug]);
+
+  const handleResolve = useCallback(async (commentId: string) => {
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/comments/${commentId}/resolve`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        setComments((prev) => prev.map((c) => c.id === commentId ? { ...c, resolved: true } : c));
+      }
+    } catch {
+      // swallow
+    }
+  }, [proposalId, tenantSlug]);
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Comments</h3>
+      {loading && <p className="text-xs text-gray-400">Loading comments...</p>}
+      {!loading && comments.length === 0 && (
+        <p className="text-xs text-gray-400 italic mb-2">No comments on this node</p>
+      )}
+      <CommentThread
+        comments={comments}
+        onAddComment={handleAddComment}
+        onResolve={handleResolve}
+      />
+    </div>
+  );
 }
 
 export function CanvasSidebar({
@@ -40,6 +136,9 @@ export function CanvasSidebar({
   onReplaceFromLibrary,
   onUpdateNodeStyle,
   onUpdateCanvas,
+  onReviseNode,
+  proposalId,
+  tenantSlug,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'settings'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
@@ -384,6 +483,24 @@ export function CanvasSidebar({
                 ))}
               </div>
             </div>
+
+            {/* Comments — only in portal context */}
+            {proposalId && tenantSlug && (
+              <CommentsSection
+                nodeId={selectedNode.id}
+                proposalId={proposalId}
+                tenantSlug={tenantSlug}
+              />
+            )}
+
+            {/* AI Revision — only for text-bearing nodes in portal context */}
+            {onReviseNode && proposalId && (selectedNode.type === 'text_block' || selectedNode.type === 'heading') && (
+              <AIRevisionPanel
+                node={selectedNode}
+                proposalId={proposalId}
+                onRevised={(newContent) => onReviseNode(selectedNode.id, newContent)}
+              />
+            )}
           </>
         )}
 

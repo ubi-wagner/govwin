@@ -70,7 +70,7 @@ export function ChangeIndicator({ history, compact = true }: ChangeIndicatorProp
 
 // ─── Node Comment Thread ────────────────────────────────────────────
 
-interface NodeComment {
+export interface NodeComment {
   id: string;
   actor_id: string;
   actor_name: string;
