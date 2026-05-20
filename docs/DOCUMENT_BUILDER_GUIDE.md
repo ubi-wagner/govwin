@@ -1,0 +1,219 @@
+# Document Builder — User Guide
+
+Admin > Document Builder (`/admin/documents`)
+
+## Quick Start
+
+1. Click **New Document**
+2. Enter a title and optional description
+3. Pick a preset (or Custom)
+4. Click **Create** — opens the editor
+
+---
+
+## Presets
+
+| Preset | Editor | Export | Use For |
+|--------|--------|--------|---------|
+| Standard Letter | Document canvas | .docx | General documents, whitepapers |
+| SBIR Phase I | Document canvas | .docx | 15-page technical volumes, TNR 10pt |
+| SBIR Phase II | Document canvas | .docx | 30-page technical volumes, TNR 12pt |
+| CSO Slide Deck | Slide editor | .pptx | Briefings, 16:9, Arial 18pt |
+| Spreadsheet | Grid editor | .xlsx | Cost volumes, data tables |
+| Custom | Document canvas | .docx | Start blank, configure everything |
+
+---
+
+## Document Editor (Letter/Custom)
+
+### Adding Content
+
+1. Click the **Add** tab in the right sidebar
+2. Click a content type to insert it after the selected node:
+   - **Heading** — H1/H2/H3 with level picker
+   - **Paragraph** — text block with formatting toolbar
+   - **Bullet List / Numbered List** — editable items with add/remove
+   - **Image** — click to upload from disk (PNG, JPEG, GIF, WebP, SVG)
+   - **Table** — editable grid with add row/column
+   - **Caption** — Figure/Table/Chart prefix with number
+   - **Footnote** — marker + text
+   - **Link** — URL + display text
+   - **Page Break** — section divider
+   - **TOC** — table of contents placeholder
+   - **Spacer** — vertical spacing
+
+### Editing Content
+
+- **Click any node** to select it (blue border)
+- **Text blocks**: click to edit, use the toolbar for **B** (Bold), *I* (Italic), U (Underline), x^2 (Superscript), x_2 (Subscript)
+  - Select text first, then click a format button to toggle it
+- **Headings**: click to edit text, use dropdown to change level (H1/H2/H3)
+- **Lists**: edit items inline, click **+ Add item** to append, click **x** to remove
+- **Tables**: click cells to edit, use **+ Row** / **+ Column** to expand, **x** to delete rows
+- **Images**: click to upload, then edit alt text and caption below the image
+- **Captions**: pick prefix (Figure/Table/Chart), set number, edit text
+- **Footnotes**: edit marker and text
+- **Links**: edit URL and display text
+
+### Moving and Deleting
+
+1. Select a node (click it)
+2. Go to the **Node** tab in the sidebar
+3. Use **Move Up** / **Move Down** to reorder
+4. Click **Delete** to remove (red button)
+5. Click **Accept** to mark AI-drafted content as accepted
+
+### Document Settings
+
+1. Click the **Settings** tab in the sidebar
+2. Configure:
+   - **Margins** — top/bottom/left/right in inches
+   - **Font** — family (Times New Roman, Arial, Calibri, etc.) and size (6-24pt)
+   - **Line Spacing** — single, 1.15, 1.5, double
+   - **Page Limit** — set to 0 for unlimited
+   - **Header** — click "+ Add header", then edit the template text
+   - **Footer** — click "+ Add footer", then edit the template text
+3. Header/footer variables: `{company_name}`, `{topic_number}`, `{pi_name}`, `{n}` (page number), `{N}` (total pages)
+
+### Saving
+
+- Click **Save** (blue button, top right) — saves to S3
+- The toolbar shows "unsaved" in orange when changes exist
+- Save errors appear as red text next to the button
+
+### Exporting
+
+- Click **Export .docx** — downloads a Word document
+- Click **Export .xlsx** — only shown if document contains tables
+- PDF export is not yet implemented (shows alert)
+
+### Save History
+
+- Click **History (N)** in the header bar to see previous saves
+- Each entry shows timestamp and file size
+- Click an entry to restore that version (confirms first)
+
+---
+
+## Slide Editor (Presentations)
+
+### Layout
+
+- **Left panel**: slide thumbnails with numbers
+- **Center**: current slide (dark background, white surface)
+- **Right**: same sidebar as document editor (Add, Node, Settings)
+
+### Creating Slides
+
+- Click **+ Add Slide** at the bottom of the thumbnail panel
+- Each slide is separated by a page_break node internally
+
+### Navigating
+
+- Click any thumbnail to switch to that slide
+- Current slide has a blue border
+
+### Editing Slide Content
+
+- Use the **Add** tab to insert content on the current slide
+- All node types work the same as the document editor
+- Slides use larger default text (Arial 18pt)
+- Footer shows slide number automatically
+
+### Deleting Slides
+
+- Hover over a thumbnail and click the red **x** button
+- Cannot delete the last remaining slide
+
+### Exporting
+
+- Click **Export .pptx** — downloads a PowerPoint file
+
+---
+
+## Spreadsheet Editor
+
+### Layout
+
+- **Top**: toolbar with cell reference, formula bar, Save, Export
+- **Center**: grid with column headers (A, B, C...) and row numbers
+- **Bottom**: sheet tabs
+
+### Cell Editing
+
+- **Click** a cell to select it (blue outline)
+- **Double-click** or **start typing** to enter edit mode
+- **Enter** — commit and move down
+- **Tab** — commit and move right
+- **Shift+Tab** — commit and move left
+- **Escape** — cancel edit
+- **Arrow keys** — navigate between cells
+- **Delete/Backspace** — clear cell and start editing
+- **Formula bar** — shows and edits the active cell's content
+
+### Adding Rows and Columns
+
+- Click **+ Row** at the bottom of the grid
+- Click **+** in the column header area to add a column
+
+### Deleting Rows and Columns
+
+- Click the **x** at the end of any row to delete it
+- Click the **x** below any column letter to delete it
+- Cannot delete the last row or column
+
+### Sheet Management
+
+- Click a **sheet tab** to switch sheets
+- Click **+** next to the tabs to add a new sheet
+- **Double-click** a tab name to rename it (Enter to confirm, Escape to cancel)
+- Click **x** on a tab to delete that sheet (confirms first, cannot delete last sheet)
+
+### Exporting
+
+- Click **Export .xlsx** — downloads an Excel workbook
+  - Each sheet tab becomes a worksheet
+  - Sheet names are preserved
+
+---
+
+## Common Workflows
+
+### Build a 5-page whitepaper
+
+1. New Document > Custom
+2. Settings tab: 1" margins, 12pt Times New Roman, single spacing
+3. Settings tab: add footer "Page {n} of {N}"
+4. Add: TOC
+5. Add: Heading (H1) — "Introduction"
+6. Add: Paragraph — write content, use B/I/U toolbar
+7. Add: Heading (H2) — "Background"
+8. Add: Paragraph
+9. Add: Image — upload a diagram
+10. Add: Caption — "Figure 1: System Architecture"
+11. Continue adding sections...
+12. Add: Footnote — reference citations
+13. Save > Export .docx
+
+### Build a cost volume spreadsheet
+
+1. New Document > Spreadsheet
+2. Double-click "Sheet 1" tab > rename to "Labor"
+3. Edit header row: Name, Role, Hours, Rate, Total
+4. Fill in data rows
+5. + Add Sheet > rename to "Materials"
+6. Fill in materials data
+7. + Add Sheet > rename to "Travel"
+8. Save > Export .xlsx
+
+### Build a CSO briefing deck
+
+1. New Document > CSO Slide Deck
+2. Edit the first slide: add Heading "Company Name — Topic Title"
+3. Add Paragraph with key points
+4. + Add Slide
+5. Add Heading "Technical Approach"
+6. Add Bullet List with approach items
+7. Add Image — upload a diagram
+8. Continue adding slides...
+9. Save > Export .pptx
