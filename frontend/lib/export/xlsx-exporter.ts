@@ -25,6 +25,11 @@ function cellText(cell: string | CanvasTableCell): string {
   return typeof cell === 'string' ? cell : cell.text;
 }
 
+/** Normalize a string or TableCell to a full TableCell object. */
+function resolveTableCell(cell: string | CanvasTableCell): CanvasTableCell {
+  return typeof cell === 'string' ? { text: cell } : cell;
+}
+
 /**
  * Convert a CanvasDocument to an .xlsx Buffer suitable for download.
  *
@@ -72,20 +77,36 @@ export async function exportToXlsx(
 
     // Style header row
     const headerRow = ws.getRow(1);
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true, size: 11 };
-      cell.fill = {
+    headerRow.eachCell((excelCell, colNumber) => {
+      excelCell.font = { bold: true, size: 11 };
+      excelCell.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FFE0E0E0' },
       };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = {
+      excelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      excelCell.border = {
         top: { style: 'thin' },
         left: { style: 'thin' },
         bottom: { style: 'thin' },
         right: { style: 'thin' },
       };
+
+      // Apply per-cell style overrides from the canvas data
+      const resolved = resolveTableCell(tc.headers[colNumber - 1]);
+      if (resolved.style?.bg) {
+        excelCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF' + resolved.style.bg.replace('#', '') },
+        };
+      }
+      if (resolved.style?.bold !== undefined) {
+        excelCell.font = { ...excelCell.font, bold: resolved.style.bold };
+      }
+      if (resolved.style?.alignment) {
+        excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
+      }
     });
 
     // Write data rows
@@ -93,15 +114,31 @@ export async function exportToXlsx(
       const rowValues = row.map((cell) => cellText(cell));
       const dataRow = ws.addRow(rowValues);
 
-      dataRow.eachCell((cell) => {
-        cell.font = { size: 11 };
-        cell.alignment = { vertical: 'middle', wrapText: true };
-        cell.border = {
+      dataRow.eachCell((excelCell, colNumber) => {
+        excelCell.font = { size: 11 };
+        excelCell.alignment = { vertical: 'middle', wrapText: true };
+        excelCell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
           bottom: { style: 'thin' },
           right: { style: 'thin' },
         };
+
+        // Apply per-cell style overrides from the canvas data
+        const resolved = resolveTableCell(row[colNumber - 1]);
+        if (resolved.style?.bold) {
+          excelCell.font = { ...excelCell.font, bold: true };
+        }
+        if (resolved.style?.bg) {
+          excelCell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF' + resolved.style.bg.replace('#', '') },
+          };
+        }
+        if (resolved.style?.alignment) {
+          excelCell.alignment = { ...excelCell.alignment, horizontal: resolved.style.alignment as 'left' | 'center' | 'right' };
+        }
       });
     }
 

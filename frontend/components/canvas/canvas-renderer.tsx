@@ -401,7 +401,72 @@ function TextBlockNode({
         <textarea
           ref={textareaRef}
           value={content.text}
-          onChange={(e) => onUpdate({ ...content, text: e.target.value })}
+          onChange={(e) => {
+            const newText = e.target.value;
+            const oldText = content.text;
+            const formats = content.inline_formats;
+
+            if (!formats || formats.length === 0) {
+              onUpdate({ ...content, text: newText });
+              return;
+            }
+
+            // Detect the edit position and length change
+            const textarea = e.target;
+            const cursorPos = textarea.selectionStart;
+            const lengthDiff = newText.length - oldText.length;
+
+            // The edit happened at position (cursorPos - lengthDiff) in the old text
+            // if lengthDiff > 0 (insertion), shift formats after the insertion point right
+            // if lengthDiff < 0 (deletion), shift formats after the deletion point left
+            const editStart = cursorPos - Math.max(0, lengthDiff);
+
+            const adjustedFormats = formats
+              .map(f => {
+                const fEnd = f.start + f.length;
+
+                if (lengthDiff > 0) {
+                  // Insertion
+                  if (f.start >= editStart) {
+                    // Format is entirely after insertion — shift right
+                    return { ...f, start: f.start + lengthDiff };
+                  } else if (fEnd > editStart) {
+                    // Insertion is inside the format — expand it
+                    return { ...f, length: f.length + lengthDiff };
+                  }
+                  return f;
+                } else if (lengthDiff < 0) {
+                  // Deletion
+                  const delLength = -lengthDiff;
+                  const delEnd = editStart + delLength;
+
+                  if (f.start >= delEnd) {
+                    // Format is entirely after deletion — shift left
+                    return { ...f, start: f.start + lengthDiff };
+                  } else if (fEnd <= editStart) {
+                    // Format is entirely before deletion — no change
+                    return f;
+                  } else if (f.start >= editStart && fEnd <= delEnd) {
+                    // Format is entirely within deletion — remove it
+                    return null;
+                  } else if (f.start < editStart && fEnd > delEnd) {
+                    // Deletion is inside format — shrink it
+                    return { ...f, length: f.length + lengthDiff };
+                  } else if (f.start < editStart) {
+                    // Overlap at end of format
+                    return { ...f, length: editStart - f.start };
+                  } else {
+                    // Overlap at start of format
+                    const overlapEnd = delEnd - f.start;
+                    return { ...f, start: editStart, length: f.length - overlapEnd };
+                  }
+                }
+                return f;
+              })
+              .filter((f): f is NonNullable<typeof f> => f !== null && f.length > 0);
+
+            onUpdate({ ...content, text: newText, inline_formats: adjustedFormats });
+          }}
           onSelect={handleSelect}
           onMouseUp={handleSelect}
           onKeyUp={handleSelect}
