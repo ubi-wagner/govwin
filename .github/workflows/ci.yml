@@ -50,12 +50,32 @@ jobs:
         working-directory: services/cms
     steps:
       - uses: actions/checkout@v5
+
+      # Python backend
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: python -c "import ast; [ast.parse(open(f).read()) for f in __import__('glob').glob('src/**/*.py', recursive=True)]"
-        name: Syntax check
+      - name: Python syntax check
+        run: python -m py_compile src/main.py && python -m py_compile src/event_listener.py
+      - name: Run CMS tests
+        run: pytest tests/ -v --tb=short
+        env:
+          CMS_DATABASE_URL: ""
+          SHARED_DATABASE_URL: ""
+
+      # React SPA frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install CMS frontend deps
+        working-directory: services/cms/frontend
+        run: npm ci
+      - name: Build CMS frontend
+        working-directory: services/cms/frontend
+        run: npm run build
+      - name: Verify SPA build output
+        run: test -f static/index.html
 
   migrate-crm:
     runs-on: ubuntu-latest
