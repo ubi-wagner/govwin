@@ -766,7 +766,7 @@ export function SheetEditor({
                     style={{
                       backgroundColor: !isActive && typeof h !== 'string' && h?.style?.bg ? h.style.bg : undefined,
                       fontWeight: typeof h !== 'string' && h?.style?.bold ? 'bold' : undefined,
-                      textAlign: (typeof h !== 'string' && h?.style?.alignment as React.CSSProperties['textAlign']) ?? undefined,
+                      textAlign: typeof h !== 'string' ? h?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
                     }}
                     onClick={() => setActiveCell({ row: -1, col: ci })}
                     onKeyDown={(e) => handleCellKeyDown(e, -1, ci)}
@@ -828,6 +828,11 @@ export function SheetEditor({
                           ? 'outline outline-2 outline-blue-500 bg-blue-50'
                           : ''
                       }`}
+                      style={{
+                        backgroundColor: !isActive && typeof c !== 'string' && c?.style?.bg ? c.style.bg : undefined,
+                        fontWeight: typeof c !== 'string' && c?.style?.bold ? 'bold' : undefined,
+                        textAlign: typeof c !== 'string' ? c?.style?.alignment as React.CSSProperties['textAlign'] : undefined,
+                      }}
                       onClick={() => setActiveCell({ row: ri, col: ci })}
                       onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
                       tabIndex={isActive ? 0 : -1}
