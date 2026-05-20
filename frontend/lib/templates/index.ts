@@ -10,11 +10,13 @@
  */
 
 export { DOD_SBIR_PHASE1_TECHNICAL } from './dod-sbir-phase1-technical';
+export { DOD_SBIR_PHASE2_TECHNICAL } from './dod-sbir-phase2-technical';
 export { DOD_CSO_PHASE1_BRIEFING } from './dod-cso-phase1-briefing';
 export { DOD_SBIR_PHASE1_COST } from './dod-sbir-phase1-cost';
 
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { DOD_SBIR_PHASE1_TECHNICAL } from './dod-sbir-phase1-technical';
+import { DOD_SBIR_PHASE2_TECHNICAL } from './dod-sbir-phase2-technical';
 import { DOD_CSO_PHASE1_BRIEFING } from './dod-cso-phase1-briefing';
 import { DOD_SBIR_PHASE1_COST } from './dod-sbir-phase1-cost';
 
@@ -28,6 +30,7 @@ export type TemplateKey =
 
 const TEMPLATE_MAP: Record<string, CanvasDocument> = {
   'dod-sbir-phase1-technical': DOD_SBIR_PHASE1_TECHNICAL,
+  'dod-sbir-phase2-technical': DOD_SBIR_PHASE2_TECHNICAL,
   'dod-cso-phase1-briefing': DOD_CSO_PHASE1_BRIEFING,
   'dod-sbir-phase1-cost': DOD_SBIR_PHASE1_COST,
 };
