@@ -95,6 +95,9 @@ export function CanvasEditorPage({
           actorId={actorId}
           actorName={actorName}
           readOnly={readOnly}
+          proposalId={proposalId}
+          sectionId={sectionId}
+          tenantSlug={tenantSlug}
           variables={{
             company_name: 'Your Company',
             topic_number: 'TBD',

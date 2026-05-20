@@ -25,6 +25,12 @@ interface Props {
   readOnly?: boolean;
   actorId: string;
   actorName: string;
+  /** Proposal ID — enables AI revision and comments when present */
+  proposalId?: string;
+  /** Section ID — included for context */
+  sectionId?: string;
+  /** Tenant slug — enables comments API when present */
+  tenantSlug?: string;
 }
 
 function defaultContent(type: NodeType): CanvasNode['content'] {
@@ -69,6 +75,9 @@ function CanvasEditorInner({
   readOnly = false,
   actorId,
   actorName,
+  proposalId,
+  sectionId,
+  tenantSlug,
 }: Props) {
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -203,6 +212,24 @@ function CanvasEditorInner({
   const handleUpdateCanvas = useCallback((canvas: CanvasRules) => {
     updateDoc((prev) => ({ ...prev, canvas }));
   }, [updateDoc]);
+
+  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content']) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        return {
+          ...n,
+          content: newContent,
+          provenance: { ...n.provenance, source: 'ai_draft' as const, drafted_at: new Date().toISOString() },
+          history: [
+            ...n.history,
+            { actor_id: actorId, actor_name: actorName, action: 'edited' as const, timestamp: new Date().toISOString(), comment: 'AI revision' },
+          ],
+        };
+      }),
+    }));
+  }, [updateDoc, actorId, actorName]);
 
   const handleReplaceFromLibrary = useCallback((nodeId: string, atom: LibraryAtomCandidate) => {
     updateDoc((prev) => ({
@@ -370,6 +397,9 @@ function CanvasEditorInner({
         onReplaceFromLibrary={handleReplaceFromLibrary}
         onUpdateNodeStyle={handleUpdateNodeStyle}
         onUpdateCanvas={handleUpdateCanvas}
+        onReviseNode={handleReviseNode}
+        proposalId={proposalId}
+        tenantSlug={tenantSlug}
       />
     </div>
   );
