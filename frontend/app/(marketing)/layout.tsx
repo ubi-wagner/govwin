@@ -1,6 +1,25 @@
 import Link from 'next/link';
 import { Wordmark } from '@/components/marketing/wordmark';
+import { MobileMenu } from '@/components/marketing/mobile-menu';
 import Tracker from '@/components/analytics/tracker';
+
+const mobileNavLinks = [
+  {
+    href: '#',
+    label: 'Platform',
+    children: [
+      { href: '/features', label: 'Features' },
+      { href: '/engine', label: 'Engine' },
+      { href: '/how-it-works', label: 'How It Works' },
+      { href: '/the-expert', label: 'The Expert' },
+      { href: '/pricing', label: 'Pricing' },
+    ],
+  },
+  { href: '/about', label: 'About' },
+  { href: '/resources', label: 'Resources' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/infosec', label: 'Security' },
+];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   // Migrations run automatically on deploy via entrypoint.sh → migrate.mjs
@@ -22,6 +41,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <header className="border-b border-cream-200 bg-cream-50/90 backdrop-blur-sm sticky top-0 z-50 px-6 py-4">
         <nav className="max-w-6xl mx-auto flex items-center justify-between">
           <Wordmark variant="light" size="sm" />
+          <MobileMenu links={mobileNavLinks} />
           <div className="hidden md:flex items-center gap-7 text-sm font-medium text-navy-600">
             {/* Platform dropdown */}
             <div className="group relative">

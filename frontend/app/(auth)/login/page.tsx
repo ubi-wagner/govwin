@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth, signIn } from '@/auth';
 
 interface PageProps {
@@ -90,6 +91,11 @@ export default async function LoginPage({ searchParams }: PageProps) {
               autoComplete="current-password"
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+            <div className="mt-1 text-right">
+              <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
+                Forgot password?
+              </Link>
+            </div>
           </div>
           <button
             type="submit"

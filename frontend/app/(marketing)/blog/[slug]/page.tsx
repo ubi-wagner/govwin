@@ -50,9 +50,10 @@ export default async function BlogPostPage({ params }: Props) {
         )}
       </div>
 
-      <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
-        {post.body}
-      </div>
+      <div
+        className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: post.body }}
+      />
 
       {(post.tags ?? []).length > 0 && (
         <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t">

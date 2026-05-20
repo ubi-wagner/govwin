@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { PortalNavLink } from '@/components/portal/portal-nav-link';
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -56,6 +57,7 @@ export default async function PortalLayout({
   const userName = sessionUser.name ?? sessionUser.id ?? '';
 
   const basePath = `/portal/${tenantSlug}`;
+  const isPartner = role === 'partner_user';
 
   return (
     <div className="min-h-screen flex">
@@ -63,28 +65,25 @@ export default async function PortalLayout({
         <div>
           <h2 className="text-lg font-bold mb-1 truncate">{companyName}</h2>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
-          <nav className="flex flex-col gap-2 text-sm">
-            <a href={`${basePath}/dashboard`} className="hover:text-brand-300">
-              Dashboard
-            </a>
-            <a href={`${basePath}/spotlights`} className="hover:text-brand-300">
-              Spotlight
-            </a>
-            <a href={`${basePath}/library`} className="hover:text-brand-300">
-              Library
-            </a>
-            <a href={`${basePath}/proposals`} className="hover:text-brand-300">
-              Proposals
-            </a>
-            <a href={`${basePath}/activity`} className="hover:text-brand-300">
-              Activity
-            </a>
-            <a href={`${basePath}/team`} className="hover:text-brand-300">
-              Team
-            </a>
-            <a href={`${basePath}/profile`} className="hover:text-brand-300">
-              Settings
-            </a>
+          <nav className="flex flex-col gap-1 text-sm">
+            {!isPartner && (
+              <>
+                <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>
+                <PortalNavLink href={`${basePath}/spotlights`}>Spotlight</PortalNavLink>
+                <PortalNavLink href={`${basePath}/pipeline`}>Pipeline</PortalNavLink>
+                <PortalNavLink href={`${basePath}/library`}>Library</PortalNavLink>
+              </>
+            )}
+            <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
+            {!isPartner && (
+              <>
+                <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
+                <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
+                <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
+                <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>
+              </>
+            )}
+            <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
           </nav>
         </div>
         <form action="/api/auth/signout" method="POST" className="mt-8">

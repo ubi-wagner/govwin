@@ -89,7 +89,7 @@ export default async function DashboardPage() {
   const stats: StatCard[] = [
     { label: 'Pending Applications', value: pendingApps, href: '/admin/applications', color: 'border-amber-400 bg-amber-50' },
     { label: 'Active Tenants', value: activeTenants, href: '/admin/tenants', color: 'border-blue-400 bg-blue-50' },
-    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/content', color: 'border-teal-400 bg-teal-50' },
+    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/tenants', color: 'border-teal-400 bg-teal-50' },
     { label: 'Active Proposals', value: activeProposals, href: '/admin/proposals', color: 'border-purple-400 bg-purple-50' },
     { label: 'RFPs in Curation', value: rfpsCuration, href: '/admin/rfp-curation', color: 'border-green-400 bg-green-50' },
     { label: 'Events Today', value: eventsToday, href: '/admin/events', color: 'border-indigo-400 bg-indigo-50' },
