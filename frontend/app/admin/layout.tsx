@@ -39,7 +39,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/analytics">Analytics</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">CRM</span>
-          <AdminNavLink href="/cms/" external>CRM Console</AdminNavLink>
+          <a
+            href={process.env.CMS_PUBLIC_URL || 'https://rfp-crm-production.up.railway.app/cms/'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block px-3 py-1.5 rounded text-sm text-slate-300 hover:text-white hover:bg-slate-700"
+          >
+            CRM Console &nearr;
+          </a>
         </nav>
         <div className="text-xs text-gray-600 mt-4">
           <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>

@@ -81,7 +81,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RFP Pipeline CMS-CRM", version="1.0.0", lifespan=lifespan)
 
-origins = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')]
+origins = [o.strip() for o in os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,https://www.rfppipeline.com,https://rfp-crm-production.up.railway.app').split(',')]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(APIKeyMiddleware)
 
