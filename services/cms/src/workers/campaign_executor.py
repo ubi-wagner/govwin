@@ -56,9 +56,9 @@ async def _enumerate_audience(campaign) -> list[dict]:
     try:
         if audience_type == 'all_active':
             rows = await shared_pool.fetch(
-                '''SELECT t.id as tenant_id, t.company_name,
+                '''SELECT t.id as tenant_id, t.name,
                           COALESCE(t.billing_email, u.email) as email,
-                          COALESCE(u.name, t.company_name) as name
+                          COALESCE(u.name, t.name) as name
                    FROM tenants t
                    LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
                    WHERE t.status = 'active'
@@ -78,12 +78,12 @@ async def _enumerate_audience(campaign) -> list[dict]:
                 logger.warning('tier_based audience with no tiers specified')
                 return []
             rows = await shared_pool.fetch(
-                '''SELECT t.id as tenant_id, t.company_name,
+                '''SELECT t.id as tenant_id, t.name,
                           COALESCE(t.billing_email, u.email) as email,
-                          COALESCE(u.name, t.company_name) as name
+                          COALESCE(u.name, t.name) as name
                    FROM tenants t
                    LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
-                   WHERE t.status = 'active' AND t.subscription_tier = ANY($1)
+                   WHERE t.status = 'active' AND t.product_tier = ANY($1)
                    ORDER BY t.created_at''',
                 tiers,
             )
@@ -101,14 +101,15 @@ async def _enumerate_audience(campaign) -> list[dict]:
                 logger.warning('segment audience with no criteria specified')
                 return []
             rows = await shared_pool.fetch(
-                '''SELECT t.id as tenant_id, t.company_name,
+                '''SELECT t.id as tenant_id, t.name,
                           COALESCE(t.billing_email, u.email) as email,
-                          COALESCE(u.name, t.company_name) as name
+                          COALESCE(u.name, t.name) as name
                    FROM tenants t
                    LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
-                   WHERE t.status = 'active' AND t.metadata @> $1::jsonb
+                   WHERE t.status = 'active'
+                     AND t.product_tier = ANY($1::text[])
                    ORDER BY t.created_at''',
-                json.dumps(criteria),
+                criteria if isinstance(criteria, list) else [str(criteria)],
             )
             for r in rows:
                 if r['email']:
@@ -124,9 +125,9 @@ async def _enumerate_audience(campaign) -> list[dict]:
                 logger.warning('lifecycle_stage audience with no stage specified')
                 return []
             rows = await shared_pool.fetch(
-                '''SELECT t.id as tenant_id, t.company_name,
+                '''SELECT t.id as tenant_id, t.name,
                           COALESCE(t.billing_email, u.email) as email,
-                          COALESCE(u.name, t.company_name) as name
+                          COALESCE(u.name, t.name) as name
                    FROM tenants t
                    LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'tenant_admin'
                    WHERE t.lifecycle_stage = $1
