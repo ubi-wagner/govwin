@@ -100,10 +100,18 @@ export default async function InfoSecPage() {
       <section className="bg-cream-50 border-t border-cream-200">
         <div className="max-w-4xl mx-auto px-6 py-16">
           <h2 className="font-display text-2xl font-bold text-navy-900 mb-4">{certBlock?.title ?? 'What we are. What we aren\'t. Yet.'}</h2>
-          <div className="space-y-4 text-navy-600 leading-relaxed whitespace-pre-line">
-            {(certBlock?.body ?? '<strong class="text-navy-900">We are:</strong> A SaaS platform with strong tenant isolation, audit logging, encryption at rest and in transit, and a binding commitment to never train on your data.\n\n<strong class="text-navy-900">We are not (yet):</strong> SOC 2 Type II, FedRAMP, or ITAR certified. Most SBIR/STTR proposal development work doesn\'t require those — but we\'re honest about it.\n\n<strong class="text-navy-900">Roadmap:</strong> SOC 2 targeted for Year 2.').split('\n\n').map((p: string, i: number) => (
-              <p key={i}>{p}</p>
-            ))}
+          <div className="space-y-4 text-navy-600 leading-relaxed">
+            {certBlock?.body ? (
+              certBlock.body.split('\n\n').map((p: string, i: number) => (
+                <p key={i} dangerouslySetInnerHTML={{ __html: p }} />
+              ))
+            ) : (
+              <>
+                <p><strong className="text-navy-900">We are:</strong> A SaaS platform with strong tenant isolation, audit logging, encryption at rest and in transit, and a binding commitment to never train on your data.</p>
+                <p><strong className="text-navy-900">We are not (yet):</strong> SOC 2 Type II, FedRAMP, or ITAR certified. Most SBIR/STTR proposal development work doesn&rsquo;t require those — but we&rsquo;re honest about it.</p>
+                <p><strong className="text-navy-900">Roadmap:</strong> SOC 2 targeted for Year 2. Contract management and compliance tracking coming in Year 1. Additional certifications based on customer requirements.</p>
+              </>
+            )}
           </div>
         </div>
       </section>

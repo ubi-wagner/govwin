@@ -11,7 +11,7 @@ import { getLandingPath, isRole, type Role } from '@/lib/rbac';
  *
  *   master_admin / rfp_admin      → /admin/dashboard
  *   tenant_admin / tenant_user    → /portal/<slug>/dashboard
- *   partner_user                  → /portal/<slug>/dashboard
+ *   partner_user                  → /portal/<slug>/proposals
  *   user with no tenant assigned  → rendered as a friendly "no workspace"
  *                                   message (infinite-loop safe — we
  *                                   never redirect from /portal back
