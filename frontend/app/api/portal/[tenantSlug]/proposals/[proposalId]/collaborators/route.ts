@@ -329,6 +329,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'collaborator_invited',
+                ${JSON.stringify({ email, name, role: collabRole, permission, sections_assigned: assignedSections, is_new_user: isNewUser })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/collaborators] activity log failed', logErr);
+    }
+
     return NextResponse.json({
       data: {
         id: collaboratorId,

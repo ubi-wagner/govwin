@@ -63,8 +63,9 @@ export async function POST(_request: Request, ctx: RouteContext) {
       isLocked: boolean;
       stage: string;
       lockCount: number;
+      version: number;
     }[]>`
-      SELECT id, is_locked, stage, lock_count FROM proposals
+      SELECT id, is_locked, stage, lock_count, version FROM proposals
       WHERE id = ${proposalId} AND tenant_id = ${tenantId}
       LIMIT 1
     `;
@@ -93,16 +94,19 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // Lock the proposal (AND is_locked = false prevents race condition)
+    // Lock the proposal (AND is_locked = false + version prevents race condition)
     const newLockCount = proposal.lockCount + 1;
     const lockResult = await sql`
       UPDATE proposals
       SET is_locked = true,
           lock_count = ${newLockCount},
           last_locked_at = now(),
-          unlock_deadline = NULL
+          unlock_deadline = NULL,
+          version = version + 1,
+          last_modified_by = ${sessionUser.id}::uuid
       WHERE id = ${proposalId}
         AND is_locked = false
+        AND version = ${proposal.version}
     `;
 
     if (lockResult.count === 0) {
@@ -122,6 +126,21 @@ export async function POST(_request: Request, ctx: RouteContext) {
         lockCount: newLockCount,
       },
     });
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, entity_version, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_locked', ${proposal.version + 1},
+                ${JSON.stringify({ lock_count: newLockCount })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/lock] activity log failed', logErr);
+    }
 
     // Harvest accepted content to library on first lock only.
     // This populates the tenant's library with atoms from the submitted
@@ -200,8 +219,9 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       id: string;
       isLocked: boolean;
       lockCount: number;
+      version: number;
     }[]>`
-      SELECT id, is_locked, lock_count FROM proposals
+      SELECT id, is_locked, lock_count, version FROM proposals
       WHERE id = ${proposalId} AND tenant_id = ${tenantId}
       LIMIT 1
     `;
@@ -226,7 +246,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // Self-service unlock: set 7-day edit window (AND is_locked = true prevents race condition)
+    // Self-service unlock: set 7-day edit window (AND is_locked = true + version prevents race condition)
     const unlockDeadline = new Date();
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
@@ -234,9 +254,12 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       UPDATE proposals
       SET is_locked = false,
           last_unlocked_at = now(),
-          unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null}
+          unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null},
+          version = version + 1,
+          last_modified_by = ${sessionUser.id}::uuid
       WHERE id = ${proposalId}
         AND is_locked = true
+        AND version = ${proposal.version}
     `;
 
     if (unlockResult.count === 0) {
@@ -257,6 +280,21 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         unlockDeadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null,
       },
     });
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, entity_version, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_unlocked', ${proposal.version + 1},
+                ${JSON.stringify({ lock_count: proposal.lockCount, unlock_deadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/lock] unlock activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: {

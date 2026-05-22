@@ -55,7 +55,9 @@ export const opportunityBulkAddTopicsTool = defineTool<Input, Output>({
     const actorId = ctx.actor.id;
 
     // Verify solicitation exists + grab inherit context
-    const solRows = await sql<
+    let solRows;
+    try {
+      solRows = await sql<
       {
         id: string;
         inheritSource: string | null;
@@ -71,17 +73,27 @@ export const opportunityBulkAddTopicsTool = defineTool<Input, Output>({
       LEFT JOIN opportunities o ON o.id = cs.opportunity_id
       WHERE cs.id = ${solicitationId}::uuid
     `;
+    } catch (err) {
+      console.error('[opportunity.bulk_add_topics] solicitation lookup failed:', err);
+      throw err;
+    }
     if (solRows.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
     }
     const parent = solRows[0];
 
     // Find existing topic numbers under this solicitation
-    const existingRows = await sql<{ topicNumber: string }[]>`
-      SELECT topic_number FROM opportunities
-      WHERE solicitation_id = ${solicitationId}::uuid
-        AND topic_number IS NOT NULL
-    `;
+    let existingRows: { topicNumber: string }[];
+    try {
+      existingRows = await sql<{ topicNumber: string }[]>`
+        SELECT topic_number FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+          AND topic_number IS NOT NULL
+      `;
+    } catch (err) {
+      console.error('[opportunity.bulk_add_topics] existing topics query failed:', err);
+      throw err;
+    }
     const existing = new Set(existingRows.map((r) => r.topicNumber));
 
     // Check for dupes within the input itself too
@@ -149,12 +161,17 @@ export const opportunityBulkAddTopicsTool = defineTool<Input, Output>({
 
     // Flip solicitation_type to multi_topic if we added any
     if (inserted.length > 0) {
-      await sql`
-        UPDATE curated_solicitations
-        SET solicitation_type = 'multi_topic', updated_at = now()
-        WHERE id = ${solicitationId}::uuid
-          AND solicitation_type = 'single'
-      `;
+      try {
+        await sql`
+          UPDATE curated_solicitations
+          SET solicitation_type = 'multi_topic', updated_at = now()
+          WHERE id = ${solicitationId}::uuid
+            AND solicitation_type = 'single'
+        `;
+      } catch (err) {
+        console.error('[opportunity.bulk_add_topics] type update failed:', err);
+        throw err;
+      }
     }
 
     await emitEventSingle({

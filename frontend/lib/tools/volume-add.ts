@@ -36,9 +36,15 @@ export const volumeAddTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    const exists = await sql<{ id: string }[]>`
-      SELECT id FROM curated_solicitations WHERE id = ${input.solicitationId}::uuid
-    `;
+    let exists: { id: string }[];
+    try {
+      exists = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE id = ${input.solicitationId}::uuid
+      `;
+    } catch (err) {
+      console.error('[volume.add] solicitation lookup failed:', err);
+      throw err;
+    }
     if (exists.length === 0) {
       throw new NotFoundError(`solicitation not found: ${input.solicitationId}`);
     }

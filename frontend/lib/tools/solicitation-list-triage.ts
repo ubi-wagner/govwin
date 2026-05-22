@@ -142,7 +142,9 @@ export const solicitationListTriageTool = defineTool<Input, Output>({
       closeDate: Date | null;
       postedDate: Date | null;
     };
-    const rows = await sql<Row[]>`
+    let rows: Row[];
+    try {
+      rows = await sql<Row[]>`
       SELECT
         cs.id AS solicitation_id,
         cs.opportunity_id,
@@ -171,6 +173,10 @@ export const solicitationListTriageTool = defineTool<Input, Output>({
       ORDER BY cs.created_at DESC, cs.id DESC
       LIMIT ${queryLimit}
     `;
+    } catch (err) {
+      console.error('[solicitation.list_triage] query failed:', err);
+      throw err;
+    }
 
     const hasMore = rows.length > input.limit;
     const items = (hasMore ? rows.slice(0, input.limit) : rows).map((r) => ({

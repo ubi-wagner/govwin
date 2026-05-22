@@ -145,6 +145,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
         SET content = ${contentJson},
             status = ${newStatus},
             version = ${nextVersion},
+            last_modified_by = ${sessionUser.id}::uuid,
+            editing_by = NULL,
+            editing_since = NULL,
             updated_at = now()
         WHERE id = ${sectionId}
           AND version = ${section.version}
@@ -154,6 +157,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
         UPDATE proposal_sections
         SET content = ${contentJson},
             version = ${nextVersion},
+            last_modified_by = ${sessionUser.id}::uuid,
+            editing_by = NULL,
+            editing_since = NULL,
             updated_at = now()
         WHERE id = ${sectionId}
           AND version = ${section.version}
@@ -189,6 +195,22 @@ export async function PUT(request: Request, ctx: RouteContext) {
         status: newStatus ?? undefined,
       },
     });
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      const userRole = role;
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, section_id, section_title, entity_version, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${userRole},
+                'section_saved', ${sectionId}::uuid, ${section.title}, ${nextVersion},
+                ${JSON.stringify({ previous_version: section.version })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/sections/save] activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: {

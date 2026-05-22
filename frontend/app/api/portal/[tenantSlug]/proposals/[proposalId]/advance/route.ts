@@ -77,8 +77,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       gateConfig: string[];
       lockCount: number;
       isLocked: boolean;
+      version: number;
     }[]>`
-      SELECT id, stage, title, gate_config, lock_count, is_locked FROM proposals
+      SELECT id, stage, title, gate_config, lock_count, is_locked, version FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
       LIMIT 1
@@ -126,16 +127,19 @@ export async function POST(request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
 
-    // ── Update proposal stage (atomic: AND stage = previousStage prevents double-advance) ──
+    // ── Update proposal stage (atomic: AND stage + version prevents double-advance) ──
     if (shouldLock) {
       const advanceResult = await sql`
         UPDATE proposals
         SET stage = ${targetStage},
             is_locked = true,
             lock_count = lock_count + 1,
-            last_locked_at = now()
+            last_locked_at = now(),
+            version = version + 1,
+            last_modified_by = ${sessionUser.id}::uuid
         WHERE id = ${proposalId}
           AND stage = ${previousStage}
+          AND version = ${proposal.version}
       `;
       if (advanceResult.count === 0) {
         return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
@@ -143,9 +147,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     } else {
       const advanceResult = await sql`
         UPDATE proposals
-        SET stage = ${targetStage}
+        SET stage = ${targetStage},
+            version = version + 1,
+            last_modified_by = ${sessionUser.id}::uuid
         WHERE id = ${proposalId}
           AND stage = ${previousStage}
+          AND version = ${proposal.version}
       `;
       if (advanceResult.count === 0) {
         return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
@@ -177,6 +184,21 @@ export async function POST(request: Request, ctx: RouteContext) {
         notes: notes ?? undefined,
       },
     });
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, entity_version, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'stage_advanced', ${proposal.version + 1},
+                ${JSON.stringify({ from_stage: previousStage, to_stage: targetStage, notes: notes ?? undefined })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/advance] activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: {

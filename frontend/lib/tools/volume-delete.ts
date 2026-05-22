@@ -21,11 +21,17 @@ export const volumeDeleteTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    const rows = await sql<{ id: string; solicitationId: string; volumeNumber: number }[]>`
-      DELETE FROM solicitation_volumes
-      WHERE id = ${input.volumeId}::uuid
-      RETURNING id, solicitation_id, volume_number
-    `;
+    let rows: { id: string; solicitationId: string; volumeNumber: number }[];
+    try {
+      rows = await sql<{ id: string; solicitationId: string; volumeNumber: number }[]>`
+        DELETE FROM solicitation_volumes
+        WHERE id = ${input.volumeId}::uuid
+        RETURNING id, solicitation_id, volume_number
+      `;
+    } catch (err) {
+      console.error('[volume.delete] delete failed:', err);
+      throw err;
+    }
     if (rows.length === 0) {
       throw new NotFoundError(`volume not found: ${input.volumeId}`);
     }

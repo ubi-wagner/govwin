@@ -55,24 +55,36 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
 
     // Verify solicitation exists (FK will catch it at INSERT, but a
     // pre-check gives a cleaner error).
-    const exists = await sql<{ id: string }[]>`
-      SELECT id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-    `;
+    let exists: { id: string }[];
+    try {
+      exists = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+      `;
+    } catch (err) {
+      console.error('[solicitation.save_annotation] existence check failed:', err);
+      throw err;
+    }
     if (exists.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
     }
 
-    const rows = await sql<{ id: string; createdAt: Date }[]>`
-      INSERT INTO solicitation_annotations
-        (solicitation_id, actor_id, kind, compliance_variable_name,
-         source_location, payload)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
-         ${complianceVariableName ?? null},
-         ${JSON.stringify(sourceLocation)}::jsonb,
-         ${JSON.stringify(payload)}::jsonb)
-      RETURNING id, created_at
-    `;
+    let rows: { id: string; createdAt: Date }[];
+    try {
+      rows = await sql<{ id: string; createdAt: Date }[]>`
+        INSERT INTO solicitation_annotations
+          (solicitation_id, actor_id, kind, compliance_variable_name,
+           source_location, payload)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
+           ${complianceVariableName ?? null},
+           ${JSON.stringify(sourceLocation)}::jsonb,
+           ${JSON.stringify(payload)}::jsonb)
+        RETURNING id, created_at
+      `;
+    } catch (err) {
+      console.error('[solicitation.save_annotation] insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

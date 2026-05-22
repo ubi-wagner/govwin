@@ -90,6 +90,21 @@ export async function POST(_request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'comment_resolved',
+                ${JSON.stringify({ comment_id: commentId })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/comments/resolve] activity log failed', logErr);
+    }
+
     return NextResponse.json({
       data: { id: comment.id, resolved: true },
     });

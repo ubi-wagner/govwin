@@ -257,6 +257,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── Activity log ────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_exported',
+                ${JSON.stringify({ section_count: sectionData.length })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[portal/proposals/package] activity log failed', logErr);
+    }
+
     // ── 8. Build total chars for manifest ────────────────────
     const totalChars = sectionData.reduce((sum, s) => sum + s.text_content.length, 0);
 

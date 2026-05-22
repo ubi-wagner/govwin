@@ -81,14 +81,19 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
       );
     }
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes, metadata)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'request_review',
-         'curation_in_progress', 'review_requested', ${notes ?? null},
-         ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null })}::jsonb)
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes, metadata)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'request_review',
+           'curation_in_progress', 'review_requested', ${notes ?? null},
+           ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null })}::jsonb)
+      `;
+    } catch (err) {
+      console.error('[solicitation.request_review] triage_actions insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

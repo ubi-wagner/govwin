@@ -92,8 +92,10 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
     // critical fields + customFields. Any field not listed here can use
     // a dedicated narrow tool later.
 
-    const rows = await sql<{ id: string; volumeId: string }[]>`
-      UPDATE volume_required_items
+    let rows: { id: string; volumeId: string }[];
+    try {
+      rows = await sql<{ id: string; volumeId: string }[]>`
+        UPDATE volume_required_items
       SET
         item_name = COALESCE(${input.itemName ?? null}, item_name),
         required = COALESCE(${input.required ?? null}, required),
@@ -125,6 +127,10 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
       WHERE id = ${input.itemId}::uuid
       RETURNING id, volume_id
     `;
+    } catch (err) {
+      console.error('[volume.update_required_item] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       throw new NotFoundError(`required item not found: ${input.itemId}`);
