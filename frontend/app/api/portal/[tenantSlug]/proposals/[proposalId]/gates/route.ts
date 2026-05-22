@@ -1,0 +1,458 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
+
+interface RouteContext {
+  params: Promise<{ tenantSlug: string; proposalId: string }>;
+}
+
+const VALID_REQUIREMENT_TYPES = [
+  'all_sections_complete', 'compliance_check_passed',
+  'min_sections_approved', 'admin_review_complete',
+  'collaborator_signoff', 'custom',
+] as const;
+
+/**
+ * GET /api/portal/[tenantSlug]/proposals/[proposalId]/gates
+ *
+ * Returns stage gate requirements and their completion status.
+ * Optionally filter by ?stage=<stage_name>.
+ * Auth: any tenant member with access.
+ */
+export async function GET(request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthenticated', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json(
+        { error: 'Invalid session', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json(
+        { error: 'Tenant not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Tenant access denied', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string }[]>`
+      SELECT id FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    const url = new URL(request.url);
+    const stageFilter = url.searchParams.get('stage');
+
+    let requirements: {
+      id: string;
+      proposalId: string;
+      stage: string;
+      requirementType: string;
+      label: string;
+      description: string | null;
+      isMet: boolean;
+      metBy: string | null;
+      metAt: Date | null;
+      evidence: Record<string, unknown>;
+      createdAt: Date;
+      updatedAt: Date;
+    }[];
+
+    if (stageFilter) {
+      requirements = await sql<typeof requirements>`
+        SELECT id, proposal_id, stage, requirement_type, label, description,
+               is_met, met_by, met_at, evidence, created_at, updated_at
+        FROM stage_gate_requirements
+        WHERE proposal_id = ${proposalId}::uuid
+          AND stage = ${stageFilter}
+        ORDER BY created_at ASC
+      `;
+    } else {
+      requirements = await sql<typeof requirements>`
+        SELECT id, proposal_id, stage, requirement_type, label, description,
+               is_met, met_by, met_at, evidence, created_at, updated_at
+        FROM stage_gate_requirements
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY stage ASC, created_at ASC
+      `;
+    }
+
+    return NextResponse.json({
+      data: {
+        requirements: requirements.map((r) => ({
+          id: r.id,
+          proposalId: r.proposalId,
+          stage: r.stage,
+          requirementType: r.requirementType,
+          label: r.label,
+          description: r.description,
+          isMet: r.isMet,
+          metBy: r.metBy,
+          metAt: r.metAt,
+          evidence: r.evidence,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        })),
+      },
+    });
+  } catch (e) {
+    console.error('[api/portal/proposals/gates] GET error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/portal/[tenantSlug]/proposals/[proposalId]/gates
+ *
+ * Create a stage gate requirement.
+ * Auth: tenant_admin or higher.
+ *
+ * Body: { stage, requirementType, label, description? }
+ */
+export async function POST(request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthenticated', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      email?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json(
+        { error: 'Invalid session', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json(
+        { error: 'Tenant not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Tenant access denied', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string }[]>`
+      SELECT id FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    // Parse body
+    let body: {
+      stage?: unknown;
+      requirementType?: unknown;
+      label?: unknown;
+      description?: unknown;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const stage = typeof body.stage === 'string' ? body.stage.trim() : '';
+    const requirementType = typeof body.requirementType === 'string' ? body.requirementType : '';
+    const label = typeof body.label === 'string' ? body.label.trim() : '';
+    const description = typeof body.description === 'string' ? body.description.trim() : null;
+
+    if (!stage) {
+      return NextResponse.json(
+        { error: 'stage is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (!(VALID_REQUIREMENT_TYPES as readonly string[]).includes(requirementType)) {
+      return NextResponse.json(
+        { error: `requirementType must be one of: ${VALID_REQUIREMENT_TYPES.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (!label) {
+      return NextResponse.json(
+        { error: 'label is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const [requirement] = await sql<{ id: string; createdAt: Date }[]>`
+      INSERT INTO stage_gate_requirements
+        (proposal_id, stage, requirement_type, label, description)
+      VALUES (${proposalId}::uuid, ${stage}, ${requirementType}, ${label}, ${description})
+      RETURNING id, created_at
+    `;
+
+    return NextResponse.json({
+      data: {
+        id: requirement.id,
+        proposalId,
+        stage,
+        requirementType,
+        label,
+        description,
+        isMet: false,
+        createdAt: requirement.createdAt,
+      },
+    }, { status: 201 });
+  } catch (e) {
+    console.error('[api/portal/proposals/gates] POST error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * PATCH /api/portal/[tenantSlug]/proposals/[proposalId]/gates
+ *
+ * Mark a stage gate requirement as met or unmet.
+ * Auth: tenant_admin or higher.
+ *
+ * Body: { requirementId, isMet, evidence? }
+ */
+export async function PATCH(request: Request, ctx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthenticated', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      email?: string;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+
+    const role = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !sessionUser.id) {
+      return NextResponse.json(
+        { error: 'Invalid session', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) {
+      return NextResponse.json(
+        { error: 'Tenant not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    const tenantId = tenant.id as string;
+    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Tenant access denied', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    // Verify proposal belongs to tenant
+    const [proposal] = await sql<{ id: string }[]>`
+      SELECT id FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (!proposal) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    // Parse body
+    let body: {
+      requirementId?: unknown;
+      isMet?: unknown;
+      evidence?: unknown;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const requirementId = typeof body.requirementId === 'string' ? body.requirementId : '';
+    if (!requirementId || !isValidUUID(requirementId)) {
+      return NextResponse.json(
+        { error: 'Valid requirementId is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (typeof body.isMet !== 'boolean') {
+      return NextResponse.json(
+        { error: 'isMet must be a boolean', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    const isMet = body.isMet;
+    const evidence = typeof body.evidence === 'object' && body.evidence !== null
+      ? body.evidence
+      : {};
+
+    let updateResult;
+    if (isMet) {
+      updateResult = await sql`
+        UPDATE stage_gate_requirements
+        SET is_met = true,
+            met_by = ${sessionUser.id}::uuid,
+            met_at = now(),
+            evidence = ${JSON.stringify(evidence)}::jsonb,
+            updated_at = now()
+        WHERE id = ${requirementId}::uuid
+          AND proposal_id = ${proposalId}::uuid
+      `;
+    } else {
+      updateResult = await sql`
+        UPDATE stage_gate_requirements
+        SET is_met = false,
+            met_by = NULL,
+            met_at = NULL,
+            evidence = '{}'::jsonb,
+            updated_at = now()
+        WHERE id = ${requirementId}::uuid
+          AND proposal_id = ${proposalId}::uuid
+      `;
+    }
+
+    if (updateResult.count === 0) {
+      return NextResponse.json(
+        { error: 'Requirement not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      data: {
+        id: requirementId,
+        isMet,
+        metBy: isMet ? sessionUser.id : null,
+        metAt: isMet ? new Date().toISOString() : null,
+      },
+    });
+  } catch (e) {
+    console.error('[api/portal/proposals/gates] PATCH error:', e);
+    return NextResponse.json(
+      { error: 'Internal server error', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
