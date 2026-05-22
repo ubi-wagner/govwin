@@ -70,7 +70,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Load current proposal ────────────────────────────────────────
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       stage: string;
       title: string;
@@ -78,12 +78,26 @@ export async function POST(request: Request, ctx: RouteContext) {
       lockCount: number;
       isLocked: boolean;
       version: number;
-    }[]>`
-      SELECT id, stage, title, gate_config, lock_count, is_locked, version FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        stage: string;
+        title: string;
+        gateConfig: string[];
+        lockCount: number;
+        isLocked: boolean;
+        version: number;
+      }[]>`
+        SELECT id, stage, title, gate_config, lock_count, is_locked, version FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/advance] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -128,42 +142,52 @@ export async function POST(request: Request, ctx: RouteContext) {
     const shouldLock = targetStage === 'final';
 
     // ── Update proposal stage (atomic: AND stage + version prevents double-advance) ──
-    if (shouldLock) {
-      const advanceResult = await sql`
-        UPDATE proposals
-        SET stage = ${targetStage},
-            is_locked = true,
-            lock_count = lock_count + 1,
-            last_locked_at = now(),
-            version = version + 1,
-            last_modified_by = ${sessionUser.id}::uuid
-        WHERE id = ${proposalId}
-          AND stage = ${previousStage}
-          AND version = ${proposal.version}
-      `;
-      if (advanceResult.count === 0) {
-        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+    try {
+      if (shouldLock) {
+        const advanceResult = await sql`
+          UPDATE proposals
+          SET stage = ${targetStage},
+              is_locked = true,
+              lock_count = lock_count + 1,
+              last_locked_at = now(),
+              version = version + 1,
+              last_modified_by = ${sessionUser.id}::uuid
+          WHERE id = ${proposalId}
+            AND stage = ${previousStage}
+            AND version = ${proposal.version}
+        `;
+        if (advanceResult.count === 0) {
+          return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+        }
+      } else {
+        const advanceResult = await sql`
+          UPDATE proposals
+          SET stage = ${targetStage},
+              version = version + 1,
+              last_modified_by = ${sessionUser.id}::uuid
+          WHERE id = ${proposalId}
+            AND stage = ${previousStage}
+            AND version = ${proposal.version}
+        `;
+        if (advanceResult.count === 0) {
+          return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+        }
       }
-    } else {
-      const advanceResult = await sql`
-        UPDATE proposals
-        SET stage = ${targetStage},
-            version = version + 1,
-            last_modified_by = ${sessionUser.id}::uuid
-        WHERE id = ${proposalId}
-          AND stage = ${previousStage}
-          AND version = ${proposal.version}
-      `;
-      if (advanceResult.count === 0) {
-        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
-      }
+    } catch (e) {
+      console.error('[portal/proposals/advance] stage update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     // ── Record stage history ─────────────────────────────────────────
-    await sql`
-      INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-      VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
-    `;
+    try {
+      await sql`
+        INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+        VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/advance] stage history insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({

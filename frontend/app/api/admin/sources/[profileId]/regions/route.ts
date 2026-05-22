@@ -47,14 +47,20 @@ export async function GET(_request: Request, ctx: RouteContext) {
       );
     }
 
-    const regions = await sql`
-      SELECT id, profile_id, name, selector_hint, content_context,
-             region_type, sample_html, sample_text, is_active,
-             created_at, updated_at
-      FROM source_regions
-      WHERE profile_id = ${profileId}::uuid AND is_active = true
-      ORDER BY name
-    `;
+    let regions;
+    try {
+      regions = await sql`
+        SELECT id, profile_id, name, selector_hint, content_context,
+               region_type, sample_html, sample_text, is_active,
+               created_at, updated_at
+        FROM source_regions
+        WHERE profile_id = ${profileId}::uuid AND is_active = true
+        ORDER BY name
+      `;
+    } catch (e) {
+      console.error('[admin/sources/regions] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { regions } });
   } catch (e) {
@@ -133,11 +139,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     const sampleText = typeof body.sampleText === 'string' ? body.sampleText || null : null;
 
     // ── Verify profile exists ───────────────────────────────────────
-    const [profile] = await sql<{ id: string; name: string }[]>`
-      SELECT id, name FROM source_profiles
-      WHERE id = ${profileId}::uuid AND is_active = true
-      LIMIT 1
-    `;
+    let profile: { id: string; name: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; name: string }[]>`
+        SELECT id, name FROM source_profiles
+        WHERE id = ${profileId}::uuid AND is_active = true
+        LIMIT 1
+      `;
+      profile = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/regions] profile lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!profile) {
       return NextResponse.json(
         { error: 'Source profile not found', code: 'NOT_FOUND' },
@@ -146,30 +159,42 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Insert region ───────────────────────────────────────────────
-    const [region] = await sql<{ id: string }[]>`
-      INSERT INTO source_regions (
-        profile_id, name, selector_hint, content_context,
-        region_type, sample_html, sample_text
-      ) VALUES (
-        ${profileId}::uuid, ${name}, ${selectorHint},
-        ${contentContext}, ${regionType}, ${sampleHtml}, ${sampleText}
-      )
-      RETURNING id
-    `;
+    let region: { id: string };
+    try {
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO source_regions (
+          profile_id, name, selector_hint, content_context,
+          region_type, sample_html, sample_text
+        ) VALUES (
+          ${profileId}::uuid, ${name}, ${selectorHint},
+          ${contentContext}, ${regionType}, ${sampleHtml}, ${sampleText}
+        )
+        RETURNING id
+      `;
+      region = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/regions] insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source_region.created',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId: randomUUID(),
-        sourceId: profileId,
-        sourceName: profile.name,
-        regionId: region.id,
-        regionName: name,
-      },
-    });
+    // ── Emit event (non-fatal) ─────────────────────────────────────
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'source_region.created',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        payload: {
+          correlationId: randomUUID(),
+          sourceId: profileId,
+          sourceName: profile.name,
+          regionId: region.id,
+          regionName: name,
+        },
+      });
+    } catch (e) {
+      console.error('[admin/sources/regions] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { id: region.id } }, { status: 201 });
   } catch (e) {

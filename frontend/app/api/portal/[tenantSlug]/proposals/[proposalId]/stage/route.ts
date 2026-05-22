@@ -44,7 +44,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       stage: string;
       gateConfig: string[];
@@ -54,33 +54,55 @@ export async function GET(_request: Request, ctx: RouteContext) {
       lastLockedAt: string | null;
       lastUnlockedAt: string | null;
       unlockDeadline: string | null;
-    }[]>`
-      SELECT
-        id, stage, gate_config, is_locked, lock_count,
-        download_count, last_locked_at, last_unlocked_at, unlock_deadline
-      FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        stage: string;
+        gateConfig: string[];
+        isLocked: boolean;
+        lockCount: number;
+        downloadCount: number;
+        lastLockedAt: string | null;
+        lastUnlockedAt: string | null;
+        unlockDeadline: string | null;
+      }[]>`
+        SELECT
+          id, stage, gate_config, is_locked, lock_count,
+          download_count, last_locked_at, last_unlocked_at, unlock_deadline
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/stage] GET proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // Load stage history
-    const history = await sql<{
+    let history: {
       id: string;
       fromStage: string | null;
       toStage: string;
       changedBy: string;
       notes: string | null;
       createdAt: string;
-    }[]>`
-      SELECT id, from_stage, to_stage, changed_by, notes, created_at
-      FROM proposal_stage_history
-      WHERE proposal_id = ${proposalId}
-      ORDER BY created_at ASC
-    `;
+    }[];
+    try {
+      history = await sql<typeof history>`
+        SELECT id, from_stage, to_stage, changed_by, notes, created_at
+        FROM proposal_stage_history
+        WHERE proposal_id = ${proposalId}
+        ORDER BY created_at ASC
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/stage] GET history query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({
       data: {
@@ -154,18 +176,30 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     const notes = typeof body.notes === 'string' ? body.notes : null;
 
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       stage: string;
       gateConfig: string[];
       title: string;
       lockCount: number;
-    }[]>`
-      SELECT id, stage, gate_config, title, lock_count
-      FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        stage: string;
+        gateConfig: string[];
+        title: string;
+        lockCount: number;
+      }[]>`
+        SELECT id, stage, gate_config, title, lock_count
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/stage] PATCH proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -186,28 +220,38 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const shouldLock = nextStage === 'final';
 
     // Update proposal
-    if (shouldLock) {
-      await sql`
-        UPDATE proposals
-        SET stage = ${nextStage},
-            is_locked = true,
-            lock_count = lock_count + 1,
-            last_locked_at = now()
-        WHERE id = ${proposalId}
-      `;
-    } else {
-      await sql`
-        UPDATE proposals
-        SET stage = ${nextStage}
-        WHERE id = ${proposalId}
-      `;
+    try {
+      if (shouldLock) {
+        await sql`
+          UPDATE proposals
+          SET stage = ${nextStage},
+              is_locked = true,
+              lock_count = lock_count + 1,
+              last_locked_at = now()
+          WHERE id = ${proposalId}
+        `;
+      } else {
+        await sql`
+          UPDATE proposals
+          SET stage = ${nextStage}
+          WHERE id = ${proposalId}
+        `;
+      }
+    } catch (e) {
+      console.error('[portal/proposals/stage] PATCH stage update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     // Record stage history
-    await sql`
-      INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-      VALUES (${proposalId}, ${previousStage}, ${nextStage}, ${sessionUser.id}, ${notes})
-    `;
+    try {
+      await sql`
+        INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+        VALUES (${proposalId}, ${previousStage}, ${nextStage}, ${sessionUser.id}, ${notes})
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/stage] PATCH stage history insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     await emitEventSingle({
       namespace: 'proposal',

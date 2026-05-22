@@ -47,12 +47,19 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify application exists and is actionable
-    const [app] = await sql<{ id: string; status: string; contactName: string; contactEmail: string; companyName: string }[]>`
-      SELECT id, status, contact_name, contact_email, company_name
-      FROM applications
-      WHERE id = ${id}
-      LIMIT 1
-    `;
+    let app: { id: string; status: string; contactName: string; contactEmail: string; companyName: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; status: string; contactName: string; contactEmail: string; companyName: string }[]>`
+        SELECT id, status, contact_name, contact_email, company_name
+        FROM applications
+        WHERE id = ${id}
+        LIMIT 1
+      `;
+      app = rows[0];
+    } catch (e) {
+      console.error('[admin/applications/reject] lookup query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!app) {
       return NextResponse.json({ error: 'Application not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -65,39 +72,54 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Update application status
-    await sql`
-      UPDATE applications
-      SET status = 'rejected',
-          reviewed_by = ${userId},
-          reviewed_at = now(),
-          review_notes = ${reason || null}
-      WHERE id = ${id}
-    `;
+    try {
+      await sql`
+        UPDATE applications
+        SET status = 'rejected',
+            reviewed_by = ${userId},
+            reviewed_at = now(),
+            review_notes = ${reason || null}
+        WHERE id = ${id}
+      `;
+    } catch (e) {
+      console.error('[admin/applications/reject] update query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // Emit system event
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'application.rejected',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        applicationId: id,
-        reason: reason || null,
-      },
-    });
+    // Emit system event (non-fatal)
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'application.rejected',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          applicationId: id,
+          reason: reason || null,
+        },
+      });
+    } catch (e) {
+      console.error('[admin/applications/reject] event emission failed:', e);
+      // non-fatal, continue
+    }
 
-    // Send rejection email
-    const emailContent = applicationRejectedEmail({
-      contactName: app.contactName,
-      companyName: app.companyName,
-      reason: reason,
-    });
-    await sendEmail({
-      to: app.contactEmail,
-      subject: emailContent.subject,
-      html: emailContent.html,
-    });
+    // Send rejection email (non-fatal)
+    try {
+      const emailContent = applicationRejectedEmail({
+        contactName: app.contactName,
+        companyName: app.companyName,
+        reason: reason,
+      });
+      await sendEmail({
+        to: app.contactEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+    } catch (e) {
+      console.error('[admin/applications/reject] email send failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { rejected: true } });
   } catch (e) {

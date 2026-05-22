@@ -25,17 +25,23 @@ export async function GET(_request: Request, ctx: RouteContext) {
 
     const tenantId = tenant.id as string;
 
-    const [tenantInfo] = await sql`
-      SELECT id, name, legal_name, website, billing_email, status, product_tier,
-             subscription_status, created_at
-      FROM tenants WHERE id = ${tenantId}
-    `;
+    let tenantInfo, profile;
+    try {
+      [tenantInfo] = await sql`
+        SELECT id, name, legal_name, website, billing_email, status, product_tier,
+               subscription_status, created_at
+        FROM tenants WHERE id = ${tenantId}
+      `;
 
-    const [profile] = await sql`
-      SELECT naics_codes, keywords, agency_priorities, set_aside_types,
-             technology_focus, company_summary, research_areas, target_agencies
-      FROM tenant_profiles WHERE tenant_id = ${tenantId}
-    `;
+      [profile] = await sql`
+        SELECT naics_codes, keywords, agency_priorities, set_aside_types,
+               technology_focus, company_summary, research_areas, target_agencies
+        FROM tenant_profiles WHERE tenant_id = ${tenantId}
+      `;
+    } catch (e) {
+      console.error('[api/portal/profile] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { tenant: tenantInfo ?? null, profile: profile ?? null } });
   } catch (e) {
@@ -77,14 +83,19 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     // Update tenants table
     if (body.name && typeof body.name === 'string') {
-      await sql`
-        UPDATE tenants
-        SET name = ${body.name},
-            legal_name = ${(body.legalName as string) ?? null},
-            website = ${(body.website as string) ?? null},
-            billing_email = ${(body.billingEmail as string) ?? null}
-        WHERE id = ${tenantId}
-      `;
+      try {
+        await sql`
+          UPDATE tenants
+          SET name = ${body.name},
+              legal_name = ${(body.legalName as string) ?? null},
+              website = ${(body.website as string) ?? null},
+              billing_email = ${(body.billingEmail as string) ?? null}
+          WHERE id = ${tenantId}
+        `;
+      } catch (e) {
+        console.error('[api/portal/profile] tenant update failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // Upsert tenant_profiles
@@ -96,18 +107,23 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const companySummary = typeof body.companySummary === 'string' ? body.companySummary : null;
     const technologyFocus = typeof body.technologyFocus === 'string' ? body.technologyFocus : null;
 
-    await sql`
-      INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus)
-      VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus})
-      ON CONFLICT (tenant_id) DO UPDATE SET
-        naics_codes = EXCLUDED.naics_codes,
-        keywords = EXCLUDED.keywords,
-        target_agencies = EXCLUDED.target_agencies,
-        set_aside_types = EXCLUDED.set_aside_types,
-        research_areas = EXCLUDED.research_areas,
-        company_summary = EXCLUDED.company_summary,
-        technology_focus = EXCLUDED.technology_focus
-    `;
+    try {
+      await sql`
+        INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus)
+        VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus})
+        ON CONFLICT (tenant_id) DO UPDATE SET
+          naics_codes = EXCLUDED.naics_codes,
+          keywords = EXCLUDED.keywords,
+          target_agencies = EXCLUDED.target_agencies,
+          set_aside_types = EXCLUDED.set_aside_types,
+          research_areas = EXCLUDED.research_areas,
+          company_summary = EXCLUDED.company_summary,
+          technology_focus = EXCLUDED.technology_focus
+      `;
+    } catch (e) {
+      console.error('[api/portal/profile] profile upsert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { updated: true } });
   } catch (e) {

@@ -49,9 +49,15 @@ export async function GET(
     }
 
     // ── Verify solicitation exists ──────────────────────────────────
-    const existing = await sql<{ id: string }[]>`
-      SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid
-    `;
+    let existing: { id: string }[];
+    try {
+      existing = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/templates] solicitation lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existing.length === 0) {
       return NextResponse.json(
         { error: 'Solicitation not found', code: 'NOT_FOUND' },
@@ -60,15 +66,21 @@ export async function GET(
     }
 
     // ── Query template documents ────────────────────────────────────
-    const templates = await sql`
-      SELECT id, solicitation_id, document_type, original_filename,
-             storage_key, file_size, content_type, page_count,
-             uploaded_by, metadata, created_at, updated_at
-      FROM solicitation_documents
-      WHERE solicitation_id = ${solId}::uuid
-        AND document_type = 'template'
-      ORDER BY created_at ASC
-    `;
+    let templates;
+    try {
+      templates = await sql`
+        SELECT id, solicitation_id, document_type, original_filename,
+               storage_key, file_size, content_type, page_count,
+               uploaded_by, metadata, created_at, updated_at
+        FROM solicitation_documents
+        WHERE solicitation_id = ${solId}::uuid
+          AND document_type = 'template'
+        ORDER BY created_at ASC
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/templates] query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { templates } });
   } catch (error) {

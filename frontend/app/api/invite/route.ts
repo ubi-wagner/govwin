@@ -19,28 +19,41 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Token is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    const [row] = await sql<{
+    let row: {
       email: string;
       acceptedAt: string | null;
       inviterName: string | null;
       inviterEmail: string | null;
       proposalTitle: string | null;
       companyName: string | null;
-    }[]>`
-      SELECT
-        pc.email,
-        pc.accepted_at,
-        inv.name AS inviter_name,
-        inv.email AS inviter_email,
-        p.title AS proposal_title,
-        t.name AS company_name
-      FROM proposal_collaborators pc
-      LEFT JOIN users inv ON inv.id = pc.invited_by
-      LEFT JOIN proposals p ON p.id = pc.proposal_id
-      LEFT JOIN tenants t ON t.id = p.tenant_id
-      WHERE pc.id = ${token}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [row] = await sql<{
+        email: string;
+        acceptedAt: string | null;
+        inviterName: string | null;
+        inviterEmail: string | null;
+        proposalTitle: string | null;
+        companyName: string | null;
+      }[]>`
+        SELECT
+          pc.email,
+          pc.accepted_at,
+          inv.name AS inviter_name,
+          inv.email AS inviter_email,
+          p.title AS proposal_title,
+          t.name AS company_name
+        FROM proposal_collaborators pc
+        LEFT JOIN users inv ON inv.id = pc.invited_by
+        LEFT JOIN proposals p ON p.id = pc.proposal_id
+        LEFT JOIN tenants t ON t.id = p.tenant_id
+        WHERE pc.id = ${token}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[api/invite] GET invite query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!row) {
       return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
@@ -95,18 +108,30 @@ export async function POST(request: Request) {
     }
 
     // Look up the collaborator by invite token (collaborator ID)
-    const [collaborator] = await sql<{
+    let collaborator: {
       id: string;
       userId: string | null;
       email: string;
       proposalId: string;
       acceptedAt: string | null;
-    }[]>`
-      SELECT id, user_id, email, proposal_id, accepted_at
-      FROM proposal_collaborators
-      WHERE id = ${token}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [collaborator] = await sql<{
+        id: string;
+        userId: string | null;
+        email: string;
+        proposalId: string;
+        acceptedAt: string | null;
+      }[]>`
+        SELECT id, user_id, email, proposal_id, accepted_at
+        FROM proposal_collaborators
+        WHERE id = ${token}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[api/invite] collaborator query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!collaborator) {
       return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
@@ -120,20 +145,30 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     if (collaborator.userId) {
-      await sql`
-        UPDATE users
-        SET password_hash = ${passwordHash},
-            temp_password = false
-        WHERE id = ${collaborator.userId}
-      `;
+      try {
+        await sql`
+          UPDATE users
+          SET password_hash = ${passwordHash},
+              temp_password = false
+          WHERE id = ${collaborator.userId}
+        `;
+      } catch (e) {
+        console.error('[api/invite] user password update failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // Mark collaborator as accepted
-    await sql`
-      UPDATE proposal_collaborators
-      SET accepted_at = now()
-      WHERE id = ${token}
-    `;
+    try {
+      await sql`
+        UPDATE proposal_collaborators
+        SET accepted_at = now()
+        WHERE id = ${token}
+      `;
+    } catch (e) {
+      console.error('[api/invite] collaborator accept update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     await emitEventSingle({
       namespace: 'identity',
@@ -148,13 +183,18 @@ export async function POST(request: Request) {
     });
 
     // Get the proposal's tenant slug for redirect
-    const [proposalTenant] = await sql<{ tenantSlug: string }[]>`
-      SELECT t.slug AS tenant_slug
-      FROM proposals p
-      JOIN tenants t ON t.id = p.tenant_id
-      WHERE p.id = ${collaborator.proposalId}
-      LIMIT 1
-    `;
+    let proposalTenant: { tenantSlug: string } | undefined;
+    try {
+      [proposalTenant] = await sql<{ tenantSlug: string }[]>`
+        SELECT t.slug AS tenant_slug
+        FROM proposals p
+        JOIN tenants t ON t.id = p.tenant_id
+        WHERE p.id = ${collaborator.proposalId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[api/invite] tenant slug query failed:', e);
+    }
 
     return NextResponse.json({
       data: {

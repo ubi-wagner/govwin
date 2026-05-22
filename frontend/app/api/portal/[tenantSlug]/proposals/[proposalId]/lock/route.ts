@@ -58,17 +58,29 @@ export async function POST(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       isLocked: boolean;
       stage: string;
       lockCount: number;
       version: number;
-    }[]>`
-      SELECT id, is_locked, stage, lock_count, version FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        isLocked: boolean;
+        stage: string;
+        lockCount: number;
+        version: number;
+      }[]>`
+        SELECT id, is_locked, stage, lock_count, version FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/lock] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -96,18 +108,24 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
     // Lock the proposal (AND is_locked = false + version prevents race condition)
     const newLockCount = proposal.lockCount + 1;
-    const lockResult = await sql`
-      UPDATE proposals
-      SET is_locked = true,
-          lock_count = ${newLockCount},
-          last_locked_at = now(),
-          unlock_deadline = NULL,
-          version = version + 1,
-          last_modified_by = ${sessionUser.id}::uuid
-      WHERE id = ${proposalId}
-        AND is_locked = false
-        AND version = ${proposal.version}
-    `;
+    let lockResult;
+    try {
+      lockResult = await sql`
+        UPDATE proposals
+        SET is_locked = true,
+            lock_count = ${newLockCount},
+            last_locked_at = now(),
+            unlock_deadline = NULL,
+            version = version + 1,
+            last_modified_by = ${sessionUser.id}::uuid
+        WHERE id = ${proposalId}
+          AND is_locked = false
+          AND version = ${proposal.version}
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/lock] lock update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (lockResult.count === 0) {
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
@@ -215,16 +233,27 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       isLocked: boolean;
       lockCount: number;
       version: number;
-    }[]>`
-      SELECT id, is_locked, lock_count, version FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        isLocked: boolean;
+        lockCount: number;
+        version: number;
+      }[]>`
+        SELECT id, is_locked, lock_count, version FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/lock] DELETE proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -250,17 +279,23 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     const unlockDeadline = new Date();
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
-    const unlockResult = await sql`
-      UPDATE proposals
-      SET is_locked = false,
-          last_unlocked_at = now(),
-          unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null},
-          version = version + 1,
-          last_modified_by = ${sessionUser.id}::uuid
-      WHERE id = ${proposalId}
-        AND is_locked = true
-        AND version = ${proposal.version}
-    `;
+    let unlockResult;
+    try {
+      unlockResult = await sql`
+        UPDATE proposals
+        SET is_locked = false,
+            last_unlocked_at = now(),
+            unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null},
+            version = version + 1,
+            last_modified_by = ${sessionUser.id}::uuid
+        WHERE id = ${proposalId}
+          AND is_locked = true
+          AND version = ${proposal.version}
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/lock] unlock update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (unlockResult.count === 0) {
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });

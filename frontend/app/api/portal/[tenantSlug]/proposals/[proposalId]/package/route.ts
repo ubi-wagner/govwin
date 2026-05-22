@@ -72,17 +72,28 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── 1. Verify proposal belongs to tenant ────────────────────
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       title: string;
       stage: string;
       gateConfig: unknown;
-    }[]>`
-      SELECT id, title, stage, gate_config
-      FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        title: string;
+        stage: string;
+        gateConfig: unknown;
+      }[]>`
+        SELECT id, title, stage, gate_config
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -92,22 +103,35 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── 2. Fetch all sections ordered by section_number ──────
-    const sections = await sql<{
+    let sections: {
       id: string;
       sectionNumber: string;
       title: string;
       content: string | null;
       status: string;
       pageAllocation: number | null;
-    }[]>`
-      SELECT id, section_number, title, content, status, page_allocation
-      FROM proposal_sections
-      WHERE proposal_id = ${proposalId}::uuid
-      ORDER BY section_number ASC
-    `;
+    }[];
+    try {
+      sections = await sql<{
+        id: string;
+        sectionNumber: string;
+        title: string;
+        content: string | null;
+        status: string;
+        pageAllocation: number | null;
+      }[]>`
+        SELECT id, section_number, title, content, status, page_allocation
+        FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY section_number ASC
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] sections query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── 3. Fetch compliance data via solicitation_id ─────────
-    const complianceRows = await sql<{
+    let complianceRows: {
       id: string;
       pageLimitTechnical: number | null;
       pageLimitCost: number | null;
@@ -126,17 +150,23 @@ export async function POST(request: Request, ctx: RouteContext) {
       customVariables: unknown;
       verifiedBy: string | null;
       verifiedAt: string | null;
-    }[]>`
-      SELECT id, page_limit_technical, page_limit_cost,
-             font_family, font_size, margins, line_spacing,
-             header_required, header_format, footer_required, footer_format,
-             submission_format, required_sections, required_documents,
-             evaluation_criteria, custom_variables, verified_by, verified_at
-      FROM solicitation_compliance
-      WHERE solicitation_id = (
-        SELECT solicitation_id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
-      )
-    `;
+    }[];
+    try {
+      complianceRows = await sql<typeof complianceRows>`
+        SELECT id, page_limit_technical, page_limit_cost,
+               font_family, font_size, margins, line_spacing,
+               header_required, header_format, footer_required, footer_format,
+               submission_format, required_sections, required_documents,
+               evaluation_criteria, custom_variables, verified_by, verified_at
+        FROM solicitation_compliance
+        WHERE solicitation_id = (
+          SELECT solicitation_id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
+        )
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] compliance query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── 4. Extract readable text from each section's JSON content
     const sectionData = sections.map((s) => {
@@ -238,11 +268,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     const verifiedCount = complianceData?.verifiedAt ? 1 : 0;
 
     // ── 6. Increment download_count ──────────────────────────
-    await sql`
-      UPDATE proposals
-      SET download_count = COALESCE(download_count, 0) + 1
-      WHERE id = ${proposalId}
-    `;
+    try {
+      await sql`
+        UPDATE proposals
+        SET download_count = COALESCE(download_count, 0) + 1
+        WHERE id = ${proposalId}
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] download_count update failed:', e);
+    }
 
     // ── 7. Emit event ────────────────────────────────────────
     await emitEventSingle({

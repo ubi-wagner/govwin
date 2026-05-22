@@ -51,39 +51,56 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    const [app] = await sql<{ id: string; status: string; companyName: string; contactEmail: string }[]>`
-      SELECT id, status, company_name, contact_email FROM applications WHERE id = ${id} LIMIT 1
-    `;
+    let app: { id: string; status: string; companyName: string; contactEmail: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; status: string; companyName: string; contactEmail: string }[]>`
+        SELECT id, status, company_name, contact_email FROM applications WHERE id = ${id} LIMIT 1
+      `;
+      app = rows[0];
+    } catch (e) {
+      console.error('[admin/applications/status] lookup query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!app) {
       return NextResponse.json({ error: 'Application not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     const previousStatus = app.status;
 
-    await sql`
-      UPDATE applications
-      SET status = ${body.status},
-          reviewed_by = ${userId},
-          reviewed_at = now(),
-          review_notes = ${body.note.trim()}
-      WHERE id = ${id}
-    `;
+    try {
+      await sql`
+        UPDATE applications
+        SET status = ${body.status},
+            reviewed_by = ${userId},
+            reviewed_at = now(),
+            review_notes = ${body.note.trim()}
+        WHERE id = ${id}
+      `;
+    } catch (e) {
+      console.error('[admin/applications/status] update query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'application.status_changed',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        applicationId: id,
-        companyName: app.companyName,
-        contactEmail: app.contactEmail,
-        previousStatus,
-        newStatus: body.status,
-        note: body.note.trim(),
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'application.status_changed',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          applicationId: id,
+          companyName: app.companyName,
+          contactEmail: app.contactEmail,
+          previousStatus,
+          newStatus: body.status,
+          note: body.note.trim(),
+        },
+      });
+    } catch (e) {
+      console.error('[admin/applications/status] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({
       data: { previousStatus, newStatus: body.status },

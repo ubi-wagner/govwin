@@ -430,9 +430,16 @@ export async function POST(request: Request) {
     const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
 
     // 4. Check for duplicate upload
-    const [existingUpload] = await sql<{ id: string; filename: string }[]>`
-      SELECT id, filename FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
-    `;
+    let existingUpload: { id: string; filename: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; filename: string }[]>`
+        SELECT id, filename FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
+      `;
+      existingUpload = rows[0];
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] duplicate check query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existingUpload) {
       return NextResponse.json(
         { error: `This file has already been uploaded (matched ${existingUpload.filename})`, code: 'VALIDATION_ERROR' },
@@ -529,15 +536,25 @@ export async function POST(request: Request) {
     }
 
     // 9. Record upload
-    await sql`
-      INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by)
-      VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId})
-    `;
+    try {
+      await sql`
+        INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by)
+        VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId})
+      `;
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] upload record insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // 10. End event
-    await emitEventEnd(eventId, {
-      result: { fileType, rowCount, filename },
-    });
+    // 10. End event (non-fatal)
+    try {
+      await emitEventEnd(eventId, {
+        result: { fileType, rowCount, filename },
+      });
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] event end failed:', e);
+      // non-fatal, continue
+    }
 
     // 11. Return result
     return NextResponse.json({
@@ -568,9 +585,15 @@ export async function GET() {
       return NextResponse.json({ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const uploads = await sql`
-      SELECT * FROM sbir_data_uploads ORDER BY created_at DESC LIMIT 20
-    `;
+    let uploads;
+    try {
+      uploads = await sql`
+        SELECT * FROM sbir_data_uploads ORDER BY created_at DESC LIMIT 20
+      `;
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] uploads query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { uploads } });
   } catch (e) {

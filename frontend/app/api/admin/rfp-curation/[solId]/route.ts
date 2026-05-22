@@ -50,14 +50,20 @@ export async function GET(
     }
 
     // ── Main solicitation + opportunity join ─────────────────────────
-    const rows = await sql`
-      SELECT cs.*, o.*,
-             cs.id AS solicitation_id,
-             o.id AS opportunity_id
-      FROM curated_solicitations cs
-      JOIN opportunities o ON o.id = cs.opportunity_id
-      WHERE cs.id = ${solId}::uuid
-    `;
+    let rows;
+    try {
+      rows = await sql`
+        SELECT cs.*, o.*,
+               cs.id AS solicitation_id,
+               o.id AS opportunity_id
+        FROM curated_solicitations cs
+        JOIN opportunities o ON o.id = cs.opportunity_id
+        WHERE cs.id = ${solId}::uuid
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/detail] solicitation query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -69,46 +75,52 @@ export async function GET(
     const solicitation = rows[0];
 
     // ── Fetch related data in parallel ──────────────────────────────
-    const [topics, documents, volumes, compliance] = await Promise.all([
-      sql`
-        SELECT id, topic_number, title, topic_branch, topic_status,
-               tech_focus_areas, close_date, is_active, created_at
-        FROM opportunities
-        WHERE solicitation_id = ${solId}::uuid
-        ORDER BY topic_number ASC NULLS LAST, created_at ASC
-      `,
-      sql`
-        SELECT id, document_type, original_filename, storage_key,
-               file_size, content_type, extracted_at, is_primary, created_at
-        FROM solicitation_documents
-        WHERE solicitation_id = ${solId}::uuid
-        ORDER BY is_primary DESC, created_at ASC
-      `,
-      sql`
-        SELECT v.id, v.volume_number, v.volume_name, v.volume_format,
-               v.description, v.special_requirements,
-               json_agg(
-                 json_build_object(
-                   'id', ri.id,
-                   'itemName', ri.item_name,
-                   'itemNumber', ri.item_number,
-                   'itemType', ri.item_type,
-                   'required', ri.required,
-                   'pageLimit', ri.page_limit,
-                   'slideLimit', ri.slide_limit
-                 ) ORDER BY ri.item_number ASC
-               ) FILTER (WHERE ri.id IS NOT NULL) AS required_items
-        FROM solicitation_volumes v
-        LEFT JOIN volume_required_items ri ON ri.volume_id = v.id
-        WHERE v.solicitation_id = ${solId}::uuid
-        GROUP BY v.id
-        ORDER BY v.volume_number ASC
-      `,
-      sql`
-        SELECT * FROM solicitation_compliance
-        WHERE solicitation_id = ${solId}::uuid
-      `,
-    ]);
+    let topics, documents, volumes, compliance;
+    try {
+      [topics, documents, volumes, compliance] = await Promise.all([
+        sql`
+          SELECT id, topic_number, title, topic_branch, topic_status,
+                 tech_focus_areas, close_date, is_active, created_at
+          FROM opportunities
+          WHERE solicitation_id = ${solId}::uuid
+          ORDER BY topic_number ASC NULLS LAST, created_at ASC
+        `,
+        sql`
+          SELECT id, document_type, original_filename, storage_key,
+                 file_size, content_type, extracted_at, is_primary, created_at
+          FROM solicitation_documents
+          WHERE solicitation_id = ${solId}::uuid
+          ORDER BY is_primary DESC, created_at ASC
+        `,
+        sql`
+          SELECT v.id, v.volume_number, v.volume_name, v.volume_format,
+                 v.description, v.special_requirements,
+                 json_agg(
+                   json_build_object(
+                     'id', ri.id,
+                     'itemName', ri.item_name,
+                     'itemNumber', ri.item_number,
+                     'itemType', ri.item_type,
+                     'required', ri.required,
+                     'pageLimit', ri.page_limit,
+                     'slideLimit', ri.slide_limit
+                   ) ORDER BY ri.item_number ASC
+                 ) FILTER (WHERE ri.id IS NOT NULL) AS required_items
+          FROM solicitation_volumes v
+          LEFT JOIN volume_required_items ri ON ri.volume_id = v.id
+          WHERE v.solicitation_id = ${solId}::uuid
+          GROUP BY v.id
+          ORDER BY v.volume_number ASC
+        `,
+        sql`
+          SELECT * FROM solicitation_compliance
+          WHERE solicitation_id = ${solId}::uuid
+        `,
+      ]);
+    } catch (e) {
+      console.error('[rfp-curation/detail] related data query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({
       data: {

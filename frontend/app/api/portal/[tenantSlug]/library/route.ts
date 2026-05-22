@@ -271,51 +271,56 @@ export async function POST(
   // ---------- Execute ----------
     let result: { count: number };
 
-    switch (action) {
-      case 'approve':
-        result = await sql`
-          UPDATE library_units
-          SET status = 'approved', updated_at = now()
-          WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
-        `;
-        break;
+    try {
+      switch (action) {
+        case 'approve':
+          result = await sql`
+            UPDATE library_units
+            SET status = 'approved', updated_at = now()
+            WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
+          `;
+          break;
 
-      case 'archive':
-        result = await sql`
-          UPDATE library_units
-          SET status = 'archived', updated_at = now()
-          WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
-        `;
-        break;
+        case 'archive':
+          result = await sql`
+            UPDATE library_units
+            SET status = 'archived', updated_at = now()
+            WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
+          `;
+          break;
 
-      case 'delete':
-        result = await sql`
-          DELETE FROM library_units
-          WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
-        `;
-        break;
+        case 'delete':
+          result = await sql`
+            DELETE FROM library_units
+            WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
+          `;
+          break;
 
-      case 'set_category':
-        result = await sql`
-          UPDATE library_units
-          SET category = ${newCategory!}, updated_at = now()
-          WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
-        `;
-        break;
+        case 'set_category':
+          result = await sql`
+            UPDATE library_units
+            SET category = ${newCategory!}, updated_at = now()
+            WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
+          `;
+          break;
 
-      case 'add_tags':
-        result = await sql`
-          UPDATE library_units
-          SET tags = tags || ${sql.array(newTags!)}, updated_at = now()
-          WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
-        `;
-        break;
+        case 'add_tags':
+          result = await sql`
+            UPDATE library_units
+            SET tags = tags || ${sql.array(newTags!)}, updated_at = now()
+            WHERE id = ANY(${unitIds}::uuid[]) AND tenant_id = ${tenantId}::uuid
+          `;
+          break;
 
-      default:
-        return NextResponse.json(
-          { error: 'Unhandled action', code: 'VALIDATION_ERROR' },
-          { status: 400 },
-        );
+        default:
+          return NextResponse.json(
+            { error: 'Unhandled action', code: 'VALIDATION_ERROR' },
+            { status: 400 },
+          );
+      }
+    } catch (e) {
+      console.error('[library/bulk] query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     await emitEventSingle({

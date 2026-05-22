@@ -67,7 +67,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── 1. Fetch spotlight + verify it belongs to this tenant ───
-    const [spotlight] = await sql<{
+    let spotlight: {
       id: string;
       name: string;
       description: string | null;
@@ -79,13 +79,31 @@ export async function GET(request: Request, ctx: RouteContext) {
       isActive: boolean;
       createdAt: string;
       updatedAt: string;
-    }[]>`
-      SELECT id, name, description, naics_codes, keywords, agencies,
-             program_types, min_score, is_active, created_at, updated_at
-      FROM spotlights
-      WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [spotlight] = await sql<{
+        id: string;
+        name: string;
+        description: string | null;
+        naicsCodes: string[];
+        keywords: string[];
+        agencies: string[];
+        programTypes: string[];
+        minScore: number;
+        isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
+      }[]>`
+        SELECT id, name, description, naics_codes, keywords, agencies,
+               program_types, min_score, is_active, created_at, updated_at
+        FROM spotlights
+        WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/spotlights/detail] spotlight query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!spotlight) {
       return NextResponse.json(
@@ -95,7 +113,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── 2. Fetch scored items matching spotlight filters ─────
-    const items = await sql<{
+    let items: {
       opportunityId: string;
       title: string;
       agency: string | null;
@@ -105,17 +123,23 @@ export async function GET(request: Request, ctx: RouteContext) {
       pursuitStatus: string;
       solicitationNumber: string | null;
       programType: string | null;
-    }[]>`
-      SELECT o.id AS opportunity_id, o.title, o.agency, o.close_date,
-             tpi.total_score, tpi.is_pinned, tpi.pursuit_status,
-             o.solicitation_number, o.program_type
-      FROM tenant_pipeline_items tpi
-      JOIN opportunities o ON o.id = tpi.opportunity_id
-      WHERE tpi.tenant_id = ${tenantId}::uuid
-        AND tpi.total_score >= ${spotlight.minScore}
-      ORDER BY tpi.total_score DESC
-      LIMIT 50
-    `;
+    }[];
+    try {
+      items = await sql<typeof items>`
+        SELECT o.id AS opportunity_id, o.title, o.agency, o.close_date,
+               tpi.total_score, tpi.is_pinned, tpi.pursuit_status,
+               o.solicitation_number, o.program_type
+        FROM tenant_pipeline_items tpi
+        JOIN opportunities o ON o.id = tpi.opportunity_id
+        WHERE tpi.tenant_id = ${tenantId}::uuid
+          AND tpi.total_score >= ${spotlight.minScore}
+        ORDER BY tpi.total_score DESC
+        LIMIT 50
+      `;
+    } catch (e) {
+      console.error('[portal/spotlights/detail] items query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({
       data: {
@@ -187,11 +211,17 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify spotlight exists and belongs to tenant ────────
-    const [existing] = await sql<{ id: string }[]>`
-      SELECT id FROM spotlights
-      WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
-      LIMIT 1
-    `;
+    let existing: { id: string } | undefined;
+    try {
+      [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM spotlights
+        WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/spotlights/update] spotlight query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!existing) {
       return NextResponse.json(
         { error: 'Spotlight not found', code: 'NOT_FOUND' },
@@ -217,17 +247,22 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // Apply updates using individual conditional UPDATEs to avoid dynamic SQL
-    if (name !== undefined) await sql`UPDATE spotlights SET name = ${name}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (description !== undefined) await sql`UPDATE spotlights SET description = ${description}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (naicsCodes !== undefined) await sql`UPDATE spotlights SET naics_codes = ${sql.array(naicsCodes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (keywords !== undefined) await sql`UPDATE spotlights SET keywords = ${sql.array(keywords)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (agencies !== undefined) await sql`UPDATE spotlights SET agencies = ${sql.array(agencies)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (programTypes !== undefined) await sql`UPDATE spotlights SET program_types = ${sql.array(programTypes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (minScore !== undefined) await sql`UPDATE spotlights SET min_score = ${minScore}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-    if (isActive !== undefined) await sql`UPDATE spotlights SET is_active = ${isActive}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+    try {
+      if (name !== undefined) await sql`UPDATE spotlights SET name = ${name}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (description !== undefined) await sql`UPDATE spotlights SET description = ${description}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (naicsCodes !== undefined) await sql`UPDATE spotlights SET naics_codes = ${sql.array(naicsCodes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (keywords !== undefined) await sql`UPDATE spotlights SET keywords = ${sql.array(keywords)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (agencies !== undefined) await sql`UPDATE spotlights SET agencies = ${sql.array(agencies)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (programTypes !== undefined) await sql`UPDATE spotlights SET program_types = ${sql.array(programTypes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (minScore !== undefined) await sql`UPDATE spotlights SET min_score = ${minScore}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      if (isActive !== undefined) await sql`UPDATE spotlights SET is_active = ${isActive}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+    } catch (e) {
+      console.error('[portal/spotlights/update] spotlight update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // Fetch the updated spotlight to return
-    const [updated] = await sql<{
+    let updated: {
       id: string;
       name: string;
       description: string | null;
@@ -238,13 +273,30 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       minScore: number;
       isActive: boolean;
       updatedAt: string;
-    }[]>`
-      SELECT id, name, description, naics_codes, keywords, agencies,
-             program_types, min_score, is_active, updated_at
-      FROM spotlights
-      WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [updated] = await sql<{
+        id: string;
+        name: string;
+        description: string | null;
+        naicsCodes: string[];
+        keywords: string[];
+        agencies: string[];
+        programTypes: string[];
+        minScore: number;
+        isActive: boolean;
+        updatedAt: string;
+      }[]>`
+        SELECT id, name, description, naics_codes, keywords, agencies,
+               program_types, min_score, is_active, updated_at
+        FROM spotlights
+        WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/spotlights/update] spotlight re-fetch failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { spotlight: updated } });
   } catch (err) {
@@ -300,11 +352,17 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     }
 
     // ── Delete spotlight ──────────────────────────────────────
-    const deleted = await sql<{ id: string }[]>`
-      DELETE FROM spotlights
-      WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
-      RETURNING id
-    `;
+    let deleted: { id: string }[];
+    try {
+      deleted = await sql<{ id: string }[]>`
+        DELETE FROM spotlights
+        WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
+        RETURNING id
+      `;
+    } catch (e) {
+      console.error('[portal/spotlights/delete] delete query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (deleted.length === 0) {
       return NextResponse.json(

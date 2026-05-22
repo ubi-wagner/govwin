@@ -48,18 +48,24 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // ── Query diffs ─────────────────────────────────────────────────
-    const diffs = await sql`
-      SELECT sd.id, sd.profile_id, sd.region_id, sd.is_meaningful,
-             sd.summary, sd.severity, sd.claude_model,
-             sd.claude_tokens_used, sd.reviewed_by, sd.reviewed_at,
-             sd.created_at,
-             sr.name AS region_name
-      FROM source_diffs sd
-      LEFT JOIN source_regions sr ON sr.id = sd.region_id
-      WHERE sd.profile_id = ${profileId}::uuid
-      ORDER BY sd.created_at DESC
-      LIMIT 50
-    `;
+    let diffs;
+    try {
+      diffs = await sql`
+        SELECT sd.id, sd.profile_id, sd.region_id, sd.is_meaningful,
+               sd.summary, sd.severity, sd.claude_model,
+               sd.claude_tokens_used, sd.reviewed_by, sd.reviewed_at,
+               sd.created_at,
+               sr.name AS region_name
+        FROM source_diffs sd
+        LEFT JOIN source_regions sr ON sr.id = sd.region_id
+        WHERE sd.profile_id = ${profileId}::uuid
+        ORDER BY sd.created_at DESC
+        LIMIT 50
+      `;
+    } catch (e) {
+      console.error('[admin/sources/diffs] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { diffs } });
   } catch (e) {
@@ -129,15 +135,22 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Update ──────────────────────────────────────────────────────
-    const [diff] = await sql<{ id: string }[]>`
-      UPDATE source_diffs
-      SET reviewed_by = ${userId}::uuid,
-          reviewed_at = now()
-      WHERE id = ${diffId}::uuid
-        AND profile_id = ${profileId}::uuid
-        AND reviewed_at IS NULL
-      RETURNING id
-    `;
+    let diff: { id: string } | undefined;
+    try {
+      const rows = await sql<{ id: string }[]>`
+        UPDATE source_diffs
+        SET reviewed_by = ${userId}::uuid,
+            reviewed_at = now()
+        WHERE id = ${diffId}::uuid
+          AND profile_id = ${profileId}::uuid
+          AND reviewed_at IS NULL
+        RETURNING id
+      `;
+      diff = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/diffs] PATCH update query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!diff) {
       return NextResponse.json(
@@ -146,17 +159,22 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source_diff.reviewed',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId: randomUUID(),
-        sourceId: profileId,
-        diffId: diff.id,
-      },
-    });
+    // ── Emit event (non-fatal) ─────────────────────────────────────
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'source_diff.reviewed',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        payload: {
+          correlationId: randomUUID(),
+          sourceId: profileId,
+          diffId: diff.id,
+        },
+      });
+    } catch (e) {
+      console.error('[admin/sources/diffs] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { reviewed: true } });
   } catch (e) {

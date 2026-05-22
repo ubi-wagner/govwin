@@ -71,11 +71,17 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/gates] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
@@ -86,7 +92,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     const url = new URL(request.url);
     const stageFilter = url.searchParams.get('stage');
 
-    let requirements: {
+    type RequirementRow = {
       id: string;
       proposalId: string;
       stage: string;
@@ -99,25 +105,31 @@ export async function GET(request: Request, ctx: RouteContext) {
       evidence: Record<string, unknown>;
       createdAt: Date;
       updatedAt: Date;
-    }[];
+    };
 
-    if (stageFilter) {
-      requirements = await sql<typeof requirements>`
-        SELECT id, proposal_id, stage, requirement_type, label, description,
-               is_met, met_by, met_at, evidence, created_at, updated_at
-        FROM stage_gate_requirements
-        WHERE proposal_id = ${proposalId}::uuid
-          AND stage = ${stageFilter}
-        ORDER BY created_at ASC
-      `;
-    } else {
-      requirements = await sql<typeof requirements>`
-        SELECT id, proposal_id, stage, requirement_type, label, description,
-               is_met, met_by, met_at, evidence, created_at, updated_at
-        FROM stage_gate_requirements
-        WHERE proposal_id = ${proposalId}::uuid
-        ORDER BY stage ASC, created_at ASC
-      `;
+    let requirements: RequirementRow[];
+    try {
+      if (stageFilter) {
+        requirements = await sql<RequirementRow[]>`
+          SELECT id, proposal_id, stage, requirement_type, label, description,
+                 is_met, met_by, met_at, evidence, created_at, updated_at
+          FROM stage_gate_requirements
+          WHERE proposal_id = ${proposalId}::uuid
+            AND stage = ${stageFilter}
+          ORDER BY created_at ASC
+        `;
+      } else {
+        requirements = await sql<RequirementRow[]>`
+          SELECT id, proposal_id, stage, requirement_type, label, description,
+                 is_met, met_by, met_at, evidence, created_at, updated_at
+          FROM stage_gate_requirements
+          WHERE proposal_id = ${proposalId}::uuid
+          ORDER BY stage ASC, created_at ASC
+        `;
+      }
+    } catch (e) {
+      console.error('[portal/proposals/gates] requirements query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -213,11 +225,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/gates] POST proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
@@ -267,12 +285,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    const [requirement] = await sql<{ id: string; createdAt: Date }[]>`
-      INSERT INTO stage_gate_requirements
-        (proposal_id, stage, requirement_type, label, description)
-      VALUES (${proposalId}::uuid, ${stage}, ${requirementType}, ${label}, ${description})
-      RETURNING id, created_at
-    `;
+    let requirement: { id: string; createdAt: Date };
+    try {
+      [requirement] = await sql<{ id: string; createdAt: Date }[]>`
+        INSERT INTO stage_gate_requirements
+          (proposal_id, stage, requirement_type, label, description)
+        VALUES (${proposalId}::uuid, ${stage}, ${requirementType}, ${label}, ${description})
+        RETURNING id, created_at
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/gates] requirement insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({
       data: {
@@ -361,11 +385,17 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/gates] PATCH proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
@@ -409,28 +439,33 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       : {};
 
     let updateResult;
-    if (isMet) {
-      updateResult = await sql`
-        UPDATE stage_gate_requirements
-        SET is_met = true,
-            met_by = ${sessionUser.id}::uuid,
-            met_at = now(),
-            evidence = ${JSON.stringify(evidence)}::jsonb,
-            updated_at = now()
-        WHERE id = ${requirementId}::uuid
-          AND proposal_id = ${proposalId}::uuid
-      `;
-    } else {
-      updateResult = await sql`
-        UPDATE stage_gate_requirements
-        SET is_met = false,
-            met_by = NULL,
-            met_at = NULL,
-            evidence = '{}'::jsonb,
-            updated_at = now()
-        WHERE id = ${requirementId}::uuid
-          AND proposal_id = ${proposalId}::uuid
-      `;
+    try {
+      if (isMet) {
+        updateResult = await sql`
+          UPDATE stage_gate_requirements
+          SET is_met = true,
+              met_by = ${sessionUser.id}::uuid,
+              met_at = now(),
+              evidence = ${JSON.stringify(evidence)}::jsonb,
+              updated_at = now()
+          WHERE id = ${requirementId}::uuid
+            AND proposal_id = ${proposalId}::uuid
+        `;
+      } else {
+        updateResult = await sql`
+          UPDATE stage_gate_requirements
+          SET is_met = false,
+              met_by = NULL,
+              met_at = NULL,
+              evidence = '{}'::jsonb,
+              updated_at = now()
+          WHERE id = ${requirementId}::uuid
+            AND proposal_id = ${proposalId}::uuid
+        `;
+      }
+    } catch (e) {
+      console.error('[portal/proposals/gates] requirement update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (updateResult.count === 0) {

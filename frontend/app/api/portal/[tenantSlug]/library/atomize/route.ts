@@ -79,34 +79,44 @@ export async function POST(request: Request, ctx: RouteContext) {
   // Actual columns: id, tenant_id, content, category, subcategory, tags,
   //   embedding, confidence, status, source_type, source_id, usage_count,
   //   parent_unit_id, created_at, updated_at (plus 017 migration columns)
-  const pending = fileIds
-    ? await sql<{
-        id: string;
-        sourceId: string | null;
-        tags: string[] | null;
-      }[]>`
-        SELECT id, source_id, tags
-        FROM library_units
-        WHERE tenant_id = ${tenantId}::uuid
-          AND status = 'draft'
-          AND content = '[pending extraction]'
-          AND id = ANY(${fileIds}::uuid[])
-        ORDER BY created_at ASC
-        LIMIT 20
-      `
-    : await sql<{
-        id: string;
-        sourceId: string | null;
-        tags: string[] | null;
-      }[]>`
-        SELECT id, source_id, tags
-        FROM library_units
-        WHERE tenant_id = ${tenantId}::uuid
-          AND status = 'draft'
-          AND content = '[pending extraction]'
-        ORDER BY created_at ASC
-        LIMIT 20
-      `;
+  let pending: {
+    id: string;
+    sourceId: string | null;
+    tags: string[] | null;
+  }[];
+  try {
+    pending = fileIds
+      ? await sql<{
+          id: string;
+          sourceId: string | null;
+          tags: string[] | null;
+        }[]>`
+          SELECT id, source_id, tags
+          FROM library_units
+          WHERE tenant_id = ${tenantId}::uuid
+            AND status = 'draft'
+            AND content = '[pending extraction]'
+            AND id = ANY(${fileIds}::uuid[])
+          ORDER BY created_at ASC
+          LIMIT 20
+        `
+      : await sql<{
+          id: string;
+          sourceId: string | null;
+          tags: string[] | null;
+        }[]>`
+          SELECT id, source_id, tags
+          FROM library_units
+          WHERE tenant_id = ${tenantId}::uuid
+            AND status = 'draft'
+            AND content = '[pending extraction]'
+          ORDER BY created_at ASC
+          LIMIT 20
+        `;
+  } catch (e) {
+    console.error('[library/atomize] pending query failed:', e);
+    return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+  }
 
   if (pending.length === 0) {
     return NextResponse.json({ data: { atomized: 0, atomsCreated: 0, atoms: [], message: 'No pending documents' } });
@@ -131,7 +141,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Storage key: check source_id column (upload route stores it there)
     const storageKey = unit.sourceId;
     if (!storageKey) {
-      await sql`UPDATE library_units SET status = 'archived', content = '[no storage key]' WHERE id = ${unit.id}::uuid`;
+      try {
+        await sql`UPDATE library_units SET status = 'archived', content = '[no storage key]' WHERE id = ${unit.id}::uuid`;
+      } catch (e) {
+        console.error('[library/atomize] archive no-key unit failed:', e);
+      }
       continue;
     }
 
@@ -162,7 +176,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     if (!fileBytes || fileBytes.length === 0) {
-      await sql`UPDATE library_units SET status = 'archived', content = '[empty file]' WHERE id = ${unit.id}::uuid`;
+      try {
+        await sql`UPDATE library_units SET status = 'archived', content = '[empty file]' WHERE id = ${unit.id}::uuid`;
+      } catch (e) {
+        console.error('[library/atomize] archive empty-file unit failed:', e);
+      }
       continue;
     }
 
@@ -195,7 +213,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     } catch (err) {
       console.error(`[atomize] Reader failed for ${storageKey} (ext=${ext})`, err);
-      await sql`UPDATE library_units SET status = 'archived', content = '[extraction failed]' WHERE id = ${unit.id}::uuid`;
+      try {
+        await sql`UPDATE library_units SET status = 'archived', content = '[extraction failed]' WHERE id = ${unit.id}::uuid`;
+      } catch (dbErr) {
+        console.error('[library/atomize] archive extraction-failed unit failed:', dbErr);
+      }
       continue;
     }
 
@@ -205,17 +227,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       .join('\n\n');
 
     // Mark the parent unit as seminal and update with full extracted text + metadata
-    await sql`
-      UPDATE library_units
-      SET content = ${fullText.slice(0, 100000)},
-          status = 'approved',
-          is_seminal = true,
-          source_filename = ${sourceFilename},
-          source_storage_key = ${storageKey},
-          document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
-          updated_at = now()
-      WHERE id = ${unit.id}::uuid
-    `;
+    try {
+      await sql`
+        UPDATE library_units
+        SET content = ${fullText.slice(0, 100000)},
+            status = 'approved',
+            is_seminal = true,
+            source_filename = ${sourceFilename},
+            source_storage_key = ${storageKey},
+            document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
+            updated_at = now()
+        WHERE id = ${unit.id}::uuid
+      `;
+    } catch (dbErr) {
+      console.error(`[library/atomize] parent unit update failed for ${unit.id}:`, dbErr);
+      continue;
+    }
     atomized++;
 
     // Create child atoms with structured storage
@@ -225,29 +252,35 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       const atomType = getAtomType(atom);
 
-      const [row] = await sql<{ id: string }[]>`
-        INSERT INTO library_units
-          (tenant_id, content, category, tags, status, source_type, source_id,
-           parent_unit_id, canvas_nodes, document_metadata, source_filename,
-           source_storage_key, heading_text, char_offset, char_length)
-        VALUES
-          (${tenantId}::uuid,
-           ${atomContent.slice(0, 50000)},
-           ${atom.suggestedCategory},
-           ${sql.array(atom.suggestedTags)}::text[],
-           'draft',
-           'upload',
-           ${atomType},
-           ${unit.id}::uuid,
-           ${JSON.stringify(atom.nodes)}::jsonb,
-           ${JSON.stringify(importResult.metadata)}::jsonb,
-           ${importResult.sourceFilename},
-           ${storageKey},
-           ${atom.headingText},
-           ${atom.charOffset},
-           ${atom.charLength})
-        RETURNING id
-      `;
+      let row: { id: string };
+      try {
+        [row] = await sql<{ id: string }[]>`
+          INSERT INTO library_units
+            (tenant_id, content, category, tags, status, source_type, source_id,
+             parent_unit_id, canvas_nodes, document_metadata, source_filename,
+             source_storage_key, heading_text, char_offset, char_length)
+          VALUES
+            (${tenantId}::uuid,
+             ${atomContent.slice(0, 50000)},
+             ${atom.suggestedCategory},
+             ${sql.array(atom.suggestedTags)}::text[],
+             'draft',
+             'upload',
+             ${atomType},
+             ${unit.id}::uuid,
+             ${JSON.stringify(atom.nodes)}::jsonb,
+             ${JSON.stringify(importResult.metadata)}::jsonb,
+             ${importResult.sourceFilename},
+             ${storageKey},
+             ${atom.headingText},
+             ${atom.charOffset},
+             ${atom.charLength})
+          RETURNING id
+        `;
+      } catch (dbErr) {
+        console.error(`[library/atomize] atom insert failed for unit ${unit.id}:`, dbErr);
+        continue;
+      }
 
       totalAtomsCreated++;
       allAtomInfo.push({

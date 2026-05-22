@@ -319,19 +319,24 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'compliance.preset_applied',
-      actor: { type: 'user', id: user.id ?? 'unknown' },
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        solicitationId: solId,
-        topicIds,
-        presetId: (body.presetId as string) ?? null,
-        topicCount: topicIds.length,
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'compliance.preset_applied',
+        actor: { type: 'user', id: user.id ?? 'unknown' },
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          solicitationId: solId,
+          topicIds,
+          presetId: (body.presetId as string) ?? null,
+          topicCount: topicIds.length,
+        },
+      });
+    } catch (e) {
+      console.error('[apply-preset] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({
       data: { applied: topicIds.length, topicIds },

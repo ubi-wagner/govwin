@@ -378,13 +378,18 @@ export async function POST(
     });
 
     // 3. Archive all existing child atoms
-    await sql`
-      UPDATE library_units
-      SET status = 'archived', updated_at = now()
-      WHERE parent_unit_id = ${ctx.unitId}::uuid
-        AND tenant_id = ${ctx.tenantId}::uuid
-        AND status != 'archived'
-    `;
+    try {
+      await sql`
+        UPDATE library_units
+        SET status = 'archived', updated_at = now()
+        WHERE parent_unit_id = ${ctx.unitId}::uuid
+          AND tenant_id = ${ctx.tenantId}::uuid
+          AND status != 'archived'
+      `;
+    } catch (err) {
+      console.error('[library/unit/reatomize] archive child atoms failed:', err);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // 4. Re-read the original file from S3
     let fileBytes: Buffer | null = null;
@@ -447,13 +452,18 @@ export async function POST(
       .map((atom) => atom.nodes.map(getNodeText).join('\n'))
       .join('\n\n');
 
-    await sql`
-      UPDATE library_units
-      SET content = ${fullText.slice(0, 100000)},
-          document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
-          updated_at = now()
-      WHERE id = ${ctx.unitId}::uuid
-    `;
+    try {
+      await sql`
+        UPDATE library_units
+        SET content = ${fullText.slice(0, 100000)},
+            document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
+            updated_at = now()
+        WHERE id = ${ctx.unitId}::uuid
+      `;
+    } catch (err) {
+      console.error('[library/unit/reatomize] parent unit update failed:', err);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // 7. Create new child atoms
     let atomsCreated = 0;
@@ -463,28 +473,33 @@ export async function POST(
 
       const atomType = getAtomType(atom);
 
-      await sql`
-        INSERT INTO library_units
-          (tenant_id, content, category, tags, status, source_type, source_id,
-           parent_unit_id, canvas_nodes, document_metadata, source_filename,
-           source_storage_key, heading_text, char_offset, char_length)
-        VALUES
-          (${ctx.tenantId}::uuid,
-           ${atomContent.slice(0, 50000)},
-           ${atom.suggestedCategory},
-           ${sql.array(atom.suggestedTags)}::text[],
-           'draft',
-           'upload',
-           ${atomType},
-           ${ctx.unitId}::uuid,
-           ${JSON.stringify(atom.nodes)}::jsonb,
-           ${JSON.stringify(importResult.metadata)}::jsonb,
-           ${importResult.sourceFilename},
-           ${unit.sourceStorageKey},
-           ${atom.headingText},
-           ${atom.charOffset},
-           ${atom.charLength})
-      `;
+      try {
+        await sql`
+          INSERT INTO library_units
+            (tenant_id, content, category, tags, status, source_type, source_id,
+             parent_unit_id, canvas_nodes, document_metadata, source_filename,
+             source_storage_key, heading_text, char_offset, char_length)
+          VALUES
+            (${ctx.tenantId}::uuid,
+             ${atomContent.slice(0, 50000)},
+             ${atom.suggestedCategory},
+             ${sql.array(atom.suggestedTags)}::text[],
+             'draft',
+             'upload',
+             ${atomType},
+             ${ctx.unitId}::uuid,
+             ${JSON.stringify(atom.nodes)}::jsonb,
+             ${JSON.stringify(importResult.metadata)}::jsonb,
+             ${importResult.sourceFilename},
+             ${unit.sourceStorageKey},
+             ${atom.headingText},
+             ${atom.charOffset},
+             ${atom.charLength})
+        `;
+      } catch (err) {
+        console.error(`[library/unit/reatomize] child atom insert failed:`, err);
+        continue;
+      }
       atomsCreated++;
     }
 
