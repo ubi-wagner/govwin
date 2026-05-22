@@ -91,7 +91,7 @@ export function requiredRoleForPath(pathname: string): Role | null {
  * Rules:
  *   master_admin / rfp_admin      → /admin/dashboard
  *   tenant_admin / tenant_user    → /portal/<slug>/dashboard (if slug set)
- *   partner_user                  → /portal/<slug>/dashboard (if slug set)
+ *   partner_user                  → /portal/<slug>/proposals  (if slug set)
  *   any role with no tenant slug  → null (caller should show
  *                                   a "no workspace assigned" message)
  */
@@ -103,6 +103,11 @@ export function getLandingPath(
     return '/admin/dashboard';
   }
   if (tenantSlug) {
+    // Partner users land on the proposals list (restricted sidebar);
+    // tenant admins and tenant users land on the dashboard.
+    if (role === 'partner_user') {
+      return `/portal/${tenantSlug}/proposals`;
+    }
     return `/portal/${tenantSlug}/dashboard`;
   }
   return null;

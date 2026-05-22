@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { getPageBlocks, getPublishedContent, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 
 export const revalidate = 60;
 
@@ -20,6 +20,7 @@ export default async function LandingPage() {
   const expertGate = single(lookup['expert-gate']);
   const quote = single(lookup['quote']);
   const cta = single(lookup['cta']);
+  const blogPosts = await getPublishedContent('blog_post', 3);
   const DEFAULT_STATS = [
     { title: '4+', body: 'Federal Sources Ingested' },
     { title: '72h', body: 'Expert-Review SLA' },
@@ -167,10 +168,23 @@ export default async function LandingPage() {
               </h2>
             </div>
             <div className="bg-white border border-cream-200 rounded-xl p-8">
-              <p className="text-xs uppercase tracking-widest text-brand-500 mb-2">{(expertGate?.metadata as { expert_name?: string })?.expert_name ?? 'Eric Wagner'} — Founder &amp; Architect</p>
-              <h3 className="font-prose italic text-2xl text-navy-800">
-                25 years of federal R&amp;D funding.
-              </h3>
+              <div className="flex items-center gap-4 mb-4">
+                <a href="https://www.linkedin.com/in/eric-c-wagner/" target="_blank" rel="noopener noreferrer" className="shrink-0">
+                  <div className="w-16 h-16 rounded-full bg-navy-100 flex items-center justify-center overflow-hidden">
+                    <svg className="w-10 h-10 text-navy-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                    </svg>
+                  </div>
+                </a>
+                <div>
+                  <a href="https://www.linkedin.com/in/eric-c-wagner/" target="_blank" rel="noopener noreferrer" className="text-xs uppercase tracking-widest text-brand-500 font-semibold hover:text-brand-700 transition-colors">
+                    {(expertGate?.metadata as { expert_name?: string })?.expert_name ?? 'Eric Wagner'} — Founder &amp; Architect
+                  </a>
+                  <h3 className="font-prose italic text-2xl text-navy-800">
+                    25 years of federal R&amp;D funding.
+                  </h3>
+                </div>
+              </div>
               <p className="mt-4 text-sm text-navy-600 leading-relaxed">
                 {expertGate?.body ?? 'The Expert personally reviews every application, curates every solicitation released into your Spotlight, and is available for pre-submission review. As the service scales, additional experts will join the roster — you will always know which expert reviewed your pipeline.'}
               </p>
@@ -188,6 +202,60 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Latest Insights */}
+      {blogPosts.length > 0 && (
+        <section className="bg-white border-t border-cream-200">
+          <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
+            <div className="flex items-baseline justify-between mb-12">
+              <div>
+                <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-3">Latest Insights</p>
+                <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
+                  From the <span className="font-prose italic text-brand-500">blog</span>.
+                </h2>
+              </div>
+              <Link href="/blog" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors hidden md:block">
+                View all posts &rarr;
+              </Link>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {blogPosts.map((post) => (
+                <Link key={post.id} href={`/blog/${post.slug}`} className="group">
+                  <article className="h-full flex flex-col">
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {(post.tags ?? []).slice(0, 2).map((tag: string) => (
+                        <span key={tag} className="text-xs px-2 py-0.5 bg-cream-100 text-navy-500 rounded-full uppercase tracking-wider">{tag}</span>
+                      ))}
+                    </div>
+                    <h3 className="font-display text-lg font-bold text-navy-900 group-hover:text-brand-600 transition-colors leading-snug">
+                      {post.title}
+                    </h3>
+                    {post.excerpt && (
+                      <p className="mt-2 text-sm text-navy-600 leading-relaxed line-clamp-3 flex-1">
+                        {post.excerpt}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-4 text-xs text-navy-400">
+                      {post.author && <span>{post.author}</span>}
+                      {post.publishedAt && (
+                        <>
+                          <span>&middot;</span>
+                          <span>{new Date(post.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </>
+                      )}
+                    </div>
+                  </article>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-8 text-center md:hidden">
+              <Link href="/blog" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">
+                View all posts &rarr;
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Quote */}
       <section className="bg-cream-100 border-y border-cream-200">
