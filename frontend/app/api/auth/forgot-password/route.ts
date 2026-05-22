@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     if (!body || !body.email || typeof body.email !== 'string') {
       return NextResponse.json(
-        { error: 'Email is required', code: 'missing_email' },
+        { error: 'Email is required', code: 'MISSING_EMAIL' },
         { status: 400 },
       )
     }
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[forgot-password] error:', err)
     return NextResponse.json(
-      { error: 'Internal error', code: 'internal_error' },
+      { error: 'Internal error', code: 'INTERNAL_ERROR' },
       { status: 500 },
     )
   }

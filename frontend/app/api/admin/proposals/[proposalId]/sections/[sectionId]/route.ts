@@ -53,7 +53,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     await sql`
       UPDATE proposal_sections
-      SET content = ${JSON.stringify(content)}::jsonb,
+      SET content = ${JSON.stringify(content)},
           status = 'in_progress',
           updated_at = now()
       WHERE id = ${sectionId}::uuid

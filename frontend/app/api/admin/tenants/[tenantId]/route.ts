@@ -170,7 +170,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     // Validate specific field values
     if ('product_tier' in body && body.product_tier !== null) {
-      const validTiers = ['free', 'starter', 'professional', 'enterprise'];
+      const validTiers = ['finder', 'reminder', 'binder', 'grinder'];
       if (!validTiers.includes(body.product_tier as string)) {
         return NextResponse.json(
           { error: `Invalid product_tier. Must be one of: ${validTiers.join(', ')}`, code: 'VALIDATION_ERROR' },

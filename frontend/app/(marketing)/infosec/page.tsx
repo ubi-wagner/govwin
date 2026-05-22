@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+}
+
 export const revalidate = 60;
 
 export const metadata = {
@@ -103,7 +110,7 @@ export default async function InfoSecPage() {
           <div className="space-y-4 text-navy-600 leading-relaxed">
             {certBlock?.body ? (
               certBlock.body.split('\n\n').map((p: string, i: number) => (
-                <p key={i} dangerouslySetInnerHTML={{ __html: p }} />
+                <p key={i} dangerouslySetInnerHTML={{ __html: sanitizeHtml(p) }} />
               ))
             ) : (
               <>

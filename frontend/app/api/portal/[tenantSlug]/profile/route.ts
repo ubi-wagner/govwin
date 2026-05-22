@@ -16,15 +16,15 @@ export async function GET(_request: Request, ctx: RouteContext) {
   const role = (session.user as { role?: string }).role ?? '';
   const userId = (session.user as { id?: string }).id ?? '';
 
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
-
-  const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
-  if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
-
-  const tenantId = tenant.id as string;
-
   try {
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+
+    const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
+
+    const tenantId = tenant.id as string;
+
     const [tenantInfo] = await sql`
       SELECT id, name, legal_name, website, billing_email, status, product_tier,
              subscription_status, created_at
@@ -59,22 +59,22 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
-
-  const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
-  if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
-
-  const tenantId = tenant.id as string;
-
-  let body: Record<string, unknown>;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
-  }
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
 
-  try {
+    const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
+
+    const tenantId = tenant.id as string;
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
+    }
+
     // Update tenants table
     if (body.name && typeof body.name === 'string') {
       await sql`

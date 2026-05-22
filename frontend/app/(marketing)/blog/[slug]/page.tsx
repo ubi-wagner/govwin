@@ -2,6 +2,13 @@ import { getContentBySlug, getPublishedContent } from '@/lib/cms';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
@@ -52,7 +59,7 @@ export default async function BlogPostPage({ params }: Props) {
 
       <div
         className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: post.body }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.body) }}
       />
 
       {(post.tags ?? []).length > 0 && (

@@ -149,8 +149,8 @@ source_diffs
 
 ```
 compliance_presets
-  id, name, description, agency, program_type, variables (JSONB),
-  created_by, created_at, updated_at
+  id, name, phase_type, agency, program_type, compliance_data (JSONB),
+  volumes_data (JSONB), is_system, created_by, created_at
   GOTCHA: solicitation_compliance and solicitation_volumes both got
           + topic_id (027) for topic-level compliance
 ```
