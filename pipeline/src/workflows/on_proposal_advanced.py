@@ -211,7 +211,7 @@ class OnProposalAdvancedToFinal(Workflow):
     steps = [
         Step(
             name="generate_export_preview",
-            action="pipeline.export.generate_preview",
+            action="workflows.actions.generate_preview.generate_preview",
             input_map={"proposal_id": "payload.proposalId"},
             timeout_minutes=15,
         ),

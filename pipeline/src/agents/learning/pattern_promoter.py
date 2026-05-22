@@ -41,7 +41,6 @@ CHANGE LOG:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 import uuid
@@ -257,11 +256,11 @@ class PatternPromoter:
                             INSERT INTO semantic_memories
                                 (id, tenant_id, agent_role, embedding, content,
                                  category, confidence, evidence_count,
-                                 source_memories, metadata, created_at, updated_at,
+                                 source_memories, created_at, updated_at,
                                  last_accessed)
                             VALUES ($1, $2, $3, $4::vector, $5,
                                     $6, $7, $8,
-                                    $9, $10::jsonb, $11, $11, $11)
+                                    $9, $10, $10, $10)
                             """,
                             uuid.UUID(mem_id),
                             uuid.UUID(tenant_id),
@@ -272,7 +271,6 @@ class PatternPromoter:
                             confidence,
                             len(cluster),
                             source_ids,
-                            json.dumps({"source": "pattern_promoter", "group_key": group_key}),
                             datetime.now(timezone.utc),
                         )
                         promoted_count += 1

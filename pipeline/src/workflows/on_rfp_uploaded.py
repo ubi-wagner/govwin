@@ -99,7 +99,7 @@ class OnRfpUploaded(Workflow):
     steps = [
         Step(
             name="shred_document",
-            action="pipeline.shredder.shred",
+            action="workflows.actions.shred.shred",
             input_map={
                 "solicitation_id": "payload.solicitationId",
                 "document_ids": "payload.documentIds",
@@ -110,7 +110,7 @@ class OnRfpUploaded(Workflow):
         ),
         Step(
             name="extract_compliance",
-            action="pipeline.shredder.extract_compliance",
+            action="workflows.actions.shred.extract_compliance",
             depends_on="shred_document",
             input_map={"solicitation_id": "payload.solicitationId"},
             timeout_minutes=5,

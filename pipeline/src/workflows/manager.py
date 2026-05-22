@@ -159,7 +159,7 @@ class WorkflowManager:
             uuid.UUID(trigger_event_id) if trigger_event_id else None,
             json.dumps(payload),
             uuid.UUID(tenant_id) if tenant_id else None,
-            uuid.UUID(actor_id) if actor_id else None,
+            self._safe_uuid(actor_id),
             actor_email,
             self.source,
             deadline,
@@ -655,25 +655,74 @@ class WorkflowManager:
         instance_id: str,
         resume_data: Optional[dict[str, Any]] = None,
     ) -> bool:
-        """Resume a paused (HITL_WAIT) instance."""
+        """Resume a paused (HITL_WAIT) instance.
+
+        Marks the HITL_WAIT step as completed (with resume_data as result)
+        and sets status to 'retrying' so execute_instance can pick it up
+        and continue from the next step.
+        """
+        row = await conn.fetchrow(
+            "SELECT current_step, step_results, step_status FROM process_instances WHERE id = $1 AND status = 'paused'",
+            uuid.UUID(instance_id),
+        )
+        if not row:
+            return False
+
+        # Mark the HITL step as completed with resume_data
+        step_status = json.loads(row["step_status"]) if isinstance(row["step_status"], str) else (row["step_status"] or {})
+        step_results = json.loads(row["step_results"]) if isinstance(row["step_results"], str) else (row["step_results"] or {})
+        current_step = row["current_step"]
+        if current_step:
+            step_status[current_step] = "completed"
+            step_results[current_step] = resume_data or {"resumed": True}
+
         result = await conn.execute(
             """
             UPDATE process_instances
-            SET status = 'running', last_heartbeat_at = now()
+            SET status = 'retrying', last_heartbeat_at = now(),
+                step_status = $2::jsonb, step_results = $3::jsonb
             WHERE id = $1 AND status = 'paused'
             """,
             uuid.UUID(instance_id),
+            json.dumps(step_status),
+            json.dumps(step_results, default=str),
         )
 
         if "UPDATE 0" in result:
             return False
 
         await self._record_transition(
-            conn, instance_id, "paused", "running", actor="system", reason="hitl_resumed"
+            conn, instance_id, "paused", "retrying", actor="system", reason="hitl_resumed"
         )
         return True
 
+    async def poll_retrying_instances(self, conn: asyncpg.Connection) -> list[str]:
+        """Find instances that need re-execution (retrying status).
+
+        Called by the processor main loop to pick up resumed HITL instances
+        and retry instances created by the admin.
+        """
+        rows = await conn.fetch(
+            """
+            SELECT id, workflow_name FROM process_instances
+            WHERE status = 'retrying' AND source = $1
+            ORDER BY updated_at ASC LIMIT 5
+            """,
+            self.source,
+        )
+        return [str(r["id"]) for r in rows]
+
     # --- Internal helpers ---
+
+    @staticmethod
+    def _safe_uuid(value: str | None) -> uuid.UUID | None:
+        """Convert string to UUID, returning None if invalid."""
+        if not value:
+            return None
+        try:
+            return uuid.UUID(value)
+        except (ValueError, AttributeError):
+            return None
 
     async def _execute_step(
         self,

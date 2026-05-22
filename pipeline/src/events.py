@@ -50,8 +50,8 @@ async def emit_event(
             actor_type,
             actor_id,
             actor_email,
-            tenant_id,
-            parent_event_id,
+            uuid.UUID(tenant_id) if tenant_id else None,
+            uuid.UUID(parent_event_id) if parent_event_id else None,
             json.dumps(event_payload),
         )
         return str(row["id"]) if row else ""

@@ -159,12 +159,11 @@ async def create_default_categories(
         try:
             await conn.execute(
                 """INSERT INTO library_units
-                     (id, tenant_id, category, heading_text, content,
+                     (id, tenant_id, category, content,
                       source_type, status, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, $5, 'ai', 'approved', now(), now())""",
+                   VALUES ($1, $2, $3, $4, 'ai', 'approved', now(), now())""",
                 uuid.uuid4(),
                 tenant_uuid,
-                cat["name"],
                 cat["name"],
                 cat["description"],
             )

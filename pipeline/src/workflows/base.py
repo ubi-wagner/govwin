@@ -165,7 +165,7 @@ class Workflow:
 
 # ─── Registry ───────────────────────────────────────────────────────
 
-_registry: dict[str, type[Workflow]] = {}
+_registry: dict[str, list[type[Workflow]]] = {}
 
 
 def register_workflow(cls: type[Workflow]) -> None:
@@ -176,25 +176,29 @@ def register_workflow(cls: type[Workflow]) -> None:
             log.error("workflow validation failed: %s", e)
         return
     key = f"{cls.trigger.namespace}:{cls.trigger.type}:{cls.trigger.phase}"
-    if key in _registry:
-        log.warning(
-            "workflow trigger conflict: %s already registered by %s, "
-            "overwriting with %s",
-            key,
-            _registry[key].__name__,
-            cls.__name__,
-        )
-    _registry[key] = cls
+    _registry.setdefault(key, []).append(cls)
     log.info("registered workflow: %s → %s", key, cls.__name__)
 
 
 def get_workflow_for_event(event: dict[str, Any]) -> Optional[type[Workflow]]:
-    """Find a workflow whose trigger matches this event."""
+    """Find a workflow whose trigger matches this event.
+
+    Supports multiple workflows per trigger key — returns the first
+    whose condition lambda matches the event payload.
+    """
     key = f"{event.get('namespace')}:{event.get('type')}:{event.get('phase')}"
-    cls = _registry.get(key)
-    if cls and cls.trigger.matches(event):
-        return cls
+    candidates = _registry.get(key, [])
+    for cls in candidates:
+        if cls.trigger.matches(event):
+            return cls
     return None
+
+
+def get_all_workflows_for_event(event: dict[str, Any]) -> list[type[Workflow]]:
+    """Find ALL workflows whose trigger matches this event."""
+    key = f"{event.get('namespace')}:{event.get('type')}:{event.get('phase')}"
+    candidates = _registry.get(key, [])
+    return [cls for cls in candidates if cls.trigger.matches(event)]
 
 
 def list_workflows() -> dict[str, type[Workflow]]:
