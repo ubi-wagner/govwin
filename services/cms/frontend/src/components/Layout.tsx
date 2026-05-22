@@ -14,6 +14,7 @@ const navGroups = [
     label: 'Content',
     items: [
       { to: '/content', label: 'Pipeline' },
+      { to: '/content/generations', label: 'AI Generations' },
       { to: '/content/new', label: 'New Post' },
     ],
   },

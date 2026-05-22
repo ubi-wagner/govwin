@@ -7,6 +7,7 @@ import EmailOutbox from './pages/EmailOutbox'
 import ContentPipeline from './pages/ContentPipeline'
 import ContentEditor from './pages/ContentEditor'
 import ContentPreview from './pages/ContentPreview'
+import ContentGenerations from './pages/ContentGenerations'
 import DripCampaigns from './pages/DripCampaigns'
 import SocialAccounts from './pages/SocialAccounts'
 import SocialPosts from './pages/SocialPosts'
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="email/campaigns" element={<EmailCampaigns />} />
           <Route path="email/outbox" element={<EmailOutbox />} />
           <Route path="content" element={<ContentPipeline />} />
+          <Route path="content/generations" element={<ContentGenerations />} />
           <Route path="content/new" element={<ContentEditor />} />
           <Route path="content/:id/edit" element={<ContentEditor />} />
           <Route path="content/:id/preview" element={<ContentPreview />} />
