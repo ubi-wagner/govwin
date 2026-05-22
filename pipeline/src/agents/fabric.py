@@ -49,6 +49,7 @@ CHANGE LOG:
 """
 
 import json
+import asyncio
 import logging
 import os
 import time
@@ -301,8 +302,16 @@ class AgentFabric:
             tool_results_log: list[dict] = []
             rounds = 0
 
-            while rounds <= MAX_TOOL_ROUNDS:
-                response = await client.messages.create(**api_kwargs)
+            while rounds < MAX_TOOL_ROUNDS:
+                try:
+                    response = await asyncio.wait_for(
+                        client.messages.create(**api_kwargs),
+                        timeout=120.0,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error("[invoke_agent] Claude API call timed out (120s)")
+                    response_text += "\n[Agent stopped: API call timed out]"
+                    break
 
                 total_input_tokens += response.usage.input_tokens
                 total_output_tokens += response.usage.output_tokens
@@ -321,13 +330,21 @@ class AgentFabric:
                         if block.type == "tool_use":
                             tool_calls_count += 1
                             try:
-                                result = await self.tool_registry.execute(
-                                    conn,
-                                    tenant_id,
-                                    block.name,
-                                    block.input,
-                                    allowed_tools=allowed_tool_names or None,
-                                )
+                                if self.tool_registry.has_tool(block.name):
+                                    result = await self.tool_registry.execute(
+                                        conn,
+                                        tenant_id,
+                                        block.name,
+                                        block.input,
+                                        allowed_tools=allowed_tool_names or None,
+                                    )
+                                elif hasattr(archetype, "execute_tool"):
+                                    result = await archetype.execute_tool(
+                                        conn, block.name, block.input,
+                                        {**context, "tenant_id": tenant_id},
+                                    )
+                                else:
+                                    result = {"error": f"Unknown tool: {block.name}"}
                             except Exception as tool_exc:
                                 logger.error(
                                     "[invoke_agent] tool %s failed: %s",
@@ -363,6 +380,11 @@ class AgentFabric:
                 else:
                     # Unexpected stop reason (e.g. max_tokens) — stop looping
                     break
+            else:
+                logger.warning(
+                    "[invoke_agent] %s exhausted %d tool-use rounds",
+                    archetype_name, MAX_TOOL_ROUNDS,
+                )
 
             # 6. Calculate cost
             cost_usd = (
@@ -500,31 +522,35 @@ class AgentFabric:
             error_msg = str(exc)[:500]
             logger.error("[invoke_agent] %s failed: %s", archetype_name, exc)
 
-            # Log the failure
-            await self._log_task(
-                conn,
-                tenant_id=tenant_id,
-                agent_role=archetype_name,
-                task_type=context.get("type", "unknown"),
-                trigger_event=context.get("id"),
-                input_tokens=total_input_tokens,
-                output_tokens=total_output_tokens,
-                tool_calls_count=tool_calls_count,
-                duration_ms=duration_ms,
-                cost_usd=(
-                    total_input_tokens * INPUT_COST_PER_TOKEN
-                    + total_output_tokens * OUTPUT_COST_PER_TOKEN
-                ),
-                error=error_msg,
-            )
+            # Log the failure — wrapped to avoid masking the original error
+            try:
+                await self._log_task(
+                    conn,
+                    tenant_id=tenant_id,
+                    agent_role=archetype_name,
+                    task_type=context.get("type", "unknown"),
+                    trigger_event=context.get("id"),
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    tool_calls_count=tool_calls_count,
+                    duration_ms=duration_ms,
+                    cost_usd=(
+                        total_input_tokens * INPUT_COST_PER_TOKEN
+                        + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                    ),
+                    error=error_msg,
+                )
+            except Exception as log_exc:
+                logger.error("[invoke_agent] error-path _log_task failed: %s", log_exc)
 
-            await self._emit_event(
-                conn,
-                namespace="tool",
-                event_type="agent.invoked",
-                phase="end",
-                tenant_id=tenant_id,
-                payload={
+            try:
+                await self._emit_event(
+                    conn,
+                    namespace="tool",
+                    event_type="agent.invoked",
+                    phase="end",
+                    tenant_id=tenant_id,
+                    payload={
                     "archetype": archetype_name,
                     "status": "error",
                     "error": error_msg,
@@ -532,8 +558,10 @@ class AgentFabric:
                     "input_tokens": total_input_tokens,
                     "output_tokens": total_output_tokens,
                 },
-                parent_event_id=start_event_id,
-            )
+                    parent_event_id=start_event_id,
+                )
+            except Exception as event_exc:
+                logger.error("[invoke_agent] error-path _emit_event failed: %s", event_exc)
 
             return {
                 "status": "error",

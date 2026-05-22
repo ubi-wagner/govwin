@@ -49,7 +49,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.diff_analyzer")
 

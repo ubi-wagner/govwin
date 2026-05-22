@@ -130,14 +130,42 @@ class MemoryStore:
             logger.error("failed to recall memories: %s", e)
             return []
 
-    async def search(self, conn, tenant_id: str, query_embedding: list[float], memory_type: str | None = None, limit: int = 10) -> list[dict]:
+    async def search(self, conn, tenant_id: str, query_embedding: list[float], memory_type: str | None = None, agent_role: str | None = None, limit: int = 10) -> list[dict]:
         """Search memories by vector similarity (V2 — requires embeddings).
 
         Falls back to recency-based recall if embeddings are zero vectors.
         """
-        # V1: delegate to recency-based recall since we don't have real embeddings yet
-        # When embedding pipeline is ready, this will use cosine similarity
-        return await self.recall(conn, tenant_id, "all", limit=limit)
+        if agent_role:
+            return await self.recall(conn, tenant_id, agent_role, limit=limit)
+        # V1 fallback: query without agent_role filter
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT id, content, memory_type, importance, metadata,
+                       occurred_at, access_count
+                FROM episodic_memories
+                WHERE tenant_id = $1
+                  AND is_archived = false
+                ORDER BY (importance * decay_factor) DESC, occurred_at DESC
+                LIMIT $2
+                """,
+                uuid.UUID(tenant_id),
+                limit,
+            )
+            return [
+                {
+                    "id": str(row["id"]),
+                    "content": row["content"],
+                    "memory_type": row["memory_type"],
+                    "importance": float(row["importance"]),
+                    "metadata": row["metadata"],
+                    "occurred_at": row["occurred_at"].isoformat() if row["occurred_at"] else None,
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            logger.error("search failed: %s", e)
+            return []
 
     async def write_episodic(self, conn, tenant_id: str, agent_role: str, content: str, metadata: dict) -> str:
         """Write a raw episodic memory."""
@@ -202,11 +230,11 @@ class MemoryStore:
                 INSERT INTO semantic_memories
                     (id, tenant_id, agent_role, embedding, content,
                      category, confidence, evidence_count,
-                     source_memories, metadata, created_at, updated_at,
+                     source_memories, created_at, updated_at,
                      last_accessed)
                 VALUES ($1, $2, $3, $4::vector, $5,
                         $6, $7, $8,
-                        $9, $10::jsonb, $11, $11, $11)
+                        $9, $10, $10, $10)
                 """,
                 uuid.UUID(memory_id),
                 uuid.UUID(tenant_id),
@@ -217,7 +245,6 @@ class MemoryStore:
                 confidence,
                 len(episodic_ids),
                 source_uuids,
-                json.dumps({"source": "promote_to_semantic"}),
                 datetime.now(timezone.utc),
             )
             logger.info(
@@ -229,12 +256,13 @@ class MemoryStore:
             logger.error("failed to promote to semantic: %s", e)
             return ""
 
-    async def archive_memories(self, conn, memory_ids: list[str]) -> int:
+    async def archive_memories(self, conn, memory_ids: list[str], tenant_id: str | None = None) -> int:
         """Bulk archive episodic memories by setting is_archived = true.
 
         Args:
             conn: asyncpg connection
             memory_ids: list of episodic memory UUIDs to archive
+            tenant_id: optional tenant scope for safety
 
         Returns:
             Number of memories successfully archived.
@@ -245,45 +273,70 @@ class MemoryStore:
         archived = 0
         for mid in memory_ids:
             try:
-                result = await conn.execute(
-                    """
-                    UPDATE episodic_memories
-                    SET is_archived = true
-                    WHERE id = $1 AND is_archived = false
-                    """,
-                    uuid.UUID(mid),
-                )
-                # asyncpg execute returns 'UPDATE N'
-                if result and result.endswith("1"):
-                    archived += 1
+                if tenant_id:
+                    result = await conn.execute(
+                        """
+                        UPDATE episodic_memories
+                        SET is_archived = true
+                        WHERE id = $1 AND tenant_id = $2 AND is_archived = false
+                        """,
+                        uuid.UUID(mid),
+                        uuid.UUID(tenant_id),
+                    )
+                else:
+                    result = await conn.execute(
+                        """
+                        UPDATE episodic_memories
+                        SET is_archived = true
+                        WHERE id = $1 AND is_archived = false
+                        """,
+                        uuid.UUID(mid),
+                    )
+                if result:
+                    count = int(result.split()[-1])
+                    if count > 0:
+                        archived += 1
             except Exception as e:
                 logger.error("failed to archive memory=%s: %s", mid, e)
 
         logger.info("archived %d of %d memories", archived, len(memory_ids))
         return archived
 
-    async def update_decay(self, conn, memory_id: str, new_decay: float) -> bool:
+    async def update_decay(self, conn, memory_id: str, new_decay: float, tenant_id: str | None = None) -> bool:
         """Update the decay factor for a specific memory.
 
         Args:
             conn: asyncpg connection
             memory_id: UUID of the episodic memory
             new_decay: new decay factor value (0.0-1.0)
+            tenant_id: optional tenant scope for safety
 
         Returns:
             True if update succeeded, False otherwise.
         """
         try:
             clamped = max(0.01, min(1.0, new_decay))
-            await conn.execute(
-                """
-                UPDATE episodic_memories
-                SET decay_factor = $1
-                WHERE id = $2
-                """,
-                clamped,
-                uuid.UUID(memory_id),
-            )
+            if tenant_id:
+                await conn.execute(
+                    """
+                    UPDATE episodic_memories
+                    SET decay_factor = $1
+                    WHERE id = $2 AND tenant_id = $3
+                    """,
+                    clamped,
+                    uuid.UUID(memory_id),
+                    uuid.UUID(tenant_id),
+                )
+            else:
+                await conn.execute(
+                    """
+                    UPDATE episodic_memories
+                    SET decay_factor = $1
+                    WHERE id = $2
+                    """,
+                    clamped,
+                    uuid.UUID(memory_id),
+                )
             return True
         except Exception as e:
             logger.error("failed to update decay for memory=%s: %s", memory_id, e)

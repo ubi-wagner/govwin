@@ -176,7 +176,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
             return {"error": f"Unknown tool: {tool_name}"}
 
     async def _search_library(self, conn, tenant_id: str | None, tool_input: dict) -> dict:
-        """Search the content library for relevant atoms."""
+        """Search the content library for relevant units."""
         if not tenant_id:
             return {"results": [], "note": "No tenant context available"}
 
@@ -185,12 +185,14 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         limit = tool_input.get("limit", 5)
 
         try:
-            # Use text search on library_atoms table
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+            # Use text search on library_units table
             if category:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags
+                    FROM library_units
                     WHERE tenant_id = $1
                       AND category = $2
                       AND content ILIKE $3
@@ -199,21 +201,21 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                     """,
                     uuid.UUID(tenant_id),
                     category,
-                    f"%{query[:100]}%",
+                    f"%{escaped_query}%",
                     limit,
                 )
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags
+                    FROM library_units
                     WHERE tenant_id = $1
-                      AND (content ILIKE $2 OR title ILIKE $2)
+                      AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
                     """,
                     uuid.UUID(tenant_id),
-                    f"%{query[:100]}%",
+                    f"%{escaped_query}%",
                     limit,
                 )
 
@@ -221,7 +223,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                 "results": [
                     {
                         "id": str(row["id"]),
-                        "title": row["title"],
+                        "title": row["heading_text"],
                         "content": row["content"][:2000] if row["content"] else "",
                         "category": row["category"],
                         "tags": row["tags"] if row["tags"] else [],

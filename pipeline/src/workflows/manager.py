@@ -103,19 +103,30 @@ class WorkflowManager:
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._stuck_detection_task: asyncio.Task[None] | None = None
 
-    async def start(self, conn: asyncpg.Connection) -> None:
-        """Start the manager's background tasks."""
-        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(conn))
-        self._stuck_detection_task = asyncio.create_task(self._stuck_detection_loop(conn))
-        # On startup, detect any instances left running from a previous crash
+    async def start(self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None) -> None:
+        """Start the manager's background tasks.
+
+        Args:
+            conn: primary connection for orphan recovery
+            pool: connection pool for background tasks (heartbeat, stuck detection).
+                  If None, background tasks use the same connection (not recommended
+                  for production — asyncpg connections are not concurrency-safe).
+        """
+        self._pool = pool
+        self._cancelled_instances: set[str] = set()
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(conn, pool))
+        self._stuck_detection_task = asyncio.create_task(self._stuck_detection_loop(conn, pool))
         await self._recover_orphaned_instances(conn)
 
     async def stop(self) -> None:
         """Gracefully stop background tasks."""
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-        if self._stuck_detection_task:
-            self._stuck_detection_task.cancel()
+        for task in [self._heartbeat_task, self._stuck_detection_task]:
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
     async def create_instance(
         self,
@@ -193,14 +204,18 @@ class WorkflowManager:
         """
         workflow_name = workflow_cls.__name__
 
-        # Claim instance
+        # Claim instance with row lock to prevent double-claim
         result = await conn.fetchrow(
             """
             UPDATE process_instances
-            SET status = 'running', started_at = now(), last_heartbeat_at = now(),
-                current_step_index = 0
-            WHERE id = $1 AND status IN ('pending', 'retrying')
-            RETURNING id
+            SET status = 'running', started_at = COALESCE(started_at, now()),
+                last_heartbeat_at = now()
+            WHERE id = (
+                SELECT id FROM process_instances
+                WHERE id = $1 AND status IN ('pending', 'retrying', 'running')
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id, status
             """,
             uuid.UUID(instance_id),
         )
@@ -208,8 +223,9 @@ class WorkflowManager:
         if not result:
             return {"status": "error", "reason": "Instance not claimable"}
 
+        prev_status = result["status"] if result["status"] != "running" else "pending"
         await self._record_transition(
-            conn, instance_id, "pending", "running", actor="system", reason="execution_started"
+            conn, instance_id, prev_status, "running", actor="system", reason="execution_started"
         )
         self._running_instances[instance_id] = workflow_name
 
@@ -249,6 +265,19 @@ class WorkflowManager:
 
         for i, step in enumerate(steps):
             step_name = step.name
+
+            # Check for cancellation between steps
+            if instance_id in getattr(self, '_cancelled_instances', set()):
+                self._cancelled_instances.discard(instance_id)
+                final_status = "cancelled"
+                break
+            cancel_check = await conn.fetchval(
+                "SELECT status FROM process_instances WHERE id = $1",
+                uuid.UUID(instance_id),
+            )
+            if cancel_check == "cancelled":
+                final_status = "cancelled"
+                break
 
             # Skip already-completed steps (crash recovery)
             if step_status.get(step_name) == "completed":
@@ -571,6 +600,10 @@ class WorkflowManager:
         if "UPDATE 0" in result:
             return False
 
+        # Signal in-memory cancellation for in-flight workflows
+        if hasattr(self, '_cancelled_instances'):
+            self._cancelled_instances.add(instance_id)
+
         await self._record_transition(
             conn,
             instance_id,
@@ -636,38 +669,70 @@ class WorkflowManager:
 
         return await processor_execute_step(conn, step, inputs, trigger_event=event_dict)
 
-    async def _heartbeat_loop(self, conn: asyncpg.Connection) -> None:
-        """Send heartbeats for all running instances every 30 seconds."""
+    async def _heartbeat_loop(
+        self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None
+    ) -> None:
+        """Send heartbeats for all running instances every 30 seconds.
+
+        Uses a dedicated pool connection if available to avoid sharing
+        the main connection (asyncpg is not concurrency-safe).
+        """
         while True:
             try:
                 await asyncio.sleep(30)
                 if self._running_instances:
                     ids = [uuid.UUID(iid) for iid in self._running_instances]
-                    await conn.execute(
-                        """
-                        UPDATE process_instances SET last_heartbeat_at = now()
-                        WHERE id = ANY($1) AND status = 'running'
-                        """,
-                        ids,
-                    )
+                    if pool:
+                        async with pool.acquire() as hb_conn:
+                            await hb_conn.execute(
+                                """
+                                UPDATE process_instances SET last_heartbeat_at = now()
+                                WHERE id = ANY($1) AND status = 'running'
+                                """,
+                                ids,
+                            )
+                    else:
+                        await conn.execute(
+                            """
+                            UPDATE process_instances SET last_heartbeat_at = now()
+                            WHERE id = ANY($1) AND status = 'running'
+                            """,
+                            ids,
+                        )
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error("[heartbeat] Error: %s", e)
 
-    async def _stuck_detection_loop(self, conn: asyncpg.Connection) -> None:
-        """Detect and mark stuck instances every 60 seconds."""
+    async def _stuck_detection_loop(
+        self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None
+    ) -> None:
+        """Detect and mark stuck + paused-timeout instances every 60 seconds."""
         while True:
             try:
                 await asyncio.sleep(60)
-                stuck = await conn.fetch(
-                    """
-                    SELECT id, workflow_name, current_step, tenant_id
-                    FROM process_instances
-                    WHERE status = 'running'
-                      AND last_heartbeat_at < now() - interval '5 minutes'
-                    """
-                )
+                work_conn = pool if pool else conn
+
+                # Check for stale heartbeats on running instances
+                if pool:
+                    async with pool.acquire() as sd_conn:
+                        stuck = await sd_conn.fetch(
+                            """
+                            SELECT id, workflow_name, current_step, tenant_id
+                            FROM process_instances
+                            WHERE status = 'running'
+                              AND last_heartbeat_at < now() - interval '5 minutes'
+                            """
+                        )
+                else:
+                    stuck = await conn.fetch(
+                        """
+                        SELECT id, workflow_name, current_step, tenant_id
+                        FROM process_instances
+                        WHERE status = 'running'
+                          AND last_heartbeat_at < now() - interval '5 minutes'
+                        """
+                    )
 
                 for stuck_row in stuck:
                     stuck_id = str(stuck_row["id"])
@@ -713,6 +778,60 @@ class WorkflowManager:
 
                     self._running_instances.pop(stuck_id, None)
 
+                # Also check for paused instances past their deadline
+                if pool:
+                    async with pool.acquire() as pt_conn:
+                        paused_timeout = await pt_conn.fetch(
+                            """
+                            SELECT id, workflow_name, current_step, tenant_id
+                            FROM process_instances
+                            WHERE status = 'paused' AND deadline IS NOT NULL
+                              AND deadline < now()
+                            """
+                        )
+                else:
+                    paused_timeout = await conn.fetch(
+                        """
+                        SELECT id, workflow_name, current_step, tenant_id
+                        FROM process_instances
+                        WHERE status = 'paused' AND deadline IS NOT NULL
+                          AND deadline < now()
+                        """
+                    )
+
+                for pt_row in paused_timeout:
+                    pt_id = str(pt_row["id"])
+                    logger.warning(
+                        "[stuck_detection] Paused instance %s (%s) past deadline",
+                        pt_id, pt_row["workflow_name"],
+                    )
+                    update_conn = pool if pool else conn
+                    if pool:
+                        async with pool.acquire() as u_conn:
+                            await u_conn.execute(
+                                """
+                                UPDATE process_instances
+                                SET status = 'failed', last_error = 'hitl_timeout',
+                                    completed_at = now()
+                                WHERE id = $1
+                                """,
+                                pt_row["id"],
+                            )
+                    else:
+                        await conn.execute(
+                            """
+                            UPDATE process_instances
+                            SET status = 'failed', last_error = 'hitl_timeout',
+                                completed_at = now()
+                            WHERE id = $1
+                            """,
+                            pt_row["id"],
+                        )
+                    await self._record_transition(
+                        conn, pt_id, "paused", "failed",
+                        actor="cron", reason="hitl_timeout",
+                    )
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -724,6 +843,7 @@ class WorkflowManager:
             """
             SELECT id, workflow_name FROM process_instances
             WHERE status = 'running' AND source = $1
+              AND last_heartbeat_at < now() - interval '5 minutes'
             """,
             self.source,
         )

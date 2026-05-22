@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import logging
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.lifecycle.gc")
 

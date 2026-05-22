@@ -154,24 +154,33 @@ Then provide your review in this structure:
 
     async def execute_tool(self, conn, tool_name: str, tool_input: dict, context: dict) -> dict:
         """Execute a tool call and return results."""
+        tenant_id = context.get("tenant_id")
+
         if tool_name == "get_eval_criteria":
-            return await self._get_eval_criteria(conn, tool_input)
+            return await self._get_eval_criteria(conn, tool_input, tenant_id)
         elif tool_name == "get_compliance_matrix":
-            return await self._get_compliance_matrix(conn, tool_input)
+            return await self._get_compliance_matrix(conn, tool_input, tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _get_eval_criteria(self, conn, tool_input: dict) -> dict:
+    async def _get_eval_criteria(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get evaluation criteria for the proposal's solicitation."""
         proposal_id = tool_input.get("proposal_id")
         if not proposal_id:
             return {"error": "proposal_id required"}
 
         try:
-            sol_id = await conn.fetchval(
-                "SELECT solicitation_id FROM proposals WHERE id = $1",
+            row = await conn.fetchrow(
+                "SELECT solicitation_id, tenant_id FROM proposals WHERE id = $1",
                 uuid.UUID(proposal_id),
             )
+            if not row:
+                return {"criteria": [], "note": "No proposal found"}
+
+            if tenant_id and str(row["tenant_id"]) != tenant_id:
+                return {"error": "Access denied", "code": "FORBIDDEN"}
+
+            sol_id = row["solicitation_id"]
             if not sol_id:
                 return {"criteria": [], "note": "No solicitation linked"}
 
@@ -194,13 +203,24 @@ Then provide your review in this structure:
             logger.warning("get_eval_criteria failed: %s", e)
             return {"error": str(e)}
 
-    async def _get_compliance_matrix(self, conn, tool_input: dict) -> dict:
+    async def _get_compliance_matrix(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get the compliance matrix showing addressed/unaddressed requirements."""
         proposal_id = tool_input.get("proposal_id")
         if not proposal_id:
             return {"error": "proposal_id required"}
 
         try:
+            # Get proposal with tenant check
+            proposal_row = await conn.fetchrow(
+                "SELECT solicitation_id, tenant_id FROM proposals WHERE id = $1",
+                uuid.UUID(proposal_id),
+            )
+            if not proposal_row:
+                return {"error": "Proposal not found"}
+
+            if tenant_id and str(proposal_row["tenant_id"]) != tenant_id:
+                return {"error": "Access denied", "code": "FORBIDDEN"}
+
             # Get proposal sections with their requirement mappings
             sections = await conn.fetch(
                 """
@@ -213,10 +233,7 @@ Then provide your review in this structure:
             )
 
             # Get compliance requirements from the linked solicitation
-            sol_id = await conn.fetchval(
-                "SELECT solicitation_id FROM proposals WHERE id = $1",
-                uuid.UUID(proposal_id),
-            )
+            sol_id = proposal_row["solicitation_id"]
 
             compliance = None
             if sol_id:

@@ -49,7 +49,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.lifecycle.contradiction_resolver")
 

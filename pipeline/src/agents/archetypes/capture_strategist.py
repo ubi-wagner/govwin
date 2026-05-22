@@ -146,7 +146,7 @@ Output your analysis as a structured JSON object."""
         """Check if this archetype handles the given event type."""
         return event_type in (
             "capture.pursuit.evaluation_requested",
-            "identity.purchase.completed",
+            "capture.purchase.completed",
         )
 
     def get_tools(self) -> list[dict]:
@@ -382,30 +382,30 @@ Then provide your analysis as JSON:
         tenant_id = context.get("tenant_id")
 
         if tool_name == "get_tenant_profile":
-            return await self._get_tenant_profile(conn, tool_input)
+            return await self._get_tenant_profile(conn, tool_input, tenant_id)
         elif tool_name == "get_opportunity_detail":
             return await self._get_opportunity_detail(conn, tool_input)
         elif tool_name == "search_library":
-            return await self._search_library(conn, tool_input)
+            return await self._search_library(conn, tool_input, tenant_id)
         elif tool_name == "search_memory":
             return await self._search_memory(conn, tool_input, tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _get_tenant_profile(self, conn, tool_input: dict) -> dict:
+    async def _get_tenant_profile(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get tenant profile with capabilities and qualifications."""
-        tenant_id = tool_input.get("tenant_id")
         if not tenant_id:
             return {"error": "tenant_id required"}
 
         try:
+            tid = uuid.UUID(tenant_id)
             tenant = await conn.fetchrow(
                 """
                 SELECT id, name, legal_name, website, product_tier, status
                 FROM tenants
                 WHERE id = $1
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
             if not tenant:
                 return {"error": "Tenant not found"}
@@ -421,20 +421,20 @@ Then provide your analysis as JSON:
                 ORDER BY p.created_at DESC
                 LIMIT 10
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
 
-            # Get capability summary from library atoms
+            # Get capability summary from library units
             capabilities = await conn.fetch(
                 """
                 SELECT category, COUNT(*) as count
-                FROM library_atoms
+                FROM library_units
                 WHERE tenant_id = $1
                 GROUP BY category
                 ORDER BY count DESC
                 LIMIT 10
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
 
             return {
@@ -454,7 +454,7 @@ Then provide your analysis as JSON:
                     for p in proposals
                 ],
                 "capability_areas": [
-                    {"category": c["category"], "atom_count": c["count"]}
+                    {"category": c["category"], "unit_count": c["count"]}
                     for c in capabilities
                 ],
             }
@@ -524,9 +524,8 @@ Then provide your analysis as JSON:
             logger.warning("get_opportunity_detail failed: %s", e)
             return {"error": str(e)}
 
-    async def _search_library(self, conn, tool_input: dict) -> dict:
-        """Search the content library for relevant atoms."""
-        tenant_id = tool_input.get("tenant_id")
+    async def _search_library(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
+        """Search the content library for relevant units."""
         query = tool_input.get("query", "")
         category = tool_input.get("category")
         limit = tool_input.get("limit", 10)
@@ -535,16 +534,16 @@ Then provide your analysis as JSON:
             return {"results": [], "note": "No tenant context available"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
             if category:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags
+                    FROM library_units
                     WHERE tenant_id = $1
                       AND category = $2
-                      AND (content ILIKE $3 OR title ILIKE $3)
+                      AND (content ILIKE $3 OR heading_text ILIKE $3)
                     ORDER BY updated_at DESC
                     LIMIT $4
                     """,
@@ -556,10 +555,10 @@ Then provide your analysis as JSON:
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags
+                    FROM library_units
                     WHERE tenant_id = $1
-                      AND (content ILIKE $2 OR title ILIKE $2)
+                      AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
                     """,
@@ -572,7 +571,7 @@ Then provide your analysis as JSON:
                 "results": [
                     {
                         "id": str(row["id"]),
-                        "title": row["title"],
+                        "title": row["heading_text"],
                         "content": row["content"][:2000] if row["content"] else "",
                         "category": row["category"],
                         "tags": row["tags"] if row["tags"] else [],
@@ -589,14 +588,13 @@ Then provide your analysis as JSON:
     ) -> dict:
         """Search agent memory for past pursuit decisions."""
         query = tool_input.get("query", "")
-        mem_tenant_id = tool_input.get("tenant_id", tenant_id)
         limit = tool_input.get("limit", 5)
 
         if not query:
             return {"memories": [], "note": "No query provided"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{escaped_query}%", limit]
             sql = """
                 SELECT id, content, memory_type, importance, created_at
@@ -605,9 +603,9 @@ Then provide your analysis as JSON:
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if mem_tenant_id:
+            if tenant_id:
                 sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(mem_tenant_id))
+                params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 

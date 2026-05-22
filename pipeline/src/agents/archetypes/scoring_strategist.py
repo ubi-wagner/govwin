@@ -290,15 +290,14 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
         tenant_id = context.get("tenant_id")
 
         if tool_name == "get_tenant_profile":
-            return await self._get_tenant_profile(conn, tool_input)
+            return await self._get_tenant_profile(conn, tool_input, tenant_id)
         elif tool_name == "search_memory":
             return await self._search_memory(conn, tool_input, tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _get_tenant_profile(self, conn, tool_input: dict) -> dict:
+    async def _get_tenant_profile(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get tenant profile for scoring context."""
-        tenant_id = tool_input.get("tenant_id")
         if not tenant_id:
             return {"error": "tenant_id required"}
 
@@ -333,7 +332,7 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
             capabilities = await conn.fetch(
                 """
                 SELECT category, COUNT(*) as count
-                FROM library_atoms
+                FROM library_units
                 WHERE tenant_id = $1
                 GROUP BY category
                 ORDER BY count DESC
@@ -358,7 +357,7 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
                     for s in proposal_stats
                 ],
                 "capability_areas": [
-                    {"category": c["category"], "atom_count": c["count"]}
+                    {"category": c["category"], "unit_count": c["count"]}
                     for c in capabilities
                 ],
             }
@@ -371,14 +370,13 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
     ) -> dict:
         """Search agent memory for scoring calibration data."""
         query = tool_input.get("query", "")
-        mem_tenant_id = tool_input.get("tenant_id", tenant_id)
         limit = tool_input.get("limit", 5)
 
         if not query:
             return {"memories": [], "note": "No query provided"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{escaped_query}%", limit]
             sql = """
                 SELECT id, content, memory_type, importance, created_at
@@ -387,9 +385,9 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if mem_tenant_id:
+            if tenant_id:
                 sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(mem_tenant_id))
+                params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 

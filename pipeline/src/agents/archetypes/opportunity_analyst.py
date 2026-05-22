@@ -187,20 +187,22 @@ Steps:
 
     async def execute_tool(self, conn, tool_name: str, tool_input: dict, context: dict) -> dict:
         """Execute a tool call and return results."""
+        tenant_id = context.get("tenant_id")
+
         if tool_name == "get_tenant_profile":
-            return await self._get_tenant_profile(conn, tool_input)
+            return await self._get_tenant_profile(conn, tool_input, tenant_id)
         elif tool_name == "search_past_awards":
-            return await self._search_past_awards(conn, tool_input)
+            return await self._search_past_awards(conn, tool_input, tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _get_tenant_profile(self, conn, tool_input: dict) -> dict:
+    async def _get_tenant_profile(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get tenant profile with capabilities and qualifications."""
-        tenant_id = tool_input.get("tenant_id")
         if not tenant_id:
             return {"error": "tenant_id required"}
 
         try:
+            tid = uuid.UUID(tenant_id)
             # Get basic tenant info
             tenant = await conn.fetchrow(
                 """
@@ -208,7 +210,7 @@ Steps:
                 FROM tenants
                 WHERE id = $1
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
             if not tenant:
                 return {"error": "Tenant not found"}
@@ -216,20 +218,20 @@ Steps:
             # Get proposal history summary (as proxy for capabilities)
             proposal_count = await conn.fetchval(
                 "SELECT COUNT(*) FROM proposals WHERE tenant_id = $1",
-                uuid.UUID(tenant_id),
+                tid,
             )
 
-            # Get library atoms for capability context
+            # Get library units for capability context
             capabilities = await conn.fetch(
                 """
                 SELECT category, COUNT(*) as count
-                FROM library_atoms
+                FROM library_units
                 WHERE tenant_id = $1
                 GROUP BY category
                 ORDER BY count DESC
                 LIMIT 10
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
 
             return {
@@ -241,7 +243,7 @@ Steps:
                 },
                 "proposal_count": proposal_count,
                 "capability_areas": [
-                    {"category": c["category"], "atom_count": c["count"]}
+                    {"category": c["category"], "unit_count": c["count"]}
                     for c in capabilities
                 ],
             }
@@ -249,9 +251,8 @@ Steps:
             logger.warning("get_tenant_profile failed: %s", e)
             return {"error": str(e)}
 
-    async def _search_past_awards(self, conn, tool_input: dict) -> dict:
+    async def _search_past_awards(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Search for relevant past awards."""
-        tenant_id = tool_input.get("tenant_id")
         keywords = tool_input.get("keywords", "")
         agency = tool_input.get("agency")
         limit = tool_input.get("limit", 10)
@@ -262,7 +263,7 @@ Steps:
         try:
             # Search opportunities that have awards matching the tenant
             # (past performance via proposals in submitted/archived stage)
-            escaped_keywords = keywords[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_keywords = keywords[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
             if agency:
                 rows = await conn.fetch(

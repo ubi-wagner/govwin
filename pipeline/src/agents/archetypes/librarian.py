@@ -327,17 +327,16 @@ Then provide your assessment as JSON:
         tenant_id = context.get("tenant_id")
 
         if tool_name == "search_library":
-            return await self._search_library(conn, tool_input)
+            return await self._search_library(conn, tool_input, tenant_id)
         elif tool_name == "search_memory":
             return await self._search_memory(conn, tool_input, tenant_id)
         elif tool_name == "get_tenant_profile":
-            return await self._get_tenant_profile(conn, tool_input)
+            return await self._get_tenant_profile(conn, tool_input, tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _search_library(self, conn, tool_input: dict) -> dict:
+    async def _search_library(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Search library for existing similar units."""
-        tenant_id = tool_input.get("tenant_id")
         query = tool_input.get("query", "")
         category = tool_input.get("category")
         limit = tool_input.get("limit", 10)
@@ -346,17 +345,17 @@ Then provide your assessment as JSON:
             return {"results": [], "note": "No tenant context available"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
             if category:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags,
-                           quality_score, atom_hash
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags,
+                           confidence, unit_hash
+                    FROM library_units
                     WHERE tenant_id = $1
                       AND category = $2
-                      AND (content ILIKE $3 OR title ILIKE $3)
+                      AND (content ILIKE $3 OR heading_text ILIKE $3)
                     ORDER BY updated_at DESC
                     LIMIT $4
                     """,
@@ -368,11 +367,11 @@ Then provide your assessment as JSON:
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT id, title, content, category, tags,
-                           quality_score, atom_hash
-                    FROM library_atoms
+                    SELECT id, heading_text, content, category, tags,
+                           confidence, unit_hash
+                    FROM library_units
                     WHERE tenant_id = $1
-                      AND (content ILIKE $2 OR title ILIKE $2)
+                      AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
                     """,
@@ -385,16 +384,16 @@ Then provide your assessment as JSON:
                 "results": [
                     {
                         "id": str(row["id"]),
-                        "title": row["title"],
+                        "title": row["heading_text"],
                         "content": row["content"][:1000] if row["content"] else "",
                         "category": row["category"],
                         "tags": row["tags"] if row["tags"] else [],
-                        "quality_score": (
-                            float(row["quality_score"])
-                            if row["quality_score"]
+                        "confidence": (
+                            float(row["confidence"])
+                            if row["confidence"]
                             else None
                         ),
-                        "atom_hash": row["atom_hash"],
+                        "unit_hash": row["unit_hash"],
                     }
                     for row in rows
                 ],
@@ -408,14 +407,13 @@ Then provide your assessment as JSON:
     ) -> dict:
         """Search agent memory for cataloging patterns."""
         query = tool_input.get("query", "")
-        mem_tenant_id = tool_input.get("tenant_id", tenant_id)
         limit = tool_input.get("limit", 5)
 
         if not query:
             return {"memories": [], "note": "No query provided"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{escaped_query}%", limit]
             sql = """
                 SELECT id, content, memory_type, importance, created_at
@@ -424,9 +422,9 @@ Then provide your assessment as JSON:
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if mem_tenant_id:
+            if tenant_id:
                 sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(mem_tenant_id))
+                params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 
@@ -449,20 +447,20 @@ Then provide your assessment as JSON:
             logger.warning("search_memory failed: %s", e)
             return {"memories": [], "error": str(e)}
 
-    async def _get_tenant_profile(self, conn, tool_input: dict) -> dict:
+    async def _get_tenant_profile(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         """Get tenant profile for relevance scoring."""
-        tenant_id = tool_input.get("tenant_id")
         if not tenant_id:
             return {"error": "tenant_id required"}
 
         try:
+            tid = uuid.UUID(tenant_id)
             tenant = await conn.fetchrow(
                 """
                 SELECT id, name, legal_name, product_tier
                 FROM tenants
                 WHERE id = $1
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
             if not tenant:
                 return {"error": "Tenant not found"}
@@ -471,13 +469,13 @@ Then provide your assessment as JSON:
             capabilities = await conn.fetch(
                 """
                 SELECT category, COUNT(*) as count,
-                       AVG(quality_score) as avg_quality
-                FROM library_atoms
+                       AVG(confidence) as avg_confidence
+                FROM library_units
                 WHERE tenant_id = $1
                 GROUP BY category
                 ORDER BY count DESC
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
 
             # Get proposal focus for understanding priorities
@@ -491,7 +489,7 @@ Then provide your assessment as JSON:
                 ORDER BY count DESC
                 LIMIT 10
                 """,
-                uuid.UUID(tenant_id),
+                tid,
             )
 
             return {
@@ -503,9 +501,9 @@ Then provide your assessment as JSON:
                     {
                         "category": c["category"],
                         "count": c["count"],
-                        "avg_quality": (
-                            float(c["avg_quality"])
-                            if c["avg_quality"]
+                        "avg_confidence": (
+                            float(c["avg_confidence"])
+                            if c["avg_confidence"]
                             else None
                         ),
                     }

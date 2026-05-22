@@ -39,7 +39,6 @@ type WorkflowInstanceRow = {
   status: string;
   currentStep: string | null;
   currentStepIndex: number;
-  totalSteps: number;
   stepStatus: Record<string, string> | null;
   startedAt: Date | null;
   completedAt: Date | null;
@@ -67,7 +66,7 @@ function mapRow(r: WorkflowInstanceRow): WorkflowInstance {
     status: r.status as WorkflowInstance['status'],
     currentStep: r.currentStep,
     currentStepIndex: r.currentStepIndex ?? 0,
-    totalSteps: r.totalSteps ?? 0,
+    totalSteps: r.stepStatus ? Object.keys(r.stepStatus).length : 0,
     stepStatus: r.stepStatus ?? {},
     startedAt: r.startedAt ? r.startedAt.toISOString() : null,
     completedAt: r.completedAt ? r.completedAt.toISOString() : null,
@@ -100,7 +99,7 @@ export default async function WorkflowMonitorPage() {
   try {
     const rows = await sql<WorkflowInstanceRow[]>`
       SELECT id, workflow_name, status, current_step, current_step_index,
-             total_steps, step_status, started_at, completed_at, last_heartbeat_at,
+             step_status, started_at, completed_at, last_heartbeat_at,
              tenant_id, source, retry_count, last_error, last_error_step,
              recovered_from,
              CASE WHEN completed_at IS NOT NULL AND started_at IS NOT NULL
@@ -126,7 +125,7 @@ export default async function WorkflowMonitorPage() {
     try {
       const rows = await sql<WorkflowInstanceRow[]>`
         SELECT id, workflow_name, status, current_step, current_step_index,
-               total_steps, step_status, started_at, completed_at, last_heartbeat_at,
+               step_status, started_at, completed_at, last_heartbeat_at,
                tenant_id, source, retry_count, last_error, last_error_step,
                recovered_from,
                CASE WHEN completed_at IS NOT NULL AND started_at IS NOT NULL

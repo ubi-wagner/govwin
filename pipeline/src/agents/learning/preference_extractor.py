@@ -48,7 +48,7 @@ import uuid
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.preference_extractor")
 
