@@ -280,7 +280,7 @@ Steps:
                     LIMIT $4
                     """,
                     uuid.UUID(tenant_id),
-                    f"%{agency}%",
+                    f"%{agency[:100].replace(chr(92), chr(92)*2).replace('%', chr(92)+'%').replace('_', chr(92)+'_')}%",
                     f"%{escaped_keywords}%",
                     limit,
                 )

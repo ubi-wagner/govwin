@@ -430,6 +430,7 @@ Then provide your analysis as JSON:
                 SELECT category, COUNT(*) as count
                 FROM library_units
                 WHERE tenant_id = $1
+                      AND status != 'archived'
                 GROUP BY category
                 ORDER BY count DESC
                 LIMIT 10
@@ -542,6 +543,7 @@ Then provide your analysis as JSON:
                     SELECT id, heading_text, content, category, tags
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND category = $2
                       AND (content ILIKE $3 OR heading_text ILIKE $3)
                     ORDER BY updated_at DESC
@@ -558,6 +560,7 @@ Then provide your analysis as JSON:
                     SELECT id, heading_text, content, category, tags
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3

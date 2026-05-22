@@ -171,7 +171,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         if tool_name == "search_library":
             return await self._search_library(conn, tenant_id, tool_input)
         elif tool_name == "get_compliance":
-            return await self._get_compliance(conn, tool_input)
+            return await self._get_compliance(conn, tool_input, tenant_id=tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
@@ -194,6 +194,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                     SELECT id, heading_text, content, category, tags
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND category = $2
                       AND content ILIKE $3
                     ORDER BY updated_at DESC
@@ -210,6 +211,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                     SELECT id, heading_text, content, category, tags
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
@@ -235,18 +237,29 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
             logger.warning("search_library failed: %s", e)
             return {"results": [], "error": str(e)}
 
-    async def _get_compliance(self, conn, tool_input: dict) -> dict:
+    async def _get_compliance(self, conn, tool_input: dict, tenant_id: str | None = None) -> dict:
         """Get compliance requirements for a proposal."""
         proposal_id = tool_input.get("proposal_id")
         if not proposal_id:
             return {"error": "proposal_id required"}
 
         try:
-            # Get the solicitation_id from the proposal
-            sol_id = await conn.fetchval(
-                "SELECT solicitation_id FROM proposals WHERE id = $1",
-                uuid.UUID(proposal_id),
-            )
+            # Get the solicitation_id from the proposal with tenant check
+            if tenant_id:
+                row = await conn.fetchrow(
+                    "SELECT solicitation_id, tenant_id FROM proposals WHERE id = $1",
+                    uuid.UUID(proposal_id),
+                )
+                if not row:
+                    return {"error": "No solicitation linked to proposal"}
+                if str(row["tenant_id"]) != tenant_id:
+                    return {"error": "Access denied"}
+                sol_id = row["solicitation_id"]
+            else:
+                sol_id = await conn.fetchval(
+                    "SELECT solicitation_id FROM proposals WHERE id = $1",
+                    uuid.UUID(proposal_id),
+                )
             if not sol_id:
                 return {"error": "No solicitation linked to proposal"}
 

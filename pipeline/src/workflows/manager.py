@@ -205,17 +205,20 @@ class WorkflowManager:
         workflow_name = workflow_cls.__name__
 
         # Claim instance with row lock to prevent double-claim
+        # CTE captures previous status before the UPDATE overwrites it
         result = await conn.fetchrow(
             """
-            UPDATE process_instances
-            SET status = 'running', started_at = COALESCE(started_at, now()),
-                last_heartbeat_at = now()
-            WHERE id = (
-                SELECT id FROM process_instances
+            WITH old AS (
+                SELECT id, status AS prev_status FROM process_instances
                 WHERE id = $1 AND status IN ('pending', 'retrying', 'running')
                 FOR UPDATE SKIP LOCKED
             )
-            RETURNING id, status
+            UPDATE process_instances pi
+            SET status = 'running', started_at = COALESCE(pi.started_at, now()),
+                last_heartbeat_at = now()
+            FROM old
+            WHERE pi.id = old.id
+            RETURNING old.prev_status
             """,
             uuid.UUID(instance_id),
         )
@@ -223,7 +226,7 @@ class WorkflowManager:
         if not result:
             return {"status": "error", "reason": "Instance not claimable"}
 
-        prev_status = result["status"] if result["status"] != "running" else "pending"
+        prev_status = result["prev_status"]
         await self._record_transition(
             conn, instance_id, prev_status, "running", actor="system", reason="execution_started"
         )
@@ -262,8 +265,10 @@ class WorkflowManager:
         # Execute steps
         steps = workflow_cls.step_execution_order()
         final_status = "completed"
+        step_name = None  # track for error reporting
 
-        for i, step in enumerate(steps):
+        try:
+          for i, step in enumerate(steps):
             step_name = step.name
 
             # Check for cancellation between steps
@@ -458,6 +463,23 @@ class WorkflowManager:
                 uuid.UUID(instance_id),
             )
 
+        except Exception as loop_exc:
+            logger.error("[%s] Infrastructure error in step loop: %s", instance_id, loop_exc)
+            final_status = "failed"
+            try:
+                await conn.execute(
+                    """
+                    UPDATE process_instances
+                    SET last_error = $2, last_error_step = $3
+                    WHERE id = $1
+                    """,
+                    uuid.UUID(instance_id),
+                    f"Infrastructure: {str(loop_exc)[:500]}",
+                    step_name,
+                )
+            except Exception:
+                pass
+
         # Mark instance complete/failed
         await conn.execute(
             """
@@ -548,7 +570,7 @@ class WorkflowManager:
             """,
             uuid.UUID(new_id),
             row["workflow_name"],
-            row["trigger_event_id"],
+            None,  # trigger_event_id NULL for retries — lineage tracked via recovered_from
             row["payload"] if isinstance(row["payload"], str) else json.dumps(row["payload"] or {}),
             row["tenant_id"],
             row["actor_id"],
@@ -734,15 +756,15 @@ class WorkflowManager:
                         """
                     )
 
-                for stuck_row in stuck:
+                # Use pool connection for writes if available
+                async def _do_stuck_writes(w_conn, stuck_row):
                     stuck_id = str(stuck_row["id"])
                     logger.warning(
                         "[stuck_detection] Instance %s (%s) has no heartbeat",
                         stuck_id,
                         stuck_row["workflow_name"],
                     )
-
-                    await conn.execute(
+                    await w_conn.execute(
                         """
                         UPDATE process_instances
                         SET status = 'failed', last_error = 'heartbeat_timeout',
@@ -751,32 +773,29 @@ class WorkflowManager:
                         """,
                         stuck_row["id"],
                     )
-
                     await self._record_transition(
-                        conn,
-                        stuck_id,
-                        "running",
-                        "failed",
-                        actor="cron",
-                        reason="heartbeat_timeout",
+                        w_conn, stuck_id, "running", "failed",
+                        actor="cron", reason="heartbeat_timeout",
                     )
-
                     tenant_str = (
                         str(stuck_row["tenant_id"]) if stuck_row["tenant_id"] else None
                     )
                     await self._emit_event(
-                        conn,
-                        "system",
-                        "workflow.stuck_detected",
-                        tenant_str,
+                        w_conn, "system", "workflow.stuck_detected", tenant_str,
                         {
                             "instance_id": stuck_id,
                             "workflow_name": stuck_row["workflow_name"],
                             "current_step": stuck_row["current_step"],
                         },
                     )
-
                     self._running_instances.pop(stuck_id, None)
+
+                for stuck_row in stuck:
+                    if pool:
+                        async with pool.acquire() as w_conn:
+                            await _do_stuck_writes(w_conn, stuck_row)
+                    else:
+                        await _do_stuck_writes(conn, stuck_row)
 
                 # Also check for paused instances past their deadline
                 if pool:
@@ -827,10 +846,17 @@ class WorkflowManager:
                             """,
                             pt_row["id"],
                         )
-                    await self._record_transition(
-                        conn, pt_id, "paused", "failed",
-                        actor="cron", reason="hitl_timeout",
-                    )
+                    if pool:
+                        async with pool.acquire() as tr_conn:
+                            await self._record_transition(
+                                tr_conn, pt_id, "paused", "failed",
+                                actor="cron", reason="hitl_timeout",
+                            )
+                    else:
+                        await self._record_transition(
+                            conn, pt_id, "paused", "failed",
+                            actor="cron", reason="hitl_timeout",
+                        )
 
             except asyncio.CancelledError:
                 break

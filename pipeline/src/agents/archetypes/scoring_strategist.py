@@ -133,7 +133,6 @@ Be precise and evidence-based. Every point of adjustment must be justified."""
     def handles_event(self, event_type: str) -> bool:
         """Check if this archetype handles the given event type."""
         return event_type in (
-            "finder.opportunity.ingested",
             "finder.scoring.completed",
             "capture.proposal.outcome_recorded",
         )

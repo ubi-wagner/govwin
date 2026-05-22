@@ -351,9 +351,10 @@ Then provide your assessment as JSON:
                 rows = await conn.fetch(
                     """
                     SELECT id, heading_text, content, category, tags,
-                           confidence, unit_hash
+                           confidence
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND category = $2
                       AND (content ILIKE $3 OR heading_text ILIKE $3)
                     ORDER BY updated_at DESC
@@ -368,9 +369,10 @@ Then provide your assessment as JSON:
                 rows = await conn.fetch(
                     """
                     SELECT id, heading_text, content, category, tags,
-                           confidence, unit_hash
+                           confidence
                     FROM library_units
                     WHERE tenant_id = $1
+                      AND status != 'archived'
                       AND (content ILIKE $2 OR heading_text ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
@@ -393,7 +395,6 @@ Then provide your assessment as JSON:
                             if row["confidence"]
                             else None
                         ),
-                        "unit_hash": row["unit_hash"],
                     }
                     for row in rows
                 ],
@@ -472,6 +473,7 @@ Then provide your assessment as JSON:
                        AVG(confidence) as avg_confidence
                 FROM library_units
                 WHERE tenant_id = $1
+                      AND status != 'archived'
                 GROUP BY category
                 ORDER BY count DESC
                 """,

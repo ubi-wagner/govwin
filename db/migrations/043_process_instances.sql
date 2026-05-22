@@ -81,6 +81,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_process_instance_updated ON process_instances;
 CREATE TRIGGER trg_process_instance_updated
     BEFORE UPDATE ON process_instances
     FOR EACH ROW EXECUTE FUNCTION update_process_instance_timestamp();

@@ -109,7 +109,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
          deadline)
       VALUES (
         ${original.workflowName},
-        ${original.triggerEventId},
+        ${null},
         'retrying',
         ${JSON.stringify(original.payload ?? {})}::jsonb,
         ${original.tenantId},

@@ -683,6 +683,7 @@ async def run_workflow_processor(
     """
     conn: Optional[asyncpg.Connection] = None
     manager: Optional[Any] = None
+    pool: Optional[Any] = None
     try:
         conn = await asyncpg.connect(database_url)
         log.info("workflow processor started")
@@ -695,8 +696,9 @@ async def run_workflow_processor(
         use_manager = await _check_manager_available(conn)
         if use_manager:
             from workflows.manager import WorkflowManager
+            pool = await asyncpg.create_pool(database_url, min_size=2, max_size=4)
             manager = WorkflowManager(source="pipeline")
-            await manager.start(conn)
+            await manager.start(conn, pool=pool)
             log.info("WorkflowManager enabled — persistent execution with crash recovery")
         else:
             log.info("process_instances table not found — using fire-and-forget execution")
@@ -828,6 +830,8 @@ async def run_workflow_processor(
     finally:
         if manager:
             await manager.stop()
+        if pool:
+            await pool.close()
         if conn:
             await conn.close()
         log.info("workflow processor stopped")
