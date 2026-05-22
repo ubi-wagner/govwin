@@ -57,6 +57,9 @@ CHANGE LOG:
                            tracking, comprehensive headers, step-level
                            retry with exponential backoff, timeout
                            enforcement via asyncio.wait_for
+    PR #xxx (2026-05-22) — WorkflowManager integration: persistent workflow
+                           execution with crash recovery. Falls back to
+                           fire-and-forget if process_instances table missing.
 ================================================================================
 """
 from __future__ import annotations
@@ -595,6 +598,71 @@ async def _run_workflow(
         )
 
 
+# ─── WorkflowManager integration ─────────────────────────────────
+
+
+async def _check_manager_available(conn: asyncpg.Connection) -> bool:
+    """Check if the process_instances table exists (migration 043 applied)."""
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_name = 'process_instances'
+            ) AS table_exists
+            """
+        )
+        return bool(row and row["table_exists"])
+    except Exception:
+        return False
+
+
+async def _run_workflow_managed(
+    conn: asyncpg.Connection,
+    manager: Any,
+    workflow_cls: type[Workflow],
+    event_dict: dict[str, Any],
+) -> None:
+    """Execute a workflow through the persistent WorkflowManager.
+
+    Creates a process_instance, then drives execution step-by-step
+    with crash recovery and audit trail.
+    """
+    workflow_name = workflow_cls.__name__
+    trigger_event_id = event_dict.get("id")
+    tenant_id = event_dict.get("tenant_id")
+    payload = event_dict.get("payload", {})
+
+    # Create persistent instance
+    instance_id = await manager.create_instance(
+        conn,
+        workflow_name=workflow_name,
+        trigger_event_id=trigger_event_id,
+        payload=payload,
+        tenant_id=tenant_id,
+        actor_id=event_dict.get("actor_id"),
+        actor_email=None,
+    )
+
+    log.info(
+        "created process instance %s for workflow %s (event=%s)",
+        instance_id,
+        workflow_name,
+        trigger_event_id,
+    )
+
+    # Execute the instance
+    result = await manager.execute_instance(
+        conn, instance_id, workflow_cls, payload
+    )
+
+    log.info(
+        "workflow instance %s finished with status=%s",
+        instance_id,
+        result.get("status"),
+    )
+
+
 # ─── Main loop ─────────────────────────────────────────────────────
 
 
@@ -608,8 +676,13 @@ async def run_workflow_processor(
 
     Runs until shutdown_event is set. Connects to the database
     independently (separate connection from the ingester consumer).
+
+    If the process_instances table exists (migration 043), uses the
+    persistent WorkflowManager for crash recovery and audit trail.
+    Otherwise falls back to fire-and-forget execution.
     """
     conn: Optional[asyncpg.Connection] = None
+    manager: Optional[Any] = None
     try:
         conn = await asyncpg.connect(database_url)
         log.info("workflow processor started")
@@ -617,6 +690,16 @@ async def run_workflow_processor(
         # Discover and register all workflow definitions
         count = discover_workflows()
         log.info("discovered %d workflow(s)", count)
+
+        # Check if persistent workflow management is available
+        use_manager = await _check_manager_available(conn)
+        if use_manager:
+            from workflows.manager import WorkflowManager
+            manager = WorkflowManager(source="pipeline")
+            await manager.start(conn)
+            log.info("WorkflowManager enabled — persistent execution with crash recovery")
+        else:
+            log.info("process_instances table not found — using fire-and-forget execution")
 
         # Seed last_processed_at to now so we only process new events
         row = await conn.fetchrow(
@@ -683,7 +766,12 @@ async def run_workflow_processor(
                     workflow_cls = get_workflow_for_event(event_dict)
                     if workflow_cls:
                         try:
-                            await _run_workflow(conn, workflow_cls, event_dict)
+                            if manager:
+                                await _run_workflow_managed(
+                                    conn, manager, workflow_cls, event_dict
+                                )
+                            else:
+                                await _run_workflow(conn, workflow_cls, event_dict)
                         except Exception as exc:
                             log.error(
                                 "workflow execution failed for event %s: %s",
@@ -738,6 +826,8 @@ async def run_workflow_processor(
     except Exception as exc:
         log.error("workflow processor fatal: %s", exc)
     finally:
+        if manager:
+            await manager.stop()
         if conn:
             await conn.close()
         log.info("workflow processor stopped")
