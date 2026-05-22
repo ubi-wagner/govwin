@@ -346,11 +346,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       if (customVars && typeof customVars === 'object') {
         for (const [key, val] of Object.entries(customVars)) {
           if (val === null || val === undefined) continue;
+          const actualValue = typeof val === 'object' && val !== null ? (val as Record<string, unknown>).value ?? JSON.stringify(val) : String(val);
           complianceVariables.push({
             id: `custom_${key}`,
             label: key.replace(/_/g, ' '),
             description: `Custom compliance variable: ${key}`,
-            value: String(val),
+            value: actualValue as string,
           });
         }
       }

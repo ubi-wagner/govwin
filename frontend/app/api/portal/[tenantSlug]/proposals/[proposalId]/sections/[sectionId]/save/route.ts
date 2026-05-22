@@ -109,14 +109,16 @@ export async function PUT(request: Request, ctx: RouteContext) {
         UPDATE proposal_sections
         SET content = ${contentJson},
             status = ${newStatus},
-            version = ${nextVersion}
+            version = ${nextVersion},
+            updated_at = now()
         WHERE id = ${sectionId}
       `;
     } else {
       await sql`
         UPDATE proposal_sections
         SET content = ${contentJson},
-            version = ${nextVersion}
+            version = ${nextVersion},
+            updated_at = now()
         WHERE id = ${sectionId}
       `;
     }

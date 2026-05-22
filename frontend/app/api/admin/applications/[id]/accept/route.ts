@@ -80,32 +80,28 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
-    // Update application status
-    await sql`
-      UPDATE applications
-      SET status = 'accepted',
-          reviewed_by = ${userId},
-          reviewed_at = now(),
-          review_notes = ${reviewNotes || null}
-      WHERE id = ${id}
-    `;
-
-    // Create or find existing tenant
+    // Create tenant with unique slug (BEFORE updating application status,
+    // so if tenant/user creation fails the application stays retryable)
     const slug = slugify(app.companyName);
     let tenantId: string;
-    const [existingTenant] = await sql<{ id: string }[]>`
-      SELECT id FROM tenants WHERE slug = ${slug} LIMIT 1
-    `;
-    if (existingTenant) {
-      tenantId = existingTenant.id;
-    } else {
-      const [newTenant] = await sql<{ id: string }[]>`
-        INSERT INTO tenants (name, slug, status)
-        VALUES (${app.companyName}, ${slug}, 'active')
-        RETURNING id
-      `;
-      tenantId = newTenant.id;
+    let finalSlug = slug;
+    let existingTenant = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
+    `.then(r => r[0]);
+    let suffix = 2;
+    while (existingTenant) {
+      finalSlug = `${slug}-${suffix}`;
+      existingTenant = await sql<{ id: string }[]>`
+        SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
+      `.then(r => r[0]);
+      suffix++;
     }
+    const [newTenant] = await sql<{ id: string }[]>`
+      INSERT INTO tenants (name, slug, status)
+      VALUES (${app.companyName}, ${finalSlug}, 'active')
+      RETURNING id
+    `;
+    tenantId = newTenant.id;
 
     // Create or find existing user, reset temp password for re-acceptance
     const tempPw = crypto.randomUUID().slice(0, 12);
@@ -142,6 +138,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       newUserId = created.id;
     }
 
+    // Update application status AFTER tenant+user creation succeeds
+    await sql`
+      UPDATE applications
+      SET status = 'accepted',
+          reviewed_by = ${userId},
+          reviewed_at = now(),
+          review_notes = ${reviewNotes || null}
+      WHERE id = ${id}
+    `;
+
     // Send welcome email with credentials
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
     const emailContent = applicationAcceptedEmail({
@@ -149,7 +155,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       contactEmail: app.contactEmail,
       companyName: app.companyName,
       tempPassword: tempPw,
-      tenantSlug: slug,
+      tenantSlug: finalSlug,
       loginUrl,
     });
     const emailResult = await sendEmail({
@@ -161,7 +167,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     await emitEventEnd(eventId, {
       result: {
         tenantId,
-        tenantSlug: slug,
+        tenantSlug: finalSlug,
         userId: newUserId,
         emailSent: emailResult.provider !== 'skipped',
       },
@@ -170,7 +176,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({
       data: {
         tenantId: tenantId,
-        tenantSlug: slug,
+        tenantSlug: finalSlug,
         userId: newUserId,
         contactEmail: app.contactEmail,
         contactName: app.contactName,

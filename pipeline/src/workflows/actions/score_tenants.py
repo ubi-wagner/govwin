@@ -96,6 +96,9 @@ async def match_tenants(
             "avgScore": 0.73,
         }
     """
+    if not solicitation_id:
+        return {"status": "skipped", "reason": "no_solicitation_id"}
+
     sol_uuid = uuid.UUID(solicitation_id)
 
     # 1. Fetch the solicitation + opportunity metadata
@@ -201,7 +204,7 @@ async def match_tenants(
             tenants_errored += 1
             log.error(
                 "match_tenants: failed to score tenant %s: %s",
-                profile.get("tenant_id"),
+                profile["tenant_id"],
                 exc,
             )
             # Continue with next tenant — one failure should not block others
@@ -250,8 +253,8 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     #   - opportunities has tech_focus_areas (TEXT[]) not keywords
     #   - tenant_profiles has keywords (TEXT[]), technology_focus (TEXT),
     #     research_areas (TEXT[])
-    sol_tech_areas = set(t.lower() for t in (sol.get("tech_focus_areas") or []))
-    sol_description_lower = (sol.get("description") or "").lower()
+    sol_tech_areas = set(t.lower() for t in (sol["tech_focus_areas"] or []))
+    sol_description_lower = (sol["description"] or "").lower()
     profile_keywords = set(k.lower() for k in (profile["keywords"] or []))
     tech_focus = (profile["technology_focus"] or "").lower()
     research_areas = set(r.lower() for r in (profile["research_areas"] or []))

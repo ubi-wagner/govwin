@@ -416,6 +416,7 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
             parsed = json.loads(text) if isinstance(text, str) else text
             if isinstance(parsed, dict):
                 adj = parsed.get("score_adjustment", 0)
+                adj = max(-15, min(15, int(adj)))
                 conf = parsed.get("confidence", 0)
                 risk = parsed.get("competitive_risk", "unknown")
                 rationale = parsed.get("rationale", "")

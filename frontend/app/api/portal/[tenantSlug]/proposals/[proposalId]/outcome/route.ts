@@ -124,6 +124,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Stage validation ───────────────────────────────────────────
+    if (proposal.stage === 'archived') {
+      return NextResponse.json(
+        { error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' },
+        { status: 409 },
+      );
+    }
+
+    if (!['submitted', 'final', 'archived'].includes(proposal.stage)) {
+      return NextResponse.json(
+        { error: 'Outcome can only be recorded for submitted or final proposals', code: 'INVALID_STAGE' },
+        { status: 422 },
+      );
+    }
+
     // ── Record outcome on the proposal ──────────────────────────────
     // The proposals table doesn't have an 'outcome' column, so we
     // store it in the stage field (archive the proposal) and record

@@ -89,16 +89,21 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // Lock the proposal
+    // Lock the proposal (AND is_locked = false prevents race condition)
     const newLockCount = proposal.lockCount + 1;
-    await sql`
+    const lockResult = await sql`
       UPDATE proposals
       SET is_locked = true,
           lock_count = ${newLockCount},
           last_locked_at = now(),
           unlock_deadline = NULL
       WHERE id = ${proposalId}
+        AND is_locked = false
     `;
+
+    if (lockResult.count === 0) {
+      return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
+    }
 
     await emitEventSingle({
       namespace: 'proposal',
@@ -217,17 +222,22 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // Self-service unlock: set 7-day edit window
+    // Self-service unlock: set 7-day edit window (AND is_locked = true prevents race condition)
     const unlockDeadline = new Date();
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
-    await sql`
+    const unlockResult = await sql`
       UPDATE proposals
       SET is_locked = false,
           last_unlocked_at = now(),
           unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null}
       WHERE id = ${proposalId}
+        AND is_locked = true
     `;
+
+    if (unlockResult.count === 0) {
+      return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
+    }
 
     await emitEventSingle({
       namespace: 'proposal',

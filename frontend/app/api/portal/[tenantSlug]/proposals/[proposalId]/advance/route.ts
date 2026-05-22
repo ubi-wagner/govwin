@@ -72,8 +72,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       title: string;
       gateConfig: string[];
       lockCount: number;
+      isLocked: boolean;
     }[]>`
-      SELECT id, stage, title, gate_config, lock_count FROM proposals
+      SELECT id, stage, title, gate_config, lock_count, is_locked FROM proposals
       WHERE id = ${proposalId}
         AND tenant_id = ${tenantId}
       LIMIT 1
@@ -81,6 +82,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    if (proposal.isLocked) {
+      return NextResponse.json({ error: 'Proposal is locked', code: 'LOCKED' }, { status: 409 });
     }
 
     // ── Determine next stage from gate_config ────────────────────────
@@ -117,22 +122,30 @@ export async function POST(request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
 
-    // ── Update proposal stage ────────────────────────────────────────
+    // ── Update proposal stage (atomic: AND stage = previousStage prevents double-advance) ──
     if (shouldLock) {
-      await sql`
+      const advanceResult = await sql`
         UPDATE proposals
         SET stage = ${targetStage},
             is_locked = true,
             lock_count = lock_count + 1,
             last_locked_at = now()
         WHERE id = ${proposalId}
+          AND stage = ${previousStage}
       `;
+      if (advanceResult.count === 0) {
+        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+      }
     } else {
-      await sql`
+      const advanceResult = await sql`
         UPDATE proposals
         SET stage = ${targetStage}
         WHERE id = ${proposalId}
+          AND stage = ${previousStage}
       `;
+      if (advanceResult.count === 0) {
+        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+      }
     }
 
     // ── Record stage history ─────────────────────────────────────────

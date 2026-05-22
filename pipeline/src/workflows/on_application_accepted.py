@@ -123,7 +123,6 @@ class OnApplicationAccepted(Workflow):
         Step(
             name="create_library_defaults",
             action="workflows.actions.create_library_defaults.create_default_categories",
-            depends_on="send_welcome_email",
             input_map={"tenant_id": "result.tenantId"},
             timeout_minutes=2,
         ),

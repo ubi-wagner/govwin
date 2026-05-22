@@ -59,7 +59,24 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error(`[stripe/webhook] Error handling ${event.type}:`, err);
-    // Return 200 so Stripe does not retry — we logged the error
+    // Distinguish transient vs permanent errors:
+    // - DB/network errors (transient): return 500 so Stripe retries
+    // - Validation/data errors (permanent): return 200 to stop retries
+    const isTransient = err instanceof Error && (
+      err.message.includes('ECONNREFUSED') ||
+      err.message.includes('ETIMEDOUT') ||
+      err.message.includes('ECONNRESET') ||
+      err.message.includes('connection') ||
+      err.message.includes('timeout') ||
+      err.message.includes('deadlock') ||
+      err.message.includes('too many clients') ||
+      err.message.includes('database') ||
+      err.name === 'DatabaseError'
+    );
+    if (isTransient) {
+      return NextResponse.json({ error: 'Transient error, please retry', code: 'DB_ERROR' }, { status: 500 });
+    }
+    // Permanent error — acknowledge so Stripe stops retrying
     return NextResponse.json({ received: true });
   }
 

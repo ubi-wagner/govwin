@@ -102,7 +102,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }[]>`
       SELECT id, section_number, title, content, status, page_allocation
       FROM proposal_sections
-      WHERE proposal_id = ${proposalId}
+      WHERE proposal_id = ${proposalId}::uuid
       ORDER BY section_number ASC
     `;
 
@@ -134,7 +134,7 @@ export async function POST(request: Request, ctx: RouteContext) {
              evaluation_criteria, custom_variables, verified_by, verified_at
       FROM solicitation_compliance
       WHERE solicitation_id = (
-        SELECT solicitation_id FROM proposals WHERE id = ${proposalId} LIMIT 1
+        SELECT solicitation_id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
       )
     `;
 
@@ -144,19 +144,58 @@ export async function POST(request: Request, ctx: RouteContext) {
       if (s.content) {
         try {
           const parsed = JSON.parse(s.content);
-          // Extract text from canvas nodes
-          if (parsed.nodes && Array.isArray(parsed.nodes)) {
-            textContent = parsed.nodes
-              .map((node: { content?: string; text?: string; items?: Array<{ content?: string }> }) => {
-                if (node.content) return node.content;
-                if (node.text) return node.text;
-                if (node.items && Array.isArray(node.items)) {
-                  return node.items.map((item: { content?: string }) => item.content ?? '').join('\n');
-                }
-                return '';
-              })
-              .filter(Boolean)
-              .join('\n\n');
+          const nodes = parsed.nodes || parsed;
+          if (Array.isArray(nodes)) {
+            const textParts: string[] = [];
+            for (const node of nodes) {
+              if (!node.content) continue;
+              switch (node.type) {
+                case 'heading':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'text_block':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'bulleted_list':
+                case 'numbered_list':
+                  if (Array.isArray(node.content.items)) {
+                    for (const item of node.content.items) {
+                      textParts.push(item.text || '');
+                    }
+                  }
+                  break;
+                case 'table':
+                  if (Array.isArray(node.content.rows)) {
+                    for (const row of node.content.rows) {
+                      if (Array.isArray(row.cells)) {
+                        for (const cell of row.cells) {
+                          textParts.push(cell.text || cell.content || '');
+                        }
+                      }
+                    }
+                  }
+                  break;
+                case 'caption':
+                case 'footnote':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'url':
+                  textParts.push(node.content.display_text || node.content.url || '');
+                  break;
+                case 'page_break':
+                case 'spacer':
+                case 'image':
+                case 'toc':
+                  break;
+                default:
+                  if (typeof node.content === 'string') {
+                    textParts.push(node.content);
+                  } else if (node.content.text) {
+                    textParts.push(node.content.text);
+                  }
+              }
+            }
+            textContent = textParts.filter(Boolean).join('\n\n');
           }
         } catch {
           // Content is plain text, not JSON

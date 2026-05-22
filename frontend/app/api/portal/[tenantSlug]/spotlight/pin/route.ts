@@ -135,7 +135,8 @@ export async function DELETE(request: Request, ctx: RouteContext) {
 
   try {
     await sql`
-      DELETE FROM tenant_pipeline_items
+      UPDATE tenant_pipeline_items
+      SET is_pinned = false, updated_at = now()
       WHERE tenant_id = ${tenantId} AND opportunity_id = ${opportunityId}
     `;
 

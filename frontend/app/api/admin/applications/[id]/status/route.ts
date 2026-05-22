@@ -32,7 +32,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    const validStatuses = ['pending', 'under_review', 'accepted', 'rejected', 'withdrawn'];
+    const validStatuses = ['pending', 'under_review', 'rejected', 'withdrawn'];
     if (!validStatuses.includes(body.status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, code: 'VALIDATION_ERROR' },
