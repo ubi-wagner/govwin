@@ -69,6 +69,7 @@ import importlib
 import json
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -753,6 +754,7 @@ async def run_workflow_processor(
                         else None,
                         "payload": payload,
                         "created_at": event_row["created_at"],
+                        "error": event_row.get("error") or event_row.get("error_json") or None,
                     }
 
                     # Duplicate detection — skip if already processed
@@ -801,6 +803,41 @@ async def run_workflow_processor(
 
                     # Advance the high-water mark
                     last_processed_at = event_row["created_at"]
+
+                # Poll for retrying instances (HITL resume + admin retry)
+                if manager:
+                    try:
+                        retrying_ids = await manager.poll_retrying_instances(conn)
+                        for rid in retrying_ids:
+                            # Look up the workflow class from the instance
+                            inst_row = await conn.fetchrow(
+                                "SELECT workflow_name, payload FROM process_instances WHERE id = $1",
+                                uuid.UUID(rid),
+                            )
+                            if inst_row:
+                                wf_cls = get_workflow_for_event({
+                                    "namespace": "",
+                                    "type": "",
+                                    "phase": "",
+                                    "payload": json.loads(inst_row["payload"]) if isinstance(inst_row["payload"], str) else (inst_row["payload"] or {}),
+                                })
+                                # If we can't find the class by event, look it up by name
+                                if not wf_cls:
+                                    from workflows.base import _registry
+                                    for candidates in _registry.values():
+                                        for c in candidates:
+                                            if c.__name__ == inst_row["workflow_name"]:
+                                                wf_cls = c
+                                                break
+                                        if wf_cls:
+                                            break
+                                if wf_cls:
+                                    await manager.execute_instance(
+                                        conn, rid, wf_cls,
+                                        json.loads(inst_row["payload"]) if isinstance(inst_row["payload"], str) else (inst_row["payload"] or {}),
+                                    )
+                    except Exception as e:
+                        log.error("poll_retrying_instances failed: %s", e)
 
             except asyncpg.PostgresConnectionError as exc:
                 log.error("workflow processor lost DB connection: %s", exc)

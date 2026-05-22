@@ -105,7 +105,7 @@ class OnApplicationAccepted(Workflow):
         namespace="capture",
         type="application.accepted",
         phase="end",
-        condition=lambda p: p.get("error") is None,
+        condition=lambda p: bool(p.get("tenantId")),
     )
 
     steps = [

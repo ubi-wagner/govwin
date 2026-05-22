@@ -66,9 +66,11 @@ function extractTextFromCanvas(content: string | null): string {
         case 'table':
           if (Array.isArray(node.content.rows)) {
             for (const row of node.content.rows) {
-              if (Array.isArray(row.cells)) {
-                for (const cell of row.cells) {
-                  textParts.push(cell.text || cell.content || '');
+              if (Array.isArray(row)) {
+                for (const cell of row) {
+                  if (typeof cell === 'string') textParts.push(cell);
+                  else if (cell?.text) textParts.push(cell.text);
+                  else if (cell?.content) textParts.push(String(cell.content));
                 }
               }
             }

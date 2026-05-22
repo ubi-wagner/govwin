@@ -846,6 +846,55 @@ class WorkflowManager:
                     else:
                         await _do_stuck_writes(conn, stuck_row)
 
+                # Check for stale pending instances (created > 1 hour ago, never picked up)
+                if pool:
+                    async with pool.acquire() as sp_conn:
+                        stale_pending = await sp_conn.fetch(
+                            """SELECT id, workflow_name FROM process_instances
+                               WHERE status = 'pending' AND created_at < now() - interval '1 hour'"""
+                        )
+                else:
+                    stale_pending = await conn.fetch(
+                        """SELECT id, workflow_name FROM process_instances
+                           WHERE status = 'pending' AND created_at < now() - interval '1 hour'"""
+                    )
+
+                for sp_row in stale_pending:
+                    sp_id = str(sp_row["id"])
+                    logger.warning(
+                        "[stuck_detection] Stale pending instance %s (%s) — created > 1 hour ago",
+                        sp_id, sp_row["workflow_name"],
+                    )
+                    if pool:
+                        async with pool.acquire() as sp_w_conn:
+                            await sp_w_conn.execute(
+                                """
+                                UPDATE process_instances
+                                SET status = 'failed', last_error = 'pending_ttl_expired',
+                                    completed_at = now()
+                                WHERE id = $1 AND status = 'pending'
+                                """,
+                                sp_row["id"],
+                            )
+                            await self._record_transition(
+                                sp_w_conn, sp_id, "pending", "failed",
+                                actor="cron", reason="pending_ttl_expired",
+                            )
+                    else:
+                        await conn.execute(
+                            """
+                            UPDATE process_instances
+                            SET status = 'failed', last_error = 'pending_ttl_expired',
+                                completed_at = now()
+                            WHERE id = $1 AND status = 'pending'
+                            """,
+                            sp_row["id"],
+                        )
+                        await self._record_transition(
+                            conn, sp_id, "pending", "failed",
+                            actor="cron", reason="pending_ttl_expired",
+                        )
+
                 # Also check for paused instances past their deadline
                 if pool:
                     async with pool.acquire() as pt_conn:

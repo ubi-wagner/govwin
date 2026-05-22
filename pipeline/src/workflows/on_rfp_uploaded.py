@@ -93,7 +93,7 @@ class OnRfpUploaded(Workflow):
         namespace="finder",
         type="rfp.uploaded",
         phase="end",
-        condition=lambda p: p.get("error") is None,
+        condition=lambda p: bool(p.get("solicitationId")),
     )
 
     steps = [

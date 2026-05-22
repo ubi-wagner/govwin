@@ -301,6 +301,7 @@ class AgentFabric:
             response_text = ""
             tool_results_log: list[dict] = []
             rounds = 0
+            tool_failure_counts: dict[str, int] = {}
 
             while rounds < MAX_TOOL_ROUNDS:
                 try:
@@ -353,6 +354,12 @@ class AgentFabric:
                                 result = {
                                     "error": f"Tool execution failed: {str(tool_exc)[:200]}"
                                 }
+
+                            # Circuit breaker: stop retrying a tool after 3 failures
+                            if isinstance(result, dict) and "error" in result:
+                                tool_failure_counts[block.name] = tool_failure_counts.get(block.name, 0) + 1
+                                if tool_failure_counts[block.name] >= 3:
+                                    result = {"error": f"Tool {block.name} is temporarily unavailable after 3 failures"}
 
                             tool_results_log.append({
                                 "tool": block.name,
@@ -742,9 +749,9 @@ class AgentFabric:
                 return False
             return True
         except Exception as exc:
-            # If we can't check, allow the call (fail open) but log
-            logger.error("[rate_limit] check failed: %s", exc)
-            return True
+            # Fail CLOSED — deny the call if we can't verify rate limit
+            logger.error("[rate_limit] check failed, denying call: %s", exc)
+            return False
 
     # ------------------------------------------------------------------
     # Budget check

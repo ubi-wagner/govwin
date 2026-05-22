@@ -60,7 +60,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { targetStage?: unknown; notes?: unknown } = {};
+    let body: { targetStage?: unknown; notes?: unknown; force?: boolean } = {};
     try {
       body = await request.json();
     } catch {
@@ -141,51 +141,68 @@ export async function POST(request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
 
-    // ── Update proposal stage (atomic: AND stage + version prevents double-advance) ──
+    // ── Check gate requirements for current stage ───────────────────
     try {
-      if (shouldLock) {
-        const advanceResult = await sql`
-          UPDATE proposals
-          SET stage = ${targetStage},
-              is_locked = true,
-              lock_count = lock_count + 1,
-              last_locked_at = now(),
-              version = version + 1,
-              last_modified_by = ${sessionUser.id}::uuid
-          WHERE id = ${proposalId}
-            AND stage = ${previousStage}
-            AND version = ${proposal.version}
-        `;
-        if (advanceResult.count === 0) {
-          return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
-        }
-      } else {
-        const advanceResult = await sql`
-          UPDATE proposals
-          SET stage = ${targetStage},
-              version = version + 1,
-              last_modified_by = ${sessionUser.id}::uuid
-          WHERE id = ${proposalId}
-            AND stage = ${previousStage}
-            AND version = ${proposal.version}
-        `;
-        if (advanceResult.count === 0) {
-          return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
-        }
+      const unmetGates = await sql`
+        SELECT label FROM stage_gate_requirements
+        WHERE proposal_id = ${proposalId}::uuid AND stage = ${previousStage} AND is_met = false
+      `;
+      if (unmetGates.length > 0 && !body.force) {
+        return NextResponse.json({
+          error: 'Unmet gate requirements',
+          code: 'GATE_REQUIREMENTS_NOT_MET',
+          details: { unmet: unmetGates.map((g: Record<string, unknown>) => g.label) }
+        }, { status: 422 });
       }
     } catch (e) {
-      console.error('[portal/proposals/advance] stage update failed:', e);
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      console.error('[advance] gate check failed:', e);
+      // Non-fatal — proceed with advance if gate table doesn't exist
     }
 
-    // ── Record stage history ─────────────────────────────────────────
+    // ── Update proposal stage + record history (transactional) ──────
     try {
-      await sql`
-        INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-        VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
-      `;
+      await sql.begin(async (tx: any) => {
+        if (shouldLock) {
+          const advanceResult = await tx`
+            UPDATE proposals
+            SET stage = ${targetStage},
+                is_locked = true,
+                lock_count = lock_count + 1,
+                last_locked_at = now(),
+                version = version + 1,
+                last_modified_by = ${sessionUser.id}::uuid
+            WHERE id = ${proposalId}
+              AND stage = ${previousStage}
+              AND version = ${proposal.version}
+          `;
+          if (advanceResult.count === 0) {
+            throw new Error('CONFLICT');
+          }
+        } else {
+          const advanceResult = await tx`
+            UPDATE proposals
+            SET stage = ${targetStage},
+                version = version + 1,
+                last_modified_by = ${sessionUser.id}::uuid
+            WHERE id = ${proposalId}
+              AND stage = ${previousStage}
+              AND version = ${proposal.version}
+          `;
+          if (advanceResult.count === 0) {
+            throw new Error('CONFLICT');
+          }
+        }
+
+        await tx`
+          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+          VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
+        `;
+      });
     } catch (e) {
-      console.error('[portal/proposals/advance] stage history insert failed:', e);
+      if (e instanceof Error && e.message === 'CONFLICT') {
+        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+      }
+      console.error('[portal/proposals/advance] stage update failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 

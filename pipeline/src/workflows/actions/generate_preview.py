@@ -217,7 +217,14 @@ def _extract_readable_text(title: str, raw_content: str) -> str:
             parts: list[str] = []
             for node in canvas.get("nodes", []):
                 node_type = node.get("type", "")
-                text = node.get("text") or node.get("content") or ""
+                content = node.get("content", {})
+
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, dict):
+                    text = content.get("text", "")
+                else:
+                    text = ""
 
                 if node_type == "heading":
                     level = node.get("level", 2)
@@ -225,13 +232,29 @@ def _extract_readable_text(title: str, raw_content: str) -> str:
                 elif node_type == "text_block":
                     parts.append(text)
                 elif node_type in ("bulleted_list", "numbered_list"):
-                    items = node.get("items", [])
+                    items = content.get("items", []) if isinstance(content, dict) else []
                     for i, item in enumerate(items):
-                        item_text = item if isinstance(item, str) else str(item)
+                        if isinstance(item, dict):
+                            item_text = item.get("text", "")
+                        elif isinstance(item, str):
+                            item_text = item
+                        else:
+                            item_text = str(item)
                         prefix = f"{i + 1}." if node_type == "numbered_list" else "-"
                         parts.append(f"  {prefix} {item_text}")
                 elif node_type == "table":
-                    parts.append(str(node.get("data", text)))
+                    rows = content.get("rows", []) if isinstance(content, dict) else []
+                    for row in rows:
+                        if isinstance(row, list):
+                            row_texts = []
+                            for cell in row:
+                                if isinstance(cell, str):
+                                    row_texts.append(cell)
+                                elif isinstance(cell, dict):
+                                    row_texts.append(cell.get("text", ""))
+                                else:
+                                    row_texts.append(str(cell))
+                            parts.append(" | ".join(row_texts))
                 elif node_type == "page_break":
                     parts.append("\n---\n")
                 elif text:

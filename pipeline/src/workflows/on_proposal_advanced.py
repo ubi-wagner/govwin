@@ -159,7 +159,7 @@ class OnProposalAdvancedToPinkTeam(Workflow):
         namespace="proposal",
         type="proposal.advanced",
         phase="single",
-        condition=lambda p: p.get("toStage") == "pink_team",
+        condition=lambda p: p.get("targetStage") == "pink_team",
     )
 
     steps = [
@@ -190,7 +190,7 @@ class OnProposalAdvancedToPinkTeam(Workflow):
                 namespace="proposal",
                 type="proposal.advanced",
                 phase="single",
-                condition=lambda p: p.get("fromStage") == "pink_team",
+                condition=lambda p: p.get("previousStage") == "pink_team",
             ),
             timeout_minutes=4320,
             on_timeout="send_review_reminder",
@@ -205,7 +205,7 @@ class OnProposalAdvancedToFinal(Workflow):
         namespace="proposal",
         type="proposal.advanced",
         phase="single",
-        condition=lambda p: p.get("toStage") == "final",
+        condition=lambda p: p.get("targetStage") == "final",
     )
 
     steps = [
