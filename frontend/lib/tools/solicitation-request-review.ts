@@ -45,21 +45,33 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
     const { solicitationId, requestedReviewerId, notes } = input;
     const actorId = ctx.actor.id;
 
-    const rows = await sql<{ id: string; curatedBy: string | null }[]>`
-      UPDATE curated_solicitations
-      SET status = 'review_requested',
-          curated_by = COALESCE(curated_by, ${actorId}::uuid),
-          review_requested_for = ${requestedReviewerId ?? null}::uuid,
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'curation_in_progress'
-      RETURNING id, curated_by
-    `;
+    let rows: { id: string; curatedBy: string | null }[];
+    try {
+      rows = await sql<{ id: string; curatedBy: string | null }[]>`
+        UPDATE curated_solicitations
+        SET status = 'review_requested',
+            curated_by = COALESCE(curated_by, ${actorId}::uuid),
+            review_requested_for = ${requestedReviewerId ?? null}::uuid,
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'curation_in_progress'
+        RETURNING id, curated_by
+      `;
+    } catch (err) {
+      console.error('[solicitation.request_review] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
-      const existing = await sql<{ status: string }[]>`
-        SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string }[];
+      try {
+        existing = await sql<{ status: string }[]>`
+          SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.request_review] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }

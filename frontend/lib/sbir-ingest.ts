@@ -247,9 +247,16 @@ export async function detectAndIngestSbirCsv(
   }
 
   const fileHash = createHash('sha256').update(buffer).digest('hex');
-  const [existing] = await sql<{ id: string }[]>`
-    SELECT id FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
-  `;
+  let existing: { id: string } | undefined;
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
+    `;
+    existing = row;
+  } catch (err) {
+    console.error('[sbir-ingest] duplicate check failed:', err);
+    throw err;
+  }
   if (existing) {
     return { fileType, rowCount: 0, filename, isDuplicate: true };
   }
@@ -285,10 +292,15 @@ export async function detectAndIngestSbirCsv(
     else await insertAwardBatch(batch);
   }
 
-  await sql`
-    INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by, storage_key)
-    VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId}::uuid, ${storageKey ?? null})
-  `;
+  try {
+    await sql`
+      INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by, storage_key)
+      VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId}::uuid, ${storageKey ?? null})
+    `;
+  } catch (err) {
+    console.error('[sbir-ingest] upload record insert failed:', err);
+    throw err;
+  }
 
   return { fileType, rowCount, filename, isDuplicate: false };
 }

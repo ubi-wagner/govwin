@@ -69,7 +69,9 @@ export const solicitationPushTool = defineTool<Input, Output>({
     const actorId = ctx.actor.id;
 
     // 1. Preflight — fetch current state + compliance + opportunity_id.
-    const rows = await sql<
+    let rows;
+    try {
+      rows = await sql<
       {
         status: string;
         namespace: string | null;
@@ -87,6 +89,10 @@ export const solicitationPushTool = defineTool<Input, Output>({
         ON sc.solicitation_id = cs.id
       WHERE cs.id = ${solicitationId}::uuid
     `;
+    } catch (err) {
+      console.error('[solicitation.push] preflight query failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
@@ -115,8 +121,10 @@ export const solicitationPushTool = defineTool<Input, Output>({
     }
 
     // 3. Atomic push in transaction — status update + opportunity activation + triage action
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pushedRows = await sql.begin(async (tx: any) => {
+    let pushedRows: { pushedAt: Date }[];
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pushedRows = await sql.begin(async (tx: any) => {
       const rows = await tx`
         UPDATE curated_solicitations
         SET status = 'pushed_to_pipeline',
@@ -151,7 +159,11 @@ export const solicitationPushTool = defineTool<Input, Output>({
       `;
 
       return rows;
-    });
+      });
+    } catch (err) {
+      console.error('[solicitation.push] transaction failed:', err);
+      throw err;
+    }
 
     if (pushedRows.length === 0) {
       throw new StateTransitionError(
@@ -162,11 +174,17 @@ export const solicitationPushTool = defineTool<Input, Output>({
 
     // Count topics (opportunities) linked to this solicitation for
     // downstream workflow matching (on_solicitation_pushed expects it).
-    const [topicRow] = await sql<{ count: string }[]>`
-      SELECT count(*)::text AS count FROM opportunities
-      WHERE solicitation_id = ${solicitationId}::uuid
-    `;
-    const topicCount = parseInt(topicRow?.count ?? '0', 10);
+    let topicCount: number;
+    try {
+      const [topicRow] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+      `;
+      topicCount = parseInt(topicRow?.count ?? '0', 10);
+    } catch (err) {
+      console.error('[solicitation.push] topic count query failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

@@ -152,7 +152,9 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
 
     // Preflight: fetch namespace + existing compliance row + prior
     // custom_variables value (for action inference).
-    const preflight = await sql<
+    let preflight: { namespace: string | null; compId: string | null; priorJson: unknown }[];
+    try {
+      preflight = await sql<
       { namespace: string | null; compId: string | null; priorJson: unknown }[]
     >`
       SELECT cs.namespace,
@@ -165,6 +167,10 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
       LEFT JOIN solicitation_compliance sc ON sc.solicitation_id = cs.id
       WHERE cs.id = ${solicitationId}::uuid
     `;
+    } catch (err) {
+      console.error('[compliance.save_variable_value] preflight query failed:', err);
+      throw err;
+    }
     if (preflight.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
     }
@@ -200,29 +206,34 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
 
     let verifiedAt: Date;
 
-    if (compId === null) {
-      const rows = await sql<{ verifiedAt: Date }[]>`
-        INSERT INTO solicitation_compliance
-          (solicitation_id, custom_variables, verified_by, verified_at)
-        VALUES
-          (${solicitationId}::uuid,
-           jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
-           ${actorId}::uuid, now())
-        RETURNING verified_at
-      `;
-      verifiedAt = rows[0].verifiedAt;
-    } else {
-      const rows = await sql<{ verifiedAt: Date }[]>`
-        UPDATE solicitation_compliance
-        SET custom_variables = COALESCE(custom_variables, '{}'::jsonb)
-                               || jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
-            verified_by = ${actorId}::uuid,
-            verified_at = now(),
-            updated_at = now()
-        WHERE id = ${compId}::uuid
-        RETURNING verified_at
-      `;
-      verifiedAt = rows[0].verifiedAt;
+    try {
+      if (compId === null) {
+        const rows = await sql<{ verifiedAt: Date }[]>`
+          INSERT INTO solicitation_compliance
+            (solicitation_id, custom_variables, verified_by, verified_at)
+          VALUES
+            (${solicitationId}::uuid,
+             jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
+             ${actorId}::uuid, now())
+          RETURNING verified_at
+        `;
+        verifiedAt = rows[0].verifiedAt;
+      } else {
+        const rows = await sql<{ verifiedAt: Date }[]>`
+          UPDATE solicitation_compliance
+          SET custom_variables = COALESCE(custom_variables, '{}'::jsonb)
+                                 || jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
+              verified_by = ${actorId}::uuid,
+              verified_at = now(),
+              updated_at = now()
+          WHERE id = ${compId}::uuid
+          RETURNING verified_at
+        `;
+        verifiedAt = rows[0].verifiedAt;
+      }
+    } catch (err) {
+      console.error('[compliance.save_variable_value] upsert failed:', err);
+      throw err;
     }
 
     const isNew = compId === null;

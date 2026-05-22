@@ -65,15 +65,21 @@ export const ingestListRecentRunsTool = defineTool<Input, Output>({
       result: Record<string, unknown> | null;
       error: string | null;
     };
-    const rows = await sql<Row[]>`
-      SELECT id AS job_id, source, status, priority, created_at,
-             started_at, completed_at, result, error
-      FROM pipeline_jobs
-      WHERE kind = 'ingest'
-        AND (${source}::text IS NULL OR source = ${source})
-      ORDER BY created_at DESC
-      LIMIT ${input.limit}
-    `;
+    let rows: Row[];
+    try {
+      rows = await sql<Row[]>`
+        SELECT id AS job_id, source, status, priority, created_at,
+               started_at, completed_at, result, error
+        FROM pipeline_jobs
+        WHERE kind = 'ingest'
+          AND (${source}::text IS NULL OR source = ${source})
+        ORDER BY created_at DESC
+        LIMIT ${input.limit}
+      `;
+    } catch (err) {
+      console.error('[ingest.list_recent_runs] query failed:', err);
+      throw err;
+    }
 
     const runs: RunRow[] = rows.map((r) => ({
       jobId: r.jobId,

@@ -100,10 +100,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Idempotency: skip if we already recorded this session
-  const [existing] = await sql<{ id: string }[]>`
-    SELECT id FROM purchases WHERE stripe_session_id = ${sessionId}
-  `;
-  if (existing) return;
+  try {
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM purchases WHERE stripe_session_id = ${sessionId}
+    `;
+    if (existing) return;
+  } catch (err) {
+    console.error('[stripe/webhook] idempotency check failed:', err);
+    throw err;
+  }
 
   const quantity = parseInt(session.metadata?.quantity ?? '1', 10) || 1;
   const amountCents = getAmountCents(productType) * quantity;
@@ -112,28 +117,33 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     : session.payment_intent?.id ?? null;
 
   // Wrap purchase insert + tenant subscription update in transaction
-  await sql.begin(async (tx: any) => {
-    // Insert the purchase record
-    await tx`
-      INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
-      VALUES (
-        ${tenantId},
-        ${opportunityId},
-        ${sessionId},
-        ${paymentIntent},
-        ${productType},
-        ${amountCents},
-        'completed'
-      )
-    `;
-
-    // For subscriptions, update the tenant's subscription status
-    if (productType === 'finder_subscription') {
+  try {
+    await sql.begin(async (tx: any) => {
+      // Insert the purchase record
       await tx`
-        UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
+        INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
+        VALUES (
+          ${tenantId},
+          ${opportunityId},
+          ${sessionId},
+          ${paymentIntent},
+          ${productType},
+          ${amountCents},
+          'completed'
+        )
       `;
-    }
-  });
+
+      // For subscriptions, update the tenant's subscription status
+      if (productType === 'finder_subscription') {
+        await tx`
+          UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
+        `;
+      }
+    });
+  } catch (err) {
+    console.error('[stripe/webhook] checkout purchase transaction failed:', err);
+    throw err;
+  }
 
   if (productType === 'finder_subscription') {
     await emitEventSingle({
@@ -179,15 +189,27 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!customerId) return;
 
   // Look up tenant by stripe_customer_id
-  const [tenant] = await sql<{ id: string }[]>`
-    SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
-  `;
+  let tenant: { id: string } | undefined;
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
+    `;
+    tenant = row;
+  } catch (err) {
+    console.error('[stripe/webhook] tenant lookup failed:', err);
+    throw err;
+  }
   if (!tenant) return;
 
   // Ensure subscription status is active on successful payment
-  await sql`
-    UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenant.id}
-  `;
+  try {
+    await sql`
+      UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenant.id}
+    `;
+  } catch (err) {
+    console.error('[stripe/webhook] subscription status update failed:', err);
+    throw err;
+  }
 
   await emitEventSingle({
     namespace: 'capture',
@@ -205,14 +227,26 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (!customerId) return;
 
-  const [tenant] = await sql<{ id: string }[]>`
-    SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
-  `;
+  let tenant: { id: string } | undefined;
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
+    `;
+    tenant = row;
+  } catch (err) {
+    console.error('[stripe/webhook] tenant lookup for subscription delete failed:', err);
+    throw err;
+  }
   if (!tenant) return;
 
-  await sql`
-    UPDATE tenants SET subscription_status = 'canceled' WHERE id = ${tenant.id}
-  `;
+  try {
+    await sql`
+      UPDATE tenants SET subscription_status = 'canceled' WHERE id = ${tenant.id}
+    `;
+  } catch (err) {
+    console.error('[stripe/webhook] subscription cancel update failed:', err);
+    throw err;
+  }
 
   await emitEventSingle({
     namespace: 'capture',

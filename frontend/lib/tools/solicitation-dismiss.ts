@@ -66,12 +66,18 @@ export const solicitationDismissTool = defineTool<Input, Output>({
 
     // Fetch current state (to know the from_state for audit + to return it).
     // We need the namespace for the memory write too.
-    const existing = await sql<
-      { status: string; claimedBy: string | null; namespace: string | null }[]
-    >`
-      SELECT status, claimed_by, namespace FROM curated_solicitations
-      WHERE id = ${solicitationId}::uuid
-    `;
+    let existing: { status: string; claimedBy: string | null; namespace: string | null }[];
+    try {
+      existing = await sql<
+        { status: string; claimedBy: string | null; namespace: string | null }[]
+      >`
+        SELECT status, claimed_by, namespace FROM curated_solicitations
+        WHERE id = ${solicitationId}::uuid
+      `;
+    } catch (err) {
+      console.error('[solicitation.dismiss] lookup failed:', err);
+      throw err;
+    }
     if (existing.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
     }
@@ -103,18 +109,24 @@ export const solicitationDismissTool = defineTool<Input, Output>({
       );
     }
 
-    const rows = await sql<{ id: string }[]>`
-      UPDATE curated_solicitations
-      SET status = 'dismissed',
-          dismissed_reason = ${notes ?? null},
-          phase_like = ${phaseClassification === 'phase_1_like' ? 'phase_1'
-                       : phaseClassification === 'phase_2_like' ? 'phase_2'
-                       : null},
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = ${current.status}
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        UPDATE curated_solicitations
+        SET status = 'dismissed',
+            dismissed_reason = ${notes ?? null},
+            phase_like = ${phaseClassification === 'phase_1_like' ? 'phase_1'
+                         : phaseClassification === 'phase_2_like' ? 'phase_2'
+                         : null},
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = ${current.status}
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[solicitation.dismiss] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       // Race: someone moved the row between our SELECT and UPDATE.
@@ -124,15 +136,20 @@ export const solicitationDismissTool = defineTool<Input, Output>({
       );
     }
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes,
-         metadata)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'dismiss',
-         ${current.status}, 'dismissed', ${notes ?? null},
-         ${JSON.stringify({ phaseClassification: phaseClassification ?? null })}::jsonb)
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes,
+           metadata)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'dismiss',
+           ${current.status}, 'dismissed', ${notes ?? null},
+           ${JSON.stringify({ phaseClassification: phaseClassification ?? null })}::jsonb)
+      `;
+    } catch (err) {
+      console.error('[solicitation.dismiss] triage_actions insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

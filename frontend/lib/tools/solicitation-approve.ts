@@ -52,25 +52,37 @@ export const solicitationApproveTool = defineTool<Input, Output>({
     const { solicitationId, notes } = input;
     const actorId = ctx.actor.id;
 
-    const rows = await sql<{ id: string; curatedBy: string; namespace: string | null }[]>`
-      UPDATE curated_solicitations
-      SET status = 'approved',
-          approved_by = ${actorId}::uuid,
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'review_requested'
-        AND curated_by IS NOT NULL
-        AND curated_by != ${actorId}::uuid
-      RETURNING id, curated_by, namespace
-    `;
+    let rows: { id: string; curatedBy: string; namespace: string | null }[];
+    try {
+      rows = await sql<{ id: string; curatedBy: string; namespace: string | null }[]>`
+        UPDATE curated_solicitations
+        SET status = 'approved',
+            approved_by = ${actorId}::uuid,
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'review_requested'
+          AND curated_by IS NOT NULL
+          AND curated_by != ${actorId}::uuid
+        RETURNING id, curated_by, namespace
+      `;
+    } catch (err) {
+      console.error('[solicitation.approve] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       // Disambiguate between the three failure modes for clear UI.
-      const existing = await sql<
-        { status: string; curatedBy: string | null }[]
-      >`
-        SELECT status, curated_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string; curatedBy: string | null }[];
+      try {
+        existing = await sql<
+          { status: string; curatedBy: string | null }[]
+        >`
+          SELECT status, curated_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.approve] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }
@@ -98,13 +110,18 @@ export const solicitationApproveTool = defineTool<Input, Output>({
 
     const { curatedBy, namespace } = rows[0];
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'approve',
-         'review_requested', 'approved', ${notes ?? null})
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'approve',
+           'review_requested', 'approved', ${notes ?? null})
+      `;
+    } catch (err) {
+      console.error('[solicitation.approve] triage_actions insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',
