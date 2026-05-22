@@ -223,53 +223,59 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
-    // Check if user exists, create if not
-    let [existingUser] = await sql<{ id: string; tenantId: string | null }[]>`
-      SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
-    `;
-
+    // Wrap user + collaborator + stage_access creation in transaction
     let isNewUser = false;
     let tempPassword: string | undefined;
-    if (!existingUser) {
-      isNewUser = true;
-      tempPassword = randomUUID().slice(0, 12);
-      const passwordHash = await bcrypt.hash(tempPassword, 12);
-      const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
-      const [newUser] = await sql<{ id: string }[]>`
-        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
-        VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
-        RETURNING id
+    const { collaboratorId, finalUserId } = await sql.begin(async (tx: any) => {
+      // Check if user exists, create if not
+      let [existingUser] = await tx<{ id: string; tenantId: string | null }[]>`
+        SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
       `;
-      existingUser = { id: newUser.id, tenantId: tenantId };
-    }
 
-    // Create collaborator record
-    const [collaborator] = await sql<{ id: string }[]>`
-      INSERT INTO proposal_collaborators (
-        proposal_id, user_id, email, name, role, invited_by,
-        assigned_sections, dropbox_enabled
-      )
-      VALUES (
-        ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
-        ${collabRole}, ${sessionUser.id},
-        ${sql.array(assignedSections)}, true
-      )
-      RETURNING id
-    `;
+      if (!existingUser) {
+        isNewUser = true;
+        tempPassword = randomUUID().slice(0, 12);
+        const passwordHash = await bcrypt.hash(tempPassword, 12);
+        const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
-    // Create stage access for current stage
-    const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
-    for (const stage of gates) {
-      await sql`
-        INSERT INTO collaborator_stage_access (
-          collaborator_id, proposal_id, stage, permission, granted_by
+        const [newUser] = await tx<{ id: string }[]>`
+          INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
+          VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
+          RETURNING id
+        `;
+        existingUser = { id: newUser.id, tenantId: tenantId };
+      }
+
+      // Create collaborator record
+      const [collaborator] = await tx<{ id: string }[]>`
+        INSERT INTO proposal_collaborators (
+          proposal_id, user_id, email, name, role, invited_by,
+          assigned_sections, dropbox_enabled
         )
         VALUES (
-          ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+          ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
+          ${collabRole}, ${sessionUser.id},
+          ${sql.array(assignedSections)}, true
         )
+        RETURNING id
       `;
-    }
+
+      // Create stage access for current stage
+      const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+      for (const stage of gates) {
+        await tx`
+          INSERT INTO collaborator_stage_access (
+            collaborator_id, proposal_id, stage, permission, granted_by
+          )
+          VALUES (
+            ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+          )
+        `;
+      }
+
+      return { collaboratorId: collaborator.id, finalUserId: existingUser.id };
+    });
 
     // Send collaborator invite email (non-blocking — failure is logged, not fatal)
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
@@ -310,7 +316,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         tenantId,
         tenantSlug,
         proposalId,
-        collaboratorId: collaborator.id,
+        collaboratorId,
         email,
         name,
         role: collabRole,
@@ -321,8 +327,8 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({
       data: {
-        id: collaborator.id,
-        userId: existingUser.id,
+        id: collaboratorId,
+        userId: finalUserId,
         email,
         name,
         role: collabRole,

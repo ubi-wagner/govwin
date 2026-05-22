@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -22,6 +23,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { id } = await ctx.params;
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
       return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });

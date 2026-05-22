@@ -139,87 +139,87 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Record outcome on the proposal ──────────────────────────────
-    // The proposals table doesn't have an 'outcome' column, so we
-    // store it in the stage field (archive the proposal) and record
-    // in stage_history with detailed notes.
-    await sql`
-      UPDATE proposals
-      SET stage = 'archived',
-          updated_at = now()
-      WHERE id = ${proposalId}
-    `;
-
-    // Record in stage history with outcome details
-    await sql`
-      INSERT INTO proposal_stage_history
-        (proposal_id, from_stage, to_stage, changed_by, notes)
-      VALUES
-        (${proposalId}, ${proposal.stage}, 'archived', ${sessionUser.id},
-         ${`Outcome: ${outcome}${notes ? ' — ' + notes : ''}`})
-    `;
-
-    // ── Update library atoms based on outcome ───────────────────────
-    let atomsUpdated = 0;
-
-    if (outcome === 'awarded') {
-      // Elevate all library atoms harvested from this proposal
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'awarded',
-            outcome_score = 1.0,
-            confidence = 1.0,
-            tags = array_append(
-              array_remove(tags, 'winning_proposal'),
-              'winning_proposal'
-            )
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
+    // ── Record outcome in a transaction ────────────────────────────
+    // Wrap proposal archive + library_units update in transaction
+    const atomsUpdated = await sql.begin(async (tx: any) => {
+      // The proposals table doesn't have an 'outcome' column, so we
+      // store it in the stage field (archive the proposal) and record
+      // in stage_history with detailed notes.
+      await tx`
+        UPDATE proposals
+        SET stage = 'archived',
+            updated_at = now()
+        WHERE id = ${proposalId}
       `;
-      atomsUpdated = result.count;
-    } else if (outcome === 'rejected') {
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'rejected',
-            outcome_score = 0.3
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-      atomsUpdated = result.count;
-    } else if (outcome === 'withdrawn') {
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'withdrawn',
-            outcome_score = 0.4
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-      atomsUpdated = result.count;
-    }
 
-    // Also record in library_atom_outcomes for audit trail
-    try {
+      // Record in stage history with outcome details
+      await tx`
+        INSERT INTO proposal_stage_history
+          (proposal_id, from_stage, to_stage, changed_by, notes)
+        VALUES
+          (${proposalId}, ${proposal.stage}, 'archived', ${sessionUser.id},
+           ${`Outcome: ${outcome}${notes ? ' — ' + notes : ''}`})
+      `;
+
+      // ── Update library atoms based on outcome ───────────────────────
+      let updated = 0;
+
+      if (outcome === 'awarded') {
+        // Elevate all library atoms harvested from this proposal
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'awarded',
+              outcome_score = 1.0,
+              confidence = 1.0,
+              tags = array_append(
+                array_remove(tags, 'winning_proposal'),
+                'winning_proposal'
+              )
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      } else if (outcome === 'rejected') {
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'rejected',
+              outcome_score = 0.3
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      } else if (outcome === 'withdrawn') {
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'withdrawn',
+              outcome_score = 0.4
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      }
+
+      // Also record in library_atom_outcomes for audit trail
       // Map to the existing check constraint values
       const atomOutcomeValue = outcome === 'awarded' ? 'win' : outcome === 'rejected' ? 'loss' : 'pending';
 
       // Get all library unit IDs for this proposal
-      const units = await sql<Array<{ id: string }>>`
+      const units = await tx<Array<{ id: string }>>`
         SELECT id FROM library_units
         WHERE original_proposal_id = ${proposalId}::uuid
           AND tenant_id = ${tenantId}::uuid
       `;
 
       for (const unit of units) {
-        await sql`
+        await tx`
           INSERT INTO library_atom_outcomes (unit_id, proposal_id, outcome)
           VALUES (${unit.id}, ${proposalId}::uuid, ${atomOutcomeValue})
           ON CONFLICT DO NOTHING
         `;
       }
-    } catch (err) {
-      // Audit trail failure is non-fatal
-      console.error('[outcome] library_atom_outcomes insert failed (non-fatal)', err);
-    }
+
+      return updated;
+    });
 
     // ── Emit event ──────────────────────────────────────────────────
     await emitEventSingle({

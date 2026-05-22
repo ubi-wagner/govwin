@@ -111,25 +111,31 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
 
-  // Insert the purchase record
-  await sql`
-    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
-    VALUES (
-      ${tenantId},
-      ${opportunityId},
-      ${sessionId},
-      ${paymentIntent},
-      ${productType},
-      ${amountCents},
-      'completed'
-    )
-  `;
-
-  // For subscriptions, update the tenant's subscription status
-  if (productType === 'finder_subscription') {
-    await sql`
-      UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
+  // Wrap purchase insert + tenant subscription update in transaction
+  await sql.begin(async (tx: any) => {
+    // Insert the purchase record
+    await tx`
+      INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
+      VALUES (
+        ${tenantId},
+        ${opportunityId},
+        ${sessionId},
+        ${paymentIntent},
+        ${productType},
+        ${amountCents},
+        'completed'
+      )
     `;
+
+    // For subscriptions, update the tenant's subscription status
+    if (productType === 'finder_subscription') {
+      await tx`
+        UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
+      `;
+    }
+  });
+
+  if (productType === 'finder_subscription') {
     await emitEventSingle({
       namespace: 'capture',
       type: 'subscription.started',

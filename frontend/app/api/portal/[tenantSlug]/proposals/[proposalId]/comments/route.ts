@@ -92,6 +92,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE pc.proposal_id = ${proposalId}
           AND pc.section_id = ${nodeId}
         ORDER BY pc.created_at ASC
+        LIMIT 200
       `;
     } else {
       comments = await sql<typeof comments>`
@@ -109,6 +110,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         LEFT JOIN users u ON u.id = pc.user_id
         WHERE pc.proposal_id = ${proposalId}
         ORDER BY pc.created_at ASC
+        LIMIT 200
       `;
     }
 
@@ -191,6 +193,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const nodeId = body.nodeId.trim();
     const text = body.text.trim();
+
+    if (text.length > 10000) {
+      return NextResponse.json({ error: 'Comment too long (max 10000 characters)', code: 'VALIDATION_ERROR' }, { status: 422 });
+    }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
     const [proposal] = await sql<{ id: string }[]>`

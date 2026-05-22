@@ -114,16 +114,43 @@ export const solicitationPushTool = defineTool<Input, Output>({
       );
     }
 
-    // 3. Atomic push — guard against race by including status in WHERE.
-    const pushedRows = await sql<{ pushedAt: Date }[]>`
-      UPDATE curated_solicitations
-      SET status = 'pushed_to_pipeline',
-          pushed_at = now(),
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'approved'
-      RETURNING pushed_at
-    `;
+    // 3. Atomic push in transaction — status update + opportunity activation + triage action
+    const pushedRows = await sql.begin(async (tx) => {
+      const rows = await tx<{ pushedAt: Date }[]>`
+        UPDATE curated_solicitations
+        SET status = 'pushed_to_pipeline',
+            pushed_at = now(),
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'approved'
+        RETURNING pushed_at
+      `;
+
+      if (rows.length === 0) {
+        throw new StateTransitionError(
+          `push lost a race on solicitation ${solicitationId}`,
+          { solicitationId },
+        );
+      }
+
+      // 4. Flip the opportunity visible — customers see it after this.
+      await tx`
+        UPDATE opportunities
+        SET is_active = true, updated_at = now()
+        WHERE id = ${r.opportunityId}::uuid
+      `;
+
+      // 5. Audit + event.
+      await tx`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'push',
+           'approved', 'pushed_to_pipeline')
+      `;
+
+      return rows;
+    });
 
     if (pushedRows.length === 0) {
       throw new StateTransitionError(
@@ -131,22 +158,6 @@ export const solicitationPushTool = defineTool<Input, Output>({
         { solicitationId },
       );
     }
-
-    // 4. Flip the opportunity visible — customers see it after this.
-    await sql`
-      UPDATE opportunities
-      SET is_active = true, updated_at = now()
-      WHERE id = ${r.opportunityId}::uuid
-    `;
-
-    // 5. Audit + event.
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'push',
-         'approved', 'pushed_to_pipeline')
-    `;
 
     // Count topics (opportunities) linked to this solicitation for
     // downstream workflow matching (on_solicitation_pushed expects it).

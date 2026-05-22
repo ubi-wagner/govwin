@@ -290,44 +290,40 @@ export async function POST(request: Request) {
     const postedParam: Date | null = meta.postedDate ? new Date(meta.postedDate) : null;
     const descParam: string | null = meta.description ?? null;
 
+    // Wrap opportunity + solicitation creation in transaction
     try {
-      const rows = await sql<{ id: string }[]>`
-        INSERT INTO opportunities
-          (id, source, source_id, title, agency, office, program_type,
-           solicitation_number, close_date, posted_date, description,
-           content_hash, is_active)
-        VALUES
-          (${oppId}::uuid, 'manual_upload', ${'manual-' + oppId},
-           ${meta.title}, ${meta.agency}, ${officeParam},
-           ${meta.programType}, ${solNumParam},
-           ${closeParam}, ${postedParam},
-           ${descParam},
-           md5(${meta.title} || ${descParam ?? ''}),
-           true)
-        RETURNING id
-      `;
-      oppRowId = rows[0].id;
-    } catch (err) {
-      console.error('[rfp-upload] opportunity insert failed', err);
-      await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
-      return NextResponse.json(
-        { error: 'Failed to create opportunity row', code: 'DB_ERROR' },
-        { status: 500 },
-      );
-    }
+      const txResult = await sql.begin(async (tx: any) => {
+        const oppRows = await tx<{ id: string }[]>`
+          INSERT INTO opportunities
+            (id, source, source_id, title, agency, office, program_type,
+             solicitation_number, close_date, posted_date, description,
+             content_hash, is_active)
+          VALUES
+            (${oppId}::uuid, 'manual_upload', ${'manual-' + oppId},
+             ${meta.title}, ${meta.agency}, ${officeParam},
+             ${meta.programType}, ${solNumParam},
+             ${closeParam}, ${postedParam},
+             ${descParam},
+             md5(${meta.title} || ${descParam ?? ''}),
+             true)
+          RETURNING id
+        `;
 
-    try {
-      const rows = await sql<{ id: string }[]>`
-        INSERT INTO curated_solicitations (opportunity_id, namespace, status)
-        VALUES (${oppRowId}::uuid, 'pending', 'new')
-        RETURNING id
-      `;
-      solId = rows[0].id;
+        const solRows = await tx<{ id: string }[]>`
+          INSERT INTO curated_solicitations (opportunity_id, namespace, status)
+          VALUES (${oppRows[0].id}::uuid, 'pending', 'new')
+          RETURNING id
+        `;
+
+        return { oppRowId: oppRows[0].id, solId: solRows[0].id };
+      });
+      oppRowId = txResult.oppRowId;
+      solId = txResult.solId;
     } catch (err) {
-      console.error('[rfp-upload] curated_solicitations insert failed', err);
+      console.error('[rfp-upload] opportunity/solicitation creation failed', err);
       await emitEventEnd(eventId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
       return NextResponse.json(
-        { error: 'Failed to create solicitation row', code: 'DB_ERROR' },
+        { error: 'Failed to create opportunity/solicitation rows', code: 'DB_ERROR' },
         { status: 500 },
       );
     }

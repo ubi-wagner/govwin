@@ -12,13 +12,21 @@ import { z } from 'zod';
 
 // ─── Primitives ─────────────────────────────────────────────────────
 
+/** RFC-4122 UUID regex (any version). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** RFC-4122 UUID (any version). */
 export const zUuid = z
   .string()
-  .regex(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    'invalid uuid',
-  );
+  .regex(UUID_RE, 'invalid uuid');
+
+/**
+ * Lightweight UUID format check for use in API route handlers where
+ * pulling in zod just for one param is overkill.
+ */
+export function isValidUUID(value: string): boolean {
+  return UUID_RE.test(value);
+}
 
 /** Case-insensitive email, lowercased + trimmed on parse. */
 export const zEmail = z

@@ -155,22 +155,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
-    // ── Create the proposal ──────────────────────────────────────────
+    // ── Create the proposal + sections in a transaction ─────────────
     const proposalTitle = topic.topicNumber
       ? `${topic.topicNumber}: ${topic.title}`
       : topic.title;
-
-    const [proposal] = await sql<{ id: string }[]>`
-      INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage)
-      VALUES (
-        ${tenantId},
-        ${topicId},
-        ${topic.solicitationId},
-        ${proposalTitle},
-        'draft'
-      )
-      RETURNING id
-    `;
 
     // ── Resolve compliance + volumes via topic -> solicitation -> defaults chain ─
     const resolved = await resolveTopicCompliance(topicId);
@@ -197,7 +185,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    // ── Create proposal_sections from required items ─────────────────
     // Build merge-field variables for template interpolation
     const tenantName = (tenant.name as string) ?? '';
     const templateVariables: Record<string, string> = {
@@ -211,71 +198,87 @@ export async function POST(request: Request, ctx: RouteContext) {
       uei: '{uei}',
     };
 
-    let sectionCount = 0;
-
-    if (requiredItems.length > 0) {
-      const programType = topic.programType ?? '';
-
-      for (const item of requiredItems) {
-        // Insert the section row first to get its id
-        const [section] = await sql<{ id: string }[]>`
-          INSERT INTO proposal_sections (
-            proposal_id, section_number, title, content, status, page_allocation
-          ) VALUES (
-            ${proposal.id},
-            ${String(item.itemNumber)},
-            ${item.itemName},
-            ${null},
-            'empty',
-            ${item.pageLimit}
-          )
-          RETURNING id
-        `;
-
-        // Attempt to resolve and apply a template for this section
-        const templateKey = resolveTemplateKey(programType, item.itemType);
-        if (templateKey) {
-          const templateDoc: CanvasDocument | null = getTemplate(templateKey);
-          if (templateDoc) {
-            // Set metadata IDs linking this document to the proposal structure
-            templateDoc.metadata.proposal_id = proposal.id;
-            templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-            templateDoc.metadata.created_at = new Date().toISOString();
-            templateDoc.metadata.last_modified_at = new Date().toISOString();
-            templateDoc.metadata.last_modified_by = userId;
-            templateDoc.document_id = section.id;
-
-            // Interpolate merge fields with available data
-            const interpolated = interpolateTemplate(templateDoc, templateVariables);
-
-            // Store the canvas document JSON and update status to reflect template content
-            const contentJson = JSON.stringify(interpolated);
-            await sql`
-              UPDATE proposal_sections
-              SET content = ${contentJson},
-                  status = 'ai_drafted'
-              WHERE id = ${section.id}
-            `;
-          }
-        }
-
-        sectionCount++;
-      }
-    } else {
-      // No required items defined — create a single default section
-      await sql`
-        INSERT INTO proposal_sections (
-          proposal_id, section_number, title, content, status
-        ) VALUES (
-          ${proposal.id},
-          '1',
-          'Technical Volume',
-          ${null},
-          'empty'
+    const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
+      const [proposalRow] = await tx<{ id: string }[]>`
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage)
+        VALUES (
+          ${tenantId},
+          ${topicId},
+          ${topic.solicitationId},
+          ${proposalTitle},
+          'draft'
         )
+        RETURNING id
       `;
-      sectionCount = 1;
-    }
+
+      let count = 0;
+
+      if (requiredItems.length > 0) {
+        const programType = topic.programType ?? '';
+
+        for (const item of requiredItems) {
+          // Insert the section row first to get its id
+          const [section] = await tx<{ id: string }[]>`
+            INSERT INTO proposal_sections (
+              proposal_id, section_number, title, content, status, page_allocation
+            ) VALUES (
+              ${proposalRow.id},
+              ${String(item.itemNumber)},
+              ${item.itemName},
+              ${null},
+              'empty',
+              ${item.pageLimit}
+            )
+            RETURNING id
+          `;
+
+          // Attempt to resolve and apply a template for this section
+          const templateKey = resolveTemplateKey(programType, item.itemType);
+          if (templateKey) {
+            const templateDoc: CanvasDocument | null = getTemplate(templateKey);
+            if (templateDoc) {
+              // Set metadata IDs linking this document to the proposal structure
+              templateDoc.metadata.proposal_id = proposalRow.id;
+              templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
+              templateDoc.metadata.created_at = new Date().toISOString();
+              templateDoc.metadata.last_modified_at = new Date().toISOString();
+              templateDoc.metadata.last_modified_by = userId;
+              templateDoc.document_id = section.id;
+
+              // Interpolate merge fields with available data
+              const interpolated = interpolateTemplate(templateDoc, templateVariables);
+
+              // Store the canvas document JSON and update status to reflect template content
+              const contentJson = JSON.stringify(interpolated);
+              await tx`
+                UPDATE proposal_sections
+                SET content = ${contentJson},
+                    status = 'ai_drafted'
+                WHERE id = ${section.id}
+              `;
+            }
+          }
+
+          count++;
+        }
+      } else {
+        // No required items defined — create a single default section
+        await tx`
+          INSERT INTO proposal_sections (
+            proposal_id, section_number, title, content, status
+          ) VALUES (
+            ${proposalRow.id},
+            '1',
+            'Technical Volume',
+            ${null},
+            'empty'
+          )
+        `;
+        count = 1;
+      }
+
+      return { proposal: proposalRow, sectionCount: count };
+    });
 
     // ── Provision S3 artifacts (non-blocking — failure is logged, not fatal) ─
     let docsCopied = 0;

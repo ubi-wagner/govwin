@@ -163,6 +163,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'File field is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // File size limit (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large (max 50MB)', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
+    }
+
     // Sanitize filename
     const safeFilename = file.name
       .replace(/[^a-zA-Z0-9._-]/g, '_')

@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
+import { isValidUUID } from '@/lib/validation';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -31,6 +32,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { id } = await ctx.params;
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
       return NextResponse.json({ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }, { status: 401 });
@@ -80,73 +84,81 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
-    // Create tenant with unique slug (BEFORE updating application status,
-    // so if tenant/user creation fails the application stays retryable)
-    const slug = slugify(app.companyName);
-    let tenantId: string;
-    let finalSlug = slug;
-    let existingTenant = await sql<{ id: string }[]>`
-      SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
-    `.then(r => r[0]);
-    let suffix = 2;
-    while (existingTenant) {
-      finalSlug = `${slug}-${suffix}`;
-      existingTenant = await sql<{ id: string }[]>`
-        SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
-      `.then(r => r[0]);
-      suffix++;
-    }
-    const [newTenant] = await sql<{ id: string }[]>`
-      INSERT INTO tenants (name, slug, status)
-      VALUES (${app.companyName}, ${finalSlug}, 'active')
-      RETURNING id
-    `;
-    tenantId = newTenant.id;
-
-    // Create or find existing user, reset temp password for re-acceptance
+    // Wrap tenant + user + application update in a transaction
+    // so partial failures don't leave orphaned rows
     const tempPw = crypto.randomUUID().slice(0, 12);
     const hash = await bcrypt.hash(tempPw, 12);
-    let newUserId: string;
 
-    const [existingUser] = await sql<{ id: string }[]>`
-      SELECT id FROM users WHERE LOWER(email) = ${app.contactEmail.toLowerCase().trim()} LIMIT 1
-    `;
-    if (existingUser) {
-      newUserId = existingUser.id;
-      await sql`
-        UPDATE users
-        SET password_hash = ${hash},
-            temp_password = true,
-            tenant_id = ${tenantId},
-            is_active = true
-        WHERE id = ${existingUser.id}
-      `;
-    } else {
-      const [created] = await sql<{ id: string }[]>`
-        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
-        VALUES (
-          ${app.contactEmail.toLowerCase().trim()},
-          ${app.contactName},
-          'tenant_admin',
-          ${tenantId},
-          ${hash},
-          true,
-          true
-        )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await sql.begin(async (tsql: any) => {
+      // Create tenant with unique slug
+      const slug = slugify(app.companyName);
+      let finalSlug = slug;
+      let existingTenant = (await tsql`
+        SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
+      `)[0];
+      let suffix = 2;
+      while (existingTenant) {
+        finalSlug = `${slug}-${suffix}`;
+        existingTenant = (await tsql`
+          SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
+        `)[0];
+        suffix++;
+      }
+      const [newTenant] = await tsql`
+        INSERT INTO tenants (name, slug, status)
+        VALUES (${app.companyName}, ${finalSlug}, 'active')
         RETURNING id
       `;
-      newUserId = created.id;
-    }
+      const tenantId = newTenant.id;
 
-    // Update application status AFTER tenant+user creation succeeds
-    await sql`
-      UPDATE applications
-      SET status = 'accepted',
-          reviewed_by = ${userId},
-          reviewed_at = now(),
-          review_notes = ${reviewNotes || null}
-      WHERE id = ${id}
-    `;
+      // Create or find existing user, reset temp password for re-acceptance
+      let newUserId: string;
+
+      const [existingUser] = await tsql`
+        SELECT id FROM users WHERE LOWER(email) = ${app.contactEmail.toLowerCase().trim()} LIMIT 1
+      `;
+      if (existingUser) {
+        newUserId = existingUser.id;
+        await tsql`
+          UPDATE users
+          SET password_hash = ${hash},
+              temp_password = true,
+              tenant_id = ${tenantId},
+              is_active = true
+          WHERE id = ${existingUser.id}
+        `;
+      } else {
+        const [created] = await tsql`
+          INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
+          VALUES (
+            ${app.contactEmail.toLowerCase().trim()},
+            ${app.contactName},
+            'tenant_admin',
+            ${tenantId},
+            ${hash},
+            true,
+            true
+          )
+          RETURNING id
+        `;
+        newUserId = created.id;
+      }
+
+      // Update application status AFTER tenant+user creation succeeds
+      await tsql`
+        UPDATE applications
+        SET status = 'accepted',
+            reviewed_by = ${userId},
+            reviewed_at = now(),
+            review_notes = ${reviewNotes || null}
+        WHERE id = ${id}
+      `;
+
+      return { tenantId, finalSlug, newUserId };
+    });
+
+    const { tenantId, finalSlug, newUserId } = result;
 
     // Send welcome email with credentials
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
