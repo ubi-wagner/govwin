@@ -97,7 +97,7 @@ async def emit_end(
     try:
         start_row = await conn.fetchrow(
             "SELECT namespace, type, actor_type, actor_id, tenant_id FROM system_events WHERE id = $1",
-            start_event_id,
+            uuid.UUID(start_event_id) if not isinstance(start_event_id, uuid.UUID) else start_event_id,
         )
         if not start_row:
             log.warning("emit_end: start event %s not found", start_event_id)
@@ -116,8 +116,8 @@ async def emit_end(
             phase="end",
             actor_type=start_row["actor_type"],
             actor_id=start_row["actor_id"],
-            tenant_id=start_row["tenant_id"],
-            parent_event_id=start_event_id,
+            tenant_id=str(start_row["tenant_id"]) if start_row["tenant_id"] else None,
+            parent_event_id=str(start_event_id),
             payload=payload,
         )
     except Exception as e:

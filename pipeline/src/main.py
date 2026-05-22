@@ -33,11 +33,9 @@ logging.basicConfig(
 )
 log = logging.getLogger("pipeline")
 
+from config import DATABASE_URL
+
 shutdown_event = asyncio.Event()
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://govtech:changeme@localhost:5432/govtech_intel",
-)
 
 
 def handle_signal(sig: signal.Signals) -> None:

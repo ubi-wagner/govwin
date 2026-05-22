@@ -296,6 +296,7 @@ async def shred_solicitation(
             doc_texts.append(capped)
 
             # Write text.md artifact to S3 (alongside the source PDF)
+            text_key = None
             try:
                 text_key = rfp_pipeline_path(
                     opportunity_id=opp_id_str, kind="text",
@@ -331,7 +332,7 @@ async def shred_solicitation(
                     "solicitation_id": solicitation_id,
                     "document_id": str(doc_id),
                     "artifact_type": "extracted_text",
-                    "storage_key": text_key if 'text_key' in dir() else None,
+                    "storage_key": text_key if text_key else None,
                     "chars": len(capped),
                     "source_key": storage_key,
                 },
