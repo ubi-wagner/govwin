@@ -1,13 +1,63 @@
 """
-Workflow processor — polls system_events and executes matching workflows.
+================================================================================
+Module: Workflow Processor (processor.py)
+================================================================================
 
-V1 keeps it simple:
-  - No process_instances table — workflows execute inline
-  - HITL_WAIT steps log and skip
-  - Tracks last-processed event timestamp in memory
-  - Step input_map resolution via dot-notation against trigger event payload
+WHO:    The core execution engine for all event-driven workflows.
 
-See docs/EVENT_CONTRACT.md §7 for the architecture this implements.
+WHAT:   Polls system_events for new events, matches them against registered
+        workflow triggers, and drives step-by-step execution. Handles input
+        resolution (dot-notation against event payloads and prior step
+        results), step dispatch by type (ACTION, AI_INVOKE, NOTIFY,
+        HITL_WAIT, CONDITION, API_CALL), and comprehensive event emission
+        at every lifecycle stage.
+
+WHY:    Centralizes workflow execution so individual workflow definitions
+        remain purely declarative. The processor uniformly handles error
+        recovery, event emission, retry logic, timeout enforcement, and
+        step dependency resolution.
+
+HOW:    Runs as a concurrent asyncio task alongside the ingester consumer
+        loop. Polls system_events every N seconds (default 10), skipping
+        namespace='system' to avoid self-triggering. For each matching
+        event, executes all workflow steps in topological order. Each step
+        dispatches to a type-specific executor. Results are collected in
+        step_results for downstream input resolution.
+
+ERROR HANDLING:
+    - Step failure: Log error, emit system:workflow.step_failed event,
+      continue to next independent step
+    - Dependency failure: Dependent steps still run but receive None inputs
+      from the failed step (graceful degradation)
+    - Workflow failure: Emit system:workflow.failed event with full context
+    - DB connection loss: Retry reconnection, log error
+    - Poll loop errors: Catch, log, continue polling (never crash)
+
+FAULT TOLERANCE:
+    - Duplicate detection: Tracks processed event IDs in-memory set to
+      prevent double-processing within a single processor lifetime
+    - Stuck workflow detection: Logs warning for workflows exceeding their
+      total timeout budget
+    - Idempotent event emission: All emitted events include trigger_event_id
+      for downstream dedup
+    - Graceful shutdown: Respects shutdown_event, closes DB connection
+
+EVENT EMISSIONS:
+    - system:workflow.started — when a workflow begins processing
+    - system:workflow.step_completed — after each step succeeds (or skips)
+    - system:workflow.step_failed — after each step fails
+    - system:workflow.completed — when all steps finish
+    - system:workflow.failed — when the entire workflow throws
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial implementation: polling, step execution,
+                           input resolution, basic event emissions
+    PR #xxx (2026-05-22) — Hardened: workflow.started event, duplicate
+                           detection, stuck workflow logging, duration_ms
+                           tracking, comprehensive headers, step-level
+                           retry with exponential backoff, timeout
+                           enforcement via asyncio.wait_for
+================================================================================
 """
 from __future__ import annotations
 
@@ -15,6 +65,7 @@ import asyncio
 import importlib
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -31,6 +82,34 @@ from workflows.base import (
 log = logging.getLogger("pipeline.workflows.processor")
 
 
+# ─── Duplicate tracking ──────────────────────────────────────────────
+
+# In-memory set of trigger event IDs already processed in this
+# processor lifetime. Prevents double-processing if the high-water
+# mark query returns an event that was already handled (e.g., due to
+# timestamp collisions at millisecond granularity).
+_processed_event_ids: set[str] = set()
+
+# Cap the size of the dedup set to prevent unbounded memory growth.
+# When exceeded, we clear the oldest half (approximated by clearing all).
+_MAX_DEDUP_SET_SIZE = 50_000
+
+
+def _track_processed(event_id: str) -> bool:
+    """Record an event ID as processed. Returns True if it was already seen."""
+    global _processed_event_ids
+    if event_id in _processed_event_ids:
+        return True
+    if len(_processed_event_ids) >= _MAX_DEDUP_SET_SIZE:
+        log.info(
+            "dedup set reached %d entries, clearing to prevent memory growth",
+            _MAX_DEDUP_SET_SIZE,
+        )
+        _processed_event_ids = set()
+    _processed_event_ids.add(event_id)
+    return False
+
+
 # ─── Input resolution ──────────────────────────────────────────────
 
 
@@ -38,10 +117,10 @@ def resolve_input(path: str, event: dict, step_results: dict) -> Any:
     """Resolve a dot-notation path against the trigger event and prior step results.
 
     Supported prefixes:
-      - payload.<key>         → event['payload'][key]
-      - result.<key>          → event['payload'][key] (end events store result in payload)
-      - step.<name>.result.<key> → step_results[name]['result'][key]
-      - "<literal>"           → the literal string (quotes stripped)
+      - payload.<key>         -> event['payload'][key]
+      - result.<key>          -> event['payload'][key] (end events store result in payload)
+      - step.<name>.result.<key> -> step_results[name]['result'][key]
+      - "<literal>"           -> the literal string (quotes stripped)
     """
     if not path:
         return None
@@ -277,6 +356,67 @@ async def _execute_step(
     return {"result": None, "skipped": True, "reason": "unknown_type"}
 
 
+async def _execute_step_with_retry(
+    conn: asyncpg.Connection,
+    step: Any,
+    inputs: dict[str, Any],
+    trigger_event: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute a step with retry logic and timeout enforcement.
+
+    Retries use exponential backoff based on step.retry_delay_seconds.
+    Timeout is enforced via asyncio.wait_for using step.timeout_minutes.
+    """
+    last_exc: Optional[Exception] = None
+    max_attempts = 1 + max(step.retry_count, 0)
+
+    for attempt in range(max_attempts):
+        try:
+            # Enforce timeout
+            timeout_seconds = step.timeout_minutes * 60
+            result = await asyncio.wait_for(
+                _execute_step(conn, step, inputs, trigger_event=trigger_event),
+                timeout=timeout_seconds,
+            )
+            return result
+        except asyncio.TimeoutError:
+            last_exc = TimeoutError(
+                f"Step '{step.name}' timed out after {step.timeout_minutes}m "
+                f"(attempt {attempt + 1}/{max_attempts})"
+            )
+            log.error(
+                "step '%s' timed out after %dm (attempt %d/%d)",
+                step.name,
+                step.timeout_minutes,
+                attempt + 1,
+                max_attempts,
+            )
+        except Exception as exc:
+            last_exc = exc
+            log.error(
+                "step '%s' failed (attempt %d/%d): %s",
+                step.name,
+                attempt + 1,
+                max_attempts,
+                exc,
+            )
+
+        # If there are more attempts, wait with exponential backoff
+        if attempt < max_attempts - 1:
+            delay = step.retry_delay_seconds * (2 ** attempt)
+            log.info(
+                "retrying step '%s' in %ds (attempt %d/%d)",
+                step.name,
+                delay,
+                attempt + 2,
+                max_attempts,
+            )
+            await asyncio.sleep(delay)
+
+    # All attempts exhausted
+    raise last_exc  # type: ignore[misc]
+
+
 async def _run_workflow(
     conn: asyncpg.Connection,
     workflow_cls: type[Workflow],
@@ -284,19 +424,41 @@ async def _run_workflow(
 ) -> None:
     """Execute all steps of a matched workflow in dependency order."""
     workflow_name = workflow_cls.__name__
+    trigger_event_id = event.get("id")
+    tenant_id = event.get("tenant_id")
+    workflow_start_time = time.monotonic()
+
     log.info(
         "starting workflow %s for event %s:%s:%s (id=%s)",
         workflow_name,
         event.get("namespace"),
         event.get("type"),
         event.get("phase"),
-        event.get("id"),
+        trigger_event_id,
     )
+
+    # Emit workflow.started event
+    try:
+        await emit_event(
+            conn,
+            namespace="system",
+            type="workflow.started",
+            payload={
+                "workflow": workflow_name,
+                "triggerEventId": trigger_event_id,
+                "tenant_id": tenant_id,
+            },
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        log.error("failed to emit workflow.started event: %s", exc)
 
     steps = workflow_cls.step_execution_order()
     step_results: dict[str, dict[str, Any]] = {}
 
     for step in steps:
+        step_start_time = time.monotonic()
+
         # If this step depends on a skipped HITL_WAIT step, skip it too
         if step.depends_on:
             dep_result = step_results.get(step.depends_on, {})
@@ -313,31 +475,52 @@ async def _run_workflow(
                 }
                 continue
 
+            # If dependency failed, log but continue (inputs will be None)
+            if "error" in dep_result:
+                log.warning(
+                    "step '%s' depends on failed step '%s' — inputs may be None",
+                    step.name,
+                    step.depends_on,
+                )
+
         inputs = resolve_inputs(step.input_map, event, step_results)
 
         try:
-            result = await _execute_step(conn, step, inputs, trigger_event=event)
-            step_results[step.name] = result
-
-            await emit_event(
-                conn,
-                namespace="system",
-                type="workflow.step_completed",
-                payload={
-                    "workflow": workflow_name,
-                    "step": step.name,
-                    "stepType": step.step_type.value,
-                    "skipped": result.get("skipped", False),
-                },
+            result = await _execute_step_with_retry(
+                conn, step, inputs, trigger_event=event
             )
+            step_results[step.name] = result
+            step_duration_ms = int((time.monotonic() - step_start_time) * 1000)
+
+            try:
+                await emit_event(
+                    conn,
+                    namespace="system",
+                    type="workflow.step_completed",
+                    payload={
+                        "workflow": workflow_name,
+                        "step": step.name,
+                        "stepType": step.step_type.value,
+                        "skipped": result.get("skipped", False),
+                        "triggerEventId": trigger_event_id,
+                        "tenant_id": tenant_id,
+                        "duration_ms": step_duration_ms,
+                    },
+                    tenant_id=tenant_id,
+                )
+            except Exception as emit_exc:
+                log.error("failed to emit step_completed event: %s", emit_exc)
+
             log.info(
-                "step '%s' completed (type=%s, skipped=%s)",
+                "step '%s' completed (type=%s, skipped=%s, duration=%dms)",
                 step.name,
                 step.step_type.value,
                 result.get("skipped", False),
+                step_duration_ms,
             )
 
         except Exception as exc:
+            step_duration_ms = int((time.monotonic() - step_start_time) * 1000)
             log.error(
                 "step '%s' in workflow %s failed: %s",
                 step.name,
@@ -346,37 +529,70 @@ async def _run_workflow(
             )
             step_results[step.name] = {"error": str(exc)}
 
-            await emit_event(
-                conn,
-                namespace="system",
-                type="workflow.step_failed",
-                payload={
-                    "workflow": workflow_name,
-                    "step": step.name,
-                    "stepType": step.step_type.value,
-                    "error": str(exc)[:500],
-                },
-            )
-            # Continue to next step — don't abort the entire workflow
+            try:
+                await emit_event(
+                    conn,
+                    namespace="system",
+                    type="workflow.step_failed",
+                    payload={
+                        "workflow": workflow_name,
+                        "step": step.name,
+                        "stepType": step.step_type.value,
+                        "error": str(exc)[:500],
+                        "triggerEventId": trigger_event_id,
+                        "tenant_id": tenant_id,
+                        "duration_ms": step_duration_ms,
+                    },
+                    tenant_id=tenant_id,
+                )
+            except Exception as emit_exc:
+                log.error("failed to emit step_failed event: %s", emit_exc)
+
+            # Continue to next step -- don't abort the entire workflow
             # (steps that depend on this one will still run but get None inputs)
 
-    await emit_event(
-        conn,
-        namespace="system",
-        type="workflow.completed",
-        payload={
-            "workflow": workflow_name,
-            "triggerEventId": event.get("id"),
-            "stepsExecuted": len(steps),
-            "stepsSkipped": sum(
-                1 for r in step_results.values() if r.get("skipped")
-            ),
-            "stepsFailed": sum(
-                1 for r in step_results.values() if "error" in r
-            ),
-        },
+    workflow_duration_ms = int((time.monotonic() - workflow_start_time) * 1000)
+
+    steps_failed = sum(1 for r in step_results.values() if "error" in r)
+    steps_skipped = sum(1 for r in step_results.values() if r.get("skipped"))
+
+    try:
+        await emit_event(
+            conn,
+            namespace="system",
+            type="workflow.completed",
+            payload={
+                "workflow": workflow_name,
+                "triggerEventId": trigger_event_id,
+                "tenant_id": tenant_id,
+                "stepsExecuted": len(steps),
+                "stepsSkipped": steps_skipped,
+                "stepsFailed": steps_failed,
+                "duration_ms": workflow_duration_ms,
+            },
+            tenant_id=tenant_id,
+        )
+    except Exception as emit_exc:
+        log.error("failed to emit workflow.completed event: %s", emit_exc)
+
+    log.info(
+        "workflow %s completed (steps=%d, skipped=%d, failed=%d, duration=%dms)",
+        workflow_name,
+        len(steps),
+        steps_skipped,
+        steps_failed,
+        workflow_duration_ms,
     )
-    log.info("workflow %s completed", workflow_name)
+
+    # Warn if workflow took longer than expected
+    total_timeout_minutes = sum(s.timeout_minutes for s in steps)
+    if workflow_duration_ms > total_timeout_minutes * 60 * 1000:
+        log.warning(
+            "STUCK WORKFLOW: %s took %dms, exceeding total step timeout budget of %dm",
+            workflow_name,
+            workflow_duration_ms,
+            total_timeout_minutes,
+        )
 
 
 # ─── Main loop ─────────────────────────────────────────────────────
@@ -454,6 +670,16 @@ async def run_workflow_processor(
                         "created_at": event_row["created_at"],
                     }
 
+                    # Duplicate detection — skip if already processed
+                    event_id = event_dict["id"]
+                    if _track_processed(event_id):
+                        log.info(
+                            "skipping duplicate event %s (already processed)",
+                            event_id,
+                        )
+                        last_processed_at = event_row["created_at"]
+                        continue
+
                     workflow_cls = get_workflow_for_event(event_dict)
                     if workflow_cls:
                         try:
@@ -464,16 +690,24 @@ async def run_workflow_processor(
                                 event_dict["id"],
                                 exc,
                             )
-                            await emit_event(
-                                conn,
-                                namespace="system",
-                                type="workflow.failed",
-                                payload={
-                                    "workflow": workflow_cls.__name__,
-                                    "triggerEventId": event_dict["id"],
-                                    "error": str(exc)[:500],
-                                },
-                            )
+                            try:
+                                await emit_event(
+                                    conn,
+                                    namespace="system",
+                                    type="workflow.failed",
+                                    payload={
+                                        "workflow": workflow_cls.__name__,
+                                        "triggerEventId": event_dict["id"],
+                                        "tenant_id": event_dict.get("tenant_id"),
+                                        "error": str(exc)[:500],
+                                    },
+                                    tenant_id=event_dict.get("tenant_id"),
+                                )
+                            except Exception as emit_exc:
+                                log.error(
+                                    "failed to emit workflow.failed event: %s",
+                                    emit_exc,
+                                )
 
                     # Advance the high-water mark
                     last_processed_at = event_row["created_at"]
@@ -498,7 +732,7 @@ async def run_workflow_processor(
                 # If we get here, shutdown was signaled
                 break
             except asyncio.TimeoutError:
-                # Normal — poll interval elapsed, loop again
+                # Normal -- poll interval elapsed, loop again
                 pass
 
     except Exception as exc:
