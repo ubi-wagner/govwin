@@ -111,7 +111,8 @@ async def match_tenants(
                       o.title, o.tech_focus_areas, o.description
                FROM curated_solicitations cs
                JOIN opportunities o ON o.id = cs.opportunity_id
-               WHERE cs.id = $1""",
+               WHERE cs.id = $1
+                 AND (o.close_date IS NULL OR o.close_date > now())""",
             sol_uuid,
         )
     except Exception as exc:
