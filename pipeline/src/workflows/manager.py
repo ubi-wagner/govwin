@@ -210,7 +210,7 @@ class WorkflowManager:
             """
             WITH old AS (
                 SELECT id, status AS prev_status FROM process_instances
-                WHERE id = $1 AND status IN ('pending', 'retrying', 'running')
+                WHERE id = $1 AND status IN ('pending', 'retrying')
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE process_instances pi

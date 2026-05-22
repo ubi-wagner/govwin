@@ -86,12 +86,21 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/activity] proposal query failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -112,7 +121,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     // Validate type filter
     if (typeFilter && !(VALID_ACTIVITY_TYPES as readonly string[]).includes(typeFilter)) {
       return NextResponse.json(
-        { error: `Invalid activity type: ${typeFilter}`, code: 'VALIDATION_ERROR' },
+        { error: 'Invalid activity type', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -141,6 +150,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     }[];
     let total: number;
 
+    try {
     if (typeFilter && actorFilter) {
       activities = await sql<typeof activities>`
         SELECT id, proposal_id, actor_id, actor_email, actor_role,
@@ -221,6 +231,13 @@ export async function GET(request: Request, ctx: RouteContext) {
           AND tenant_id = ${tenantId}::uuid
       `;
       total = parseInt(countRow.count, 10);
+    }
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/activity] activity query failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({

@@ -271,6 +271,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    const VALID_STAGES = ['draft', 'review', 'final', 'submitted', 'archived'] as const;
+    if (!(VALID_STAGES as readonly string[]).includes(stage)) {
+      return NextResponse.json(
+        { error: `stage must be one of: ${VALID_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (stage.length > 100) {
+      return NextResponse.json(
+        { error: 'stage exceeds maximum length (100 chars)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     if (!(VALID_REQUIREMENT_TYPES as readonly string[]).includes(requirementType)) {
       return NextResponse.json(
         { error: `requirementType must be one of: ${VALID_REQUIREMENT_TYPES.join(', ')}`, code: 'VALIDATION_ERROR' },
@@ -281,6 +296,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!label) {
       return NextResponse.json(
         { error: 'label is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (label.length > 500) {
+      return NextResponse.json(
+        { error: 'label exceeds maximum length (500 chars)', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -437,6 +459,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const evidence = typeof body.evidence === 'object' && body.evidence !== null
       ? body.evidence
       : {};
+
+    // Evidence size limit (10KB)
+    if (JSON.stringify(evidence).length > 10_240) {
+      return NextResponse.json(
+        { error: 'evidence exceeds maximum size (10KB)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     let updateResult;
     try {

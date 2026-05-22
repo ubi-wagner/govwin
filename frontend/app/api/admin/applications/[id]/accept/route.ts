@@ -193,7 +193,6 @@ export async function POST(request: Request, ctx: RouteContext) {
         contactEmail: app.contactEmail,
         contactName: app.contactName,
         companyName: app.companyName,
-        tempPassword: tempPw,
         emailSent: emailResult.provider !== 'skipped',
         emailProvider: emailResult.provider,
         emailError: emailResult.error ?? null,

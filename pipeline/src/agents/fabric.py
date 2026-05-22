@@ -377,6 +377,12 @@ class AgentFabric:
                         "content": tool_result_blocks,
                     })
                     rounds += 1
+
+                    # Mid-loop budget check: stop if per-call cost ceiling reached
+                    accumulated_cost = total_input_tokens * INPUT_COST_PER_TOKEN + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                    if accumulated_cost > 0.50:  # $0.50 per-call ceiling
+                        logger.warning("[invoke_agent] per-call cost ceiling reached: $%.4f", accumulated_cost)
+                        break
                 else:
                     # Unexpected stop reason (e.g. max_tokens) — stop looping
                     break
@@ -783,9 +789,9 @@ class AgentFabric:
                 return False
             return True
         except Exception as exc:
-            # If we can't check, allow the call (fail open) but log
-            logger.error("[budget] check failed: %s", exc)
-            return True
+            # Fail CLOSED — deny the call if we can't verify budget
+            logger.error("[budget] check failed, denying call: %s", exc)
+            return False
 
     # ------------------------------------------------------------------
     # Task logging

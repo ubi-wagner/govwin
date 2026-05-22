@@ -54,8 +54,8 @@ async def _run_worker(name: str, coro):
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 300)
         else:
-            logger.info("Worker %s exited cleanly", name)
-            return
+            logger.info("Worker %s exited cleanly, resetting backoff", name)
+            backoff = 1
 
 
 @asynccontextmanager

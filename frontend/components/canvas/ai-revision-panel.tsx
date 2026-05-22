@@ -53,7 +53,7 @@ export function AIRevisionPanel({ node, proposalId, onRevised }: Props) {
       const result = await invoke<{ nodes: CanvasNode[] }>('proposal.draft_section', {
         proposalId,
         sectionTitle: actionLabel,
-        instruction: `REVISE the following existing text:\n\n"${currentText}"\n\nInstruction: ${instruction}`,
+        instruction: `REVISE the following existing text:\n\n<user_content>${currentText}</user_content>\n\nInstruction: ${instruction}`,
         pageLimit: 1,
       });
 

@@ -163,11 +163,43 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Save current version to canvas_versions before overwriting ──
-    if (section.content) {
+    // Archive the PREVIOUS content with source='human_edit' (safe default for what was there before).
+    // The body's source/aiInstruction describe the INCOMING change, not the archived snapshot.
+    {
+      const currentContent = section.content;
+      // Compute char/word counts from extracted text, not raw JSON
+      let archiveCharCount = 0;
+      let archiveWordCount = 0;
+      if (currentContent) {
+        try {
+          const parsed = JSON.parse(currentContent);
+          const nodes: Array<{ type?: string; content?: Record<string, unknown> }> = parsed.nodes ?? (Array.isArray(parsed) ? parsed : []);
+          const textParts: string[] = [];
+          for (const node of nodes) {
+            if (!node.content) continue;
+            const t = (node.content as Record<string, unknown>).text;
+            if (typeof t === 'string') textParts.push(t);
+            const items = (node.content as Record<string, unknown>).items;
+            if (Array.isArray(items)) {
+              for (const item of items) {
+                if (typeof item === 'string') textParts.push(item);
+                else if (item && typeof item.text === 'string') textParts.push(item.text);
+              }
+            }
+          }
+          const extractedText = textParts.join(' ');
+          archiveCharCount = extractedText.length;
+          archiveWordCount = extractedText.split(/\s+/).filter(Boolean).length;
+        } catch {
+          // If JSON parse fails, fall back to raw length
+          archiveCharCount = currentContent.length;
+          archiveWordCount = currentContent.split(/\s+/).filter(Boolean).length;
+        }
+      }
+
+      // Archive even on first save (null content) to record the empty state
+      const contentToArchive = currentContent ?? '{}';
       try {
-        const currentContent = section.content;
-        const charCount = currentContent.length;
-        const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
         await sql`
           INSERT INTO canvas_versions
             (section_id, version_number, content, snapshot_reason, source, created_by,
@@ -175,15 +207,15 @@ export async function PUT(request: Request, ctx: RouteContext) {
           VALUES (
             ${sectionId}::uuid,
             ${section.version},
-            ${currentContent}::jsonb,
+            ${contentToArchive}::jsonb,
             'save',
-            ${source},
+            'human_edit',
             ${sessionUser.id}::uuid,
-            ${charCount},
-            ${wordCount},
-            ${aiInstruction},
-            ${aiModel},
-            ${editSummary}
+            ${archiveCharCount},
+            ${archiveWordCount},
+            ${null},
+            ${null},
+            ${null}
           )
           ON CONFLICT (section_id, version_number) DO NOTHING
         `;
@@ -191,6 +223,13 @@ export async function PUT(request: Request, ctx: RouteContext) {
         console.error('[section-save] canvas_versions insert failed:', e);
         // Non-fatal — continue with the save
       }
+    }
+
+    // ── Strip __revisionMeta before persisting ─────────────────────
+    if (typeof body.content === 'object' && body.content !== null && '__revisionMeta' in body.content) {
+      const cleaned = { ...body.content } as Record<string, unknown>;
+      delete cleaned.__revisionMeta;
+      body.content = cleaned;
     }
 
     // ── Update section with optimistic concurrency ─────────────────

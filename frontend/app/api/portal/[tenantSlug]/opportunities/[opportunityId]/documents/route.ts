@@ -14,6 +14,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; opportunityId: string }>;
@@ -22,6 +23,12 @@ interface RouteContext {
 export async function GET(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, opportunityId } = await ctx.params;
+    if (!isValidUUID(opportunityId)) {
+      return NextResponse.json(
+        { error: 'Invalid opportunity ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -119,6 +126,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         LIMIT 1
       )
       ORDER BY sd.is_primary DESC NULLS LAST, sd.document_type, sd.created_at
+      LIMIT 100
     `;
 
     // ── 3. Generate presigned S3 URLs (1 hour expiry) ───────

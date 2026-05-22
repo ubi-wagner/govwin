@@ -53,16 +53,22 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    const collaborators = await sql<{
+    let collaborators: {
       id: string;
       userId: string | null;
       email: string;
@@ -72,34 +78,41 @@ export async function GET(_request: Request, ctx: RouteContext) {
       dropboxEnabled: boolean;
       invitedAt: string;
       acceptedAt: string | null;
-    }[]>`
-      SELECT
-        pc.id,
-        pc.user_id,
-        pc.email,
-        pc.name,
-        pc.role,
-        pc.assigned_sections,
-        pc.dropbox_enabled,
-        pc.invited_at,
-        pc.accepted_at
-      FROM proposal_collaborators pc
-      WHERE pc.proposal_id = ${proposalId}
-      ORDER BY pc.invited_at ASC
-    `;
-
-    // Load stage access for each collaborator
-    const accessRows = await sql<{
+    }[];
+    let accessRows: {
       collaboratorId: string;
       stage: string;
       permission: string;
       artifactTypes: string[];
-    }[]>`
-      SELECT collaborator_id, stage, permission, artifact_types
-      FROM collaborator_stage_access
-      WHERE proposal_id = ${proposalId}
-        AND access_revoked_at IS NULL
-    `;
+    }[];
+    try {
+      collaborators = await sql<typeof collaborators>`
+        SELECT
+          pc.id,
+          pc.user_id,
+          pc.email,
+          pc.name,
+          pc.role,
+          pc.assigned_sections,
+          pc.dropbox_enabled,
+          pc.invited_at,
+          pc.accepted_at
+        FROM proposal_collaborators pc
+        WHERE pc.proposal_id = ${proposalId}
+        ORDER BY pc.invited_at ASC
+      `;
+
+      // Load stage access for each collaborator
+      accessRows = await sql<typeof accessRows>`
+        SELECT collaborator_id, stage, permission, artifact_types
+        FROM collaborator_stage_access
+        WHERE proposal_id = ${proposalId}
+          AND access_revoked_at IS NULL
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] collaborators query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     type AccessRow = { collaboratorId: string; stage: string; permission: string; artifactTypes: string[] };
     const accessByCollaborator = new Map<string, AccessRow[]>();
@@ -164,6 +177,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });

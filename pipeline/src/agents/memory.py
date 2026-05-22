@@ -177,24 +177,68 @@ class MemoryStore:
         })
 
     async def write_semantic(self, conn, tenant_id: str, agent_role: str, content: str, category: str, confidence: float = 0.5) -> str:
-        """Write a semantic memory (stored as episodic with semantic type metadata)."""
-        return await self.store(conn, tenant_id, agent_role, {
-            "input_summary": f"[semantic:{category}] {content[:150]}",
-            "output_summary": "",
-            "category": category,
-            "confidence": confidence,
-            "raw_content": content,
-        })
+        """Write a semantic memory into the semantic_memories table."""
+        memory_id = str(uuid.uuid4())
+        try:
+            await conn.execute(
+                """
+                INSERT INTO semantic_memories
+                    (id, tenant_id, agent_role, embedding, content,
+                     category, confidence, evidence_count,
+                     source_memories, created_at, updated_at, last_accessed)
+                VALUES ($1, $2, $3, $4::vector, $5,
+                        $6, $7, 0,
+                        ARRAY[]::uuid[], $8, $8, $8)
+                """,
+                uuid.UUID(memory_id),
+                uuid.UUID(tenant_id),
+                agent_role,
+                self._ZERO_VECTOR,
+                content,
+                category,
+                confidence,
+                datetime.now(timezone.utc),
+            )
+            logger.info(
+                "wrote semantic memory %s for tenant=%s agent=%s category=%s",
+                memory_id, tenant_id, agent_role, category,
+            )
+            return memory_id
+        except Exception as e:
+            logger.error("failed to write semantic memory: %s", e)
+            return ""
 
     async def write_procedural(self, conn, tenant_id: str, agent_role: str, name: str, description: str, steps: list[dict]) -> str:
-        """Write a procedural memory (stored as episodic with procedural type metadata)."""
-        return await self.store(conn, tenant_id, agent_role, {
-            "input_summary": f"[procedural:{name}] {description[:150]}",
-            "output_summary": "",
-            "procedure_name": name,
-            "description": description,
-            "steps": steps,
-        })
+        """Write a procedural memory into the procedural_memories table."""
+        memory_id = str(uuid.uuid4())
+        try:
+            await conn.execute(
+                """
+                INSERT INTO procedural_memories
+                    (id, tenant_id, agent_role, embedding, name,
+                     description, steps, confidence,
+                     created_at, updated_at, last_accessed)
+                VALUES ($1, $2, $3, $4::vector, $5,
+                        $6, $7::jsonb, 0.5,
+                        $8, $8, $8)
+                """,
+                uuid.UUID(memory_id),
+                uuid.UUID(tenant_id),
+                agent_role,
+                self._ZERO_VECTOR,
+                name,
+                description,
+                json.dumps(steps),
+                datetime.now(timezone.utc),
+            )
+            logger.info(
+                "wrote procedural memory %s for tenant=%s agent=%s name=%s",
+                memory_id, tenant_id, agent_role, name,
+            )
+            return memory_id
+        except Exception as e:
+            logger.error("failed to write procedural memory: %s", e)
+            return ""
 
     # ─── Lifecycle support methods ──────────────────────────────────────
 
@@ -256,13 +300,13 @@ class MemoryStore:
             logger.error("failed to promote to semantic: %s", e)
             return ""
 
-    async def archive_memories(self, conn, memory_ids: list[str], tenant_id: str | None = None) -> int:
+    async def archive_memories(self, conn, memory_ids: list[str], tenant_id: str) -> int:
         """Bulk archive episodic memories by setting is_archived = true.
 
         Args:
             conn: asyncpg connection
             memory_ids: list of episodic memory UUIDs to archive
-            tenant_id: optional tenant scope for safety
+            tenant_id: tenant scope (required for RLS safety)
 
         Returns:
             Number of memories successfully archived.
@@ -273,25 +317,15 @@ class MemoryStore:
         archived = 0
         for mid in memory_ids:
             try:
-                if tenant_id:
-                    result = await conn.execute(
-                        """
-                        UPDATE episodic_memories
-                        SET is_archived = true
-                        WHERE id = $1 AND tenant_id = $2 AND is_archived = false
-                        """,
-                        uuid.UUID(mid),
-                        uuid.UUID(tenant_id),
-                    )
-                else:
-                    result = await conn.execute(
-                        """
-                        UPDATE episodic_memories
-                        SET is_archived = true
-                        WHERE id = $1 AND is_archived = false
-                        """,
-                        uuid.UUID(mid),
-                    )
+                result = await conn.execute(
+                    """
+                    UPDATE episodic_memories
+                    SET is_archived = true
+                    WHERE id = $1 AND tenant_id = $2 AND is_archived = false
+                    """,
+                    uuid.UUID(mid),
+                    uuid.UUID(tenant_id),
+                )
                 if result:
                     count = int(result.split()[-1])
                     if count > 0:
@@ -302,41 +336,30 @@ class MemoryStore:
         logger.info("archived %d of %d memories", archived, len(memory_ids))
         return archived
 
-    async def update_decay(self, conn, memory_id: str, new_decay: float, tenant_id: str | None = None) -> bool:
+    async def update_decay(self, conn, memory_id: str, new_decay: float, tenant_id: str) -> bool:
         """Update the decay factor for a specific memory.
 
         Args:
             conn: asyncpg connection
             memory_id: UUID of the episodic memory
             new_decay: new decay factor value (0.0-1.0)
-            tenant_id: optional tenant scope for safety
+            tenant_id: tenant scope (required for RLS safety)
 
         Returns:
             True if update succeeded, False otherwise.
         """
         try:
             clamped = max(0.01, min(1.0, new_decay))
-            if tenant_id:
-                await conn.execute(
-                    """
-                    UPDATE episodic_memories
-                    SET decay_factor = $1
-                    WHERE id = $2 AND tenant_id = $3
-                    """,
-                    clamped,
-                    uuid.UUID(memory_id),
-                    uuid.UUID(tenant_id),
-                )
-            else:
-                await conn.execute(
-                    """
-                    UPDATE episodic_memories
-                    SET decay_factor = $1
-                    WHERE id = $2
-                    """,
-                    clamped,
-                    uuid.UUID(memory_id),
-                )
+            await conn.execute(
+                """
+                UPDATE episodic_memories
+                SET decay_factor = $1
+                WHERE id = $2 AND tenant_id = $3
+                """,
+                clamped,
+                uuid.UUID(memory_id),
+                uuid.UUID(tenant_id),
+            )
             return True
         except Exception as e:
             logger.error("failed to update decay for memory=%s: %s", memory_id, e)

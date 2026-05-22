@@ -122,6 +122,8 @@ function CanvasEditorInner({
   }, [actorId]);
 
   const handleUpdateNode = useCallback((nodeId: string, content: CanvasNode['content']) => {
+    // Human edit — clear AI revision metadata so the save isn't tagged as AI
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
@@ -162,6 +164,8 @@ function CanvasEditorInner({
   }, [updateDoc, actorId, actorName]);
 
   const handleDeleteNode = useCallback((nodeId: string) => {
+    // Human edit — clear AI revision metadata
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== nodeId),
@@ -187,6 +191,8 @@ function CanvasEditorInner({
   }, [updateDoc]);
 
   const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
+    // Human edit — clear AI revision metadata
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => {
       const nodes = [...prev.nodes];
       const idx = nodes.findIndex((n) => n.id === nodeId);

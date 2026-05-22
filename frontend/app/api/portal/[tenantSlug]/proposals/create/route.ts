@@ -8,6 +8,7 @@ import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -92,6 +93,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (typeof topicId !== 'string' || !topicId.trim()) {
       return NextResponse.json({ error: 'topicId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
+    if (!isValidUUID(topicId)) {
+      return NextResponse.json({ error: 'Invalid topicId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
 
     const validProductTypes = ['proposal_phase1', 'proposal_phase2'] as const;
     const productType = typeof body.productType === 'string' &&
@@ -100,7 +104,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       : null;
 
     // ── Find the topic (opportunity) and its parent solicitation ─────
-    const [topic] = await sql<{
+    let topic: {
       id: string;
       title: string;
       solicitationId: string | null;
@@ -108,12 +112,26 @@ export async function POST(request: Request, ctx: RouteContext) {
       topicNumber: string | null;
       programType: string | null;
       solicitationNumber: string | null;
-    }[]>`
-      SELECT id, title, solicitation_id, agency, topic_number,
-             program_type, solicitation_number
-      FROM opportunities
-      WHERE id = ${topicId}
-    `;
+    } | undefined;
+    try {
+      [topic] = await sql<{
+        id: string;
+        title: string;
+        solicitationId: string | null;
+        agency: string | null;
+        topicNumber: string | null;
+        programType: string | null;
+        solicitationNumber: string | null;
+      }[]>`
+        SELECT id, title, solicitation_id, agency, topic_number,
+               program_type, solicitation_number
+        FROM opportunities
+        WHERE id = ${topicId}
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/create] topic query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -127,12 +145,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Prevent duplicate proposals for same tenant + topic ──────────
-    const [existing] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE tenant_id = ${tenantId}
-        AND opportunity_id = ${topicId}
-      LIMIT 1
-    `;
+    let existing: { id: string } | undefined;
+    try {
+      [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE tenant_id = ${tenantId}
+          AND opportunity_id = ${topicId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/create] duplicate check failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existing) {
       return NextResponse.json(
         { error: 'Proposal already exists for this topic', code: 'VALIDATION_ERROR' },

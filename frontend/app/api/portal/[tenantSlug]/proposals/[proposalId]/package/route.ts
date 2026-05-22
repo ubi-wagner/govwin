@@ -15,6 +15,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -23,6 +24,12 @@ interface RouteContext {
 export async function POST(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();

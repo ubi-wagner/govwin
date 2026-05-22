@@ -98,11 +98,14 @@ async def send_email(
             send_body['threadId'] = thread_id
 
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: service.users().messages().send(
-                userId='me', body=send_body
-            ).execute()
+        result = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: service.users().messages().send(
+                    userId='me', body=send_body
+                ).execute()
+            ),
+            timeout=30,
         )
 
         logger.info(f'Email sent: {result.get("id")} to {to_email} (thread: {result.get("threadId")})')
@@ -134,14 +137,17 @@ async def sweep_inbox(
         if history_id:
             # Incremental sync via history API
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: service.users().history().list(
-                    userId='me',
-                    startHistoryId=history_id,
-                    historyTypes=['messageAdded'],
-                    maxResults=max_results,
-                ).execute()
+            results = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: service.users().history().list(
+                        userId='me',
+                        startHistoryId=history_id,
+                        historyTypes=['messageAdded'],
+                        maxResults=max_results,
+                    ).execute()
+                ),
+                timeout=30,
             )
 
             messages = []
@@ -158,19 +164,25 @@ async def sweep_inbox(
         else:
             # Full sync — get recent inbox messages
             loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None,
-                lambda: service.users().messages().list(
-                    userId='me',
-                    labelIds=['INBOX'],
-                    maxResults=max_results,
-                ).execute()
+            results = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: service.users().messages().list(
+                        userId='me',
+                        labelIds=['INBOX'],
+                        maxResults=max_results,
+                    ).execute()
+                ),
+                timeout=30,
             )
 
             # On first sync, get actual history ID from profile
-            profile = await loop.run_in_executor(
-                None,
-                lambda: service.users().getProfile(userId='me').execute()
+            profile = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: service.users().getProfile(userId='me').execute()
+                ),
+                timeout=30,
             )
 
             return {
@@ -188,11 +200,14 @@ async def get_message(delegate_email: str, message_id: str) -> dict:
     try:
         service = _get_gmail_service(delegate_email)
         loop = asyncio.get_event_loop()
-        msg = await loop.run_in_executor(
-            None,
-            lambda: service.users().messages().get(
-                userId='me', id=message_id, format='full'
-            ).execute()
+        msg = await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                lambda: service.users().messages().get(
+                    userId='me', id=message_id, format='full'
+                ).execute()
+            ),
+            timeout=30,
         )
         return msg
     except Exception as e:

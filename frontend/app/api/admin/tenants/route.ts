@@ -66,6 +66,7 @@ export async function GET(request: Request) {
           WHERE (t.name ILIKE ${pattern} OR t.slug ILIKE ${pattern})
             AND t.status = ${status}
           ORDER BY t.created_at DESC
+          LIMIT 200
         `;
       } else {
         tenants = await sql<{
@@ -89,6 +90,7 @@ export async function GET(request: Request) {
           FROM tenants t
           WHERE t.name ILIKE ${pattern} OR t.slug ILIKE ${pattern}
           ORDER BY t.created_at DESC
+          LIMIT 200
         `;
       }
     } else if (status) {
@@ -113,6 +115,7 @@ export async function GET(request: Request) {
         FROM tenants t
         WHERE t.status = ${status}
         ORDER BY t.created_at DESC
+        LIMIT 200
       `;
     } else {
       tenants = await sql<{
@@ -135,6 +138,7 @@ export async function GET(request: Request) {
                (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
         FROM tenants t
         ORDER BY t.created_at DESC
+        LIMIT 200
       `;
     }
 

@@ -113,16 +113,26 @@ export async function POST(request: Request, ctx: RouteContext) {
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Verify proposal exists and belongs to tenant ────────────────
-    const [proposal] = await sql<Array<{
-      id: string;
-      stage: string;
-      isLocked: boolean;
-    }>>`
-      SELECT id, stage, is_locked
-      FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; stage: string; isLocked: boolean; version: number } | undefined;
+    try {
+      [proposal] = await sql<Array<{
+        id: string;
+        stage: string;
+        isLocked: boolean;
+        version: number;
+      }>>`
+        SELECT id, stage, is_locked, version
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/outcome] proposal query failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -139,7 +149,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    if (!['submitted', 'final', 'archived'].includes(proposal.stage)) {
+    if (!['submitted', 'final'].includes(proposal.stage)) {
       return NextResponse.json(
         { error: 'Outcome can only be recorded for submitted or final proposals', code: 'INVALID_STAGE' },
         { status: 422 },
@@ -152,12 +162,19 @@ export async function POST(request: Request, ctx: RouteContext) {
       // The proposals table doesn't have an 'outcome' column, so we
       // store it in the stage field (archive the proposal) and record
       // in stage_history with detailed notes.
-      await tx`
+      // OCC: only update if version matches what we read
+      const updateResult = await tx`
         UPDATE proposals
         SET stage = 'archived',
+            version = version + 1,
             updated_at = now()
         WHERE id = ${proposalId}
+          AND version = ${proposal.version}
       `;
+
+      if (updateResult.count === 0) {
+        throw new Error('CONFLICT');
+      }
 
       // Record in stage history with outcome details
       await tx`
@@ -269,6 +286,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (e instanceof Error && e.message === 'CONFLICT') {
+      return NextResponse.json(
+        { error: 'Proposal was modified by another user', code: 'CONFLICT' },
+        { status: 409 },
+      );
+    }
     console.error('[api/portal/proposals/outcome] POST error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

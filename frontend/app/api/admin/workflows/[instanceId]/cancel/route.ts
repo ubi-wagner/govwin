@@ -56,35 +56,43 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Cancel the instance ──────────────────────────────────────
-    const updated = await sql<{ id: string }[]>`
-      UPDATE process_instances
-      SET status = 'cancelled', completed_at = now()
-      WHERE id = ${instanceId}::uuid
-        AND status IN ('running', 'paused', 'pending', 'retrying')
-      RETURNING id
-    `;
+    // ── Cancel the instance (transactional) ──────────────────────
+    const cancelResult = await sql.begin(async (tx: any) => {
+      const updated = await tx<{ id: string; status: string }[]>`
+        UPDATE process_instances
+        SET status = 'cancelled', completed_at = now()
+        WHERE id = ${instanceId}::uuid
+          AND status IN ('running', 'paused', 'pending', 'retrying')
+        RETURNING id, status
+      `;
 
-    if (updated.length === 0) {
+      if (updated.length === 0) {
+        return { found: false as const };
+      }
+
+      // Record transition audit
+      await tx`
+        INSERT INTO process_instance_transitions
+          (instance_id, from_status, to_status, actor, reason, metadata)
+        VALUES (
+          ${instanceId}::uuid,
+          NULL,
+          'cancelled',
+          ${'admin:' + actorEmail},
+          'manual_cancellation',
+          '{}'::jsonb
+        )
+      `;
+
+      return { found: true as const };
+    });
+
+    if (!cancelResult.found) {
       return NextResponse.json(
         { error: 'Instance not found or not cancellable (must be running, paused, pending, or retrying)', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
-
-    // Record transition audit
-    await sql`
-      INSERT INTO process_instance_transitions
-        (instance_id, from_status, to_status, actor, reason, metadata)
-      VALUES (
-        ${instanceId}::uuid,
-        NULL,
-        'cancelled',
-        ${'admin:' + actorEmail},
-        'manual_cancellation',
-        '{}'::jsonb
-      )
-    `;
 
     return NextResponse.json({
       data: { success: true },

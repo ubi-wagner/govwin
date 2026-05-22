@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; spotlightId: string }>;
@@ -19,6 +20,12 @@ interface RouteContext {
 export async function GET(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, spotlightId } = await ctx.params;
+    if (!isValidUUID(spotlightId)) {
+      return NextResponse.json(
+        { error: 'Invalid spotlight ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -159,6 +166,12 @@ export async function GET(request: Request, ctx: RouteContext) {
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, spotlightId } = await ctx.params;
+    if (!isValidUUID(spotlightId)) {
+      return NextResponse.json(
+        { error: 'Invalid spotlight ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth (tenant_admin required for updates) ─────────────────
     const session = await auth();
@@ -246,16 +259,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Apply updates using individual conditional UPDATEs to avoid dynamic SQL
+    // Apply updates in a single transaction to ensure atomicity
     try {
-      if (name !== undefined) await sql`UPDATE spotlights SET name = ${name}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (description !== undefined) await sql`UPDATE spotlights SET description = ${description}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (naicsCodes !== undefined) await sql`UPDATE spotlights SET naics_codes = ${sql.array(naicsCodes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (keywords !== undefined) await sql`UPDATE spotlights SET keywords = ${sql.array(keywords)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (agencies !== undefined) await sql`UPDATE spotlights SET agencies = ${sql.array(agencies)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (programTypes !== undefined) await sql`UPDATE spotlights SET program_types = ${sql.array(programTypes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (minScore !== undefined) await sql`UPDATE spotlights SET min_score = ${minScore}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
-      if (isActive !== undefined) await sql`UPDATE spotlights SET is_active = ${isActive}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      await sql.begin(async (tx: any) => {
+        if (name !== undefined) await tx`UPDATE spotlights SET name = ${name}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (description !== undefined) await tx`UPDATE spotlights SET description = ${description}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (naicsCodes !== undefined) await tx`UPDATE spotlights SET naics_codes = ${sql.array(naicsCodes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (keywords !== undefined) await tx`UPDATE spotlights SET keywords = ${sql.array(keywords)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (agencies !== undefined) await tx`UPDATE spotlights SET agencies = ${sql.array(agencies)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (programTypes !== undefined) await tx`UPDATE spotlights SET program_types = ${sql.array(programTypes)}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (minScore !== undefined) await tx`UPDATE spotlights SET min_score = ${minScore}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+        if (isActive !== undefined) await tx`UPDATE spotlights SET is_active = ${isActive}, updated_at = now() WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid`;
+      });
     } catch (e) {
       console.error('[portal/spotlights/update] spotlight update failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
@@ -311,6 +326,12 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 export async function DELETE(_request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, spotlightId } = await ctx.params;
+    if (!isValidUUID(spotlightId)) {
+      return NextResponse.json(
+        { error: 'Invalid spotlight ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth (tenant_admin required for deletes) ────────────────
     const session = await auth();
