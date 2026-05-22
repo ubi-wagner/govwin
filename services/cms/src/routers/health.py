@@ -22,4 +22,22 @@ async def health_check():
     except Exception as e:
         db_status = f'error: {type(e).__name__}'
 
-    return {'status': 'ok', 'service': 'cms', 'database': db_status}
+    # Check pending generations (debug: is the worker picking them up?)
+    pending_gens = 0
+    try:
+        from ..models.database import get_pool as _gp
+        p = _gp()
+        pending_gens = await p.fetchval(
+            "SELECT COUNT(*) FROM cms_generations WHERE status IN ('pending', 'generating')"
+        ) or 0
+    except Exception:
+        pass
+
+    import os
+    return {
+        'status': 'ok',
+        'service': 'cms',
+        'database': db_status,
+        'pending_generations': pending_gens,
+        'anthropic_key_set': bool(os.getenv('ANTHROPIC_API_KEY')),
+    }
