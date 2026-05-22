@@ -56,7 +56,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { content?: unknown; status?: unknown };
+    let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -80,6 +80,16 @@ export async function PUT(request: Request, ctx: RouteContext) {
       (VALID_STATUSES as readonly string[]).includes(body.status)
       ? body.status
       : null;
+
+    // Revision tracking metadata (optional, set by AI revision panel)
+    const VALID_SOURCES = ['ai_draft', 'human_edit', 'ai_revision', 'library_import', 'template', 'system'] as const;
+    const source = typeof body.source === 'string' &&
+      (VALID_SOURCES as readonly string[]).includes(body.source)
+      ? body.source
+      : 'human_edit';
+    const aiInstruction = typeof body.aiInstruction === 'string' ? body.aiInstruction.slice(0, 2000) : null;
+    const aiModel = typeof body.aiModel === 'string' ? body.aiModel.slice(0, 100) : null;
+    const editSummary = typeof body.editSummary === 'string' ? body.editSummary.slice(0, 500) : null;
 
     // ── Verify proposal belongs to tenant and is not locked ─────────
     let proposal: { id: string; isLocked: boolean; unlockDeadline: Date | null; stage: string } | undefined;
@@ -135,10 +145,10 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string }[]>`
-        SELECT id, version, status, title FROM proposal_sections
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null }[]>`
+        SELECT id, version, status, title, content FROM proposal_sections
         WHERE id = ${sectionId}
           AND proposal_id = ${proposalId}
         LIMIT 1
@@ -150,6 +160,37 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     if (!section) {
       return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Save current version to canvas_versions before overwriting ──
+    if (section.content) {
+      try {
+        const currentContent = section.content;
+        const charCount = currentContent.length;
+        const wordCount = currentContent.split(/\s+/).filter(Boolean).length;
+        await sql`
+          INSERT INTO canvas_versions
+            (section_id, version_number, content, snapshot_reason, source, created_by,
+             char_count, word_count, ai_instruction, ai_model, edit_summary)
+          VALUES (
+            ${sectionId}::uuid,
+            ${section.version},
+            ${currentContent}::jsonb,
+            'save',
+            ${source},
+            ${sessionUser.id}::uuid,
+            ${charCount},
+            ${wordCount},
+            ${aiInstruction},
+            ${aiModel},
+            ${editSummary}
+          )
+          ON CONFLICT (section_id, version_number) DO NOTHING
+        `;
+      } catch (e) {
+        console.error('[section-save] canvas_versions insert failed:', e);
+        // Non-fatal — continue with the save
+      }
     }
 
     // ── Update section with optimistic concurrency ─────────────────

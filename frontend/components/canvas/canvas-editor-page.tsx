@@ -41,11 +41,18 @@ export function CanvasEditorPage({
     ? `/portal/${tenantSlug}/proposals/${proposalId}`
     : `/admin/proposals/${proposalId}`;
 
-  const handleSave = useCallback(async (doc: CanvasDocument) => {
+  const handleSave = useCallback(async (doc: CanvasDocument & { __revisionMeta?: { source: string; aiInstruction: string } }) => {
+    // Extract revision metadata if present (set by AI revision panel)
+    const meta = doc.__revisionMeta;
+    const payload: Record<string, unknown> = { content: doc };
+    if (meta) {
+      payload.source = meta.source;
+      payload.aiInstruction = meta.aiInstruction;
+    }
     const resp = await fetch(saveUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: doc }),
+      body: JSON.stringify(payload),
     });
     if (!resp.ok) {
       const json = await resp.json().catch(() => ({}));

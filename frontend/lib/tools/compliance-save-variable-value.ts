@@ -236,6 +236,27 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
       throw err;
     }
 
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, old_value, new_value, metadata)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'compliance_updated',
+          ${variableName},
+          ${priorValue !== null && priorValue !== undefined ? JSON.stringify(priorValue) : null},
+          ${JSON.stringify(coerced)},
+          ${JSON.stringify({ action, sourceExcerpt: sourceExcerpt ?? null })}::jsonb
+        )
+      `;
+    } catch (revErr) {
+      console.error('[compliance.save_variable_value] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
+
     const isNew = compId === null;
     await emitEventSingle({
       namespace: 'finder',

@@ -172,6 +172,26 @@ export const solicitationPushTool = defineTool<Input, Output>({
       );
     }
 
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, old_value, new_value)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'status_changed',
+          'status',
+          'approved',
+          'pushed_to_pipeline'
+        )
+      `;
+    } catch (revErr) {
+      console.error('[solicitation.push] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
+
     // Count topics (opportunities) linked to this solicitation for
     // downstream workflow matching (on_solicitation_pushed expects it).
     let topicCount: number;

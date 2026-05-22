@@ -86,6 +86,26 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
       throw err;
     }
 
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, new_value, metadata)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'annotation_added',
+          ${complianceVariableName ?? null},
+          ${kind},
+          ${JSON.stringify({ annotationId: rows[0].id, sourceLocation, payload })}::jsonb
+        )
+      `;
+    } catch (revErr) {
+      console.error('[solicitation.save_annotation] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
+
     await emitEventSingle({
       namespace: 'finder',
       type: 'annotation.saved',

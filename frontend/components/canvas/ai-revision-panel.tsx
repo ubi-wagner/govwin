@@ -18,10 +18,15 @@ import type { CanvasNode, TextBlockContent } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { useTool } from '@/lib/hooks/use-tool';
 
+interface RevisionMeta {
+  source: 'ai_revision' | 'library_import';
+  aiInstruction: string;
+}
+
 interface Props {
   node: CanvasNode;
   proposalId: string;
-  onRevised: (newContent: CanvasNode['content']) => void;
+  onRevised: (newContent: CanvasNode['content'], meta?: RevisionMeta) => void;
 }
 
 const QUICK_ACTIONS = [
@@ -56,7 +61,7 @@ export function AIRevisionPanel({ node, proposalId, onRevised }: Props) {
         // Use the first node's content as the replacement
         const newContent = result.nodes[0].content;
         if (newContent) {
-          onRevised(newContent);
+          onRevised(newContent, { source: 'ai_revision', aiInstruction: instruction });
         }
       }
     } catch {
@@ -151,7 +156,7 @@ export function AIRevisionPanel({ node, proposalId, onRevised }: Props) {
 
             await handleRevise(
               `Replace this text using the following proven content from the customer's library. Adapt the language to fit the current section context:\n\n${atomContext}`,
-              'From Library'
+              'From Library',
             );
           } catch {
             // Fall back to generic instruction

@@ -8,7 +8,7 @@
  * Manages the document state, node CRUD, and save/export actions.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
 import { createNode } from '@/lib/types/canvas-document';
@@ -16,6 +16,12 @@ import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+
+/** Metadata about the last AI revision, used to tag the save with the correct source */
+interface RevisionMeta {
+  source: 'ai_revision' | 'ai_draft' | 'library_import';
+  aiInstruction: string;
+}
 
 interface Props {
   initialDocument: CanvasDocument;
@@ -86,6 +92,7 @@ function CanvasEditorInner({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
+  const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
@@ -240,7 +247,14 @@ function CanvasEditorInner({
     updateDoc((prev) => ({ ...prev, canvas }));
   }, [updateDoc]);
 
-  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content']) => {
+  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content'], meta?: { source: string; aiInstruction: string }) => {
+    // Store revision metadata so the save route can tag the version correctly
+    if (meta) {
+      lastRevisionMetaRef.current = {
+        source: meta.source as RevisionMeta['source'],
+        aiInstruction: meta.aiInstruction,
+      };
+    }
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
@@ -334,8 +348,15 @@ function CanvasEditorInner({
     setSaving(true);
     setSaveError(null);
     try {
-      await onSave(doc);
+      // Pass revision metadata alongside the doc so the save route can tag the version
+      const meta = lastRevisionMetaRef.current;
+      const docWithMeta = meta
+        ? Object.assign({}, doc, { __revisionMeta: meta })
+        : doc;
+      await onSave(docWithMeta);
       setDirty(false);
+      // Clear revision meta after successful save
+      lastRevisionMetaRef.current = null;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {

@@ -123,6 +123,27 @@ export const solicitationApproveTool = defineTool<Input, Output>({
       throw err;
     }
 
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, old_value, new_value, metadata)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'review_approved',
+          'status',
+          'review_requested',
+          'approved',
+          ${JSON.stringify({ curatedBy, notes: notes ?? null })}::jsonb
+        )
+      `;
+    } catch (revErr) {
+      console.error('[solicitation.approve] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
+
     await emitEventSingle({
       namespace: 'finder',
       type: 'solicitation.approved',

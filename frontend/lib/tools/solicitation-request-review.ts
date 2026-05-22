@@ -95,6 +95,27 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
       throw err;
     }
 
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, old_value, new_value, metadata)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'review_requested',
+          'status',
+          'curation_in_progress',
+          'review_requested',
+          ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null, notes: notes ?? null })}::jsonb
+        )
+      `;
+    } catch (revErr) {
+      console.error('[solicitation.request_review] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
+
     await emitEventSingle({
       namespace: 'finder',
       type: 'solicitation.review_requested',

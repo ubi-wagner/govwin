@@ -29,7 +29,7 @@ interface Props {
   /** Update canvas-level settings (margins, font, etc.) */
   onUpdateCanvas?: (canvas: CanvasRules) => void;
   /** Handler for AI revision — replaces a node's content with AI-revised text */
-  onReviseNode?: (nodeId: string, newContent: CanvasNode['content']) => void;
+  onReviseNode?: (nodeId: string, newContent: CanvasNode['content'], meta?: { source: string; aiInstruction: string }) => void;
   /** Proposal ID for AI revision and comments (only available in portal context) */
   proposalId?: string;
   /** Tenant slug for comments API (only available in portal context) */
@@ -498,7 +498,7 @@ export function CanvasSidebar({
               <AIRevisionPanel
                 node={selectedNode}
                 proposalId={proposalId}
-                onRevised={(newContent) => onReviseNode(selectedNode.id, newContent)}
+                onRevised={(newContent, meta) => onReviseNode(selectedNode.id, newContent, meta)}
               />
             )}
           </>
