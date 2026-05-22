@@ -14,6 +14,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -47,6 +48,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId, sectionId } = await ctx.params;
+    if (!isValidUUID(proposalId) || !isValidUUID(sectionId)) {
+      return NextResponse.json(
+        { error: 'Invalid ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json(

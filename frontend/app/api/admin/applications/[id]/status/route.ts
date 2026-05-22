@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -20,6 +21,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { id } = await ctx.params;
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const userId = (session.user as { id?: string }).id;
     if (!userId) {
       return NextResponse.json({ error: 'Missing user id', code: 'UNAUTHENTICATED' }, { status: 401 });

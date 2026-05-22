@@ -115,8 +115,9 @@ export const solicitationPushTool = defineTool<Input, Output>({
     }
 
     // 3. Atomic push in transaction — status update + opportunity activation + triage action
-    const pushedRows = await sql.begin(async (tx) => {
-      const rows = await tx<{ pushedAt: Date }[]>`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pushedRows = await sql.begin(async (tx: any) => {
+      const rows = await tx`
         UPDATE curated_solicitations
         SET status = 'pushed_to_pipeline',
             pushed_at = now(),
@@ -124,7 +125,7 @@ export const solicitationPushTool = defineTool<Input, Output>({
         WHERE id = ${solicitationId}::uuid
           AND status = 'approved'
         RETURNING pushed_at
-      `;
+      ` as { pushedAt: Date }[];
 
       if (rows.length === 0) {
         throw new StateTransitionError(

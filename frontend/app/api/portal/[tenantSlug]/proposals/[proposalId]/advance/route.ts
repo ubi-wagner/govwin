@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -44,6 +45,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -63,7 +67,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       // No body is acceptable — will auto-advance to next gate
     }
 
-    const notes = typeof body.notes === 'string' ? body.notes : null;
+    const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Load current proposal ────────────────────────────────────────
     const [proposal] = await sql<{

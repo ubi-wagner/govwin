@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantId: string }>;
@@ -17,6 +18,12 @@ interface RouteContext {
 export async function GET(request: Request, ctx: RouteContext) {
   try {
     const { tenantId } = await ctx.params;
+    if (!isValidUUID(tenantId)) {
+      return NextResponse.json(
+        { error: 'Invalid tenant ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -115,6 +122,12 @@ export async function GET(request: Request, ctx: RouteContext) {
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
     const { tenantId } = await ctx.params;
+    if (!isValidUUID(tenantId)) {
+      return NextResponse.json(
+        { error: 'Invalid tenant ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
