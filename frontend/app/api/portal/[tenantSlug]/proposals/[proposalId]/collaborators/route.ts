@@ -204,8 +204,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string; stage: string; gateConfig: string[] }[]>`
-      SELECT id, stage, gate_config FROM proposals
+    const [proposal] = await sql<{ id: string; title: string; stage: string; gateConfig: string[] }[]>`
+      SELECT id, title, stage, gate_config FROM proposals
       WHERE id = ${proposalId} AND tenant_id = ${tenantId}
       LIMIT 1
     `;
@@ -229,9 +229,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     `;
 
     let isNewUser = false;
+    let tempPassword: string | undefined;
     if (!existingUser) {
       isNewUser = true;
-      const tempPassword = randomUUID().slice(0, 12);
+      tempPassword = randomUUID().slice(0, 12);
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
@@ -268,6 +269,33 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
         )
       `;
+    }
+
+    // Send collaborator invite email (non-blocking — failure is logged, not fatal)
+    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+    const inviterName = (session.user as { name?: string }).name || sessionUser.email || 'A team member';
+    try {
+      const emailContent = collaboratorInviteEmail({
+        recipientName: name,
+        recipientEmail: email,
+        proposalTitle: proposal.title || proposalId,
+        inviterName,
+        role: collabRole,
+        permission,
+        isNewUser,
+        tempPassword,
+        loginUrl,
+      });
+      await sendEmail({
+        to: email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+    } catch (emailErr) {
+      console.error('[api/portal/proposals/collaborators] invite email failed', {
+        email,
+        err: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
     }
 
     // Emit event

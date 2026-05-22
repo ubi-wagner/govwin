@@ -72,7 +72,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Stripe gate — founding cohort bypass
     // When Stripe is live, check for a valid purchase or active subscription
     // before allowing proposal creation. For now, all tenant_admins can create.
-    const FOUNDING_COHORT_BYPASS = true; // Set to false when Stripe billing is enforced
+    const FOUNDING_COHORT_BYPASS = process.env.FOUNDING_COHORT_BYPASS === 'true';
     if (!FOUNDING_COHORT_BYPASS) {
       return NextResponse.json(
         { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
