@@ -1,26 +1,104 @@
-"""AgentFabric — orchestrator for all agent invocations."""
+"""
+================================================================================
+AgentFabric — Central Orchestrator for AI Agent Workforce
+================================================================================
+
+WHO:    Called by workflow processor (AI_INVOKE steps), pipeline workers,
+        and frontend API routes (via agent_task_queue polling).
+
+WHAT:   Routes events/tasks to the correct agent archetype, assembles context
+        (tenant profile + memories + task data), executes Claude API calls with
+        tool-use loops, tracks token usage and costs, enforces rate limits and
+        budgets, and emits events at every stage.
+
+WHY:    Agents are stateless functions — the fabric provides the stateful
+        infrastructure (memory retrieval, tool execution, cost tracking) that
+        makes each invocation feel continuous and specialized per tenant.
+
+HOW:    1. Receive event or dequeue from agent_task_queue
+        2. Match to archetype (or use explicit archetype_name)
+        3. Check rate limits (50 calls/hour/tenant) and budget ($50/month default)
+        4. Assemble context via ContextAssembler
+        5. Call Claude with tool-use loop (max 20 rounds)
+        6. Process response, execute tool calls via ToolRegistry
+        7. Store episodic memory of interaction
+        8. Log to agent_task_log (tokens, cost, duration)
+        9. Emit system_events (tool.agent.invoked start/end)
+        10. Return structured result
+
+GUARDRAILS:
+    - Agents NEVER: submit proposals, grant/revoke access, delete content,
+      communicate externally, override humans
+    - Agents MAY autonomously: draft sections, score opportunities, flag
+      compliance, suggest content, send internal notifications
+    - Agents RECOMMEND but human decides: pursuit decisions, win themes,
+      partner selection, stage advancement, final approval
+
+COST MODEL (Sonnet pricing):
+    - Per-call: $0.06-$0.17 depending on archetype
+    - Per-proposal: $4.50-$12.50 depending on complexity
+    - Per-tenant/month: $3.55-$17.55 depending on usage
+    - AI is <2% COGS at $199/month subscription
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial stub: basic invoke + single-turn response
+    PR #xxx (2026-05-22) — Full implementation: rate limits, budgets, tool-use
+                           loop, event emission, task queue processing, cost
+                           tracking, multi-round conversations
+================================================================================
+"""
 
 import json
 import logging
 import os
+import time
+import uuid
 from datetime import datetime, timezone
 
 import anthropic
 
+from .context import ContextAssembler
 from .memory import MemoryStore
+from .tools import ToolRegistry, create_default_registry
 
 logger = logging.getLogger("pipeline.agents")
 
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+MAX_TOOL_ROUNDS = 20
+RATE_LIMIT_PER_HOUR = 50
+DEFAULT_MONTHLY_BUDGET_USD = 50.00
+DEFAULT_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_MAX_TOKENS = 4096
+
+# Sonnet pricing: $3/M input, $15/M output
+INPUT_COST_PER_TOKEN = 3.0 / 1_000_000
+OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000
+
 
 class AgentFabric:
-    """Routes events to agent archetypes, manages context assembly and execution."""
+    """Routes events to agent archetypes, manages context assembly and execution.
+
+    The fabric is the central orchestrator: it owns the Anthropic client,
+    memory store, context assembler, and tool registry. Agent archetypes are
+    stateless — the fabric injects all state through context assembly.
+    """
 
     def __init__(self):
         self.client = None
         self.memory = MemoryStore()
-        self._archetypes = {}
+        self.context_assembler = ContextAssembler()
+        self.tool_registry = create_default_registry()
+        self._archetypes: dict[str, object] = {}
 
-    def _get_client(self):
+    # ------------------------------------------------------------------
+    # Lazy client initialisation
+    # ------------------------------------------------------------------
+
+    def _get_client(self) -> anthropic.AsyncAnthropic:
+        """Return (and lazily create) the Anthropic async client."""
         if not self.client:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
@@ -28,96 +106,771 @@ class AgentFabric:
             self.client = anthropic.AsyncAnthropic(api_key=api_key)
         return self.client
 
-    def register_archetype(self, name: str, archetype):
+    # ------------------------------------------------------------------
+    # Archetype management
+    # ------------------------------------------------------------------
+
+    def register_archetype(self, name: str, archetype) -> None:
         """Register an archetype instance by name."""
         self._archetypes[name] = archetype
+        logger.info("registered archetype: %s", name)
+
+    # ------------------------------------------------------------------
+    # Event routing
+    # ------------------------------------------------------------------
 
     async def handle_event(self, conn, event: dict) -> dict:
-        """Route an event to the appropriate agent archetype."""
+        """Route an event to the appropriate agent archetype.
+
+        Iterates over registered archetypes and delegates to the first one
+        whose ``handles_event`` returns True. Emits dispatch start/end events
+        for observability.
+        """
         event_type = event.get("type", "")
+        tenant_id = event.get("tenant_id")
 
-        # Find matching archetype
-        for name, archetype in self._archetypes.items():
-            if archetype.handles_event(event_type):
-                return await self.invoke_agent(conn, name, event)
+        # Emit dispatch start
+        start_event_id = await self._emit_event(
+            conn,
+            namespace="tool",
+            event_type="agent.dispatch",
+            phase="start",
+            tenant_id=tenant_id,
+            payload={"event_type": event_type},
+        )
 
-        return {"status": "no_handler", "event_type": event_type}
+        try:
+            for name, archetype in self._archetypes.items():
+                if archetype.handles_event(event_type):
+                    result = await self.invoke_agent(
+                        conn, name, event, tenant_id=tenant_id,
+                    )
+                    # Emit dispatch end — success
+                    await self._emit_event(
+                        conn,
+                        namespace="tool",
+                        event_type="agent.dispatch",
+                        phase="end",
+                        tenant_id=tenant_id,
+                        payload={
+                            "event_type": event_type,
+                            "archetype": name,
+                            "status": result.get("status", "unknown"),
+                        },
+                        parent_event_id=start_event_id,
+                    )
+                    return result
 
-    async def invoke_agent(self, conn, archetype_name: str, context: dict) -> dict:
-        """Invoke a specific agent archetype with context."""
+            # No matching archetype
+            await self._emit_event(
+                conn,
+                namespace="tool",
+                event_type="agent.dispatch",
+                phase="end",
+                tenant_id=tenant_id,
+                payload={
+                    "event_type": event_type,
+                    "status": "no_handler",
+                },
+                parent_event_id=start_event_id,
+            )
+            return {"status": "no_handler", "event_type": event_type}
+
+        except Exception as exc:
+            logger.error("[handle_event] dispatch failed for %s: %s", event_type, exc)
+            await self._emit_event(
+                conn,
+                namespace="tool",
+                event_type="agent.dispatch",
+                phase="end",
+                tenant_id=tenant_id,
+                payload={
+                    "event_type": event_type,
+                    "status": "error",
+                    "error": str(exc)[:500],
+                },
+                parent_event_id=start_event_id,
+            )
+            return {"status": "error", "event_type": event_type, "error": str(exc)}
+
+    # ------------------------------------------------------------------
+    # Core invocation
+    # ------------------------------------------------------------------
+
+    async def invoke_agent(
+        self,
+        conn,
+        archetype_name: str,
+        context: dict,
+        tenant_id: str | None = None,
+    ) -> dict:
+        """Invoke a specific agent archetype with full orchestration.
+
+        Steps:
+            1. Emit tool:agent.invoked start event
+            2. Check rate limit (50 calls/hour/tenant)
+            3. Check monthly budget
+            4. Assemble context via ContextAssembler
+            5. Call Claude with tool-use loop (max 20 rounds)
+            6. Calculate cost
+            7. Store episodic memory
+            8. Log to agent_task_log
+            9. Emit tool:agent.invoked end event
+            10. Return structured result
+        """
+        start_time = time.monotonic()
+        tenant_id = tenant_id or context.get("tenant_id")
+
+        # Resolve archetype
         archetype = self._archetypes.get(archetype_name)
         if not archetype:
             return {"status": "error", "reason": f"Unknown archetype: {archetype_name}"}
 
-        client = self._get_client()
+        # 1. Emit start event
+        start_event_id = await self._emit_event(
+            conn,
+            namespace="tool",
+            event_type="agent.invoked",
+            phase="start",
+            tenant_id=tenant_id,
+            payload={
+                "archetype": archetype_name,
+                "task_type": context.get("type", "unknown"),
+            },
+        )
 
-        # Build the prompt from archetype config
-        system_prompt = archetype.system_prompt
-        tools = archetype.get_tools()
-
-        # Load relevant memories
-        tenant_id = context.get("tenant_id")
-        memories = []
-        if tenant_id:
-            memories = await self.memory.recall(conn, tenant_id, archetype_name, limit=10)
-
-        # Build messages
-        messages = archetype.build_messages(context, memories)
-
-        # Call Claude
-        kwargs = {
-            "model": archetype.model or "claude-sonnet-4-20250514",
-            "max_tokens": archetype.max_tokens or 4096,
-            "system": system_prompt,
-            "messages": messages,
-        }
-        if tools:
-            kwargs["tools"] = tools
+        total_input_tokens = 0
+        total_output_tokens = 0
+        tool_calls_count = 0
 
         try:
-            response = await client.messages.create(**kwargs)
-
-            # Process tool calls if any
-            result = await self._process_response(conn, archetype, response, context)
-
-            # Store memory of this interaction
+            # 2. Check rate limit
             if tenant_id:
-                await self.memory.store(conn, tenant_id, archetype_name, {
-                    "input_summary": str(context.get("type", ""))[:200],
-                    "output_summary": str(result.get("summary", ""))[:200],
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                })
+                rate_ok = await self._check_rate_limit(conn, tenant_id)
+                if not rate_ok:
+                    raise RateLimitExceeded(
+                        f"Tenant {tenant_id} exceeded {RATE_LIMIT_PER_HOUR} calls/hour"
+                    )
 
+            # 3. Check budget
+            if tenant_id:
+                budget_ok = await self._check_budget(conn, tenant_id)
+                if not budget_ok:
+                    raise BudgetExceeded(
+                        f"Tenant {tenant_id} exceeded monthly AI budget"
+                    )
+
+            # 4. Assemble context
+            assembled = await self.context_assembler.assemble(
+                conn, archetype, tenant_id, context,
+            )
+
+            # 5. Claude API call with tool-use loop
+            client = self._get_client()
+            model = getattr(archetype, "model", None) or DEFAULT_MODEL
+            max_tokens = getattr(archetype, "max_tokens", None) or DEFAULT_MAX_TOKENS
+            temperature = getattr(archetype, "temperature", 0.3)
+
+            system_prompt = assembled["system_prompt"]
+            messages = assembled["messages"]
+            tools = assembled["tools"]
+
+            # Get tool definitions from registry for the archetype's allowed tools
+            allowed_tool_names = getattr(archetype, "tools", [])
+            registry_tool_defs = self.tool_registry.get_definitions(allowed_tool_names)
+
+            # Merge archetype-provided tool defs with registry defs (registry takes priority)
+            registry_tool_names = {t["name"] for t in registry_tool_defs}
+            merged_tools = list(registry_tool_defs)
+            for tool_def in tools:
+                if tool_def.get("name") not in registry_tool_names:
+                    merged_tools.append(tool_def)
+
+            # Build the initial API kwargs
+            api_kwargs: dict = {
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+                "system": system_prompt,
+                "messages": list(messages),
+            }
+            if merged_tools:
+                api_kwargs["tools"] = merged_tools
+
+            response_text = ""
+            tool_results_log: list[dict] = []
+            rounds = 0
+
+            while rounds <= MAX_TOOL_ROUNDS:
+                response = await client.messages.create(**api_kwargs)
+
+                total_input_tokens += response.usage.input_tokens
+                total_output_tokens += response.usage.output_tokens
+
+                # Extract text blocks from response
+                for block in response.content:
+                    if block.type == "text":
+                        response_text += block.text
+
+                if response.stop_reason == "end_turn":
+                    break
+
+                if response.stop_reason == "tool_use":
+                    tool_result_blocks = []
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            tool_calls_count += 1
+                            try:
+                                result = await self.tool_registry.execute(
+                                    conn,
+                                    tenant_id,
+                                    block.name,
+                                    block.input,
+                                    allowed_tools=allowed_tool_names or None,
+                                )
+                            except Exception as tool_exc:
+                                logger.error(
+                                    "[invoke_agent] tool %s failed: %s",
+                                    block.name, tool_exc,
+                                )
+                                result = {
+                                    "error": f"Tool execution failed: {str(tool_exc)[:200]}"
+                                }
+
+                            tool_results_log.append({
+                                "tool": block.name,
+                                "input": block.input,
+                                "output": result,
+                            })
+
+                            tool_result_blocks.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": json.dumps(result),
+                            })
+
+                    # Append the assistant turn (with tool_use blocks) and user
+                    # turn (with tool_result blocks) for the next round.
+                    api_kwargs["messages"].append({
+                        "role": "assistant",
+                        "content": response.content,
+                    })
+                    api_kwargs["messages"].append({
+                        "role": "user",
+                        "content": tool_result_blocks,
+                    })
+                    rounds += 1
+                else:
+                    # Unexpected stop reason (e.g. max_tokens) — stop looping
+                    break
+
+            # 6. Calculate cost
+            cost_usd = (
+                total_input_tokens * INPUT_COST_PER_TOKEN
+                + total_output_tokens * OUTPUT_COST_PER_TOKEN
+            )
+
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+
+            # Let archetype post-process if available
+            raw_result = {
+                "text": response_text,
+                "tool_results": tool_results_log,
+            }
+            summary = ""
+            if hasattr(archetype, "summarize_result"):
+                summary = archetype.summarize_result(raw_result)
+            else:
+                summary = response_text[:200] if response_text else "No text output"
+
+            # 7. Store episodic memory
+            memories_written = 0
+            if tenant_id:
+                try:
+                    mem_id = await self.memory.store(conn, tenant_id, archetype_name, {
+                        "input_summary": str(context.get("type", ""))[:200],
+                        "output_summary": summary[:200],
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "cost_usd": float(cost_usd),
+                        "tool_calls": tool_calls_count,
+                    })
+                    if mem_id:
+                        memories_written = 1
+                except Exception as mem_exc:
+                    logger.error("[invoke_agent] memory store failed: %s", mem_exc)
+
+            # 8. Log to agent_task_log
+            await self._log_task(
+                conn,
+                tenant_id=tenant_id,
+                agent_role=archetype_name,
+                task_type=context.get("type", "unknown"),
+                trigger_event=context.get("id"),
+                proposal_id=context.get("proposal_id") or context.get("payload", {}).get("proposalId"),
+                section_id=context.get("section_id") or context.get("payload", {}).get("sectionId"),
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                tool_calls_count=tool_calls_count,
+                duration_ms=duration_ms,
+                cost_usd=cost_usd,
+                memories_written=memories_written,
+                error=None,
+            )
+
+            # 9. Emit end event
+            await self._emit_event(
+                conn,
+                namespace="tool",
+                event_type="agent.invoked",
+                phase="end",
+                tenant_id=tenant_id,
+                payload={
+                    "archetype": archetype_name,
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
+                    "tool_calls": tool_calls_count,
+                    "rounds": rounds,
+                    "cost_usd": float(cost_usd),
+                    "duration_ms": duration_ms,
+                    "status": "completed",
+                },
+                parent_event_id=start_event_id,
+            )
+
+            # 10. Return structured result
             return {
                 "status": "completed",
                 "archetype": archetype_name,
-                "result": result,
-                "tokens": {
-                    "input": response.usage.input_tokens,
-                    "output": response.usage.output_tokens,
+                "result": {
+                    "text": response_text,
+                    "summary": summary,
+                    "tool_results": tool_results_log,
                 },
+                "tokens": {
+                    "input": total_input_tokens,
+                    "output": total_output_tokens,
+                },
+                "cost_usd": float(cost_usd),
+                "duration_ms": duration_ms,
+                "rounds": rounds,
             }
-        except Exception as e:
-            logger.error(f"[invoke_agent] {archetype_name} failed: {e}")
-            return {"status": "error", "archetype": archetype_name, "error": str(e)}
 
-    async def _process_response(self, conn, archetype, response, context):
-        """Process Claude's response, handling tool calls if present."""
-        result = {"text": "", "tool_results": []}
+        except (RateLimitExceeded, BudgetExceeded) as guard_exc:
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            error_msg = str(guard_exc)
+            logger.error("[invoke_agent] guardrail blocked %s: %s", archetype_name, error_msg)
 
-        for block in response.content:
-            if block.type == "text":
-                result["text"] += block.text
-            elif block.type == "tool_use":
-                tool_result = await archetype.execute_tool(
-                    conn, block.name, block.input, context
+            await self._log_task(
+                conn,
+                tenant_id=tenant_id,
+                agent_role=archetype_name,
+                task_type=context.get("type", "unknown"),
+                trigger_event=context.get("id"),
+                input_tokens=0,
+                output_tokens=0,
+                tool_calls_count=0,
+                duration_ms=duration_ms,
+                cost_usd=0,
+                error=error_msg,
+            )
+
+            await self._emit_event(
+                conn,
+                namespace="tool",
+                event_type="agent.invoked",
+                phase="end",
+                tenant_id=tenant_id,
+                payload={
+                    "archetype": archetype_name,
+                    "status": "rejected",
+                    "error": error_msg,
+                    "duration_ms": duration_ms,
+                },
+                parent_event_id=start_event_id,
+            )
+
+            return {
+                "status": "rejected",
+                "archetype": archetype_name,
+                "error": error_msg,
+            }
+
+        except Exception as exc:
+            duration_ms = int((time.monotonic() - start_time) * 1000)
+            error_msg = str(exc)[:500]
+            logger.error("[invoke_agent] %s failed: %s", archetype_name, exc)
+
+            # Log the failure
+            await self._log_task(
+                conn,
+                tenant_id=tenant_id,
+                agent_role=archetype_name,
+                task_type=context.get("type", "unknown"),
+                trigger_event=context.get("id"),
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
+                tool_calls_count=tool_calls_count,
+                duration_ms=duration_ms,
+                cost_usd=(
+                    total_input_tokens * INPUT_COST_PER_TOKEN
+                    + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                ),
+                error=error_msg,
+            )
+
+            await self._emit_event(
+                conn,
+                namespace="tool",
+                event_type="agent.invoked",
+                phase="end",
+                tenant_id=tenant_id,
+                payload={
+                    "archetype": archetype_name,
+                    "status": "error",
+                    "error": error_msg,
+                    "duration_ms": duration_ms,
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
+                },
+                parent_event_id=start_event_id,
+            )
+
+            return {
+                "status": "error",
+                "archetype": archetype_name,
+                "error": error_msg,
+            }
+
+    # ------------------------------------------------------------------
+    # Task queue processing
+    # ------------------------------------------------------------------
+
+    async def process_task_queue(self, conn) -> list[dict]:
+        """Poll agent_task_queue for pending tasks, claim, execute, update.
+
+        Uses FOR UPDATE SKIP LOCKED to safely claim tasks across multiple
+        workers. Returns a list of result dicts for each processed task.
+        """
+        results: list[dict] = []
+        worker_id = f"fabric-{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Claim up to 5 pending tasks atomically
+            rows = await conn.fetch(
+                """
+                UPDATE agent_task_queue
+                SET status = 'running',
+                    worker_id = $1,
+                    picked_at = now()
+                WHERE id IN (
+                    SELECT id FROM agent_task_queue
+                    WHERE status = 'pending'
+                    ORDER BY created_at ASC
+                    LIMIT 5
+                    FOR UPDATE SKIP LOCKED
                 )
-                result["tool_results"].append({
-                    "tool": block.name,
-                    "input": block.input,
-                    "output": tool_result,
+                RETURNING id, tenant_id, agent_role, task_type, input,
+                          proposal_id, section_id
+                """,
+                worker_id,
+            )
+        except Exception as exc:
+            logger.error("[process_task_queue] claim failed: %s", exc)
+            return results
+
+        for row in rows:
+            task_id = row["id"]
+            tenant_id = str(row["tenant_id"]) if row["tenant_id"] else None
+            agent_role = row["agent_role"]
+            task_type = row["task_type"]
+
+            # Parse the task input — asyncpg may return JSONB as dict or str
+            raw_input = row["input"]
+            if isinstance(raw_input, str):
+                try:
+                    task_input = json.loads(raw_input)
+                except json.JSONDecodeError:
+                    task_input = {}
+            elif raw_input is None:
+                task_input = {}
+            else:
+                task_input = raw_input
+
+            # Build context from the task row
+            context = {
+                "type": task_type,
+                "tenant_id": tenant_id,
+                "task_id": str(task_id),
+                "proposal_id": str(row["proposal_id"]) if row["proposal_id"] else None,
+                "section_id": str(row["section_id"]) if row["section_id"] else None,
+                **task_input,
+            }
+
+            try:
+                result = await self.invoke_agent(
+                    conn, agent_role, context, tenant_id=tenant_id,
+                )
+
+                # Store result
+                try:
+                    await conn.execute(
+                        """
+                        INSERT INTO agent_task_results (id, task_id, output, created_at)
+                        VALUES ($1, $2, $3::jsonb, now())
+                        """,
+                        uuid.uuid4(),
+                        task_id,
+                        json.dumps(result),
+                    )
+                except Exception as res_exc:
+                    logger.error(
+                        "[process_task_queue] result store failed for task %s: %s",
+                        task_id, res_exc,
+                    )
+
+                # Update task status
+                status = "completed" if result.get("status") == "completed" else "failed"
+                error_text = result.get("error") if status == "failed" else None
+
+                try:
+                    await conn.execute(
+                        """
+                        UPDATE agent_task_queue
+                        SET status = $1, completed_at = now(), error = $2
+                        WHERE id = $3
+                        """,
+                        status,
+                        error_text,
+                        task_id,
+                    )
+                except Exception as upd_exc:
+                    logger.error(
+                        "[process_task_queue] status update failed for task %s: %s",
+                        task_id, upd_exc,
+                    )
+
+                results.append({"task_id": str(task_id), **result})
+
+            except Exception as exc:
+                logger.error(
+                    "[process_task_queue] task %s execution failed: %s",
+                    task_id, exc,
+                )
+                try:
+                    await conn.execute(
+                        """
+                        UPDATE agent_task_queue
+                        SET status = 'failed', completed_at = now(), error = $1
+                        WHERE id = $2
+                        """,
+                        str(exc)[:500],
+                        task_id,
+                    )
+                except Exception as upd_exc:
+                    logger.error(
+                        "[process_task_queue] failure update failed for task %s: %s",
+                        task_id, upd_exc,
+                    )
+
+                results.append({
+                    "task_id": str(task_id),
+                    "status": "error",
+                    "error": str(exc)[:500],
                 })
 
-        # Let archetype post-process
-        result["summary"] = archetype.summarize_result(result)
-        return result
+        return results
+
+    # ------------------------------------------------------------------
+    # Rate limit check
+    # ------------------------------------------------------------------
+
+    async def _check_rate_limit(self, conn, tenant_id: str) -> bool:
+        """Check if tenant has exceeded the hourly rate limit.
+
+        Returns True if within limit, False if exceeded.
+        """
+        try:
+            row = await conn.fetchrow(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM agent_task_log
+                WHERE tenant_id = $1
+                  AND created_at > now() - interval '1 hour'
+                """,
+                uuid.UUID(tenant_id),
+            )
+            count = row["cnt"] if row else 0
+            if count >= RATE_LIMIT_PER_HOUR:
+                logger.error(
+                    "[rate_limit] tenant %s has %d calls in the last hour (limit: %d)",
+                    tenant_id, count, RATE_LIMIT_PER_HOUR,
+                )
+                return False
+            return True
+        except Exception as exc:
+            # If we can't check, allow the call (fail open) but log
+            logger.error("[rate_limit] check failed: %s", exc)
+            return True
+
+    # ------------------------------------------------------------------
+    # Budget check
+    # ------------------------------------------------------------------
+
+    async def _check_budget(self, conn, tenant_id: str) -> bool:
+        """Check if tenant has exceeded their monthly AI budget.
+
+        Returns True if within budget, False if exceeded.
+        Reads monthly_budget from tenant_agent_config (default $50).
+        Sums cost_usd from agent_task_log for the current calendar month.
+        """
+        try:
+            # Get the tenant's budget config
+            config_row = await conn.fetchrow(
+                """
+                SELECT monthly_budget
+                FROM tenant_agent_config
+                WHERE tenant_id = $1
+                """,
+                uuid.UUID(tenant_id),
+            )
+            monthly_budget = float(config_row["monthly_budget"]) if config_row else DEFAULT_MONTHLY_BUDGET_USD
+
+            # Sum costs for the current calendar month
+            usage_row = await conn.fetchrow(
+                """
+                SELECT COALESCE(SUM(cost_usd), 0) AS total_cost
+                FROM agent_task_log
+                WHERE tenant_id = $1
+                  AND created_at >= date_trunc('month', now())
+                """,
+                uuid.UUID(tenant_id),
+            )
+            total_cost = float(usage_row["total_cost"]) if usage_row else 0.0
+
+            if total_cost >= monthly_budget:
+                logger.error(
+                    "[budget] tenant %s used $%.4f of $%.2f monthly budget",
+                    tenant_id, total_cost, monthly_budget,
+                )
+                return False
+            return True
+        except Exception as exc:
+            # If we can't check, allow the call (fail open) but log
+            logger.error("[budget] check failed: %s", exc)
+            return True
+
+    # ------------------------------------------------------------------
+    # Task logging
+    # ------------------------------------------------------------------
+
+    async def _log_task(
+        self,
+        conn,
+        *,
+        tenant_id: str | None,
+        agent_role: str,
+        task_type: str,
+        trigger_event: str | None = None,
+        proposal_id: str | None = None,
+        section_id: str | None = None,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        tool_calls_count: int = 0,
+        duration_ms: int = 0,
+        cost_usd: float = 0.0,
+        memories_written: int = 0,
+        error: str | None = None,
+    ) -> None:
+        """Insert a row into agent_task_log for audit and billing."""
+        if not tenant_id:
+            return  # Admin/system invocations don't require logging
+
+        try:
+            await conn.execute(
+                """
+                INSERT INTO agent_task_log
+                    (id, tenant_id, agent_role, task_type, trigger_event,
+                     proposal_id, section_id, input_tokens, output_tokens,
+                     tool_calls_count, duration_ms, cost_usd,
+                     memories_written, error, created_at)
+                VALUES
+                    ($1, $2, $3, $4, $5,
+                     $6, $7, $8, $9,
+                     $10, $11, $12,
+                     $13, $14, now())
+                """,
+                uuid.uuid4(),
+                uuid.UUID(tenant_id),
+                agent_role,
+                task_type,
+                trigger_event,
+                uuid.UUID(proposal_id) if proposal_id else None,
+                uuid.UUID(section_id) if section_id else None,
+                input_tokens,
+                output_tokens,
+                tool_calls_count,
+                duration_ms,
+                cost_usd,
+                memories_written,
+                error,
+            )
+        except Exception as exc:
+            logger.error("[_log_task] failed to log agent task: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Event emission helper
+    # ------------------------------------------------------------------
+
+    async def _emit_event(
+        self,
+        conn,
+        *,
+        namespace: str,
+        event_type: str,
+        phase: str,
+        tenant_id: str | None = None,
+        payload: dict | None = None,
+        parent_event_id: str | None = None,
+    ) -> str:
+        """Insert a system_events row. Returns the event id as a string."""
+        event_id = str(uuid.uuid4())
+        event_payload = payload or {}
+        if "correlationId" not in event_payload:
+            event_payload["correlationId"] = str(uuid.uuid4())
+
+        try:
+            await conn.execute(
+                """
+                INSERT INTO system_events
+                    (id, namespace, type, phase, actor_type, actor_id,
+                     tenant_id, parent_event_id, payload, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+                """,
+                uuid.UUID(event_id),
+                namespace,
+                event_type,
+                phase,
+                "agent",
+                "fabric",
+                uuid.UUID(tenant_id) if tenant_id else None,
+                uuid.UUID(parent_event_id) if parent_event_id else None,
+                json.dumps(event_payload),
+                datetime.now(timezone.utc),
+            )
+            return event_id
+        except Exception as exc:
+            logger.error("[_emit_event] failed: %s", exc)
+            return ""
+
+
+# ---------------------------------------------------------------------------
+# Guardrail exceptions
+# ---------------------------------------------------------------------------
+
+
+class RateLimitExceeded(Exception):
+    """Raised when a tenant exceeds the hourly rate limit."""
+
+
+class BudgetExceeded(Exception):
+    """Raised when a tenant exceeds their monthly AI budget."""
