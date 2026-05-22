@@ -121,7 +121,7 @@ async def store_document(content: bytes, content_type: str, original_filename: s
 
 async def delete_file(rel_path: str) -> bool:
     """Delete a file by relative path. Returns True if deleted."""
-    abs_path = STORAGE_ROOT / rel_path
+    abs_path = get_abs_path(rel_path)
     if abs_path.exists():
         abs_path.unlink()
         logger.info(f'Deleted file: {rel_path}')

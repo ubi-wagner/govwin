@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { ApplicationReview, type ApplicationItem } from '@/components/admin/application-review';
 
+export const dynamic = 'force-dynamic';
+
 type ApplicationRow = {
   id: string;
   contactEmail: string;

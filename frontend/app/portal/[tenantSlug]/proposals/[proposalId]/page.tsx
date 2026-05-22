@@ -5,6 +5,8 @@ import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }

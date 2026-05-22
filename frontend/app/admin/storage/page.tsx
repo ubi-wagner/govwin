@@ -2,6 +2,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import AdminFileManager from '@/components/admin/admin-file-manager';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminStoragePage() {
   const session = await auth();
   if (!session?.user) redirect('/login');

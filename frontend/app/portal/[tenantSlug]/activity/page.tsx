@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { ActivityStreamClient } from './activity-stream-client';
 
+export const dynamic = 'force-dynamic';
+
 export type ActivityEventRow = {
   id: string;
   namespace: string;

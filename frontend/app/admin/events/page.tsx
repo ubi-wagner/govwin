@@ -4,6 +4,8 @@ import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { EventStreamClient } from './event-stream-client';
 
+export const dynamic = 'force-dynamic';
+
 export type EventRow = {
   id: string;
   namespace: string;

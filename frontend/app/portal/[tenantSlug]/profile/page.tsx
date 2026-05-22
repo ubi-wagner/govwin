@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { ProfileEditor } from '@/components/portal/profile-editor';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string }>;
 }

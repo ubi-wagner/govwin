@@ -5,6 +5,8 @@ import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import SpotlightDetailActions from '@/components/portal/spotlight-detail-actions';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string; spotlightId: string }>;
 }

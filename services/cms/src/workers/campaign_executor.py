@@ -268,8 +268,19 @@ async def _execute_one_time_campaign(pool, campaign) -> dict:
 
     created = 0
     errors = 0
+    skipped = 0
 
     for recipient in recipients:
+        recipient_email = recipient['email']
+        # Dedup check: skip if a send already exists for this campaign + recipient
+        existing = await pool.fetchrow(
+            "SELECT id FROM email_sends WHERE campaign_id = $1 AND recipient_email = $2",
+            campaign_id, recipient_email,
+        )
+        if existing:
+            skipped += 1
+            continue
+
         success = await _create_send_for_recipient(pool, campaign, recipient, hitl_required)
         if success:
             created += 1
@@ -311,8 +322,19 @@ async def _execute_recurring_campaign(pool, campaign) -> dict:
 
     created = 0
     errors = 0
+    skipped = 0
 
     for recipient in recipients:
+        recipient_email = recipient['email']
+        # Dedup check: skip if a send already exists for this campaign + recipient
+        existing = await pool.fetchrow(
+            "SELECT id FROM email_sends WHERE campaign_id = $1 AND recipient_email = $2",
+            campaign_id, recipient_email,
+        )
+        if existing:
+            skipped += 1
+            continue
+
         success = await _create_send_for_recipient(pool, campaign, recipient, hitl_required)
         if success:
             created += 1

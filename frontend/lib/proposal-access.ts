@@ -23,11 +23,26 @@ export interface UserAccess {
   unlockDeadline: string | null;
 }
 
+const NO_ACCESS: UserAccess = {
+  role: 'external',
+  editableSections: [],
+  commentableSections: [],
+  viewableSections: [],
+  canUpload: false,
+  canAdvance: false,
+  canManageTeam: false,
+  canExport: false,
+  lockCount: 0,
+  isLocked: false,
+  unlockDeadline: null,
+};
+
 export async function resolveUserAccess(
   userId: string,
   proposalId: string,
   tenantId: string,
 ): Promise<UserAccess> {
+  try {
   // Load proposal lock state
   const [proposal] = await sql<{
     lockCount: number;
@@ -49,19 +64,7 @@ export async function resolveUserAccess(
   `;
 
   if (!proposal) {
-    return {
-      role: 'external',
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
-      canUpload: false,
-      canAdvance: false,
-      canManageTeam: false,
-      canExport: false,
-      lockCount: 0,
-      isLocked: false,
-      unlockDeadline: null,
-    };
+    return NO_ACCESS;
   }
 
   // Check if user is tenant_admin for this tenant
@@ -117,14 +120,7 @@ export async function resolveUserAccess(
 
   if (!collaborator) {
     return {
-      role: 'external',
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
-      canUpload: false,
-      canAdvance: false,
-      canManageTeam: false,
-      canExport: false,
+      ...NO_ACCESS,
       lockCount: proposal.lockCount,
       isLocked: proposal.isLocked,
       unlockDeadline: proposal.unlockDeadline,
@@ -178,4 +174,8 @@ export async function resolveUserAccess(
     isLocked: proposal.isLocked,
     unlockDeadline: proposal.unlockDeadline,
   };
+  } catch (err) {
+    console.error('[proposal-access] resolveUserAccess failed:', err);
+    return NO_ACCESS;
+  }
 }

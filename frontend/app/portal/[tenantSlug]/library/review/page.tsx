@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import AtomReviewWrapper from '@/components/portal/atom-review-wrapper';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Library atom review page — server component that loads draft atoms
  * after document upload + atomization, then renders the AtomReview

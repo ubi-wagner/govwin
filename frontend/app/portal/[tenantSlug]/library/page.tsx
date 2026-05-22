@@ -5,6 +5,8 @@ import { isRole, type Role } from '@/lib/rbac';
 import LibraryDashboard from '@/components/portal/library-dashboard';
 import type { LibraryUnit } from '@/components/portal/atom-detail-modal';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Library page — rich card-catalog with provenance tracking, outcome badges,
  * bulk upload, and proposal linkage.

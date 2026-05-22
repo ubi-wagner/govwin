@@ -717,24 +717,45 @@ function ImageNode({ content, readOnly, onUpdate, isSelected }: {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Detect portal vs admin context for storage endpoint
+  const storageEndpoint = (() => {
+    if (typeof window === 'undefined') return '/api/admin/storage';
+    const path = window.location.pathname;
+    if (path.includes('/portal/')) {
+      const slug = path.split('/portal/')[1]?.split('/')[0];
+      if (slug) return `/api/portal/${slug}/storage`;
+    }
+    return '/api/admin/storage';
+  })();
+
+  const uploadEndpoint = (() => {
+    if (typeof window === 'undefined') return '/api/admin/documents/upload-image';
+    const path = window.location.pathname;
+    if (path.includes('/portal/')) {
+      const slug = path.split('/portal/')[1]?.split('/')[0];
+      if (slug) return `/api/portal/${slug}/uploads/image`;
+    }
+    return '/api/admin/documents/upload-image';
+  })();
+
   // Load presigned URL when we have a storage_key
   useEffect(() => {
     if (content.storage_key) {
-      fetch(`/api/admin/storage?download=${encodeURIComponent(content.storage_key)}`)
+      fetch(`${storageEndpoint}?download=${encodeURIComponent(content.storage_key)}`)
         .then(res => res.json())
         .then(json => {
           if (json.data?.url) setImageUrl(json.data.url);
         })
         .catch(() => {});
     }
-  }, [content.storage_key]);
+  }, [content.storage_key, storageEndpoint]);
 
   const handleUpload = async (file: File) => {
     setUploading(true);
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch('/api/admin/documents/upload-image', {
+      const res = await fetch(uploadEndpoint, {
         method: 'POST',
         body: form,
       });

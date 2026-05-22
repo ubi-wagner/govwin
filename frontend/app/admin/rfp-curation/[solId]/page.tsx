@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { CurationWorkspace } from '@/components/rfp-curation/curation-workspace';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ solId: string }>;
 }

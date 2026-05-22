@@ -3,6 +3,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 type ProposalRow = {
   id: string;
   title: string;

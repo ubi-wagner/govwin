@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 type StatCard = {
   label: string;
   value: number;

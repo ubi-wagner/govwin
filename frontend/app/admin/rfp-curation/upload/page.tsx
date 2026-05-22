@@ -2,6 +2,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { UploadForm } from '@/components/rfp-curation/upload-form';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Upload RFP — Admin',
 };

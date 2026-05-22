@@ -149,6 +149,11 @@ export default function BulkUpload({ tenantSlug, onComplete }: BulkUploadProps) 
 
   const atomizeAll = useCallback(async () => {
     setIsAtomizing(true);
+    // Collect file IDs from successfully uploaded files
+    const uploadedFileIds = files
+      .filter((f) => f.status === 'uploaded' && f.id)
+      .map((f) => f.id as string);
+
     // Mark uploaded files as atomizing
     setFiles((prev) =>
       prev.map((f) =>
@@ -159,6 +164,8 @@ export default function BulkUpload({ tenantSlug, onComplete }: BulkUploadProps) 
     try {
       await fetch(`/api/portal/${tenantSlug}/library/atomize`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileIds: uploadedFileIds }),
       });
 
       setFiles((prev) =>

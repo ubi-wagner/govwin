@@ -3,6 +3,8 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Customer dashboard — the first page a newly-accepted customer sees.
  *

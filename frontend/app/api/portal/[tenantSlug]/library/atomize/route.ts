@@ -63,23 +63,50 @@ export async function POST(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
 
+  // Parse optional fileIds from request body to scope atomization
+  let fileIds: string[] | null = null;
+  try {
+    const body = await request.json();
+    if (Array.isArray(body?.fileIds) && body.fileIds.length > 0) {
+      fileIds = body.fileIds.filter((id: unknown) => typeof id === 'string' && id.length > 0);
+      if (fileIds && fileIds.length === 0) fileIds = null;
+    }
+  } catch {
+    // No body or invalid JSON — atomize all pending (backwards compatible)
+  }
+
   // Find pending library units
   // Actual columns: id, tenant_id, content, category, subcategory, tags,
   //   embedding, confidence, status, source_type, source_id, usage_count,
   //   parent_unit_id, created_at, updated_at (plus 017 migration columns)
-  const pending = await sql<{
-    id: string;
-    sourceId: string | null;
-    tags: string[] | null;
-  }[]>`
-    SELECT id, source_id, tags
-    FROM library_units
-    WHERE tenant_id = ${tenantId}::uuid
-      AND status = 'draft'
-      AND content = '[pending extraction]'
-    ORDER BY created_at ASC
-    LIMIT 20
-  `;
+  const pending = fileIds
+    ? await sql<{
+        id: string;
+        sourceId: string | null;
+        tags: string[] | null;
+      }[]>`
+        SELECT id, source_id, tags
+        FROM library_units
+        WHERE tenant_id = ${tenantId}::uuid
+          AND status = 'draft'
+          AND content = '[pending extraction]'
+          AND id = ANY(${fileIds}::uuid[])
+        ORDER BY created_at ASC
+        LIMIT 20
+      `
+    : await sql<{
+        id: string;
+        sourceId: string | null;
+        tags: string[] | null;
+      }[]>`
+        SELECT id, source_id, tags
+        FROM library_units
+        WHERE tenant_id = ${tenantId}::uuid
+          AND status = 'draft'
+          AND content = '[pending extraction]'
+        ORDER BY created_at ASC
+        LIMIT 20
+      `;
 
   if (pending.length === 0) {
     return NextResponse.json({ data: { atomized: 0, atomsCreated: 0, atoms: [], message: 'No pending documents' } });

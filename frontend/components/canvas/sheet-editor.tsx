@@ -536,37 +536,40 @@ export function SheetEditor({
     [editingCell, readOnly, startEdit, getCellValue, rows.length, colCount],
   );
 
-  // ─── Render ────────────────────────────────────────────────────────
+  // ─── Create default sheet if none exist ─────────────────────────────
+  const [initialized, setInitialized] = useState(false);
 
-  // If no sheets exist, create a default one
-  if (sheets.length === 0 && !readOnly) {
-    // Trigger creation of a default sheet
-    const defaultTable = createNode({
-      type: 'table',
-      content: {
-        headers: ['Column A', 'Column B', 'Column C', 'Column D'],
-        rows: [
-          ['', '', '', ''],
-          ['', '', '', ''],
-          ['', '', '', ''],
-          ['', '', '', ''],
-          ['', '', '', ''],
-        ],
-        sheet_name: 'Sheet 1',
-      } as TableContent,
-      source: 'manual',
-      actorId,
-      actorName,
-    });
+  useEffect(() => {
+    if (sheets.length === 0 && !readOnly && !initialized) {
+      const defaultTable = createNode({
+        type: 'table',
+        content: {
+          headers: ['Column A', 'Column B', 'Column C', 'Column D'],
+          rows: [
+            ['', '', '', ''],
+            ['', '', '', ''],
+            ['', '', '', ''],
+            ['', '', '', ''],
+            ['', '', '', ''],
+          ],
+          sheet_name: 'Sheet 1',
+        } as TableContent,
+        source: 'manual',
+        actorId,
+        actorName,
+      });
 
-    // Use a microtask to avoid setState during render
-    Promise.resolve().then(() => {
       updateDoc((prev) => ({
         ...prev,
         nodes: [...prev.nodes, defaultTable],
       }));
-    });
+      setInitialized(true);
+    }
+  }, [sheets.length, readOnly, initialized, actorId, actorName, updateDoc]);
 
+  // ─── Render ────────────────────────────────────────────────────────
+
+  if (sheets.length === 0 && !readOnly) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400 text-sm">
         Initializing spreadsheet...

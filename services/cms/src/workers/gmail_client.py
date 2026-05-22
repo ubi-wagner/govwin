@@ -12,6 +12,7 @@ Requires:
   - Domain-wide delegation configured in Google Admin
   - Scopes: gmail.send, gmail.readonly, gmail.modify
 """
+import asyncio
 import os
 import json
 import base64
@@ -96,9 +97,13 @@ async def send_email(
         if thread_id:
             send_body['threadId'] = thread_id
 
-        result = service.users().messages().send(
-            userId='me', body=send_body
-        ).execute()
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: service.users().messages().send(
+                userId='me', body=send_body
+            ).execute()
+        )
 
         logger.info(f'Email sent: {result.get("id")} to {to_email} (thread: {result.get("threadId")})')
 
@@ -128,12 +133,16 @@ async def sweep_inbox(
 
         if history_id:
             # Incremental sync via history API
-            results = service.users().history().list(
-                userId='me',
-                startHistoryId=history_id,
-                historyTypes=['messageAdded'],
-                maxResults=max_results,
-            ).execute()
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: service.users().history().list(
+                    userId='me',
+                    startHistoryId=history_id,
+                    historyTypes=['messageAdded'],
+                    maxResults=max_results,
+                ).execute()
+            )
 
             messages = []
             for record in results.get('history', []):
@@ -148,15 +157,25 @@ async def sweep_inbox(
             }
         else:
             # Full sync — get recent inbox messages
-            results = service.users().messages().list(
-                userId='me',
-                labelIds=['INBOX'],
-                maxResults=max_results,
-            ).execute()
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: service.users().messages().list(
+                    userId='me',
+                    labelIds=['INBOX'],
+                    maxResults=max_results,
+                ).execute()
+            )
+
+            # On first sync, get actual history ID from profile
+            profile = await loop.run_in_executor(
+                None,
+                lambda: service.users().getProfile(userId='me').execute()
+            )
 
             return {
                 'messages': results.get('messages', []),
-                'new_history_id': results.get('resultSizeEstimate', '0'),
+                'new_history_id': profile.get('historyId'),
             }
 
     except Exception as e:
@@ -168,9 +187,13 @@ async def get_message(delegate_email: str, message_id: str) -> dict:
     """Fetch a full message by ID."""
     try:
         service = _get_gmail_service(delegate_email)
-        msg = service.users().messages().get(
-            userId='me', id=message_id, format='full'
-        ).execute()
+        loop = asyncio.get_event_loop()
+        msg = await loop.run_in_executor(
+            None,
+            lambda: service.users().messages().get(
+                userId='me', id=message_id, format='full'
+            ).execute()
+        )
         return msg
     except Exception as e:
         logger.error(f'[get_message] Failed for {message_id}: {e}')

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { TriageQueue } from '@/components/rfp-curation/triage-queue';
 
+export const dynamic = 'force-dynamic';
+
 export default async function RFPCurationPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');

@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import SpotlightFeed, { type ScoredTopic } from '@/components/portal/spotlight-feed';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Spotlight feed — ranked list of open topics scored against the
  * customer's profile (tech areas, target agencies, target programs).

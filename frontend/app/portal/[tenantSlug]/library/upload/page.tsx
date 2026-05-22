@@ -4,6 +4,8 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import LibraryUploadForm from '@/components/portal/library-upload-form';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Library upload page — server component that authenticates, then
  * renders the client-side drag-and-drop upload form.
