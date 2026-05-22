@@ -10,6 +10,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ proposalId: string; sectionId: string }>;
@@ -27,6 +28,9 @@ export async function PUT(request: Request, ctx: RouteContext) {
   const userId = (session.user as { id?: string }).id;
 
   const { proposalId, sectionId } = await ctx.params;
+  if (!isValidUUID(proposalId) || !isValidUUID(sectionId)) {
+    return NextResponse.json({ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+  }
 
   let body: Record<string, unknown>;
   try {
