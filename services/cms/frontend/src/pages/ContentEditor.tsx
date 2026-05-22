@@ -62,6 +62,48 @@ export default function ContentEditor() {
     user_id: '',
   })
   const [genResult, setGenResult] = useState<string | null>(null)
+  const [genProgress, setGenProgress] = useState<{ step: string; elapsed: number } | null>(null)
+
+  function pollGeneration(genId: string) {
+    const startTime = Date.now()
+    const interval = setInterval(async () => {
+      try {
+        const gen = await api.get<Record<string, unknown>>(`/content/generations/${genId}`)
+        const status = gen.status as string
+        const elapsed = Math.round((Date.now() - startTime) / 1000)
+
+        if (status === 'pending') {
+          setGenProgress({ step: 'Queued — waiting for AI worker...', elapsed })
+        } else if (status === 'generating') {
+          setGenProgress({ step: 'Generating content with Claude...', elapsed })
+        } else if (status === 'completed') {
+          clearInterval(interval)
+          setGenProgress(null)
+          setGenerating(false)
+          const title = gen.generated_title as string || ''
+          const body = gen.generated_body as string || ''
+          const excerpt = gen.generated_excerpt as string || ''
+          const tags = gen.generated_tags as string[] || []
+          setForm((prev) => ({
+            ...prev,
+            title: title || prev.title,
+            body: body || prev.body,
+            excerpt: excerpt || prev.excerpt,
+            tags: tags.join(', ') || prev.tags,
+          }))
+          setGenResult('completed')
+        } else if (status === 'failed') {
+          clearInterval(interval)
+          setGenProgress(null)
+          setGenerating(false)
+          setGenResult('failed')
+          setError(`Generation failed: ${gen.error_message || 'Unknown error'}`)
+        }
+      } catch {
+        // keep polling on network errors
+      }
+    }, 3000)
+  }
 
   useEffect(() => {
     if (!id) return
@@ -127,10 +169,10 @@ export default function ContentEditor() {
       }
 
       const result = await api.post<{ id: string; status: string }>('/content/generations', payload)
-      setGenResult(`Generation request created (ID: ${result.id}, status: ${result.status}). It will be processed by the AI worker.`)
+      setGenResult(`pending`)
+      pollGeneration(result.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation request failed')
-    } finally {
       setGenerating(false)
     }
   }
@@ -172,9 +214,34 @@ export default function ContentEditor() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
       )}
 
-      {genResult && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">{genResult}</div>
+      {genProgress && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <div>
+              <div className="font-medium">{genProgress.step}</div>
+              <div className="text-xs text-blue-500">{genProgress.elapsed}s elapsed</div>
+            </div>
+          </div>
+          <div className="mt-2 flex gap-1">
+            {['Queued', 'Generating', 'Parsing', 'Done'].map((s, i) => (
+              <div key={s} className={`h-1.5 flex-1 rounded-full ${
+                (genProgress.step.includes('Queued') && i === 0) ? 'bg-blue-500 animate-pulse' :
+                (genProgress.step.includes('Generating') && i <= 1) ? 'bg-blue-500' :
+                i === 0 ? 'bg-blue-500' : 'bg-blue-200'
+              }`} />
+            ))}
+          </div>
+        </div>
       )}
+
+      {genResult === 'completed' && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded mb-4">
+          Content generated successfully! Review the fields below and save.
+        </div>
+      )}
+
+      {genResult === 'failed' && null}
 
       {/* AI Generation Panel */}
       <div className="mb-6">

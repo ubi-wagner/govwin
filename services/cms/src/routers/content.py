@@ -441,6 +441,24 @@ async def create_generation(body: GenerationRequest):
         raise HTTPException(500, 'Failed to create generation request')
 
 
+@router.get('/generations/{gen_id}')
+async def get_generation(gen_id: str):
+    """Get a single generation by ID — used for polling status."""
+    pool = get_pool()
+    try:
+        row = await pool.fetchrow(
+            'SELECT * FROM cms_generations WHERE id = $1::uuid', gen_id,
+        )
+        if not row:
+            raise HTTPException(404, detail='Generation not found')
+        return {'data': dict(row)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[GET /generations/{gen_id}] Error: {e}')
+        raise HTTPException(500, 'Failed to fetch generation')
+
+
 @router.post('/generations/from-url', status_code=201)
 async def generate_from_url(
     url: str = Query(...),
