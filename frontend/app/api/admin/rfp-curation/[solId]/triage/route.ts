@@ -148,8 +148,6 @@ export async function POST(
           claimed_at = CASE WHEN ${action} IN ('claim', 'reclaim') THEN now() ELSE claimed_at END,
           dismissed_reason = CASE WHEN ${action} = 'dismiss' THEN ${typeof notes === 'string' ? notes : null} ELSE dismissed_reason END,
           curated_by = CASE WHEN ${action} = 'request_review' THEN ${actorId}::uuid ELSE curated_by END,
-          approved_by = CASE WHEN ${action} = 'approve' THEN ${actorId}::uuid ELSE approved_by END,
-          pushed_at = CASE WHEN ${action} = 'push' THEN now() ELSE pushed_at END,
           updated_at = now()
       WHERE id = ${solId}::uuid
         AND status = ${fromState}
