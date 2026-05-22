@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { sendEmail } from '@/lib/email';
+import { collaboratorInviteEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {

@@ -17,8 +17,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
     const role = (session.user as { role?: string }).role;
-    if (role !== 'master_admin') {
-      return NextResponse.json({ error: 'master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
+    if (role !== 'master_admin' && role !== 'rfp_admin') {
+      return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     const { id } = await ctx.params;

@@ -71,52 +71,179 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement proposal package export
-    //
-    // 1. Verify proposal belongs to tenant and is locked:
-    //    SELECT id, title, is_locked, lock_count, stage
-    //    FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
-    //    Reject if not locked (same gate as single-section export)
-    //
-    // 2. Fetch all sections with content:
-    //    SELECT id, section_number, title, content
-    //    FROM proposal_sections WHERE proposal_id = ${proposalId}
-    //    ORDER BY section_number
-    //
-    // 3. For each section with canvas JSON content:
-    //    a. Parse canvas JSON
-    //    b. Determine export format from volume_required_items.volume_format
-    //       (default to docx)
-    //    c. Export using existing exporters:
-    //       - docx: exportToDocx(doc, vars)
-    //       - pptx: exportToPptx(doc, vars)
-    //       - xlsx: exportToXlsx(doc, vars)
-    //
-    // 4. Bundle into ZIP using archiver or JSZip:
-    //    const JSZip = (await import('jszip')).default;
-    //    const zip = new JSZip();
-    //    for (const section of sections) {
-    //      zip.file(`${section.number}_${section.title}.${format}`, buffer);
-    //    }
-    //    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-    //
-    // 5. Increment download_count on proposal
-    //
-    // 6. Emit proposal:package.exported event
-    //
-    // 7. Return ZIP as binary response:
-    //    return new NextResponse(new Uint8Array(zipBuffer), {
-    //      headers: {
-    //        'Content-Type': 'application/zip',
-    //        'Content-Disposition': `attachment; filename="${proposalTitle}.zip"`,
-    //      },
-    //    });
+    // ── 1. Verify proposal belongs to tenant ────────────────────
+    const [proposal] = await sql<{
+      id: string;
+      title: string;
+      stage: string;
+      gateConfig: unknown;
+    }[]>`
+      SELECT id, title, stage, gate_config
+      FROM proposals
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+      LIMIT 1
+    `;
+
+    if (!proposal) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    // ── 2. Fetch all sections ordered by section_number ──────
+    const sections = await sql<{
+      id: string;
+      sectionNumber: string;
+      title: string;
+      content: string | null;
+      status: string;
+      pageAllocation: number | null;
+    }[]>`
+      SELECT id, section_number, title, content, status, page_allocation
+      FROM proposal_sections
+      WHERE proposal_id = ${proposalId}
+      ORDER BY section_number ASC
+    `;
+
+    // ── 3. Fetch compliance data via solicitation_id ─────────
+    const complianceRows = await sql<{
+      id: string;
+      pageLimitTechnical: number | null;
+      pageLimitCost: number | null;
+      fontFamily: string | null;
+      fontSize: string | null;
+      margins: string | null;
+      lineSpacing: string | null;
+      headerRequired: boolean;
+      headerFormat: string | null;
+      footerRequired: boolean;
+      footerFormat: string | null;
+      submissionFormat: string | null;
+      requiredSections: unknown;
+      requiredDocuments: unknown;
+      evaluationCriteria: unknown;
+      customVariables: unknown;
+      verifiedBy: string | null;
+      verifiedAt: string | null;
+    }[]>`
+      SELECT id, page_limit_technical, page_limit_cost,
+             font_family, font_size, margins, line_spacing,
+             header_required, header_format, footer_required, footer_format,
+             submission_format, required_sections, required_documents,
+             evaluation_criteria, custom_variables, verified_by, verified_at
+      FROM solicitation_compliance
+      WHERE solicitation_id = (
+        SELECT solicitation_id FROM proposals WHERE id = ${proposalId} LIMIT 1
+      )
+    `;
+
+    // ── 4. Extract readable text from each section's JSON content
+    const sectionData = sections.map((s) => {
+      let textContent = '';
+      if (s.content) {
+        try {
+          const parsed = JSON.parse(s.content);
+          // Extract text from canvas nodes
+          if (parsed.nodes && Array.isArray(parsed.nodes)) {
+            textContent = parsed.nodes
+              .map((node: { content?: string; text?: string; items?: Array<{ content?: string }> }) => {
+                if (node.content) return node.content;
+                if (node.text) return node.text;
+                if (node.items && Array.isArray(node.items)) {
+                  return node.items.map((item: { content?: string }) => item.content ?? '').join('\n');
+                }
+                return '';
+              })
+              .filter(Boolean)
+              .join('\n\n');
+          }
+        } catch {
+          // Content is plain text, not JSON
+          textContent = s.content;
+        }
+      }
+      return {
+        number: s.sectionNumber,
+        title: s.title,
+        text_content: textContent,
+        status: s.status,
+        page_allocation: s.pageAllocation,
+      };
+    });
+
+    // ── 5. Build compliance summary ──────────────────────────
+    const complianceData = complianceRows[0] ?? null;
+    const complianceVariables = complianceData
+      ? {
+          page_limit_technical: complianceData.pageLimitTechnical,
+          page_limit_cost: complianceData.pageLimitCost,
+          font_family: complianceData.fontFamily,
+          font_size: complianceData.fontSize,
+          margins: complianceData.margins,
+          line_spacing: complianceData.lineSpacing,
+          header_required: complianceData.headerRequired,
+          header_format: complianceData.headerFormat,
+          footer_required: complianceData.footerRequired,
+          footer_format: complianceData.footerFormat,
+          submission_format: complianceData.submissionFormat,
+          required_sections: complianceData.requiredSections,
+          required_documents: complianceData.requiredDocuments,
+          evaluation_criteria: complianceData.evaluationCriteria,
+          custom_variables: complianceData.customVariables,
+          verified_by: complianceData.verifiedBy,
+          verified_at: complianceData.verifiedAt,
+        }
+      : null;
+
+    const verifiedCount = complianceData?.verifiedAt ? 1 : 0;
+
+    // ── 6. Increment download_count ──────────────────────────
+    await sql`
+      UPDATE proposals
+      SET download_count = COALESCE(download_count, 0) + 1
+      WHERE id = ${proposalId}
+    `;
+
+    // ── 7. Emit event ────────────────────────────────────────
+    await emitEventSingle({
+      namespace: 'proposal',
+      type: 'package.exported',
+      actor: userActor(sessionUser.id, (session.user as { email?: string }).email),
+      tenantId,
+      payload: {
+        correlationId: crypto.randomUUID(),
+        proposalId,
+        sectionCount: sectionData.length,
+      },
+    });
+
+    // ── 8. Build total chars for manifest ────────────────────
+    const totalChars = sectionData.reduce((sum, s) => sum + s.text_content.length, 0);
 
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-15',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        proposal: {
+          title: proposal.title,
+          stage: proposal.stage,
+          gate_config: proposal.gateConfig,
+        },
+        sections: sectionData,
+        compliance: {
+          variables: complianceVariables,
+          summary: {
+            total: complianceRows.length,
+            verified: verifiedCount,
+            unverified: complianceRows.length - verifiedCount,
+          },
+        },
+        manifest: {
+          generated_at: new Date().toISOString(),
+          section_count: sectionData.length,
+          total_chars: totalChars,
+        },
+      },
+    });
   } catch (err) {
     console.error('[portal/proposals/package] error:', err);
     return NextResponse.json(
