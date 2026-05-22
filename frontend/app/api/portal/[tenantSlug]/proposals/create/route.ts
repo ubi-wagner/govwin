@@ -370,6 +370,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── Activity log ─────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposal.id}::uuid, ${tenantId}::uuid, ${userId}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_created',
+                ${JSON.stringify({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/create] activity log failed', logErr);
+    }
+
     return NextResponse.json({
       data: {
         proposalId: proposal.id,
