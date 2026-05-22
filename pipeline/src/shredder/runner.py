@@ -715,6 +715,12 @@ async def _upsert_compliance(
         sol_id,
     )
 
+    import re as _re
+    _SAFE_COL = _re.compile(r'^[a-z_][a-z0-9_]*$')
+    for col in column_updates:
+        if not _SAFE_COL.match(col):
+            raise ValueError(f"unsafe column name in compliance upsert: {col!r}")
+
     set_parts = []
     values: list[Any] = []
     for col, val in column_updates.items():

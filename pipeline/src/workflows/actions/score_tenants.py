@@ -274,15 +274,15 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     keyword_score = min(len(matched_kw) * 5, 25)
 
     # Agency preference (max 20 points)
-    sol_agency = (sol["agency"] or "").strip()
-    profile_agencies = set(a.strip() for a in (profile["agency_priorities"] or []))
-    profile_target_agencies = set(a.strip() for a in (profile["target_agencies"] or []))
+    sol_agency = (sol["agency"] or "").strip().lower()
+    profile_agencies = set(a.strip().lower() for a in (profile["agency_priorities"] or []))
+    profile_target_agencies = set(a.strip().lower() for a in (profile["target_agencies"] or []))
     all_preferred = profile_agencies | profile_target_agencies
     agency_score = 20 if sol_agency and sol_agency in all_preferred else 0
 
-    # Set-aside match (max 10 points)
-    sol_set_aside = (sol["set_aside_type"] or "").strip()
-    profile_set_asides = set(s.strip() for s in (profile["set_aside_types"] or []))
+    # Set-aside match (max 10 points) — case-insensitive
+    sol_set_aside = (sol["set_aside_type"] or "").strip().lower()
+    profile_set_asides = set(s.strip().lower() for s in (profile["set_aside_types"] or []))
     set_aside_score = 10 if sol_set_aside and sol_set_aside in profile_set_asides else 0
 
     # Program type match (max 10 points)

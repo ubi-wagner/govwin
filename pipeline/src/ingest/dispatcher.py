@@ -82,7 +82,7 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
                 VALUES ($1, 'pending', 5, $2::jsonb)
                 """,
                 source,
-                f'{{"run_type": "{sched["run_type"]}", "triggered_by": "cron"}}',
+                json.dumps({"run_type": sched["run_type"], "triggered_by": "cron"}),
             )
             inserted += 1
 
