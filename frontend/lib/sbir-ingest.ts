@@ -125,18 +125,23 @@ async function insertCompanyBatch(rows: RawRow[]): Promise<void> {
       parseInt2(row.number_awards),
     );
   }
-  await sql.unsafe(
-    `INSERT INTO sbir_companies (company_name,uei,duns,address1,address2,city,state,zip,country,company_url,hubzone_owned,woman_owned,disadvantaged,number_awards)
-     VALUES ${placeholders.join(',')}
-     ON CONFLICT (uei) WHERE uei IS NOT NULL AND uei != '' DO UPDATE SET
-       company_name=EXCLUDED.company_name, duns=COALESCE(EXCLUDED.duns,sbir_companies.duns),
-       address1=COALESCE(EXCLUDED.address1,sbir_companies.address1), city=COALESCE(EXCLUDED.city,sbir_companies.city),
-       state=COALESCE(EXCLUDED.state,sbir_companies.state), zip=COALESCE(EXCLUDED.zip,sbir_companies.zip),
-       company_url=COALESCE(EXCLUDED.company_url,sbir_companies.company_url),
-       hubzone_owned=EXCLUDED.hubzone_owned, woman_owned=EXCLUDED.woman_owned, disadvantaged=EXCLUDED.disadvantaged,
-       number_awards=EXCLUDED.number_awards, updated_at=now()`,
-    params,
-  );
+  try {
+    await sql.unsafe(
+      `INSERT INTO sbir_companies (company_name,uei,duns,address1,address2,city,state,zip,country,company_url,hubzone_owned,woman_owned,disadvantaged,number_awards)
+       VALUES ${placeholders.join(',')}
+       ON CONFLICT (uei) WHERE uei IS NOT NULL AND uei != '' DO UPDATE SET
+         company_name=EXCLUDED.company_name, duns=COALESCE(EXCLUDED.duns,sbir_companies.duns),
+         address1=COALESCE(EXCLUDED.address1,sbir_companies.address1), city=COALESCE(EXCLUDED.city,sbir_companies.city),
+         state=COALESCE(EXCLUDED.state,sbir_companies.state), zip=COALESCE(EXCLUDED.zip,sbir_companies.zip),
+         company_url=COALESCE(EXCLUDED.company_url,sbir_companies.company_url),
+         hubzone_owned=EXCLUDED.hubzone_owned, woman_owned=EXCLUDED.woman_owned, disadvantaged=EXCLUDED.disadvantaged,
+         number_awards=EXCLUDED.number_awards, updated_at=now()`,
+      params,
+    );
+  } catch (err) {
+    console.error('[sbir-ingest] insertCompanyBatch failed:', err);
+    throw err;
+  }
 }
 
 async function insertAwardBatch(rows: RawRow[]): Promise<void> {
@@ -179,16 +184,21 @@ async function insertAwardBatch(rows: RawRow[]): Promise<void> {
     );
     idx += cols;
   }
-  await sql.unsafe(
-    `INSERT INTO sbir_awards (company_name,award_title,agency,branch,phase,program,agency_tracking_number,contract,
-      proposal_award_date,contract_end_date,solicitation_number,solicitation_year,solicitation_close_date,
-      proposal_receipt_date,date_of_notification,topic_code,award_year,award_amount,uei,duns,
-      hubzone_owned,disadvantaged,woman_owned,number_employees,company_website,
-      address1,address2,city,state,zip,abstract,contact_name,contact_title,contact_phone,contact_email,
-      pi_name,pi_title,pi_phone,pi_email,ri_name,ri_poc_name,ri_poc_phone)
-     VALUES ${placeholders.join(',')}`,
-    params,
-  );
+  try {
+    await sql.unsafe(
+      `INSERT INTO sbir_awards (company_name,award_title,agency,branch,phase,program,agency_tracking_number,contract,
+        proposal_award_date,contract_end_date,solicitation_number,solicitation_year,solicitation_close_date,
+        proposal_receipt_date,date_of_notification,topic_code,award_year,award_amount,uei,duns,
+        hubzone_owned,disadvantaged,woman_owned,number_employees,company_website,
+        address1,address2,city,state,zip,abstract,contact_name,contact_title,contact_phone,contact_email,
+        pi_name,pi_title,pi_phone,pi_email,ri_name,ri_poc_name,ri_poc_phone)
+       VALUES ${placeholders.join(',')}`,
+      params,
+    );
+  } catch (err) {
+    console.error('[sbir-ingest] insertAwardBatch failed:', err);
+    throw err;
+  }
 }
 
 export interface IngestResult {
