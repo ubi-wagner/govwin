@@ -242,6 +242,7 @@ export function ProposalWorkspace({
           dropboxFiles={dropboxFiles}
           hasEmptySections={hasEmptySections}
           isLocked={isLocked}
+          proposalStage={proposalStage}
         />
       ) : (
         <ProposalContributorView

@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamManager } from './team-manager';
 import { ProposalDropbox } from './proposal-dropbox';
+import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ interface ProposalAdminPanelProps {
   dropboxFiles: DropboxFileEntry[];
   hasEmptySections: boolean;
   isLocked: boolean;
+  proposalStage: string;
 }
 
 // ─── Status config ────────────────────────────────────────────────────
@@ -125,6 +127,7 @@ export function ProposalAdminPanel({
   dropboxFiles,
   hasEmptySections,
   isLocked,
+  proposalStage,
 }: ProposalAdminPanelProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'artifacts' | 'team' | 'compliance' | 'ai'>('artifacts');
@@ -353,49 +356,13 @@ export function ProposalAdminPanel({
 
       {/* ─── AI & Library Tab ─────────────────────────────────────── */}
       {activeTab === 'ai' && (
-        <div className="space-y-5">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">AI Drafting</h3>
-            <p className="text-sm text-gray-500 mb-3">
-              Use Claude to draft content using your library atoms and RFP requirements.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                'Draft All Empty Sections',
-                'Draft Technical Approach',
-                'Generate Cover Page',
-                'Auto-fill Certifications',
-              ].map((action) => (
-                <button
-                  key={action}
-                  disabled={isLocked}
-                  className="px-3 py-2 text-xs font-medium border border-gray-200 rounded-md bg-white hover:bg-gray-50 hover:border-blue-300 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                >
-                  <span className="text-purple-500">✦</span> {action}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Library Atoms Available</h3>
-            <p className="text-sm text-gray-500 mb-3">
-              Content from your library ranked by relevance to this topic.
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Technical Approach', count: 12, note: '3 from winning proposals', color: 'text-blue-600' },
-                { label: 'Key Personnel', count: 8, note: '4 bios ready', color: 'text-emerald-600' },
-                { label: 'Past Performance', count: 5, note: '2 from awarded contracts', color: 'text-amber-600' },
-              ].map((atom) => (
-                <div key={atom.label} className="border border-gray-200 rounded-md p-2.5">
-                  <div className={`text-xs font-semibold ${atom.color}`}>{atom.label}</div>
-                  <div className="text-xs text-gray-400">{atom.count} atoms &middot; {atom.note}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ProposalAiActions
+          tenantSlug={tenantSlug}
+          proposalId={proposalId}
+          stage={proposalStage}
+          userRole="admin"
+          isLocked={isLocked}
+        />
       )}
     </div>
   );
