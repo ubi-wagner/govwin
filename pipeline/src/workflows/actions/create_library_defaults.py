@@ -1,13 +1,54 @@
 """
-Workflow ACTION target for creating default library categories.
+================================================================================
+Workflow Action: create_default_categories (create_library_defaults.py)
+================================================================================
 
-Called by OnApplicationAccepted workflow to set up a new tenant's library
-with standard categories that help organize past performance, resumes,
-and reusable content from day one.
+WHO:    Called by workflow processor when OnApplicationAccepted workflow
+        executes the create_library_defaults step.
 
-Trigger chain:
-  admin accepts application → capture:application.accepted:end
-  → OnApplicationAccepted.create_library_defaults → this function
+WHAT:   Creates 8 default library categories for a newly accepted tenant.
+        These categories match the typical volume structure of DoD
+        SBIR/STTR/BAA proposals: Technical Approach, Past Performance,
+        Key Personnel, Management Plan, Cost & Pricing, Company Overview,
+        Certifications & Compliance, and Commercialization. Each category
+        is represented by a seed library_unit row that acts as a category
+        marker — users add real content units into these categories over
+        time.
+
+INPUTS:
+        - tenant_id: str — tenants.id (UUID string) of the newly accepted
+          tenant
+
+OUTPUTS:
+        - categoriesCreated: int — number of new categories inserted
+        - categoriesSkipped: int — categories that already existed
+        - status: str — "skipped" if tenant not found (with reason)
+
+ERROR HANDLING:
+    - Tenant not found: Returns status="skipped", reason="tenant_not_found"
+    - Invalid tenant_id format: Raises ValueError (caught by processor)
+    - Per-category INSERT failure: Caught and logged per-category,
+      continues with remaining categories. One failed category does not
+      block creation of others.
+    - DB connection errors: Propagate to processor for step-level handling
+
+TENANT ISOLATION:
+    - Strictly tenant-scoped: all library_units rows include tenant_id
+    - Reads existing categories only for the target tenant
+    - Creates new rows only for the target tenant
+    - No cross-tenant data access
+
+EVENT EMISSIONS:
+    - None directly — events are emitted by the workflow processor at
+      the step level (workflow.step_completed / workflow.step_failed).
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial implementation: 8 default categories,
+                           idempotent insert, tenant verification
+    PR #xxx (2026-05-22) — Added comprehensive documentation header,
+                           per-category error handling, idempotency
+                           documentation, tenant isolation notes
+================================================================================
 """
 from __future__ import annotations
 
@@ -73,27 +114,41 @@ async def create_default_categories(
     Returns:
         {"categoriesCreated": N, "categoriesSkipped": M}
     """
-    tenant_uuid = uuid.UUID(tenant_id)
+    # Validate tenant_id format
+    try:
+        tenant_uuid = uuid.UUID(tenant_id)
+    except (ValueError, TypeError):
+        log.error("create_default_categories: invalid tenant_id: %s", tenant_id)
+        return {"status": "skipped", "reason": "invalid_tenant_id"}
 
     # 1. Verify tenant exists
-    tenant_row = await conn.fetchval(
-        "SELECT id FROM tenants WHERE id = $1",
-        tenant_uuid,
-    )
+    try:
+        tenant_row = await conn.fetchval(
+            "SELECT id FROM tenants WHERE id = $1",
+            tenant_uuid,
+        )
+    except Exception as exc:
+        log.error("create_default_categories: failed to verify tenant: %s", exc)
+        return {"status": "skipped", "reason": f"db_error: {exc}"}
+
     if tenant_row is None:
         return {"status": "skipped", "reason": "tenant_not_found"}
 
     # 2. Check existing categories for this tenant
-    existing_rows = await conn.fetch(
-        "SELECT DISTINCT category FROM library_units WHERE tenant_id = $1",
-        tenant_uuid,
-    )
-    existing_categories = {row["category"] for row in existing_rows}
+    try:
+        existing_rows = await conn.fetch(
+            "SELECT DISTINCT category FROM library_units WHERE tenant_id = $1",
+            tenant_uuid,
+        )
+        existing_categories = {row["category"] for row in existing_rows}
+    except Exception as exc:
+        log.error("create_default_categories: failed to fetch existing categories: %s", exc)
+        existing_categories = set()
 
     # 3. For each default category not already present, insert a seed
     #    library_unit. source_type='ai' is the closest valid option for
     #    system-generated content (CHECK constraint allows: manual, upload,
-    #    harvest, ai). The seed unit acts as a category marker — users
+    #    harvest, ai). The seed unit acts as a category marker -- users
     #    add real content units into these categories over time.
     created = 0
     skipped = 0

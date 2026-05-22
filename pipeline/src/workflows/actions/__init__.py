@@ -1,21 +1,41 @@
 """
-Workflow ACTION step targets — importable functions called by the workflow processor.
+================================================================================
+Workflow Actions Package (__init__.py)
+================================================================================
 
-Each function in this package is referenced by a workflow step's `action` field
-(e.g., "pipeline.shredder.shred"). The workflow processor dynamically imports
-the module and calls the function with (conn, **inputs).
+WHO:    Called by the workflow processor when a step references an action
+        function via its dotted import path.
 
-All functions MUST:
-  - Accept `conn: asyncpg.Connection` as the first positional arg
-  - Accept keyword args matching the step's `input_map` keys
-  - Be async (or the processor awaits them if they return a coroutine)
-  - Return a dict that becomes the step's `result` (used by downstream steps)
+WHAT:   Re-exports all workflow action functions for discoverability and
+        testing. Each function in this package is an async callable with
+        the signature: async def action(conn: asyncpg.Connection, **kwargs)
+        -> dict[str, Any].
 
-See docs/EVENT_CONTRACT.md §7 for the workflow architecture.
+        The workflow processor dynamically imports the module and calls the
+        function with (conn, **inputs). This __init__.py provides convenient
+        re-exports for direct import in tests and documentation.
+
+INPUTS: Each action function accepts:
+        - conn: asyncpg.Connection (first positional arg)
+        - **kwargs: keyword args matching the step's input_map keys
+
+OUTPUTS: Each action returns a dict that becomes the step's `result`,
+         available to downstream steps via step.<name>.result.<key>.
+
+ERROR HANDLING:
+    - Each action handles its own internal errors (per-item try/catch)
+    - Unhandled exceptions propagate to the processor, which records
+      them as step failures and emits workflow.step_failed events
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial implementation: re-exports for all
+                           action functions
+    PR #xxx (2026-05-22) — Added comprehensive documentation header
+================================================================================
 """
 
 # Re-export action functions so they can be discovered via dotted import paths.
-# The workflow processor uses importlib to resolve "pipeline.shredder.shred" →
+# The workflow processor uses importlib to resolve "pipeline.shredder.shred" ->
 # this package is NOT on that path. Instead, these re-exports support direct
 # import for testing and documentation.
 

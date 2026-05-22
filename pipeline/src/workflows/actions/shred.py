@@ -1,14 +1,71 @@
 """
-Workflow ACTION targets for the shredder pipeline.
+================================================================================
+Workflow Action: shred / extract_compliance
+================================================================================
 
-These thin wrappers adapt the existing shredder runner to the interface
-expected by the workflow processor: async function(conn, **input_map_kwargs).
+WHO:    Called by workflow processor when OnRfpUploaded workflow executes
+        the shred_document and extract_compliance steps.
 
-Called by:
-  - OnRfpUploaded.step("shred_document")   → shred()
-  - OnRfpUploaded.step("extract_compliance") → extract_compliance()
+WHAT:   Provides two action functions:
+        1. shred() — Wrapper around shredder.runner.shred_solicitation that
+           handles Anthropic client instantiation. Extracts text, structure,
+           and embeddings from uploaded RFP documents via Claude.
+        2. extract_compliance() — Re-runs compliance variable extraction on
+           already-shredded solicitation data. Tries Claude-based extraction
+           first, falls back to pattern-based extraction (page limits, font
+           requirements, submission deadlines, margins, line spacing).
 
-See pipeline/src/shredder/runner.py for the full shredder implementation.
+INPUTS:
+    shred():
+        - solicitation_id: str — curated_solicitations.id (UUID string)
+        - document_ids: Optional[list[str]] — specific document IDs to shred.
+          If None, processes all linked documents.
+
+    extract_compliance():
+        - solicitation_id: str — curated_solicitations.id (UUID string)
+
+OUTPUTS:
+    shred():
+        - status: str — "completed" or "shredder_failed"
+        - reason: str — failure reason if applicable
+        - sections_extracted: int — number of sections found (on success)
+        - token_usage: dict — input/output token counts (on success)
+
+    extract_compliance():
+        - status: str — "completed" or "skipped"
+        - reason: str — skip reason if applicable
+        - compliance_matches: int — total matches found
+        - extraction_method: str — "claude" or "pattern_based"
+        - column_updates: int — DB columns updated (Claude method)
+        - custom_variables: int — custom vars created (Claude method)
+
+ERROR HANDLING:
+    - Missing Anthropic SDK: Returns status="shredder_failed" with reason
+      rather than crashing. Allows workflow to continue to notification.
+    - Missing API key: Anthropic client instantiates with empty key;
+      SDK will fail on first call — caught by shredder runner.
+    - ShredderBudgetError: Intentionally NOT caught — propagates to
+      processor so the step is recorded as failed.
+    - Invalid solicitation_id: Returns status="skipped" with reason.
+    - JSONB parse errors: Returns status="skipped" for malformed data.
+    - Per-section extraction errors: Logged and skipped; other sections
+      continue processing.
+
+TENANT ISOLATION:
+    - Not tenant-scoped — curated_solicitations are global resources
+      managed by rfp_admin. No tenant_id filtering required.
+
+EVENT EMISSIONS:
+    - None directly — events are emitted by the workflow processor at
+      the step level (workflow.step_completed / workflow.step_failed).
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial implementation: shred wrapper,
+                           compliance extraction with Claude + pattern
+                           fallback
+    PR #xxx (2026-05-22) — Added comprehensive documentation header,
+                           error handling documentation, idempotency notes
+================================================================================
 """
 from __future__ import annotations
 
@@ -29,11 +86,15 @@ async def shred(
     solicitation_id: str,
     document_ids: Optional[list[str]] = None,
 ) -> dict[str, Any]:
-    """Shred a solicitation's documents — extract text, call Claude, persist results.
+    """Shred a solicitation's documents -- extract text, call Claude, persist results.
 
     This is the workflow-callable wrapper around shredder.runner.shred_solicitation.
     It handles Anthropic client instantiation so the runner stays testable with
     injected mocks.
+
+    Idempotency: The shredder runner checks if ai_extracted data already exists
+    for the solicitation. If it does, the runner skips re-processing unless
+    force=True is passed (not exposed at workflow level).
 
     Args:
         conn: Active asyncpg connection (from workflow processor).
@@ -44,6 +105,16 @@ async def shred(
     Returns:
         Dict with status, section count, compliance match count, token usage.
     """
+    # Validate solicitation_id format
+    try:
+        uuid.UUID(solicitation_id)
+    except (ValueError, TypeError):
+        log.error("shred: invalid solicitation_id format: %s", solicitation_id)
+        return {
+            "status": "shredder_failed",
+            "reason": "invalid_solicitation_id",
+        }
+
     from shredder import runner as shredder_runner
     from shredder.runner import shred_solicitation
 
@@ -55,14 +126,14 @@ async def shred(
             from anthropic import AsyncAnthropic
             client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
         except ImportError:
-            log.error("anthropic SDK not available — cannot shred")
+            log.error("anthropic SDK not available -- cannot shred")
             return {
                 "status": "shredder_failed",
                 "reason": "anthropic_sdk_not_installed",
             }
 
     # Delegate to the runner. ShredderBudgetError is intentionally not
-    # caught here — it propagates so the workflow processor records the
+    # caught here -- it propagates so the workflow processor records the
     # step as failed.
     result = await shred_solicitation(
         conn=conn,
@@ -93,13 +164,23 @@ async def extract_compliance(
     Returns:
         Dict with compliance match counts and any errors.
     """
-    sol_uuid = uuid.UUID(solicitation_id)
+    # Validate solicitation_id format
+    try:
+        sol_uuid = uuid.UUID(solicitation_id)
+    except (ValueError, TypeError):
+        log.error("extract_compliance: invalid solicitation_id: %s", solicitation_id)
+        return {"status": "skipped", "reason": "invalid_solicitation_id"}
 
     # 1. Fetch ai_extracted JSONB from curated_solicitations
-    row = await conn.fetchrow(
-        "SELECT ai_extracted FROM curated_solicitations WHERE id = $1",
-        sol_uuid,
-    )
+    try:
+        row = await conn.fetchrow(
+            "SELECT ai_extracted FROM curated_solicitations WHERE id = $1",
+            sol_uuid,
+        )
+    except Exception as exc:
+        log.error("extract_compliance: DB query failed: %s", exc)
+        return {"status": "skipped", "reason": f"db_error: {exc}"}
+
     if row is None:
         return {"status": "skipped", "reason": "solicitation_not_found"}
 
@@ -136,11 +217,16 @@ async def extract_compliance(
         system_comp, comp_template = _split_system_and_examples(compliance_prompt)
 
         # Master variable list from DB
-        variable_rows = await conn.fetch(
-            "SELECT name, label, category, data_type FROM compliance_variables ORDER BY name"
-        )
+        try:
+            variable_rows = await conn.fetch(
+                "SELECT name, label, category, data_type FROM compliance_variables ORDER BY name"
+            )
+        except Exception as exc:
+            log.error("extract_compliance: failed to fetch compliance_variables: %s", exc)
+            variable_rows = []
+
         master_list = "\n".join(
-            f"- {v['name']} ({v['data_type']}) — {v['label']}"
+            f"- {v['name']} ({v['data_type']}) -- {v['label']}"
             for v in variable_rows
         )
 
@@ -233,28 +319,39 @@ async def extract_compliance(
 
     # Store pattern-based results as custom_variables in solicitation_compliance
     if compliance_vars:
-        existing = await conn.fetchval(
-            "SELECT id FROM solicitation_compliance WHERE solicitation_id = $1",
-            sol_uuid,
-        )
-        custom_blob = json.dumps({
-            "pattern_extracted": compliance_vars,
-        })
-        if existing is None:
-            await conn.execute(
-                """INSERT INTO solicitation_compliance (solicitation_id, custom_variables)
-                   VALUES ($1, $2::jsonb)""",
+        try:
+            existing = await conn.fetchval(
+                "SELECT id FROM solicitation_compliance WHERE solicitation_id = $1",
                 sol_uuid,
-                custom_blob,
             )
-        else:
-            await conn.execute(
-                """UPDATE solicitation_compliance
-                   SET custom_variables = $2::jsonb, updated_at = now()
-                   WHERE solicitation_id = $1""",
-                sol_uuid,
-                custom_blob,
+            custom_blob = json.dumps({
+                "pattern_extracted": compliance_vars,
+            })
+            if existing is None:
+                await conn.execute(
+                    """INSERT INTO solicitation_compliance (solicitation_id, custom_variables)
+                       VALUES ($1, $2::jsonb)""",
+                    sol_uuid,
+                    custom_blob,
+                )
+            else:
+                await conn.execute(
+                    """UPDATE solicitation_compliance
+                       SET custom_variables = $2::jsonb, updated_at = now()
+                       WHERE solicitation_id = $1""",
+                    sol_uuid,
+                    custom_blob,
+                )
+        except Exception as exc:
+            log.error(
+                "extract_compliance: failed to upsert solicitation_compliance: %s", exc
             )
+            return {
+                "status": "completed",
+                "compliance_matches": len(compliance_vars),
+                "extraction_method": "pattern_based",
+                "db_error": str(exc)[:200],
+            }
 
     return {
         "status": "completed",

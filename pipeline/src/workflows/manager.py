@@ -1,0 +1,898 @@
+"""
+================================================================================
+WorkflowManager — Persistent Workflow Orchestration with Crash Recovery
+================================================================================
+
+WHO:    Central orchestrator for all workflow execution across both the RFP
+        Pipeline (admin workflows) and CMS (email/content automation workflows).
+        Called by the main pipeline loop and CMS event listener.
+
+WHAT:   Replaces the fire-and-forget workflow processor with a fully persistent,
+        crash-recoverable workflow execution engine. Every workflow instance is
+        tracked in the process_instances table from creation through completion.
+
+WHY:    Without persistence:
+        - If the process crashes mid-workflow, all in-flight work is lost
+        - Admins have no visibility into what's running or what failed
+        - Failed workflows can't be retried from the last successful step
+        - No audit trail for compliance reporting
+        - HITL_WAIT steps can't actually pause and resume
+
+HOW:    1. Event arrives → create process_instance row (status=pending)
+        2. Claim instance (status=running, heartbeat starts)
+        3. Execute steps sequentially, persisting each result
+        4. On step completion → update step_results + step_status JSONB
+        5. On step failure → mark instance failed, store error, emit event
+        6. On HITL_WAIT → mark instance paused, store resume trigger
+        7. On completion → mark instance completed, emit event
+        8. Cron heartbeat: mark stuck instances (no heartbeat > 5min) as failed
+        9. Recovery: create new instance from failed one, skip completed steps
+        10. Admin actions: cancel, retry, force-complete
+
+CRASH RECOVERY:
+        If the process dies mid-execution:
+        1. Cron detects missing heartbeat after 5 minutes
+        2. Marks instance as 'failed' with reason='heartbeat_timeout'
+        3. Admin or auto-recovery creates new instance with recovered_from=old.id
+        4. New instance reads step_status from old instance
+        5. Skips all steps marked 'completed', resumes from first non-completed step
+        6. Emits system:workflow.recovered event
+
+CRON HEARTBEAT (every 30 seconds):
+        UPDATE process_instances SET last_heartbeat_at = now()
+        WHERE id = $current_instance AND status = 'running'
+
+STUCK DETECTION (every 60 seconds):
+        SELECT * FROM process_instances
+        WHERE status = 'running'
+        AND last_heartbeat_at < now() - interval '5 minutes'
+        → Mark as failed, emit system:workflow.stuck_detected event
+
+ADMIN ACTIONS:
+        - Cancel: status → cancelled, emit event
+        - Retry: create new instance from failed, skip completed steps
+        - Force-complete: status → completed (for stuck HITL_WAIT)
+
+EVENT EMISSIONS:
+        - system:workflow.instance_created (single)
+        - system:workflow.instance_started (single)
+        - system:workflow.step_started (single)
+        - system:workflow.step_completed (single)
+        - system:workflow.step_failed (single)
+        - system:workflow.instance_completed (single)
+        - system:workflow.instance_failed (single)
+        - system:workflow.instance_cancelled (single)
+        - system:workflow.instance_recovered (single)
+        - system:workflow.stuck_detected (single)
+
+CHANGE LOG:
+    PR #xxx (2026-05-22) — Initial implementation: full persistent workflow
+                           manager with crash recovery, heartbeat, admin actions
+================================================================================
+"""
+from __future__ import annotations
+
+import asyncio
+import importlib
+import json
+import logging
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
+import asyncpg
+
+from events import emit_event
+from workflows.base import StepType, Workflow
+
+logger = logging.getLogger("pipeline.workflows.manager")
+
+
+class WorkflowManager:
+    """Persistent workflow orchestration with crash recovery."""
+
+    def __init__(self, source: str = "pipeline"):
+        """Initialize manager.
+
+        Args:
+            source: 'pipeline' for RFP admin workflows, 'cms' for CMS workflows
+        """
+        self.source = source
+        self._running_instances: dict[str, str] = {}  # instance_id → workflow_name
+        self._heartbeat_task: asyncio.Task[None] | None = None
+        self._stuck_detection_task: asyncio.Task[None] | None = None
+
+    async def start(self, conn: asyncpg.Connection) -> None:
+        """Start the manager's background tasks."""
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(conn))
+        self._stuck_detection_task = asyncio.create_task(self._stuck_detection_loop(conn))
+        # On startup, detect any instances left running from a previous crash
+        await self._recover_orphaned_instances(conn)
+
+    async def stop(self) -> None:
+        """Gracefully stop background tasks."""
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+        if self._stuck_detection_task:
+            self._stuck_detection_task.cancel()
+
+    async def create_instance(
+        self,
+        conn: asyncpg.Connection,
+        workflow_name: str,
+        trigger_event_id: Optional[str],
+        payload: dict[str, Any],
+        tenant_id: Optional[str] = None,
+        actor_id: Optional[str] = None,
+        actor_email: Optional[str] = None,
+    ) -> str:
+        """Create a new workflow instance (status=pending).
+
+        Returns the instance ID.
+        """
+        instance_id = str(uuid.uuid4())
+
+        # Calculate deadline from workflow definition (default 1 hour)
+        deadline = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        await conn.execute(
+            """
+            INSERT INTO process_instances
+                (id, workflow_name, trigger_event_id, status, payload,
+                 tenant_id, actor_id, actor_email, source, deadline)
+            VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9)
+            """,
+            uuid.UUID(instance_id),
+            workflow_name,
+            uuid.UUID(trigger_event_id) if trigger_event_id else None,
+            json.dumps(payload),
+            uuid.UUID(tenant_id) if tenant_id else None,
+            uuid.UUID(actor_id) if actor_id else None,
+            actor_email,
+            self.source,
+            deadline,
+        )
+
+        # Record transition
+        await self._record_transition(
+            conn, instance_id, None, "pending", actor="system", reason="created"
+        )
+
+        # Emit event
+        await self._emit_event(
+            conn,
+            "system",
+            "workflow.instance_created",
+            tenant_id,
+            {
+                "instance_id": instance_id,
+                "workflow_name": workflow_name,
+                "trigger_event_id": trigger_event_id,
+            },
+        )
+
+        return instance_id
+
+    async def execute_instance(
+        self,
+        conn: asyncpg.Connection,
+        instance_id: str,
+        workflow_cls: type[Workflow],
+        trigger_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a workflow instance step by step with persistence.
+
+        This is the main execution loop. It:
+        1. Claims the instance (pending → running)
+        2. Iterates through workflow steps
+        3. Skips already-completed steps (for recovery)
+        4. Persists each step result
+        5. Handles HITL_WAIT by pausing
+        6. Marks complete or failed at the end
+        """
+        workflow_name = workflow_cls.__name__
+
+        # Claim instance
+        result = await conn.fetchrow(
+            """
+            UPDATE process_instances
+            SET status = 'running', started_at = now(), last_heartbeat_at = now(),
+                current_step_index = 0
+            WHERE id = $1 AND status IN ('pending', 'retrying')
+            RETURNING id
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        if not result:
+            return {"status": "error", "reason": "Instance not claimable"}
+
+        await self._record_transition(
+            conn, instance_id, "pending", "running", actor="system", reason="execution_started"
+        )
+        self._running_instances[instance_id] = workflow_name
+
+        await self._emit_event(
+            conn,
+            "system",
+            "workflow.instance_started",
+            None,
+            {
+                "instance_id": instance_id,
+                "workflow_name": workflow_name,
+            },
+        )
+
+        # Load prior step results (for recovery)
+        row = await conn.fetchrow(
+            "SELECT step_results, step_status FROM process_instances WHERE id = $1",
+            uuid.UUID(instance_id),
+        )
+        step_results: dict[str, Any] = {}
+        step_status: dict[str, str] = {}
+        if row:
+            raw_results = row["step_results"]
+            raw_status = row["step_status"]
+            if isinstance(raw_results, str):
+                step_results = json.loads(raw_results) if raw_results else {}
+            elif isinstance(raw_results, dict):
+                step_results = raw_results
+            if isinstance(raw_status, str):
+                step_status = json.loads(raw_status) if raw_status else {}
+            elif isinstance(raw_status, dict):
+                step_status = raw_status
+
+        # Execute steps
+        steps = workflow_cls.step_execution_order()
+        final_status = "completed"
+
+        for i, step in enumerate(steps):
+            step_name = step.name
+
+            # Skip already-completed steps (crash recovery)
+            if step_status.get(step_name) == "completed":
+                logger.info("[%s] Skipping completed step: %s", instance_id, step_name)
+                continue
+
+            # Update current step
+            await conn.execute(
+                """
+                UPDATE process_instances
+                SET current_step = $2, current_step_index = $3, last_heartbeat_at = now()
+                WHERE id = $1
+                """,
+                uuid.UUID(instance_id),
+                step_name,
+                i,
+            )
+
+            # Check step dependencies
+            if step.depends_on:
+                dep_status = step_status.get(step.depends_on)
+                if dep_status == "failed":
+                    logger.warning(
+                        "[%s] Dependency %s failed for %s, skipping",
+                        instance_id,
+                        step.depends_on,
+                        step_name,
+                    )
+                    step_status[step_name] = "skipped"
+                    await self._persist_step_status(conn, instance_id, step_results, step_status)
+                    continue
+                if dep_status == "skipped":
+                    logger.warning(
+                        "[%s] Dependency %s skipped for %s, skipping",
+                        instance_id,
+                        step.depends_on,
+                        step_name,
+                    )
+                    step_status[step_name] = "skipped"
+                    await self._persist_step_status(conn, instance_id, step_results, step_status)
+                    continue
+
+            # Mark step as running
+            step_status[step_name] = "running"
+            await self._persist_step_status(conn, instance_id, step_results, step_status)
+
+            # Emit step started
+            await self._emit_event(
+                conn,
+                "system",
+                "workflow.step_started",
+                None,
+                {
+                    "instance_id": instance_id,
+                    "workflow_name": workflow_name,
+                    "step_name": step_name,
+                    "step_index": i,
+                },
+            )
+
+            # Handle HITL_WAIT steps
+            if step.step_type == StepType.HITL_WAIT:
+                step_status[step_name] = "waiting"
+                await self._persist_step_status(conn, instance_id, step_results, step_status)
+                await conn.execute(
+                    """
+                    UPDATE process_instances SET status = 'paused', current_step = $2
+                    WHERE id = $1
+                    """,
+                    uuid.UUID(instance_id),
+                    step_name,
+                )
+                await self._record_transition(
+                    conn,
+                    instance_id,
+                    "running",
+                    "paused",
+                    actor="system",
+                    reason=f"hitl_wait:{step_name}",
+                )
+                self._running_instances.pop(instance_id, None)
+                return {
+                    "status": "paused",
+                    "waiting_for": step_name,
+                    "instance_id": instance_id,
+                }
+
+            # Execute step with retry
+            step_start = time.monotonic()
+            max_retries = step.retry_count
+            timeout_seconds = step.timeout_minutes * 60
+
+            step_result: Optional[dict[str, Any]] = None
+            step_error: Optional[str] = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    step_result = await asyncio.wait_for(
+                        self._execute_step(
+                            conn, step, trigger_payload, step_results
+                        ),
+                        timeout=timeout_seconds,
+                    )
+                    break  # Success
+                except asyncio.TimeoutError:
+                    step_error = (
+                        f"Timeout after {step.timeout_minutes}m (attempt {attempt + 1})"
+                    )
+                    if attempt < max_retries:
+                        delay = step.retry_delay_seconds * (2**attempt)
+                        await asyncio.sleep(delay)
+                except Exception as e:
+                    step_error = f"{type(e).__name__}: {str(e)[:500]}"
+                    if attempt < max_retries:
+                        delay = step.retry_delay_seconds * (2**attempt)
+                        await asyncio.sleep(delay)
+
+            duration_ms = int((time.monotonic() - step_start) * 1000)
+
+            if step_result is not None:
+                # Step succeeded
+                step_results[step_name] = step_result
+                step_status[step_name] = "completed"
+                await self._persist_step_status(conn, instance_id, step_results, step_status)
+
+                await self._emit_event(
+                    conn,
+                    "system",
+                    "workflow.step_completed",
+                    None,
+                    {
+                        "instance_id": instance_id,
+                        "workflow_name": workflow_name,
+                        "step_name": step_name,
+                        "duration_ms": duration_ms,
+                    },
+                )
+            else:
+                # Step failed after all retries
+                step_status[step_name] = "failed"
+                await self._persist_step_status(conn, instance_id, step_results, step_status)
+
+                # Update instance with error info
+                await conn.execute(
+                    """
+                    UPDATE process_instances
+                    SET last_error = $2, last_error_step = $3
+                    WHERE id = $1
+                    """,
+                    uuid.UUID(instance_id),
+                    step_error,
+                    step_name,
+                )
+
+                await self._emit_event(
+                    conn,
+                    "system",
+                    "workflow.step_failed",
+                    None,
+                    {
+                        "instance_id": instance_id,
+                        "workflow_name": workflow_name,
+                        "step_name": step_name,
+                        "error": step_error,
+                        "duration_ms": duration_ms,
+                    },
+                )
+
+                # Step failure is fatal — stop the workflow
+                final_status = "failed"
+                break
+
+            # Heartbeat after each step
+            await conn.execute(
+                """
+                UPDATE process_instances SET last_heartbeat_at = now() WHERE id = $1
+                """,
+                uuid.UUID(instance_id),
+            )
+
+        # Mark instance complete/failed
+        await conn.execute(
+            """
+            UPDATE process_instances
+            SET status = $2, completed_at = now(), current_step = NULL
+            WHERE id = $1
+            """,
+            uuid.UUID(instance_id),
+            final_status,
+        )
+
+        await self._record_transition(
+            conn,
+            instance_id,
+            "running",
+            final_status,
+            actor="system",
+            reason="execution_finished",
+        )
+
+        event_type = f"workflow.instance_{final_status}"
+        await self._emit_event(
+            conn,
+            "system",
+            event_type,
+            None,
+            {
+                "instance_id": instance_id,
+                "workflow_name": workflow_name,
+                "steps_completed": sum(1 for s in step_status.values() if s == "completed"),
+                "steps_failed": sum(1 for s in step_status.values() if s == "failed"),
+            },
+        )
+
+        self._running_instances.pop(instance_id, None)
+        return {
+            "status": final_status,
+            "instance_id": instance_id,
+            "step_results": step_results,
+        }
+
+    async def retry_instance(
+        self, conn: asyncpg.Connection, instance_id: str, actor_email: str
+    ) -> str:
+        """Create a new instance that recovers from a failed one.
+
+        Skips all previously completed steps, resumes from the failed step.
+        Returns the new instance ID.
+        """
+        # Fetch the failed instance
+        row = await conn.fetchrow(
+            """
+            SELECT workflow_name, trigger_event_id, payload, tenant_id,
+                   actor_id, actor_email, step_results, step_status, retry_count
+            FROM process_instances WHERE id = $1 AND status IN ('failed', 'cancelled')
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        if not row:
+            raise ValueError(f"Instance {instance_id} not found or not retryable")
+
+        # Parse JSONB fields
+        prior_results = row["step_results"]
+        if isinstance(prior_results, str):
+            prior_results = json.loads(prior_results) if prior_results else {}
+        elif prior_results is None:
+            prior_results = {}
+
+        prior_status = row["step_status"]
+        if isinstance(prior_status, str):
+            prior_status = json.loads(prior_status) if prior_status else {}
+        elif prior_status is None:
+            prior_status = {}
+
+        # Create recovery instance
+        new_id = str(uuid.uuid4())
+        await conn.execute(
+            """
+            INSERT INTO process_instances
+                (id, workflow_name, trigger_event_id, status, payload,
+                 tenant_id, actor_id, actor_email, source,
+                 step_results, step_status, retry_count, recovered_from,
+                 deadline)
+            VALUES ($1, $2, $3, 'retrying', $4::jsonb, $5, $6, $7, $8,
+                    $9::jsonb, $10::jsonb, $11, $12,
+                    now() + interval '1 hour')
+            """,
+            uuid.UUID(new_id),
+            row["workflow_name"],
+            row["trigger_event_id"],
+            row["payload"] if isinstance(row["payload"], str) else json.dumps(row["payload"] or {}),
+            row["tenant_id"],
+            row["actor_id"],
+            row["actor_email"],
+            self.source,
+            json.dumps(prior_results, default=str),
+            json.dumps(prior_status),
+            (row["retry_count"] or 0) + 1,
+            uuid.UUID(instance_id),
+        )
+
+        await self._record_transition(
+            conn,
+            new_id,
+            None,
+            "retrying",
+            actor=f"admin:{actor_email}",
+            reason=f"retry_from:{instance_id}",
+        )
+
+        await self._emit_event(
+            conn,
+            "system",
+            "workflow.instance_recovered",
+            None,
+            {
+                "instance_id": new_id,
+                "recovered_from": instance_id,
+                "workflow_name": row["workflow_name"],
+                "actor": actor_email,
+            },
+        )
+
+        return new_id
+
+    async def cancel_instance(
+        self, conn: asyncpg.Connection, instance_id: str, actor_email: str
+    ) -> bool:
+        """Cancel a running or paused workflow instance."""
+        result = await conn.execute(
+            """
+            UPDATE process_instances
+            SET status = 'cancelled', completed_at = now()
+            WHERE id = $1 AND status IN ('running', 'paused', 'pending', 'retrying')
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        if "UPDATE 0" in result:
+            return False
+
+        await self._record_transition(
+            conn,
+            instance_id,
+            None,
+            "cancelled",
+            actor=f"admin:{actor_email}",
+            reason="manual_cancellation",
+        )
+
+        await self._emit_event(
+            conn,
+            "system",
+            "workflow.instance_cancelled",
+            None,
+            {
+                "instance_id": instance_id,
+                "actor": actor_email,
+            },
+        )
+
+        self._running_instances.pop(instance_id, None)
+        return True
+
+    async def resume_instance(
+        self,
+        conn: asyncpg.Connection,
+        instance_id: str,
+        resume_data: Optional[dict[str, Any]] = None,
+    ) -> bool:
+        """Resume a paused (HITL_WAIT) instance."""
+        result = await conn.execute(
+            """
+            UPDATE process_instances
+            SET status = 'running', last_heartbeat_at = now()
+            WHERE id = $1 AND status = 'paused'
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        if "UPDATE 0" in result:
+            return False
+
+        await self._record_transition(
+            conn, instance_id, "paused", "running", actor="system", reason="hitl_resumed"
+        )
+        return True
+
+    # --- Internal helpers ---
+
+    async def _execute_step(
+        self,
+        conn: asyncpg.Connection,
+        step: Any,
+        trigger_payload: dict[str, Any],
+        prior_results: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a single workflow step. Delegates to the step's action."""
+        from workflows.processor import resolve_inputs, _execute_step as processor_execute_step
+
+        # Build a fake event dict so resolve_inputs works with existing logic
+        event_dict: dict[str, Any] = {"payload": trigger_payload}
+        inputs = resolve_inputs(step.input_map, event_dict, prior_results)
+
+        return await processor_execute_step(conn, step, inputs, trigger_event=event_dict)
+
+    async def _heartbeat_loop(self, conn: asyncpg.Connection) -> None:
+        """Send heartbeats for all running instances every 30 seconds."""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                if self._running_instances:
+                    ids = [uuid.UUID(iid) for iid in self._running_instances]
+                    await conn.execute(
+                        """
+                        UPDATE process_instances SET last_heartbeat_at = now()
+                        WHERE id = ANY($1) AND status = 'running'
+                        """,
+                        ids,
+                    )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("[heartbeat] Error: %s", e)
+
+    async def _stuck_detection_loop(self, conn: asyncpg.Connection) -> None:
+        """Detect and mark stuck instances every 60 seconds."""
+        while True:
+            try:
+                await asyncio.sleep(60)
+                stuck = await conn.fetch(
+                    """
+                    SELECT id, workflow_name, current_step, tenant_id
+                    FROM process_instances
+                    WHERE status = 'running'
+                      AND last_heartbeat_at < now() - interval '5 minutes'
+                    """
+                )
+
+                for stuck_row in stuck:
+                    stuck_id = str(stuck_row["id"])
+                    logger.warning(
+                        "[stuck_detection] Instance %s (%s) has no heartbeat",
+                        stuck_id,
+                        stuck_row["workflow_name"],
+                    )
+
+                    await conn.execute(
+                        """
+                        UPDATE process_instances
+                        SET status = 'failed', last_error = 'heartbeat_timeout',
+                            completed_at = now()
+                        WHERE id = $1
+                        """,
+                        stuck_row["id"],
+                    )
+
+                    await self._record_transition(
+                        conn,
+                        stuck_id,
+                        "running",
+                        "failed",
+                        actor="cron",
+                        reason="heartbeat_timeout",
+                    )
+
+                    tenant_str = (
+                        str(stuck_row["tenant_id"]) if stuck_row["tenant_id"] else None
+                    )
+                    await self._emit_event(
+                        conn,
+                        "system",
+                        "workflow.stuck_detected",
+                        tenant_str,
+                        {
+                            "instance_id": stuck_id,
+                            "workflow_name": stuck_row["workflow_name"],
+                            "current_step": stuck_row["current_step"],
+                        },
+                    )
+
+                    self._running_instances.pop(stuck_id, None)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("[stuck_detection] Error: %s", e)
+
+    async def _recover_orphaned_instances(self, conn: asyncpg.Connection) -> None:
+        """On startup, find instances that were running when we crashed."""
+        orphans = await conn.fetch(
+            """
+            SELECT id, workflow_name FROM process_instances
+            WHERE status = 'running' AND source = $1
+            """,
+            self.source,
+        )
+
+        for orphan_row in orphans:
+            orphan_id = str(orphan_row["id"])
+            logger.warning(
+                "[recovery] Orphaned instance %s (%s)",
+                orphan_id,
+                orphan_row["workflow_name"],
+            )
+            await conn.execute(
+                """
+                UPDATE process_instances
+                SET status = 'failed', last_error = 'process_crash_recovery',
+                    completed_at = now()
+                WHERE id = $1
+                """,
+                orphan_row["id"],
+            )
+            await self._record_transition(
+                conn,
+                orphan_id,
+                "running",
+                "failed",
+                actor="system",
+                reason="startup_crash_recovery",
+            )
+
+    async def _persist_step_status(
+        self,
+        conn: asyncpg.Connection,
+        instance_id: str,
+        step_results: dict[str, Any],
+        step_status: dict[str, str],
+    ) -> None:
+        """Persist current step results and status to DB."""
+        await conn.execute(
+            """
+            UPDATE process_instances
+            SET step_results = $2::jsonb, step_status = $3::jsonb,
+                last_heartbeat_at = now()
+            WHERE id = $1
+            """,
+            uuid.UUID(instance_id),
+            json.dumps(step_results, default=str),
+            json.dumps(step_status),
+        )
+
+    async def _record_transition(
+        self,
+        conn: asyncpg.Connection,
+        instance_id: str,
+        from_status: Optional[str],
+        to_status: str,
+        actor: str = "system",
+        reason: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Record a state transition in the audit table."""
+        try:
+            await conn.execute(
+                """
+                INSERT INTO process_instance_transitions
+                    (id, instance_id, from_status, to_status, actor, reason, metadata)
+                VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+                """,
+                uuid.uuid4(),
+                uuid.UUID(instance_id),
+                from_status,
+                to_status,
+                actor,
+                reason,
+                json.dumps(metadata or {}),
+            )
+        except Exception as e:
+            logger.error("[transition_audit] Failed to record: %s", e)
+
+    async def _emit_event(
+        self,
+        conn: asyncpg.Connection,
+        namespace: str,
+        event_type: str,
+        tenant_id: Optional[str],
+        payload: dict[str, Any],
+    ) -> None:
+        """Emit a system event via the pipeline's emit_event helper."""
+        try:
+            await emit_event(
+                conn,
+                namespace=namespace,
+                type=event_type,
+                phase="single",
+                actor_type="system",
+                actor_id="workflow_manager",
+                tenant_id=tenant_id,
+                payload=payload,
+            )
+        except Exception as e:
+            logger.error("[emit_event] Failed: %s", e)
+
+    # --- Query helpers for admin UI ---
+
+    async def get_active_instances(
+        self, conn: asyncpg.Connection, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Get currently running/paused instances for admin dashboard."""
+        rows = await conn.fetch(
+            """
+            SELECT id, workflow_name, status, current_step, current_step_index,
+                   started_at, last_heartbeat_at, tenant_id, source,
+                   step_status, retry_count, last_error
+            FROM process_instances
+            WHERE status IN ('running', 'paused', 'pending', 'retrying')
+              AND source = $1
+            ORDER BY started_at DESC
+            LIMIT $2
+            """,
+            self.source,
+            limit,
+        )
+        return [dict(r) for r in rows]
+
+    async def get_recent_instances(
+        self, conn: asyncpg.Connection, hours: int = 24, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """Get recently completed/failed instances for admin dashboard."""
+        rows = await conn.fetch(
+            """
+            SELECT id, workflow_name, status, current_step,
+                   started_at, completed_at, tenant_id, source,
+                   step_status, retry_count, last_error, last_error_step,
+                   recovered_from
+            FROM process_instances
+            WHERE source = $1
+              AND created_at > now() - ($2 || ' hours')::interval
+            ORDER BY created_at DESC
+            LIMIT $3
+            """,
+            self.source,
+            str(hours),
+            limit,
+        )
+        return [dict(r) for r in rows]
+
+    async def get_instance_detail(
+        self, conn: asyncpg.Connection, instance_id: str
+    ) -> Optional[dict[str, Any]]:
+        """Get full detail of a specific instance including transitions."""
+        row = await conn.fetchrow(
+            """
+            SELECT * FROM process_instances WHERE id = $1
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        if not row:
+            return None
+
+        transitions = await conn.fetch(
+            """
+            SELECT * FROM process_instance_transitions
+            WHERE instance_id = $1
+            ORDER BY created_at ASC
+            """,
+            uuid.UUID(instance_id),
+        )
+
+        return {
+            "instance": dict(row),
+            "transitions": [dict(t) for t in transitions],
+        }

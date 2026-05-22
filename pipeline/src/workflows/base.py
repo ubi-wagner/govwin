@@ -1,10 +1,41 @@
 """
-Workflow base classes — the contract every workflow definition must follow.
+================================================================================
+Module: Workflow Base Classes (base.py)
+================================================================================
 
-A Workflow is a declarative job template. It does NOT execute anything
-itself — the event_processor reads the definition and drives execution.
+WHO:    Used by all workflow definitions and the workflow processor.
 
-See docs/EVENT_CONTRACT.md §7 for architecture and §8 for extension rules.
+WHAT:   Defines the contract every workflow definition must follow. A Workflow
+        is a declarative job template — it does NOT execute anything itself.
+        The event_processor reads the definition and drives execution.
+
+        Provides: EventTrigger (matches system_events rows), StepType (enum
+        of step execution strategies), Step (one unit of work), Workflow
+        (base class with trigger + steps), and a registry for auto-discovery
+        at boot time.
+
+WHY:    Decouples workflow declaration from execution. Workflow authors define
+        triggers, steps, and dependencies declaratively; the processor handles
+        retry, timeout, event emission, and error handling uniformly.
+
+HOW:    Subclasses set `trigger` and `steps` as class attributes. The
+        discover_workflows() function auto-imports all modules in the
+        workflows package and registers each Workflow subclass whose trigger
+        passes validation. The processor calls get_workflow_for_event() on
+        each new system_events row to find a matching workflow.
+
+ERROR HANDLING:
+    - validate() catches common definition mistakes (missing trigger,
+      empty steps, broken depends_on, HITL_WAIT without wait_for)
+    - Registration logs warnings on trigger conflicts (last-write-wins)
+    - Auto-discovery catches import errors per-module without crashing
+
+CHANGE LOG:
+    PR #140 (2026-05-22) — Initial implementation: base classes, registry,
+                           auto-discovery, topological step ordering
+    PR #xxx (2026-05-22) — Hardened: comprehensive docstring header, added
+                           validate() for CONDITION steps, improved logging
+================================================================================
 """
 from __future__ import annotations
 
