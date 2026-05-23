@@ -140,14 +140,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
+    // Verify proposal belongs to tenant and is not locked
+    const [proposal] = await sql<{ id: string; isLocked: boolean; stage: string }[]>`
+      SELECT id, is_locked, stage FROM proposals
       WHERE id = ${proposalId} AND tenant_id = ${tenantId}
       LIMIT 1
     `;
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // Block uploads when proposal is locked or in submitted/archived stage
+    if (proposal.isLocked) {
+      return NextResponse.json({ error: 'Proposal is locked — uploads are disabled', code: 'LOCKED' }, { status: 423 });
+    }
+    if (proposal.stage === 'submitted' || proposal.stage === 'archived') {
+      return NextResponse.json({ error: 'Proposal is in a terminal stage — uploads are disabled', code: 'STAGE_LOCKED' }, { status: 423 });
     }
 
     // Parse multipart form data

@@ -57,6 +57,12 @@ proposal_sections
   id, proposal_id, section_number, title, content (TEXT), page_allocation,
   status, assigned_to, requirement_ids, ai_confidence, version,
   created_at, updated_at
+  + completed_stage, completed_at, accepted_by, accepted_at (046)
+
+stage_completion_snapshots (046)
+  id, proposal_id, stage, completed_by, completed_at,
+  sections_snapshot (JSONB), total_sections, sections_complete,
+  sections_approved, notes, created_at
 
 proposal_comments
   id, proposal_id, section_id, user_id, content, resolved, created_at

@@ -145,6 +145,9 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Update proposal stage + record history (transactional) ──────
     // Gate check is inside the transaction to prevent TOCTOU races.
+    let sectionsSnapshot: { section_id: string; title: string; version: number; status: string; char_count: number }[] = [];
+    let completeSections = 0;
+    let approvedSections = 0;
     try {
       await sql.begin(async (tx: any) => {
         // ── Check gate requirements inside transaction ────────────
@@ -167,6 +170,67 @@ export async function POST(request: Request, ctx: RouteContext) {
           } else {
             // Real DB error — do NOT silently skip
             throw gateErr;
+          }
+        }
+
+        // ── 1. Snapshot all sections at their current state ────────
+        const sections = await tx<{
+          id: string;
+          title: string;
+          version: number;
+          status: string;
+          content: string | null;
+        }[]>`
+          SELECT id, title, version, status, content
+          FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid
+          ORDER BY section_number
+        `;
+
+        sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null }) => ({
+          section_id: s.id,
+          title: s.title,
+          version: s.version,
+          status: s.status,
+          char_count: s.content ? s.content.length : 0,
+        }));
+
+        completeSections = sections.filter((s: { status: string }) => s.status === 'complete' || s.status === 'approved').length;
+        approvedSections = sections.filter((s: { status: string }) => s.status === 'approved').length;
+
+        // ── 2. Insert stage completion snapshot ────────────────────
+        await tx`
+          INSERT INTO stage_completion_snapshots
+            (proposal_id, stage, completed_by, sections_snapshot, total_sections,
+             sections_complete, sections_approved, notes)
+          VALUES (
+            ${proposalId}::uuid, ${previousStage}, ${sessionUser.id}::uuid,
+            ${JSON.stringify(sectionsSnapshot)}::jsonb,
+            ${sections.length},
+            ${completeSections},
+            ${approvedSections},
+            ${notes}
+          )
+        `;
+
+        // ── 3. Mark all sections as completed for this stage ──────
+        await tx`
+          UPDATE proposal_sections
+          SET completed_stage = ${previousStage},
+              completed_at = now(),
+              accepted_by = ${sessionUser.id}::uuid,
+              accepted_at = now()
+          WHERE proposal_id = ${proposalId}::uuid
+            AND (completed_stage IS NULL OR completed_stage = ${previousStage})
+        `;
+
+        // ── 4. Create canvas version snapshots for each section ───
+        for (const s of sections) {
+          if (s.content) {
+            await tx`
+              INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
+              VALUES (${s.id}::uuid, ${s.version}, ${s.content}::jsonb, ${'stage_completed:' + previousStage}, 'system', ${sessionUser.id}::uuid)
+              ON CONFLICT (section_id, version_number) DO NOTHING
+            `;
           }
         }
 
@@ -261,7 +325,14 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'stage_advanced', ${proposal.version + 1},
-                ${JSON.stringify({ from_stage: previousStage, to_stage: finalStageValue, notes: notes ?? undefined })}::jsonb)
+                ${JSON.stringify({
+                  from_stage: previousStage,
+                  to_stage: finalStageValue,
+                  notes: notes ?? undefined,
+                  sections_accepted: sectionsSnapshot.length,
+                  sections_complete: completeSections,
+                  sections_approved: approvedSections,
+                })}::jsonb)
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/advance] activity log failed', logErr);

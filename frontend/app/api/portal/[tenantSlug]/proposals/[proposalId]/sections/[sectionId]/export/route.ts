@@ -114,8 +114,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Download gate: must be locked at final stage with at least one lock
-    if (!(proposal.lockCount >= 1 && proposal.isLocked)) {
+    // Download gate: must have completed at least one stage (lock_count >= 1)
+    // OR proposal is in submitted/archived stage
+    // Downloads are allowed on locked proposals — that's the whole point of locking.
+    // They are also allowed on unlocked proposals that have been previously locked.
+    if (proposal.lockCount < 1 && proposal.stage !== 'submitted' && proposal.stage !== 'archived') {
       return NextResponse.json(
         { error: 'Downloads available after final review and lock', code: 'FORBIDDEN' },
         { status: 403 },

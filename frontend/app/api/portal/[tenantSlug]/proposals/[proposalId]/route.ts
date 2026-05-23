@@ -88,7 +88,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // ── Load sections ───────────────────────────────────────────────
+    // ── Load sections with completion markers ─────────────────────
     const sections = await sql<{
       id: string;
       sectionNumber: string;
@@ -96,6 +96,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       status: string;
       pageAllocation: number | null;
       version: number;
+      completedStage: string | null;
+      completedAt: Date | null;
+      acceptedBy: string | null;
+      acceptedAt: Date | null;
+      acceptedByName: string | null;
     }[]>`
       SELECT
         ps.id,
@@ -103,11 +108,43 @@ export async function GET(_request: Request, ctx: RouteContext) {
         ps.title,
         ps.status,
         ps.page_allocation,
-        ps.version
+        ps.version,
+        ps.completed_stage,
+        ps.completed_at,
+        ps.accepted_by,
+        ps.accepted_at,
+        u.name AS accepted_by_name
       FROM proposal_sections ps
+      LEFT JOIN users u ON u.id = ps.accepted_by
       WHERE ps.proposal_id = ${proposalId}
       ORDER BY ps.section_number ASC
     `;
+
+    // ── Load stage completion history ──────────────────────────────
+    let stageSnapshots: {
+      stage: string;
+      completedBy: string | null;
+      completedByName: string | null;
+      completedAt: Date;
+      totalSections: number;
+      sectionsComplete: number;
+      sectionsApproved: number;
+      notes: string | null;
+    }[] = [];
+    try {
+      stageSnapshots = await sql<typeof stageSnapshots>`
+        SELECT scs.stage, scs.completed_by, u.name AS completed_by_name,
+               scs.completed_at, scs.total_sections, scs.sections_complete,
+               scs.sections_approved, scs.notes
+        FROM stage_completion_snapshots scs
+        LEFT JOIN users u ON u.id = scs.completed_by
+        WHERE scs.proposal_id = ${proposalId}::uuid
+        ORDER BY scs.completed_at ASC
+      `;
+    } catch (snapErr) {
+      // Non-fatal — table may not exist yet on older deployments
+      console.error('[api/portal/proposals/detail] stage snapshots query failed (non-fatal):', snapErr);
+    }
 
     return NextResponse.json({
       data: {
@@ -132,6 +169,22 @@ export async function GET(_request: Request, ctx: RouteContext) {
           status: s.status,
           pageAllocation: s.pageAllocation,
           version: s.version,
+          completedStage: s.completedStage,
+          completedAt: s.completedAt,
+          acceptedBy: s.acceptedBy,
+          acceptedByName: s.acceptedByName,
+          acceptedAt: s.acceptedAt,
+          isEditable: s.completedStage === null || s.completedStage === proposal.stage,
+        })),
+        stageCompletionHistory: stageSnapshots.map((snap) => ({
+          stage: snap.stage,
+          completedBy: snap.completedBy,
+          completedByName: snap.completedByName,
+          completedAt: snap.completedAt,
+          totalSections: snap.totalSections,
+          sectionsComplete: snap.sectionsComplete,
+          sectionsApproved: snap.sectionsApproved,
+          notes: snap.notes,
         })),
       },
     });

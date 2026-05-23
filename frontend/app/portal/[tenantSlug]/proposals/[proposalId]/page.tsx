@@ -96,9 +96,9 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     console.error('[portal/proposals/workspace] access resolver error:', e);
     access = {
       role: 'external' as const,
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
+      editableSections: [] as string[],
+      commentableSections: [] as string[],
+      viewableSections: [] as string[],
       canUpload: false,
       canAdvance: false,
       canManageTeam: false,
@@ -106,6 +106,8 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       lockCount: proposal.lockCount || 0,
       isLocked: proposal.isLocked,
       unlockDeadline: proposal.unlockDeadline,
+      currentStage: proposal.stage || '',
+      accessibleStages: [] as string[],
     };
   }
 
