@@ -8,6 +8,9 @@ interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
+/** The 5 stages enforced by the DB CHECK constraint on proposals.stage */
+const DB_STAGES = ['draft', 'review', 'final', 'submitted', 'archived'] as const;
+
 const VALID_REQUIREMENT_TYPES = [
   'all_sections_complete', 'compliance_check_passed',
   'min_sections_approved', 'admin_review_complete',
@@ -271,14 +274,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Validate stage against the proposal's gate_config instead of a hardcoded list
-    const validStages = (proposal.gateConfig && proposal.gateConfig.length > 0)
+    // Stage must be a valid DB value AND in this proposal's gate_config
+    const proposalGates = (proposal.gateConfig && proposal.gateConfig.length > 0)
       ? proposal.gateConfig
       : ['draft', 'final'];
-    if (!validStages.includes(stage)) {
+    if (!(DB_STAGES as readonly string[]).includes(stage) || !proposalGates.includes(stage)) {
       return NextResponse.json(
-        { error: `stage must be one of: ${validStages.join(', ')}`, code: 'VALIDATION_ERROR' },
-        { status: 400 },
+        { error: `stage must be one of: ${proposalGates.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { status: 422 },
       );
     }
 

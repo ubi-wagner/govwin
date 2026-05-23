@@ -218,13 +218,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
     const nextStage = gates[currentIndex + 1];
     const shouldLock = nextStage === 'final';
+    // When advancing to 'final' AND auto-locking, also advance to 'submitted'
+    const actualStage = shouldLock ? 'submitted' : nextStage;
 
     // Update proposal
     try {
       if (shouldLock) {
         await sql`
           UPDATE proposals
-          SET stage = ${nextStage},
+          SET stage = 'submitted',
               is_locked = true,
               lock_count = lock_count + 1,
               last_locked_at = now()
@@ -248,6 +250,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
         VALUES (${proposalId}, ${previousStage}, ${nextStage}, ${sessionUser.id}, ${notes})
       `;
+      // If auto-locked at final, also record the auto-advance to 'submitted'
+      if (shouldLock) {
+        await sql`
+          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+          VALUES (${proposalId}, ${nextStage}, 'submitted', ${sessionUser.id}, 'Auto-advanced on lock')
+        `;
+      }
     } catch (e) {
       console.error('[portal/proposals/stage] PATCH stage history insert failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
@@ -265,7 +274,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         proposalId,
         proposalTitle: proposal.title,
         previousStage,
-        nextStage,
+        nextStage: actualStage,
         locked: shouldLock,
         notes: notes ?? undefined,
       },
@@ -273,7 +282,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({
       data: {
-        stage: nextStage,
+        stage: actualStage,
         previousStage,
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,

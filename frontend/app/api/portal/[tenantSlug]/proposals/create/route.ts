@@ -82,7 +82,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { topicId?: unknown; productType?: unknown };
+    const DB_STAGES = ['draft', 'review', 'final', 'submitted', 'archived'] as const;
+
+    let body: { topicId?: unknown; productType?: unknown; gateConfig?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -102,6 +104,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       (validProductTypes as readonly string[]).includes(body.productType)
       ? body.productType
       : null;
+
+    // Validate gate_config if provided, otherwise default to ['draft', 'final']
+    let gateConfig: string[] = ['draft', 'final'];
+    if (Array.isArray(body.gateConfig) && body.gateConfig.length >= 2) {
+      const allValid = body.gateConfig.every(
+        (s: unknown) => typeof s === 'string' && (DB_STAGES as readonly string[]).includes(s),
+      );
+      if (!allValid) {
+        return NextResponse.json(
+          { error: `gate_config values must be from: ${DB_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
+      }
+      gateConfig = body.gateConfig as string[];
+    }
 
     // ── Find the topic (opportunity) and its parent solicitation ─────
     let topic: {
@@ -224,13 +241,14 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
-        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage)
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config)
         VALUES (
           ${tenantId},
           ${topicId},
           ${topic.solicitationId},
           ${proposalTitle},
-          'draft'
+          'draft',
+          ${JSON.stringify(gateConfig)}::jsonb
         )
         RETURNING id
       `;

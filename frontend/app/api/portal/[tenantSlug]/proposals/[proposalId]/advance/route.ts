@@ -140,6 +140,8 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
+    // When advancing to 'final' AND auto-locking, also advance to 'submitted'
+    const finalStageValue = shouldLock ? 'submitted' : targetStage;
 
     // ── Update proposal stage + record history (transactional) ──────
     // Gate check is inside the transaction to prevent TOCTOU races.
@@ -169,9 +171,10 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
 
         if (shouldLock) {
+          // Advance to 'submitted' (not just 'final') and auto-lock
           const advanceResult = await tx`
             UPDATE proposals
-            SET stage = ${targetStage},
+            SET stage = 'submitted',
                 is_locked = true,
                 lock_count = lock_count + 1,
                 last_locked_at = now(),
@@ -199,10 +202,19 @@ export async function POST(request: Request, ctx: RouteContext) {
           }
         }
 
+        // Record the advance to the target gate
         await tx`
           INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
           VALUES (${proposalId}::uuid, ${previousStage}, ${targetStage}, ${sessionUser.id}::uuid, ${notes})
         `;
+
+        // If auto-locked at final, also record the auto-advance to 'submitted'
+        if (shouldLock) {
+          await tx`
+            INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+            VALUES (${proposalId}::uuid, ${targetStage}, 'submitted', ${sessionUser.id}::uuid, 'Auto-advanced on lock')
+          `;
+        }
       });
     } catch (e) {
       if (e instanceof Error && e.message === 'CONFLICT') {
@@ -233,7 +245,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalId,
         proposalTitle: proposal.title,
         previousStage,
-        targetStage,
+        targetStage: finalStageValue,
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
         notes: notes ?? undefined,
@@ -249,7 +261,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'stage_advanced', ${proposal.version + 1},
-                ${JSON.stringify({ from_stage: previousStage, to_stage: targetStage, notes: notes ?? undefined })}::jsonb)
+                ${JSON.stringify({ from_stage: previousStage, to_stage: finalStageValue, notes: notes ?? undefined })}::jsonb)
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/advance] activity log failed', logErr);
@@ -257,7 +269,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({
       data: {
-        stage: targetStage,
+        stage: finalStageValue,
         previousStage,
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,

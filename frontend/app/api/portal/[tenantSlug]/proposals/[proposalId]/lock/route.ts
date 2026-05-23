@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, hasRoleAtLeast, isMasterAdmin } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { harvestProposalToLibrary } from '@/lib/proposal-harvest';
@@ -64,6 +64,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
       stage: string;
       lockCount: number;
       version: number;
+      opportunityCloseDate: string | null;
     } | undefined;
     try {
       [proposal] = await sql<{
@@ -72,9 +73,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
         stage: string;
         lockCount: number;
         version: number;
+        opportunityCloseDate: string | null;
       }[]>`
-        SELECT id, is_locked, stage, lock_count, version FROM proposals
-        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        SELECT p.id, p.is_locked, p.stage, p.lock_count, p.version,
+               o.close_date AS opportunity_close_date
+        FROM proposals p
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.id = ${proposalId} AND p.tenant_id = ${tenantId}
         LIMIT 1
       `;
     } catch (e) {
@@ -98,16 +103,18 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // Business rule: after second lock, only master_admin can lock again
-    if (proposal.lockCount >= 2 && !isMasterAdmin(role)) {
+    // Business rule: after second lock, only rfp_admin or master_admin can lock again
+    if (proposal.lockCount >= 2 && role !== 'master_admin' && role !== 'rfp_admin') {
       return NextResponse.json(
-        { error: 'Further locks require master admin. Contact RFP Pipeline support.', code: 'FORBIDDEN' },
+        { error: 'Further locks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' },
         { status: 403 },
       );
     }
 
-    // Lock the proposal (AND is_locked = false + version prevents race condition)
+    // Lock the proposal and auto-advance to 'submitted' stage
     const newLockCount = proposal.lockCount + 1;
+    const autoAdvanceToSubmitted = proposal.stage === 'final';
+    const previousStage = proposal.stage;
     let lockResult;
     try {
       lockResult = await sql`
@@ -116,6 +123,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
             lock_count = ${newLockCount},
             last_locked_at = now(),
             unlock_deadline = NULL,
+            stage = ${autoAdvanceToSubmitted ? 'submitted' : proposal.stage},
             version = version + 1,
             last_modified_by = ${sessionUser.id}::uuid
         WHERE id = ${proposalId}
@@ -131,6 +139,18 @@ export async function POST(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
     }
 
+    // Record stage history if auto-advanced to 'submitted'
+    if (autoAdvanceToSubmitted) {
+      try {
+        await sql`
+          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+          VALUES (${proposalId}::uuid, ${previousStage}, 'submitted', ${sessionUser.id}::uuid, 'Auto-advanced on lock')
+        `;
+      } catch (histErr) {
+        console.error('[portal/proposals/lock] stage history insert failed (non-fatal)', histErr);
+      }
+    }
+
     await emitEventSingle({
       namespace: 'proposal',
       type: 'proposal.locked',
@@ -142,6 +162,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         tenantSlug,
         proposalId,
         lockCount: newLockCount,
+        autoAdvancedToSubmitted: autoAdvanceToSubmitted,
       },
     });
 
@@ -179,6 +200,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         lockedAt: new Date().toISOString(),
         downloadAvailable: true,
         harvest: harvestResult,
+        stage: autoAdvanceToSubmitted ? 'submitted' : proposal.stage,
       },
     });
   } catch (e) {
@@ -236,18 +258,25 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     let proposal: {
       id: string;
       isLocked: boolean;
+      stage: string;
       lockCount: number;
       version: number;
+      opportunityCloseDate: string | null;
     } | undefined;
     try {
       [proposal] = await sql<{
         id: string;
         isLocked: boolean;
+        stage: string;
         lockCount: number;
         version: number;
+        opportunityCloseDate: string | null;
       }[]>`
-        SELECT id, is_locked, lock_count, version FROM proposals
-        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        SELECT p.id, p.is_locked, p.stage, p.lock_count, p.version,
+               o.close_date AS opportunity_close_date
+        FROM proposals p
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.id = ${proposalId} AND p.tenant_id = ${tenantId}
         LIMIT 1
       `;
     } catch (e) {
@@ -267,10 +296,24 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
-    // Business rule: after second lock, only master_admin can unlock
-    if (proposal.lockCount >= 2 && !isMasterAdmin(role)) {
+    const userRole = isRole(sessionUser.role) ? sessionUser.role : role;
+    const isAdminRole = userRole === 'master_admin' || userRole === 'rfp_admin';
+
+    // Business rule: after RFP close date, only admins can unlock
+    if (proposal.opportunityCloseDate) {
+      const closeDate = new Date(proposal.opportunityCloseDate);
+      if (closeDate < new Date() && !isAdminRole) {
+        return NextResponse.json(
+          { error: 'RFP close date has passed. Unlocks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Business rule: after first unlock, subsequent unlocks require rfp_admin or master_admin
+    if (proposal.lockCount >= 2 && !isAdminRole) {
       return NextResponse.json(
-        { error: 'Further unlocks require master admin. Contact RFP Pipeline support.', code: 'FORBIDDEN' },
+        { error: 'Additional unlocks require admin approval. Please contact support.', code: 'ADMIN_UNLOCK_REQUIRED' },
         { status: 403 },
       );
     }
@@ -279,12 +322,14 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     const unlockDeadline = new Date();
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
+    // Revert stage from 'submitted' back to 'final' on unlock so the proposal can be edited
     let unlockResult;
     try {
       unlockResult = await sql`
         UPDATE proposals
         SET is_locked = false,
             last_unlocked_at = now(),
+            stage = CASE WHEN stage = 'submitted' THEN 'final' ELSE stage END,
             unlock_deadline = ${proposal.lockCount === 1 ? unlockDeadline.toISOString() : null},
             version = version + 1,
             last_modified_by = ${sessionUser.id}::uuid
@@ -301,6 +346,18 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
     }
 
+    // Record stage history if reverted from 'submitted' to 'final'
+    if (proposal.stage === 'submitted') {
+      try {
+        await sql`
+          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+          VALUES (${proposalId}::uuid, 'submitted', 'final', ${sessionUser.id}::uuid, 'Reverted on unlock')
+        `;
+      } catch (histErr) {
+        console.error('[portal/proposals/lock] unlock stage history failed (non-fatal)', histErr);
+      }
+    }
+
     await emitEventSingle({
       namespace: 'proposal',
       type: 'proposal.unlocked',
@@ -312,6 +369,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         tenantSlug,
         proposalId,
         lockCount: proposal.lockCount,
+        revertedFromSubmitted: proposal.stage === 'submitted',
         unlockDeadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null,
       },
     });
@@ -335,6 +393,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       data: {
         locked: false,
         lockCount: proposal.lockCount,
+        stage: proposal.stage === 'submitted' ? 'final' : proposal.stage,
         unlockDeadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null,
       },
     });
