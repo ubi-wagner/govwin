@@ -89,7 +89,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const tempPw = crypto.randomUUID().slice(0, 12);
     const hash = await bcrypt.hash(tempPw, 12);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const result = await sql.begin(async (tsql: any) => {
       // Create tenant with unique slug
       const slug = slugify(app.companyName);

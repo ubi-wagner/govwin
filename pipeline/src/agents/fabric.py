@@ -360,6 +360,12 @@ class AgentFabric:
                                 tool_failure_counts[block.name] = tool_failure_counts.get(block.name, 0) + 1
                                 if tool_failure_counts[block.name] >= 3:
                                     result = {"error": f"Tool {block.name} is temporarily unavailable after 3 failures"}
+                                    # Remove the tripped tool so Claude stops calling it
+                                    if "tools" in api_kwargs:
+                                        api_kwargs["tools"] = [
+                                            t for t in api_kwargs["tools"]
+                                            if t.get("name") != block.name
+                                        ]
 
                             tool_results_log.append({
                                 "tool": block.name,
@@ -775,6 +781,14 @@ class AgentFabric:
                 uuid.UUID(tenant_id),
             )
             monthly_budget = float(config_row["monthly_budget"]) if config_row else DEFAULT_MONTHLY_BUDGET_USD
+
+            # Explicit zero budget means AI is disabled for this tenant
+            if monthly_budget == 0:
+                logger.info(
+                    "[budget] tenant %s has monthly_budget=0 (AI disabled)",
+                    tenant_id,
+                )
+                return False
 
             # Sum costs for the current calendar month
             usage_row = await conn.fetchrow(

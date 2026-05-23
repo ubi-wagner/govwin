@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN tenant_agent_config tac ON tac.tenant_id = atl.tenant_id
       WHERE atl.created_at >= now() - ${intervalStr}::interval
       GROUP BY atl.tenant_id, t.name, tac.monthly_budget
-      ORDER BY cost_usd DESC
+      ORDER BY SUM(atl.cost_usd) DESC NULLS LAST
     `;
 
     const byTenantMapped = byTenant.map((row) => {

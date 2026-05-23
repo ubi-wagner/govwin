@@ -17,14 +17,22 @@ const store = new Map<string, RateLimitEntry>();
 
 // Periodic cleanup to prevent memory leak (every 5 minutes)
 const CLEANUP_INTERVAL = 5 * 60 * 1000;
+// Hard cap: if an attacker sends requests from >100K unique IPs,
+// force an immediate cleanup to bound memory usage.
+const MAX_STORE_SIZE = 100_000;
 let lastCleanup = Date.now();
 
 function cleanup() {
   const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  const oversize = store.size >= MAX_STORE_SIZE;
+  if (!oversize && now - lastCleanup < CLEANUP_INTERVAL) return;
   lastCleanup = now;
   for (const [key, entry] of store) {
     if (entry.resetAt <= now) store.delete(key);
+  }
+  // If still over limit after expiry cleanup, drop everything
+  if (store.size >= MAX_STORE_SIZE) {
+    store.clear();
   }
 }
 

@@ -836,6 +836,15 @@ async def run_workflow_processor(
                                         conn, rid, wf_cls,
                                         json.loads(inst_row["payload"]) if isinstance(inst_row["payload"], str) else (inst_row["payload"] or {}),
                                     )
+                                else:
+                                    log.warning(
+                                        "Cannot resolve workflow for retrying instance %s (name=%s)",
+                                        rid, inst_row["workflow_name"],
+                                    )
+                                    await conn.execute(
+                                        "UPDATE process_instances SET status = 'failed', last_error = 'workflow_class_not_found', completed_at = now() WHERE id = $1",
+                                        uuid.UUID(rid),
+                                    )
                     except Exception as e:
                         log.error("poll_retrying_instances failed: %s", e)
 

@@ -281,8 +281,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       await sql`
         UPDATE proposals
         SET download_count = COALESCE(download_count, 0) + 1
-        WHERE id = ${proposalId}
-      `;
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+`;
     } catch (e) {
       console.error('[portal/proposals/package] download_count update failed:', e);
     }

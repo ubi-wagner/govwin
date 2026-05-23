@@ -90,8 +90,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         version: number;
       }[]>`
         SELECT id, stage, title, gate_config, lock_count, is_locked, version FROM proposals
-        WHERE id = ${proposalId}
-          AND tenant_id = ${tenantId}
+        WHERE id = ${proposalId}::uuid
+          AND tenant_id = ${tenantId}::uuid
         LIMIT 1
       `;
     } catch (e) {
@@ -141,27 +141,33 @@ export async function POST(request: Request, ctx: RouteContext) {
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
 
-    // ── Check gate requirements for current stage ───────────────────
-    try {
-      const unmetGates = await sql`
-        SELECT label FROM stage_gate_requirements
-        WHERE proposal_id = ${proposalId}::uuid AND stage = ${previousStage} AND is_met = false
-      `;
-      if (unmetGates.length > 0 && !body.force) {
-        return NextResponse.json({
-          error: 'Unmet gate requirements',
-          code: 'GATE_REQUIREMENTS_NOT_MET',
-          details: { unmet: unmetGates.map((g: Record<string, unknown>) => g.label) }
-        }, { status: 422 });
-      }
-    } catch (e) {
-      console.error('[advance] gate check failed:', e);
-      // Non-fatal — proceed with advance if gate table doesn't exist
-    }
-
     // ── Update proposal stage + record history (transactional) ──────
+    // Gate check is inside the transaction to prevent TOCTOU races.
     try {
       await sql.begin(async (tx: any) => {
+        // ── Check gate requirements inside transaction ────────────
+        try {
+          const unmetGates = await tx`
+            SELECT label FROM stage_gate_requirements
+            WHERE proposal_id = ${proposalId}::uuid AND stage = ${previousStage} AND is_met = false
+          `;
+          if (unmetGates.length > 0 && !body.force) {
+            throw new Error('GATE_REQUIREMENTS_NOT_MET:' + JSON.stringify(unmetGates.map((g: Record<string, unknown>) => g.label)));
+          }
+        } catch (gateErr) {
+          if (gateErr instanceof Error && gateErr.message.startsWith('GATE_REQUIREMENTS_NOT_MET:')) {
+            throw gateErr;
+          }
+          // Check for "relation does not exist" (PostgreSQL error code 42P01)
+          const pgErr = gateErr as { code?: string };
+          if (pgErr.code === '42P01') {
+            // Table doesn't exist yet — gate system not deployed, proceed
+          } else {
+            // Real DB error — do NOT silently skip
+            throw gateErr;
+          }
+        }
+
         if (shouldLock) {
           const advanceResult = await tx`
             UPDATE proposals
@@ -171,7 +177,7 @@ export async function POST(request: Request, ctx: RouteContext) {
                 last_locked_at = now(),
                 version = version + 1,
                 last_modified_by = ${sessionUser.id}::uuid
-            WHERE id = ${proposalId}
+            WHERE id = ${proposalId}::uuid
               AND stage = ${previousStage}
               AND version = ${proposal.version}
           `;
@@ -184,7 +190,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             SET stage = ${targetStage},
                 version = version + 1,
                 last_modified_by = ${sessionUser.id}::uuid
-            WHERE id = ${proposalId}
+            WHERE id = ${proposalId}::uuid
               AND stage = ${previousStage}
               AND version = ${proposal.version}
           `;
@@ -195,12 +201,20 @@ export async function POST(request: Request, ctx: RouteContext) {
 
         await tx`
           INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-          VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
+          VALUES (${proposalId}::uuid, ${previousStage}, ${targetStage}, ${sessionUser.id}::uuid, ${notes})
         `;
       });
     } catch (e) {
       if (e instanceof Error && e.message === 'CONFLICT') {
         return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+      }
+      if (e instanceof Error && e.message.startsWith('GATE_REQUIREMENTS_NOT_MET:')) {
+        const unmetLabels = JSON.parse(e.message.replace('GATE_REQUIREMENTS_NOT_MET:', ''));
+        return NextResponse.json({
+          error: 'Unmet gate requirements',
+          code: 'GATE_REQUIREMENTS_NOT_MET',
+          details: { unmet: unmetLabels }
+        }, { status: 422 });
       }
       console.error('[portal/proposals/advance] stage update failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });

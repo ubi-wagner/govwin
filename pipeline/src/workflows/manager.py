@@ -782,8 +782,6 @@ class WorkflowManager:
         while True:
             try:
                 await asyncio.sleep(60)
-                work_conn = pool if pool else conn
-
                 # Check for stale heartbeats on running instances
                 if pool:
                     async with pool.acquire() as sd_conn:
@@ -851,12 +849,14 @@ class WorkflowManager:
                     async with pool.acquire() as sp_conn:
                         stale_pending = await sp_conn.fetch(
                             """SELECT id, workflow_name FROM process_instances
-                               WHERE status = 'pending' AND created_at < now() - interval '1 hour'"""
+                               WHERE status = 'pending' AND created_at < now() - interval '1 hour'
+                               FOR UPDATE SKIP LOCKED"""
                         )
                 else:
                     stale_pending = await conn.fetch(
                         """SELECT id, workflow_name FROM process_instances
-                           WHERE status = 'pending' AND created_at < now() - interval '1 hour'"""
+                           WHERE status = 'pending' AND created_at < now() - interval '1 hour'
+                           FOR UPDATE SKIP LOCKED"""
                     )
 
                 for sp_row in stale_pending:
@@ -922,7 +922,6 @@ class WorkflowManager:
                         "[stuck_detection] Paused instance %s (%s) past deadline",
                         pt_id, pt_row["workflow_name"],
                     )
-                    update_conn = pool if pool else conn
                     if pool:
                         async with pool.acquire() as u_conn:
                             await u_conn.execute(

@@ -96,8 +96,8 @@ const RATE_LIMITED_PATHS: Record<string, { limit: number; windowMs: number }> = 
 
 function getClientIp(request: Request): string {
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     'unknown'
   );
 }
@@ -112,47 +112,45 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  // Rate limiting for POST requests to public endpoints
-  if (req.method === 'POST') {
-    const rateLimitConfig = RATE_LIMITED_PATHS[pathname];
-    if (rateLimitConfig) {
-      const ip = getClientIp(req);
-      const key = `${ip}:${pathname}`;
-      const result = checkRateLimit(key, rateLimitConfig.limit, rateLimitConfig.windowMs);
-      if (!result.allowed) {
-        return new NextResponse(
-          JSON.stringify({ error: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' }),
-          {
-            status: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
-              'X-RateLimit-Limit': String(rateLimitConfig.limit),
-              'X-RateLimit-Remaining': '0',
-              'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
-            },
+  // Rate limiting for public endpoints (all methods)
+  const rateLimitConfig = RATE_LIMITED_PATHS[pathname];
+  if (rateLimitConfig) {
+    const ip = getClientIp(req);
+    const key = `${ip}:${pathname}`;
+    const result = checkRateLimit(key, rateLimitConfig.limit, rateLimitConfig.windowMs);
+    if (!result.allowed) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': String(rateLimitConfig.limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
           },
-        );
-      }
+        },
+      );
     }
+  }
 
-    // Auth login rate limiting (slightly higher limit)
-    if (pathname.startsWith('/api/auth/') && !RATE_LIMITED_PATHS[pathname]) {
-      const ip = getClientIp(req);
-      const key = `${ip}:/api/auth`;
-      const result = checkRateLimit(key, 20, 15 * 60 * 1000);
-      if (!result.allowed) {
-        return new NextResponse(
-          JSON.stringify({ error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED' }),
-          {
-            status: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
-            },
+  // Auth login rate limiting (all methods, slightly higher limit)
+  if (pathname.startsWith('/api/auth/') && !RATE_LIMITED_PATHS[pathname]) {
+    const ip = getClientIp(req);
+    const key = `${ip}:/api/auth`;
+    const result = checkRateLimit(key, 20, 15 * 60 * 1000);
+    if (!result.allowed) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
           },
-        );
-      }
+        },
+      );
     }
   }
 

@@ -45,21 +45,39 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import asyncpg
 
 logger = logging.getLogger("pipeline.lifecycle")
 
 
+def _seconds_until_next_hour() -> float:
+    """Return seconds until the start of the next UTC hour."""
+    now = datetime.now(timezone.utc)
+    # seconds remaining in this hour
+    remaining = 3600 - (now.minute * 60 + now.second + now.microsecond / 1e6)
+    return max(remaining, 1.0)
+
+
 async def run_lifecycle_scheduler(
     database_url: str,
     shutdown_event: asyncio.Event,
 ) -> None:
-    """Main lifecycle scheduler loop. Runs hourly, checks what's due."""
+    """Main lifecycle scheduler loop. Runs hourly, checks what's due.
+
+    Tracks last run dates to prevent duplicate execution when the loop
+    fires multiple times in the same hour (timing drift prevention).
+    Reconnects automatically if the DB connection drops.
+    """
 
     logger.info("lifecycle scheduler started")
     conn: asyncpg.Connection | None = None
+
+    # Track last execution dates to prevent duplicates (P2-#17, P1-#3)
+    last_daily_run: date | None = None
+    last_weekly_run: date | None = None
+    last_monthly_run: date | None = None
 
     try:
         conn = await asyncpg.connect(database_url)
@@ -67,34 +85,54 @@ async def run_lifecycle_scheduler(
 
         while not shutdown_event.is_set():
             now = datetime.now(timezone.utc)
+            today = now.date()
             hour = now.hour
             weekday = now.weekday()  # 0 = Monday
             day_of_month = now.day
 
-            # Daily jobs (3 AM UTC)
-            if hour == 3:
+            # Daily jobs (3 AM UTC) — once per calendar day
+            if hour >= 3 and last_daily_run != today:
                 await _run_daily_jobs(conn)
+                last_daily_run = today
 
-            # Weekly jobs (Monday 4 AM UTC)
-            if hour == 4 and weekday == 0:
+            # Weekly jobs (Monday 4 AM UTC) — once per calendar week
+            if hour >= 4 and weekday == 0 and last_weekly_run != today:
                 await _run_weekly_jobs(conn)
+                last_weekly_run = today
 
-            # Monthly jobs (1st Monday 5 AM UTC)
-            if hour == 5 and weekday == 0 and day_of_month <= 7:
+            # Monthly jobs (1st Monday 5 AM UTC) — once per month
+            if hour >= 5 and weekday == 0 and day_of_month <= 7 and last_monthly_run != today:
                 await _run_monthly_jobs(conn)
+                last_monthly_run = today
 
-            # Sleep for 1 hour (check at each hour boundary)
+            # Sleep until next hour boundary to prevent timing drift
+            sleep_seconds = _seconds_until_next_hour()
             try:
                 await asyncio.wait_for(
                     shutdown_event.wait(),
-                    timeout=3600,
+                    timeout=sleep_seconds,
                 )
                 break  # shutdown_event was set
             except asyncio.TimeoutError:
-                pass  # Normal — hour elapsed, loop again
+                pass  # Normal — hour boundary reached, loop again
 
     except asyncio.CancelledError:
         logger.info("lifecycle scheduler cancelled")
+    except (asyncpg.PostgresConnectionError, OSError) as conn_err:
+        logger.error("lifecycle scheduler connection lost: %s, reconnecting...", conn_err)
+        try:
+            if conn:
+                await conn.close()
+        except Exception:
+            pass
+        conn = None
+        # Wait before reconnecting, then restart the loop
+        if not shutdown_event.is_set():
+            await asyncio.sleep(30)
+            try:
+                await run_lifecycle_scheduler(database_url, shutdown_event)
+            except Exception as re_err:
+                logger.error("lifecycle scheduler reconnect loop failed: %s", re_err)
     except Exception as e:
         logger.error("lifecycle scheduler fatal: %s", e)
     finally:

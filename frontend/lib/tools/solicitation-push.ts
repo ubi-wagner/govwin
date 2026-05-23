@@ -123,7 +123,7 @@ export const solicitationPushTool = defineTool<Input, Output>({
     // 3. Atomic push in transaction — status update + opportunity activation + triage action
     let pushedRows: { pushedAt: Date }[];
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       pushedRows = await sql.begin(async (tx: any) => {
       const rows = await tx`
         UPDATE curated_solicitations

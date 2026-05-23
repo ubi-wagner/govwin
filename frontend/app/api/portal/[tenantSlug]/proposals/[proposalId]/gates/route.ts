@@ -224,11 +224,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Verify proposal belongs to tenant
-    let proposal: { id: string } | undefined;
+    // Verify proposal belongs to tenant and fetch its gate_config
+    let proposal: { id: string; gateConfig: string[] | null } | undefined;
     try {
-      [proposal] = await sql<{ id: string }[]>`
-        SELECT id FROM proposals
+      [proposal] = await sql<{ id: string; gateConfig: string[] | null }[]>`
+        SELECT id, gate_config FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}
         LIMIT 1
       `;
@@ -271,10 +271,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    const VALID_STAGES = ['draft', 'review', 'final', 'submitted', 'archived'] as const;
-    if (!(VALID_STAGES as readonly string[]).includes(stage)) {
+    // Validate stage against the proposal's gate_config instead of a hardcoded list
+    const validStages = (proposal.gateConfig && proposal.gateConfig.length > 0)
+      ? proposal.gateConfig
+      : ['draft', 'final'];
+    if (!validStages.includes(stage)) {
       return NextResponse.json(
-        { error: `stage must be one of: ${VALID_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { error: `stage must be one of: ${validStages.join(', ')}`, code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
