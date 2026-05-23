@@ -20,7 +20,11 @@
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
-const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
+const { sqlMock } = vi.hoisted(() => {
+  const mock = vi.fn() as any;
+  mock.begin = vi.fn(async (fn: any) => fn(mock));
+  return { sqlMock: mock };
+});
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({ sql: sqlMock }));
@@ -77,6 +81,7 @@ beforeEach(() => {
   register(solicitationPushTool);
   register(complianceSaveVariableValueTool);
   sqlMock.mockReset();
+  sqlMock.begin = vi.fn(async (fn: any) => fn(sqlMock));
   emitSingleMock.mockReset();
   emitSingleMock.mockResolvedValue(undefined);
 });
@@ -150,13 +155,14 @@ describe('Phase 1 §E24 — full curation flow', () => {
     expect(save.memoryWritten).toBe(true);
     expect(save.action).toBe('manual_entry');
 
-    // Count sql calls so far: triage(1) + claim(2) + release(3) + save(3) = 9
-    expect(sqlMock).toHaveBeenCalledTimes(9);
+    // Count sql calls so far: triage(1) + claim(2) + release(3) + save(3) + revision(1) = 10
+    expect(sqlMock).toHaveBeenCalledTimes(10);
 
     // ── Step 6: admin A requests review ─────────────────────────
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: ADMIN_A_ID }])
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(undefined) // triage_actions
+      .mockResolvedValueOnce(undefined); // curation_revision
 
     const req = await invoke('solicitation.request_review', {
       solicitationId: SOL_ID,
@@ -168,7 +174,8 @@ describe('Phase 1 §E24 — full curation flow', () => {
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: ADMIN_A_ID, namespace: NAMESPACE }])
       .mockResolvedValueOnce(undefined) // triage_actions
-      .mockResolvedValueOnce(undefined); // approve memory INSERT
+      .mockResolvedValueOnce(undefined) // approve memory INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision
 
     const approve = await invoke('solicitation.approve', {
       solicitationId: SOL_ID,
@@ -184,6 +191,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active
       .mockResolvedValueOnce(undefined)                   // triage_actions
+      .mockResolvedValueOnce(undefined)                   // curation_revision
       .mockResolvedValueOnce([{ count: '5' }])            // topic COUNT
       .mockResolvedValueOnce(undefined);                  // push memory INSERT
 

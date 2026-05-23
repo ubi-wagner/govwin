@@ -11,7 +11,12 @@
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
-const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
+const { sqlMock } = vi.hoisted(() => {
+  const mock = vi.fn() as any;
+  // sql.begin(async (tx) => { ... }) — pass the mock itself as tx
+  mock.begin = vi.fn(async (fn: any) => fn(mock));
+  return { sqlMock: mock };
+});
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({ sql: sqlMock }));
@@ -73,6 +78,7 @@ beforeEach(() => {
   register(solicitationRejectReviewTool);
   register(solicitationPushTool);
   sqlMock.mockReset();
+  sqlMock.begin = vi.fn(async (fn: any) => fn(sqlMock));
   emitSingleMock.mockReset();
   emitSingleMock.mockResolvedValue(undefined);
 });
@@ -83,7 +89,8 @@ describe('solicitation.request_review', () => {
   it('happy path: transitions + emits event', async () => {
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: CURATOR_ID }])
-      .mockResolvedValueOnce(undefined); // triage_actions INSERT
+      .mockResolvedValueOnce(undefined) // triage_actions INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision INSERT
 
     const result = await invoke('solicitation.request_review',
       { solicitationId: SOL_ID }, ctx(),
@@ -122,7 +129,8 @@ describe('solicitation.approve', () => {
         id: SOL_ID, curatedBy: CURATOR_ID, namespace: NAMESPACE,
       }])
       .mockResolvedValueOnce(undefined) // triage_actions
-      .mockResolvedValueOnce(undefined); // memory INSERT
+      .mockResolvedValueOnce(undefined) // memory INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision INSERT
 
     const result = await invoke('solicitation.approve',
       { solicitationId: SOL_ID }, ctx(),
@@ -133,8 +141,8 @@ describe('solicitation.approve', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.approved' }),
     );
-    // 3 sql calls: UPDATE + triage + memory
-    expect(sqlMock).toHaveBeenCalledTimes(3);
+    // 4 sql calls: UPDATE + triage + memory + curation_revision
+    expect(sqlMock).toHaveBeenCalledTimes(4);
   });
 
   it('throws ForbiddenError (SAME_PERSON_REVIEW) when curator == approver', async () => {
@@ -171,12 +179,14 @@ describe('solicitation.approve', () => {
   it('skips memory write when namespace is null', async () => {
     sqlMock
       .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: CURATOR_ID, namespace: null }])
-      .mockResolvedValueOnce(undefined); // only triage INSERT, no memory
+      .mockResolvedValueOnce(undefined) // triage INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision INSERT (no memory since namespace is null)
 
     await invoke('solicitation.approve',
       { solicitationId: SOL_ID }, ctx(),
     );
-    expect(sqlMock).toHaveBeenCalledTimes(2);
+    // 3 sql calls: UPDATE + triage + curation_revision (no memory since namespace is null)
+    expect(sqlMock).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -232,6 +242,7 @@ describe('solicitation.push', () => {
       .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
       .mockResolvedValueOnce(undefined) // opportunities UPDATE
       .mockResolvedValueOnce(undefined) // triage_actions
+      .mockResolvedValueOnce(undefined) // curation_revision INSERT
       .mockResolvedValueOnce([{ count: '3' }]) // topic COUNT
       .mockResolvedValueOnce(undefined); // memory INSERT
 
@@ -245,8 +256,8 @@ describe('solicitation.push', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.pushed' }),
     );
-    // 6 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + COUNT topics + memory
-    expect(sqlMock).toHaveBeenCalledTimes(6);
+    // 7 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + COUNT topics + memory + revision
+    expect(sqlMock).toHaveBeenCalledTimes(7);
   });
 
   it('throws ValidationError when submission_format is missing', async () => {

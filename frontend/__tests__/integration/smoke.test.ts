@@ -151,10 +151,9 @@ describe('Smoke 2 — Proposal provisioning round-trip', () => {
     expect(resolveTemplateKey('sbir_phase_1', 'spreadsheet')).toBeNull();
   });
 
-  it('resolveTemplateKey() returns null for sbir_phase_2 (template not yet in map)', () => {
-    // sbir_phase_2 resolves the key but the template is not in TEMPLATE_MAP
+  it('resolveTemplateKey() returns key for sbir_phase_2', () => {
     const key = resolveTemplateKey('sbir_phase_2', 'word_doc');
-    expect(key).toBeNull();
+    expect(key).toBe('dod-sbir-phase2-technical');
   });
 
   it('getTemplate() returns a deep clone of the technical template', () => {
