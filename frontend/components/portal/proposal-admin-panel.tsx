@@ -18,6 +18,10 @@ interface SectionItem {
   nodeCount: number;
   permission: 'edit' | 'comment' | 'view' | 'none';
   assignedTo?: string | null;
+  completedStage?: string | null;
+  completedAt?: string | null;
+  acceptedByName?: string | null;
+  isEditable?: boolean;
 }
 
 interface Collaborator {
@@ -131,6 +135,39 @@ export function ProposalAdminPanel({
 }: ProposalAdminPanelProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'artifacts' | 'team' | 'compliance' | 'ai'>('artifacts');
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [complianceLoading, setComplianceLoading] = useState(false);
+  const [complianceResults, setComplianceResults] = useState<{
+    totalVariables: number;
+    passed: number;
+    failed: number;
+    partial: number;
+    checks: Array<{
+      variableId: string;
+      variableName: string;
+      status: string;
+      excerpt: string | null;
+      suggestion: string | null;
+    }>;
+  } | null>(null);
+  const [complianceError, setComplianceError] = useState<string | null>(null);
+  const [gateRequirements, setGateRequirements] = useState<Array<{
+    id: string;
+    stage: string;
+    requirementType: string;
+    label: string;
+    description: string | null;
+    isMet: boolean;
+    metBy: string | null;
+    metAt: string | null;
+  }>>([]);
+  const [gatesLoading, setGatesLoading] = useState(false);
+  const [gatesLoaded, setGatesLoaded] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const [newGateLabel, setNewGateLabel] = useState('');
+  const [newGateStage, setNewGateStage] = useState('');
+  const [addingGate, setAddingGate] = useState(false);
 
   const handleSectionClick = useCallback(
     (sectionId: string) => {
@@ -140,6 +177,135 @@ export function ProposalAdminPanel({
     },
     [router, tenantSlug, proposalId],
   );
+
+  // ── Export Package handler ───────────────────────────────────
+  const handleExport = useCallback(async () => {
+    setExportLoading(true);
+    setExportMessage(null);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/package`,
+        { method: 'POST' },
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Export failed' }));
+        setExportMessage({ type: 'error', text: json.error || 'Export failed' });
+        return;
+      }
+      const json = await res.json();
+      const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `proposal-package-${proposalId.slice(0, 8)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportMessage({ type: 'success', text: 'Package exported successfully' });
+    } catch {
+      setExportMessage({ type: 'error', text: 'Network error' });
+    } finally {
+      setExportLoading(false);
+    }
+  }, [tenantSlug, proposalId]);
+
+  // ── Compliance Check handler ──────────────────────────────
+  const handleComplianceCheck = useCallback(async () => {
+    setComplianceLoading(true);
+    setComplianceError(null);
+    setComplianceResults(null);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/ai/compliance`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Check failed' }));
+        setComplianceError(json.error || 'Compliance check failed');
+        return;
+      }
+      const json = await res.json();
+      setComplianceResults(json.data);
+    } catch {
+      setComplianceError('Network error');
+    } finally {
+      setComplianceLoading(false);
+    }
+  }, [tenantSlug, proposalId]);
+
+  // ── Gate Requirements handlers ────────────────────────────
+  const fetchGates = useCallback(async () => {
+    setGatesLoading(true);
+    setGateError(null);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/gates`,
+      );
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({ error: 'Failed to load' }));
+        setGateError(json.error || 'Failed to load gates');
+        return;
+      }
+      const json = await res.json();
+      setGateRequirements(json.data?.requirements ?? []);
+      setGatesLoaded(true);
+    } catch {
+      setGateError('Network error');
+    } finally {
+      setGatesLoading(false);
+    }
+  }, [tenantSlug, proposalId]);
+
+  const handleToggleGate = useCallback(async (reqId: string, isMet: boolean) => {
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/gates`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requirementId: reqId, isMet }),
+        },
+      );
+      if (res.ok) {
+        setGateRequirements((prev) =>
+          prev.map((g) => (g.id === reqId ? { ...g, isMet } : g)),
+        );
+      }
+    } catch {
+      // swallow
+    }
+  }, [tenantSlug, proposalId]);
+
+  const handleAddGate = useCallback(async () => {
+    if (!newGateLabel.trim() || !newGateStage.trim()) return;
+    setAddingGate(true);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/gates`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stage: newGateStage,
+            requirementType: 'custom',
+            label: newGateLabel.trim(),
+          }),
+        },
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setGateRequirements((prev) => [...prev, json.data]);
+        setNewGateLabel('');
+      }
+    } catch {
+      // swallow
+    } finally {
+      setAddingGate(false);
+    }
+  }, [tenantSlug, proposalId, newGateLabel, newGateStage]);
 
   // Group sections by volume (using section number prefix)
   const volumes = groupSectionsByVolume(sections);
@@ -244,6 +410,15 @@ export function ProposalAdminPanel({
                         {statusInfo.label}
                       </span>
 
+                      {/* Completion marker */}
+                      {section.completedStage && (
+                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0" title={`Completed in ${section.completedStage}${section.acceptedByName ? ` by ${section.acceptedByName}` : ''}${section.completedAt ? ` on ${new Date(section.completedAt).toLocaleDateString()}` : ''}`}>
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </span>
+                      )}
+
                       {/* Action */}
                       <button
                         onClick={() => handleSectionClick(section.id)}
@@ -257,6 +432,25 @@ export function ProposalAdminPanel({
               </div>
             </div>
           ))}
+
+          {/* Export Package */}
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              onClick={handleExport}
+              disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exportLoading ? 'Exporting...' : 'Export Package'}
+            </button>
+            {(!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived') && (
+              <span className="text-xs text-gray-400">Lock the proposal or advance to submitted stage to export</span>
+            )}
+            {exportMessage && (
+              <span className={`text-xs ${exportMessage.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                {exportMessage.text}
+              </span>
+            )}
+          </div>
 
           {/* Dropboxes */}
           {collaborators.length > 0 && (
@@ -309,48 +503,191 @@ export function ProposalAdminPanel({
 
       {/* ─── Compliance Tab ───────────────────────────────────────── */}
       {activeTab === 'compliance' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Compliance Checklist</h3>
-          {complianceItems.length > 0 ? (
-            <div className="space-y-2">
-              {complianceItems.map((item, idx) => {
-                const label = item.requirement || item.label || `Item ${idx + 1}`;
-                const passed = item.status === 'met' || item.status === 'pass' || item.met === true;
-                const failed = item.status === 'failed' || item.status === 'fail' || item.met === false;
-                const pending = !passed && !failed;
+        <div className="space-y-5">
+          {/* AI Compliance Check */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">AI Compliance Check</h3>
+              <button
+                onClick={handleComplianceCheck}
+                disabled={complianceLoading}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                {complianceLoading ? 'Checking...' : 'Run Compliance Check'}
+              </button>
+            </div>
 
-                return (
-                  <div key={item.id || idx} className="flex items-center gap-2.5 py-2 text-sm">
-                    <div
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
-                        passed
-                          ? 'bg-emerald-100 text-emerald-600'
-                          : failed
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-gray-100 text-gray-400'
-                      }`}
-                    >
-                      {passed ? '✓' : failed ? '✗' : '?'}
-                    </div>
-                    <span className="flex-1 text-gray-700">{label}</span>
-                    {(item.details || item.value) && (
-                      <span
-                        className={`text-xs ml-auto flex-shrink-0 ${
-                          passed ? 'text-emerald-600' : failed ? 'text-red-500' : 'text-gray-400'
+            {complianceError && (
+              <p className="text-xs text-red-500 mb-3">{complianceError}</p>
+            )}
+
+            {complianceResults && (
+              <div>
+                <div className="flex gap-4 mb-4 text-xs">
+                  <span className="text-emerald-600 font-medium">{complianceResults.passed} passed</span>
+                  <span className="text-red-600 font-medium">{complianceResults.failed} failed</span>
+                  <span className="text-yellow-600 font-medium">{complianceResults.partial} partial</span>
+                  <span className="text-gray-400">{complianceResults.totalVariables} total</span>
+                </div>
+                <div className="space-y-2">
+                  {complianceResults.checks.map((check, idx) => {
+                    const statusColors: Record<string, string> = {
+                      pass: 'bg-emerald-100 text-emerald-600',
+                      fail: 'bg-red-100 text-red-600',
+                      partial: 'bg-yellow-100 text-yellow-600',
+                      not_applicable: 'bg-gray-100 text-gray-400',
+                    };
+                    return (
+                      <div key={idx} className="border border-gray-100 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase ${statusColors[check.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                            {check.status}
+                          </span>
+                          <span className="text-sm font-medium text-gray-700">{check.variableName}</span>
+                        </div>
+                        {check.excerpt && (
+                          <p className="text-xs text-gray-500 mt-1 italic">&quot;{check.excerpt}&quot;</p>
+                        )}
+                        {check.suggestion && (
+                          <p className="text-xs text-amber-600 mt-1">{check.suggestion}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!complianceResults && !complianceLoading && !complianceError && (
+              <p className="text-xs text-gray-400">
+                Run an AI compliance check to verify your proposal against solicitation requirements.
+              </p>
+            )}
+          </div>
+
+          {/* Compliance Checklist */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Compliance Checklist</h3>
+            {complianceItems.length > 0 ? (
+              <div className="space-y-2">
+                {complianceItems.map((item, idx) => {
+                  const label = item.requirement || item.label || `Item ${idx + 1}`;
+                  const passed = item.status === 'met' || item.status === 'pass' || item.met === true;
+                  const failed = item.status === 'failed' || item.status === 'fail' || item.met === false;
+
+                  return (
+                    <div key={item.id || idx} className="flex items-center gap-2.5 py-2 text-sm">
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
+                          passed
+                            ? 'bg-emerald-100 text-emerald-600'
+                            : failed
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-gray-100 text-gray-400'
                         }`}
                       >
-                        {item.details || item.value}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                        {passed ? '✓' : failed ? '✗' : '?'}
+                      </div>
+                      <span className="flex-1 text-gray-700">{label}</span>
+                      {(item.details || item.value) && (
+                        <span
+                          className={`text-xs ml-auto flex-shrink-0 ${
+                            passed ? 'text-emerald-600' : failed ? 'text-red-500' : 'text-gray-400'
+                          }`}
+                        >
+                          {item.details || item.value}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">
+                No compliance data available. Compliance matrix will be populated when the proposal is provisioned from a solicitation.
+              </p>
+            )}
+          </div>
+
+          {/* Stage Gate Requirements */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900">Stage Gate Requirements</h3>
+              {!gatesLoaded && (
+                <button
+                  onClick={fetchGates}
+                  disabled={gatesLoading}
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-md hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                >
+                  {gatesLoading ? 'Loading...' : 'Load Gates'}
+                </button>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">
-              No compliance data available. Compliance matrix will be populated when the proposal is provisioned from a solicitation.
-            </p>
-          )}
+
+            {gateError && <p className="text-xs text-red-500 mb-3">{gateError}</p>}
+
+            {gatesLoaded && gateRequirements.length === 0 && (
+              <p className="text-xs text-gray-400 mb-4">No gate requirements defined yet.</p>
+            )}
+
+            {gateRequirements.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {gateRequirements.map((gate) => (
+                  <div key={gate.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                    <button
+                      onClick={() => handleToggleGate(gate.id, !gate.isMet)}
+                      className={`w-5 h-5 rounded border flex items-center justify-center text-[10px] flex-shrink-0 transition-colors ${
+                        gate.isMet
+                          ? 'bg-emerald-100 border-emerald-300 text-emerald-600'
+                          : 'bg-white border-gray-300 text-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {gate.isMet ? '✓' : ''}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-gray-700">{gate.label}</span>
+                      {gate.description && (
+                        <p className="text-[10px] text-gray-400">{gate.description}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded capitalize flex-shrink-0">
+                      {gate.stage}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new gate */}
+            {gatesLoaded && (
+              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                <select
+                  value={newGateStage}
+                  onChange={(e) => setNewGateStage(e.target.value)}
+                  className="px-2 py-1.5 text-xs border border-gray-200 rounded-md"
+                >
+                  <option value="">Stage...</option>
+                  <option value="draft">Draft</option>
+                  <option value="review">Review</option>
+                  <option value="final">Final</option>
+                </select>
+                <input
+                  type="text"
+                  value={newGateLabel}
+                  onChange={(e) => setNewGateLabel(e.target.value)}
+                  placeholder="Requirement label..."
+                  className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md"
+                />
+                <button
+                  onClick={handleAddGate}
+                  disabled={addingGate || !newGateLabel.trim() || !newGateStage}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {addingGate ? '...' : 'Add'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

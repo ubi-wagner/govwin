@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
+import { SupportingDocActions } from '@/components/portal/supporting-doc-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -200,6 +201,8 @@ export default async function DocumentsPage({ params }: Props) {
     console.error('[portal/documents] sol docs query failed', e);
   }
 
+  const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
+
   const totalCount = sections.length + supportingDocs.length + libraryItems.length + solDocs.length;
 
   return (
@@ -297,6 +300,7 @@ export default async function DocumentsPage({ params }: Props) {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">File</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">Size</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Proposal</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -327,6 +331,16 @@ export default async function DocumentsPage({ params }: Props) {
                       >
                         {d.proposalTitle}
                       </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <SupportingDocActions
+                        docId={d.id}
+                        proposalId={d.proposalId}
+                        tenantSlug={tenantSlug}
+                        status={d.status}
+                        requirementLabel={d.requirementLabel}
+                        isAdmin={isAdmin}
+                      />
                     </td>
                   </tr>
                 ))}

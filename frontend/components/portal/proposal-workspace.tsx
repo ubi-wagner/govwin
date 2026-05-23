@@ -21,6 +21,20 @@ interface SectionItem {
   nodeCount: number;
   permission: 'edit' | 'comment' | 'view' | 'none';
   assignedTo?: string | null;
+  completedStage?: string | null;
+  completedAt?: string | null;
+  acceptedByName?: string | null;
+  isEditable?: boolean;
+}
+
+interface StageHistoryEntry {
+  stage: string;
+  completedByName: string | null;
+  completedAt: string;
+  totalSections: number;
+  sectionsComplete: number;
+  sectionsApproved: number;
+  notes: string | null;
 }
 
 interface Collaborator {
@@ -83,6 +97,7 @@ interface ProposalWorkspaceProps {
   canExport: boolean;
   canManageTeam: boolean;
   closeDate?: string | null;
+  stageCompletionHistory?: StageHistoryEntry[];
   proposalEvents: Array<{
     id: string;
     namespace: string;
@@ -126,6 +141,7 @@ export function ProposalWorkspace({
   canExport,
   canManageTeam,
   closeDate,
+  stageCompletionHistory,
   proposalEvents,
 }: ProposalWorkspaceProps) {
   const router = useRouter();
@@ -193,9 +209,47 @@ export function ProposalWorkspace({
 
       {/* ─── Timeline Tab ────────────────────────────────────────────── */}
       {workspaceTab === 'timeline' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Proposal Activity Timeline</h3>
-          <ProposalTimeline events={proposalEvents} />
+        <div className="space-y-6">
+          {/* Stage Completion History */}
+          {stageCompletionHistory && stageCompletionHistory.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Stage Completion History</h3>
+              <div className="space-y-3">
+                {stageCompletionHistory.map((h, idx) => (
+                  <div key={idx} className="flex items-start gap-3 border-l-2 border-emerald-300 pl-4 py-2">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 capitalize">
+                        {h.stage} completed
+                        {h.completedByName && (
+                          <span className="text-gray-500 font-normal"> by {h.completedByName}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {new Date(h.completedAt).toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                        {' -- '}
+                        {h.totalSections} sections, {h.sectionsComplete} complete, {h.sectionsApproved} approved
+                      </p>
+                      {h.notes && (
+                        <p className="text-xs text-gray-400 italic mt-0.5">{h.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Proposal Activity Timeline</h3>
+            <ProposalTimeline events={proposalEvents} />
+          </div>
         </div>
       )}
 

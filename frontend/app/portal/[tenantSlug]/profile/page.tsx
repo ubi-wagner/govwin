@@ -208,6 +208,7 @@ export default async function ProfilePage({ params }: Props) {
               researchAreas: profile.researchAreas ?? [],
               targetAgencies: profile.targetAgencies ?? [],
               setAsideTypes: profile.setAsideTypes ?? [],
+              agencyPriorities: profile.agencyPriorities ?? [],
             } : null}
           />
         </div>

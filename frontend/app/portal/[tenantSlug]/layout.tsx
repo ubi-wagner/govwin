@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
+import { NotificationBell } from '@/components/portal/notification-panel';
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -95,7 +96,12 @@ export default async function PortalLayout({
           </button>
         </form>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-8">
+        <div className="flex justify-end mb-4">
+          <NotificationBell tenantSlug={tenantSlug} />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

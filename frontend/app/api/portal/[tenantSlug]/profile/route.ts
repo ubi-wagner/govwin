@@ -106,11 +106,12 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const researchAreas = Array.isArray(body.researchAreas) ? body.researchAreas.filter((s: unknown) => typeof s === 'string') : [];
     const companySummary = typeof body.companySummary === 'string' ? body.companySummary : null;
     const technologyFocus = typeof body.technologyFocus === 'string' ? body.technologyFocus : null;
+    const agencyPriorities = Array.isArray(body.agencyPriorities) ? body.agencyPriorities.filter((s: unknown) => typeof s === 'string') : [];
 
     try {
       await sql`
-        INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus)
-        VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus})
+        INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus, agency_priorities)
+        VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus}, ${agencyPriorities})
         ON CONFLICT (tenant_id) DO UPDATE SET
           naics_codes = EXCLUDED.naics_codes,
           keywords = EXCLUDED.keywords,
@@ -118,7 +119,8 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           set_aside_types = EXCLUDED.set_aside_types,
           research_areas = EXCLUDED.research_areas,
           company_summary = EXCLUDED.company_summary,
-          technology_focus = EXCLUDED.technology_focus
+          technology_focus = EXCLUDED.technology_focus,
+          agency_priorities = EXCLUDED.agency_priorities
       `;
     } catch (e) {
       console.error('[api/portal/profile] profile upsert failed:', e);

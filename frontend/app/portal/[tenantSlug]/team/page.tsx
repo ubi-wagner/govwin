@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
+import { TeamInviteForm } from '@/components/portal/team-invite-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,7 @@ export default async function TeamPage({ params }: Props) {
   }
 
   const basePath = `/portal/${tenantSlug}`;
+  const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
 
   return (
     <div>
@@ -107,10 +109,14 @@ export default async function TeamPage({ params }: Props) {
             {members.length} member{members.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <span className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-4 py-2">
-          To invite team members, open a proposal and use the Team &amp; Access tab.
-        </span>
       </div>
+
+      {/* Invite form (admin only) */}
+      {isAdmin && (
+        <div className="mb-8">
+          <TeamInviteForm tenantSlug={tenantSlug} />
+        </div>
+      )}
 
       {/* Team Members */}
       <section className="mb-10">

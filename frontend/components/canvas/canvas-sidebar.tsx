@@ -5,7 +5,7 @@
  * history, and library match suggestions.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeEdit, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
@@ -34,6 +34,8 @@ interface Props {
   proposalId?: string;
   /** Tenant slug for comments API (only available in portal context) */
   tenantSlug?: string;
+  /** Section ID for version history (only available in portal context) */
+  sectionId?: string;
 }
 
 // ─── Self-contained comments section with data fetching ─────────────
@@ -124,6 +126,171 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
   );
 }
 
+// ─── Version History section with data fetching ──────────────────────
+
+interface VersionEntry {
+  version_number: number;
+  source: string;
+  created_by: string | null;
+  created_by_email: string | null;
+  created_at: string;
+  char_count: number | null;
+  edit_summary: string | null;
+}
+
+function VersionHistorySection({
+  proposalId,
+  tenantSlug,
+  sectionId,
+}: {
+  proposalId: string;
+  tenantSlug: string;
+  sectionId: string;
+}) {
+  const [versions, setVersions] = useState<VersionEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [versionContent, setVersionContent] = useState<string | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/versions`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({ error: 'Failed to load' }));
+          setError(json.error || 'Failed to load versions');
+          return;
+        }
+        const json = await res.json();
+        setVersions(json.data?.versions ?? []);
+      })
+      .catch(() => setError('Network error'))
+      .finally(() => setLoading(false));
+  }, [proposalId, tenantSlug, sectionId]);
+
+  const handleViewVersion = useCallback(
+    async (vn: number) => {
+      if (selectedVersion === vn) {
+        setSelectedVersion(null);
+        setVersionContent(null);
+        return;
+      }
+      setSelectedVersion(vn);
+      setContentLoading(true);
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/versions?version=${vn}`,
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const content = json.data?.content;
+          if (content && typeof content === 'object') {
+            const nodes = content.nodes || content;
+            if (Array.isArray(nodes)) {
+              const parts: string[] = [];
+              for (const node of nodes) {
+                if (node.content?.text) parts.push(node.content.text);
+                else if (typeof node.content === 'string') parts.push(node.content);
+              }
+              setVersionContent(parts.join('\n\n').slice(0, 2000));
+            } else {
+              setVersionContent(JSON.stringify(content).slice(0, 2000));
+            }
+          } else {
+            setVersionContent(String(content ?? '').slice(0, 2000));
+          }
+        }
+      } catch {
+        setVersionContent('Failed to load content');
+      } finally {
+        setContentLoading(false);
+      }
+    },
+    [proposalId, tenantSlug, sectionId, selectedVersion],
+  );
+
+  const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
+    ai_draft: { label: 'AI Draft', color: 'bg-yellow-100 text-yellow-700' },
+    human_edit: { label: 'Human Edit', color: 'bg-blue-100 text-blue-700' },
+    ai_revision: { label: 'AI Revision', color: 'bg-purple-100 text-purple-700' },
+    manual: { label: 'Manual', color: 'bg-green-100 text-green-700' },
+    library: { label: 'Library', color: 'bg-indigo-100 text-indigo-700' },
+  };
+
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        Version History
+      </h3>
+      {loading && <p className="text-xs text-gray-400">Loading versions...</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!loading && !error && versions.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No version history yet</p>
+      )}
+      {versions.length > 0 && (
+        <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+          {versions.map((v, idx) => {
+            const badge = SOURCE_BADGE[v.source] ?? { label: v.source, color: 'bg-gray-100 text-gray-600' };
+            const isLatest = idx === 0;
+            const isSelected = selectedVersion === v.version_number;
+            return (
+              <div key={v.version_number}>
+                <button
+                  onClick={() => handleViewVersion(v.version_number)}
+                  className={`w-full text-left px-2 py-1.5 rounded text-xs border transition-colors ${
+                    isSelected ? 'border-blue-300 bg-blue-50' : 'border-gray-100 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-medium text-gray-700">v{v.version_number}</span>
+                    <div className="flex items-center gap-1">
+                      {isLatest && (
+                        <span className="px-1 py-0.5 text-[9px] font-semibold bg-emerald-100 text-emerald-600 rounded">
+                          Current
+                        </span>
+                      )}
+                      <span className={`px-1 py-0.5 text-[9px] font-medium rounded ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    {v.created_by_email ?? 'System'}
+                    {' -- '}
+                    {new Date(v.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                    {v.char_count != null && ` -- ${v.char_count.toLocaleString()} chars`}
+                  </div>
+                  {v.edit_summary && (
+                    <div className="text-[10px] text-gray-500 italic mt-0.5 truncate">
+                      {v.edit_summary}
+                    </div>
+                  )}
+                </button>
+                {isSelected && (
+                  <div className="mx-1 mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-600 max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                    {contentLoading ? 'Loading...' : versionContent ?? 'No content'}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CanvasSidebar({
   document: doc,
   selectedNode,
@@ -139,8 +306,9 @@ export function CanvasSidebar({
   onReviseNode,
   proposalId,
   tenantSlug,
+  sectionId,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'settings'>('compliance');
+  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
   const pageEstimate = Math.max(1, Math.ceil(doc.nodes.length / 8));
@@ -155,10 +323,10 @@ export function CanvasSidebar({
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 text-xs">
-        {(['compliance', 'node', 'add', 'settings'] as const).map((tab) => (
+        {(['compliance', 'node', 'add', ...(proposalId && tenantSlug && sectionId ? ['history'] as const : []), 'settings'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => setActiveTab(tab as typeof activeTab)}
             className={`flex-1 py-2.5 font-medium capitalize ${
               activeTab === tab ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
             }`}
@@ -538,6 +706,15 @@ export function CanvasSidebar({
               ))}
             </div>
           </div>
+        )}
+
+        {/* ── History tab ────────────────────────────────────── */}
+        {activeTab === 'history' && proposalId && tenantSlug && sectionId && (
+          <VersionHistorySection
+            proposalId={proposalId}
+            tenantSlug={tenantSlug}
+            sectionId={sectionId}
+          />
         )}
 
         {/* ── Settings tab ───────────────────────────────────── */}
