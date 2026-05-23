@@ -68,24 +68,21 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    // TODO: Implement agent performance metrics
-    //
-    // SELECT agent_role,
-    //        count(*)::int AS total_tasks,
-    //        count(*) FILTER (WHERE status = 'completed')::int AS completed,
-    //        count(*) FILTER (WHERE status = 'failed')::int AS failed,
-    //        avg(EXTRACT(EPOCH FROM (completed_at - created_at)))::int AS avg_duration_seconds,
-    //        round(count(*) FILTER (WHERE status = 'completed')::numeric /
-    //              NULLIF(count(*), 0) * 100, 1) AS success_rate
-    // FROM agent_task_queue
-    // WHERE tenant_id = ${tenantId}::uuid
-    // GROUP BY agent_role
-    // ORDER BY total_tasks DESC
+    const metrics = await sql`
+      SELECT agent_role,
+             count(*)::int AS total_tasks,
+             count(*) FILTER (WHERE status = 'completed')::int AS completed,
+             count(*) FILTER (WHERE status = 'failed')::int AS failed,
+             coalesce(avg(EXTRACT(EPOCH FROM (completed_at - created_at)))::int, 0) AS avg_duration_seconds,
+             coalesce(round(count(*) FILTER (WHERE status = 'completed')::numeric /
+                   NULLIF(count(*), 0) * 100, 1), 0) AS success_rate
+      FROM agent_task_queue
+      WHERE tenant_id = ${tenantId}::uuid
+      GROUP BY agent_role
+      ORDER BY total_tasks DESC
+    `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-17',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    return NextResponse.json({ data: { metrics } });
   } catch (err) {
     console.error('[portal/agents/performance] error:', err);
     return NextResponse.json(

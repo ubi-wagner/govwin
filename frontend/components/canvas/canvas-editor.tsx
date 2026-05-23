@@ -409,14 +409,9 @@ function CanvasEditorInner({
                   Export .docx
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      await onExport(doc, 'pdf');
-                    } catch (err) {
-                      setSaveError(err instanceof Error ? err.message : 'Export failed');
-                    }
-                  }}
-                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                  disabled
+                  title="Coming soon"
+                  className="px-3 py-1.5 text-xs border rounded bg-gray-100 text-gray-400 cursor-not-allowed"
                 >
                   Export .pdf
                 </button>

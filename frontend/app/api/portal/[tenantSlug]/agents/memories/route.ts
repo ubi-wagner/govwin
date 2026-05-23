@@ -74,20 +74,44 @@ export async function GET(request: Request, ctx: RouteContext) {
     const rawLimit = parseInt(url.searchParams.get('limit') ?? '50', 10);
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 200);
 
-    // TODO: Implement agent memory query
-    //
-    // SELECT am.id, am.agent_role, am.memory_type, am.content,
-    //        am.confidence, am.created_at, am.last_accessed_at
-    // FROM agent_memories am
-    // WHERE am.tenant_id = ${tenantId}::uuid
-    //   [AND am.agent_role = ${agentRole}]
-    // ORDER BY am.created_at DESC
-    // LIMIT ${limit}
+    // Query both episodic and semantic memories for this tenant
+    const episodic = agentRole
+      ? await sql`
+          SELECT id, agent_role, memory_type, content, importance AS confidence,
+                 occurred_at, created_at, last_accessed, 'episodic' AS memory_source
+          FROM episodic_memories
+          WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : await sql`
+          SELECT id, agent_role, memory_type, content, importance AS confidence,
+                 occurred_at, created_at, last_accessed, 'episodic' AS memory_source
+          FROM episodic_memories
+          WHERE tenant_id = ${tenantId}::uuid
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-16',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    const semantic = agentRole
+      ? await sql`
+          SELECT id, agent_role, category AS memory_type, content, confidence,
+                 valid_from, created_at, 'semantic' AS memory_source
+          FROM semantic_memories
+          WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `
+      : await sql`
+          SELECT id, agent_role, category AS memory_type, content, confidence,
+                 valid_from, created_at, 'semantic' AS memory_source
+          FROM semantic_memories
+          WHERE tenant_id = ${tenantId}::uuid
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `;
+
+    return NextResponse.json({ data: { episodic, semantic } });
   } catch (err) {
     console.error('[portal/agents/memories] error:', err);
     return NextResponse.json(

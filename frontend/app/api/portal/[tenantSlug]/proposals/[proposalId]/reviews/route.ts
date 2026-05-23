@@ -71,28 +71,32 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement review listing
-    //
-    // This requires a reviews / review_comments schema. Options:
-    // a) Use proposal_comments with a "review_round" field
-    // b) Create dedicated tables: proposal_reviews + proposal_review_items
-    //
-    // For V1, use proposal_comments grouped by stage at which they were made:
-    // SELECT pc.id, pc.section_id, pc.user_id, pc.content, pc.resolved,
-    //        pc.created_at, u.name AS reviewer_name,
-    //        psh.to_stage AS review_stage
-    // FROM proposal_comments pc
-    // JOIN users u ON u.id = pc.user_id
-    // LEFT JOIN proposal_stage_history psh ON psh.proposal_id = pc.proposal_id
-    //   AND psh.created_at <= pc.created_at
-    // WHERE pc.proposal_id = ${proposalId}
-    //   AND pc.proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)
-    // ORDER BY pc.created_at DESC
+    // Verify proposal belongs to tenant
+    const proposalCheck = await sql<{ id: string }[]>`
+      SELECT id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
+    `;
+    if (proposalCheck.length === 0) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-14',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    // Use proposal_comments grouped by the stage at which they were made
+    const reviews = await sql`
+      SELECT pc.id, pc.section_id, pc.user_id, pc.content, pc.resolved,
+             pc.created_at, u.name AS reviewer_name,
+             psh.to_stage AS review_stage
+      FROM proposal_comments pc
+      JOIN users u ON u.id = pc.user_id
+      LEFT JOIN proposal_stage_history psh ON psh.proposal_id = pc.proposal_id
+        AND psh.created_at <= pc.created_at
+      WHERE pc.proposal_id = ${proposalId}::uuid
+        AND pc.proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)
+      ORDER BY pc.created_at DESC
+    `;
+
+    return NextResponse.json({ data: { reviews } });
   } catch (err) {
     console.error('[portal/proposals/reviews/list] error:', err);
     return NextResponse.json(
@@ -176,18 +180,53 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // TODO: Implement review round creation
-    //
     // 1. Verify proposal belongs to tenant and is in 'review' stage
-    // 2. Create review round record (or use stage advancement as the trigger)
-    // 3. Assign reviewers to sections
-    // 4. Emit proposal:review.created event
-    // 5. Return { data: { reviewId, reviewType, reviewerCount } }
+    const proposalCheck = await sql<{ id: string; stage: string }[]>`
+      SELECT id, stage FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
+    `;
+    if (proposalCheck.length === 0) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
 
+    if (proposalCheck[0].stage !== 'review') {
+      return NextResponse.json(
+        { error: 'Proposal must be in review stage to create a review round', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    // 2. Create a comment for each reviewer marking the review round
+    const reviewerIds = body.reviewerIds ?? [];
+    const notes = body.notes ?? '';
+
+    // Record the review round in stage history as a note
+    const [stageEntry] = await sql<{ id: string }[]>`
+      INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+      VALUES (${proposalId}::uuid, 'review', 'review', ${sessionUser.id}::uuid,
+              ${`${body.reviewType} review round initiated. ${notes}`.trim()})
+      RETURNING id
+    `;
+
+    // 3. Emit event
+    await emitEventSingle({
+      namespace: 'proposal',
+      type: 'review.created',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, reviewType: body.reviewType, reviewerIds },
+    });
+
+    // 4. Return response
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-14',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        reviewId: stageEntry.id,
+        reviewType: body.reviewType,
+        reviewerCount: reviewerIds.length,
+      },
+    }, { status: 201 });
   } catch (err) {
     console.error('[portal/proposals/reviews/create] error:', err);
     return NextResponse.json(

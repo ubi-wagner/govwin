@@ -48,6 +48,7 @@ interface Output {
   inputTokens: number;
   outputTokens: number;
   model: string;
+  error?: string;
 }
 
 // ─── System prompt construction ────────────────────────────────────
@@ -331,7 +332,13 @@ export const proposalDraftSectionTool = defineTool<Input, Output>({
       return draftWithClaude(input, actorId, actorName);
     }
 
-    ctx.log.info({ proposalId: input.proposalId, section: input.sectionTitle }, 'No ANTHROPIC_API_KEY — generating placeholder nodes');
-    return draftPlaceholder(input, actorId, actorName);
+    ctx.log.warn({ proposalId: input.proposalId, section: input.sectionTitle }, 'No ANTHROPIC_API_KEY — returning error');
+    return {
+      nodes: [],
+      model: 'none',
+      inputTokens: 0,
+      outputTokens: 0,
+      error: 'AI drafting unavailable — ANTHROPIC_API_KEY not configured. Please contact your administrator.',
+    };
   },
 });
