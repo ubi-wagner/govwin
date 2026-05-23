@@ -60,10 +60,11 @@ async def main() -> None:
     from ingest.dispatcher import run_consumer_loop
     from workflows.processor import run_workflow_processor
     from health import run_health_server
+    from lifecycle_scheduler import run_lifecycle_scheduler
 
-    # Run the ingester consumer loop, workflow processor, and health
-    # server concurrently. All manage their own resources and respect
-    # shutdown_event.
+    # Run the ingester consumer loop, workflow processor, health
+    # server, and lifecycle scheduler concurrently. All manage their
+    # own resources and respect shutdown_event.
     await asyncio.gather(
         run_consumer_loop(
             database_url=DATABASE_URL,
@@ -76,6 +77,10 @@ async def main() -> None:
             poll_interval=10,
         ),
         run_health_server(
+            shutdown_event=shutdown_event,
+        ),
+        run_lifecycle_scheduler(
+            database_url=DATABASE_URL,
             shutdown_event=shutdown_event,
         ),
     )
