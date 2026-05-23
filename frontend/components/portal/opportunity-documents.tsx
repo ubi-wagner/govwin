@@ -93,7 +93,7 @@ export function OpportunityDocuments({ tenantSlug, opportunityId }: OpportunityD
           >
             <div className="flex items-center gap-3 min-w-0">
               <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-mono font-medium bg-gray-100 text-gray-600 flex-shrink-0">
-                {doc.documentType?.toUpperCase() ?? 'FILE'}
+                {doc.documentType.toUpperCase()}
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">

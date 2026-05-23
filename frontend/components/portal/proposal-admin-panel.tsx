@@ -273,15 +273,19 @@ export function ProposalAdminPanel({
         setGateRequirements((prev) =>
           prev.map((g) => (g.id === reqId ? { ...g, isMet } : g)),
         );
+      } else {
+        const json = await res.json().catch(() => ({ error: 'Failed to update gate' }));
+        setGateError(json.error || 'Failed to update gate');
       }
     } catch {
-      // swallow
+      setGateError('Network error toggling gate');
     }
   }, [tenantSlug, proposalId]);
 
   const handleAddGate = useCallback(async () => {
     if (!newGateLabel.trim() || !newGateStage.trim()) return;
     setAddingGate(true);
+    setGateError(null);
     try {
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/gates`,
@@ -299,9 +303,13 @@ export function ProposalAdminPanel({
         const json = await res.json();
         setGateRequirements((prev) => [...prev, json.data]);
         setNewGateLabel('');
+        setNewGateStage('');
+      } else {
+        const json = await res.json().catch(() => ({ error: 'Failed to add gate' }));
+        setGateError(json.error || 'Failed to add gate');
       }
     } catch {
-      // swallow
+      setGateError('Network error adding gate');
     } finally {
       setAddingGate(false);
     }
@@ -359,9 +367,9 @@ export function ProposalAdminPanel({
                   const assignee = collaborators.find((c) => c.userId === section.assignedTo);
                   const assigneeIdx = assignee ? collaborators.indexOf(assignee) : -1;
                   const pagePercent = section.pageAllocation
-                    ? Math.min(100, Math.round((section.nodeCount / (section.pageAllocation * 3)) * 100))
+                    ? Math.round((section.nodeCount / (section.pageAllocation * 3)) * 100)
                     : 0;
-                  const pageColor = pagePercent > 90 ? 'bg-amber-500' : pagePercent > 100 ? 'bg-red-500' : 'bg-emerald-500';
+                  const pageColor = pagePercent > 100 ? 'bg-red-500' : pagePercent > 90 ? 'bg-amber-500' : 'bg-emerald-500';
 
                   return (
                     <div

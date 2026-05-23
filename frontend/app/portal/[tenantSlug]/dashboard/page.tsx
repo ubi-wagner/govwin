@@ -249,7 +249,7 @@ export default async function DashboardPage({
         )}
       </div>
       {/* Agent Usage (admin only) */}
-      {(role === 'tenant_admin' || role === 'master_admin') && (
+      {(role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin') && (
         <div className="mt-8">
           <AgentUsagePanel tenantSlug={tenantSlug} />
         </div>

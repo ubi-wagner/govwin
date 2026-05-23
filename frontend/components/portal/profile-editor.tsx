@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface TenantInfoProps {
   name: string;
@@ -46,6 +46,23 @@ export function ProfileEditor({ tenantSlug, canEdit, tenantInfo, profile }: Prof
     researchAreas: (profile?.researchAreas ?? []).join(', '),
     agencyPriorities: (profile?.agencyPriorities ?? []).join(', '),
   });
+
+  useEffect(() => {
+    setFormData({
+      name: tenantInfo?.name ?? '',
+      legalName: tenantInfo?.legalName ?? '',
+      website: tenantInfo?.website ?? '',
+      billingEmail: tenantInfo?.billingEmail ?? '',
+      companySummary: profile?.companySummary ?? '',
+      technologyFocus: profile?.technologyFocus ?? '',
+      naicsCodes: (profile?.naicsCodes ?? []).join(', '),
+      keywords: (profile?.keywords ?? []).join(', '),
+      targetAgencies: (profile?.targetAgencies ?? []).join(', '),
+      setAsideTypes: (profile?.setAsideTypes ?? []).join(', '),
+      researchAreas: (profile?.researchAreas ?? []).join(', '),
+      agencyPriorities: (profile?.agencyPriorities ?? []).join(', '),
+    });
+  }, [tenantInfo, profile]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);

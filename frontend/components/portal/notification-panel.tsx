@@ -44,6 +44,8 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
 
   useEffect(() => {
     fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60_000);
+    return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   // Close on outside click
@@ -59,12 +61,17 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
     }
   }, [open]);
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  // Phase 2: persist read status server-side. For now, track "seen" IDs locally.
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
 
-  const handleMarkRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-    );
+  const unreadCount = notifications.filter((n) => !n.is_read && !seenIds.has(n.id)).length;
+
+  const handleMarkSeen = useCallback((id: string) => {
+    setSeenIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   }, []);
 
   const EVENT_LABELS: Record<string, string> = {
@@ -123,16 +130,18 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
 
           {!loading && !error && notifications.length > 0 && (
             <ul className="divide-y divide-gray-50">
-              {notifications.map((n) => (
+              {notifications.map((n) => {
+                const isUnseen = !n.is_read && !seenIds.has(n.id);
+                return (
                 <li
                   key={n.id}
-                  onClick={() => handleMarkRead(n.id)}
+                  onClick={() => handleMarkSeen(n.id)}
                   className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-                    !n.is_read ? 'bg-blue-50/50' : ''
+                    isUnseen ? 'bg-blue-50/50' : ''
                   }`}
                 >
                   <div className="flex items-start gap-2">
-                    {!n.is_read && (
+                    {isUnseen && (
                       <span className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
@@ -156,7 +165,8 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
                     </span>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

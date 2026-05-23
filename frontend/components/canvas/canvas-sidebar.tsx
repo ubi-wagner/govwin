@@ -154,12 +154,20 @@ function VersionHistorySection({
   const [versionContent, setVersionContent] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
   const fetchedRef = useRef(false);
+  const prevSectionIdRef = useRef(sectionId);
 
   useEffect(() => {
+    if (prevSectionIdRef.current !== sectionId) {
+      fetchedRef.current = false;
+      prevSectionIdRef.current = sectionId;
+    }
     if (fetchedRef.current) return;
     fetchedRef.current = true;
     setLoading(true);
     setError(null);
+    setVersions([]);
+    setSelectedVersion(null);
+    setVersionContent(null);
     fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/versions`)
       .then(async (res) => {
         if (!res.ok) {
@@ -345,7 +353,7 @@ export function CanvasSidebar({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status</span>
-                  <span className="font-medium">{doc.metadata.status.replace('_', ' ')}</span>
+                  <span className="font-medium">{doc.metadata.status.replace(/_/g, ' ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Atoms</span>
@@ -411,7 +419,7 @@ export function CanvasSidebar({
           <>
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Selected: {selectedNode.type.replace('_', ' ')}
+                Selected: {selectedNode.type.replace(/_/g, ' ')}
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -421,7 +429,7 @@ export function CanvasSidebar({
                     selectedNode.provenance.source === 'library' ? 'bg-indigo-100 text-indigo-700' :
                     'bg-gray-100 text-gray-600'
                   }`}>
-                    {selectedNode.provenance.source.replace('_', ' ')}
+                    {selectedNode.provenance.source.replace(/_/g, ' ')}
                   </span>
                 </div>
                 {selectedNode.provenance.library_unit_id && (

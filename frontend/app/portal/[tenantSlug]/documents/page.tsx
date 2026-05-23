@@ -338,7 +338,7 @@ export default async function DocumentsPage({ params }: Props) {
                         proposalId={d.proposalId}
                         tenantSlug={tenantSlug}
                         status={d.status}
-                        requirementLabel={d.requirementLabel}
+                        downloadUrl={d.status !== 'missing' ? `/api/portal/${tenantSlug}/proposals/${d.proposalId}/supporting-docs/${d.id}` : null}
                         isAdmin={isAdmin}
                       />
                     </td>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface TeamInviteFormProps {
   tenantSlug: string;
@@ -13,11 +13,18 @@ export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const emailRef = useRef(email);
+  emailRef.current = email;
+  const nameRef = useRef(name);
+  nameRef.current = name;
+  const roleRef = useRef(role);
+  roleRef.current = role;
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedEmail = emailRef.current.trim().toLowerCase();
       if (!trimmedEmail || !trimmedEmail.includes('@')) {
         setMessage({ type: 'error', text: 'Please enter a valid email address' });
         return;
@@ -32,8 +39,8 @@ export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: trimmedEmail,
-            name: name.trim() || null,
-            role,
+            name: nameRef.current.trim() || null,
+            role: roleRef.current,
           }),
         });
 
@@ -53,7 +60,7 @@ export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
         setSubmitting(false);
       }
     },
-    [tenantSlug, email, name, role],
+    [tenantSlug],
   );
 
   return (

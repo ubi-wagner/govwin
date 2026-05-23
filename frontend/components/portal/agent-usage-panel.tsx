@@ -118,7 +118,7 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="border border-gray-200 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Total AI Calls (this month)</p>
+          <p className="text-xs text-gray-500">Total AI Calls ({period === '7d' ? 'last 7 days' : period === '30d' ? 'last 30 days' : 'last 90 days'})</p>
           <p className="text-xl font-bold mt-1">{data.summary.totalCalls}</p>
         </div>
         <div className="border border-gray-200 rounded-lg p-3">

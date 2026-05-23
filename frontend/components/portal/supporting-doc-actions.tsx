@@ -7,7 +7,6 @@ interface SupportingDocActionsProps {
   proposalId: string;
   tenantSlug: string;
   status: string;
-  requirementLabel: string;
   downloadUrl?: string | null;
   isAdmin: boolean;
 }
@@ -17,7 +16,6 @@ export function SupportingDocActions({
   proposalId,
   tenantSlug,
   status,
-  requirementLabel,
   downloadUrl,
   isAdmin,
 }: SupportingDocActionsProps) {

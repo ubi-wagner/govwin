@@ -137,7 +137,7 @@ export default async function ProfilePage({ params }: Props) {
                   <dt className="text-gray-500">Role</dt>
                   <dd className="mt-0.5">
                     <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
-                      {userInfo.role.replace('_', ' ')}
+                      {userInfo.role.replace(/_/g, ' ')}
                     </span>
                   </dd>
                 </div>

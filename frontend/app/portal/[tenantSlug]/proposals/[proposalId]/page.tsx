@@ -274,7 +274,16 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       ORDER BY requirement_text ASC
     `;
     if (matrix.length > 0) {
-      compliance = { items: matrix, source: 'database' };
+      compliance = {
+        items: matrix.map((row) => ({
+          id: row.id,
+          requirement: row.requirementText,
+          label: row.requirementText,
+          status: row.status,
+          details: row.notes,
+        })),
+        source: 'database',
+      };
     }
   } catch (e) {
     console.error('[portal/proposals/workspace] compliance query error:', e);
