@@ -64,6 +64,14 @@ stage_completion_snapshots (046)
   sections_snapshot (JSONB), total_sections, sections_complete,
   sections_approved, notes, created_at
 
+proposal_supporting_docs (047)
+  id, proposal_id, tenant_id, requirement_label, requirement_source,
+  category, is_required, storage_key, original_filename, file_size,
+  content_type, status, uploaded_by, uploaded_at, reviewed_by,
+  reviewed_at, notes, library_unit_id, created_at, updated_at
+  CHECK category IN ('supporting_document', 'proposal_input', 'other')
+  CHECK status IN ('missing', 'uploaded', 'reviewed', 'approved', 'waived')
+
 proposal_comments
   id, proposal_id, section_id, user_id, content, resolved, created_at
   NOTE: column is "section_id" not "node_id", "user_id" not "actor_id",

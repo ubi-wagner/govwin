@@ -319,6 +319,46 @@ export async function POST(request: Request, ctx: RouteContext) {
         count = 1;
       }
 
+      // ── Seed supporting documents from compliance matrix ──────────
+      try {
+        const complianceRow = await tx`
+          SELECT required_documents, required_sections FROM solicitation_compliance
+          WHERE solicitation_id = ${topic.solicitationId}::uuid LIMIT 1
+        `;
+
+        if (complianceRow.length > 0) {
+          const requiredDocs = complianceRow[0].requiredDocuments;
+          // requiredDocs is JSONB — could be array of strings or array of objects
+          if (Array.isArray(requiredDocs)) {
+            for (const doc of requiredDocs) {
+              const label = typeof doc === 'string' ? doc : (doc.name || doc.label || String(doc));
+              const source = typeof doc === 'object' && doc !== null ? (doc.source || doc.reference || null) : null;
+              const required = typeof doc === 'object' && doc !== null ? (doc.required !== false) : true;
+
+              await tx`
+                INSERT INTO proposal_supporting_docs
+                  (proposal_id, tenant_id, requirement_label, requirement_source,
+                   category, is_required, status)
+                VALUES (${proposalRow.id}::uuid, ${tenantId}::uuid, ${label}, ${source},
+                        'supporting_document', ${required}, 'missing')
+              `;
+            }
+          }
+        }
+
+        // Also create placeholder rows for the user-upload categories
+        await tx`
+          INSERT INTO proposal_supporting_docs
+            (proposal_id, tenant_id, requirement_label, category, is_required, status)
+          VALUES
+            (${proposalRow.id}::uuid, ${tenantId}::uuid, 'Proposal Input Materials', 'proposal_input', false, 'missing'),
+            (${proposalRow.id}::uuid, ${tenantId}::uuid, 'Other Documents', 'other', false, 'missing')
+        `;
+      } catch (seedErr) {
+        // Supporting doc seeding is enrichment — don't fail the whole proposal creation
+        console.error('[api/portal/proposals/create] supporting docs seed failed (non-fatal):', seedErr);
+      }
+
       return { proposal: proposalRow, sectionCount: count };
     });
 

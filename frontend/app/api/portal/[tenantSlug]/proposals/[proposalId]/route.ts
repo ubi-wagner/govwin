@@ -120,6 +120,40 @@ export async function GET(_request: Request, ctx: RouteContext) {
       ORDER BY ps.section_number ASC
     `;
 
+    // ── Load supporting documents ──────────────────────────────────
+    let supportingDocs: {
+      id: string;
+      requirementLabel: string;
+      requirementSource: string | null;
+      category: string;
+      isRequired: boolean;
+      storageKey: string | null;
+      originalFilename: string | null;
+      fileSize: number | null;
+      contentType: string | null;
+      status: string;
+      uploadedBy: string | null;
+      uploadedAt: Date | null;
+      reviewedBy: string | null;
+      reviewedAt: Date | null;
+      notes: string | null;
+    }[] = [];
+    try {
+      supportingDocs = await sql<typeof supportingDocs>`
+        SELECT id, requirement_label, requirement_source, category, is_required,
+               storage_key, original_filename, file_size, content_type,
+               status, uploaded_by, uploaded_at, reviewed_by, reviewed_at, notes
+        FROM proposal_supporting_docs
+        WHERE proposal_id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
+        ORDER BY
+          CASE category WHEN 'supporting_document' THEN 1 WHEN 'proposal_input' THEN 2 ELSE 3 END,
+          requirement_label
+      `;
+    } catch (sdErr) {
+      // Non-fatal — table may not exist yet on older deployments
+      console.error('[api/portal/proposals/detail] supporting docs query failed (non-fatal):', sdErr);
+    }
+
     // ── Load stage completion history ──────────────────────────────
     let stageSnapshots: {
       stage: string;
@@ -185,6 +219,22 @@ export async function GET(_request: Request, ctx: RouteContext) {
           sectionsComplete: snap.sectionsComplete,
           sectionsApproved: snap.sectionsApproved,
           notes: snap.notes,
+        })),
+        supportingDocs: supportingDocs.map((sd) => ({
+          id: sd.id,
+          requirementLabel: sd.requirementLabel,
+          requirementSource: sd.requirementSource,
+          category: sd.category,
+          isRequired: sd.isRequired,
+          originalFilename: sd.originalFilename,
+          fileSize: sd.fileSize,
+          contentType: sd.contentType,
+          status: sd.status,
+          uploadedBy: sd.uploadedBy,
+          uploadedAt: sd.uploadedAt,
+          reviewedBy: sd.reviewedBy,
+          reviewedAt: sd.reviewedAt,
+          notes: sd.notes,
         })),
       },
     });

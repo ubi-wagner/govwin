@@ -16,6 +16,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
+import { getSignedGetUrl } from '@/lib/storage/s3-client';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -276,7 +277,45 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const verifiedCount = complianceData?.verifiedAt ? 1 : 0;
 
-    // ── 6. Increment download_count ──────────────────────────
+    // ── 6. Fetch supporting docs with signed URLs ────────────
+    let supportingDocsData: {
+      id: string;
+      requirementLabel: string;
+      category: string;
+      isRequired: boolean;
+      status: string;
+      storageKey: string | null;
+      originalFilename: string | null;
+      fileSize: number | null;
+      contentType: string | null;
+    }[] = [];
+    try {
+      supportingDocsData = await sql<typeof supportingDocsData>`
+        SELECT id, requirement_label, category, is_required, status,
+               storage_key, original_filename, file_size, content_type
+        FROM proposal_supporting_docs
+        WHERE proposal_id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
+        AND storage_key IS NOT NULL
+        ORDER BY category, requirement_label
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] supporting docs query failed (non-fatal):', e);
+    }
+
+    // Generate signed URLs for each uploaded doc
+    const supportingDocsWithUrls = await Promise.all(supportingDocsData.map(async (doc) => ({
+      id: doc.id,
+      requirementLabel: doc.requirementLabel,
+      category: doc.category,
+      isRequired: doc.isRequired,
+      status: doc.status,
+      originalFilename: doc.originalFilename,
+      fileSize: doc.fileSize,
+      contentType: doc.contentType,
+      downloadUrl: doc.storageKey ? await getSignedGetUrl(doc.storageKey).catch(() => null) : null,
+    })));
+
+    // ── 8. Increment download_count ──────────────────────────
     try {
       await sql`
         UPDATE proposals
@@ -287,7 +326,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[portal/proposals/package] download_count update failed:', e);
     }
 
-    // ── 7. Emit event ────────────────────────────────────────
+    // ── 9. Emit event ────────────────────────────────────────
     await emitEventSingle({
       namespace: 'proposal',
       type: 'package.exported',
@@ -300,7 +339,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
-    // ── Activity log ────────────────────────────────────────
+    // ── 10. Activity log ───────────────────────────────────────
     try {
       await sql`
         INSERT INTO proposal_activity_log
@@ -315,7 +354,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[portal/proposals/package] activity log failed', logErr);
     }
 
-    // ── 8. Build total chars for manifest ────────────────────
+    // ── 11. Build total chars for manifest ────────────────────
     const totalChars = sectionData.reduce((sum, s) => sum + s.text_content.length, 0);
 
     return NextResponse.json({
@@ -334,9 +373,11 @@ export async function POST(request: Request, ctx: RouteContext) {
             unverified: complianceRows.length - verifiedCount,
           },
         },
+        supportingDocs: supportingDocsWithUrls,
         manifest: {
           generated_at: new Date().toISOString(),
           section_count: sectionData.length,
+          supporting_doc_count: supportingDocsWithUrls.length,
           total_chars: totalChars,
         },
       },
