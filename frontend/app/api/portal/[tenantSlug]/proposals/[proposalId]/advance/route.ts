@@ -138,6 +138,24 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Verify proposal has at least one section ─────────────────────
+    let sectionCountCheck: { count: string }[];
+    try {
+      sectionCountCheck = await sql<{ count: string }[]>`
+        SELECT count(*)::text FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/advance] section count query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (parseInt(sectionCountCheck[0]?.count ?? '0', 10) === 0) {
+      return NextResponse.json(
+        { error: 'Cannot advance a proposal with no sections', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
     const previousStage = proposal.stage;
     const shouldLock = targetStage === 'final';
     // When advancing to 'final' AND auto-locking, also advance to 'submitted'
@@ -309,7 +327,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalId,
         proposalTitle: proposal.title,
         previousStage,
-        targetStage: finalStageValue,
+        targetStage,
+        ...(shouldLock ? { effectiveStage: 'submitted' } : {}),
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
         notes: notes ?? undefined,

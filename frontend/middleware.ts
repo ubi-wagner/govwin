@@ -57,11 +57,15 @@ const PUBLIC_PATHS = [
   '/legal',
   '/api/health',
   '/api/waitlist',
-  '/api/applications',
   '/api/content',
   '/api/analytics',
   '/api/stripe/webhook',
   '/invite',
+];
+
+/** Paths that are public but must match exactly (no startsWith prefix matching). */
+const PUBLIC_EXACT_PATHS = [
+  '/api/applications',
 ];
 
 // Static asset extensions that bypass auth. Exhaustive on purpose:
@@ -80,6 +84,9 @@ function isPublicPath(pathname: string): boolean {
     pathname.startsWith('/favicon') ||
     STATIC_ASSET_RE.test(pathname)
   ) {
+    return true;
+  }
+  if (PUBLIC_EXACT_PATHS.includes(pathname)) {
     return true;
   }
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));

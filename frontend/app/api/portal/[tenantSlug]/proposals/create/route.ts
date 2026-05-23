@@ -362,6 +362,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       return { proposal: proposalRow, sectionCount: count };
     });
 
+    // ── Link matching purchase to the new proposal ─────────────────
+    try {
+      await sql`
+        UPDATE purchases
+        SET proposal_id = ${proposal.id}::uuid,
+            updated_at = now()
+        WHERE tenant_id = ${tenantId}::uuid
+          AND opportunity_id = ${topicId}::uuid
+          AND proposal_id IS NULL
+      `;
+    } catch (purchaseErr) {
+      // Non-fatal — purchase linkage is not critical path
+      console.error('[api/portal/proposals/create] purchase link failed (non-fatal):', purchaseErr);
+    }
+
     // ── Provision S3 artifacts (non-blocking — failure is logged, not fatal) ─
     let docsCopied = 0;
     try {

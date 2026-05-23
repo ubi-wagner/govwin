@@ -49,7 +49,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // ── Load proposal with opportunity context ──────────────────────
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       title: string;
       stage: string;
@@ -62,34 +62,53 @@ export async function GET(_request: Request, ctx: RouteContext) {
       closeDate: Date | null;
       programType: string | null;
       solicitationTitle: string | null;
-    }[]>`
-      SELECT
-        p.id,
-        p.title,
-        p.stage,
-        p.is_locked,
-        p.created_at,
-        p.opportunity_id,
-        p.solicitation_id,
-        o.agency,
-        o.topic_number,
-        o.close_date,
-        o.program_type,
-        cs.solicitation_title
-      FROM proposals p
-      JOIN opportunities o ON o.id = p.opportunity_id
-      LEFT JOIN curated_solicitations cs ON cs.id = p.solicitation_id
-      WHERE p.id = ${proposalId}
-        AND p.tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        title: string;
+        stage: string;
+        isLocked: boolean;
+        createdAt: Date;
+        opportunityId: string;
+        solicitationId: string | null;
+        agency: string | null;
+        topicNumber: string | null;
+        closeDate: Date | null;
+        programType: string | null;
+        solicitationTitle: string | null;
+      }[]>`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.is_locked,
+          p.created_at,
+          p.opportunity_id,
+          p.solicitation_id,
+          o.agency,
+          o.topic_number,
+          o.close_date,
+          o.program_type,
+          cs.solicitation_title
+        FROM proposals p
+        JOIN opportunities o ON o.id = p.opportunity_id
+        LEFT JOIN curated_solicitations cs ON cs.id = p.solicitation_id
+        WHERE p.id = ${proposalId}
+          AND p.tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/detail] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Load sections with completion markers ─────────────────────
-    const sections = await sql<{
+    let sections: {
       id: string;
       sectionNumber: string;
       title: string;
@@ -101,24 +120,30 @@ export async function GET(_request: Request, ctx: RouteContext) {
       acceptedBy: string | null;
       acceptedAt: Date | null;
       acceptedByName: string | null;
-    }[]>`
-      SELECT
-        ps.id,
-        ps.section_number,
-        ps.title,
-        ps.status,
-        ps.page_allocation,
-        ps.version,
-        ps.completed_stage,
-        ps.completed_at,
-        ps.accepted_by,
-        ps.accepted_at,
-        u.name AS accepted_by_name
-      FROM proposal_sections ps
-      LEFT JOIN users u ON u.id = ps.accepted_by
-      WHERE ps.proposal_id = ${proposalId}
-      ORDER BY ps.section_number ASC
-    `;
+    }[];
+    try {
+      sections = await sql<typeof sections>`
+        SELECT
+          ps.id,
+          ps.section_number,
+          ps.title,
+          ps.status,
+          ps.page_allocation,
+          ps.version,
+          ps.completed_stage,
+          ps.completed_at,
+          ps.accepted_by,
+          ps.accepted_at,
+          u.name AS accepted_by_name
+        FROM proposal_sections ps
+        LEFT JOIN users u ON u.id = ps.accepted_by
+        WHERE ps.proposal_id = ${proposalId}
+        ORDER BY ps.section_number ASC
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/detail] sections query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── Load supporting documents ──────────────────────────────────
     let supportingDocs: {

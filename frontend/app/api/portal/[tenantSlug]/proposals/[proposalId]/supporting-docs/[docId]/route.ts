@@ -240,6 +240,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       : null;
     const newNotes = typeof body.notes === 'string' ? body.notes : null;
 
+    // ── Validate status transitions ─────────────────────────
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      missing: ['uploaded'],
+      uploaded: ['reviewed'],
+      reviewed: ['approved', 'waived'],
+      approved: ['waived'],
+      waived: ['reviewed'],
+    };
+
     // Status transitions to reviewed/approved/waived require tenant_admin
     if (newStatus && ['reviewed', 'approved', 'waived'].includes(newStatus)) {
       if (!hasRoleAtLeast(role, 'tenant_admin')) {
@@ -258,10 +267,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify doc exists ────────────────────────────────────
-    let existingDoc: { id: string } | undefined;
+    let existingDoc: { id: string; status: string } | undefined;
     try {
-      [existingDoc] = await sql<{ id: string }[]>`
-        SELECT id FROM proposal_supporting_docs
+      [existingDoc] = await sql<{ id: string; status: string }[]>`
+        SELECT id, status FROM proposal_supporting_docs
         WHERE id = ${docId}::uuid
           AND proposal_id = ${proposalId}::uuid
           AND tenant_id = ${tenantId}::uuid
@@ -277,6 +286,17 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         { error: 'Supporting document not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // ── Enforce valid status transitions ─────────────────────
+    if (newStatus) {
+      const allowed = VALID_TRANSITIONS[existingDoc.status];
+      if (!allowed || !allowed.includes(newStatus)) {
+        return NextResponse.json(
+          { error: `Cannot transition from '${existingDoc.status}' to '${newStatus}'`, code: 'VALIDATION_ERROR' },
+          { status: 422 },
+        );
+      }
     }
 
     // ── Apply update ─────────────────────────────────────────
@@ -384,6 +404,26 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         { error: 'Forbidden', code: 'FORBIDDEN' },
         { status: 403 },
       );
+    }
+
+    // ── Proposal-level access check for non-admin users ───────
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      try {
+        const [collab] = await sql<{ userId: string }[]>`
+          SELECT user_id FROM proposal_collaborators
+          WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
+          LIMIT 1
+        `;
+        if (!collab) {
+          return NextResponse.json(
+            { error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' },
+            { status: 403 },
+          );
+        }
+      } catch (e) {
+        console.error('[portal/proposals/supporting-docs/detail] collaborator check failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // ── Find the doc ─────────────────────────────────────────

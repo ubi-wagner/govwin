@@ -182,6 +182,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       gateConfig: string[];
       title: string;
       lockCount: number;
+      version: number;
     } | undefined;
     try {
       [proposal] = await sql<{
@@ -190,8 +191,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         gateConfig: string[];
         title: string;
         lockCount: number;
+        version: number;
       }[]>`
-        SELECT id, stage, gate_config, title, lock_count
+        SELECT id, stage, gate_config, title, lock_count, version
         FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}
         LIMIT 1
@@ -224,20 +226,38 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     // Update proposal
     try {
       if (shouldLock) {
-        await sql`
+        const lockResult = await sql`
           UPDATE proposals
           SET stage = 'submitted',
               is_locked = true,
               lock_count = lock_count + 1,
-              last_locked_at = now()
+              last_locked_at = now(),
+              version = version + 1
           WHERE id = ${proposalId}
+            AND tenant_id = ${tenantId}::uuid
+            AND version = ${proposal.version}
         `;
+        if (lockResult.count === 0) {
+          return NextResponse.json(
+            { error: 'Proposal was modified by another user', code: 'CONFLICT' },
+            { status: 409 },
+          );
+        }
       } else {
-        await sql`
+        const updateResult = await sql`
           UPDATE proposals
-          SET stage = ${nextStage}
+          SET stage = ${nextStage},
+              version = version + 1
           WHERE id = ${proposalId}
+            AND tenant_id = ${tenantId}::uuid
+            AND version = ${proposal.version}
         `;
+        if (updateResult.count === 0) {
+          return NextResponse.json(
+            { error: 'Proposal was modified by another user', code: 'CONFLICT' },
+            { status: 409 },
+          );
+        }
       }
     } catch (e) {
       console.error('[portal/proposals/stage] PATCH stage update failed:', e);

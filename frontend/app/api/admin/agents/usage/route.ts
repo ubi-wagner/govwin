@@ -63,22 +63,28 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Summary stats ────────────────────────────────────────────
-    const summaryRows = await sql<{
+    let summaryRows: {
       totalCalls: number;
       totalInputTokens: string;
       totalOutputTokens: string;
       totalCostUsd: string;
       uniqueTenants: number;
-    }[]>`
-      SELECT
-        COUNT(*)::int AS total_calls,
-        COALESCE(SUM(input_tokens), 0)::text AS total_input_tokens,
-        COALESCE(SUM(output_tokens), 0)::text AS total_output_tokens,
-        COALESCE(SUM(cost_usd), 0)::text AS total_cost_usd,
-        COUNT(DISTINCT tenant_id)::int AS unique_tenants
-      FROM agent_task_log
-      WHERE created_at >= now() - ${intervalStr}::interval
-    `;
+    }[];
+    try {
+      summaryRows = await sql<typeof summaryRows>`
+        SELECT
+          COUNT(*)::int AS total_calls,
+          COALESCE(SUM(input_tokens), 0)::text AS total_input_tokens,
+          COALESCE(SUM(output_tokens), 0)::text AS total_output_tokens,
+          COALESCE(SUM(cost_usd), 0)::text AS total_cost_usd,
+          COUNT(DISTINCT tenant_id)::int AS unique_tenants
+        FROM agent_task_log
+        WHERE created_at >= now() - ${intervalStr}::interval
+      `;
+    } catch (dbErr) {
+      console.error('[admin/agents/usage] summary query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const summaryRow = summaryRows[0];
     const totalCalls = summaryRow?.totalCalls ?? 0;
@@ -96,7 +102,7 @@ export async function GET(request: NextRequest) {
     };
 
     // ── By archetype ─────────────────────────────────────────────
-    const byArchetype = await sql<{
+    let byArchetype: {
       agentRole: string;
       calls: number;
       inputTokens: string;
@@ -104,20 +110,26 @@ export async function GET(request: NextRequest) {
       costUsd: string;
       avgDurationMs: number;
       totalErrors: number;
-    }[]>`
-      SELECT
-        agent_role,
-        COUNT(*)::int AS calls,
-        COALESCE(SUM(input_tokens), 0)::text AS input_tokens,
-        COALESCE(SUM(output_tokens), 0)::text AS output_tokens,
-        COALESCE(SUM(cost_usd), 0)::text AS cost_usd,
-        COALESCE(AVG(duration_ms), 0)::int AS avg_duration_ms,
-        COUNT(*) FILTER (WHERE error IS NOT NULL)::int AS total_errors
-      FROM agent_task_log
-      WHERE created_at >= now() - ${intervalStr}::interval
-      GROUP BY agent_role
-      ORDER BY calls DESC
-    `;
+    }[];
+    try {
+      byArchetype = await sql<typeof byArchetype>`
+        SELECT
+          agent_role,
+          COUNT(*)::int AS calls,
+          COALESCE(SUM(input_tokens), 0)::text AS input_tokens,
+          COALESCE(SUM(output_tokens), 0)::text AS output_tokens,
+          COALESCE(SUM(cost_usd), 0)::text AS cost_usd,
+          COALESCE(AVG(duration_ms), 0)::int AS avg_duration_ms,
+          COUNT(*) FILTER (WHERE error IS NOT NULL)::int AS total_errors
+        FROM agent_task_log
+        WHERE created_at >= now() - ${intervalStr}::interval
+        GROUP BY agent_role
+        ORDER BY calls DESC
+      `;
+    } catch (dbErr) {
+      console.error('[admin/agents/usage] archetype query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const byArchetypeMapped = byArchetype.map((row) => ({
       agentRole: row.agentRole,
@@ -132,26 +144,32 @@ export async function GET(request: NextRequest) {
     }));
 
     // ── By tenant ────────────────────────────────────────────────
-    const byTenant = await sql<{
+    let byTenant: {
       tenantId: string;
       tenantName: string;
       calls: number;
       costUsd: string;
       monthlyBudget: string | null;
-    }[]>`
-      SELECT
-        atl.tenant_id,
-        t.name AS tenant_name,
-        COUNT(*)::int AS calls,
-        COALESCE(SUM(atl.cost_usd), 0)::text AS cost_usd,
-        tac.monthly_budget::text AS monthly_budget
-      FROM agent_task_log atl
-      JOIN tenants t ON t.id = atl.tenant_id
-      LEFT JOIN tenant_agent_config tac ON tac.tenant_id = atl.tenant_id
-      WHERE atl.created_at >= now() - ${intervalStr}::interval
-      GROUP BY atl.tenant_id, t.name, tac.monthly_budget
-      ORDER BY SUM(atl.cost_usd) DESC NULLS LAST
-    `;
+    }[];
+    try {
+      byTenant = await sql<typeof byTenant>`
+        SELECT
+          atl.tenant_id,
+          t.name AS tenant_name,
+          COUNT(*)::int AS calls,
+          COALESCE(SUM(atl.cost_usd), 0)::text AS cost_usd,
+          tac.monthly_budget::text AS monthly_budget
+        FROM agent_task_log atl
+        JOIN tenants t ON t.id = atl.tenant_id
+        LEFT JOIN tenant_agent_config tac ON tac.tenant_id = atl.tenant_id
+        WHERE atl.created_at >= now() - ${intervalStr}::interval
+        GROUP BY atl.tenant_id, t.name, tac.monthly_budget
+        ORDER BY SUM(atl.cost_usd) DESC NULLS LAST
+      `;
+    } catch (dbErr) {
+      console.error('[admin/agents/usage] tenant query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const byTenantMapped = byTenant.map((row) => {
       const costUsd = parseFloat(row.costUsd);
@@ -171,20 +189,26 @@ export async function GET(request: NextRequest) {
     });
 
     // ── Daily trend ──────────────────────────────────────────────
-    const dailyTrend = await sql<{
+    let dailyTrend: {
       date: string;
       calls: number;
       costUsd: string;
-    }[]>`
-      SELECT
-        date_trunc('day', created_at)::date::text AS date,
-        COUNT(*)::int AS calls,
-        COALESCE(SUM(cost_usd), 0)::text AS cost_usd
-      FROM agent_task_log
-      WHERE created_at >= now() - ${intervalStr}::interval
-      GROUP BY date
-      ORDER BY date
-    `;
+    }[];
+    try {
+      dailyTrend = await sql<typeof dailyTrend>`
+        SELECT
+          date_trunc('day', created_at)::date::text AS date,
+          COUNT(*)::int AS calls,
+          COALESCE(SUM(cost_usd), 0)::text AS cost_usd
+        FROM agent_task_log
+        WHERE created_at >= now() - ${intervalStr}::interval
+        GROUP BY date
+        ORDER BY date
+      `;
+    } catch (dbErr) {
+      console.error('[admin/agents/usage] daily trend query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const dailyTrendMapped = dailyTrend.map((row) => ({
       date: row.date,

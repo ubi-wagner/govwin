@@ -101,20 +101,32 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     }
 
     // ── Summary: total calls + budget used % ─────────────────────
-    const totalCallsRows = await sql<{ totalCalls: number; totalCostUsd: string }[]>`
-      SELECT
-        COUNT(*)::int AS total_calls,
-        COALESCE(SUM(cost_usd), 0)::text AS total_cost_usd
-      FROM agent_task_log
-      WHERE tenant_id = ${tenantId}::uuid
-        AND created_at >= date_trunc('month', now())
-    `;
+    let totalCallsRows: { totalCalls: number; totalCostUsd: string }[];
+    try {
+      totalCallsRows = await sql<typeof totalCallsRows>`
+        SELECT
+          COUNT(*)::int AS total_calls,
+          COALESCE(SUM(cost_usd), 0)::text AS total_cost_usd
+        FROM agent_task_log
+        WHERE tenant_id = ${tenantId}::uuid
+          AND created_at >= date_trunc('month', now())
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/usage] total calls query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    const budgetRows = await sql<{ monthlyBudget: string | null }[]>`
-      SELECT monthly_budget::text AS monthly_budget
-      FROM tenant_agent_config
-      WHERE tenant_id = ${tenantId}::uuid
-    `;
+    let budgetRows: { monthlyBudget: string | null }[];
+    try {
+      budgetRows = await sql<typeof budgetRows>`
+        SELECT monthly_budget::text AS monthly_budget
+        FROM tenant_agent_config
+        WHERE tenant_id = ${tenantId}::uuid
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/usage] budget query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const monthlyBudget = budgetRows[0]?.monthlyBudget
       ? parseFloat(budgetRows[0].monthlyBudget)
@@ -125,12 +137,18 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
       : 0;
 
     // ── Calls remaining this hour ────────────────────────────────
-    const hourlyRows = await sql<{ callsThisHour: number }[]>`
-      SELECT COUNT(*)::int AS calls_this_hour
-      FROM agent_task_log
-      WHERE tenant_id = ${tenantId}::uuid
-        AND created_at > now() - interval '1 hour'
-    `;
+    let hourlyRows: { callsThisHour: number }[];
+    try {
+      hourlyRows = await sql<typeof hourlyRows>`
+        SELECT COUNT(*)::int AS calls_this_hour
+        FROM agent_task_log
+        WHERE tenant_id = ${tenantId}::uuid
+          AND created_at > now() - interval '1 hour'
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/usage] hourly query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     const callsThisHour = hourlyRows[0]?.callsThisHour ?? 0;
     const callsRemainingThisHour = Math.max(0, RATE_LIMIT_PER_HOUR - callsThisHour);
 
@@ -141,21 +159,27 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     };
 
     // ── By agent (within the requested period) ───────────────────
-    const byAgent = await sql<{
+    let byAgent: {
       agentRole: string;
       calls: number;
       lastUsed: string | null;
-    }[]>`
-      SELECT
-        agent_role,
-        COUNT(*)::int AS calls,
-        MAX(created_at)::text AS last_used
-      FROM agent_task_log
-      WHERE tenant_id = ${tenantId}::uuid
-        AND created_at >= now() - ${intervalStr}::interval
-      GROUP BY agent_role
-      ORDER BY calls DESC
-    `;
+    }[];
+    try {
+      byAgent = await sql<typeof byAgent>`
+        SELECT
+          agent_role,
+          COUNT(*)::int AS calls,
+          MAX(created_at)::text AS last_used
+        FROM agent_task_log
+        WHERE tenant_id = ${tenantId}::uuid
+          AND created_at >= now() - ${intervalStr}::interval
+        GROUP BY agent_role
+        ORDER BY calls DESC
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/usage] by agent query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const byAgentMapped = byAgent.map((row) => ({
       agentRole: row.agentRole,
@@ -165,24 +189,30 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     }));
 
     // ── Recent activity ──────────────────────────────────────────
-    const recentActivity = await sql<{
+    let recentActivity: {
       agentRole: string;
       taskType: string;
       createdAt: string;
       durationMs: number | null;
       humanAccepted: boolean | null;
-    }[]>`
-      SELECT
-        agent_role,
-        task_type,
-        created_at::text AS created_at,
-        duration_ms,
-        human_accepted
-      FROM agent_task_log
-      WHERE tenant_id = ${tenantId}::uuid
-      ORDER BY created_at DESC
-      LIMIT 20
-    `;
+    }[];
+    try {
+      recentActivity = await sql<typeof recentActivity>`
+        SELECT
+          agent_role,
+          task_type,
+          created_at::text AS created_at,
+          duration_ms,
+          human_accepted
+        FROM agent_task_log
+        WHERE tenant_id = ${tenantId}::uuid
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/usage] recent activity query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     const recentActivityMapped = recentActivity.map((row) => ({
       agentRole: row.agentRole,

@@ -51,25 +51,37 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments/resolve] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Resolve the comment ──────────────────────────────────────────
-    const [comment] = await sql<{ id: string; resolved: boolean }[]>`
-      UPDATE proposal_comments
-      SET resolved = true
-      WHERE id = ${commentId}
-        AND proposal_id = ${proposalId}
-      RETURNING id, resolved
-    `;
+    let comment: { id: string; resolved: boolean } | undefined;
+    try {
+      [comment] = await sql<{ id: string; resolved: boolean }[]>`
+        UPDATE proposal_comments
+        SET resolved = true
+        WHERE id = ${commentId}
+          AND proposal_id = ${proposalId}
+        RETURNING id, resolved
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments/resolve] update failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!comment) {
       return NextResponse.json({ error: 'Comment not found', code: 'NOT_FOUND' }, { status: 404 });

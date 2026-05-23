@@ -169,6 +169,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             version = version + 1,
             updated_at = now()
         WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}::uuid
           AND version = ${proposal.version}
       `;
 

@@ -147,12 +147,14 @@ class WorkflowManager:
         # Calculate deadline from workflow definition (default 1 hour)
         deadline = datetime.now(timezone.utc) + timedelta(hours=1)
 
-        await conn.execute(
+        result = await conn.fetchrow(
             """
             INSERT INTO process_instances
                 (id, workflow_name, trigger_event_id, status, payload,
                  tenant_id, actor_id, actor_email, source, deadline)
             VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9)
+            ON CONFLICT (workflow_name, trigger_event_id) DO NOTHING
+            RETURNING id
             """,
             uuid.UUID(instance_id),
             workflow_name,
@@ -164,6 +166,22 @@ class WorkflowManager:
             self.source,
             deadline,
         )
+
+        if result is None:
+            # Duplicate — fetch the existing instance ID
+            existing = await conn.fetchval(
+                """
+                SELECT id::text FROM process_instances
+                WHERE workflow_name = $1 AND trigger_event_id = $2
+                """,
+                workflow_name,
+                uuid.UUID(trigger_event_id) if trigger_event_id else None,
+            )
+            logger.warning(
+                "[create_instance] Duplicate for workflow=%s trigger=%s — returning existing %s",
+                workflow_name, trigger_event_id, existing,
+            )
+            return existing or instance_id
 
         # Record transition
         await self._record_transition(

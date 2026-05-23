@@ -269,8 +269,58 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    if (filename.trim().length > 255) {
+      return NextResponse.json(
+        { error: 'filename exceeds maximum length (255 characters)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     const contentType = typeof body.contentType === 'string' ? body.contentType : 'application/octet-stream';
     const fileSize = typeof body.fileSize === 'number' ? body.fileSize : null;
+
+    // Validate content type against safe MIME types
+    const SAFE_MIME_TYPES = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-excel',
+      'application/vnd.ms-powerpoint',
+      'text/plain',
+      'text/csv',
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'application/zip',
+      'application/octet-stream',
+    ];
+    if (!SAFE_MIME_TYPES.includes(contentType)) {
+      return NextResponse.json(
+        { error: 'Unsupported file type', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    // Validate file size (50 MB max)
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+    if (fileSize !== null && fileSize > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File size exceeds maximum (50 MB)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    // Validate requirementLabel length
+    if (typeof body.requirementLabel === 'string' && body.requirementLabel.length > 500) {
+      return NextResponse.json(
+        { error: 'requirementLabel exceeds maximum length (500 characters)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Verify proposal belongs to tenant ────────────────────
     let proposal: { id: string } | undefined;
@@ -290,6 +340,26 @@ export async function POST(request: Request, ctx: RouteContext) {
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // ── Proposal-level access check for non-admin users ───────
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      try {
+        const [collab] = await sql<{ userId: string }[]>`
+          SELECT user_id FROM proposal_collaborators
+          WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
+          LIMIT 1
+        `;
+        if (!collab) {
+          return NextResponse.json(
+            { error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' },
+            { status: 403 },
+          );
+        }
+      } catch (e) {
+        console.error('[portal/proposals/supporting-docs] collaborator check failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     let targetDocId: string;

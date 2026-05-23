@@ -102,6 +102,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       id: string;
       title: string;
       stage: string;
+      isLocked: boolean;
       gateConfig: unknown;
       createdAt: string;
     } | undefined;
@@ -110,10 +111,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         id: string;
         title: string;
         stage: string;
+        isLocked: boolean;
         gateConfig: unknown;
         createdAt: string;
       }[]>`
-        SELECT id, title, stage, gate_config, created_at
+        SELECT id, title, stage, is_locked, gate_config, created_at
         FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
         LIMIT 1
@@ -127,6 +129,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
+      );
+    }
+
+    // ── Lock check: reject if not locked and not in submitted/archived stage ──
+    if (!proposal.isLocked && proposal.stage !== 'submitted' && proposal.stage !== 'archived') {
+      return NextResponse.json(
+        { error: 'Proposal must be locked or in submitted/archived stage to export package', code: 'FORBIDDEN' },
+        { status: 403 },
       );
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -60,6 +60,13 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
     const { tenantSlug, proposalId } = await ctx.params;
     if (!isValidUUID(proposalId)) {
       return NextResponse.json(
@@ -107,6 +114,26 @@ export async function GET(request: Request, ctx: RouteContext) {
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // ── Proposal-level access check for non-admin users ─────────────
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      try {
+        const [collab] = await sql<{ userId: string }[]>`
+          SELECT user_id FROM proposal_collaborators
+          WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
+          LIMIT 1
+        `;
+        if (!collab) {
+          return NextResponse.json(
+            { error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' },
+            { status: 403 },
+          );
+        }
+      } catch (e) {
+        console.error('[api/portal/proposals/activity] collaborator check failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // ── Parse query params ──────────────────────────────────────────

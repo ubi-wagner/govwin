@@ -195,7 +195,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         companyName: app.companyName,
         emailSent: emailResult.provider !== 'skipped',
         emailProvider: emailResult.provider,
-        emailError: emailResult.error ?? null,
+        emailFailed: !!emailResult.error,
       },
     });
   } catch (e) {

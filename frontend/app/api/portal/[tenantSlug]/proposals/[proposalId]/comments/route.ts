@@ -48,12 +48,18 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -75,6 +81,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       userEmail: string | null;
     }[];
 
+    try {
     if (nodeId) {
       comments = await sql<typeof comments>`
         SELECT
@@ -112,6 +119,10 @@ export async function GET(request: Request, ctx: RouteContext) {
         ORDER BY pc.created_at ASC
         LIMIT 200
       `;
+    }
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] comments query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -199,23 +210,35 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal2: { id: string } | undefined;
+    try {
+      [proposal2] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] POST proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    if (!proposal) {
+    if (!proposal2) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Insert comment ───────────────────────────────────────────────
-    const [comment] = await sql<{ id: string; createdAt: Date }[]>`
-      INSERT INTO proposal_comments (proposal_id, section_id, user_id, content)
-      VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text})
-      RETURNING id, created_at
-    `;
+    let comment: { id: string; createdAt: Date };
+    try {
+      [comment] = await sql<{ id: string; createdAt: Date }[]>`
+        INSERT INTO proposal_comments (proposal_id, section_id, user_id, content)
+        VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text})
+        RETURNING id, created_at
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] POST insert failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({

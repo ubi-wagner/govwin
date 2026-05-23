@@ -100,12 +100,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant + download gate ──────────
-    const [proposal] = await sql<{ id: string; lockCount: number; isLocked: boolean; stage: string }[]>`
-      SELECT id, lock_count, is_locked, stage FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; lockCount: number; isLocked: boolean; stage: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string; lockCount: number; isLocked: boolean; stage: string }[]>`
+        SELECT id, lock_count, is_locked, stage FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections/export] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -126,12 +132,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ──────────────────────
-    const [section] = await sql<{ id: string; title: string }[]>`
-      SELECT id, title FROM proposal_sections
-      WHERE id = ${sectionId}
-        AND proposal_id = ${proposalId}
-      LIMIT 1
-    `;
+    let section: { id: string; title: string } | undefined;
+    try {
+      [section] = await sql<{ id: string; title: string }[]>`
+        SELECT id, title FROM proposal_sections
+        WHERE id = ${sectionId}
+          AND proposal_id = ${proposalId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections/export] section query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!section) {
       return NextResponse.json(
@@ -148,7 +160,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Increment download count ────────────────────────────────────
     try {
-      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid`;
     } catch (countErr) {
       console.error('[api/portal/proposals/sections/export] download_count increment error:', countErr);
     }
