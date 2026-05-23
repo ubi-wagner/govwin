@@ -22,6 +22,24 @@ interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
+/**
+ * Package Export — Returns complete proposal data for download.
+ *
+ * Response shape:
+ * {
+ *   data: {
+ *     proposal: { title, stage, gateConfig, createdAt },
+ *     sections: [{ number, title, textContent, status, pageAllocation, completedStage }],
+ *     compliance: { variables: [...], summary: { total, verified } } | null,
+ *     supportingDocs: [{ label, category, filename, downloadUrl, status }],
+ *     manifest: { generatedAt, sectionCount, totalChars, supportingDocCount }
+ *   }
+ * }
+ *
+ * Increments proposals.download_count.
+ * Emits proposal:package.exported event.
+ * Logs proposal_exported activity.
+ */
 export async function POST(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, proposalId } = await ctx.params;
@@ -85,6 +103,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       title: string;
       stage: string;
       gateConfig: unknown;
+      createdAt: string;
     } | undefined;
     try {
       [proposal] = await sql<{
@@ -92,8 +111,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         title: string;
         stage: string;
         gateConfig: unknown;
+        createdAt: string;
       }[]>`
-        SELECT id, title, stage, gate_config
+        SELECT id, title, stage, gate_config, created_at
         FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
         LIMIT 1
@@ -118,6 +138,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       content: string | null;
       status: string;
       pageAllocation: number | null;
+      completedStage: string | null;
     }[];
     try {
       sections = await sql<{
@@ -127,8 +148,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         content: string | null;
         status: string;
         pageAllocation: number | null;
+        completedStage: string | null;
       }[]>`
-        SELECT id, section_number, title, content, status, page_allocation
+        SELECT id, section_number, title, content, status, page_allocation, completed_stage
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}::uuid
         ORDER BY section_number ASC
@@ -248,6 +270,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         text_content: textContent,
         status: s.status,
         page_allocation: s.pageAllocation,
+        completed_stage: s.completedStage,
       };
     });
 
@@ -363,6 +386,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           title: proposal.title,
           stage: proposal.stage,
           gate_config: proposal.gateConfig,
+          created_at: proposal.createdAt,
         },
         sections: sectionData,
         compliance: {

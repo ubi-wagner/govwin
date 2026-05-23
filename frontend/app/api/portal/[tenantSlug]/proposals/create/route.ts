@@ -467,6 +467,47 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/create] activity log failed', logErr);
     }
 
+    // ── Notify RFP admins about new proposal (72-hour review SLA) ───
+    try {
+      const admins = await sql<{ email: string; name: string | null }[]>`
+        SELECT email, name FROM users
+        WHERE role IN ('rfp_admin', 'master_admin') AND is_active = true
+        LIMIT 10
+      `;
+
+      if (admins.length > 0) {
+        const { sendEmail } = await import('@/lib/email');
+        const tenantRow = await sql<{ name: string }[]>`SELECT name FROM tenants WHERE id = ${tenantId}::uuid`;
+        const tenantName = tenantRow[0]?.name || tenantSlug;
+
+        for (const admin of admins) {
+          try {
+            await sendEmail({
+              to: admin.email,
+              subject: `New Proposal Created — ${tenantName} — Review within 72 hours`,
+              html: `
+                <p>Hi ${admin.name || 'Admin'},</p>
+                <p>A new proposal workspace has been created and needs your review within 72 hours:</p>
+                <ul>
+                  <li><strong>Customer:</strong> ${tenantName}</li>
+                  <li><strong>Proposal:</strong> ${proposalTitle}</li>
+                  <li><strong>Sections:</strong> ${sectionCount}</li>
+                  <li><strong>Created:</strong> ${new Date().toISOString()}</li>
+                </ul>
+                <p>Please review the proposal setup (sections, compliance matrix, templates) to ensure quality before the customer begins drafting.</p>
+                <p>— RFP Pipeline System</p>
+              `,
+            });
+          } catch (emailErr) {
+            console.error('[proposals/create] admin alert email failed:', emailErr);
+          }
+        }
+      }
+    } catch (alertErr) {
+      console.error('[proposals/create] admin alert setup failed:', alertErr);
+      // Non-fatal — proposal creation succeeded
+    }
+
     return NextResponse.json({
       data: {
         proposalId: proposal.id,
