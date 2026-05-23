@@ -107,12 +107,9 @@ export default async function TeamPage({ params }: Props) {
             {members.length} member{members.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link
-          href={`${basePath}/proposals`}
-          className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Invite via Proposal
-        </Link>
+        <span className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-4 py-2">
+          To invite team members, open a proposal and use the Team &amp; Access tab.
+        </span>
       </div>
 
       {/* Team Members */}

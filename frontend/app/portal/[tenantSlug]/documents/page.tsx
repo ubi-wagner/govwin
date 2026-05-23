@@ -368,7 +368,7 @@ export default async function DocumentsPage({ params }: Props) {
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
                       <Link
-                        href={`${basePath}/library/${li.id}`}
+                        href={`${basePath}/library`}
                         className="text-blue-600 hover:underline"
                       >
                         {li.title ?? 'Untitled'}

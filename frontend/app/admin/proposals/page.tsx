@@ -11,6 +11,7 @@ type ProposalRow = {
   stage: string;
   createdAt: Date;
   updatedAt: Date;
+  tenantId: string;
   tenantName: string;
   tenantSlug: string;
   opportunityTitle: string | null;
@@ -18,12 +19,10 @@ type ProposalRow = {
 
 const STAGE_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
-  capture: 'bg-blue-100 text-blue-700',
-  outline: 'bg-indigo-100 text-indigo-700',
-  writing: 'bg-purple-100 text-purple-700',
-  review: 'bg-amber-100 text-amber-700',
+  review: 'bg-blue-100 text-blue-700',
+  final: 'bg-purple-100 text-purple-700',
   submitted: 'bg-green-100 text-green-700',
-  archived: 'bg-slate-100 text-slate-500',
+  archived: 'bg-amber-100 text-amber-700',
 };
 
 export default async function AdminProposalsPage() {
@@ -39,7 +38,7 @@ export default async function AdminProposalsPage() {
   try {
     proposals = await sql<ProposalRow[]>`
       SELECT p.id, p.title, p.stage, p.created_at, p.updated_at,
-             t.name as tenant_name, t.slug as tenant_slug,
+             t.id as tenant_id, t.name as tenant_name, t.slug as tenant_slug,
              o.title as opportunity_title
       FROM proposals p
       JOIN tenants t ON t.id = p.tenant_id
@@ -89,7 +88,7 @@ export default async function AdminProposalsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      <Link href={`/admin/tenants`} className="hover:underline">
+                      <Link href={`/admin/tenants/${p.tenantId}`} className="hover:underline">
                         {p.tenantName}
                       </Link>
                     </td>

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { list as listTools } from '@/lib/tools';
 import type { Tool } from '@/lib/tools';
+import { AgentUsageSummary } from '@/components/admin/agent-usage-summary';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,12 @@ export default async function AgentsPage() {
           {tools.length} registered tool{tools.length !== 1 ? 's' : ''} across {namespaces.length} namespace{namespaces.length !== 1 ? 's' : ''}
         </p>
       </header>
+
+      {/* Usage Summary */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-4">Usage Summary (30 days)</h2>
+        <AgentUsageSummary />
+      </section>
 
       {/* Tool Registry */}
       <section className="mb-10">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface DropboxFile {
   key: string;
@@ -70,6 +70,27 @@ export function ProposalDropbox({
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch dropbox files on mount if none were provided server-side
+  useEffect(() => {
+    if (initialFiles.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/dropbox`,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && Array.isArray(json.data)) {
+          setFiles(json.data);
+        }
+      } catch {
+        // Silently fail — files will just show empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tenantSlug, proposalId, initialFiles.length]);
 
   const uploadFile = useCallback(
     async (file: File) => {
