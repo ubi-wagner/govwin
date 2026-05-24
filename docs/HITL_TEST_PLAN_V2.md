@@ -1,10 +1,10 @@
 # V1 HITL Test Plan -- Pre-Launch Validation
 
-**Version:** 2.0
-**Date:** 2026-05-23
+**Version:** 2.1
+**Date:** 2026-05-24
 **Launch Target:** June 1, 2026
-**Scope:** All 15 user journeys across 6 structured test sessions
-**Estimated Total Time:** 5-6 hours (one tester) or 3 hours (two testers in parallel)
+**Scope:** All 15 user journeys + CMS content pipeline across 7 structured test sessions
+**Estimated Total Time:** ~6 hours (one tester) or 3.5 hours (two testers in parallel)
 
 ---
 
@@ -45,6 +45,27 @@ Before starting tests, verify:
 2. **Database migrations applied** through 047: `SELECT MAX(version) FROM schema_migrations` or count migration files
 3. **S3 bucket accessible**: `aws s3 ls s3://rfp-pipeline-prod-r8t7tr6/ --max-items 1`
 4. **At least one test PDF** available locally (real SBIR solicitation preferred, or any multi-page PDF)
+
+### Test Accounts
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ SEEDED TEST ACCOUNTS (Migration 041 — ALL PASSWORDS CHANGE AT LAUNCH)  │
+├──────────────┬───────────────────────────┬───────────────────┬──────────┤
+│ Role         │ Email                     │ Password          │ Tenant   │
+├──────────────┼───────────────────────────┼───────────────────┼──────────┤
+│ master_admin │ eric.c.wagner@gmail.com   │ TestAdmin2026!    │ System   │
+│ rfp_admin    │ (create via accept flow)  │ (generated)       │ System   │
+│ tenant_admin │ admin@apexdefense.test    │ TestCustomer2026! │ Apex     │
+│ tenant_user  │ james@apexdefense.test    │ TestEmployee2026! │ Apex     │
+│ partner_user │ partner@techalliance.test │ TestPartner2026!  │ Apex     │
+└──────────────┴───────────────────────────┴───────────────────┴──────────┘
+```
+
+**Tenant:** Apex Defense Solutions (slug: `apex-defense`, tier: grinder, status: active)
+**Tenant Profile:** NAICS 541330/541511/541512/541519/334111, keywords: AI/ML/cyber/cloud/autonomy/ISR/C4ISR, agencies: DoD/AF/Navy/DARPA/NSA
+
+> **Note:** The `rfp_admin` account is created during Test 1.4 (Accept Application) when a new tenant is provisioned. The `master_admin` and all `.test` domain accounts are seeded by migration 041 with `temp_password=false` (no password change required). The bootstrap `master_admin` from `pipeline/src/seeds/master_admin.py` uses `temp_password=true` but migration 041 overrides this with a known password.
 
 ### Browser Setup
 
@@ -1003,6 +1024,217 @@ Verify all error responses include both `error` and `code` fields per the projec
 
 ---
 
+### SESSION 7: CMS Content Pipeline (45 min)
+
+**Covers:** Blog publishing, page block editing, RSS/sitemap/SEO, AI content generation
+**Roles tested:** master_admin
+**Routes:** `/admin/content`, `/admin/content/new`, `/admin/content/[slug]/preview`, `/blog/[slug]`, `/blog/feed.xml`, `/sitemap.xml`
+
+**Prerequisites:** master_admin account seeded (migration 041). No dependency on Sessions 1-6.
+
+---
+
+#### Test 7.1: Content Admin Dashboard
+
+**Route:** `/admin/content`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Login as master_admin (eric.c.wagner@gmail.com / TestAdmin2026!) | Login succeeds, redirect to `/admin/dashboard` |
+| 2 | Navigate to `/admin/content` | CMS content manager loads |
+| 3 | Verify page tabs show grouped content (Homepage, About, Features, Pricing, etc.) | Tabs render with content type groupings |
+| 4 | Verify blog posts section shows any seeded content | Blog post list renders (may be empty) |
+| 5 | Verify status counts (published/draft/archived) | Status counters display numeric values |
+| 6 | Open DevTools Console | No JS errors logged |
+
+**Pass criteria:** CMS page manager loads with grouped content, status counts render, no JS console errors.
+
+---
+
+#### Test 7.2: Create Blog Post
+
+**Route:** `/admin/content/new`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Click "New Content" or navigate to `/admin/content/new` | Content creation form renders |
+| 2 | Fill title: "Testing AI-Powered SBIR Proposals" | Title field populated |
+| 3 | Set content_type: `blog_post` | Content type selector works |
+| 4 | Write body in markdown: `## Introduction\n\nThis is a test blog post.\n\n**Bold text** and *italic text*.\n\n- Bullet point 1\n- Bullet point 2` | Markdown editor accepts input |
+| 5 | Fill excerpt: "A test post covering AI-powered proposal writing" | Excerpt field populated |
+| 6 | Fill author: "Eric Wagner" | Author field populated |
+| 7 | Fill tags: "sbir,testing" | Tags field populated |
+| 8 | Set status: `draft` | Status selector works |
+| 9 | Click "Save" | Content saved. API returns 201. Slug auto-generated (e.g., `testing-ai-powered-sbir-proposals`) |
+| 10 | Verify redirect to editor or content list with success confirmation | Visual confirmation (toast or redirect) |
+
+**Pass criteria:** Content saved, slug auto-generated from title, all metadata persisted.
+
+---
+
+#### Test 7.3: Preview Draft Content
+
+**Route:** `/admin/content/[slug]/preview`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Click "Preview" button (purple) in the editor or content list | Preview page loads |
+| 2 | Verify preview renders at `/admin/content/{slug}/preview` | Correct URL in address bar |
+| 3 | Verify admin toolbar shows at top | Status badge "draft" visible, Edit button present, Publish button present |
+| 4 | Verify markdown renders as HTML | Headings (`## Introduction` -> `<h2>`), bold, italic, bullets all rendered |
+| 5 | Verify blog layout matches public `/blog/[slug]` format | Layout structure consistent with public blog template |
+
+**Pass criteria:** Mirror preview with admin controls, markdown renders correctly as HTML.
+
+---
+
+#### Test 7.4: Publish from Preview
+
+**Route:** `/admin/content/[slug]/preview` then `/blog/[slug]`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Click "Publish" in the admin toolbar | Publish action fires |
+| 2 | Verify status changes to "published" | Status badge updates from "draft" to "published" |
+| 3 | Navigate to `/blog/{slug}` (public page) | Post renders on public blog |
+| 4 | Verify post appears with correct rendering | Title, author, date, body all displayed. Markdown rendered as HTML |
+
+**Pass criteria:** Published content visible on public site within 60s (ISR revalidation).
+
+---
+
+#### Test 7.5: Edit Published Content
+
+**Route:** `/admin/content/[slug]`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Return to `/admin/content/{slug}` (editor) | Editor loads with current content |
+| 2 | Modify the body text (add a new paragraph or change existing text) | Editor accepts changes |
+| 3 | Click "Save" | Save succeeds |
+| 4 | Navigate to preview `/admin/content/{slug}/preview` | Changes reflected in preview immediately |
+| 5 | Navigate to `/blog/{slug}` (public) | Changes reflected after ISR revalidation |
+
+**Pass criteria:** Edits reflected in preview immediately, public site updated within 60s.
+
+---
+
+#### Test 7.6: Unpublish Content
+
+**Route:** `/admin/content/[slug]/preview` then `/blog/[slug]`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | From preview, click "Unpublish" | Unpublish action fires |
+| 2 | Verify status changes back to "draft" | Status badge updates to "draft" |
+| 3 | Navigate to `/blog/{slug}` (public) | Post no longer visible (404 or not found page) |
+
+**Pass criteria:** Unpublished content removed from public site.
+
+---
+
+#### Test 7.7: AI Content Generation from URL
+
+**Route:** `/admin/content/new` or `/admin/content/[slug]`
+
+**Note:** Requires `ANTHROPIC_API_KEY` to be set. If not set, AI features will fail gracefully.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | In editor, enter an external URL (e.g., a SAM.gov opportunity page) | URL field accepts input |
+| 2 | Click "Auto-generate" | AI generation starts, loading indicator visible |
+| 3 | Verify title auto-populated from the URL | Title field filled with extracted/generated title |
+| 4 | Verify excerpt auto-populated | Excerpt field filled |
+| 5 | Verify tags auto-populated | Tags field filled with relevant terms |
+| 6 | If `ANTHROPIC_API_KEY` set: verify AI-enhanced summary appears in body | Body field contains AI-generated summary content |
+| 7 | If `ANTHROPIC_API_KEY` not set: verify graceful fallback | Basic extraction without AI enhancement, no crash |
+
+**Pass criteria:** Content scaffolded from external source. AI enhancement works when API key available, graceful degradation when not.
+
+---
+
+#### Test 7.8: Inline Page Block Editing
+
+**Route:** `/admin/content` then `/` (public homepage)
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/admin/content` | Content manager loads |
+| 2 | Select the "Homepage" tab | Homepage content blocks displayed |
+| 3 | Click "Edit" on any `page_block` | Block editor opens with current content |
+| 4 | Modify the body text | Editor accepts changes |
+| 5 | Click "Save" | Save succeeds |
+| 6 | Navigate to `/` (public homepage) | Change appears within 60s (ISR revalidation) |
+
+**Pass criteria:** Inline edits flow to public site via ISR.
+
+---
+
+#### Test 7.9: RSS Feed
+
+**Route:** `/blog/feed.xml`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Ensure at least one blog post is published (re-publish from Test 7.6 if needed) | Published blog post exists |
+| 2 | Navigate to `/blog/feed.xml` | XML content renders in browser |
+| 3 | Verify valid RSS 2.0 structure: `<rss version="2.0">`, `<channel>`, `<item>` elements | Well-formed RSS XML |
+| 4 | Verify each `<item>` has `<title>`, `<link>`, `<description>`, `<pubDate>` | All required RSS fields present |
+| 5 | Verify links point to correct blog post URLs | Links resolve to `/blog/[slug]` paths |
+
+**Pass criteria:** Feed renders valid RSS 2.0 XML with published blog posts.
+
+---
+
+#### Test 7.10: Sitemap
+
+**Route:** `/sitemap.xml`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/sitemap.xml` | XML content renders in browser |
+| 2 | Verify includes static pages: `/`, `/about`, `/features`, `/pricing`, etc. | Static page URLs listed |
+| 3 | Verify includes dynamic blog post URLs | Published blog post URLs listed as `<url>` entries |
+| 4 | Verify each `<url>` has `<loc>` and optional `<lastmod>` | Required sitemap elements present |
+
+**Pass criteria:** Valid sitemap including both static pages and dynamic blog post URLs.
+
+---
+
+#### Test 7.11: SEO Meta Tags
+
+**Route:** Published blog post page
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to a published blog post `/blog/[slug]` | Blog post page loads |
+| 2 | View page source (Ctrl+U or right-click -> View Source) | HTML source visible |
+| 3 | Verify `<meta property="og:title">` present with post title | Open Graph title matches post title |
+| 4 | Verify `<meta property="og:description">` present with excerpt | Open Graph description matches excerpt |
+| 5 | Verify `<meta property="og:type" content="article">` | Content type is "article" |
+| 6 | Verify `<meta property="og:image">` present | Image URL specified (may be default) |
+| 7 | Verify `<meta name="twitter:card" content="summary_large_image">` | Twitter card type is "summary_large_image" |
+
+**Pass criteria:** Full social sharing meta tags present for SEO and link previews.
+
+---
+
+#### Test 7.12: Content List Management
+
+**Route:** `/admin/content`
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/admin/content` | Content list loads with all content items |
+| 2 | Verify each content item has Edit and Preview links | Action buttons/links visible on each row/card |
+| 3 | Click Preview on a `page_block` item | Preview shows content in page context (homepage, about, etc.) |
+| 4 | Click Preview on a `blog_post` item | Preview shows content in blog layout |
+| 5 | Verify status badges distinguish published/draft/archived | Visual status indicators correct |
+
+**Pass criteria:** Preview links work for all content types, routing to appropriate layout per content type.
+
+---
+
 ## Test Results Template
 
 Copy this template for each test:
@@ -1071,12 +1303,24 @@ Defect: {defect ID if FAIL, or "N/A"}
 | 6 | 6.4 | Locked Proposal Ops | | |
 | 6 | 6.5 | Error Response Format | | |
 | 6 | 6.6 | Temp Password Enforcement | | |
+| 7 | 7.1 | Content Admin Dashboard | | |
+| 7 | 7.2 | Create Blog Post | | |
+| 7 | 7.3 | Preview Draft Content | | |
+| 7 | 7.4 | Publish from Preview | | |
+| 7 | 7.5 | Edit Published Content | | |
+| 7 | 7.6 | Unpublish Content | | |
+| 7 | 7.7 | AI Content Generation | | |
+| 7 | 7.8 | Inline Page Block Editing | | |
+| 7 | 7.9 | RSS Feed | | |
+| 7 | 7.10 | Sitemap | | |
+| 7 | 7.11 | SEO Meta Tags | | |
+| 7 | 7.12 | Content List Management | | |
 
 ---
 
 ## Post-Test Checklist
 
-After completing all 6 sessions:
+After completing all 7 sessions:
 
 ### Journey Coverage
 
@@ -1145,6 +1389,16 @@ After completing all 6 sessions:
 - [ ] OnRfpUploaded: visible with completed status (if shredder ran)
 - [ ] OnSolicitationPushed: visible with completed status
 - [ ] OnProposalCreated: visible with completed/skipped status
+
+### CMS Content Pipeline Verified
+
+- [ ] CMS content pipeline tested (create, preview, publish, unpublish)
+- [ ] Blog markdown rendering verified
+- [ ] RSS feed accessible and valid
+- [ ] Sitemap includes dynamic content
+- [ ] SEO meta tags present on blog posts
+- [ ] Admin preview toolbar functional
+- [ ] ISR revalidation confirmed (content appears within 60s)
 
 ### System Integrity
 
@@ -1246,7 +1500,10 @@ After completing all 6 sessions:
 | `/admin/purchases` | Purchase history | Cross-tenant purchase records |
 | `/admin/analytics` | Analytics dashboard | Usage analytics |
 | `/admin/billing` | Billing overview | Subscription and payment data |
-| `/admin/content` | CMS content | Blog posts, resources, guides |
+| `/admin/content` | CMS content manager | Blog posts, page blocks, status counts, grouped tabs |
+| `/admin/content/new` | Create content | Content creation form (blog post, page block) |
+| `/admin/content/[slug]` | Edit content | Content editor with metadata, markdown body |
+| `/admin/content/[slug]/preview` | Preview content | Mirror preview with admin toolbar (publish/unpublish) |
 | `/admin/storage` | Storage overview | S3 bucket usage |
 | `/admin/templates` | Section templates | Template management |
 | `/admin/system` | System admin (master_admin only) | System configuration |
