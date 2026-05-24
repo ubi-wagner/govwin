@@ -90,12 +90,12 @@ export default async function DashboardPage() {
   const stats: StatCard[] = [
     { label: 'Pending Applications', value: pendingApps, href: '/admin/applications', color: 'border-amber-400 bg-amber-50' },
     { label: 'Active Tenants', value: activeTenants, href: '/admin/tenants', color: 'border-blue-400 bg-blue-50' },
-    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/tenants', color: 'border-teal-400 bg-teal-50' },
+    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/analytics', color: 'border-teal-400 bg-teal-50' },
     { label: 'Active Proposals', value: activeProposals, href: '/admin/proposals', color: 'border-purple-400 bg-purple-50' },
     { label: 'RFPs in Curation', value: rfpsCuration, href: '/admin/rfp-curation', color: 'border-green-400 bg-green-50' },
     { label: 'Events Today', value: eventsToday, href: '/admin/events', color: 'border-indigo-400 bg-indigo-50' },
-    { label: 'SBIR Companies', value: sbirCompanies, href: '/admin/sources', color: 'border-orange-400 bg-orange-50' },
-    { label: 'SBIR Awards', value: sbirAwards, href: '/admin/sources', color: 'border-pink-400 bg-pink-50' },
+    { label: 'SBIR Companies', value: sbirCompanies, href: '/admin/analytics', color: 'border-orange-400 bg-orange-50' },
+    { label: 'SBIR Awards', value: sbirAwards, href: '/admin/analytics', color: 'border-pink-400 bg-pink-50' },
   ];
 
   // Recent events
@@ -239,12 +239,12 @@ export default async function DashboardPage() {
                 {unclaimed}
               </span>
             </Link>
-            <div className="flex items-center justify-between px-4 py-3">
+            <Link href="/admin/analytics" className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
               <span className="text-sm text-gray-700">Draft atoms awaiting review</span>
               <span className={`text-sm font-bold ${draftAtoms > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
                 {draftAtoms}
               </span>
-            </div>
+            </Link>
           </div>
         </div>
       </div>

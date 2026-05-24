@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
@@ -171,9 +172,9 @@ export default async function DashboardPage({
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Library Units" value={libraryCount} />
-        <StatCard label="Active Proposals" value={proposalCount} />
-        <StatCard label="Pinned Topics" value={pinnedCount} />
+        <Link href={`/portal/${tenantSlug}/library`}><StatCard label="Library Units" value={libraryCount} /></Link>
+        <Link href={`/portal/${tenantSlug}/proposals`}><StatCard label="Active Proposals" value={proposalCount} /></Link>
+        <Link href={`/portal/${tenantSlug}/pipeline`}><StatCard label="Pinned Topics" value={pinnedCount} /></Link>
       </div>
 
       {/* Get Started checklist */}
