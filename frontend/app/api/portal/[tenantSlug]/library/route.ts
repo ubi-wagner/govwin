@@ -323,13 +323,17 @@ export async function POST(
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    await emitEventSingle({
-      namespace: 'library',
-      type: `unit.${action === 'approve' ? 'approved' : action === 'archive' ? 'archived' : action === 'delete' ? 'deleted' : action === 'set_category' ? 'categorized' : 'tagged'}`,
-      actor: { type: 'user', id: sessionUser.id },
-      tenantId,
-      payload: { correlationId: randomUUID(), action, unitCount: unitIds.length, affected: result },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'library',
+        type: `unit.${action === 'approve' ? 'approved' : action === 'archive' ? 'archived' : action === 'delete' ? 'deleted' : action === 'set_category' ? 'categorized' : 'tagged'}`,
+        actor: { type: 'user', id: sessionUser.id },
+        tenantId,
+        payload: { correlationId: randomUUID(), action, unitCount: unitIds.length, affected: result },
+      });
+    } catch (evtErr) {
+      console.error('[library/bulk] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({ data: { updated: result.count } });
   } catch (err) {

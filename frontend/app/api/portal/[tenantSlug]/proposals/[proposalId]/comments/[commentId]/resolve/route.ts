@@ -88,19 +88,23 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'comment.resolved',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'comment.resolved',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        commentId,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          proposalId,
+          commentId,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/comments/resolve] event emission failed:', e);
+    }
 
     // ── Activity log ────────────────────────────────────────────────
     try {

@@ -215,6 +215,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Valid email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    if (name.length > 200) {
+      return NextResponse.json({ error: 'Name exceeds maximum length (200 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (email.length > 320) {
+      return NextResponse.json({ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
     if (!['contributor', 'external'].includes(collabRole)) {
       return NextResponse.json({ error: 'Role must be contributor or external', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
@@ -325,25 +333,29 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Emit event
-    const correlationId = randomUUID();
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.collaborator_invited',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId,
+    try {
+      const correlationId = randomUUID();
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.collaborator_invited',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        collaboratorId,
-        email,
-        name,
-        role: collabRole,
-        permission,
-        isNewUser,
-      },
-    });
+        payload: {
+          correlationId,
+          tenantId,
+          tenantSlug,
+          proposalId,
+          collaboratorId,
+          email: email.slice(0, 320),
+          name: name.slice(0, 200),
+          role: collabRole,
+          permission,
+          isNewUser,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/collaborators] event emission failed:', e);
+    }
 
     // ── Activity log ────────────────────────────────────────────────
     try {

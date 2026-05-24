@@ -170,17 +170,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    await emitEventSingle({
-      namespace: 'identity',
-      type: 'identity.invite_accepted',
-      actor: systemActor(),
-      payload: {
-        correlationId: randomUUID(),
-        collaboratorId: collaborator.id,
-        email: collaborator.email,
-        proposalId: collaborator.proposalId,
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'identity',
+        type: 'identity.invite_accepted',
+        actor: systemActor(),
+        payload: {
+          correlationId: randomUUID(),
+          collaboratorId: collaborator.id,
+          email: collaborator.email,
+          proposalId: collaborator.proposalId,
+        },
+      });
+    } catch (evtErr) {
+      console.error('[api/invite] event emission failed:', evtErr);
+    }
 
     // Get the proposal's tenant slug for redirect
     let proposalTenant: { tenantSlug: string } | undefined;

@@ -260,6 +260,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     }
 
+    if (newNotes !== null && newNotes.length > 5000) {
+      return NextResponse.json(
+        { error: 'Notes exceed maximum length (5000 chars)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     if (!newStatus && newNotes === null) {
       return NextResponse.json(
         { error: 'Nothing to update', code: 'VALIDATION_ERROR' },
@@ -268,10 +275,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify doc exists ────────────────────────────────────
-    let existingDoc: { id: string; status: string } | undefined;
+    let existingDoc: { id: string; status: string; storageKey: string | null } | undefined;
     try {
-      [existingDoc] = await sql<{ id: string; status: string }[]>`
-        SELECT id, status FROM proposal_supporting_docs
+      [existingDoc] = await sql<{ id: string; status: string; storageKey: string | null }[]>`
+        SELECT id, status, storage_key FROM proposal_supporting_docs
         WHERE id = ${docId}::uuid
           AND proposal_id = ${proposalId}::uuid
           AND tenant_id = ${tenantId}::uuid
@@ -291,6 +298,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     // ── Enforce valid status transitions ─────────────────────
     if (newStatus) {
+      // Cannot transition to 'uploaded' without an actual file
+      if (newStatus === 'uploaded' && !existingDoc.storageKey) {
+        return NextResponse.json(
+          { error: 'Cannot mark as uploaded without an attached file', code: 'VALIDATION_ERROR' },
+          { status: 422 },
+        );
+      }
       const allowed = VALID_TRANSITIONS[existingDoc.status];
       if (!allowed || !allowed.includes(newStatus)) {
         return NextResponse.json(

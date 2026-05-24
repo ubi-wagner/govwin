@@ -510,6 +510,7 @@ function CanvasEditorInner({
         onReviseNode={handleReviseNode}
         proposalId={proposalId}
         tenantSlug={tenantSlug}
+        sectionId={sectionId}
       />
     </div>
   );

@@ -7,6 +7,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject, deleteObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { s3, BUCKET } from '@/lib/storage/s3-client';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -41,6 +42,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -53,11 +57,17 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/dropbox] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
@@ -65,8 +75,12 @@ export async function GET(request: Request, ctx: RouteContext) {
     // Admin can view any user's dropbox
     const url = new URL(request.url);
     const isAdmin = hasRoleAtLeast(role, 'tenant_admin');
-    const targetUserId = isAdmin && url.searchParams.get('userId')
-      ? url.searchParams.get('userId')!
+    const userIdParam = url.searchParams.get('userId');
+    if (userIdParam && !isValidUUID(userIdParam)) {
+      return NextResponse.json({ error: 'Invalid userId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    const targetUserId = isAdmin && userIdParam
+      ? userIdParam
       : sessionUser.id;
 
     const prefix = dropboxPrefix(tenantSlug, proposalId, targetUserId);
@@ -129,6 +143,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -198,19 +215,23 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.dropbox_file_uploaded',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.dropbox_file_uploaded',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        proposalId,
-        filename: safeFilename,
-        size: buffer.length,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          proposalId,
+          filename: safeFilename,
+          size: buffer.length,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/dropbox] event emission failed:', e);
+    }
 
     return NextResponse.json({
       data: {
@@ -255,6 +276,9 @@ export async function DELETE(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -301,18 +325,22 @@ export async function DELETE(request: Request, ctx: RouteContext) {
       );
     }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.dropbox_file_deleted',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.dropbox_file_deleted',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        proposalId,
-        key,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          proposalId,
+          key,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/dropbox] event emission failed:', e);
+    }
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (e) {

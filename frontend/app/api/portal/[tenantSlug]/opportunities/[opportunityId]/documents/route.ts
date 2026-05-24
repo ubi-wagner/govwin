@@ -78,20 +78,32 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── 1. Verify tenant has access to this opportunity ────────
-    const [pipelineItem] = await sql<{ id: string }[]>`
-      SELECT id FROM tenant_pipeline_items
-      WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
-      LIMIT 1
-    `;
+    let pipelineItem: { id: string } | undefined;
+    try {
+      [pipelineItem] = await sql<{ id: string }[]>`
+        SELECT id FROM tenant_pipeline_items
+        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[portal/opportunities/documents] pipeline query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!pipelineItem) {
       // Fall back to checking purchases table
-      const [purchase] = await sql<{ id: string }[]>`
-        SELECT id FROM purchases
-        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
-          AND status = 'completed'
-        LIMIT 1
-      `;
+      let purchase: { id: string } | undefined;
+      try {
+        [purchase] = await sql<{ id: string }[]>`
+          SELECT id FROM purchases
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+            AND status = 'completed'
+          LIMIT 1
+        `;
+      } catch (dbErr) {
+        console.error('[portal/opportunities/documents] purchase query failed:', dbErr);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
       if (!purchase) {
         return NextResponse.json(
           { error: 'No access to this opportunity', code: 'FORBIDDEN' },
@@ -103,7 +115,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── 2. Fetch linked solicitation documents ──────────────
     // Opportunities link to solicitations via solicitation_id.
     // Documents are stored on solicitation_documents via solicitation_id.
-    const documents = await sql<{
+    let documents: {
       id: string;
       originalFilename: string;
       documentType: string;
@@ -115,19 +127,25 @@ export async function GET(request: Request, ctx: RouteContext) {
       isPrimary: boolean | null;
       documentLabel: string | null;
       createdAt: string;
-    }[]>`
-      SELECT sd.id, sd.original_filename, sd.document_type, sd.storage_key,
-             sd.file_size, sd.content_type, sd.page_count, sd.extracted_at,
-             sd.is_primary, sd.document_label, sd.created_at
-      FROM solicitation_documents sd
-      WHERE sd.solicitation_id = (
-        SELECT solicitation_id FROM opportunities
-        WHERE id = ${opportunityId}::uuid
-        LIMIT 1
-      )
-      ORDER BY sd.is_primary DESC NULLS LAST, sd.document_type, sd.created_at
-      LIMIT 100
-    `;
+    }[];
+    try {
+      documents = await sql<typeof documents>`
+        SELECT sd.id, sd.original_filename, sd.document_type, sd.storage_key,
+               sd.file_size, sd.content_type, sd.page_count, sd.extracted_at,
+               sd.is_primary, sd.document_label, sd.created_at
+        FROM solicitation_documents sd
+        WHERE sd.solicitation_id = (
+          SELECT solicitation_id FROM opportunities
+          WHERE id = ${opportunityId}::uuid
+          LIMIT 1
+        )
+        ORDER BY sd.is_primary DESC NULLS LAST, sd.document_type, sd.created_at
+        LIMIT 100
+      `;
+    } catch (dbErr) {
+      console.error('[portal/opportunities/documents] documents query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── 3. Generate presigned S3 URLs (1 hour expiry) ───────
     const documentsWithUrls = await Promise.all(

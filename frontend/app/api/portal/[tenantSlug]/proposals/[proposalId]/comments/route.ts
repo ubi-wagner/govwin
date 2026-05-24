@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -36,6 +37,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -68,6 +72,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── Optional nodeId filter ───────────────────────────────────────
     const url = new URL(request.url);
     const nodeId = url.searchParams.get('nodeId');
+    if (nodeId && !isValidUUID(nodeId)) {
+      return NextResponse.json({ error: 'Invalid nodeId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
 
     let comments: {
       id: string;
@@ -175,6 +182,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -203,6 +213,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const nodeId = body.nodeId.trim();
+    if (!isValidUUID(nodeId)) {
+      return NextResponse.json({ error: 'Invalid nodeId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const text = body.text.trim();
 
     if (text.length > 10000) {
@@ -241,21 +254,25 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'comment.created',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'comment.created',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        commentId: comment.id,
-        commentText: text,
-        nodeId,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          proposalId,
+          commentId: comment.id,
+          commentText: text.slice(0, 100),
+          nodeId,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/comments] event emission failed:', e);
+    }
 
     // ── Activity log ────────────────────────────────────────────────
     try {

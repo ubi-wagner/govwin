@@ -109,7 +109,7 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
           COALESCE(SUM(cost_usd), 0)::text AS total_cost_usd
         FROM agent_task_log
         WHERE tenant_id = ${tenantId}::uuid
-          AND created_at >= date_trunc('month', now())
+          AND created_at >= now() - ${intervalStr}::interval
       `;
     } catch (dbErr) {
       console.error('[portal/agents/usage] total calls query failed:', dbErr);

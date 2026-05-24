@@ -109,13 +109,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create checkout session', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'checkout.started',
-      actor: { type: 'user', id: user.id!, email: user.email ?? undefined },
-      tenantId: user.tenantId,
-      payload: { correlationId: randomUUID(), productType, tenantId: user.tenantId },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'checkout.started',
+        actor: { type: 'user', id: user.id!, email: user.email ?? undefined },
+        tenantId: user.tenantId,
+        payload: { correlationId: randomUUID(), productType, tenantId: user.tenantId },
+      });
+    } catch (evtErr) {
+      console.error('[stripe/checkout] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({ data: { url: checkoutSession.url } });
   } catch (err) {

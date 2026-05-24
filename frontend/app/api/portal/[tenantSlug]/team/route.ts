@@ -45,7 +45,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const members = await sql<{
+    if (!hasRoleAtLeast(role, 'tenant_user')) {
+      return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    let members: {
       id: string;
       email: string;
       name: string | null;
@@ -53,13 +57,19 @@ export async function GET(_request: Request, ctx: RouteContext) {
       isActive: boolean;
       lastLoginAt: string | null;
       createdAt: string;
-    }[]>`
-      SELECT id, email, name, role, is_active, last_login_at, created_at
-      FROM users
-      WHERE tenant_id = ${tenantId}
-        AND is_active = true
-      ORDER BY created_at ASC
-    `;
+    }[];
+    try {
+      members = await sql<typeof members>`
+        SELECT id, email, name, role, is_active, last_login_at, created_at
+        FROM users
+        WHERE tenant_id = ${tenantId}
+          AND is_active = true
+        ORDER BY created_at ASC
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/team] GET query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: members });
   } catch (e) {
@@ -129,6 +139,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Valid email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    if (name.length > 200) {
+      return NextResponse.json({ error: 'Name exceeds maximum length (200 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (email.length > 320) {
+      return NextResponse.json({ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
     if (!['tenant_admin', 'tenant_user', 'partner_user'].includes(memberRole)) {
       return NextResponse.json(
         { error: 'Role must be tenant_admin, tenant_user, or partner_user', code: 'VALIDATION_ERROR' },
@@ -137,9 +155,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Check if user already exists
-    const [existing] = await sql<{ id: string; tenantId: string | null }[]>`
-      SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
-    `;
+    let existing: { id: string; tenantId: string | null } | undefined;
+    try {
+      [existing] = await sql<{ id: string; tenantId: string | null }[]>`
+        SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/team] POST user lookup failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (existing) {
       if (existing.tenantId === tenantId) {
@@ -155,27 +179,37 @@ export async function POST(request: Request, ctx: RouteContext) {
     const tempPassword = randomUUID().slice(0, 12);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-    const [newUser] = await sql<{ id: string }[]>`
-      INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
-      VALUES (${email}, ${name || null}, ${memberRole}, ${tenantId}, ${passwordHash}, true)
-      RETURNING id
-    `;
+    let newUser: { id: string };
+    try {
+      [newUser] = await sql<{ id: string }[]>`
+        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
+        VALUES (${email}, ${name || null}, ${memberRole}, ${tenantId}, ${passwordHash}, true)
+        RETURNING id
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/team] POST user insert failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.team_member_invited',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'team_member.invited',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        userId: newUser.id,
-        email,
-        name,
-        role: memberRole,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          userId: newUser.id,
+          email,
+          name,
+          role: memberRole,
+        },
+      });
+    } catch (evtErr) {
+      console.error('[api/portal/team] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({
       data: {

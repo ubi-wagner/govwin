@@ -145,30 +145,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     throw err;
   }
 
-  if (productType === 'finder_subscription') {
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'subscription.started',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType },
-    });
-  } else if (productType === 'expert_consulting') {
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'consulting.purchased',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType, hours: quantity },
-    });
-  } else {
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'purchase.completed',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
-    });
+  try {
+    if (productType === 'finder_subscription') {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'subscription.started',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType },
+      });
+    } else if (productType === 'expert_consulting') {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'consulting.purchased',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType, hours: quantity },
+      });
+    } else {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'purchase.completed',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
+      });
+    }
+  } catch (evtErr) {
+    console.error('[stripe/webhook] checkout event emission failed:', evtErr);
   }
 }
 
@@ -211,13 +215,17 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     throw err;
   }
 
-  await emitEventSingle({
-    namespace: 'capture',
-    type: 'subscription.renewed',
-    actor: systemActor('stripe-webhook'),
-    tenantId: tenant.id,
-    payload: { correlationId: randomUUID(), invoiceId: invoice.id, subscriptionId },
-  });
+  try {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'subscription.renewed',
+      actor: systemActor('stripe-webhook'),
+      tenantId: tenant.id,
+      payload: { correlationId: randomUUID(), invoiceId: invoice.id, subscriptionId },
+    });
+  } catch (evtErr) {
+    console.error('[stripe/webhook] invoice event emission failed:', evtErr);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -248,11 +256,15 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     throw err;
   }
 
-  await emitEventSingle({
-    namespace: 'capture',
-    type: 'subscription.canceled',
-    actor: systemActor('stripe-webhook'),
-    tenantId: tenant.id,
-    payload: { correlationId: randomUUID(), subscriptionId: subscription.id },
-  });
+  try {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'subscription.canceled',
+      actor: systemActor('stripe-webhook'),
+      tenantId: tenant.id,
+      payload: { correlationId: randomUUID(), subscriptionId: subscription.id },
+    });
+  } catch (evtErr) {
+    console.error('[stripe/webhook] subscription cancel event emission failed:', evtErr);
+  }
 }

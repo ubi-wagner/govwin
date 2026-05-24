@@ -63,6 +63,18 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (body.document_type.length > 100) {
+      return NextResponse.json(
+        { error: 'document_type exceeds maximum length (100 chars)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+    if (body.document_version.length > 50) {
+      return NextResponse.json(
+        { error: 'document_version exceeds maximum length (50 chars)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
     if (body.accepted !== true) {
       return NextResponse.json(
         { error: 'accepted must be true to record consent', code: 'VALIDATION_ERROR' },

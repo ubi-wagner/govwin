@@ -96,13 +96,17 @@ export async function POST(request: Request, ctx: RouteContext) {
       DO UPDATE SET is_pinned = true
     `;
 
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'topic.pinned',
-      actor: { type: 'user', id: userId },
-      tenantId,
-      payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId, topicTitle: opp.title },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'topic.pinned',
+        actor: { type: 'user', id: userId },
+        tenantId,
+        payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId, topicTitle: opp.title },
+      });
+    } catch (evtErr) {
+      console.error('[spotlight/pin POST] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({ data: { pinned: true, opportunityId } });
   } catch (e) {
@@ -140,13 +144,17 @@ export async function DELETE(request: Request, ctx: RouteContext) {
       WHERE tenant_id = ${tenantId} AND opportunity_id = ${opportunityId}
     `;
 
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'topic.unpinned',
-      actor: { type: 'user', id: userId },
-      tenantId,
-      payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'topic.unpinned',
+        actor: { type: 'user', id: userId },
+        tenantId,
+        payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId },
+      });
+    } catch (evtErr) {
+      console.error('[spotlight/pin DELETE] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({ data: { pinned: false, opportunityId } });
   } catch (e) {

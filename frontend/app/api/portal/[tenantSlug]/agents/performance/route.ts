@@ -68,19 +68,25 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    const metrics = await sql`
-      SELECT agent_role,
-             count(*)::int AS total_tasks,
-             count(*) FILTER (WHERE status = 'completed')::int AS completed,
-             count(*) FILTER (WHERE status = 'failed')::int AS failed,
-             coalesce(avg(EXTRACT(EPOCH FROM (completed_at - created_at)))::int, 0) AS avg_duration_seconds,
-             coalesce(round(count(*) FILTER (WHERE status = 'completed')::numeric /
-                   NULLIF(count(*), 0) * 100, 1), 0) AS success_rate
-      FROM agent_task_queue
-      WHERE tenant_id = ${tenantId}::uuid
-      GROUP BY agent_role
-      ORDER BY total_tasks DESC
-    `;
+    let metrics;
+    try {
+      metrics = await sql`
+        SELECT agent_role,
+               count(*)::int AS total_tasks,
+               count(*) FILTER (WHERE status = 'completed')::int AS completed,
+               count(*) FILTER (WHERE status = 'failed')::int AS failed,
+               coalesce(avg(EXTRACT(EPOCH FROM (completed_at - created_at)))::int, 0) AS avg_duration_seconds,
+               coalesce(round(count(*) FILTER (WHERE status = 'completed')::numeric /
+                     NULLIF(count(*), 0) * 100, 1), 0) AS success_rate
+        FROM agent_task_queue
+        WHERE tenant_id = ${tenantId}::uuid
+        GROUP BY agent_role
+        ORDER BY total_tasks DESC
+      `;
+    } catch (dbErr) {
+      console.error('[portal/agents/performance] metrics query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { metrics } });
   } catch (err) {

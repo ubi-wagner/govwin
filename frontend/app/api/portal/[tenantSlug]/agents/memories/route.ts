@@ -75,41 +75,53 @@ export async function GET(request: Request, ctx: RouteContext) {
     const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 200);
 
     // Query both episodic and semantic memories for this tenant
-    const episodic = agentRole
-      ? await sql`
-          SELECT id, agent_role, memory_type, content, importance AS confidence,
-                 occurred_at, created_at, last_accessed, 'episodic' AS memory_source
-          FROM episodic_memories
-          WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `
-      : await sql`
-          SELECT id, agent_role, memory_type, content, importance AS confidence,
-                 occurred_at, created_at, last_accessed, 'episodic' AS memory_source
-          FROM episodic_memories
-          WHERE tenant_id = ${tenantId}::uuid
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
+    let episodic;
+    let semantic;
+    try {
+      episodic = agentRole
+        ? await sql`
+            SELECT id, agent_role, memory_type, content, importance AS confidence,
+                   occurred_at, created_at, last_accessed, 'episodic' AS memory_source
+            FROM episodic_memories
+            WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
+            ORDER BY created_at DESC
+            LIMIT ${limit}
+          `
+        : await sql`
+            SELECT id, agent_role, memory_type, content, importance AS confidence,
+                   occurred_at, created_at, last_accessed, 'episodic' AS memory_source
+            FROM episodic_memories
+            WHERE tenant_id = ${tenantId}::uuid
+            ORDER BY created_at DESC
+            LIMIT ${limit}
+          `;
+    } catch (dbErr) {
+      console.error('[portal/agents/memories] episodic query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    const semantic = agentRole
-      ? await sql`
-          SELECT id, agent_role, category AS memory_type, content, confidence,
-                 valid_from, created_at, 'semantic' AS memory_source
-          FROM semantic_memories
-          WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `
-      : await sql`
-          SELECT id, agent_role, category AS memory_type, content, confidence,
-                 valid_from, created_at, 'semantic' AS memory_source
-          FROM semantic_memories
-          WHERE tenant_id = ${tenantId}::uuid
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        `;
+    try {
+      semantic = agentRole
+        ? await sql`
+            SELECT id, agent_role, category AS memory_type, content, confidence,
+                   valid_from, created_at, 'semantic' AS memory_source
+            FROM semantic_memories
+            WHERE tenant_id = ${tenantId}::uuid AND agent_role = ${agentRole}
+            ORDER BY created_at DESC
+            LIMIT ${limit}
+          `
+        : await sql`
+            SELECT id, agent_role, category AS memory_type, content, confidence,
+                   valid_from, created_at, 'semantic' AS memory_source
+            FROM semantic_memories
+            WHERE tenant_id = ${tenantId}::uuid
+            ORDER BY created_at DESC
+            LIMIT ${limit}
+          `;
+    } catch (dbErr) {
+      console.error('[portal/agents/memories] semantic query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { episodic, semantic } });
   } catch (err) {

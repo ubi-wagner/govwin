@@ -256,10 +256,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant and fetch its gate_config
-    let proposal: { id: string; gateConfig: string[] | null } | undefined;
+    let proposal: { id: string; gateConfig: string[] | null; isLocked: boolean } | undefined;
     try {
-      [proposal] = await sql<{ id: string; gateConfig: string[] | null }[]>`
-        SELECT id, gate_config FROM proposals
+      [proposal] = await sql<{ id: string; gateConfig: string[] | null; isLocked: boolean }[]>`
+        SELECT id, gate_config, is_locked FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}
         LIMIT 1
       `;
@@ -271,6 +271,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
+      );
+    }
+
+    if (proposal.isLocked) {
+      return NextResponse.json(
+        { error: 'Cannot modify gates on a locked proposal', code: 'PROPOSAL_LOCKED' },
+        { status: 423 },
       );
     }
 
@@ -337,6 +344,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (label.length > 500) {
       return NextResponse.json(
         { error: 'label exceeds maximum length (500 chars)', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (description && description.length > 2000) {
+      return NextResponse.json(
+        { error: 'description exceeds maximum length (2000 chars)', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -453,10 +467,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    let proposal: { id: string } | undefined;
+    let proposal: { id: string; isLocked: boolean } | undefined;
     try {
-      [proposal] = await sql<{ id: string }[]>`
-        SELECT id FROM proposals
+      [proposal] = await sql<{ id: string; isLocked: boolean }[]>`
+        SELECT id, is_locked FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}
         LIMIT 1
       `;
@@ -468,6 +482,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
+      );
+    }
+
+    if (proposal.isLocked) {
+      return NextResponse.json(
+        { error: 'Cannot modify gates on a locked proposal', code: 'PROPOSAL_LOCKED' },
+        { status: 423 },
       );
     }
 
