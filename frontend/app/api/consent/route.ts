@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export async function POST(request: Request) {
   try {
@@ -86,6 +87,18 @@ export async function POST(request: Request) {
         await sql`
           UPDATE users SET terms_accepted_at = now() WHERE id = ${sessionUser.id}::uuid
         `;
+      }
+
+      try {
+        await emitEventSingle({
+          namespace: 'identity',
+          type: 'consent.recorded',
+          actor: userActor(sessionUser.id),
+          tenantId: null,
+          payload: { userId: sessionUser.id, documentType: body.document_type },
+        });
+      } catch (e) {
+        console.error('[consent] event emission failed:', e);
       }
 
       return NextResponse.json(

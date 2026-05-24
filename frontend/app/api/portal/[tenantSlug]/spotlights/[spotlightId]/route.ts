@@ -12,6 +12,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; spotlightId: string }>;
@@ -313,6 +314,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'spotlight.updated',
+        actor: userActor(sessionUser.id),
+        tenantId,
+        payload: { spotlightId, fields: Object.keys(body) },
+      });
+    } catch (e) {
+      console.error('[portal/spotlights/update] event emission failed:', e);
+    }
+
     return NextResponse.json({ data: { spotlight: updated } });
   } catch (err) {
     console.error('[portal/spotlights/update] error:', err);
@@ -373,12 +386,12 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     }
 
     // ── Delete spotlight ──────────────────────────────────────
-    let deleted: { id: string }[];
+    let deleted: { id: string; name: string }[];
     try {
-      deleted = await sql<{ id: string }[]>`
+      deleted = await sql<{ id: string; name: string }[]>`
         DELETE FROM spotlights
         WHERE id = ${spotlightId}::uuid AND tenant_id = ${tenantId}::uuid
-        RETURNING id
+        RETURNING id, name
       `;
     } catch (e) {
       console.error('[portal/spotlights/delete] delete query failed:', e);
@@ -390,6 +403,18 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         { error: 'Spotlight not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'spotlight.deleted',
+        actor: userActor(sessionUser.id),
+        tenantId,
+        payload: { spotlightId, name: deleted[0].name },
+      });
+    } catch (e) {
+      console.error('[portal/spotlights/delete] event emission failed:', e);
     }
 
     return NextResponse.json({ data: { deleted: true } });

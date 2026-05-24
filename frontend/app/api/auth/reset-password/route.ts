@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { sql } from '@/lib/db'
+import { emitEventSingle, systemActor } from '@/lib/events'
 
 /**
  * POST /api/auth/reset-password
@@ -140,6 +141,18 @@ export async function POST(request: Request) {
         { error: 'Internal error', code: 'INTERNAL_ERROR' },
         { status: 500 },
       )
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'identity',
+        type: 'password.reset_completed',
+        actor: systemActor('password-reset'),
+        tenantId: null,
+        payload: { email: normalized },
+      })
+    } catch (e) {
+      console.error('[reset-password] event emission failed:', e)
     }
 
     return NextResponse.json({ data: { reset: true } })

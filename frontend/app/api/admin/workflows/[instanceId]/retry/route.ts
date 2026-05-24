@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ instanceId: string }>;
@@ -137,7 +138,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         )
       `;
 
-      return { newId };
+      return { newId, workflowName: original.workflowName };
     });
 
     if ('error' in result) {
@@ -156,6 +157,19 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     const newId = (result as { newId: string }).newId;
+    const workflowName = (result as { workflowName?: string }).workflowName;
+
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'workflow.instance_retried',
+        actor: userActor(sessionUser.id as string, sessionUser.email),
+        tenantId: null,
+        payload: { instanceId, newInstanceId: newId, workflowName: workflowName ?? null },
+      });
+    } catch (e) {
+      console.error('[admin/workflows/retry] event emission failed:', e);
+    }
 
     return NextResponse.json({
       data: { newInstanceId: newId },

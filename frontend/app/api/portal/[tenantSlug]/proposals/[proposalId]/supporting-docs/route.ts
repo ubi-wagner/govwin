@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -450,6 +451,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (e) {
       console.error('[portal/proposals/supporting-docs] update failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Determine category/label for the event payload
+    const eventCategory = typeof body.category === 'string' ? body.category : 'other';
+    const eventLabel = typeof body.requirementLabel === 'string' && body.requirementLabel.trim()
+      ? body.requirementLabel.trim()
+      : (filename as string);
+
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'supporting_doc.uploaded',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { proposalId, docId: targetDocId, requirementLabel: eventLabel, filename, category: eventCategory },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/supporting-docs] event emission failed:', e);
     }
 
     return NextResponse.json({

@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl, deleteObject } from '@/lib/storage/s3-client';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; docId: string }>;
@@ -333,6 +334,20 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    if (newStatus) {
+      try {
+        await emitEventSingle({
+          namespace: 'proposal',
+          type: 'supporting_doc.status_changed',
+          actor: userActor(sessionUser.id, sessionUser.email),
+          tenantId,
+          payload: { proposalId, docId, fromStatus: existingDoc.status, toStatus: newStatus, actorRole: role },
+        });
+      } catch (e) {
+        console.error('[portal/proposals/supporting-docs/detail] event emission failed:', e);
+      }
+    }
+
     return NextResponse.json({ data: { id: docId, status: newStatus ?? 'unchanged' } });
   } catch (err) {
     console.error('[portal/proposals/supporting-docs/detail] error:', err);
@@ -427,10 +442,10 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     }
 
     // ── Find the doc ─────────────────────────────────────────
-    let doc: { id: string; storageKey: string | null; isRequired: boolean } | undefined;
+    let doc: { id: string; storageKey: string | null; isRequired: boolean; requirementLabel: string } | undefined;
     try {
-      [doc] = await sql<{ id: string; storageKey: string | null; isRequired: boolean }[]>`
-        SELECT id, storage_key, is_required
+      [doc] = await sql<{ id: string; storageKey: string | null; isRequired: boolean; requirementLabel: string }[]>`
+        SELECT id, storage_key, is_required, requirement_label
         FROM proposal_supporting_docs
         WHERE id = ${docId}::uuid
           AND proposal_id = ${proposalId}::uuid
@@ -477,6 +492,18 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     } catch (e) {
       console.error('[portal/proposals/supporting-docs/detail] revert failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'supporting_doc.deleted',
+        actor: userActor(sessionUser.id),
+        tenantId,
+        payload: { proposalId, docId, requirementLabel: doc.requirementLabel },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/supporting-docs/detail] event emission failed:', e);
     }
 
     return NextResponse.json({ data: { id: docId, status: 'missing' } });

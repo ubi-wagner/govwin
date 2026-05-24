@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -353,6 +354,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'gate_requirement.created',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { proposalId, requirementId: requirement.id, stage, label, requirementType },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/gates] event emission failed:', e);
+    }
+
     return NextResponse.json({
       data: {
         id: requirement.id,
@@ -536,6 +549,31 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         { error: 'Requirement not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // Fetch stage for event payload
+    let reqStage: string | undefined;
+    try {
+      const [reqRow] = await sql<{ stage: string }[]>`
+        SELECT stage FROM stage_gate_requirements
+        WHERE id = ${requirementId}::uuid
+        LIMIT 1
+      `;
+      reqStage = reqRow?.stage;
+    } catch {
+      // Non-fatal — stage is just for the event payload
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'gate_requirement.toggled',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { proposalId, requirementId, isMet, stage: reqStage ?? null },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/gates] event emission failed:', e);
     }
 
     return NextResponse.json({

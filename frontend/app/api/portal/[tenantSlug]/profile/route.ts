@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -125,6 +126,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     } catch (e) {
       console.error('[api/portal/profile] profile upsert failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'profile.updated',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        tenantId,
+        payload: { tenantId, fields: Object.keys(body) },
+      });
+    } catch (e) {
+      console.error('[api/portal/profile] event emission failed:', e);
     }
 
     return NextResponse.json({ data: { updated: true } });
