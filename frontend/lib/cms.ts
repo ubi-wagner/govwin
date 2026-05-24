@@ -72,6 +72,46 @@ export async function getContentBySlug(slug: string): Promise<ContentRow | null>
 }
 
 /**
+ * Fetch a single content item by slug (any status — for admin preview).
+ */
+export async function getContentBySlugAdmin(slug: string): Promise<ContentRow | null> {
+  try {
+    const [row] = await sql<ContentRow[]>`
+      SELECT id, slug, title, content_type, body, excerpt, author, tags,
+             published, status, published_at, featured_image, external_url,
+             display_order, metadata, created_at, updated_at
+      FROM cms_content
+      WHERE slug = ${slug}
+      LIMIT 1
+    `;
+    return row ?? null;
+  } catch (e) {
+    console.error('[cms/getContentBySlugAdmin] error:', e);
+    return null;
+  }
+}
+
+/**
+ * Fetch a single content item by ID (any status — for admin preview).
+ */
+export async function getContentByIdAdmin(id: string): Promise<ContentRow | null> {
+  try {
+    const [row] = await sql<ContentRow[]>`
+      SELECT id, slug, title, content_type, body, excerpt, author, tags,
+             published, status, published_at, featured_image, external_url,
+             display_order, metadata, created_at, updated_at
+      FROM cms_content
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return row ?? null;
+  } catch (e) {
+    console.error('[cms/getContentByIdAdmin] error:', e);
+    return null;
+  }
+}
+
+/**
  * Fetch published content matching a given tag.
  */
 export async function getContentBlocks(tag: string): Promise<ContentRow[]> {
