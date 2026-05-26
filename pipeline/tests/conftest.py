@@ -1,5 +1,9 @@
 """Shared pytest fixtures + async config."""
+import os
 import pytest
+
+# Ensure config.py doesn't crash during test collection
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
 
 
 def pytest_collection_modifyitems(config, items):
