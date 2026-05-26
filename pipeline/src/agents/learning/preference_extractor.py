@@ -48,7 +48,7 @@ import uuid
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.preference_extractor")
 
@@ -290,11 +290,11 @@ class PreferenceExtractor:
                                 INSERT INTO semantic_memories
                                     (id, tenant_id, agent_role, embedding, content,
                                      category, confidence, evidence_count,
-                                     source_memories, metadata, created_at, updated_at,
+                                     source_memories, created_at, updated_at,
                                      last_accessed)
                                 VALUES ($1, $2, $3, $4::vector, $5,
                                         $6, $7, $8,
-                                        $9, $10::jsonb, $11, $11, $11)
+                                        $9, $10, $10, $10)
                                 """,
                                 uuid.UUID(mem_id),
                                 uuid.UUID(tenant_id),
@@ -305,7 +305,6 @@ class PreferenceExtractor:
                                 0.5,
                                 theme["frequency"],
                                 source_ids,
-                                json.dumps({"keywords": keywords[:10], "source": "preference_extractor"}),
                                 datetime.now(timezone.utc),
                             )
                             results.append({

@@ -43,14 +43,20 @@ export const ingestTriggerManualTool = defineTool<Input, Output>({
     const actorId = ctx.actor.id;
     const priority = 1; // high
 
-    const rows = await sql<{ id: string }[]>`
-      INSERT INTO pipeline_jobs
-        (source, kind, status, priority, metadata)
-      VALUES
-        (${source}, 'ingest', 'pending', ${priority},
-         ${JSON.stringify({ run_type: runType, triggered_by: actorId, manual: true })}::jsonb)
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        INSERT INTO pipeline_jobs
+          (source, kind, status, priority, metadata)
+        VALUES
+          (${source}, 'ingest', 'pending', ${priority},
+           ${JSON.stringify({ run_type: runType, triggered_by: actorId, manual: true })}::jsonb)
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[ingest.trigger_manual] insert failed:', err);
+      throw err;
+    }
     const jobId = rows[0].id;
 
     await emitEventSingle({

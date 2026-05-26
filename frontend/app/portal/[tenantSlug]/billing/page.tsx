@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import BillingPanel from '@/components/portal/billing-panel';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Billing page — tenant_admin (or higher) only.
  *

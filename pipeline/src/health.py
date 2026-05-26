@@ -22,10 +22,7 @@ import asyncpg
 
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://govtech:changeme@localhost:5432/govtech_intel",
-)
+from config import DATABASE_URL
 
 HEALTH_PORT = int(os.getenv("HEALTH_PORT", "8080"))
 

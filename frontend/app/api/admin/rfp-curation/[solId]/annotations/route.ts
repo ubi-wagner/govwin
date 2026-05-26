@@ -55,11 +55,17 @@ export async function GET(
     }
 
     // ── Query ───────────────────────────────────────────────────────
-    const annotations = await sql`
-      SELECT * FROM solicitation_annotations
-      WHERE solicitation_id = ${solId}::uuid
-      ORDER BY created_at ASC
-    `;
+    let annotations;
+    try {
+      annotations = await sql`
+        SELECT * FROM solicitation_annotations
+        WHERE solicitation_id = ${solId}::uuid
+        ORDER BY created_at ASC
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/annotations] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { annotations } });
   } catch (error) {
@@ -145,9 +151,15 @@ export async function POST(
     const actorId = user.id!;
 
     // ── Verify solicitation exists ──────────────────────────────────
-    const existing = await sql<{ id: string }[]>`
-      SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid
-    `;
+    let existing: { id: string }[];
+    try {
+      existing = await sql<{ id: string }[]>`
+        SELECT id FROM curated_solicitations WHERE id = ${solId}::uuid
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/annotations] solicitation lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existing.length === 0) {
       return NextResponse.json(
         { error: 'Solicitation not found', code: 'NOT_FOUND' },
@@ -156,24 +168,36 @@ export async function POST(
     }
 
     // ── Insert annotation ───────────────────────────────────────────
-    const [annotation] = await sql`
-      INSERT INTO solicitation_annotations
-        (solicitation_id, actor_id, kind, source_location, payload, compliance_variable_name)
-      VALUES
-        (${solId}::uuid, ${actorId}::uuid, ${kind},
-         ${JSON.stringify(sourceLocation)}::jsonb,
-         ${JSON.stringify(payload ?? {})}::jsonb,
-         ${typeof complianceVariableName === 'string' ? complianceVariableName : null})
-      RETURNING *
-    `;
+    let annotation: Record<string, unknown>;
+    try {
+      const rows = await sql`
+        INSERT INTO solicitation_annotations
+          (solicitation_id, actor_id, kind, source_location, payload, compliance_variable_name)
+        VALUES
+          (${solId}::uuid, ${actorId}::uuid, ${kind},
+           ${JSON.stringify(sourceLocation)}::jsonb,
+           ${JSON.stringify(payload ?? {})}::jsonb,
+           ${typeof complianceVariableName === 'string' ? complianceVariableName : null})
+        RETURNING *
+      `;
+      annotation = rows[0];
+    } catch (e) {
+      console.error('[rfp-curation/annotations] insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'annotation.saved',
-      actor: { type: 'user', id: actorId },
-      tenantId: null,
-      payload: { correlationId: randomUUID(), solicitationId: solId, annotationId: (annotation as { id: string }).id },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'annotation.saved',
+        actor: { type: 'user', id: actorId },
+        tenantId: null,
+        payload: { correlationId: randomUUID(), solicitationId: solId, annotationId: (annotation as { id: string }).id },
+      });
+    } catch (e) {
+      console.error('[rfp-curation/annotations] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { annotation } });
   } catch (error) {

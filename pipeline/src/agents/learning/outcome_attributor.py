@@ -47,7 +47,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.outcome_attributor")
 
@@ -83,7 +83,7 @@ class OutcomeAttributor:
             task_logs = await conn.fetch(
                 """
                 SELECT id, agent_role, task_type, human_accepted, human_edit_pct,
-                       cost_usd, duration_ms, model_used, created_at
+                       cost_usd, duration_ms, created_at
                 FROM agent_task_log
                 WHERE proposal_id = $1
                   AND tenant_id = $2
@@ -228,9 +228,6 @@ class OutcomeAttributor:
                 role_avg_edit = sum(role_edit_pcts) / len(role_edit_pcts) if role_edit_pcts else 0.0
                 role_costs = [float(t["cost_usd"] or 0) for t in tasks]
                 role_avg_cost = sum(role_costs) / len(role_costs) if role_costs else 0.0
-                role_durations = [float(t["duration_ms"] or 0) for t in tasks]
-                role_avg_duration = sum(role_durations) / len(role_durations) if role_durations else 0.0
-
                 try:
                     # Upsert into agent_performance
                     await conn.execute(
@@ -238,15 +235,14 @@ class OutcomeAttributor:
                         INSERT INTO agent_performance
                             (id, tenant_id, agent_role, period_start, period_end,
                              tasks_completed, acceptance_rate, avg_edit_pct,
-                             avg_cost_usd, avg_duration_ms, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                        ON CONFLICT (tenant_id, agent_role, period_start, period_end)
+                             avg_cost_usd, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                        ON CONFLICT (tenant_id, agent_role, period_start)
                         DO UPDATE SET
                             tasks_completed = agent_performance.tasks_completed + EXCLUDED.tasks_completed,
                             acceptance_rate = EXCLUDED.acceptance_rate,
                             avg_edit_pct = EXCLUDED.avg_edit_pct,
-                            avg_cost_usd = EXCLUDED.avg_cost_usd,
-                            avg_duration_ms = EXCLUDED.avg_duration_ms
+                            avg_cost_usd = EXCLUDED.avg_cost_usd
                         """,
                         uuid.UUID(str(uuid.uuid4())),
                         uuid.UUID(tenant_id),
@@ -257,7 +253,6 @@ class OutcomeAttributor:
                         role_rate,
                         role_avg_edit,
                         role_avg_cost,
-                        role_avg_duration,
                         now,
                     )
                 except Exception as e:

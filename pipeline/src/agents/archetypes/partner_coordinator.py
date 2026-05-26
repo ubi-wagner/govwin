@@ -459,35 +459,41 @@ Then provide your output as JSON:
             if not sol_id:
                 return {"compliance": None, "note": "No solicitation linked"}
 
-            # Get compliance variables relevant to partners
-            variables = await conn.fetch(
-                """
-                SELECT id, variable_name, variable_type, value
-                FROM solicitation_compliance
-                WHERE solicitation_id = $1
-                  AND (
-                    variable_name ILIKE '%partner%'
-                    OR variable_name ILIKE '%sub%'
-                    OR variable_name ILIKE '%team%'
-                    OR variable_name ILIKE '%loi%'
-                    OR variable_name ILIKE '%letter%'
-                    OR variable_name ILIKE '%collaborat%'
-                  )
-                ORDER BY variable_name ASC
-                """,
+            # Get partner-relevant compliance data from real columns
+            comp_row = await conn.fetchrow(
+                """SELECT partner_max_pct, cost_sharing_required,
+                          pi_must_be_employee, pi_university_allowed,
+                          taba_allowed, custom_variables,
+                          verified_by, verified_at
+                   FROM solicitation_compliance
+                   WHERE solicitation_id = $1
+                   LIMIT 1""",
                 sol_id,
             )
 
+            partner_requirements = []
+            if comp_row:
+                if comp_row["partner_max_pct"] is not None:
+                    partner_requirements.append({"name": "partner_max_pct", "label": "Partner Max Pct", "value": str(comp_row["partner_max_pct"]), "type": "number"})
+                if comp_row["cost_sharing_required"] is not None:
+                    partner_requirements.append({"name": "cost_sharing_required", "label": "Cost Sharing Required", "value": str(comp_row["cost_sharing_required"]), "type": "boolean"})
+                if comp_row["pi_must_be_employee"] is not None:
+                    partner_requirements.append({"name": "pi_must_be_employee", "label": "Pi Must Be Employee", "value": str(comp_row["pi_must_be_employee"]), "type": "boolean"})
+                if comp_row["pi_university_allowed"] is not None:
+                    partner_requirements.append({"name": "pi_university_allowed", "label": "Pi University Allowed", "value": str(comp_row["pi_university_allowed"]), "type": "boolean"})
+                if comp_row["taba_allowed"] is not None:
+                    partner_requirements.append({"name": "taba_allowed", "label": "TABA Allowed", "value": str(comp_row["taba_allowed"]), "type": "boolean"})
+                # Check custom_variables for partner-related entries
+                if comp_row["custom_variables"]:
+                    custom = comp_row["custom_variables"]
+                    if isinstance(custom, list):
+                        for cv in custom:
+                            cv_name = cv.get("name", "").lower()
+                            if any(kw in cv_name for kw in ["partner", "sub", "team", "loi", "letter", "collaborat"]):
+                                partner_requirements.append({"name": cv.get("name", "custom"), "label": cv.get("label", "Custom"), "value": str(cv.get("value", "")), "type": cv.get("type", "text")})
+
             return {
-                "partner_requirements": [
-                    {
-                        "id": str(v["id"]),
-                        "variable_name": v["variable_name"],
-                        "variable_type": v["variable_type"],
-                        "value": v["value"],
-                    }
-                    for v in variables
-                ],
+                "partner_requirements": partner_requirements,
             }
         except Exception as e:
             logger.warning("get_compliance failed: %s", e)
@@ -498,14 +504,13 @@ Then provide your output as JSON:
     ) -> dict:
         """Search agent memory for partner interaction history."""
         query = tool_input.get("query", "")
-        mem_tenant_id = tool_input.get("tenant_id", tenant_id)
         limit = tool_input.get("limit", 5)
 
         if not query:
             return {"memories": [], "note": "No query provided"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{escaped_query}%", limit]
             sql = """
                 SELECT id, content, memory_type, importance, created_at
@@ -514,9 +519,9 @@ Then provide your output as JSON:
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if mem_tenant_id:
+            if tenant_id:
                 sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(mem_tenant_id))
+                params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 

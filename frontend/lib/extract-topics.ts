@@ -127,24 +127,32 @@ export async function extractTopicsForSolicitation(
 ): Promise<ExtractTopicsResult> {
   // Resolve text if not provided
   if (!text) {
-    const docRows = await sql<{ extractedText: string | null }[]>`
-      SELECT extracted_text FROM solicitation_documents
-      WHERE solicitation_id = ${solicitationId}::uuid
-        AND document_type = 'source'
-        AND extracted_text IS NOT NULL
-      ORDER BY created_at ASC LIMIT 1
-    `;
-    if (docRows.length > 0 && docRows[0].extractedText) {
-      text = docRows[0].extractedText;
+    try {
+      const docRows = await sql<{ extractedText: string | null }[]>`
+        SELECT extracted_text FROM solicitation_documents
+        WHERE solicitation_id = ${solicitationId}::uuid
+          AND document_type = 'source'
+          AND extracted_text IS NOT NULL
+        ORDER BY created_at ASC LIMIT 1
+      `;
+      if (docRows.length > 0 && docRows[0].extractedText) {
+        text = docRows[0].extractedText;
+      }
+    } catch (err) {
+      console.error('[extract-topics] Failed to load solicitation documents:', err);
     }
   }
 
   if (!text) {
-    const csRows = await sql<{ fullText: string | null }[]>`
-      SELECT full_text FROM curated_solicitations
-      WHERE id = ${solicitationId}::uuid
-    `;
-    text = csRows[0]?.fullText ?? null;
+    try {
+      const csRows = await sql<{ fullText: string | null }[]>`
+        SELECT full_text FROM curated_solicitations
+        WHERE id = ${solicitationId}::uuid
+      `;
+      text = csRows[0]?.fullText ?? null;
+    } catch (err) {
+      console.error('[extract-topics] Failed to load curated solicitation text:', err);
+    }
   }
 
   if (!text || text.length < 100) {
@@ -176,11 +184,17 @@ export async function extractTopicsForSolicitation(
   const topics = extractTopicsFromText(text, topicNumbers);
 
   // Filter out topics that already exist under this solicitation
-  const existingRows = await sql<{ topicNumber: string }[]>`
-    SELECT topic_number FROM opportunities
-    WHERE solicitation_id = ${solicitationId}::uuid
-      AND topic_number IS NOT NULL
-  `;
+  let existingRows: { topicNumber: string }[];
+  try {
+    existingRows = await sql<{ topicNumber: string }[]>`
+      SELECT topic_number FROM opportunities
+      WHERE solicitation_id = ${solicitationId}::uuid
+        AND topic_number IS NOT NULL
+    `;
+  } catch (err) {
+    console.error('[extract-topics] Failed to load existing topics:', err);
+    existingRows = [];
+  }
   const existing = new Set(existingRows.map((r) => r.topicNumber));
   const newTopics = topics.filter((t) => !existing.has(t.topicNumber));
 

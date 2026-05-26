@@ -60,7 +60,9 @@ export const opportunityAddTopicTool = defineTool<Input, Output>({
     // Confirm the parent solicitation exists + grab context we need
     // for the topic's opportunity row (source, agency, etc. can be
     // inherited from the primary opportunity under the same solicitation).
-    const solRows = await sql<
+    let solRows;
+    try {
+      solRows = await sql<
       {
         id: string;
         solicitationType: string | null;
@@ -79,6 +81,10 @@ export const opportunityAddTopicTool = defineTool<Input, Output>({
       LEFT JOIN opportunities o ON o.id = cs.opportunity_id
       WHERE cs.id = ${solicitationId}::uuid
     `;
+    } catch (err) {
+      console.error('[opportunity.add_topic] solicitation lookup failed:', err);
+      throw err;
+    }
     if (solRows.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
     }
@@ -86,12 +92,18 @@ export const opportunityAddTopicTool = defineTool<Input, Output>({
 
     // Dedupe on (solicitation_id, topic_number) — same topic number
     // under the same umbrella is always the same topic.
-    const existing = await sql<{ id: string }[]>`
-      SELECT id FROM opportunities
-      WHERE solicitation_id = ${solicitationId}::uuid
-        AND topic_number = ${topicNumber}
-      LIMIT 1
-    `;
+    let existing: { id: string }[];
+    try {
+      existing = await sql<{ id: string }[]>`
+        SELECT id FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+          AND topic_number = ${topicNumber}
+        LIMIT 1
+      `;
+    } catch (err) {
+      console.error('[opportunity.add_topic] dedupe check failed:', err);
+      throw err;
+    }
     if (existing.length > 0) {
       throw new ValidationError(
         `topic ${topicNumber} already exists under this solicitation`,
@@ -106,42 +118,48 @@ export const opportunityAddTopicTool = defineTool<Input, Output>({
     // constraint on opportunities doesn't collide. Format: {parent}-{topic_number}.
     const sourceIdDerived = `${solicitationId.slice(0, 8)}-${topicNumber}`;
 
-    const rows = await sql<{ id: string }[]>`
-      INSERT INTO opportunities
-        (source, source_id, title, agency, office, program_type,
-         close_date, posted_date, description,
-         content_hash, is_active,
-         solicitation_id, topic_number, topic_branch,
-         topic_status, tech_focus_areas, naics_codes,
-         poc_name, poc_email)
-      VALUES
-        (${source}, ${sourceIdDerived}, ${title},
-         ${parent.inheritAgency ?? null},
-         ${input.topicBranch ?? parent.inheritOffice ?? null},
-         ${input.programType ?? null},
-         ${closeDt}, ${postedDt},
-         ${input.description ?? null},
-         md5(${solicitationId} || ${topicNumber} || ${title}), true,
-         ${solicitationId}::uuid,
-         ${topicNumber},
-         ${input.topicBranch ?? null},
-         ${input.topicStatus},
-         ${input.techFocusAreas}::text[],
-         ${input.naicsCodes}::text[],
-         ${input.pocName ?? null},
-         ${input.pocEmail ?? null})
-      RETURNING id
-    `;
-    const topicId = rows[0].id;
+    let topicId: string;
+    try {
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO opportunities
+          (source, source_id, title, agency, office, program_type,
+           close_date, posted_date, description,
+           content_hash, is_active,
+           solicitation_id, topic_number, topic_branch,
+           topic_status, tech_focus_areas, naics_codes,
+           poc_name, poc_email)
+        VALUES
+          (${source}, ${sourceIdDerived}, ${title},
+           ${parent.inheritAgency ?? null},
+           ${input.topicBranch ?? parent.inheritOffice ?? null},
+           ${input.programType ?? null},
+           ${closeDt}, ${postedDt},
+           ${input.description ?? null},
+           md5(${solicitationId} || ${topicNumber} || ${title}), true,
+           ${solicitationId}::uuid,
+           ${topicNumber},
+           ${input.topicBranch ?? null},
+           ${input.topicStatus},
+           ${input.techFocusAreas}::text[],
+           ${input.naicsCodes}::text[],
+           ${input.pocName ?? null},
+           ${input.pocEmail ?? null})
+        RETURNING id
+      `;
+      topicId = rows[0].id;
 
-    // If the parent was 'single' type, flip to 'multi_topic' — it now
-    // has a real topic under it (the primary opportunity or additional).
-    await sql`
-      UPDATE curated_solicitations
-      SET solicitation_type = 'multi_topic', updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND solicitation_type = 'single'
-    `;
+      // If the parent was 'single' type, flip to 'multi_topic' — it now
+      // has a real topic under it (the primary opportunity or additional).
+      await sql`
+        UPDATE curated_solicitations
+        SET solicitation_type = 'multi_topic', updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND solicitation_type = 'single'
+      `;
+    } catch (err) {
+      console.error('[opportunity.add_topic] insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

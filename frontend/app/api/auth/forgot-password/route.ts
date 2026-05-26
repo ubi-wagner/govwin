@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { sql } from '@/lib/db'
 import { sendEmail } from '@/lib/email'
+import { emitEventSingle, systemActor } from '@/lib/events'
 
 /**
  * POST /api/auth/forgot-password
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     if (!body || !body.email || typeof body.email !== 'string') {
       return NextResponse.json(
-        { error: 'Email is required', code: 'missing_email' },
+        { error: 'Email is required', code: 'MISSING_EMAIL' },
         { status: 400 },
       )
     }
@@ -71,6 +72,18 @@ export async function POST(request: Request) {
             <p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
           `,
         })
+
+        try {
+          await emitEventSingle({
+            namespace: 'identity',
+            type: 'password.reset_requested',
+            actor: systemActor('password-reset'),
+            tenantId: null,
+            payload: { email: normalized },
+          })
+        } catch (e) {
+          console.error('[forgot-password] event emission failed:', e)
+        }
       }
     } catch (dbErr) {
       // Log but don't reveal to client
@@ -82,7 +95,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error('[forgot-password] error:', err)
     return NextResponse.json(
-      { error: 'Internal error', code: 'internal_error' },
+      { error: 'Internal error', code: 'INTERNAL_ERROR' },
       { status: 500 },
     )
   }

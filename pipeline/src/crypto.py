@@ -6,6 +6,8 @@ from config import API_KEY_ENCRYPTION_SECRET
 
 
 def _get_key() -> bytes:
+    if not API_KEY_ENCRYPTION_SECRET:
+        raise RuntimeError("API_KEY_ENCRYPTION_SECRET not set — cannot encrypt")
     return hashlib.sha256(API_KEY_ENCRYPTION_SECRET.encode()).digest()
 
 

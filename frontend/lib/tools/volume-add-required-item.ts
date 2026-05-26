@@ -41,9 +41,15 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    const vol = await sql<{ solicitationId: string }[]>`
-      SELECT solicitation_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
-    `;
+    let vol: { solicitationId: string }[];
+    try {
+      vol = await sql<{ solicitationId: string }[]>`
+        SELECT solicitation_id FROM solicitation_volumes WHERE id = ${input.volumeId}::uuid
+      `;
+    } catch (err) {
+      console.error('[volume.add_required_item] volume lookup failed:', err);
+      throw err;
+    }
     if (vol.length === 0) throw new NotFoundError(`volume not found: ${input.volumeId}`);
 
     let rows;

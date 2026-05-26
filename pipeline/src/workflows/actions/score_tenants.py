@@ -96,6 +96,9 @@ async def match_tenants(
             "avgScore": 0.73,
         }
     """
+    if not solicitation_id:
+        return {"status": "skipped", "reason": "no_solicitation_id"}
+
     sol_uuid = uuid.UUID(solicitation_id)
 
     # 1. Fetch the solicitation + opportunity metadata
@@ -108,7 +111,8 @@ async def match_tenants(
                       o.title, o.tech_focus_areas, o.description
                FROM curated_solicitations cs
                JOIN opportunities o ON o.id = cs.opportunity_id
-               WHERE cs.id = $1""",
+               WHERE cs.id = $1
+                 AND (o.close_date IS NULL OR o.close_date > now())""",
             sol_uuid,
         )
     except Exception as exc:
@@ -201,7 +205,7 @@ async def match_tenants(
             tenants_errored += 1
             log.error(
                 "match_tenants: failed to score tenant %s: %s",
-                profile.get("tenant_id"),
+                profile["tenant_id"],
                 exc,
             )
             # Continue with next tenant — one failure should not block others
@@ -250,8 +254,8 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     #   - opportunities has tech_focus_areas (TEXT[]) not keywords
     #   - tenant_profiles has keywords (TEXT[]), technology_focus (TEXT),
     #     research_areas (TEXT[])
-    sol_tech_areas = set(t.lower() for t in (sol.get("tech_focus_areas") or []))
-    sol_description_lower = (sol.get("description") or "").lower()
+    sol_tech_areas = set(t.lower() for t in (sol["tech_focus_areas"] or []))
+    sol_description_lower = (sol["description"] or "").lower()
     profile_keywords = set(k.lower() for k in (profile["keywords"] or []))
     tech_focus = (profile["technology_focus"] or "").lower()
     research_areas = set(r.lower() for r in (profile["research_areas"] or []))
@@ -270,15 +274,15 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
     keyword_score = min(len(matched_kw) * 5, 25)
 
     # Agency preference (max 20 points)
-    sol_agency = (sol["agency"] or "").strip()
-    profile_agencies = set(a.strip() for a in (profile["agency_priorities"] or []))
-    profile_target_agencies = set(a.strip() for a in (profile["target_agencies"] or []))
+    sol_agency = (sol["agency"] or "").strip().lower()
+    profile_agencies = set(a.strip().lower() for a in (profile["agency_priorities"] or []))
+    profile_target_agencies = set(a.strip().lower() for a in (profile["target_agencies"] or []))
     all_preferred = profile_agencies | profile_target_agencies
     agency_score = 20 if sol_agency and sol_agency in all_preferred else 0
 
-    # Set-aside match (max 10 points)
-    sol_set_aside = (sol["set_aside_type"] or "").strip()
-    profile_set_asides = set(s.strip() for s in (profile["set_aside_types"] or []))
+    # Set-aside match (max 10 points) — case-insensitive
+    sol_set_aside = (sol["set_aside_type"] or "").strip().lower()
+    profile_set_asides = set(s.strip().lower() for s in (profile["set_aside_types"] or []))
     set_aside_score = 10 if sol_set_aside and sol_set_aside in profile_set_asides else 0
 
     # Program type match (max 10 points)

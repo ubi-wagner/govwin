@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -32,6 +33,12 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   const { id } = await ctx.params;
+  if (!isValidUUID(id)) {
+    return NextResponse.json(
+      { error: 'Invalid document ID format', code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
 
   try {
     const rows = await sql<{ storageKey: string; originalFilename: string }[]>`

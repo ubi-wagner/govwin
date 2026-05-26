@@ -99,6 +99,10 @@ class ToolRegistry:
             parameters=parameters or {},
         )
 
+    def has_tool(self, name: str) -> bool:
+        """Check if a tool is registered by name."""
+        return name in self._tools
+
     async def execute(
         self,
         conn,

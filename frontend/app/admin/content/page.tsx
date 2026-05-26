@@ -6,6 +6,8 @@ import CmsPageManager, {
   type GroupedData,
 } from '@/components/admin/cms-page-manager';
 
+export const dynamic = 'force-dynamic';
+
 const PAGE_TAGS = [
   'homepage', 'about', 'features', 'value', 'pricing',
   'how-it-works', 'engine', 'the-expert', 'security', 'infosec',

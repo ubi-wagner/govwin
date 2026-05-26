@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import { sql } from '@/lib/db'
+import { emitEventSingle, systemActor } from '@/lib/events'
 
 /**
  * POST /api/auth/reset-password
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null)
     if (!body) {
       return NextResponse.json(
-        { error: 'Request body required', code: 'invalid_body' },
+        { error: 'Request body required', code: 'INVALID_BODY' },
         { status: 400 },
       )
     }
@@ -64,19 +65,19 @@ export async function POST(request: Request) {
 
     if (!token || typeof token !== 'string') {
       return NextResponse.json(
-        { error: 'Reset token is required', code: 'missing_token' },
+        { error: 'Reset token is required', code: 'MISSING_TOKEN' },
         { status: 400 },
       )
     }
     if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { error: 'Email is required', code: 'missing_email' },
+        { error: 'Email is required', code: 'MISSING_EMAIL' },
         { status: 400 },
       )
     }
     if (!password || typeof password !== 'string' || password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters', code: 'weak_password' },
+        { error: 'Password must be at least 8 characters', code: 'WEAK_PASSWORD' },
         { status: 400 },
       )
     }
@@ -95,14 +96,14 @@ export async function POST(request: Request) {
     } catch (dbErr) {
       console.error('[reset-password] DB lookup error:', dbErr)
       return NextResponse.json(
-        { error: 'Internal error', code: 'internal_error' },
+        { error: 'Internal error', code: 'INTERNAL_ERROR' },
         { status: 500 },
       )
     }
 
     if (!user || !user.passwordHash) {
       return NextResponse.json(
-        { error: 'Invalid or expired reset link', code: 'invalid_token' },
+        { error: 'Invalid or expired reset link', code: 'INVALID_TOKEN' },
         { status: 400 },
       )
     }
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
     const result = verifyResetToken(token, user.passwordHash)
     if (!result.valid) {
       return NextResponse.json(
-        { error: 'Invalid or expired reset link', code: 'invalid_token' },
+        { error: 'Invalid or expired reset link', code: 'INVALID_TOKEN' },
         { status: 400 },
       )
     }
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
     // Ensure the token's userId matches the looked-up user
     if (result.userId !== user.id) {
       return NextResponse.json(
-        { error: 'Invalid or expired reset link', code: 'invalid_token' },
+        { error: 'Invalid or expired reset link', code: 'INVALID_TOKEN' },
         { status: 400 },
       )
     }
@@ -137,16 +138,28 @@ export async function POST(request: Request) {
     } catch (dbErr) {
       console.error('[reset-password] DB update error:', dbErr)
       return NextResponse.json(
-        { error: 'Internal error', code: 'internal_error' },
+        { error: 'Internal error', code: 'INTERNAL_ERROR' },
         { status: 500 },
       )
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'identity',
+        type: 'password.reset_completed',
+        actor: systemActor('password-reset'),
+        tenantId: null,
+        payload: { email: normalized },
+      })
+    } catch (e) {
+      console.error('[reset-password] event emission failed:', e)
     }
 
     return NextResponse.json({ data: { reset: true } })
   } catch (err) {
     console.error('[reset-password] error:', err)
     return NextResponse.json(
-      { error: 'Internal error', code: 'internal_error' },
+      { error: 'Internal error', code: 'INTERNAL_ERROR' },
       { status: 500 },
     )
   }

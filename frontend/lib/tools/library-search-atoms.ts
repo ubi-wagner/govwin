@@ -82,7 +82,24 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
     // Main query — approved atoms for this tenant, filtered, sorted
     // by outcome_score DESC (winning atoms first), then by usage_count
     // DESC (frequently used atoms next).
-    const rows = await sql<Array<{
+    let rows: Array<{
+      id: string;
+      content: string;
+      category: string;
+      subcategory: string | null;
+      tags: string[];
+      confidence: number;
+      outcomeScore: number | null;
+      outcome: string | null;
+      status: string;
+      usageCount: number;
+      sourceType: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    let total: number;
+    try {
+      rows = await sql<Array<{
       id: string;
       content: string;
       category: string;
@@ -121,18 +138,22 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       LIMIT ${limitVal}
     `;
 
-    // Count query (same filters, no limit)
-    const countRows = await sql<Array<{ count: string }>>`
-      SELECT COUNT(*)::text AS count
-      FROM library_units
-      WHERE tenant_id = ${tenantId}::uuid
-        AND status = 'approved'
-        ${categoryFilter}
-        ${tagsFilter}
-        ${queryFilter}
-    `;
+      // Count query (same filters, no limit)
+      const countRows = await sql<Array<{ count: string }>>`
+        SELECT COUNT(*)::text AS count
+        FROM library_units
+        WHERE tenant_id = ${tenantId}::uuid
+          AND status = 'approved'
+          ${categoryFilter}
+          ${tagsFilter}
+          ${queryFilter}
+      `;
 
-    const total = parseInt(countRows[0]?.count ?? '0', 10);
+      total = parseInt(countRows[0]?.count ?? '0', 10);
+    } catch (err) {
+      console.error('[library.search_atoms] query failed:', err);
+      throw err;
+    }
 
     const atoms: LibraryAtom[] = rows.map((row) => ({
       id: row.id,

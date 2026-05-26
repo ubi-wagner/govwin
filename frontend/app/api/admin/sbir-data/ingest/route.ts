@@ -287,28 +287,33 @@ async function insertCompanyBatch(rows: RawRow[]): Promise<void> {
   }
 
   // postgres.js unsafe() for dynamic multi-row inserts
-  await sql.unsafe(
-    `INSERT INTO sbir_companies (
-      company_name, uei, duns, address1, address2,
-      city, state, zip, country, company_url,
-      hubzone_owned, woman_owned, disadvantaged
-    ) VALUES ${placeholders.join(', ')}
-    ON CONFLICT (uei) WHERE uei IS NOT NULL AND uei != '' DO UPDATE SET
-      company_name = EXCLUDED.company_name,
-      duns = COALESCE(EXCLUDED.duns, sbir_companies.duns),
-      address1 = COALESCE(EXCLUDED.address1, sbir_companies.address1),
-      address2 = COALESCE(EXCLUDED.address2, sbir_companies.address2),
-      city = COALESCE(EXCLUDED.city, sbir_companies.city),
-      state = COALESCE(EXCLUDED.state, sbir_companies.state),
-      zip = COALESCE(EXCLUDED.zip, sbir_companies.zip),
-      country = COALESCE(EXCLUDED.country, sbir_companies.country),
-      company_url = COALESCE(EXCLUDED.company_url, sbir_companies.company_url),
-      hubzone_owned = EXCLUDED.hubzone_owned,
-      woman_owned = EXCLUDED.woman_owned,
-      disadvantaged = EXCLUDED.disadvantaged,
-      updated_at = now()`,
-    params,
-  );
+  try {
+    await sql.unsafe(
+      `INSERT INTO sbir_companies (
+        company_name, uei, duns, address1, address2,
+        city, state, zip, country, company_url,
+        hubzone_owned, woman_owned, disadvantaged
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT (uei) WHERE uei IS NOT NULL AND uei != '' DO UPDATE SET
+        company_name = EXCLUDED.company_name,
+        duns = COALESCE(EXCLUDED.duns, sbir_companies.duns),
+        address1 = COALESCE(EXCLUDED.address1, sbir_companies.address1),
+        address2 = COALESCE(EXCLUDED.address2, sbir_companies.address2),
+        city = COALESCE(EXCLUDED.city, sbir_companies.city),
+        state = COALESCE(EXCLUDED.state, sbir_companies.state),
+        zip = COALESCE(EXCLUDED.zip, sbir_companies.zip),
+        country = COALESCE(EXCLUDED.country, sbir_companies.country),
+        company_url = COALESCE(EXCLUDED.company_url, sbir_companies.company_url),
+        hubzone_owned = EXCLUDED.hubzone_owned,
+        woman_owned = EXCLUDED.woman_owned,
+        disadvantaged = EXCLUDED.disadvantaged,
+        updated_at = now()`,
+      params,
+    );
+  } catch (err) {
+    console.error('[admin/sbir-data/ingest] company batch insert failed:', err);
+    throw err;
+  }
 }
 
 async function insertAwardBatch(rows: RawRow[]): Promise<void> {
@@ -341,25 +346,30 @@ async function insertAwardBatch(rows: RawRow[]): Promise<void> {
     );
   }
 
-  await sql.unsafe(
-    `INSERT INTO sbir_awards (
-      company_name, award_title, agency, branch, phase,
-      program, agency_tracking_number, contract,
-      proposal_award_date, contract_end_date,
-      solicitation_number, solicitation_year,
-      solicitation_close_date, proposal_receipt_date,
-      date_of_notification, topic_code, award_year,
-      award_amount, uei, duns,
-      hubzone_owned, disadvantaged, woman_owned,
-      number_employees, company_website,
-      address1, address2, city, state, zip,
-      abstract, contact_name, contact_title,
-      contact_phone, contact_email,
-      pi_name, pi_title, pi_phone, pi_email,
-      ri_name, ri_poc_name, ri_poc_phone
-    ) VALUES ${placeholders.join(', ')}`,
-    params,
-  );
+  try {
+    await sql.unsafe(
+      `INSERT INTO sbir_awards (
+        company_name, award_title, agency, branch, phase,
+        program, agency_tracking_number, contract,
+        proposal_award_date, contract_end_date,
+        solicitation_number, solicitation_year,
+        solicitation_close_date, proposal_receipt_date,
+        date_of_notification, topic_code, award_year,
+        award_amount, uei, duns,
+        hubzone_owned, disadvantaged, woman_owned,
+        number_employees, company_website,
+        address1, address2, city, state, zip,
+        abstract, contact_name, contact_title,
+        contact_phone, contact_email,
+        pi_name, pi_title, pi_phone, pi_email,
+        ri_name, ri_poc_name, ri_poc_phone
+      ) VALUES ${placeholders.join(', ')}`,
+      params,
+    );
+  } catch (err) {
+    console.error('[admin/sbir-data/ingest] award batch insert failed:', err);
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -420,9 +430,16 @@ export async function POST(request: Request) {
     const fileHash = createHash('sha256').update(fileBuffer).digest('hex');
 
     // 4. Check for duplicate upload
-    const [existingUpload] = await sql<{ id: string; filename: string }[]>`
-      SELECT id, filename FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
-    `;
+    let existingUpload: { id: string; filename: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; filename: string }[]>`
+        SELECT id, filename FROM sbir_data_uploads WHERE file_hash = ${fileHash} LIMIT 1
+      `;
+      existingUpload = rows[0];
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] duplicate check query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existingUpload) {
       return NextResponse.json(
         { error: `This file has already been uploaded (matched ${existingUpload.filename})`, code: 'VALIDATION_ERROR' },
@@ -519,15 +536,25 @@ export async function POST(request: Request) {
     }
 
     // 9. Record upload
-    await sql`
-      INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by)
-      VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId})
-    `;
+    try {
+      await sql`
+        INSERT INTO sbir_data_uploads (filename, file_hash, file_type, row_count, uploaded_by)
+        VALUES (${filename}, ${fileHash}, ${fileType}, ${rowCount}, ${userId})
+      `;
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] upload record insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // 10. End event
-    await emitEventEnd(eventId, {
-      result: { fileType, rowCount, filename },
-    });
+    // 10. End event (non-fatal)
+    try {
+      await emitEventEnd(eventId, {
+        result: { fileType, rowCount, filename },
+      });
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] event end failed:', e);
+      // non-fatal, continue
+    }
 
     // 11. Return result
     return NextResponse.json({
@@ -558,9 +585,15 @@ export async function GET() {
       return NextResponse.json({ error: 'master_admin or rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const uploads = await sql`
-      SELECT * FROM sbir_data_uploads ORDER BY created_at DESC LIMIT 20
-    `;
+    let uploads;
+    try {
+      uploads = await sql`
+        SELECT * FROM sbir_data_uploads ORDER BY created_at DESC LIMIT 20
+      `;
+    } catch (e) {
+      console.error('[admin/sbir-data/ingest] uploads query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { uploads } });
   } catch (e) {

@@ -331,10 +331,10 @@ export default function SpotlightFeed({
                     {topic.isPinned ? 'Unpin' : 'Pin'}
                   </button>
                   <a
-                    href={`/portal/${tenantSlug}/purchase?topic=${topic.id}`}
-                    className="px-3 py-1.5 text-sm rounded font-medium bg-brand-600 text-white hover:bg-brand-700"
+                    href={`/portal/${tenantSlug}/spotlights/${topic.id}`}
+                    className="px-3 py-1.5 text-sm rounded font-medium bg-indigo-600 text-white hover:bg-indigo-700"
                   >
-                    Purchase Portal
+                    View Details
                   </a>
                 </div>
               </li>

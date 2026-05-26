@@ -42,25 +42,30 @@ export async function GET(request: Request) {
 
     // ── Query ───────────────────────────────────────────────────────
     let solicitations;
-    if (statuses && statuses.length > 0) {
-      solicitations = await sql`
-        SELECT cs.id, cs.opportunity_id, cs.status, cs.namespace, cs.claimed_by,
-               o.title, o.agency, o.program_type, o.close_date, cs.created_at
-        FROM curated_solicitations cs
-        JOIN opportunities o ON o.id = cs.opportunity_id
-        WHERE cs.status = ANY(${statuses}::text[])
-        ORDER BY cs.created_at DESC
-        LIMIT 100
-      `;
-    } else {
-      solicitations = await sql`
-        SELECT cs.id, cs.opportunity_id, cs.status, cs.namespace, cs.claimed_by,
-               o.title, o.agency, o.program_type, o.close_date, cs.created_at
-        FROM curated_solicitations cs
-        JOIN opportunities o ON o.id = cs.opportunity_id
-        ORDER BY cs.created_at DESC
-        LIMIT 100
-      `;
+    try {
+      if (statuses && statuses.length > 0) {
+        solicitations = await sql`
+          SELECT cs.id, cs.opportunity_id, cs.status, cs.namespace, cs.claimed_by,
+                 o.title, o.agency, o.program_type, o.close_date, cs.created_at
+          FROM curated_solicitations cs
+          JOIN opportunities o ON o.id = cs.opportunity_id
+          WHERE cs.status = ANY(${statuses}::text[])
+          ORDER BY cs.created_at DESC
+          LIMIT 100
+        `;
+      } else {
+        solicitations = await sql`
+          SELECT cs.id, cs.opportunity_id, cs.status, cs.namespace, cs.claimed_by,
+                 o.title, o.agency, o.program_type, o.close_date, cs.created_at
+          FROM curated_solicitations cs
+          JOIN opportunities o ON o.id = cs.opportunity_id
+          ORDER BY cs.created_at DESC
+          LIMIT 100
+        `;
+      }
+    } catch (e) {
+      console.error('[rfp-curation] list query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     return NextResponse.json({ data: { solicitations } });

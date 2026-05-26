@@ -16,6 +16,7 @@ import { auth } from '@/auth';
 import { putObject, getObjectBuffer } from '@/lib/storage/s3-client';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -177,6 +178,19 @@ export async function POST(request: NextRequest) {
     };
     index.push(meta);
     await saveIndex(index);
+
+    const userId = (session.user as { id?: string }).id;
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'document.created',
+        actor: userActor(userId ?? 'unknown', createdBy !== 'unknown' ? createdBy : undefined),
+        tenantId: null,
+        payload: { documentId: id, title: title.trim(), preset },
+      });
+    } catch (e) {
+      console.error('[admin/documents] event emission failed:', e);
+    }
 
     return NextResponse.json({ data: { id, title: title.trim(), preset } }, { status: 201 });
   } catch (err) {

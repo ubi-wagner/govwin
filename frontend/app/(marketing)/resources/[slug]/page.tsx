@@ -1,12 +1,47 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getContentBySlug } from '@/lib/cms';
+import { renderMarkdown } from '@/lib/markdown';
+
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+}
 
 interface RouteContext {
   params: Promise<{ slug: string }>;
 }
 
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: RouteContext): Promise<Metadata> {
+  const { slug } = await params;
+  const article = await getContentBySlug(slug);
+  if (!article) return { title: 'Not Found' };
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfppipeline.com';
+  return {
+    title: `${article.title} | RFP Pipeline`,
+    description: article.excerpt || article.title,
+    openGraph: {
+      title: article.title,
+      description: article.excerpt || article.title,
+      type: 'article',
+      url: `${baseUrl}/resources/${slug}`,
+      images: article.featuredImage ? [{ url: article.featuredImage }] : [],
+      publishedTime: article.publishedAt?.toISOString(),
+      authors: article.author ? [article.author] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: article.title,
+      description: article.excerpt || article.title,
+    },
+  };
+}
 
 export default async function ResourceArticlePage({ params }: RouteContext) {
   const { slug } = await params;
@@ -75,9 +110,10 @@ export default async function ResourceArticlePage({ params }: RouteContext) {
             </div>
           )}
 
-          <div className="prose prose-navy max-w-none text-navy-700 leading-relaxed whitespace-pre-wrap">
-            {article.body}
-          </div>
+          <div
+            className="prose prose-navy max-w-none text-navy-700 leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(article.body)) }}
+          />
 
           {article.externalUrl && (
             <div className="mt-8 p-4 bg-cream-50 border border-cream-200 rounded-lg">

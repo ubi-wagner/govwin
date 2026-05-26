@@ -95,7 +95,7 @@ class OnProposalCreated(Workflow):
         namespace="proposal",
         type="proposal.created",
         phase="end",
-        condition=lambda p: p.get("error") is None,
+        condition=lambda p: bool(p.get("proposalId")),
     )
 
     steps = [

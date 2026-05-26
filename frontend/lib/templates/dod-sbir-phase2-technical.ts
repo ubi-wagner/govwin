@@ -13,10 +13,8 @@
  *   5. Management Plan — schedule, milestones, risk mitigation
  *   6. Facilities & Equipment — labs, tools, partnerships
  *
- * TODO: Populate full node tree matching Phase II BAA requirements.
- *       This stub defines the document structure and metadata.
- *       Each section needs heading nodes, placeholder text blocks,
- *       and compliance-linked requirement placeholders.
+ * Template provides bracketed instruction placeholders for each section.
+ * Users fill in their content guided by the instructions in each placeholder.
  */
 
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
@@ -96,9 +94,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s1-intro', {
       type: 'text_block',
       content: {
-        text: 'TODO: Summarize Phase I objectives, technical approach, and key results. '
-          + 'Demonstrate that the Phase I effort successfully established feasibility '
-          + 'of the proposed approach. Include quantitative results and metrics.',
+        text: '[Phase I Summary — Describe your Phase I objectives, approach, and key results. Demonstrate that the Phase I effort successfully established feasibility of the proposed approach. Include specific quantitative results, metrics, and deliverables achieved.]',
       },
     }),
     node('s1-objectives', {
@@ -107,7 +103,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s1-objectives-text', {
       type: 'text_block',
-      content: { text: 'TODO: Detail each Phase I objective and corresponding results.' },
+      content: { text: '[For each Phase I objective, describe the approach taken and the results achieved. Include data, test outcomes, and any deviations from the original plan. Reference figures and tables as appropriate.]' },
     }),
     node('s1-feasibility', {
       type: 'heading',
@@ -115,7 +111,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s1-feasibility-text', {
       type: 'text_block',
-      content: { text: 'TODO: Provide evidence of technical feasibility from Phase I work.' },
+      content: { text: '[Provide evidence of technical feasibility established during Phase I. Include experimental data, prototype performance, simulation results, or other quantitative evidence that validates the proposed approach for Phase II.]' },
     }),
 
     // ─── Section 2: Technical Approach ──────────────────────────
@@ -126,9 +122,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s2-intro', {
       type: 'text_block',
       content: {
-        text: 'TODO: Describe the detailed technical approach for Phase II R&D. '
-          + 'Explain how this builds on Phase I results. Address each technical '
-          + 'objective with specific methods, tools, and expected outcomes.',
+        text: '[Describe the detailed technical approach for Phase II R&D. Explain how this builds on Phase I results and addresses each technical objective with specific methods, tools, and expected outcomes. This section should be the most substantive part of the proposal. 3-5 paragraphs minimum.]',
       },
     }),
     node('s2-innovation', {
@@ -137,7 +131,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s2-innovation-text', {
       type: 'text_block',
-      content: { text: 'TODO: Describe the innovative aspects and technical merit of the approach.' },
+      content: { text: '[Describe what is novel about your approach compared to the state of the art. Explain the specific technical challenges you will overcome and why your solution represents a significant advancement. Reference relevant literature and competing approaches.]' },
     }),
     node('s2-methodology', {
       type: 'heading',
@@ -145,7 +139,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s2-methodology-text', {
       type: 'text_block',
-      content: { text: 'TODO: Detail the research methodology, experiments, and analyses.' },
+      content: { text: '[Detail the research methodology, experimental design, and analytical approaches. Include specific protocols, test conditions, sample sizes, and statistical methods. Explain how each experiment maps to a technical objective.]' },
     }),
     node('s2-milestones', {
       type: 'heading',
@@ -153,7 +147,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s2-milestones-text', {
       type: 'text_block',
-      content: { text: 'TODO: List Phase II milestones with go/no-go decision criteria.' },
+      content: { text: '[List Phase II technical milestones with specific go/no-go decision criteria, quantitative success metrics, and deliverables for each milestone. Include a milestone table or Gantt chart reference.]' },
     }),
 
     // ─── Section 3: Key Personnel ───────────────────────────────
@@ -164,9 +158,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s3-intro', {
       type: 'text_block',
       content: {
-        text: 'TODO: Describe the qualifications of key personnel. Include relevant '
-          + 'experience, publications, and prior SBIR/STTR work. Identify any new '
-          + 'team members added for Phase II.',
+        text: '[Describe the qualifications of all key personnel. Include relevant experience, publications, and prior SBIR/STTR work. Identify any new team members added for Phase II and explain why their expertise is needed for the expanded scope.]',
       },
     }),
     node('s3-pi', {
@@ -175,7 +167,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s3-pi-text', {
       type: 'text_block',
-      content: { text: 'TODO: PI qualifications, relevant experience, and time commitment.' },
+      content: { text: '[Name, title, highest degree. Describe the PI\'s relevant experience, publications, and prior SBIR/STTR awards. Specify their role and time commitment (% effort) for Phase II. PI must be primarily employed by the small business concern. 1-2 paragraphs.]' },
     }),
 
     // ─── Section 4: Commercialization Plan ──────────────────────
@@ -186,9 +178,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s4-intro', {
       type: 'text_block',
       content: {
-        text: 'TODO: Present a comprehensive commercialization strategy. Address market '
-          + 'size, target customers (DoD and commercial), competitive landscape, IP '
-          + 'strategy, and revenue projections.',
+        text: '[Present a comprehensive commercialization strategy. Address total addressable market size, target customers (DoD and commercial), competitive landscape, IP strategy, and revenue projections. This section is heavily weighted in Phase II evaluation. 2-3 paragraphs.]',
       },
     }),
     node('s4-market', {
@@ -197,7 +187,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s4-market-text', {
       type: 'text_block',
-      content: { text: 'TODO: Total addressable market, customer segments, growth trends.' },
+      content: { text: '[Describe the total addressable market (TAM) for the proposed technology. Break down by customer segments (DoD programs of record, other federal agencies, commercial). Provide specific dollar estimates and growth projections with sources.]' },
     }),
     node('s4-customers', {
       type: 'heading',
@@ -205,7 +195,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s4-customers-text', {
       type: 'text_block',
-      content: { text: 'TODO: Letters of intent, MOUs, or other evidence of customer interest.' },
+      content: { text: '[List potential customers and partners with evidence of interest: Letters of Intent, MOUs, teaming agreements, or documented conversations. Include specific DoD program offices, prime contractors, or commercial customers in your pipeline.]' },
     }),
     node('s4-ip', {
       type: 'heading',
@@ -213,7 +203,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s4-ip-text', {
       type: 'text_block',
-      content: { text: 'TODO: Patent filings, trade secrets, licensing approach.' },
+      content: { text: '[Describe your IP position: existing patents or applications, trade secrets, and proprietary processes. Detail your licensing strategy and plans for IP generated under this effort. SBIR data rights apply per DFARS 252.227-7018.]' },
     }),
 
     // ─── Section 5: Management Plan ─────────────────────────────
@@ -227,7 +217,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s5-schedule-text', {
       type: 'text_block',
-      content: { text: 'TODO: Detailed project schedule with milestones, deliverables, and decision points.' },
+      content: { text: '[Provide a detailed project schedule for the Phase II period of performance. Include milestones, deliverables, decision points, and task dependencies. Consider including a Gantt chart or milestone table.]' },
     }),
     node('s5-risk', {
       type: 'heading',
@@ -235,7 +225,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     }),
     node('s5-risk-text', {
       type: 'text_block',
-      content: { text: 'TODO: Technical and programmatic risks with mitigation strategies.' },
+      content: { text: '[Identify technical and programmatic risks with likelihood and impact assessments. Provide specific mitigation strategies for each risk. Consider using a risk matrix table.]' },
     }),
 
     // ─── Section 6: Facilities & Equipment ──────────────────────
@@ -246,8 +236,7 @@ export const DOD_SBIR_PHASE2_TECHNICAL: CanvasDocument = {
     node('s6-text', {
       type: 'text_block',
       content: {
-        text: 'TODO: Describe facilities, equipment, and any subcontractor resources '
-          + 'available for Phase II work.',
+        text: '[Describe facilities, equipment, and subcontractor resources available for Phase II work. Include laboratory space, computing resources, test equipment, and specialized hardware or software. Note whether resources are owned, leased, or accessible through partners.]',
       },
     }),
   ],

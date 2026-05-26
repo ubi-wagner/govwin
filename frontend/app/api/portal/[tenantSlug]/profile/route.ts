@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -16,26 +17,32 @@ export async function GET(_request: Request, ctx: RouteContext) {
   const role = (session.user as { role?: string }).role ?? '';
   const userId = (session.user as { id?: string }).id ?? '';
 
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
-
-  const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
-  if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
-
-  const tenantId = tenant.id as string;
-
   try {
-    const [tenantInfo] = await sql`
-      SELECT id, name, legal_name, website, billing_email, status, product_tier,
-             subscription_status, created_at
-      FROM tenants WHERE id = ${tenantId}
-    `;
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
 
-    const [profile] = await sql`
-      SELECT naics_codes, keywords, agency_priorities, set_aside_types,
-             technology_focus, company_summary, research_areas, target_agencies
-      FROM tenant_profiles WHERE tenant_id = ${tenantId}
-    `;
+    const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
+
+    const tenantId = tenant.id as string;
+
+    let tenantInfo, profile;
+    try {
+      [tenantInfo] = await sql`
+        SELECT id, name, legal_name, website, billing_email, status, product_tier,
+               subscription_status, created_at
+        FROM tenants WHERE id = ${tenantId}
+      `;
+
+      [profile] = await sql`
+        SELECT naics_codes, keywords, agency_priorities, set_aside_types,
+               technology_focus, company_summary, research_areas, target_agencies
+        FROM tenant_profiles WHERE tenant_id = ${tenantId}
+      `;
+    } catch (e) {
+      console.error('[api/portal/profile] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { tenant: tenantInfo ?? null, profile: profile ?? null } });
   } catch (e) {
@@ -59,32 +66,37 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
   }
 
-  const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
-
-  const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
-  if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
-
-  const tenantId = tenant.id as string;
-
-  let body: Record<string, unknown>;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
-  }
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
 
-  try {
+    const hasAccess = await verifyTenantAccess(userId, role, tenant.id as string);
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
+
+    const tenantId = tenant.id as string;
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
+    }
+
     // Update tenants table
     if (body.name && typeof body.name === 'string') {
-      await sql`
-        UPDATE tenants
-        SET name = ${body.name},
-            legal_name = ${(body.legalName as string) ?? null},
-            website = ${(body.website as string) ?? null},
-            billing_email = ${(body.billingEmail as string) ?? null}
-        WHERE id = ${tenantId}
-      `;
+      try {
+        await sql`
+          UPDATE tenants
+          SET name = ${body.name},
+              legal_name = ${(body.legalName as string) ?? null},
+              website = ${(body.website as string) ?? null},
+              billing_email = ${(body.billingEmail as string) ?? null}
+          WHERE id = ${tenantId}
+        `;
+      } catch (e) {
+        console.error('[api/portal/profile] tenant update failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // Upsert tenant_profiles
@@ -95,19 +107,38 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const researchAreas = Array.isArray(body.researchAreas) ? body.researchAreas.filter((s: unknown) => typeof s === 'string') : [];
     const companySummary = typeof body.companySummary === 'string' ? body.companySummary : null;
     const technologyFocus = typeof body.technologyFocus === 'string' ? body.technologyFocus : null;
+    const agencyPriorities = Array.isArray(body.agencyPriorities) ? body.agencyPriorities.filter((s: unknown) => typeof s === 'string') : [];
 
-    await sql`
-      INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus)
-      VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus})
-      ON CONFLICT (tenant_id) DO UPDATE SET
-        naics_codes = EXCLUDED.naics_codes,
-        keywords = EXCLUDED.keywords,
-        target_agencies = EXCLUDED.target_agencies,
-        set_aside_types = EXCLUDED.set_aside_types,
-        research_areas = EXCLUDED.research_areas,
-        company_summary = EXCLUDED.company_summary,
-        technology_focus = EXCLUDED.technology_focus
-    `;
+    try {
+      await sql`
+        INSERT INTO tenant_profiles (tenant_id, naics_codes, keywords, target_agencies, set_aside_types, research_areas, company_summary, technology_focus, agency_priorities)
+        VALUES (${tenantId}, ${naicsCodes}, ${keywords}, ${targetAgencies}, ${setAsideTypes}, ${researchAreas}, ${companySummary}, ${technologyFocus}, ${agencyPriorities})
+        ON CONFLICT (tenant_id) DO UPDATE SET
+          naics_codes = EXCLUDED.naics_codes,
+          keywords = EXCLUDED.keywords,
+          target_agencies = EXCLUDED.target_agencies,
+          set_aside_types = EXCLUDED.set_aside_types,
+          research_areas = EXCLUDED.research_areas,
+          company_summary = EXCLUDED.company_summary,
+          technology_focus = EXCLUDED.technology_focus,
+          agency_priorities = EXCLUDED.agency_priorities
+      `;
+    } catch (e) {
+      console.error('[api/portal/profile] profile upsert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'profile.updated',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        tenantId,
+        payload: { tenantId, fields: Object.keys(body) },
+      });
+    } catch (e) {
+      console.error('[api/portal/profile] event emission failed:', e);
+    }
 
     return NextResponse.json({ data: { updated: true } });
   } catch (e) {

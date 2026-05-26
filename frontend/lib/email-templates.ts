@@ -287,3 +287,66 @@ ${button('Log In to View All Matches', dashboardUrl)}
 
   return { subject, html: layout(body) };
 }
+
+// ---------------------------------------------------------------------------
+// 6. Collaborator Invite
+// ---------------------------------------------------------------------------
+
+export function collaboratorInviteEmail(params: {
+  recipientName: string;
+  recipientEmail: string;
+  proposalTitle: string;
+  inviterName: string;
+  role: string;
+  permission: string;
+  isNewUser: boolean;
+  tempPassword?: string;
+  loginUrl: string;
+}): { subject: string; html: string } {
+  const { recipientName, recipientEmail, proposalTitle, inviterName, role, permission, isNewUser, tempPassword, loginUrl } = params;
+
+  const subject = `You've been invited to collaborate on "${proposalTitle}"`;
+
+  const credentialsBlock = isNewUser && tempPassword
+    ? `
+<p style="margin-top:24px;font-weight:600;">Your login credentials:</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;width:100%;margin-bottom:8px;">
+  <tr>
+    <td style="padding:12px 16px;">
+      <span style="font-size:13px;color:#64748b;">Email</span><br>
+      <span style="font-size:15px;font-weight:600;color:${BRAND_NAVY};">${escapeHtml(recipientEmail)}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:0 16px 12px;">
+      <span style="font-size:13px;color:#64748b;">Temporary Password</span><br>
+      <code style="font-size:16px;font-weight:700;color:${BRAND_BLUE};font-family:'Courier New',Courier,monospace;letter-spacing:1px;">${escapeHtml(tempPassword)}</code>
+    </td>
+  </tr>
+</table>
+<p style="font-size:13px;color:#ef4444;margin-top:4px;">This temporary password expires on first use. You will be prompted to set a permanent password.</p>
+`
+    : '';
+
+  const body = `
+<h2 style="margin:0 0 16px;font-size:20px;color:${BRAND_NAVY};">Hi ${escapeHtml(recipientName || 'there')},</h2>
+<p><strong>${escapeHtml(inviterName)}</strong> has invited you to collaborate on the proposal <strong>&ldquo;${escapeHtml(proposalTitle)}&rdquo;</strong>.</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:16px 0;">
+  <tr>
+    <td style="padding:8px 0;font-size:13px;color:#64748b;width:120px;vertical-align:top;">Role</td>
+    <td style="padding:8px 0;font-size:15px;color:${BRAND_NAVY};">${escapeHtml(role)}</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 0;font-size:13px;color:#64748b;vertical-align:top;">Permission</td>
+    <td style="padding:8px 0;font-size:15px;color:${BRAND_NAVY};">${escapeHtml(permission)}</td>
+  </tr>
+</table>
+
+${credentialsBlock}
+
+${button('Open Proposal', loginUrl)}
+`;
+
+  return { subject, html: layout(body) };
+}

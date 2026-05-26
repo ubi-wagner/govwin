@@ -180,6 +180,21 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       });
 
+      // ── Activity log ──────────────────────────────────────────────
+      try {
+        await sql`
+          INSERT INTO proposal_activity_log
+            (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+             activity_type, details)
+          VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                  ${sessionUser.email ?? null}, ${role},
+                  'ai_review_requested',
+                  ${JSON.stringify({ sections_queued: sectionsQueued, review_type: reviewType })}::jsonb)
+        `;
+      } catch (logErr) {
+        console.error('[portal/proposals/ai/review] activity log failed', logErr);
+      }
+
       return NextResponse.json({
         data: { sections_queued: sectionsQueued },
       });

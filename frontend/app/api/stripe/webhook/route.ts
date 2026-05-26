@@ -59,7 +59,24 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error(`[stripe/webhook] Error handling ${event.type}:`, err);
-    // Return 200 so Stripe does not retry — we logged the error
+    // Distinguish transient vs permanent errors:
+    // - DB/network errors (transient): return 500 so Stripe retries
+    // - Validation/data errors (permanent): return 200 to stop retries
+    const isTransient = err instanceof Error && (
+      err.message.includes('ECONNREFUSED') ||
+      err.message.includes('ETIMEDOUT') ||
+      err.message.includes('ECONNRESET') ||
+      err.message.includes('connection') ||
+      err.message.includes('timeout') ||
+      err.message.includes('deadlock') ||
+      err.message.includes('too many clients') ||
+      err.message.includes('database') ||
+      err.name === 'DatabaseError'
+    );
+    if (isTransient) {
+      return NextResponse.json({ error: 'Transient error, please retry', code: 'DB_ERROR' }, { status: 500 });
+    }
+    // Permanent error — acknowledge so Stripe stops retrying
     return NextResponse.json({ received: true });
   }
 
@@ -83,10 +100,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Idempotency: skip if we already recorded this session
-  const [existing] = await sql<{ id: string }[]>`
-    SELECT id FROM purchases WHERE stripe_session_id = ${sessionId}
-  `;
-  if (existing) return;
+  try {
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM purchases WHERE stripe_session_id = ${sessionId}
+    `;
+    if (existing) return;
+  } catch (err) {
+    console.error('[stripe/webhook] idempotency check failed:', err);
+    throw err;
+  }
 
   const quantity = parseInt(session.metadata?.quantity ?? '1', 10) || 1;
   const amountCents = getAmountCents(productType) * quantity;
@@ -94,48 +116,63 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
 
-  // Insert the purchase record
-  await sql`
-    INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
-    VALUES (
-      ${tenantId},
-      ${opportunityId},
-      ${sessionId},
-      ${paymentIntent},
-      ${productType},
-      ${amountCents},
-      'completed'
-    )
-  `;
+  // Wrap purchase insert + tenant subscription update in transaction
+  try {
+    await sql.begin(async (tx: any) => {
+      // Insert the purchase record
+      await tx`
+        INSERT INTO purchases (tenant_id, opportunity_id, stripe_session_id, stripe_payment_intent, product_type, amount_cents, status)
+        VALUES (
+          ${tenantId},
+          ${opportunityId},
+          ${sessionId},
+          ${paymentIntent},
+          ${productType},
+          ${amountCents},
+          'completed'
+        )
+      `;
 
-  // For subscriptions, update the tenant's subscription status
-  if (productType === 'finder_subscription') {
-    await sql`
-      UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
-    `;
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'subscription.started',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType },
+      // For subscriptions, update the tenant's subscription status
+      if (productType === 'finder_subscription') {
+        await tx`
+          UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenantId}
+        `;
+      }
     });
-  } else if (productType === 'expert_consulting') {
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'consulting.purchased',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType, hours: quantity },
-    });
-  } else {
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'purchase.completed',
-      actor: systemActor('stripe-webhook'),
-      tenantId,
-      payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
-    });
+  } catch (err) {
+    console.error('[stripe/webhook] checkout purchase transaction failed:', err);
+    throw err;
+  }
+
+  try {
+    if (productType === 'finder_subscription') {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'subscription.started',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType },
+      });
+    } else if (productType === 'expert_consulting') {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'consulting.purchased',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType, hours: quantity },
+      });
+    } else {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'purchase.completed',
+        actor: systemActor('stripe-webhook'),
+        tenantId,
+        payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
+      });
+    }
+  } catch (evtErr) {
+    console.error('[stripe/webhook] checkout event emission failed:', evtErr);
   }
 }
 
@@ -156,23 +193,39 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!customerId) return;
 
   // Look up tenant by stripe_customer_id
-  const [tenant] = await sql<{ id: string }[]>`
-    SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
-  `;
+  let tenant: { id: string } | undefined;
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
+    `;
+    tenant = row;
+  } catch (err) {
+    console.error('[stripe/webhook] tenant lookup failed:', err);
+    throw err;
+  }
   if (!tenant) return;
 
   // Ensure subscription status is active on successful payment
-  await sql`
-    UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenant.id}
-  `;
+  try {
+    await sql`
+      UPDATE tenants SET subscription_status = 'active' WHERE id = ${tenant.id}
+    `;
+  } catch (err) {
+    console.error('[stripe/webhook] subscription status update failed:', err);
+    throw err;
+  }
 
-  await emitEventSingle({
-    namespace: 'capture',
-    type: 'subscription.renewed',
-    actor: systemActor('stripe-webhook'),
-    tenantId: tenant.id,
-    payload: { correlationId: randomUUID(), invoiceId: invoice.id, subscriptionId },
-  });
+  try {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'subscription.renewed',
+      actor: systemActor('stripe-webhook'),
+      tenantId: tenant.id,
+      payload: { correlationId: randomUUID(), invoiceId: invoice.id, subscriptionId },
+    });
+  } catch (evtErr) {
+    console.error('[stripe/webhook] invoice event emission failed:', evtErr);
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -182,20 +235,36 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (!customerId) return;
 
-  const [tenant] = await sql<{ id: string }[]>`
-    SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
-  `;
+  let tenant: { id: string } | undefined;
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      SELECT id FROM tenants WHERE stripe_customer_id = ${customerId}
+    `;
+    tenant = row;
+  } catch (err) {
+    console.error('[stripe/webhook] tenant lookup for subscription delete failed:', err);
+    throw err;
+  }
   if (!tenant) return;
 
-  await sql`
-    UPDATE tenants SET subscription_status = 'canceled' WHERE id = ${tenant.id}
-  `;
+  try {
+    await sql`
+      UPDATE tenants SET subscription_status = 'canceled' WHERE id = ${tenant.id}
+    `;
+  } catch (err) {
+    console.error('[stripe/webhook] subscription cancel update failed:', err);
+    throw err;
+  }
 
-  await emitEventSingle({
-    namespace: 'capture',
-    type: 'subscription.canceled',
-    actor: systemActor('stripe-webhook'),
-    tenantId: tenant.id,
-    payload: { correlationId: randomUUID(), subscriptionId: subscription.id },
-  });
+  try {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'subscription.canceled',
+      actor: systemActor('stripe-webhook'),
+      tenantId: tenant.id,
+      payload: { correlationId: randomUUID(), subscriptionId: subscription.id },
+    });
+  } catch (evtErr) {
+    console.error('[stripe/webhook] subscription cancel event emission failed:', evtErr);
+  }
 }

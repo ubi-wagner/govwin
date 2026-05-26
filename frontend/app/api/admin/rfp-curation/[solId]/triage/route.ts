@@ -34,9 +34,7 @@ const ACTION_STATE_MAP: Record<string, { to: string; from: string[] }> = {
   release:            { to: 'released_for_analysis', from: ['claimed'] },
   dismiss:            { to: 'dismissed',            from: ['new', 'claimed', 'released_for_analysis', 'ai_analyzed', 'curation_in_progress', 'rejected_review'] },
   request_review:     { to: 'review_requested',     from: ['curation_in_progress'] },
-  approve:            { to: 'approved',              from: ['review_requested'] },
   reject:             { to: 'rejected_review',       from: ['review_requested'] },
-  push:               { to: 'pushed_to_pipeline',    from: ['approved'] },
   reclaim:            { to: 'claimed',               from: ['released_for_analysis', 'ai_analyzed', 'rejected_review'] },
   skip_shredder:      { to: 'curation_in_progress',  from: ['claimed', 'released_for_analysis', 'ai_analyzed'] },
   return_to_curation: { to: 'curation_in_progress',  from: ['review_requested', 'approved', 'rejected_review'] },
@@ -150,8 +148,6 @@ export async function POST(
           claimed_at = CASE WHEN ${action} IN ('claim', 'reclaim') THEN now() ELSE claimed_at END,
           dismissed_reason = CASE WHEN ${action} = 'dismiss' THEN ${typeof notes === 'string' ? notes : null} ELSE dismissed_reason END,
           curated_by = CASE WHEN ${action} = 'request_review' THEN ${actorId}::uuid ELSE curated_by END,
-          approved_by = CASE WHEN ${action} = 'approve' THEN ${actorId}::uuid ELSE approved_by END,
-          pushed_at = CASE WHEN ${action} = 'push' THEN now() ELSE pushed_at END,
           updated_at = now()
       WHERE id = ${solId}::uuid
         AND status = ${fromState}

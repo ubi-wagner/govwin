@@ -72,6 +72,12 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
   const published = status === 'published';
   const [metadata, setMetadata] = useState(JSON.stringify(existing?.metadata ?? {}, null, 2));
 
+  const [publishedAtInput, setPublishedAtInput] = useState(
+    existing?.metadata?.scheduled_publish_at
+      ? String(existing.metadata.scheduled_publish_at)
+      : ''
+  );
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -79,6 +85,7 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
   const [success, setSuccess] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   const parsedTags = tagsInput
     .split(',')
@@ -150,6 +157,13 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
       return;
     }
 
+    // Include scheduled publish datetime in metadata
+    if (publishedAtInput.trim()) {
+      parsedMetadata.scheduled_publish_at = publishedAtInput.trim();
+    } else {
+      delete parsedMetadata.scheduled_publish_at;
+    }
+
     setSaving(true);
     setError('');
     setSuccess('');
@@ -182,6 +196,7 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
       }
 
       setSuccess('Saved successfully.');
+      setLastSavedAt(new Date().toLocaleTimeString());
       if (isNew) {
         router.push(`/admin/content/${json.data.slug}`);
       }
@@ -190,7 +205,7 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
     } finally {
       setSaving(false);
     }
-  }, [title, slug, contentType, body, excerpt, author, parsedTags, published, featuredImage, externalUrl, displayOrder, metadata, isNew, router]);
+  }, [title, slug, contentType, body, excerpt, author, parsedTags, published, status, featuredImage, externalUrl, displayOrder, metadata, publishedAtInput, isNew, router]);
 
   // ── Delete ──────────────────────────────────────────────────────────
   const handleDelete = useCallback(async () => {
@@ -430,6 +445,25 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
           </p>
         </div>
 
+        {/* Scheduled Publish At */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Scheduled Publish At
+            <span className="ml-2 text-xs text-gray-400 font-normal">
+              (optional — for editorial scheduling)
+            </span>
+          </label>
+          <input
+            type="datetime-local"
+            value={publishedAtInput}
+            onChange={(e) => setPublishedAtInput(e.target.value)}
+            className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Set a future date/time when this content should be published. Save with status &ldquo;Pending Review&rdquo; to hold until then.
+          </p>
+        </div>
+
         {/* Preview toggle */}
         <div>
           <button
@@ -487,12 +521,23 @@ export default function ContentEditorForm({ existing }: ContentEditorFormProps) 
           >
             {saving ? 'Saving...' : isNew ? 'Create Content' : 'Save Changes'}
           </button>
+          {!isNew && existing?.slug && (
+            <button
+              onClick={() => router.push(`/admin/content/${existing.slug}/preview`)}
+              className="inline-flex items-center rounded-md bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              Preview
+            </button>
+          )}
           <button
             onClick={() => router.push('/admin/content')}
             className="inline-flex items-center rounded-md border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
+          {lastSavedAt && (
+            <span className="text-xs text-gray-400">Last saved at {lastSavedAt}</span>
+          )}
           {!isNew && (
             <>
               {showDeleteConfirm ? (

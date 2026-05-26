@@ -61,7 +61,7 @@ export default function DocumentEditorPage() {
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {
     if (format === 'pdf') {
-      alert('PDF export is not yet implemented');
+      // PDF export not yet available — no-op instead of confusing alert
       return;
     }
     const res = await fetch(`/api/admin/documents/${documentId}/export`, {

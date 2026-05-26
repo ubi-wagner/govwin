@@ -47,7 +47,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.calibrator")
 
@@ -138,15 +138,14 @@ class Calibrator:
                         INSERT INTO agent_performance
                             (id, tenant_id, agent_role, period_start, period_end,
                              tasks_completed, acceptance_rate, avg_edit_pct,
-                             avg_cost_usd, avg_duration_ms, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                        ON CONFLICT (tenant_id, agent_role, period_start, period_end)
+                             avg_cost_usd, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                        ON CONFLICT (tenant_id, agent_role, period_start)
                         DO UPDATE SET
                             tasks_completed = EXCLUDED.tasks_completed,
                             acceptance_rate = EXCLUDED.acceptance_rate,
                             avg_edit_pct = EXCLUDED.avg_edit_pct,
-                            avg_cost_usd = EXCLUDED.avg_cost_usd,
-                            avg_duration_ms = EXCLUDED.avg_duration_ms
+                            avg_cost_usd = EXCLUDED.avg_cost_usd
                         """,
                         uuid.UUID(str(uuid.uuid4())),
                         uuid.UUID(tenant_id),
@@ -157,7 +156,6 @@ class Calibrator:
                         acceptance_rate,
                         avg_edit_pct,
                         avg_cost,
-                        avg_duration,
                         now,
                     )
                 except Exception as e:

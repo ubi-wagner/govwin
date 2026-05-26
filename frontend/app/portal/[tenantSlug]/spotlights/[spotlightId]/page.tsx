@@ -4,6 +4,9 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import SpotlightDetailActions from '@/components/portal/spotlight-detail-actions';
+import { OpportunityDocuments } from '@/components/portal/opportunity-documents';
+
+export const dynamic = 'force-dynamic';
 
 interface Props {
   params: Promise<{ tenantSlug: string; spotlightId: string }>;
@@ -450,6 +453,14 @@ export default async function SpotlightDetailPage({ params }: Props) {
           </p>
         </div>
       )}
+
+      {/* ── Source Documents ──────────────────────────────────────────── */}
+      <div className="mb-6">
+        <OpportunityDocuments
+          tenantSlug={tenantSlug}
+          opportunityId={spotlightId}
+        />
+      </div>
 
       {/* ── Related Info ────────────────────────────────────────────── */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">

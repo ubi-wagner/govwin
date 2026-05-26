@@ -128,16 +128,22 @@ export async function harvestProposalToLibrary(
   let atomsSkipped = 0;
 
   // Load all sections for this proposal
-  const sections = await sql<Array<{
-    id: string;
-    title: string;
-    content: string | null;
-  }>>`
-    SELECT id, title, content
-    FROM proposal_sections
-    WHERE proposal_id = ${proposalId}
-    ORDER BY section_number
-  `;
+  let sections: Array<{ id: string; title: string; content: string | null }>;
+  try {
+    sections = await sql<Array<{
+      id: string;
+      title: string;
+      content: string | null;
+    }>>`
+      SELECT id, title, content
+      FROM proposal_sections
+      WHERE proposal_id = ${proposalId}
+      ORDER BY section_number
+    `;
+  } catch (err) {
+    console.error('[harvest] Failed to load proposal sections:', err);
+    return { atomsHarvested: 0, atomsSkipped: 0 };
+  }
 
   for (const section of sections) {
     if (!section.content) continue;

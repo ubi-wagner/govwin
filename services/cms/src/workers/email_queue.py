@@ -191,10 +191,14 @@ async def process_queue_batch() -> int:
                 await pool.execute('DELETE FROM email_queue WHERE id = $1', queue_item['id'])
                 logger.error(f'Send {send_id} failed permanently after {attempts} attempts')
             else:
-                # Unlock and increment attempts for retry
+                # Unlock and increment attempts for retry with exponential backoff
+                retry_delay = min(2 ** attempts * 60, 3600)  # 60s, 120s, 240s, ... up to 1h
                 await pool.execute(
-                    'UPDATE email_queue SET locked_at = NULL, locked_by = NULL, attempts = $1 WHERE id = $2',
-                    attempts, queue_item['id'],
+                    """UPDATE email_queue
+                       SET locked_at = NULL, locked_by = NULL, attempts = $1,
+                           scheduled_for = NOW() + $2 * INTERVAL '1 second'
+                       WHERE id = $3""",
+                    attempts, retry_delay, queue_item['id'],
                 )
 
     return processed

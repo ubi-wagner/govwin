@@ -24,35 +24,41 @@ export async function GET() {
       return NextResponse.json({ error: 'Admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    const sources = await sql`
-      SELECT sp.*,
-        (SELECT COUNT(*) FROM source_visits sv WHERE sv.profile_id = sp.id) AS visit_count,
-        (SELECT MAX(sv.created_at) FROM source_visits sv WHERE sv.profile_id = sp.id) AS last_activity
-      FROM source_profiles sp
-      WHERE sp.is_active = true
-      ORDER BY sp.name
-    `;
+    let sources, recentActivity, recentDiffs;
+    try {
+      sources = await sql`
+        SELECT sp.*,
+          (SELECT COUNT(*) FROM source_visits sv WHERE sv.profile_id = sp.id) AS visit_count,
+          (SELECT MAX(sv.created_at) FROM source_visits sv WHERE sv.profile_id = sp.id) AS last_activity
+        FROM source_profiles sp
+        WHERE sp.is_active = true
+        ORDER BY sp.name
+      `;
 
-    const recentActivity = await sql`
-      SELECT sv.*, sp.name AS source_name
-      FROM source_visits sv
-      JOIN source_profiles sp ON sp.id = sv.profile_id
-      ORDER BY sv.created_at DESC
-      LIMIT 20
-    `;
+      recentActivity = await sql`
+        SELECT sv.*, sp.name AS source_name
+        FROM source_visits sv
+        JOIN source_profiles sp ON sp.id = sv.profile_id
+        ORDER BY sv.created_at DESC
+        LIMIT 20
+      `;
 
-    const recentDiffs = await sql`
-      SELECT sd.id, sd.profile_id, sd.summary, sd.severity,
-             sd.is_meaningful, sd.created_at,
-             sp.name AS source_name,
-             sr.name AS region_name
-      FROM source_diffs sd
-      JOIN source_profiles sp ON sp.id = sd.profile_id
-      LEFT JOIN source_regions sr ON sr.id = sd.region_id
-      WHERE sd.is_meaningful = true
-      ORDER BY sd.created_at DESC
-      LIMIT 20
-    `;
+      recentDiffs = await sql`
+        SELECT sd.id, sd.profile_id, sd.summary, sd.severity,
+               sd.is_meaningful, sd.created_at,
+               sp.name AS source_name,
+               sr.name AS region_name
+        FROM source_diffs sd
+        JOIN source_profiles sp ON sp.id = sd.profile_id
+        LEFT JOIN source_regions sr ON sr.id = sd.region_id
+        WHERE sd.is_meaningful = true
+        ORDER BY sd.created_at DESC
+        LIMIT 20
+      `;
+    } catch (e) {
+      console.error('[admin/sources] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { sources, recentActivity, recentDiffs } });
   } catch (e) {
@@ -113,25 +119,37 @@ export async function POST(request: Request) {
     const visitInstructions = typeof body.visitInstructions === 'string' ? body.visitInstructions.trim() || null : null;
 
     // ── Insert ────────────────────────────────────────────────────
-    const [row] = await sql<{ id: string; name: string }[]>`
-      INSERT INTO source_profiles (
-        name, site_type, base_url, bookmark_url,
-        agency, program_type, admin_notes, visit_instructions,
-        created_by
-      ) VALUES (
-        ${name}, ${siteType}, ${baseUrl}, ${bookmarkUrl},
-        ${agency}, ${programType}, ${adminNotes}, ${visitInstructions},
-        ${userId}::uuid
-      )
-      RETURNING id, name
-    `;
+    let row: { id: string; name: string };
+    try {
+      const rows = await sql<{ id: string; name: string }[]>`
+        INSERT INTO source_profiles (
+          name, site_type, base_url, bookmark_url,
+          agency, program_type, admin_notes, visit_instructions,
+          created_by
+        ) VALUES (
+          ${name}, ${siteType}, ${baseUrl}, ${bookmarkUrl},
+          ${agency}, ${programType}, ${adminNotes}, ${visitInstructions},
+          ${userId}::uuid
+        )
+        RETURNING id, name
+      `;
+      row = rows[0];
+    } catch (e) {
+      console.error('[admin/sources] POST insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source.created',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { correlationId: randomUUID(), sourceId: row.id, name: row.name, siteType },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'source.created',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        payload: { correlationId: randomUUID(), sourceId: row.id, name: row.name, siteType },
+      });
+    } catch (e) {
+      console.error('[admin/sources] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { id: row.id, name: row.name } });
   } catch (e) {

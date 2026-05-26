@@ -94,11 +94,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify profile exists ───────────────────────────────────────
-    const [profile] = await sql<{ id: string; name: string }[]>`
-      SELECT id, name FROM source_profiles
-      WHERE id = ${profileId}::uuid
-      LIMIT 1
-    `;
+    let profile: { id: string; name: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; name: string }[]>`
+        SELECT id, name FROM source_profiles
+        WHERE id = ${profileId}::uuid
+        LIMIT 1
+      `;
+      profile = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/profile] lookup query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!profile) {
       return NextResponse.json(
         { error: 'Source profile not found', code: 'NOT_FOUND' },
@@ -115,29 +122,39 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const visitInstructionsProvided = 'visitInstructions' in values;
     const visitInstructionsVal = visitInstructionsProvided ? (values.visitInstructions != null ? String(values.visitInstructions) : null) : null;
 
-    await sql`
-      UPDATE source_profiles SET
-        auto_crawl_enabled = COALESCE(${autoCrawlVal}::boolean, auto_crawl_enabled),
-        crawl_cron = COALESCE(${crawlCronVal}::text, crawl_cron),
-        admin_notes = CASE WHEN ${adminNotesProvided}::boolean THEN ${adminNotesVal}::text ELSE admin_notes END,
-        visit_instructions = CASE WHEN ${visitInstructionsProvided}::boolean THEN ${visitInstructionsVal}::text ELSE visit_instructions END,
-        updated_at = now()
-      WHERE id = ${profileId}::uuid
-    `;
+    try {
+      await sql`
+        UPDATE source_profiles SET
+          auto_crawl_enabled = COALESCE(${autoCrawlVal}::boolean, auto_crawl_enabled),
+          crawl_cron = COALESCE(${crawlCronVal}::text, crawl_cron),
+          admin_notes = CASE WHEN ${adminNotesProvided}::boolean THEN ${adminNotesVal}::text ELSE admin_notes END,
+          visit_instructions = CASE WHEN ${visitInstructionsProvided}::boolean THEN ${visitInstructionsVal}::text ELSE visit_instructions END,
+          updated_at = now()
+        WHERE id = ${profileId}::uuid
+      `;
+    } catch (e) {
+      console.error('[admin/sources/profile] update query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // ── Emit event ──────────────────────────────────────────────────
-    const correlationId = randomUUID();
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source.updated',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId,
-        sourceId: profileId,
-        sourceName: profile.name,
-        updatedFields: Object.keys(values),
-      },
-    });
+    // ── Emit event (non-fatal) ─────────────────────────────────────
+    try {
+      const correlationId = randomUUID();
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'source.updated',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        payload: {
+          correlationId,
+          sourceId: profileId,
+          sourceName: profile.name,
+          updatedFields: Object.keys(values),
+        },
+      });
+    } catch (e) {
+      console.error('[admin/sources/profile] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { updated: true } });
   } catch (e) {

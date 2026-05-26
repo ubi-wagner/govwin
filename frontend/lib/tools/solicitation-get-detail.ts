@@ -128,7 +128,9 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
     const { solicitationId } = input;
 
     // 1. curated_solicitations + JOIN opportunity (one query — both are required)
-    const solRows = await sql`
+    let solRows;
+    try {
+      solRows = await sql`
       SELECT
         cs.id, cs.opportunity_id, cs.status, cs.namespace,
         cs.claimed_by, cs.claimed_at, cs.curated_by, cs.approved_by,
@@ -143,6 +145,10 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
       JOIN opportunities o ON o.id = cs.opportunity_id
       WHERE cs.id = ${solicitationId}::uuid
     `;
+    } catch (err) {
+      console.error('[solicitation.get_detail] main query failed:', err);
+      throw err;
+    }
 
     if (solRows.length === 0) {
       throw new NotFoundError(`solicitation not found: ${solicitationId}`);
@@ -187,14 +193,20 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
     };
 
     // 2. compliance (separate because it may not exist yet)
-    const compRows = await sql`
-      SELECT id, solicitation_id, page_limit_technical, page_limit_cost,
-             font_family, font_size, margins, submission_format,
-             slides_allowed, slide_limit, taba_allowed, pi_must_be_employee,
-             custom_variables, verified_by, verified_at
-      FROM solicitation_compliance
-      WHERE solicitation_id = ${solicitationId}::uuid
-    `;
+    let compRows;
+    try {
+      compRows = await sql`
+        SELECT id, solicitation_id, page_limit_technical, page_limit_cost,
+               font_family, font_size, margins, submission_format,
+               slides_allowed, slide_limit, taba_allowed, pi_must_be_employee,
+               custom_variables, verified_by, verified_at
+        FROM solicitation_compliance
+        WHERE solicitation_id = ${solicitationId}::uuid
+      `;
+    } catch (err) {
+      console.error('[solicitation.get_detail] compliance query failed:', err);
+      throw err;
+    }
     const compliance: ComplianceRow | null =
       compRows.length === 0
         ? null
@@ -217,13 +229,19 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
           };
 
     // 3. annotations
-    const annRows = await sql`
-      SELECT id, kind, compliance_variable_name,
-             source_location, payload, actor_id, created_at
-      FROM solicitation_annotations
-      WHERE solicitation_id = ${solicitationId}::uuid
-      ORDER BY created_at ASC
-    `;
+    let annRows;
+    try {
+      annRows = await sql`
+        SELECT id, kind, compliance_variable_name,
+               source_location, payload, actor_id, created_at
+        FROM solicitation_annotations
+        WHERE solicitation_id = ${solicitationId}::uuid
+        ORDER BY created_at ASC
+      `;
+    } catch (err) {
+      console.error('[solicitation.get_detail] annotations query failed:', err);
+      throw err;
+    }
     const annotations: Annotation[] = annRows.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -235,12 +253,18 @@ export const solicitationGetDetailTool = defineTool<Input, Output>({
     }));
 
     // 4. triage history
-    const triageRows = await sql`
-      SELECT id, action, actor_id, notes, created_at
-      FROM triage_actions
-      WHERE solicitation_id = ${solicitationId}::uuid
-      ORDER BY created_at ASC
-    `;
+    let triageRows;
+    try {
+      triageRows = await sql`
+        SELECT id, action, actor_id, notes, created_at
+        FROM triage_actions
+        WHERE solicitation_id = ${solicitationId}::uuid
+        ORDER BY created_at ASC
+      `;
+    } catch (err) {
+      console.error('[solicitation.get_detail] triage query failed:', err);
+      throw err;
+    }
     const triageHistory: TriageAction[] = triageRows.map((t) => ({
       id: t.id,
       action: t.action,

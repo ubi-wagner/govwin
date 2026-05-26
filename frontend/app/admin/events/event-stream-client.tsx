@@ -18,25 +18,23 @@ export type SerializedEvent = {
 
 const NAMESPACES = [
   'all',
-  'identity',
   'finder',
   'capture',
-  'admin',
-  'library',
+  'identity',
   'proposal',
-  'agent',
-  'cms',
+  'library',
+  'system',
+  'tool',
 ] as const;
 
 const NAMESPACE_COLORS: Record<string, string> = {
   identity: 'text-blue-600 bg-blue-50',
   finder: 'text-indigo-600 bg-indigo-50',
   capture: 'text-green-600 bg-green-50',
-  admin: 'text-yellow-700 bg-yellow-50',
   library: 'text-teal-600 bg-teal-50',
   proposal: 'text-purple-600 bg-purple-50',
-  agent: 'text-orange-600 bg-orange-50',
-  cms: 'text-pink-600 bg-pink-50',
+  system: 'text-yellow-700 bg-yellow-50',
+  tool: 'text-orange-600 bg-orange-50',
 };
 
 const TIME_RANGES = [

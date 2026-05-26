@@ -54,36 +54,47 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
     // Dedupe: if an atom with the same hash already exists for this
     // tenant, skip (don't create duplicates of the same paragraph).
     if (input.atomHash) {
-      const existing = await sql<{ id: string }[]>`
-        SELECT id FROM library_units
-        WHERE tenant_id = ${tenantId}::uuid
-          AND atom_hash = ${input.atomHash}
-        LIMIT 1
-      `;
-      if (existing.length > 0) {
-        return { libraryUnitId: existing[0].id, category: input.category, isNew: false };
+      try {
+        const existing = await sql<{ id: string }[]>`
+          SELECT id FROM library_units
+          WHERE tenant_id = ${tenantId}::uuid
+            AND atom_hash = ${input.atomHash}
+          LIMIT 1
+        `;
+        if (existing.length > 0) {
+          return { libraryUnitId: existing[0].id, category: input.category, isNew: false };
+        }
+      } catch (err) {
+        console.error('[library.save_atom] dedupe check failed:', err);
+        throw err;
       }
     }
 
     const contentJson = JSON.stringify(input.content);
 
-    const rows = await sql<{ id: string }[]>`
-      INSERT INTO library_units
-        (tenant_id, content, category, tags, status, source_type, source_id,
-         original_proposal_id, original_node_id, atom_hash)
-      VALUES
-        (${tenantId}::uuid,
-         ${contentJson},
-         ${input.category},
-         ${input.tags}::text[],
-         'approved',
-         'ai',
-         ${JSON.stringify(input.sourceAnchor ?? null)},
-         ${input.proposalId}::uuid,
-         ${input.nodeId},
-         ${input.atomHash ?? null})
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        INSERT INTO library_units
+          (tenant_id, content, category, tags, status, source_type, source_id,
+           original_proposal_id, original_node_id, atom_hash)
+        VALUES
+          (${tenantId}::uuid,
+           ${contentJson},
+           ${input.category},
+           ${input.tags}::text[],
+           'approved',
+           'ai',
+           ${JSON.stringify(input.sourceAnchor ?? null)},
+           ${input.proposalId}::uuid,
+           ${input.nodeId},
+           ${input.atomHash ?? null})
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[library.save_atom] insert failed:', err);
+      throw err;
+    }
     if (!rows.length) {
       throw new ToolExecutionError('Failed to save library atom — INSERT returned no rows');
     }

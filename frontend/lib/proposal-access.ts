@@ -21,13 +21,32 @@ export interface UserAccess {
   lockCount: number;
   isLocked: boolean;
   unlockDeadline: string | null;
+  currentStage: string;
+  accessibleStages: string[];
 }
+
+const NO_ACCESS: UserAccess = {
+  role: 'external',
+  editableSections: [],
+  commentableSections: [],
+  viewableSections: [],
+  canUpload: false,
+  canAdvance: false,
+  canManageTeam: false,
+  canExport: false,
+  lockCount: 0,
+  isLocked: false,
+  unlockDeadline: null,
+  currentStage: '',
+  accessibleStages: [],
+};
 
 export async function resolveUserAccess(
   userId: string,
   proposalId: string,
   tenantId: string,
 ): Promise<UserAccess> {
+  try {
   // Load proposal lock state
   const [proposal] = await sql<{
     lockCount: number;
@@ -49,19 +68,7 @@ export async function resolveUserAccess(
   `;
 
   if (!proposal) {
-    return {
-      role: 'external',
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
-      canUpload: false,
-      canAdvance: false,
-      canManageTeam: false,
-      canExport: false,
-      lockCount: 0,
-      isLocked: false,
-      unlockDeadline: null,
-    };
+    return NO_ACCESS;
   }
 
   // Check if user is tenant_admin for this tenant
@@ -78,25 +85,43 @@ export async function resolveUserAccess(
       (user.role === 'tenant_admin' && user.tenantId === tenantId));
 
   if (isAdmin) {
-    // Admin gets full access to all sections
-    const sections = await sql<{ id: string }[]>`
-      SELECT id FROM proposal_sections
+    // Admin gets full access to all sections in ALL stages
+    const sections = await sql<{ id: string; completedStage: string | null }[]>`
+      SELECT id, completed_stage FROM proposal_sections
       WHERE proposal_id = ${proposalId}
     `;
     const allIds = sections.map((s) => s.id);
 
+    // Admins can edit sections in the current stage; completed-stage sections are read-only
+    const editableIds = sections
+      .filter((s) => s.completedStage === null || s.completedStage === proposal.stage)
+      .map((s) => s.id);
+
+    // Load gate_config for accessible stages
+    let gateConfig: string[] = [];
+    try {
+      const [proposalGates] = await sql<{ gateConfig: string[] }[]>`
+        SELECT gate_config FROM proposals WHERE id = ${proposalId} LIMIT 1
+      `;
+      gateConfig = (proposalGates?.gateConfig || ['draft', 'final']) as string[];
+    } catch {
+      gateConfig = ['draft', 'final'];
+    }
+
     return {
       role: 'admin',
-      editableSections: allIds,
+      editableSections: proposal.isLocked ? [] : editableIds,
       commentableSections: allIds,
       viewableSections: allIds,
-      canUpload: true,
+      canUpload: !proposal.isLocked,
       canAdvance: true,
       canManageTeam: true,
-      canExport: proposal.lockCount >= 1 && proposal.isLocked,
+      canExport: proposal.lockCount >= 1,
       lockCount: proposal.lockCount,
       isLocked: proposal.isLocked,
       unlockDeadline: proposal.unlockDeadline,
+      currentStage: proposal.stage,
+      accessibleStages: gateConfig,
     };
   }
 
@@ -117,21 +142,15 @@ export async function resolveUserAccess(
 
   if (!collaborator) {
     return {
-      role: 'external',
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
-      canUpload: false,
-      canAdvance: false,
-      canManageTeam: false,
-      canExport: false,
+      ...NO_ACCESS,
       lockCount: proposal.lockCount,
       isLocked: proposal.isLocked,
       unlockDeadline: proposal.unlockDeadline,
+      currentStage: proposal.stage,
     };
   }
 
-  // Load stage access permissions
+  // Load stage access permissions — include ALL granted stages, not just current
   const stageAccess = await sql<{
     permission: string;
     artifactTypes: string[];
@@ -142,23 +161,53 @@ export async function resolveUserAccess(
     WHERE collaborator_id = ${collaborator.id}
       AND proposal_id = ${proposalId}
       AND access_revoked_at IS NULL
-      AND stage = ${proposal.stage}
   `;
+
+  // Build a set of stages this collaborator can access
+  const accessibleStages = [...new Set(stageAccess.map((a) => a.stage))];
+  const hasCurrentStageAccess = stageAccess.some((a) => a.stage === proposal.stage);
+
+  // Load sections with completion info to determine editability
+  const sectionRows = await sql<{ id: string; completedStage: string | null }[]>`
+    SELECT id, completed_stage FROM proposal_sections
+    WHERE proposal_id = ${proposalId}
+  `;
+  const sectionCompletionMap = new Map(sectionRows.map((s) => [s.id, s.completedStage]));
 
   const editableSections: string[] = [];
   const commentableSections: string[] = [];
   const viewableSections: string[] = [];
 
-  // Assigned sections get the permission from stage_access
-  for (const access of stageAccess) {
+  // Current stage permissions — can edit/comment on assigned sections
+  const currentStageAccess = stageAccess.filter((a) => a.stage === proposal.stage);
+  for (const access of currentStageAccess) {
     const sectionIds = collaborator.assignedSections || [];
     for (const sectionId of sectionIds) {
-      if (access.permission === 'edit') {
+      const completedStage = sectionCompletionMap.get(sectionId);
+      // Only allow edits if section is not locked from a previous stage
+      const sectionIsEditable = completedStage === null || completedStage === proposal.stage;
+      if (access.permission === 'edit' && sectionIsEditable && !proposal.isLocked) {
         editableSections.push(sectionId);
-      } else if (access.permission === 'comment') {
+      } else if (access.permission === 'comment' || (access.permission === 'edit' && !sectionIsEditable)) {
         commentableSections.push(sectionId);
       } else if (access.permission === 'view') {
         viewableSections.push(sectionId);
+      }
+    }
+  }
+
+  // Previous completed stages — if user has access to current stage, they can
+  // VIEW content from previous stages (read-only)
+  if (hasCurrentStageAccess) {
+    const previousStageAccess = stageAccess.filter((a) => a.stage !== proposal.stage);
+    for (const access of previousStageAccess) {
+      const sectionIds = collaborator.assignedSections || [];
+      for (const sectionId of sectionIds) {
+        if (!viewableSections.includes(sectionId) &&
+            !commentableSections.includes(sectionId) &&
+            !editableSections.includes(sectionId)) {
+          viewableSections.push(sectionId);
+        }
       }
     }
   }
@@ -170,12 +219,18 @@ export async function resolveUserAccess(
     editableSections,
     commentableSections,
     viewableSections,
-    canUpload: collaborator.dropboxEnabled,
+    canUpload: collaborator.dropboxEnabled && !proposal.isLocked,
     canAdvance: false,
     canManageTeam: false,
     canExport: false,
     lockCount: proposal.lockCount,
     isLocked: proposal.isLocked,
     unlockDeadline: proposal.unlockDeadline,
+    currentStage: proposal.stage,
+    accessibleStages,
   };
+  } catch (err) {
+    console.error('[proposal-access] resolveUserAccess failed:', err);
+    return NO_ACCESS;
+  }
 }

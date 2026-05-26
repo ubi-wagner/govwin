@@ -59,28 +59,33 @@ export async function getOrCreateStripeCustomer(
 ): Promise<string> {
   if (!stripe) throw new Error('Stripe is not configured');
 
-  // Check if tenant already has a Stripe customer
-  const [tenant] = await sql<{ stripeCustomerId: string | null }[]>`
-    SELECT stripe_customer_id FROM tenants WHERE id = ${tenantId}
-  `;
+  try {
+    // Check if tenant already has a Stripe customer
+    const [tenant] = await sql<{ stripeCustomerId: string | null }[]>`
+      SELECT stripe_customer_id FROM tenants WHERE id = ${tenantId}
+    `;
 
-  if (tenant?.stripeCustomerId) {
-    return tenant.stripeCustomerId;
+    if (tenant?.stripeCustomerId) {
+      return tenant.stripeCustomerId;
+    }
+
+    // Create a new customer in Stripe
+    const customer = await stripe.customers.create({
+      email,
+      name,
+      metadata: { tenant_id: tenantId },
+    });
+
+    // Persist the mapping
+    await sql`
+      UPDATE tenants SET stripe_customer_id = ${customer.id} WHERE id = ${tenantId}
+    `;
+
+    return customer.id;
+  } catch (err) {
+    console.error('[stripe] getOrCreateStripeCustomer failed:', err);
+    throw err;
   }
-
-  // Create a new customer in Stripe
-  const customer = await stripe.customers.create({
-    email,
-    name,
-    metadata: { tenant_id: tenantId },
-  });
-
-  // Persist the mapping
-  await sql`
-    UPDATE tenants SET stripe_customer_id = ${customer.id} WHERE id = ${tenantId}
-  `;
-
-  return customer.id;
 }
 
 /**

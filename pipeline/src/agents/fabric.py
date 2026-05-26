@@ -49,6 +49,7 @@ CHANGE LOG:
 """
 
 import json
+import asyncio
 import logging
 import os
 import time
@@ -300,9 +301,18 @@ class AgentFabric:
             response_text = ""
             tool_results_log: list[dict] = []
             rounds = 0
+            tool_failure_counts: dict[str, int] = {}
 
-            while rounds <= MAX_TOOL_ROUNDS:
-                response = await client.messages.create(**api_kwargs)
+            while rounds < MAX_TOOL_ROUNDS:
+                try:
+                    response = await asyncio.wait_for(
+                        client.messages.create(**api_kwargs),
+                        timeout=120.0,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error("[invoke_agent] Claude API call timed out (120s)")
+                    response_text += "\n[Agent stopped: API call timed out]"
+                    break
 
                 total_input_tokens += response.usage.input_tokens
                 total_output_tokens += response.usage.output_tokens
@@ -321,13 +331,21 @@ class AgentFabric:
                         if block.type == "tool_use":
                             tool_calls_count += 1
                             try:
-                                result = await self.tool_registry.execute(
-                                    conn,
-                                    tenant_id,
-                                    block.name,
-                                    block.input,
-                                    allowed_tools=allowed_tool_names or None,
-                                )
+                                if self.tool_registry.has_tool(block.name):
+                                    result = await self.tool_registry.execute(
+                                        conn,
+                                        tenant_id,
+                                        block.name,
+                                        block.input,
+                                        allowed_tools=allowed_tool_names or None,
+                                    )
+                                elif hasattr(archetype, "execute_tool"):
+                                    result = await archetype.execute_tool(
+                                        conn, block.name, block.input,
+                                        {**context, "tenant_id": tenant_id},
+                                    )
+                                else:
+                                    result = {"error": f"Unknown tool: {block.name}"}
                             except Exception as tool_exc:
                                 logger.error(
                                     "[invoke_agent] tool %s failed: %s",
@@ -336,6 +354,18 @@ class AgentFabric:
                                 result = {
                                     "error": f"Tool execution failed: {str(tool_exc)[:200]}"
                                 }
+
+                            # Circuit breaker: stop retrying a tool after 3 failures
+                            if isinstance(result, dict) and "error" in result:
+                                tool_failure_counts[block.name] = tool_failure_counts.get(block.name, 0) + 1
+                                if tool_failure_counts[block.name] >= 3:
+                                    result = {"error": f"Tool {block.name} is temporarily unavailable after 3 failures"}
+                                    # Remove the tripped tool so Claude stops calling it
+                                    if "tools" in api_kwargs:
+                                        api_kwargs["tools"] = [
+                                            t for t in api_kwargs["tools"]
+                                            if t.get("name") != block.name
+                                        ]
 
                             tool_results_log.append({
                                 "tool": block.name,
@@ -360,9 +390,20 @@ class AgentFabric:
                         "content": tool_result_blocks,
                     })
                     rounds += 1
+
+                    # Mid-loop budget check: stop if per-call cost ceiling reached
+                    accumulated_cost = total_input_tokens * INPUT_COST_PER_TOKEN + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                    if accumulated_cost > 0.50:  # $0.50 per-call ceiling
+                        logger.warning("[invoke_agent] per-call cost ceiling reached: $%.4f", accumulated_cost)
+                        break
                 else:
                     # Unexpected stop reason (e.g. max_tokens) — stop looping
                     break
+            else:
+                logger.warning(
+                    "[invoke_agent] %s exhausted %d tool-use rounds",
+                    archetype_name, MAX_TOOL_ROUNDS,
+                )
 
             # 6. Calculate cost
             cost_usd = (
@@ -500,31 +541,35 @@ class AgentFabric:
             error_msg = str(exc)[:500]
             logger.error("[invoke_agent] %s failed: %s", archetype_name, exc)
 
-            # Log the failure
-            await self._log_task(
-                conn,
-                tenant_id=tenant_id,
-                agent_role=archetype_name,
-                task_type=context.get("type", "unknown"),
-                trigger_event=context.get("id"),
-                input_tokens=total_input_tokens,
-                output_tokens=total_output_tokens,
-                tool_calls_count=tool_calls_count,
-                duration_ms=duration_ms,
-                cost_usd=(
-                    total_input_tokens * INPUT_COST_PER_TOKEN
-                    + total_output_tokens * OUTPUT_COST_PER_TOKEN
-                ),
-                error=error_msg,
-            )
+            # Log the failure — wrapped to avoid masking the original error
+            try:
+                await self._log_task(
+                    conn,
+                    tenant_id=tenant_id,
+                    agent_role=archetype_name,
+                    task_type=context.get("type", "unknown"),
+                    trigger_event=context.get("id"),
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    tool_calls_count=tool_calls_count,
+                    duration_ms=duration_ms,
+                    cost_usd=(
+                        total_input_tokens * INPUT_COST_PER_TOKEN
+                        + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                    ),
+                    error=error_msg,
+                )
+            except Exception as log_exc:
+                logger.error("[invoke_agent] error-path _log_task failed: %s", log_exc)
 
-            await self._emit_event(
-                conn,
-                namespace="tool",
-                event_type="agent.invoked",
-                phase="end",
-                tenant_id=tenant_id,
-                payload={
+            try:
+                await self._emit_event(
+                    conn,
+                    namespace="tool",
+                    event_type="agent.invoked",
+                    phase="end",
+                    tenant_id=tenant_id,
+                    payload={
                     "archetype": archetype_name,
                     "status": "error",
                     "error": error_msg,
@@ -532,8 +577,10 @@ class AgentFabric:
                     "input_tokens": total_input_tokens,
                     "output_tokens": total_output_tokens,
                 },
-                parent_event_id=start_event_id,
-            )
+                    parent_event_id=start_event_id,
+                )
+            except Exception as event_exc:
+                logger.error("[invoke_agent] error-path _emit_event failed: %s", event_exc)
 
             return {
                 "status": "error",
@@ -708,9 +755,9 @@ class AgentFabric:
                 return False
             return True
         except Exception as exc:
-            # If we can't check, allow the call (fail open) but log
-            logger.error("[rate_limit] check failed: %s", exc)
-            return True
+            # Fail CLOSED — deny the call if we can't verify rate limit
+            logger.error("[rate_limit] check failed, denying call: %s", exc)
+            return False
 
     # ------------------------------------------------------------------
     # Budget check
@@ -735,6 +782,14 @@ class AgentFabric:
             )
             monthly_budget = float(config_row["monthly_budget"]) if config_row else DEFAULT_MONTHLY_BUDGET_USD
 
+            # Explicit zero budget means AI is disabled for this tenant
+            if monthly_budget == 0:
+                logger.info(
+                    "[budget] tenant %s has monthly_budget=0 (AI disabled)",
+                    tenant_id,
+                )
+                return False
+
             # Sum costs for the current calendar month
             usage_row = await conn.fetchrow(
                 """
@@ -755,9 +810,9 @@ class AgentFabric:
                 return False
             return True
         except Exception as exc:
-            # If we can't check, allow the call (fail open) but log
-            logger.error("[budget] check failed: %s", exc)
-            return True
+            # Fail CLOSED — deny the call if we can't verify budget
+            logger.error("[budget] check failed, denying call: %s", exc)
+            return False
 
     # ------------------------------------------------------------------
     # Task logging

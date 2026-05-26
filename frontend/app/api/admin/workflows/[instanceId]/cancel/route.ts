@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ instanceId: string }>;
@@ -56,35 +57,55 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Cancel the instance ──────────────────────────────────────
-    const updated = await sql<{ id: string }[]>`
-      UPDATE process_instances
-      SET status = 'cancelled', completed_at = now()
-      WHERE id = ${instanceId}::uuid
-        AND status IN ('running', 'paused', 'pending', 'retrying')
-      RETURNING id
-    `;
+    // ── Cancel the instance (transactional) ──────────────────────
+    const cancelResult = await sql.begin(async (tx: any) => {
+      const updated = await tx<{ id: string; status: string; workflowName: string }[]>`
+        UPDATE process_instances
+        SET status = 'cancelled', completed_at = now()
+        WHERE id = ${instanceId}::uuid
+          AND status IN ('running', 'paused', 'pending', 'retrying')
+        RETURNING id, status, workflow_name
+      `;
 
-    if (updated.length === 0) {
+      if (updated.length === 0) {
+        return { found: false as const };
+      }
+
+      // Record transition audit
+      await tx`
+        INSERT INTO process_instance_transitions
+          (instance_id, from_status, to_status, actor, reason, metadata)
+        VALUES (
+          ${instanceId}::uuid,
+          NULL,
+          'cancelled',
+          ${'admin:' + actorEmail},
+          'manual_cancellation',
+          '{}'::jsonb
+        )
+      `;
+
+      return { found: true as const, workflowName: updated[0].workflowName };
+    });
+
+    if (!cancelResult.found) {
       return NextResponse.json(
         { error: 'Instance not found or not cancellable (must be running, paused, pending, or retrying)', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    // Record transition audit
-    await sql`
-      INSERT INTO process_instance_transitions
-        (instance_id, from_status, to_status, actor, reason, metadata)
-      VALUES (
-        ${instanceId}::uuid,
-        NULL,
-        'cancelled',
-        ${'admin:' + actorEmail},
-        'manual_cancellation',
-        '{}'::jsonb
-      )
-    `;
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'workflow.instance_cancelled',
+        actor: userActor(sessionUser.id as string, sessionUser.email),
+        tenantId: null,
+        payload: { instanceId, workflowName: cancelResult.workflowName },
+      });
+    } catch (e) {
+      console.error('[admin/workflows/cancel] event emission failed:', e);
+    }
 
     return NextResponse.json({
       data: { success: true },

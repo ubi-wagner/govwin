@@ -105,7 +105,7 @@ class OnApplicationAccepted(Workflow):
         namespace="capture",
         type="application.accepted",
         phase="end",
-        condition=lambda p: p.get("error") is None,
+        condition=lambda p: bool(p.get("tenantId")),
     )
 
     steps = [
@@ -122,8 +122,7 @@ class OnApplicationAccepted(Workflow):
         ),
         Step(
             name="create_library_defaults",
-            action="pipeline.library.create_default_categories",
-            depends_on="send_welcome_email",
+            action="workflows.actions.create_library_defaults.create_default_categories",
             input_map={"tenant_id": "result.tenantId"},
             timeout_minutes=2,
         ),

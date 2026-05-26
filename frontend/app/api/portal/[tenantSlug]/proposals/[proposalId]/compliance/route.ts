@@ -48,7 +48,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     // Verify proposal belongs to tenant
     const [proposal] = await sql<{ id: string }[]>`
       SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+      WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
       LIMIT 1
     `;
     if (!proposal) {
@@ -80,7 +80,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         }[]>`
           SELECT id, requirement_text, status, notes, section_id
           FROM proposal_compliance_matrix
-          WHERE proposal_id = ${proposalId}
+          WHERE proposal_id = ${proposalId}::uuid
           ORDER BY requirement_text ASC
         `;
         compliance = { items: matrix, source: 'database' };

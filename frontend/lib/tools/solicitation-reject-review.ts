@@ -39,20 +39,32 @@ export const solicitationRejectReviewTool = defineTool<Input, Output>({
     const { solicitationId, notes } = input;
     const actorId = ctx.actor.id;
 
-    const rows = await sql<{ id: string }[]>`
-      UPDATE curated_solicitations
-      SET status = 'curation_in_progress',
-          review_requested_for = NULL,
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'review_requested'
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        UPDATE curated_solicitations
+        SET status = 'curation_in_progress',
+            review_requested_for = NULL,
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'review_requested'
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[solicitation.reject_review] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
-      const existing = await sql<{ status: string }[]>`
-        SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string }[];
+      try {
+        existing = await sql<{ status: string }[]>`
+          SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.reject_review] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }
@@ -62,13 +74,18 @@ export const solicitationRejectReviewTool = defineTool<Input, Output>({
       );
     }
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'reject',
-         'review_requested', 'curation_in_progress', ${notes})
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'reject',
+           'review_requested', 'curation_in_progress', ${notes})
+      `;
+    } catch (err) {
+      console.error('[solicitation.reject_review] triage_actions insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

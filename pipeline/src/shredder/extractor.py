@@ -119,7 +119,8 @@ async def extract_text_from_s3_key(
     if s3_client is None or bucket is None:
         # Resolve lazily to keep tests insulated from storage config
         try:
-            from storage.s3_client import s3 as default_client, BUCKET as default_bucket
+            from storage.s3_client import get_s3_client, BUCKET as default_bucket
+            default_client = get_s3_client()
         except ImportError as e:
             raise ExtractionError(
                 "No s3_client provided and default storage module unavailable: "

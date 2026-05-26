@@ -8,7 +8,7 @@
  * Manages the document state, node CRUD, and save/export actions.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
 import { createNode } from '@/lib/types/canvas-document';
@@ -16,6 +16,12 @@ import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+
+/** Metadata about the last AI revision, used to tag the save with the correct source */
+interface RevisionMeta {
+  source: 'ai_revision' | 'ai_draft' | 'library_import';
+  aiInstruction: string;
+}
 
 interface Props {
   initialDocument: CanvasDocument;
@@ -86,6 +92,7 @@ function CanvasEditorInner({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
+  const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
@@ -115,6 +122,8 @@ function CanvasEditorInner({
   }, [actorId]);
 
   const handleUpdateNode = useCallback((nodeId: string, content: CanvasNode['content']) => {
+    // Human edit — clear AI revision metadata so the save isn't tagged as AI
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
@@ -155,6 +164,8 @@ function CanvasEditorInner({
   }, [updateDoc, actorId, actorName]);
 
   const handleDeleteNode = useCallback((nodeId: string) => {
+    // Human edit — clear AI revision metadata
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== nodeId),
@@ -180,6 +191,8 @@ function CanvasEditorInner({
   }, [updateDoc]);
 
   const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
+    // Human edit — clear AI revision metadata
+    lastRevisionMetaRef.current = null;
     updateDoc((prev) => {
       const nodes = [...prev.nodes];
       const idx = nodes.findIndex((n) => n.id === nodeId);
@@ -240,7 +253,14 @@ function CanvasEditorInner({
     updateDoc((prev) => ({ ...prev, canvas }));
   }, [updateDoc]);
 
-  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content']) => {
+  const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content'], meta?: { source: string; aiInstruction: string }) => {
+    // Store revision metadata so the save route can tag the version correctly
+    if (meta) {
+      lastRevisionMetaRef.current = {
+        source: meta.source as RevisionMeta['source'],
+        aiInstruction: meta.aiInstruction,
+      };
+    }
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
@@ -334,8 +354,15 @@ function CanvasEditorInner({
     setSaving(true);
     setSaveError(null);
     try {
-      await onSave(doc);
+      // Pass revision metadata alongside the doc so the save route can tag the version
+      const meta = lastRevisionMetaRef.current;
+      const docWithMeta = meta
+        ? Object.assign({}, doc, { __revisionMeta: meta })
+        : doc;
+      await onSave(docWithMeta);
       setDirty(false);
+      // Clear revision meta after successful save
+      lastRevisionMetaRef.current = null;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -382,14 +409,9 @@ function CanvasEditorInner({
                   Export .docx
                 </button>
                 <button
-                  onClick={async () => {
-                    try {
-                      await onExport(doc, 'pdf');
-                    } catch (err) {
-                      setSaveError(err instanceof Error ? err.message : 'Export failed');
-                    }
-                  }}
-                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                  disabled
+                  title="Coming soon"
+                  className="px-3 py-1.5 text-xs border rounded bg-gray-100 text-gray-400 cursor-not-allowed"
                 >
                   Export .pdf
                 </button>
@@ -488,6 +510,7 @@ function CanvasEditorInner({
         onReviseNode={handleReviseNode}
         proposalId={proposalId}
         tenantSlug={tenantSlug}
+        sectionId={sectionId}
       />
     </div>
   );

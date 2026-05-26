@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import ContentEditorForm from '@/components/admin/content-editor-form';
 
+export const dynamic = 'force-dynamic';
+
 interface ContentEditRow {
   id: string;
   slug: string;

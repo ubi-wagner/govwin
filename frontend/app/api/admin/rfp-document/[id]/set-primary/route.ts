@@ -11,6 +11,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
 import { randomUUID } from 'crypto';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -33,6 +34,12 @@ export async function POST(_req: Request, ctx: RouteContext) {
   }
 
   const { id } = await ctx.params;
+  if (!isValidUUID(id)) {
+    return NextResponse.json(
+      { error: 'Invalid document ID format', code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
 
   try {
   // Look up the document to find its solicitation_id

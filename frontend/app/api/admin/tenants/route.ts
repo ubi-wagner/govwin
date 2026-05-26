@@ -35,20 +35,114 @@ export async function GET(request: Request) {
       );
     }
 
-    // TODO: Implement tenant listing
-    //
-    // SELECT t.id, t.slug, t.name, t.status, t.product_tier,
-    //        t.subscription_status, t.billing_email,
-    //        t.trial_ends_at, t.created_at,
-    //        (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
-    //        (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
-    // FROM tenants t
-    // ORDER BY t.created_at DESC
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') ?? '';
+    const status = searchParams.get('status') ?? '';
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-23',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    let tenants;
+    if (search) {
+      const escaped = search.replace(/[%_\\]/g, '\\$&');
+      const pattern = `%${escaped}%`;
+      if (status) {
+        tenants = await sql<{
+          id: string;
+          slug: string;
+          name: string;
+          status: string;
+          productTier: string | null;
+          subscriptionStatus: string | null;
+          billingEmail: string | null;
+          trialEndsAt: string | null;
+          createdAt: string;
+          userCount: number;
+          proposalCount: number;
+        }[]>`
+          SELECT t.id, t.slug, t.name, t.status, t.product_tier,
+                 t.subscription_status, t.billing_email,
+                 t.trial_ends_at, t.created_at,
+                 (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
+                 (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
+          FROM tenants t
+          WHERE (t.name ILIKE ${pattern} OR t.slug ILIKE ${pattern})
+            AND t.status = ${status}
+          ORDER BY t.created_at DESC
+          LIMIT 200
+        `;
+      } else {
+        tenants = await sql<{
+          id: string;
+          slug: string;
+          name: string;
+          status: string;
+          productTier: string | null;
+          subscriptionStatus: string | null;
+          billingEmail: string | null;
+          trialEndsAt: string | null;
+          createdAt: string;
+          userCount: number;
+          proposalCount: number;
+        }[]>`
+          SELECT t.id, t.slug, t.name, t.status, t.product_tier,
+                 t.subscription_status, t.billing_email,
+                 t.trial_ends_at, t.created_at,
+                 (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
+                 (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
+          FROM tenants t
+          WHERE t.name ILIKE ${pattern} OR t.slug ILIKE ${pattern}
+          ORDER BY t.created_at DESC
+          LIMIT 200
+        `;
+      }
+    } else if (status) {
+      tenants = await sql<{
+        id: string;
+        slug: string;
+        name: string;
+        status: string;
+        productTier: string | null;
+        subscriptionStatus: string | null;
+        billingEmail: string | null;
+        trialEndsAt: string | null;
+        createdAt: string;
+        userCount: number;
+        proposalCount: number;
+      }[]>`
+        SELECT t.id, t.slug, t.name, t.status, t.product_tier,
+               t.subscription_status, t.billing_email,
+               t.trial_ends_at, t.created_at,
+               (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
+               (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
+        FROM tenants t
+        WHERE t.status = ${status}
+        ORDER BY t.created_at DESC
+        LIMIT 200
+      `;
+    } else {
+      tenants = await sql<{
+        id: string;
+        slug: string;
+        name: string;
+        status: string;
+        productTier: string | null;
+        subscriptionStatus: string | null;
+        billingEmail: string | null;
+        trialEndsAt: string | null;
+        createdAt: string;
+        userCount: number;
+        proposalCount: number;
+      }[]>`
+        SELECT t.id, t.slug, t.name, t.status, t.product_tier,
+               t.subscription_status, t.billing_email,
+               t.trial_ends_at, t.created_at,
+               (SELECT count(*)::int FROM users WHERE tenant_id = t.id) AS user_count,
+               (SELECT count(*)::int FROM proposals WHERE tenant_id = t.id) AS proposal_count
+        FROM tenants t
+        ORDER BY t.created_at DESC
+        LIMIT 200
+      `;
+    }
+
+    return NextResponse.json({ data: { tenants } });
   } catch (err) {
     console.error('[admin/tenants/list] error:', err);
     return NextResponse.json(

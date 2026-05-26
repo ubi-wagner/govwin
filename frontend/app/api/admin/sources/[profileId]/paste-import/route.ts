@@ -327,30 +327,43 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify profile exists ─────────────────────────────────────
-    const [profile] = await sql<{ id: string; name: string }[]>`
-      SELECT id, name FROM source_profiles
-      WHERE id = ${profileId}::uuid AND is_active = true
-      LIMIT 1
-    `;
+    let profile: { id: string; name: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; name: string }[]>`
+        SELECT id, name FROM source_profiles
+        WHERE id = ${profileId}::uuid AND is_active = true
+        LIMIT 1
+      `;
+      profile = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/paste-import] profile lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!profile) {
       return NextResponse.json({ error: 'Source profile not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Verify solicitation exists ────────────────────────────────
-    const solRows = await sql<{
-      id: string;
-      inheritSource: string | null;
-      inheritAgency: string | null;
-      inheritOffice: string | null;
-    }[]>`
-      SELECT cs.id,
-             o.source AS inherit_source,
-             o.agency AS inherit_agency,
-             o.office AS inherit_office
-      FROM curated_solicitations cs
-      LEFT JOIN opportunities o ON o.id = cs.opportunity_id
-      WHERE cs.id = ${solicitationId}::uuid
-    `;
+    let solRows: { id: string; inheritSource: string | null; inheritAgency: string | null; inheritOffice: string | null }[];
+    try {
+      solRows = await sql<{
+        id: string;
+        inheritSource: string | null;
+        inheritAgency: string | null;
+        inheritOffice: string | null;
+      }[]>`
+        SELECT cs.id,
+               o.source AS inherit_source,
+               o.agency AS inherit_agency,
+               o.office AS inherit_office
+        FROM curated_solicitations cs
+        LEFT JOIN opportunities o ON o.id = cs.opportunity_id
+        WHERE cs.id = ${solicitationId}::uuid
+      `;
+    } catch (e) {
+      console.error('[admin/sources/paste-import] solicitation lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (solRows.length === 0) {
       return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
     }
@@ -367,11 +380,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Find existing topic numbers to dedupe ─────────────────────
-    const existingRows = await sql<{ topicNumber: string }[]>`
-      SELECT topic_number FROM opportunities
-      WHERE solicitation_id = ${solicitationId}::uuid
-        AND topic_number IS NOT NULL
-    `;
+    let existingRows: { topicNumber: string }[];
+    try {
+      existingRows = await sql<{ topicNumber: string }[]>`
+        SELECT topic_number FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+          AND topic_number IS NOT NULL
+      `;
+    } catch (e) {
+      console.error('[admin/sources/paste-import] existing topics query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     const existingSet = new Set(existingRows.map((r) => r.topicNumber));
 
     // ── Start event for multi-step paste-import ───────────────────
@@ -449,43 +468,63 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Flip solicitation_type to multi_topic if we added any ─────
     if (inserted.length > 0) {
-      await sql`
-        UPDATE curated_solicitations
-        SET solicitation_type = 'multi_topic', updated_at = now()
-        WHERE id = ${solicitationId}::uuid
-          AND solicitation_type = 'single'
-      `;
+      try {
+        await sql`
+          UPDATE curated_solicitations
+          SET solicitation_type = 'multi_topic', updated_at = now()
+          WHERE id = ${solicitationId}::uuid
+            AND solicitation_type = 'single'
+        `;
+      } catch (e) {
+        console.error('[admin/sources/paste-import] solicitation type update failed:', e);
+        // non-fatal, continue
+      }
     }
 
     // ── Log the import as a source_visit ──────────────────────────
-    await sql`
-      INSERT INTO source_visits (
-        profile_id, visited_by, action, notes,
-        topics_count, metadata
-      ) VALUES (
-        ${profileId}::uuid, ${userId}::uuid, 'import_topics',
-        ${'Parsed ' + inserted.length + ' topics from pasted ' + format + ' content'},
-        ${inserted.length},
-        ${JSON.stringify({ format, skippedCount: skipped.length, solicitationId })}::jsonb
-      )
-    `;
+    try {
+      await sql`
+        INSERT INTO source_visits (
+          profile_id, visited_by, action, notes,
+          topics_count, metadata
+        ) VALUES (
+          ${profileId}::uuid, ${userId}::uuid, 'import_topics',
+          ${'Parsed ' + inserted.length + ' topics from pasted ' + format + ' content'},
+          ${inserted.length},
+          ${JSON.stringify({ format, skippedCount: skipped.length, solicitationId })}::jsonb
+        )
+      `;
+    } catch (e) {
+      console.error('[admin/sources/paste-import] visit log insert failed:', e);
+      // non-fatal, continue
+    }
 
     // ── Update profile last-visited ───────────────────────────────
-    await sql`
-      UPDATE source_profiles
-      SET last_visited_at = now(),
-          last_visited_by = ${userId}::uuid,
-          updated_at = now()
-      WHERE id = ${profileId}::uuid
-    `;
+    try {
+      await sql`
+        UPDATE source_profiles
+        SET last_visited_at = now(),
+            last_visited_by = ${userId}::uuid,
+            updated_at = now()
+        WHERE id = ${profileId}::uuid
+      `;
+    } catch (e) {
+      console.error('[admin/sources/paste-import] profile update failed:', e);
+      // non-fatal, continue
+    }
 
-    // ── End event ─────────────────────────────────────────────────
-    await emitEventEnd(eventId, {
-      result: {
-        importedCount: inserted.length,
-        skippedCount: skipped.length,
-      },
-    });
+    // ── End event (non-fatal) ────────────────────────────────────
+    try {
+      await emitEventEnd(eventId, {
+        result: {
+          importedCount: inserted.length,
+          skippedCount: skipped.length,
+        },
+      });
+    } catch (e) {
+      console.error('[admin/sources/paste-import] event end failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({
       data: {

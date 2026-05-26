@@ -1,25 +1,25 @@
 """
 ================================================================================
-Workflow: OnProposalAdvancedToPinkTeam / OnProposalAdvancedToFinal
+Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal
 ================================================================================
 
 This module contains two workflow classes that handle proposal stage
 advancement. They share the same base trigger event
 (proposal:proposal.advanced:single) but are differentiated by the
-payload.toStage condition.
+payload.targetStage condition.
 
 ────────────────────────────────────────────────────────────────────────
-Sub-Workflow 1: OnProposalAdvancedToPinkTeam
+Sub-Workflow 1: OnProposalAdvancedToReview
 ────────────────────────────────────────────────────────────────────────
 
 TRIGGER:    proposal:proposal.advanced:single
-            Condition: payload.toStage == "pink_team"
+            Condition: payload.targetStage == "review"
 
-PURPOSE:    When a proposal advances to the pink team review stage, this
+PURPOSE:    When a proposal advances to the review stage, this
             workflow runs an AI compliance review (checking the proposal
             against the solicitation's compliance requirements), notifies
             the designated reviewers that the review is ready, and waits
-            for the human review to complete. Pink team is the first
+            for the human review to complete. Review is the first
             formal review gate in the proposal lifecycle — it catches
             compliance gaps before significant writing effort is invested.
 
@@ -37,7 +37,7 @@ STEPS:
 
     2. notify_reviewers (NOTIFY)
        Action: system.notify
-       Input: channel=email, template=pink_team_review_ready, proposal_id
+       Input: channel=email, template=review_ready, proposal_id
        Output: notified=True/False
        Retry: 0
        Timeout: 30 minutes
@@ -47,7 +47,7 @@ STEPS:
 
     3. wait_for_review (HITL_WAIT)
        Action: hitl_wait
-       Input: None (waiting for reviewer to advance proposal past pink_team)
+       Input: None (waiting for reviewer to advance proposal past review)
        Output: None (skipped in V1)
        Retry: 0
        Timeout: 4320 minutes (72 hours)
@@ -56,10 +56,10 @@ STEPS:
 
 HITL GATES:
     - Step 3 (wait_for_review): A designated reviewer must complete the
-      pink team review and advance the proposal to the next stage.
+      review and advance the proposal to the next stage.
       Timeout: 72h -> send review reminder email
       Resume event: proposal:proposal.advanced:single where
-                    payload.fromStage == "pink_team"
+                    payload.previousStage == "review"
 
 ERROR HANDLING:
     - AI compliance review failure: Reviewers still notified. They
@@ -79,7 +79,7 @@ Sub-Workflow 2: OnProposalAdvancedToFinal
 ────────────────────────────────────────────────────────────────────────
 
 TRIGGER:    proposal:proposal.advanced:single
-            Condition: payload.toStage == "final"
+            Condition: payload.targetStage == "final"
 
 PURPOSE:    When a proposal advances to the final stage, this workflow
             generates an export preview document (ZIP of all sections as
@@ -152,14 +152,14 @@ CHANGE LOG:
 from workflows.base import Workflow, Step, StepType, EventTrigger
 
 
-class OnProposalAdvancedToPinkTeam(Workflow):
-    description = "Run AI compliance review when proposal enters pink team"
+class OnProposalAdvancedToReview(Workflow):
+    description = "Run AI compliance review when proposal enters review"
 
     trigger = EventTrigger(
         namespace="proposal",
         type="proposal.advanced",
         phase="single",
-        condition=lambda p: p.get("toStage") == "pink_team",
+        condition=lambda p: p.get("targetStage") == "review",
     )
 
     steps = [
@@ -177,7 +177,7 @@ class OnProposalAdvancedToPinkTeam(Workflow):
             depends_on="ai_compliance_review",
             input_map={
                 "channel": '"email"',
-                "template": '"pink_team_review_ready"',
+                "template": '"review_ready"',
                 "proposal_id": "payload.proposalId",
             },
         ),
@@ -190,7 +190,7 @@ class OnProposalAdvancedToPinkTeam(Workflow):
                 namespace="proposal",
                 type="proposal.advanced",
                 phase="single",
-                condition=lambda p: p.get("fromStage") == "pink_team",
+                condition=lambda p: p.get("previousStage") == "review",
             ),
             timeout_minutes=4320,
             on_timeout="send_review_reminder",
@@ -205,13 +205,13 @@ class OnProposalAdvancedToFinal(Workflow):
         namespace="proposal",
         type="proposal.advanced",
         phase="single",
-        condition=lambda p: p.get("toStage") == "final",
+        condition=lambda p: p.get("targetStage") == "final",
     )
 
     steps = [
         Step(
             name="generate_export_preview",
-            action="pipeline.export.generate_preview",
+            action="workflows.actions.generate_preview.generate_preview",
             input_map={"proposal_id": "payload.proposalId"},
             timeout_minutes=15,
         ),

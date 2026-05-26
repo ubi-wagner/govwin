@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ instanceId: string }>;
@@ -58,88 +59,117 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Fetch the failed instance ────────────────────────────────
-    const instances = await sql<{
-      id: string;
-      workflowName: string;
-      triggerEventId: string | null;
-      payload: Record<string, unknown> | null;
-      tenantId: string | null;
-      actorId: string | null;
-      actorEmail: string | null;
-      stepResults: Record<string, unknown> | null;
-      stepStatus: Record<string, string> | null;
-      retryCount: number;
-      maxRetries: number;
-      source: string;
-      status: string;
-    }[]>`
-      SELECT id, workflow_name, trigger_event_id, payload,
-             tenant_id, actor_id, actor_email,
-             step_results, step_status, retry_count, max_retries,
-             source, status
-      FROM process_instances
-      WHERE id = ${instanceId}::uuid
-        AND status IN ('failed', 'cancelled')
-    `;
+    // ── Fetch the failed instance + create recovery in a transaction ──
+    const result = await sql.begin(async (tx: any) => {
+      const instances = await tx<{
+        id: string;
+        workflowName: string;
+        triggerEventId: string | null;
+        payload: Record<string, unknown> | null;
+        tenantId: string | null;
+        actorId: string | null;
+        actorEmail: string | null;
+        stepResults: Record<string, unknown> | null;
+        stepStatus: Record<string, string> | null;
+        retryCount: number;
+        maxRetries: number;
+        source: string;
+        status: string;
+      }[]>`
+        SELECT id, workflow_name, trigger_event_id, payload,
+               tenant_id, actor_id, actor_email,
+               step_results, step_status, retry_count, max_retries,
+               source, status
+        FROM process_instances
+        WHERE id = ${instanceId}::uuid
+          AND status IN ('failed', 'cancelled')
+        FOR UPDATE
+      `;
 
-    if (instances.length === 0) {
-      return NextResponse.json(
-        { error: 'Instance not found or not retryable (must be failed or cancelled)', code: 'NOT_FOUND' },
-        { status: 404 },
-      );
+      if (instances.length === 0) {
+        return { error: 'NOT_FOUND' as const };
+      }
+
+      const original = instances[0];
+
+      // Check retry limit
+      if (original.retryCount >= original.maxRetries) {
+        return { error: 'MAX_RETRIES' as const, maxRetries: original.maxRetries };
+      }
+
+      // Create recovery instance
+      const newInstances = await tx<{ id: string }[]>`
+        INSERT INTO process_instances
+          (workflow_name, trigger_event_id, status, payload,
+           tenant_id, actor_id, actor_email, source,
+           step_results, step_status, retry_count, recovered_from,
+           deadline)
+        VALUES (
+          ${original.workflowName},
+          ${null},
+          'retrying',
+          ${JSON.stringify(original.payload ?? {})}::jsonb,
+          ${original.tenantId},
+          ${original.actorId},
+          ${original.actorEmail},
+          ${original.source},
+          ${JSON.stringify(original.stepResults ?? {})}::jsonb,
+          ${JSON.stringify(original.stepStatus ?? {})}::jsonb,
+          ${original.retryCount + 1},
+          ${instanceId}::uuid,
+          now() + interval '1 hour'
+        )
+        RETURNING id
+      `;
+
+      const newId = newInstances[0].id;
+
+      // Record transition audit
+      await tx`
+        INSERT INTO process_instance_transitions
+          (instance_id, from_status, to_status, actor, reason, metadata)
+        VALUES (
+          ${newId}::uuid,
+          NULL,
+          'retrying',
+          ${'admin:' + actorEmail},
+          ${'retry_from:' + instanceId},
+          '{}'::jsonb
+        )
+      `;
+
+      return { newId, workflowName: original.workflowName };
+    });
+
+    if ('error' in result) {
+      if (result.error === 'NOT_FOUND') {
+        return NextResponse.json(
+          { error: 'Instance not found or not retryable (must be failed or cancelled)', code: 'NOT_FOUND' },
+          { status: 404 },
+        );
+      }
+      if (result.error === 'MAX_RETRIES') {
+        return NextResponse.json(
+          { error: `Max retries (${result.maxRetries}) exceeded`, code: 'CONFLICT' },
+          { status: 409 },
+        );
+      }
     }
 
-    const original = instances[0];
+    const newId = (result as { newId: string }).newId;
+    const workflowName = (result as { workflowName?: string }).workflowName;
 
-    // Check retry limit
-    if (original.retryCount >= original.maxRetries) {
-      return NextResponse.json(
-        { error: `Max retries (${original.maxRetries}) exceeded`, code: 'CONFLICT' },
-        { status: 409 },
-      );
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'workflow.instance_retried',
+        actor: userActor(sessionUser.id as string, sessionUser.email),
+        tenantId: null,
+        payload: { instanceId, newInstanceId: newId, workflowName: workflowName ?? null },
+      });
+    } catch (e) {
+      console.error('[admin/workflows/retry] event emission failed:', e);
     }
-
-    // ── Create recovery instance ─────────────────────────────────
-    const newInstances = await sql<{ id: string }[]>`
-      INSERT INTO process_instances
-        (workflow_name, trigger_event_id, status, payload,
-         tenant_id, actor_id, actor_email, source,
-         step_results, step_status, retry_count, recovered_from,
-         deadline)
-      VALUES (
-        ${original.workflowName},
-        ${original.triggerEventId},
-        'retrying',
-        ${JSON.stringify(original.payload ?? {})}::jsonb,
-        ${original.tenantId},
-        ${original.actorId},
-        ${original.actorEmail},
-        ${original.source},
-        ${JSON.stringify(original.stepResults ?? {})}::jsonb,
-        ${JSON.stringify(original.stepStatus ?? {})}::jsonb,
-        ${original.retryCount + 1},
-        ${instanceId}::uuid,
-        now() + interval '1 hour'
-      )
-      RETURNING id
-    `;
-
-    const newId = newInstances[0].id;
-
-    // Record transition audit
-    await sql`
-      INSERT INTO process_instance_transitions
-        (instance_id, from_status, to_status, actor, reason, metadata)
-      VALUES (
-        ${newId}::uuid,
-        NULL,
-        'retrying',
-        ${'admin:' + actorEmail},
-        ${'retry_from:' + instanceId},
-        '{}'::jsonb
-      )
-    `;
 
     return NextResponse.json({
       data: { newInstanceId: newId },

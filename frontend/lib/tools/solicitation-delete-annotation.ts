@@ -34,12 +34,18 @@ export const solicitationDeleteAnnotationTool = defineTool<Input, Output>({
   async handler(input, ctx) {
     const { annotationId, solicitationId } = input;
 
-    const rows = await sql<{ id: string }[]>`
-      DELETE FROM solicitation_annotations
-      WHERE id = ${annotationId}::uuid
-        AND solicitation_id = ${solicitationId}::uuid
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        DELETE FROM solicitation_annotations
+        WHERE id = ${annotationId}::uuid
+          AND solicitation_id = ${solicitationId}::uuid
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[solicitation.delete_annotation] delete failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       throw new NotFoundError(

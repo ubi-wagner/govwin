@@ -46,12 +46,16 @@ CREATE TABLE IF NOT EXISTS process_instances (
 );
 
 -- Indexes for efficient querying
-CREATE INDEX idx_process_instances_status ON process_instances(status) WHERE status IN ('pending', 'running', 'paused', 'retrying');
-CREATE INDEX idx_process_instances_workflow ON process_instances(workflow_name, status);
-CREATE INDEX idx_process_instances_tenant ON process_instances(tenant_id) WHERE tenant_id IS NOT NULL;
-CREATE INDEX idx_process_instances_heartbeat ON process_instances(last_heartbeat_at) WHERE status = 'running';
-CREATE INDEX idx_process_instances_created ON process_instances(created_at DESC);
-CREATE INDEX idx_process_instances_trigger ON process_instances(trigger_event_id);
+CREATE INDEX IF NOT EXISTS idx_process_instances_status ON process_instances(status) WHERE status IN ('pending', 'running', 'paused', 'retrying');
+CREATE INDEX IF NOT EXISTS idx_process_instances_workflow ON process_instances(workflow_name, status);
+CREATE INDEX IF NOT EXISTS idx_process_instances_tenant ON process_instances(tenant_id) WHERE tenant_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_process_instances_heartbeat ON process_instances(last_heartbeat_at) WHERE status = 'running';
+CREATE INDEX IF NOT EXISTS idx_process_instances_created ON process_instances(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_process_instances_trigger ON process_instances(trigger_event_id);
+
+-- Prevent duplicate workflow instances for the same trigger event
+CREATE UNIQUE INDEX IF NOT EXISTS idx_process_instances_dedup
+    ON process_instances(workflow_name, trigger_event_id) WHERE trigger_event_id IS NOT NULL;
 
 -- Audit table for state transitions
 CREATE TABLE IF NOT EXISTS process_instance_transitions (
@@ -66,7 +70,7 @@ CREATE TABLE IF NOT EXISTS process_instance_transitions (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_pit_instance ON process_instance_transitions(instance_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pit_instance ON process_instance_transitions(instance_id, created_at DESC);
 
 -- Updated_at trigger
 CREATE OR REPLACE FUNCTION update_process_instance_timestamp()
@@ -77,6 +81,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_process_instance_updated ON process_instances;
 CREATE TRIGGER trg_process_instance_updated
     BEFORE UPDATE ON process_instances
     FOR EACH ROW EXECUTE FUNCTION update_process_instance_timestamp();

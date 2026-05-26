@@ -52,20 +52,32 @@ export const solicitationReleaseTool = defineTool<Input, Output>({
     const actorId = ctx.actor.id;
 
     // Atomic transition — only the claimer may release their claim.
-    const rows = await sql<{ id: string }[]>`
-      UPDATE curated_solicitations
-      SET status = 'released_for_analysis',
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'claimed'
-        AND claimed_by = ${actorId}::uuid
-      RETURNING id
-    `;
+    let rows: { id: string }[];
+    try {
+      rows = await sql<{ id: string }[]>`
+        UPDATE curated_solicitations
+        SET status = 'released_for_analysis',
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'claimed'
+          AND claimed_by = ${actorId}::uuid
+        RETURNING id
+      `;
+    } catch (err) {
+      console.error('[solicitation.release] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
-      const existing = await sql<{ status: string; claimedBy: string | null }[]>`
-        SELECT status, claimed_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string; claimedBy: string | null }[];
+      try {
+        existing = await sql<{ status: string; claimedBy: string | null }[]>`
+          SELECT status, claimed_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.release] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }
@@ -81,27 +93,33 @@ export const solicitationReleaseTool = defineTool<Input, Output>({
     }
 
     // Triage audit row
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'release',
-         'claimed', 'released_for_analysis')
-    `;
+    let shredJobId: string;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'release',
+           'claimed', 'released_for_analysis')
+      `;
 
-    // Insert shred job. The Phase 1 §C dispatcher sees kind='shred_solicitation'
-    // and routes to shredder.runner.shred_solicitation. priority=3 so
-    // shred jobs sit between high-priority manual ingests (1) and
-    // scheduled cron ingests (5 default).
-    const jobRows = await sql<{ id: string }[]>`
-      INSERT INTO pipeline_jobs
-        (source, kind, status, priority, metadata)
-      VALUES
-        ('system', 'shred_solicitation', 'pending', 3,
-         ${JSON.stringify({ solicitation_id: solicitationId })}::jsonb)
-      RETURNING id
-    `;
-    const shredJobId = jobRows[0].id;
+      // Insert shred job. The Phase 1 §C dispatcher sees kind='shred_solicitation'
+      // and routes to shredder.runner.shred_solicitation. priority=3 so
+      // shred jobs sit between high-priority manual ingests (1) and
+      // scheduled cron ingests (5 default).
+      const jobRows = await sql<{ id: string }[]>`
+        INSERT INTO pipeline_jobs
+          (source, kind, status, priority, metadata)
+        VALUES
+          ('system', 'shred_solicitation', 'pending', 3,
+           ${JSON.stringify({ solicitation_id: solicitationId })}::jsonb)
+        RETURNING id
+      `;
+      shredJobId = jobRows[0].id;
+    } catch (err) {
+      console.error('[solicitation.release] audit/job insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

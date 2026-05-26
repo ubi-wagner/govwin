@@ -13,6 +13,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 const BodySchema = z.object({
   title: z.string().min(1).max(500).optional(),
@@ -37,6 +38,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   }
 
   const { id } = await ctx.params;
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: 'Invalid topic ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+  }
   const body = await request.json();
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {

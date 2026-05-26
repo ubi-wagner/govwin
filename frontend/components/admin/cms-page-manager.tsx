@@ -488,6 +488,13 @@ function BlockCard({ block, onRefresh }: BlockCardProps) {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          <Link
+            href={`/admin/content/${block.slug}/preview`}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+            title="Preview"
+          >
+            Preview
+          </Link>
           <button
             onClick={() => setExpanded(!expanded)}
             className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
@@ -618,12 +625,21 @@ function ArticleCard({ block }: { block: CmsBlock }) {
             )}
           </div>
         </div>
-        <Link
-          href={`/admin/content/${block.slug}`}
-          className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 shrink-0"
-        >
-          Edit
-        </Link>
+        <div className="flex items-center gap-1 shrink-0">
+          <Link
+            href={`/admin/content/${block.slug}/preview`}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+            title="Preview"
+          >
+            Preview
+          </Link>
+          <Link
+            href={`/admin/content/${block.slug}`}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          >
+            Edit
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface TenantInfoProps {
   name: string;
@@ -17,6 +17,7 @@ interface ProfileProps {
   researchAreas: string[];
   targetAgencies: string[];
   setAsideTypes: string[];
+  agencyPriorities?: string[];
 }
 
 interface ProfileEditorProps {
@@ -43,7 +44,25 @@ export function ProfileEditor({ tenantSlug, canEdit, tenantInfo, profile }: Prof
     targetAgencies: (profile?.targetAgencies ?? []).join(', '),
     setAsideTypes: (profile?.setAsideTypes ?? []).join(', '),
     researchAreas: (profile?.researchAreas ?? []).join(', '),
+    agencyPriorities: (profile?.agencyPriorities ?? []).join(', '),
   });
+
+  useEffect(() => {
+    setFormData({
+      name: tenantInfo?.name ?? '',
+      legalName: tenantInfo?.legalName ?? '',
+      website: tenantInfo?.website ?? '',
+      billingEmail: tenantInfo?.billingEmail ?? '',
+      companySummary: profile?.companySummary ?? '',
+      technologyFocus: profile?.technologyFocus ?? '',
+      naicsCodes: (profile?.naicsCodes ?? []).join(', '),
+      keywords: (profile?.keywords ?? []).join(', '),
+      targetAgencies: (profile?.targetAgencies ?? []).join(', '),
+      setAsideTypes: (profile?.setAsideTypes ?? []).join(', '),
+      researchAreas: (profile?.researchAreas ?? []).join(', '),
+      agencyPriorities: (profile?.agencyPriorities ?? []).join(', '),
+    });
+  }, [tenantInfo, profile]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -64,6 +83,7 @@ export function ProfileEditor({ tenantSlug, canEdit, tenantInfo, profile }: Prof
           targetAgencies: formData.targetAgencies.split(',').map(s => s.trim()).filter(Boolean),
           setAsideTypes: formData.setAsideTypes.split(',').map(s => s.trim()).filter(Boolean),
           researchAreas: formData.researchAreas.split(',').map(s => s.trim()).filter(Boolean),
+          agencyPriorities: formData.agencyPriorities.split(',').map(s => s.trim()).filter(Boolean),
         }),
       });
 
@@ -188,6 +208,18 @@ export function ProfileEditor({ tenantSlug, canEdit, tenantInfo, profile }: Prof
                 : <span className="text-gray-400 text-xs">None set</span>}
             </dd>
           </div>
+          <div>
+            <dt className="text-gray-500">Agency Priorities</dt>
+            <dd className="mt-1 flex flex-wrap gap-1">
+              {(profile?.agencyPriorities ?? []).length > 0
+                ? profile!.agencyPriorities!.map(a => (
+                    <span key={a} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+                      {a}
+                    </span>
+                  ))
+                : <span className="text-gray-400 text-xs">None set</span>}
+            </dd>
+          </div>
           <div className="md:col-span-2">
             <dt className="text-gray-500">Research Areas</dt>
             <dd className="mt-1 flex flex-wrap gap-1">
@@ -260,6 +292,7 @@ export function ProfileEditor({ tenantSlug, canEdit, tenantInfo, profile }: Prof
         <Field label="Keywords (comma-separated)" value={formData.keywords} onChange={v => handleChange('keywords', v)} />
         <Field label="Target Agencies (comma-separated)" value={formData.targetAgencies} onChange={v => handleChange('targetAgencies', v)} />
         <Field label="Set-Aside Types (comma-separated)" value={formData.setAsideTypes} onChange={v => handleChange('setAsideTypes', v)} />
+        <Field label="Agency Priorities (comma-separated)" value={formData.agencyPriorities} onChange={v => handleChange('agencyPriorities', v)} />
         <div className="md:col-span-2">
           <Field label="Research Areas (comma-separated)" value={formData.researchAreas} onChange={v => handleChange('researchAreas', v)} />
         </div>

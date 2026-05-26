@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -67,6 +68,12 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Tenant verification ─────────────────────────────────────────
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json(
@@ -106,16 +113,26 @@ export async function POST(request: Request, ctx: RouteContext) {
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Verify proposal exists and belongs to tenant ────────────────
-    const [proposal] = await sql<Array<{
-      id: string;
-      stage: string;
-      isLocked: boolean;
-    }>>`
-      SELECT id, stage, is_locked
-      FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; stage: string; isLocked: boolean; version: number } | undefined;
+    try {
+      [proposal] = await sql<Array<{
+        id: string;
+        stage: string;
+        isLocked: boolean;
+        version: number;
+      }>>`
+        SELECT id, stage, is_locked, version
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/outcome] proposal query failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -124,87 +141,110 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Record outcome on the proposal ──────────────────────────────
-    // The proposals table doesn't have an 'outcome' column, so we
-    // store it in the stage field (archive the proposal) and record
-    // in stage_history with detailed notes.
-    await sql`
-      UPDATE proposals
-      SET stage = 'archived',
-          updated_at = now()
-      WHERE id = ${proposalId}
-    `;
-
-    // Record in stage history with outcome details
-    await sql`
-      INSERT INTO proposal_stage_history
-        (proposal_id, from_stage, to_stage, changed_by, notes)
-      VALUES
-        (${proposalId}, ${proposal.stage}, 'archived', ${sessionUser.id},
-         ${`Outcome: ${outcome}${notes ? ' — ' + notes : ''}`})
-    `;
-
-    // ── Update library atoms based on outcome ───────────────────────
-    let atomsUpdated = 0;
-
-    if (outcome === 'awarded') {
-      // Elevate all library atoms harvested from this proposal
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'awarded',
-            outcome_score = 1.0,
-            confidence = 1.0,
-            tags = array_append(
-              array_remove(tags, 'winning_proposal'),
-              'winning_proposal'
-            )
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-      atomsUpdated = result.count;
-    } else if (outcome === 'rejected') {
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'rejected',
-            outcome_score = 0.3
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-      atomsUpdated = result.count;
-    } else if (outcome === 'withdrawn') {
-      const result = await sql`
-        UPDATE library_units
-        SET outcome = 'withdrawn',
-            outcome_score = 0.4
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-      atomsUpdated = result.count;
+    // ── Stage validation ───────────────────────────────────────────
+    if (proposal.stage === 'archived') {
+      return NextResponse.json(
+        { error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' },
+        { status: 409 },
+      );
     }
 
-    // Also record in library_atom_outcomes for audit trail
-    try {
+    if (!['submitted', 'final'].includes(proposal.stage)) {
+      return NextResponse.json(
+        { error: 'Outcome can only be recorded for submitted or final proposals', code: 'INVALID_STAGE' },
+        { status: 422 },
+      );
+    }
+
+    // ── Record outcome in a transaction ────────────────────────────
+    // Wrap proposal archive + library_units update in transaction
+    const atomsUpdated = await sql.begin(async (tx: any) => {
+      // The proposals table doesn't have an 'outcome' column, so we
+      // store it in the stage field (archive the proposal) and record
+      // in stage_history with detailed notes.
+      // OCC: only update if version matches what we read
+      const updateResult = await tx`
+        UPDATE proposals
+        SET stage = 'archived',
+            version = version + 1,
+            updated_at = now()
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}::uuid
+          AND version = ${proposal.version}
+      `;
+
+      if (updateResult.count === 0) {
+        throw new Error('CONFLICT');
+      }
+
+      // Record in stage history with outcome details
+      await tx`
+        INSERT INTO proposal_stage_history
+          (proposal_id, from_stage, to_stage, changed_by, notes)
+        VALUES
+          (${proposalId}, ${proposal.stage}, 'archived', ${sessionUser.id},
+           ${`Outcome: ${outcome}${notes ? ' — ' + notes : ''}`})
+      `;
+
+      // ── Update library atoms based on outcome ───────────────────────
+      let updated = 0;
+
+      if (outcome === 'awarded') {
+        // Elevate all library atoms harvested from this proposal
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'awarded',
+              outcome_score = 1.0,
+              confidence = 1.0,
+              tags = array_append(
+                array_remove(tags, 'winning_proposal'),
+                'winning_proposal'
+              )
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      } else if (outcome === 'rejected') {
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'rejected',
+              outcome_score = 0.3
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      } else if (outcome === 'withdrawn') {
+        const result = await tx`
+          UPDATE library_units
+          SET outcome = 'withdrawn',
+              outcome_score = 0.4
+          WHERE original_proposal_id = ${proposalId}::uuid
+            AND tenant_id = ${tenantId}::uuid
+        `;
+        updated = result.count;
+      }
+
+      // Also record in library_atom_outcomes for audit trail
       // Map to the existing check constraint values
       const atomOutcomeValue = outcome === 'awarded' ? 'win' : outcome === 'rejected' ? 'loss' : 'pending';
 
       // Get all library unit IDs for this proposal
-      const units = await sql<Array<{ id: string }>>`
+      const units = await tx<Array<{ id: string }>>`
         SELECT id FROM library_units
         WHERE original_proposal_id = ${proposalId}::uuid
           AND tenant_id = ${tenantId}::uuid
       `;
 
       for (const unit of units) {
-        await sql`
+        await tx`
           INSERT INTO library_atom_outcomes (unit_id, proposal_id, outcome)
           VALUES (${unit.id}, ${proposalId}::uuid, ${atomOutcomeValue})
           ON CONFLICT DO NOTHING
         `;
       }
-    } catch (err) {
-      // Audit trail failure is non-fatal
-      console.error('[outcome] library_atom_outcomes insert failed (non-fatal)', err);
-    }
+
+      return updated;
+    });
 
     // ── Emit event ──────────────────────────────────────────────────
     await emitEventSingle({
@@ -223,6 +263,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'outcome_recorded',
+                ${JSON.stringify({ outcome, notes: notes ?? undefined, atoms_updated: atomsUpdated })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/outcome] activity log failed', logErr);
+    }
+
     return NextResponse.json({
       data: {
         proposalId,
@@ -232,6 +287,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
   } catch (e) {
+    if (e instanceof Error && e.message === 'CONFLICT') {
+      return NextResponse.json(
+        { error: 'Proposal was modified by another user', code: 'CONFLICT' },
+        { status: 409 },
+      );
+    }
     console.error('[api/portal/proposals/outcome] POST error:', e);
     return NextResponse.json(
       { error: 'Internal server error', code: 'DB_ERROR' },

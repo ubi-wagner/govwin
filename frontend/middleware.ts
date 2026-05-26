@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
 import { authConfig } from '@/auth.config';
 import { hasRoleAtLeast, isRole, requiredRoleForPath, type Role } from '@/lib/rbac';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 /**
  * Edge middleware — runs before every request that matches the
@@ -56,11 +57,15 @@ const PUBLIC_PATHS = [
   '/legal',
   '/api/health',
   '/api/waitlist',
-  '/api/applications',
   '/api/content',
   '/api/analytics',
   '/api/stripe/webhook',
   '/invite',
+];
+
+/** Paths that are public but must match exactly (no startsWith prefix matching). */
+const PUBLIC_EXACT_PATHS = [
+  '/api/applications',
 ];
 
 // Static asset extensions that bypass auth. Exhaustive on purpose:
@@ -81,7 +86,27 @@ function isPublicPath(pathname: string): boolean {
   ) {
     return true;
   }
+  if (PUBLIC_EXACT_PATHS.includes(pathname)) {
+    return true;
+  }
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
+
+// Rate limiting for public POST endpoints (runs before auth check so
+// unauthenticated abuse is caught).
+const RATE_LIMITED_PATHS: Record<string, { limit: number; windowMs: number }> = {
+  '/api/applications': { limit: 5, windowMs: 15 * 60 * 1000 },
+  '/api/auth/forgot-password': { limit: 5, windowMs: 15 * 60 * 1000 },
+  '/api/auth/reset-password': { limit: 5, windowMs: 15 * 60 * 1000 },
+  '/api/waitlist': { limit: 5, windowMs: 15 * 60 * 1000 },
+};
+
+function getClientIp(request: Request): string {
+  return (
+    request.headers.get('x-real-ip') ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'unknown'
+  );
 }
 
 // Create an edge-compatible NextAuth instance from the shared config.
@@ -93,6 +118,48 @@ const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+
+  // Rate limiting for public endpoints (all methods)
+  const rateLimitConfig = RATE_LIMITED_PATHS[pathname];
+  if (rateLimitConfig) {
+    const ip = getClientIp(req);
+    const key = `${ip}:${pathname}`;
+    const result = checkRateLimit(key, rateLimitConfig.limit, rateLimitConfig.windowMs);
+    if (!result.allowed) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Limit': String(rateLimitConfig.limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil(result.resetAt / 1000)),
+          },
+        },
+      );
+    }
+  }
+
+  // Auth login rate limiting (all methods, slightly higher limit)
+  if (pathname.startsWith('/api/auth/') && !RATE_LIMITED_PATHS[pathname]) {
+    const ip = getClientIp(req);
+    const key = `${ip}:/api/auth`;
+    const result = checkRateLimit(key, 20, 15 * 60 * 1000);
+    if (!result.allowed) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)),
+          },
+        },
+      );
+    }
+  }
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();

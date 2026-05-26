@@ -254,7 +254,9 @@ export const sourceScoutTool = defineTool<Input, Output>({
     const warnings: string[] = [];
 
     // ── 1. Load source profile ──────────────────────────────────────
-    const profiles = await sql<
+    let profiles;
+    try {
+      profiles = await sql<
       {
         id: string;
         name: string;
@@ -267,6 +269,10 @@ export const sourceScoutTool = defineTool<Input, Output>({
       FROM source_profiles
       WHERE id = ${sourceId}::uuid
     `;
+    } catch (err) {
+      console.error('[finder.scout_source] profile query failed:', err);
+      throw err;
+    }
 
     if (profiles.length === 0) {
       throw new NotFoundError(`source profile not found: ${sourceId}`);
@@ -278,7 +284,9 @@ export const sourceScoutTool = defineTool<Input, Output>({
     }
 
     // ── 2. Load active regions ──────────────────────────────────────
-    const regions = await sql<
+    let regions;
+    try {
+      regions = await sql<
       {
         id: string;
         name: string;
@@ -294,6 +302,10 @@ export const sourceScoutTool = defineTool<Input, Output>({
         AND is_active = true
       ORDER BY created_at
     `;
+    } catch (err) {
+      console.error('[finder.scout_source] regions query failed:', err);
+      throw err;
+    }
 
     if (regions.length === 0) {
       warnings.push(
@@ -347,28 +359,40 @@ export const sourceScoutTool = defineTool<Input, Output>({
       const hash = contentHash(regionText);
 
       // Check last snapshot for this region
-      const lastSnapshots = await sql<
-        { id: string; contentHash: string; contentText: string | null }[]
-      >`
-        SELECT id, content_hash, content_text
-        FROM source_snapshots
-        WHERE profile_id = ${sourceId}::uuid
-          AND (region_id = ${region.id}::uuid OR (region_id IS NULL AND ${region.id}::uuid IS NULL))
-        ORDER BY captured_at DESC
-        LIMIT 1
-      `;
+      let lastSnapshots;
+      let newSnapshots;
+      try {
+        lastSnapshots = await sql<
+          { id: string; contentHash: string; contentText: string | null }[]
+        >`
+          SELECT id, content_hash, content_text
+          FROM source_snapshots
+          WHERE profile_id = ${sourceId}::uuid
+            AND (region_id = ${region.id}::uuid OR (region_id IS NULL AND ${region.id}::uuid IS NULL))
+          ORDER BY captured_at DESC
+          LIMIT 1
+        `;
+      } catch (err) {
+        console.error('[finder.scout_source] snapshot lookup failed:', err);
+        throw err;
+      }
 
       const lastSnapshot = lastSnapshots[0] ?? null;
       const hashChanged = !lastSnapshot || lastSnapshot.contentHash !== hash;
 
       // Always create a new snapshot
-      const newSnapshots = await sql<{ id: string }[]>`
-        INSERT INTO source_snapshots
-          (profile_id, region_id, content_hash, content_text)
-        VALUES
-          (${sourceId}::uuid, ${region.id}::uuid, ${hash}, ${regionText.slice(0, 50000)})
-        RETURNING id
-      `;
+      try {
+        newSnapshots = await sql<{ id: string }[]>`
+          INSERT INTO source_snapshots
+            (profile_id, region_id, content_hash, content_text)
+          VALUES
+            (${sourceId}::uuid, ${region.id}::uuid, ${hash}, ${regionText.slice(0, 50000)})
+          RETURNING id
+        `;
+      } catch (err) {
+        console.error('[finder.scout_source] snapshot insert failed:', err);
+        throw err;
+      }
       snapshotsCreated++;
       const newSnapshotId = newSnapshots[0].id;
 
@@ -401,18 +425,23 @@ export const sourceScoutTool = defineTool<Input, Output>({
       const extractedOpps = analysis?.extractedOpportunities ?? [];
 
       // Create diff record
-      await sql`
-        INSERT INTO source_diffs
-          (profile_id, region_id, prev_snapshot_id, next_snapshot_id,
-           is_meaningful, summary, extracted_opportunities, severity,
-           claude_model, claude_tokens_used)
-        VALUES
-          (${sourceId}::uuid, ${region.id}::uuid,
-           ${lastSnapshot?.id ?? null}::uuid, ${newSnapshotId}::uuid,
-           ${isMeaningful}, ${summary},
-           ${JSON.stringify(extractedOpps)}::jsonb, ${severity},
-           ${analysis?.model ?? null}, ${analysis?.tokensUsed ?? null})
-      `;
+      try {
+        await sql`
+          INSERT INTO source_diffs
+            (profile_id, region_id, prev_snapshot_id, next_snapshot_id,
+             is_meaningful, summary, extracted_opportunities, severity,
+             claude_model, claude_tokens_used)
+          VALUES
+            (${sourceId}::uuid, ${region.id}::uuid,
+             ${lastSnapshot?.id ?? null}::uuid, ${newSnapshotId}::uuid,
+             ${isMeaningful}, ${summary},
+             ${JSON.stringify(extractedOpps)}::jsonb, ${severity},
+             ${analysis?.model ?? null}, ${analysis?.tokensUsed ?? null})
+        `;
+      } catch (err) {
+        console.error('[finder.scout_source] diff insert failed:', err);
+        throw err;
+      }
 
       diffsFound++;
       if (isMeaningful) meaningfulChanges++;
@@ -428,11 +457,16 @@ export const sourceScoutTool = defineTool<Input, Output>({
     }
 
     // ── 5. Update source profile last_crawl_at ──────────────────────
-    await sql`
-      UPDATE source_profiles
-      SET last_crawl_at = now(), updated_at = now()
-      WHERE id = ${sourceId}::uuid
-    `;
+    try {
+      await sql`
+        UPDATE source_profiles
+        SET last_crawl_at = now(), updated_at = now()
+        WHERE id = ${sourceId}::uuid
+      `;
+    } catch (err) {
+      console.error('[finder.scout_source] profile update failed:', err);
+      throw err;
+    }
 
     // ── 6. Emit scout event ─────────────────────────────────────────
     await emitEventSingle({

@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import logging
 
-from pipeline.src.events import emit_event
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.lifecycle.decay")
 
@@ -87,18 +87,18 @@ class MemoryDecay:
             result = await conn.execute(
                 """
                 UPDATE episodic_memories
-                SET decay_factor = GREATEST(
+                SET decay_factor = LEAST(1.0, GREATEST(
                     0.01,
-                    decay_factor * (
+                    decay_factor * LEAST(1.0,
                         0.995
-                        * (1.0 + 0.1 * LN(GREATEST(access_count, 1)))
+                        * (1.0 + 0.02 * LN(GREATEST(access_count, 1)))
                         * CASE
                             WHEN importance > 0.8 THEN 0.999
                             WHEN importance < 0.3 THEN 0.98
                             ELSE 1.0
                           END
                     )
-                )
+                ))
                 WHERE is_archived = false
                   AND last_accessed < now() - interval '7 days'
                 """

@@ -262,17 +262,22 @@ export async function PUT(request: Request, ctx: RouteContext) {
       `;
     }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'compliance.topic_override_saved',
-      actor: { type: 'user', id: authResult.user.id ?? 'unknown' },
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        solicitationId: solId,
-        topicId,
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'compliance.topic_override_saved',
+        actor: { type: 'user', id: authResult.user.id ?? 'unknown' },
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          solicitationId: solId,
+          topicId,
+        },
+      });
+    } catch (e) {
+      console.error('[topic-compliance] PUT event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { topicId, saved: true } });
   } catch (err) {
@@ -320,17 +325,22 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         WHERE solicitation_id = ${solId}::uuid AND topic_id = ${topicId}::uuid`;
     }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'compliance.topic_override_cleared',
-      actor: { type: 'user', id: authResult.user.id ?? 'unknown' },
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        solicitationId: solId,
-        topicId,
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'compliance.topic_override_cleared',
+        actor: { type: 'user', id: authResult.user.id ?? 'unknown' },
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          solicitationId: solId,
+          topicId,
+        },
+      });
+    } catch (e) {
+      console.error('[topic-compliance] DELETE event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { topicId, cleared: true } });
   } catch (err) {

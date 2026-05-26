@@ -57,6 +57,20 @@ proposal_sections
   id, proposal_id, section_number, title, content (TEXT), page_allocation,
   status, assigned_to, requirement_ids, ai_confidence, version,
   created_at, updated_at
+  + completed_stage, completed_at, accepted_by, accepted_at (046)
+
+stage_completion_snapshots (046)
+  id, proposal_id, stage, completed_by, completed_at,
+  sections_snapshot (JSONB), total_sections, sections_complete,
+  sections_approved, notes, created_at
+
+proposal_supporting_docs (047)
+  id, proposal_id, tenant_id, requirement_label, requirement_source,
+  category, is_required, storage_key, original_filename, file_size,
+  content_type, status, uploaded_by, uploaded_at, reviewed_by,
+  reviewed_at, notes, library_unit_id, created_at, updated_at
+  CHECK category IN ('supporting_document', 'proposal_input', 'other')
+  CHECK status IN ('missing', 'uploaded', 'reviewed', 'approved', 'waived')
 
 proposal_comments
   id, proposal_id, section_id, user_id, content, resolved, created_at
@@ -149,8 +163,8 @@ source_diffs
 
 ```
 compliance_presets
-  id, name, description, agency, program_type, variables (JSONB),
-  created_by, created_at, updated_at
+  id, name, phase_type, agency, program_type, compliance_data (JSONB),
+  volumes_data (JSONB), is_system, created_by, created_at
   GOTCHA: solicitation_compliance and solicitation_volumes both got
           + topic_id (027) for topic-level compliance
 ```

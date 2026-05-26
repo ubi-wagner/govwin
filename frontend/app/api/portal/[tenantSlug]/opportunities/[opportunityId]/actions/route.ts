@@ -94,31 +94,85 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement opportunity actions
-    //
-    // 1. Verify opportunity exists in tenant_pipeline_items:
-    //    SELECT id FROM tenant_pipeline_items
-    //    WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
-    //
-    // 2. Execute action:
-    //    pin/unpin:     UPDATE tenant_pipeline_items SET is_pinned = true/false
-    //    thumb_up/down: UPDATE tenant_pipeline_items SET thumb_direction = 'up'/'down'
-    //    pursue:        INSERT INTO proposals (tenant_id, opportunity_id, title, stage)
-    //                   VALUES (..., 'draft') — or redirect to purchase flow
-    //
-    // 3. Emit capture event:
-    //    await emitEventSingle({
-    //      namespace: 'capture',
-    //      type: `opportunity.${action}`,
-    //      actor: userActor(sessionUser.id, sessionUser.email),
-    //      tenantId,
-    //      payload: { opportunityId, action },
-    //    });
 
-    return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-03',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+    // 1. Verify opportunity exists in tenant_pipeline_items
+    let items: { id: string }[];
+    try {
+      items = await sql<{ id: string }[]>`
+        SELECT id FROM tenant_pipeline_items
+        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+      `;
+    } catch (dbErr) {
+      console.error('[portal/opportunities/actions] pipeline query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (items.length === 0) {
+      return NextResponse.json(
+        { error: 'Opportunity not found in pipeline', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    // 2. Execute action
+    try {
+      if (action === 'pin') {
+        await sql`
+          UPDATE tenant_pipeline_items
+          SET pursuit_status = 'monitoring', is_pinned = true
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+        `;
+      } else if (action === 'unpin') {
+        await sql`
+          UPDATE tenant_pipeline_items
+          SET is_pinned = false
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+        `;
+      } else if (action === 'thumb_up') {
+        await sql`
+          UPDATE tenant_pipeline_items
+          SET recommendation = 'positive'
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+        `;
+      } else if (action === 'thumb_down') {
+        await sql`
+          UPDATE tenant_pipeline_items
+          SET recommendation = 'negative'
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid
+        `;
+      } else if (action === 'pursue') {
+        return NextResponse.json({
+          data: {
+            message: 'To pursue this opportunity, use the proposal creation endpoint: POST /api/portal/{tenantSlug}/proposals/create',
+            opportunityId,
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.error('[portal/opportunities/actions] update failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // 3. Emit capture event
+    const actionToPastTense: Record<string, string> = {
+      pin: 'pinned',
+      unpin: 'unpinned',
+      thumb_up: 'thumbed_up',
+      thumb_down: 'thumbed_down',
+      pursue: 'pursued',
+    };
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: `opportunity.${actionToPastTense[action] ?? action}`,
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { opportunityId, action },
+      });
+    } catch (evtErr) {
+      console.error('[portal/opportunities/actions] event emission failed:', evtErr);
+    }
+
+    return NextResponse.json({ data: { opportunityId, action, success: true } });
   } catch (err) {
     console.error('[portal/opportunities/actions] error:', err);
     return NextResponse.json(

@@ -1,18 +1,43 @@
+import type { Metadata } from 'next';
 import { getContentBySlug, getPublishedContent } from '@/lib/cms';
+import { renderMarkdown } from '@/lib/markdown';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getContentBySlug(slug);
   if (!post) return { title: 'Not Found' };
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfppipeline.com';
   return {
-    title: `${post.title} — RFP Pipeline Blog`,
-    description: post.excerpt ?? post.body?.slice(0, 160),
+    title: `${post.title} | RFP Pipeline`,
+    description: post.excerpt || post.title,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt || post.title,
+      type: 'article',
+      url: `${baseUrl}/blog/${slug}`,
+      images: post.featuredImage ? [{ url: post.featuredImage }] : [],
+      publishedTime: post.publishedAt?.toISOString(),
+      authors: post.author ? [post.author] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt || post.title,
+    },
   };
 }
 
@@ -52,7 +77,7 @@ export default async function BlogPostPage({ params }: Props) {
 
       <div
         className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: post.body }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(post.body)) }}
       />
 
       {(post.tags ?? []).length > 0 && (

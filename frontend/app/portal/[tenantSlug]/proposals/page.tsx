@@ -4,19 +4,18 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string }>;
 }
 
 const STAGE_LABELS: Record<string, { label: string; color: string }> = {
-  outline:    { label: 'Outline',    color: 'bg-gray-100 text-gray-700' },
-  draft:      { label: 'Drafting',   color: 'bg-blue-100 text-blue-700' },
-  pink_team:  { label: 'Pink Team',  color: 'bg-pink-100 text-pink-700' },
-  red_team:   { label: 'Red Team',   color: 'bg-red-100 text-red-700' },
-  gold_team:  { label: 'Gold Team',  color: 'bg-yellow-100 text-yellow-800' },
-  final:      { label: 'Final',      color: 'bg-green-100 text-green-700' },
-  submitted:  { label: 'Submitted',  color: 'bg-emerald-100 text-emerald-700' },
-  archived:   { label: 'Archived',   color: 'bg-gray-200 text-gray-500' },
+  draft:      { label: 'Draft',      color: 'bg-gray-100 text-gray-700' },
+  review:     { label: 'Review',     color: 'bg-blue-100 text-blue-700' },
+  final:      { label: 'Final',      color: 'bg-purple-100 text-purple-700' },
+  submitted:  { label: 'Submitted',  color: 'bg-green-100 text-green-700' },
+  archived:   { label: 'Archived',   color: 'bg-amber-100 text-amber-700' },
 };
 
 export default async function ProposalsListPage({ params }: Props) {

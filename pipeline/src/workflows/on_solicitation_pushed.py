@@ -93,7 +93,7 @@ class OnSolicitationPushed(Workflow):
     steps = [
         Step(
             name="find_matching_tenants",
-            action="pipeline.scoring.match_tenants",
+            action="workflows.actions.score_tenants.match_tenants",
             input_map={
                 "solicitation_id": "payload.solicitationId",
                 "topic_count": "payload.topicCount",

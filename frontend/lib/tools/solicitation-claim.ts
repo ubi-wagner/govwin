@@ -44,23 +44,35 @@ export const solicitationClaimTool = defineTool<Input, Output>({
     const { solicitationId } = input;
     const actorId = ctx.actor.id;
 
-    const rows = await sql<{ id: string; claimedAt: Date }[]>`
-      UPDATE curated_solicitations
-      SET status = 'claimed',
-          claimed_by = ${actorId}::uuid,
-          claimed_at = now(),
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'new'
-        AND claimed_by IS NULL
-      RETURNING id, claimed_at
-    `;
+    let rows: { id: string; claimedAt: Date }[];
+    try {
+      rows = await sql<{ id: string; claimedAt: Date }[]>`
+        UPDATE curated_solicitations
+        SET status = 'claimed',
+            claimed_by = ${actorId}::uuid,
+            claimed_at = now(),
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'new'
+          AND claimed_by IS NULL
+        RETURNING id, claimed_at
+      `;
+    } catch (err) {
+      console.error('[solicitation.claim] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       // Disambiguate: NotFound vs already-claimed. Useful for UI feedback.
-      const existing = await sql<{ status: string; claimedBy: string | null }[]>`
-        SELECT status, claimed_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string; claimedBy: string | null }[];
+      try {
+        existing = await sql<{ status: string; claimedBy: string | null }[]>`
+          SELECT status, claimed_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.claim] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }
@@ -74,12 +86,17 @@ export const solicitationClaimTool = defineTool<Input, Output>({
       );
     }
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'claim', 'new', 'claimed')
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'claim', 'new', 'claimed')
+      `;
+    } catch (err) {
+      console.error('[solicitation.claim] triage_actions insert failed:', err);
+      throw err;
+    }
 
     await emitEventSingle({
       namespace: 'finder',

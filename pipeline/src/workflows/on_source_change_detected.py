@@ -112,7 +112,7 @@ class OnSourceChangeDetected(Workflow):
     steps = [
         Step(
             name="create_draft_solicitations",
-            action="finder.create_drafts_from_scout",
+            action="workflows.actions.create_drafts_from_scout.create_drafts_from_scout",
             step_type=StepType.ACTION,
             input_map={
                 "source_id": "payload.sourceId",

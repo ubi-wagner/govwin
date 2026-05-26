@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
 import SourceDetailClient from './source-detail-client';
 
+export const dynamic = 'force-dynamic';
+
 // ── Types for raw DB rows ───────────────────────────────────────────
 
 type SourceProfileRow = {

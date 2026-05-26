@@ -40,13 +40,18 @@ export const complianceListVariablesTool = defineTool<Input, Output>({
   tenantScoped: false,
   async handler(input, ctx) {
     const categoryFilter = input.category ?? null;
-    const rows = await sql<VariableRow[]>`
-      SELECT id, name, label, category, data_type, options, is_system
-      FROM compliance_variables
-      WHERE (${categoryFilter}::text IS NULL OR category = ${categoryFilter})
-      ORDER BY category, name
-    `;
-    ctx.log?.info?.({ msg: 'compliance.list_variables returned', count: rows.length });
-    return { variables: rows };
+    try {
+      const rows = await sql<VariableRow[]>`
+        SELECT id, name, label, category, data_type, options, is_system
+        FROM compliance_variables
+        WHERE (${categoryFilter}::text IS NULL OR category = ${categoryFilter})
+        ORDER BY category, name
+      `;
+      ctx.log?.info?.({ msg: 'compliance.list_variables returned', count: rows.length });
+      return { variables: rows };
+    } catch (err) {
+      console.error('[compliance.list_variables] query failed:', err);
+      throw err;
+    }
   },
 });

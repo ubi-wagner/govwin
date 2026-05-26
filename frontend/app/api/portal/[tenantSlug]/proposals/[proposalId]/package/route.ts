@@ -15,14 +15,40 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
+import { getSignedGetUrl } from '@/lib/storage/s3-client';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
 
+/**
+ * Package Export — Returns complete proposal data for download.
+ *
+ * Response shape:
+ * {
+ *   data: {
+ *     proposal: { title, stage, gateConfig, createdAt },
+ *     sections: [{ number, title, textContent, status, pageAllocation, completedStage }],
+ *     compliance: { variables: [...], summary: { total, verified } } | null,
+ *     supportingDocs: [{ label, category, filename, downloadUrl, status }],
+ *     manifest: { generatedAt, sectionCount, totalChars, supportingDocCount }
+ *   }
+ * }
+ *
+ * Increments proposals.download_count.
+ * Emits proposal:package.exported event.
+ * Logs proposal_exported activity.
+ */
 export async function POST(request: Request, ctx: RouteContext) {
   try {
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -71,52 +97,325 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Business logic ───────────────────────────────────────────
-    // TODO: Implement proposal package export
-    //
-    // 1. Verify proposal belongs to tenant and is locked:
-    //    SELECT id, title, is_locked, lock_count, stage
-    //    FROM proposals WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
-    //    Reject if not locked (same gate as single-section export)
-    //
-    // 2. Fetch all sections with content:
-    //    SELECT id, section_number, title, content
-    //    FROM proposal_sections WHERE proposal_id = ${proposalId}
-    //    ORDER BY section_number
-    //
-    // 3. For each section with canvas JSON content:
-    //    a. Parse canvas JSON
-    //    b. Determine export format from volume_required_items.volume_format
-    //       (default to docx)
-    //    c. Export using existing exporters:
-    //       - docx: exportToDocx(doc, vars)
-    //       - pptx: exportToPptx(doc, vars)
-    //       - xlsx: exportToXlsx(doc, vars)
-    //
-    // 4. Bundle into ZIP using archiver or JSZip:
-    //    const JSZip = (await import('jszip')).default;
-    //    const zip = new JSZip();
-    //    for (const section of sections) {
-    //      zip.file(`${section.number}_${section.title}.${format}`, buffer);
-    //    }
-    //    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-    //
-    // 5. Increment download_count on proposal
-    //
-    // 6. Emit proposal:package.exported event
-    //
-    // 7. Return ZIP as binary response:
-    //    return new NextResponse(new Uint8Array(zipBuffer), {
-    //      headers: {
-    //        'Content-Type': 'application/zip',
-    //        'Content-Disposition': `attachment; filename="${proposalTitle}.zip"`,
-    //      },
-    //    });
+    // ── 1. Verify proposal belongs to tenant ────────────────────
+    let proposal: {
+      id: string;
+      title: string;
+      stage: string;
+      isLocked: boolean;
+      gateConfig: unknown;
+      createdAt: string;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        title: string;
+        stage: string;
+        isLocked: boolean;
+        gateConfig: unknown;
+        createdAt: string;
+      }[]>`
+        SELECT id, title, stage, is_locked, gate_config, created_at
+        FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    if (!proposal) {
+      return NextResponse.json(
+        { error: 'Proposal not found', code: 'NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    // ── Lock check: reject if not locked and not in submitted/archived stage ──
+    if (!proposal.isLocked && proposal.stage !== 'submitted' && proposal.stage !== 'archived') {
+      return NextResponse.json(
+        { error: 'Proposal must be locked or in submitted/archived stage to export package', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    // ── 2. Fetch all sections ordered by section_number ──────
+    let sections: {
+      id: string;
+      sectionNumber: string;
+      title: string;
+      content: string | null;
+      status: string;
+      pageAllocation: number | null;
+      completedStage: string | null;
+    }[];
+    try {
+      sections = await sql<{
+        id: string;
+        sectionNumber: string;
+        title: string;
+        content: string | null;
+        status: string;
+        pageAllocation: number | null;
+        completedStage: string | null;
+      }[]>`
+        SELECT id, section_number, title, content, status, page_allocation, completed_stage
+        FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY section_number ASC
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] sections query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // ── 3. Fetch compliance data via solicitation_id ─────────
+    let complianceRows: {
+      id: string;
+      pageLimitTechnical: number | null;
+      pageLimitCost: number | null;
+      fontFamily: string | null;
+      fontSize: string | null;
+      margins: string | null;
+      lineSpacing: string | null;
+      headerRequired: boolean;
+      headerFormat: string | null;
+      footerRequired: boolean;
+      footerFormat: string | null;
+      submissionFormat: string | null;
+      requiredSections: unknown;
+      requiredDocuments: unknown;
+      evaluationCriteria: unknown;
+      customVariables: unknown;
+      verifiedBy: string | null;
+      verifiedAt: string | null;
+    }[];
+    try {
+      complianceRows = await sql<typeof complianceRows>`
+        SELECT id, page_limit_technical, page_limit_cost,
+               font_family, font_size, margins, line_spacing,
+               header_required, header_format, footer_required, footer_format,
+               submission_format, required_sections, required_documents,
+               evaluation_criteria, custom_variables, verified_by, verified_at
+        FROM solicitation_compliance
+        WHERE solicitation_id = (
+          SELECT solicitation_id FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
+        )
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] compliance query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // ── 4. Extract readable text from each section's JSON content
+    const sectionData = sections.map((s) => {
+      let textContent = '';
+      if (s.content) {
+        try {
+          const parsed = JSON.parse(s.content);
+          const nodes = parsed.nodes || parsed;
+          if (Array.isArray(nodes)) {
+            const textParts: string[] = [];
+            for (const node of nodes) {
+              if (!node.content) continue;
+              switch (node.type) {
+                case 'heading':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'text_block':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'bulleted_list':
+                case 'numbered_list':
+                  if (Array.isArray(node.content.items)) {
+                    for (const item of node.content.items) {
+                      textParts.push(item.text || '');
+                    }
+                  }
+                  break;
+                case 'table':
+                  if (Array.isArray(node.content.rows)) {
+                    for (const row of node.content.rows) {
+                      if (Array.isArray(row)) {
+                        for (const cell of row) {
+                          if (typeof cell === 'string') textParts.push(cell);
+                          else if (cell?.text) textParts.push(cell.text);
+                          else if (cell?.content) textParts.push(String(cell.content));
+                        }
+                      }
+                    }
+                  }
+                  break;
+                case 'caption':
+                case 'footnote':
+                  textParts.push(node.content.text || '');
+                  break;
+                case 'url':
+                  textParts.push(node.content.display_text || node.content.url || '');
+                  break;
+                case 'page_break':
+                case 'spacer':
+                case 'image':
+                case 'toc':
+                  break;
+                default:
+                  if (typeof node.content === 'string') {
+                    textParts.push(node.content);
+                  } else if (node.content.text) {
+                    textParts.push(node.content.text);
+                  }
+              }
+            }
+            textContent = textParts.filter(Boolean).join('\n\n');
+          }
+        } catch {
+          // Content is plain text, not JSON
+          textContent = s.content;
+        }
+      }
+      return {
+        number: s.sectionNumber,
+        title: s.title,
+        text_content: textContent,
+        status: s.status,
+        page_allocation: s.pageAllocation,
+        completed_stage: s.completedStage,
+      };
+    });
+
+    // ── 5. Build compliance summary ──────────────────────────
+    const complianceData = complianceRows[0] ?? null;
+    const complianceVariables = complianceData
+      ? {
+          page_limit_technical: complianceData.pageLimitTechnical,
+          page_limit_cost: complianceData.pageLimitCost,
+          font_family: complianceData.fontFamily,
+          font_size: complianceData.fontSize,
+          margins: complianceData.margins,
+          line_spacing: complianceData.lineSpacing,
+          header_required: complianceData.headerRequired,
+          header_format: complianceData.headerFormat,
+          footer_required: complianceData.footerRequired,
+          footer_format: complianceData.footerFormat,
+          submission_format: complianceData.submissionFormat,
+          required_sections: complianceData.requiredSections,
+          required_documents: complianceData.requiredDocuments,
+          evaluation_criteria: complianceData.evaluationCriteria,
+          custom_variables: complianceData.customVariables,
+          verified_by: complianceData.verifiedBy,
+          verified_at: complianceData.verifiedAt,
+        }
+      : null;
+
+    const verifiedCount = complianceData?.verifiedAt ? 1 : 0;
+
+    // ── 6. Fetch supporting docs with signed URLs ────────────
+    let supportingDocsData: {
+      id: string;
+      requirementLabel: string;
+      category: string;
+      isRequired: boolean;
+      status: string;
+      storageKey: string | null;
+      originalFilename: string | null;
+      fileSize: number | null;
+      contentType: string | null;
+    }[] = [];
+    try {
+      supportingDocsData = await sql<typeof supportingDocsData>`
+        SELECT id, requirement_label, category, is_required, status,
+               storage_key, original_filename, file_size, content_type
+        FROM proposal_supporting_docs
+        WHERE proposal_id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
+        AND storage_key IS NOT NULL
+        ORDER BY category, requirement_label
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/package] supporting docs query failed (non-fatal):', e);
+    }
+
+    // Generate signed URLs for each uploaded doc
+    const supportingDocsWithUrls = await Promise.all(supportingDocsData.map(async (doc) => ({
+      id: doc.id,
+      requirementLabel: doc.requirementLabel,
+      category: doc.category,
+      isRequired: doc.isRequired,
+      status: doc.status,
+      originalFilename: doc.originalFilename,
+      fileSize: doc.fileSize,
+      contentType: doc.contentType,
+      downloadUrl: doc.storageKey ? await getSignedGetUrl(doc.storageKey).catch(() => null) : null,
+    })));
+
+    // ── 8. Increment download_count ──────────────────────────
+    try {
+      await sql`
+        UPDATE proposals
+        SET download_count = COALESCE(download_count, 0) + 1
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid
+`;
+    } catch (e) {
+      console.error('[portal/proposals/package] download_count update failed:', e);
+    }
+
+    // ── 9. Emit event ────────────────────────────────────────
+    await emitEventSingle({
+      namespace: 'proposal',
+      type: 'package.exported',
+      actor: userActor(sessionUser.id, (session.user as { email?: string }).email),
+      tenantId,
+      payload: {
+        correlationId: crypto.randomUUID(),
+        proposalId,
+        sectionCount: sectionData.length,
+      },
+    });
+
+    // ── 10. Activity log ───────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_exported',
+                ${JSON.stringify({ section_count: sectionData.length })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[portal/proposals/package] activity log failed', logErr);
+    }
+
+    // ── 11. Build total chars for manifest ────────────────────
+    const totalChars = sectionData.reduce((sum, s) => sum + s.text_content.length, 0);
 
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-15',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        proposal: {
+          title: proposal.title,
+          stage: proposal.stage,
+          gate_config: proposal.gateConfig,
+          created_at: proposal.createdAt,
+        },
+        sections: sectionData,
+        compliance: {
+          variables: complianceVariables,
+          summary: {
+            total: complianceRows.length,
+            verified: verifiedCount,
+            unverified: complianceRows.length - verifiedCount,
+          },
+        },
+        supportingDocs: supportingDocsWithUrls,
+        manifest: {
+          generated_at: new Date().toISOString(),
+          section_count: sectionData.length,
+          supporting_doc_count: supportingDocsWithUrls.length,
+          total_chars: totalChars,
+        },
+      },
+    });
   } catch (err) {
     console.error('[portal/proposals/package] error:', err);
     return NextResponse.json(

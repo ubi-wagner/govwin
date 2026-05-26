@@ -33,9 +33,16 @@ export async function POST(request: Request, ctx: RouteContext) {
     const { proposalId, sectionId } = await ctx.params;
 
     // Download gate: check lock status
-    const [proposal] = await sql<{ lockCount: number; isLocked: boolean }[]>`
-      SELECT lock_count, is_locked FROM proposals WHERE id = ${proposalId} LIMIT 1
-    `;
+    let proposal: { lockCount: number; isLocked: boolean } | undefined;
+    try {
+      const rows = await sql<{ lockCount: number; isLocked: boolean }[]>`
+        SELECT lock_count, is_locked FROM proposals WHERE id = ${proposalId} LIMIT 1
+      `;
+      proposal = rows[0];
+    } catch (e) {
+      console.error('[admin/export] lock status query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (proposal && !(proposal.lockCount >= 1 && proposal.isLocked)) {
       return NextResponse.json(
         { error: 'Downloads available after final review and lock', code: 'FORBIDDEN' },
@@ -43,7 +50,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
     if (proposal) {
-      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+      try {
+        await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+      } catch (e) {
+        console.error('[admin/export] download count update failed:', e);
+        // non-fatal, continue
+      }
     }
 
     const body = await request.json();
@@ -79,12 +91,17 @@ export async function POST(request: Request, ctx: RouteContext) {
       buffer = await exportToDocx(doc, vars);
     }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'section.exported',
-      actor: { type: 'user', id: sessionUser.id ?? 'unknown', email: sessionUser.email ?? undefined },
-      payload: { proposalId, sectionId, format, title },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'section.exported',
+        actor: { type: 'user', id: sessionUser.id ?? 'unknown', email: sessionUser.email ?? undefined },
+        payload: { proposalId, sectionId, format, title },
+      });
+    } catch (e) {
+      console.error('[admin/export] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     const contentTypes: Record<string, string> = {
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

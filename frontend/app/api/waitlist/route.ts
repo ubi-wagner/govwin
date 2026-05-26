@@ -8,6 +8,7 @@
 
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { emitEventSingle, systemActor } from '@/lib/events';
 
 export async function GET() {
   // Admin-only check endpoint — not needed for V1 public form
@@ -67,6 +68,18 @@ export async function POST(request: Request) {
           metadata = waitlist.metadata || EXCLUDED.metadata
         RETURNING id, created_at
       `;
+
+      try {
+        await emitEventSingle({
+          namespace: 'capture',
+          type: 'waitlist.joined',
+          actor: systemActor('waitlist'),
+          tenantId: null,
+          payload: { email: body.email.toLowerCase().trim(), company: body.company_name ?? null },
+        });
+      } catch (e) {
+        console.error('[waitlist] event emission failed:', e);
+      }
 
       return NextResponse.json(
         { data: { id: entry.id, message: 'Successfully joined waitlist' } },

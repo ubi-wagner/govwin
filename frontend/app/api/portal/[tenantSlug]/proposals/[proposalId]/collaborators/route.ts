@@ -4,6 +4,9 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { sendEmail } from '@/lib/email';
+import { collaboratorInviteEmail } from '@/lib/email-templates';
+import { isValidUUID } from '@/lib/validation';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -35,6 +38,9 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -47,16 +53,22 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    const collaborators = await sql<{
+    let collaborators: {
       id: string;
       userId: string | null;
       email: string;
@@ -66,34 +78,41 @@ export async function GET(_request: Request, ctx: RouteContext) {
       dropboxEnabled: boolean;
       invitedAt: string;
       acceptedAt: string | null;
-    }[]>`
-      SELECT
-        pc.id,
-        pc.user_id,
-        pc.email,
-        pc.name,
-        pc.role,
-        pc.assigned_sections,
-        pc.dropbox_enabled,
-        pc.invited_at,
-        pc.accepted_at
-      FROM proposal_collaborators pc
-      WHERE pc.proposal_id = ${proposalId}
-      ORDER BY pc.invited_at ASC
-    `;
-
-    // Load stage access for each collaborator
-    const accessRows = await sql<{
+    }[];
+    let accessRows: {
       collaboratorId: string;
       stage: string;
       permission: string;
       artifactTypes: string[];
-    }[]>`
-      SELECT collaborator_id, stage, permission, artifact_types
-      FROM collaborator_stage_access
-      WHERE proposal_id = ${proposalId}
-        AND access_revoked_at IS NULL
-    `;
+    }[];
+    try {
+      collaborators = await sql<typeof collaborators>`
+        SELECT
+          pc.id,
+          pc.user_id,
+          pc.email,
+          pc.name,
+          pc.role,
+          pc.assigned_sections,
+          pc.dropbox_enabled,
+          pc.invited_at,
+          pc.accepted_at
+        FROM proposal_collaborators pc
+        WHERE pc.proposal_id = ${proposalId}
+        ORDER BY pc.invited_at ASC
+      `;
+
+      // Load stage access for each collaborator
+      accessRows = await sql<typeof accessRows>`
+        SELECT collaborator_id, stage, permission, artifact_types
+        FROM collaborator_stage_access
+        WHERE proposal_id = ${proposalId}
+          AND access_revoked_at IS NULL
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] collaborators query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     type AccessRow = { collaboratorId: string; stage: string; permission: string; artifactTypes: string[] };
     const accessByCollaborator = new Map<string, AccessRow[]>();
@@ -158,6 +177,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -193,6 +215,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Valid email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    if (name.length > 200) {
+      return NextResponse.json({ error: 'Name exceeds maximum length (200 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (email.length > 320) {
+      return NextResponse.json({ error: 'Email exceeds maximum length (320 chars)', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
     if (!['contributor', 'external'].includes(collabRole)) {
       return NextResponse.json({ error: 'Role must be contributor or external', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
@@ -202,8 +232,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string; stage: string; gateConfig: string[] }[]>`
-      SELECT id, stage, gate_config FROM proposals
+    const [proposal] = await sql<{ id: string; title: string; stage: string; gateConfig: string[] }[]>`
+      SELECT id, title, stage, gate_config FROM proposals
       WHERE id = ${proposalId} AND tenant_id = ${tenantId}
       LIMIT 1
     `;
@@ -221,78 +251,131 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
-    // Check if user exists, create if not
-    let [existingUser] = await sql<{ id: string; tenantId: string | null }[]>`
-      SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
-    `;
-
+    // Wrap user + collaborator + stage_access creation in transaction
     let isNewUser = false;
-    if (!existingUser) {
-      isNewUser = true;
-      const tempPassword = randomUUID().slice(0, 12);
-      const passwordHash = await bcrypt.hash(tempPassword, 12);
-      const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
+    let tempPassword: string | undefined;
 
-      const [newUser] = await sql<{ id: string }[]>`
-        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
-        VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
-        RETURNING id
+    const { collaboratorId, finalUserId } = await sql.begin(async (tx: any) => {
+      // Check if user exists, create if not
+      let [existingUser] = await tx<{ id: string; tenantId: string | null }[]>`
+        SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
       `;
-      existingUser = { id: newUser.id, tenantId: tenantId };
-    }
 
-    // Create collaborator record
-    const [collaborator] = await sql<{ id: string }[]>`
-      INSERT INTO proposal_collaborators (
-        proposal_id, user_id, email, name, role, invited_by,
-        assigned_sections, dropbox_enabled
-      )
-      VALUES (
-        ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
-        ${collabRole}, ${sessionUser.id},
-        ${sql.array(assignedSections)}, true
-      )
-      RETURNING id
-    `;
+      if (!existingUser) {
+        isNewUser = true;
+        tempPassword = randomUUID().slice(0, 12);
+        const passwordHash = await bcrypt.hash(tempPassword, 12);
+        const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
-    // Create stage access for current stage
-    const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
-    for (const stage of gates) {
-      await sql`
-        INSERT INTO collaborator_stage_access (
-          collaborator_id, proposal_id, stage, permission, granted_by
+        const [newUser] = await tx<{ id: string }[]>`
+          INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
+          VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
+          RETURNING id
+        `;
+        existingUser = { id: newUser.id, tenantId: tenantId };
+      }
+
+      // Create collaborator record
+      const [collaborator] = await tx<{ id: string }[]>`
+        INSERT INTO proposal_collaborators (
+          proposal_id, user_id, email, name, role, invited_by,
+          assigned_sections, dropbox_enabled
         )
         VALUES (
-          ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+          ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
+          ${collabRole}, ${sessionUser.id},
+          ${sql.array(assignedSections)}, true
         )
+        RETURNING id
       `;
-    }
 
-    // Emit event
-    const correlationId = randomUUID();
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.collaborator_invited',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId,
-        tenantId,
-        tenantSlug,
-        proposalId,
-        collaboratorId: collaborator.id,
-        email,
-        name,
+      // Create stage access for current stage
+      const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+      for (const stage of gates) {
+        await tx`
+          INSERT INTO collaborator_stage_access (
+            collaborator_id, proposal_id, stage, permission, granted_by
+          )
+          VALUES (
+            ${collaborator.id}, ${proposalId}, ${stage}, ${permission}, ${sessionUser.id}
+          )
+        `;
+      }
+
+      return { collaboratorId: collaborator.id, finalUserId: existingUser.id };
+    });
+
+    // Send collaborator invite email (non-blocking — failure is logged, not fatal)
+    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+    const inviterName = (session.user as { name?: string }).name || sessionUser.email || 'A team member';
+    try {
+      const emailContent = collaboratorInviteEmail({
+        recipientName: name,
+        recipientEmail: email,
+        proposalTitle: proposal.title || proposalId,
+        inviterName,
         role: collabRole,
         permission,
         isNewUser,
-      },
-    });
+        tempPassword,
+        loginUrl,
+      });
+      await sendEmail({
+        to: email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+    } catch (emailErr) {
+      console.error('[api/portal/proposals/collaborators] invite email failed', {
+        email,
+        err: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
+    }
+
+    // Emit event
+    try {
+      const correlationId = randomUUID();
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.collaborator_invited',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: {
+          correlationId,
+          tenantId,
+          tenantSlug,
+          proposalId,
+          collaboratorId,
+          email: email.slice(0, 320),
+          name: name.slice(0, 200),
+          role: collabRole,
+          permission,
+          isNewUser,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/collaborators] event emission failed:', e);
+    }
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'collaborator_invited',
+                ${JSON.stringify({ email, name, role: collabRole, permission, sections_assigned: assignedSections, is_new_user: isNewUser })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/collaborators] activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: {
-        id: collaborator.id,
-        userId: existingUser.id,
+        id: collaboratorId,
+        userId: finalUserId,
         email,
         name,
         role: collabRole,

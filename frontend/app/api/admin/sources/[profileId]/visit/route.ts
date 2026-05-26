@@ -75,52 +75,76 @@ export async function POST(request: Request, ctx: RouteContext) {
       : {};
 
     // ── Verify profile exists ───────────────────────────────────────
-    const [profile] = await sql<{ id: string; name: string }[]>`
-      SELECT id, name FROM source_profiles
-      WHERE id = ${profileId}::uuid AND is_active = true
-      LIMIT 1
-    `;
+    let profile: { id: string; name: string } | undefined;
+    try {
+      const rows = await sql<{ id: string; name: string }[]>`
+        SELECT id, name FROM source_profiles
+        WHERE id = ${profileId}::uuid AND is_active = true
+        LIMIT 1
+      `;
+      profile = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/visit] profile lookup failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!profile) {
       return NextResponse.json({ error: 'Source profile not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Insert visit ────────────────────────────────────────────────
-    const [visit] = await sql<{ id: string }[]>`
-      INSERT INTO source_visits (
-        profile_id, visited_by, action, url, notes,
-        files_count, topics_count, metadata
-      ) VALUES (
-        ${profileId}::uuid, ${userId}::uuid,
-        ${action as VisitAction}, ${url}, ${notes},
-        ${filesCount}, ${topicsCount},
-        ${JSON.stringify(metadata)}::jsonb
-      )
-      RETURNING id
-    `;
+    let visit: { id: string };
+    try {
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO source_visits (
+          profile_id, visited_by, action, url, notes,
+          files_count, topics_count, metadata
+        ) VALUES (
+          ${profileId}::uuid, ${userId}::uuid,
+          ${action as VisitAction}, ${url}, ${notes},
+          ${filesCount}, ${topicsCount},
+          ${JSON.stringify(metadata)}::jsonb
+        )
+        RETURNING id
+      `;
+      visit = rows[0];
+    } catch (e) {
+      console.error('[admin/sources/visit] insert failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
-    // ── Update profile last-visited ─────────────────────────────────
-    await sql`
-      UPDATE source_profiles
-      SET last_visited_at = now(),
-          last_visited_by = ${userId}::uuid,
-          updated_at = now()
-      WHERE id = ${profileId}::uuid
-    `;
+    // ── Update profile last-visited (non-fatal) ────────────────────
+    try {
+      await sql`
+        UPDATE source_profiles
+        SET last_visited_at = now(),
+            last_visited_by = ${userId}::uuid,
+            updated_at = now()
+        WHERE id = ${profileId}::uuid
+      `;
+    } catch (e) {
+      console.error('[admin/sources/visit] profile update failed:', e);
+      // non-fatal, continue
+    }
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source.visited',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId: randomUUID(),
-        action,
-        sourceName: profile.name,
-        sourceId: profileId,
-        filesCount,
-        topicsCount,
-      },
-    });
+    // ── Emit event (non-fatal) ─────────────────────────────────────
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'source.visited',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        payload: {
+          correlationId: randomUUID(),
+          action,
+          sourceName: profile.name,
+          sourceId: profileId,
+          filesCount,
+          topicsCount,
+        },
+      });
+    } catch (e) {
+      console.error('[admin/sources/visit] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: { visitId: visit.id } });
   } catch (e) {

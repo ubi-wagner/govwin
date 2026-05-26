@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { sql } from '@/lib/db';
 import { TopicDetail } from '@/components/rfp-curation/topic-detail';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ solId: string; topicId: string }>;
 }

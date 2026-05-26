@@ -5,6 +5,8 @@ import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
 }
@@ -94,9 +96,9 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     console.error('[portal/proposals/workspace] access resolver error:', e);
     access = {
       role: 'external' as const,
-      editableSections: [],
-      commentableSections: [],
-      viewableSections: [],
+      editableSections: [] as string[],
+      commentableSections: [] as string[],
+      viewableSections: [] as string[],
       canUpload: false,
       canAdvance: false,
       canManageTeam: false,
@@ -104,10 +106,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       lockCount: proposal.lockCount || 0,
       isLocked: proposal.isLocked,
       unlockDeadline: proposal.unlockDeadline,
+      currentStage: proposal.stage || '',
+      accessibleStages: [] as string[],
     };
   }
 
-  // ── Load sections ──────────────────────────────────────────────────
+  // ── Load sections (with completion markers) ────────────────────────
   let sections: {
     id: string;
     sectionNumber: string;
@@ -117,6 +121,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     version: number;
     nodeCount: number;
     assignedTo: string | null;
+    completedStage: string | null;
+    completedAt: Date | null;
+    acceptedBy: string | null;
+    acceptedByName: string | null;
   }[] = [];
 
   try {
@@ -129,6 +137,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.page_allocation,
         ps.version,
         ps.assigned_to,
+        ps.completed_stage,
+        ps.completed_at,
+        ps.accepted_by,
+        u.name AS accepted_by_name,
         CASE
           WHEN ps.content IS NOT NULL AND ps.content::text != 'null' AND ps.content::text != ''
           THEN (
@@ -144,11 +156,37 @@ export default async function ProposalWorkspacePage({ params }: Props) {
           ELSE 0
         END AS node_count
       FROM proposal_sections ps
+      LEFT JOIN users u ON u.id = ps.accepted_by
       WHERE ps.proposal_id = ${proposalId}
       ORDER BY ps.section_number ASC
     `;
   } catch (e) {
     console.error('[portal/proposals/workspace] sections query error:', e);
+  }
+
+  // ── Load stage completion history ──────────────────────────────────
+  let stageCompletionHistory: {
+    stage: string;
+    completedBy: string | null;
+    completedByName: string | null;
+    completedAt: Date;
+    totalSections: number;
+    sectionsComplete: number;
+    sectionsApproved: number;
+    notes: string | null;
+  }[] = [];
+  try {
+    stageCompletionHistory = await sql<typeof stageCompletionHistory>`
+      SELECT scs.stage, scs.completed_by, u.name AS completed_by_name,
+             scs.completed_at, scs.total_sections, scs.sections_complete,
+             scs.sections_approved, scs.notes
+      FROM stage_completion_snapshots scs
+      LEFT JOIN users u ON u.id = scs.completed_by
+      WHERE scs.proposal_id = ${proposalId}
+      ORDER BY scs.completed_at ASC
+    `;
+  } catch (e) {
+    console.error('[portal/proposals/workspace] stage history query error:', e);
   }
 
   // ── Load collaborators ─────────────────────────────────────────────
@@ -236,7 +274,16 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       ORDER BY requirement_text ASC
     `;
     if (matrix.length > 0) {
-      compliance = { items: matrix, source: 'database' };
+      compliance = {
+        items: matrix.map((row) => ({
+          id: row.id,
+          requirement: row.requirementText,
+          label: row.requirementText,
+          status: row.status,
+          details: row.notes,
+        })),
+        source: 'database',
+      };
     }
   } catch (e) {
     console.error('[portal/proposals/workspace] compliance query error:', e);
@@ -333,6 +380,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       nodeCount: s.nodeCount,
       permission,
       assignedTo: s.assignedTo,
+      completedStage: s.completedStage ?? null,
+      completedAt: s.completedAt ? new Date(s.completedAt).toISOString() : null,
+      acceptedByName: s.acceptedByName ?? null,
+      isEditable: s.completedStage === null || s.completedStage === proposal.stage,
     };
   });
 
@@ -395,6 +446,15 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         canManageTeam={access.canManageTeam}
         closeDate={proposal.closeDate?.toISOString() ?? null}
         proposalEvents={proposalEvents}
+        stageCompletionHistory={stageCompletionHistory.map((h) => ({
+          stage: h.stage,
+          completedByName: h.completedByName,
+          completedAt: h.completedAt.toISOString(),
+          totalSections: h.totalSections,
+          sectionsComplete: h.sectionsComplete,
+          sectionsApproved: h.sectionsApproved,
+          notes: h.notes,
+        }))}
       />
     </div>
   );

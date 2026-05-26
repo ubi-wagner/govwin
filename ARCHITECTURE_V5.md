@@ -470,4 +470,32 @@ Phase 4 will have agents read from this same memory store to drive autonomous ex
 
 ---
 
+## Memory System & Cost Controls
+
+The agent memory system uses three PostgreSQL-backed memory types (episodic, semantic,
+procedural) with tenant isolation via RLS and WHERE clause enforcement. Memory matures
+over time through a scheduled lifecycle: daily decay and preference extraction, weekly
+garbage collection and pattern promotion, monthly compaction, contradiction resolution,
+and calibration. See [Memory Management](docs/MEMORY_MANAGEMENT.md) for the full
+reference.
+
+Cost controls operate at two levels: HTTP rate limiting (in-memory, IP-based, Edge-
+compatible) for public endpoints, and per-tenant agent rate limiting (50 calls/hour)
+plus budget enforcement ($50/month default, configurable) at the fabric layer. Both
+agent guardrails fail closed — if the database is unreachable, calls are denied.
+See [Rate Monitoring & Cost](docs/RATE_MONITORING.md) for the full reference.
+
+---
+
+## Reference Documents
+
+- [Agent Framework](docs/AGENT_FRAMEWORK.md) -- Agent system architecture, all 10 archetypes, tool registry
+- [Automation Workflows](docs/AUTOMATION_WORKFLOWS.md) -- Event-driven workflows, 7 definitions, step types
+- [Memory Management](docs/MEMORY_MANAGEMENT.md) -- Memory lifecycle, context injection, maturation timeline
+- [Rate Monitoring & Cost](docs/RATE_MONITORING.md) -- Rate limits, budgets, cost model, usage tracking
+- [Architectural Review](docs/ARCHITECTURAL_REVIEW.md) -- 8 systemic design decisions
+- [Bug Extermination Report](docs/BUG_EXTERMINATION_REPORT.md) -- Audit history, 200+ bugs fixed
+
+---
+
 For the implementation TODO with verifiable acceptance criteria for every item, see `docs/PHASE_1_PLAN.md`.

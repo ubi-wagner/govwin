@@ -49,6 +49,7 @@ const SYSTEM_DEFAULTS: Record<string, unknown> = {
  * @returns Merged compliance record and resolved volume list
  */
 export async function resolveTopicCompliance(topicId: string): Promise<ResolvedCompliance> {
+  try {
   // ── 1. Get the topic's solicitation_id ──────────────────────────────
   const [topic] = await sql<{ solicitationId: string | null }[]>`
     SELECT solicitation_id FROM opportunities WHERE id = ${topicId}
@@ -82,6 +83,10 @@ export async function resolveTopicCompliance(topicId: string): Promise<ResolvedC
   const volumes = await resolveVolumes(solicitationId, topicId);
 
   return { compliance, volumes };
+  } catch (err) {
+    console.error('[compliance-resolver] resolveTopicCompliance failed:', err);
+    return { compliance: { ...SYSTEM_DEFAULTS }, volumes: [] };
+  }
 }
 
 /**
@@ -196,6 +201,7 @@ async function resolveVolumes(
   solicitationId: string,
   topicId: string,
 ): Promise<ResolvedCompliance['volumes']> {
+  try {
   // Check for topic-specific volumes first
   const [topicVolumeCount] = await sql<{ count: string }[]>`
     SELECT COUNT(*)::text AS count
@@ -294,4 +300,8 @@ async function resolveVolumes(
       customFields: item.customFields,
     })),
   }));
+  } catch (err) {
+    console.error('[compliance-resolver] resolveVolumes failed:', err);
+    return [];
+  }
 }

@@ -48,14 +48,20 @@ export const opportunityGetByIdTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    const rows = await sql`
-      SELECT id, source, source_id, title, agency, office, program_type,
-             solicitation_number, naics_codes, set_aside_type,
-             classification_code, close_date, posted_date, description,
-             is_active, created_at
-      FROM opportunities
-      WHERE id = ${input.opportunityId}::uuid
-    `;
+    let rows;
+    try {
+      rows = await sql`
+        SELECT id, source, source_id, title, agency, office, program_type,
+               solicitation_number, naics_codes, set_aside_type,
+               classification_code, close_date, posted_date, description,
+               is_active, created_at
+        FROM opportunities
+        WHERE id = ${input.opportunityId}::uuid
+      `;
+    } catch (err) {
+      console.error('[opportunity.get_by_id] query failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
       throw new NotFoundError(`opportunity not found: ${input.opportunityId}`);

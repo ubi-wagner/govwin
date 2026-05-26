@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -44,6 +45,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -56,31 +60,51 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { targetStage?: unknown; notes?: unknown } = {};
+    let body: { targetStage?: unknown; notes?: unknown; force?: boolean } = {};
     try {
       body = await request.json();
     } catch {
       // No body is acceptable — will auto-advance to next gate
     }
 
-    const notes = typeof body.notes === 'string' ? body.notes : null;
+    const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Load current proposal ────────────────────────────────────────
-    const [proposal] = await sql<{
+    let proposal: {
       id: string;
       stage: string;
       title: string;
       gateConfig: string[];
       lockCount: number;
-    }[]>`
-      SELECT id, stage, title, gate_config, lock_count FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+      isLocked: boolean;
+      version: number;
+    } | undefined;
+    try {
+      [proposal] = await sql<{
+        id: string;
+        stage: string;
+        title: string;
+        gateConfig: string[];
+        lockCount: number;
+        isLocked: boolean;
+        version: number;
+      }[]>`
+        SELECT id, stage, title, gate_config, lock_count, is_locked, version FROM proposals
+        WHERE id = ${proposalId}::uuid
+          AND tenant_id = ${tenantId}::uuid
+        LIMIT 1
+      `;
+    } catch (e) {
+      console.error('[portal/proposals/advance] proposal query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    if (proposal.isLocked) {
+      return NextResponse.json({ error: 'Proposal is locked', code: 'LOCKED' }, { status: 409 });
     }
 
     // ── Determine next stage from gate_config ────────────────────────
@@ -114,32 +138,181 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    const previousStage = proposal.stage;
-    const shouldLock = targetStage === 'final';
-
-    // ── Update proposal stage ────────────────────────────────────────
-    if (shouldLock) {
-      await sql`
-        UPDATE proposals
-        SET stage = ${targetStage},
-            is_locked = true,
-            lock_count = lock_count + 1,
-            last_locked_at = now()
-        WHERE id = ${proposalId}
+    // ── Verify proposal has at least one section ─────────────────────
+    let sectionCountCheck: { count: string }[];
+    try {
+      sectionCountCheck = await sql<{ count: string }[]>`
+        SELECT count(*)::text FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
       `;
-    } else {
-      await sql`
-        UPDATE proposals
-        SET stage = ${targetStage}
-        WHERE id = ${proposalId}
-      `;
+    } catch (e) {
+      console.error('[portal/proposals/advance] section count query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (parseInt(sectionCountCheck[0]?.count ?? '0', 10) === 0) {
+      return NextResponse.json(
+        { error: 'Cannot advance a proposal with no sections', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
     }
 
-    // ── Record stage history ─────────────────────────────────────────
-    await sql`
-      INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-      VALUES (${proposalId}, ${previousStage}, ${targetStage}, ${sessionUser.id}, ${notes})
-    `;
+    const previousStage = proposal.stage;
+    const shouldLock = targetStage === 'final';
+    // When advancing to 'final' AND auto-locking, also advance to 'submitted'
+    const finalStageValue = shouldLock ? 'submitted' : targetStage;
+
+    // ── Update proposal stage + record history (transactional) ──────
+    // Gate check is inside the transaction to prevent TOCTOU races.
+    let sectionsSnapshot: { section_id: string; title: string; version: number; status: string; char_count: number }[] = [];
+    let completeSections = 0;
+    let approvedSections = 0;
+    try {
+      await sql.begin(async (tx: any) => {
+        // ── Check gate requirements inside transaction ────────────
+        try {
+          const unmetGates = await tx`
+            SELECT label FROM stage_gate_requirements
+            WHERE proposal_id = ${proposalId}::uuid AND stage = ${previousStage} AND is_met = false
+          `;
+          if (unmetGates.length > 0 && !body.force) {
+            throw new Error('GATE_REQUIREMENTS_NOT_MET:' + JSON.stringify(unmetGates.map((g: Record<string, unknown>) => g.label)));
+          }
+        } catch (gateErr) {
+          if (gateErr instanceof Error && gateErr.message.startsWith('GATE_REQUIREMENTS_NOT_MET:')) {
+            throw gateErr;
+          }
+          // Check for "relation does not exist" (PostgreSQL error code 42P01)
+          const pgErr = gateErr as { code?: string };
+          if (pgErr.code === '42P01') {
+            // Table doesn't exist yet — gate system not deployed, proceed
+          } else {
+            // Real DB error — do NOT silently skip
+            throw gateErr;
+          }
+        }
+
+        // ── 1. Snapshot all sections at their current state ────────
+        const sections = await tx<{
+          id: string;
+          title: string;
+          version: number;
+          status: string;
+          content: string | null;
+        }[]>`
+          SELECT id, title, version, status, content
+          FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid
+          ORDER BY section_number
+        `;
+
+        sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null }) => ({
+          section_id: s.id,
+          title: s.title,
+          version: s.version,
+          status: s.status,
+          char_count: s.content ? s.content.length : 0,
+        }));
+
+        completeSections = sections.filter((s: { status: string }) => s.status === 'complete' || s.status === 'approved').length;
+        approvedSections = sections.filter((s: { status: string }) => s.status === 'approved').length;
+
+        // ── 2. Insert stage completion snapshot ────────────────────
+        await tx`
+          INSERT INTO stage_completion_snapshots
+            (proposal_id, stage, completed_by, sections_snapshot, total_sections,
+             sections_complete, sections_approved, notes)
+          VALUES (
+            ${proposalId}::uuid, ${previousStage}, ${sessionUser.id}::uuid,
+            ${JSON.stringify(sectionsSnapshot)}::jsonb,
+            ${sections.length},
+            ${completeSections},
+            ${approvedSections},
+            ${notes}
+          )
+        `;
+
+        // ── 3. Mark all sections as completed for this stage ──────
+        await tx`
+          UPDATE proposal_sections
+          SET completed_stage = ${previousStage},
+              completed_at = now(),
+              accepted_by = ${sessionUser.id}::uuid,
+              accepted_at = now()
+          WHERE proposal_id = ${proposalId}::uuid
+            AND (completed_stage IS NULL OR completed_stage = ${previousStage})
+        `;
+
+        // ── 4. Create canvas version snapshots for each section ───
+        for (const s of sections) {
+          if (s.content) {
+            await tx`
+              INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
+              VALUES (${s.id}::uuid, ${s.version}, ${s.content}::jsonb, ${'stage_completed:' + previousStage}, 'system', ${sessionUser.id}::uuid)
+              ON CONFLICT (section_id, version_number) DO NOTHING
+            `;
+          }
+        }
+
+        if (shouldLock) {
+          // Advance to 'submitted' (not just 'final') and auto-lock
+          const advanceResult = await tx`
+            UPDATE proposals
+            SET stage = 'submitted',
+                is_locked = true,
+                lock_count = lock_count + 1,
+                last_locked_at = now(),
+                version = version + 1,
+                last_modified_by = ${sessionUser.id}::uuid
+            WHERE id = ${proposalId}::uuid
+              AND stage = ${previousStage}
+              AND version = ${proposal.version}
+          `;
+          if (advanceResult.count === 0) {
+            throw new Error('CONFLICT');
+          }
+        } else {
+          const advanceResult = await tx`
+            UPDATE proposals
+            SET stage = ${targetStage},
+                version = version + 1,
+                last_modified_by = ${sessionUser.id}::uuid
+            WHERE id = ${proposalId}::uuid
+              AND stage = ${previousStage}
+              AND version = ${proposal.version}
+          `;
+          if (advanceResult.count === 0) {
+            throw new Error('CONFLICT');
+          }
+        }
+
+        // Record the advance to the target gate
+        await tx`
+          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+          VALUES (${proposalId}::uuid, ${previousStage}, ${targetStage}, ${sessionUser.id}::uuid, ${notes})
+        `;
+
+        // If auto-locked at final, also record the auto-advance to 'submitted'
+        if (shouldLock) {
+          await tx`
+            INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
+            VALUES (${proposalId}::uuid, ${targetStage}, 'submitted', ${sessionUser.id}::uuid, 'Auto-advanced on lock')
+          `;
+        }
+      });
+    } catch (e) {
+      if (e instanceof Error && e.message === 'CONFLICT') {
+        return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
+      }
+      if (e instanceof Error && e.message.startsWith('GATE_REQUIREMENTS_NOT_MET:')) {
+        const unmetLabels = JSON.parse(e.message.replace('GATE_REQUIREMENTS_NOT_MET:', ''));
+        return NextResponse.json({
+          error: 'Unmet gate requirements',
+          code: 'GATE_REQUIREMENTS_NOT_MET',
+          details: { unmet: unmetLabels }
+        }, { status: 422 });
+      }
+      console.error('[portal/proposals/advance] stage update failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── Emit event ───────────────────────────────────────────────────
     await emitEventSingle({
@@ -155,15 +328,38 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalTitle: proposal.title,
         previousStage,
         targetStage,
+        ...(shouldLock ? { effectiveStage: 'submitted' } : {}),
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
         notes: notes ?? undefined,
       },
     });
 
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, entity_version, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'stage_advanced', ${proposal.version + 1},
+                ${JSON.stringify({
+                  from_stage: previousStage,
+                  to_stage: finalStageValue,
+                  notes: notes ?? undefined,
+                  sections_accepted: sectionsSnapshot.length,
+                  sections_complete: completeSections,
+                  sections_approved: approvedSections,
+                })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/advance] activity log failed', logErr);
+    }
+
     return NextResponse.json({
       data: {
-        stage: targetStage,
+        stage: finalStageValue,
         previousStage,
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,

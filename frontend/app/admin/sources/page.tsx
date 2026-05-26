@@ -7,6 +7,8 @@ import SourcesHub, {
   type SourceDiff,
 } from '@/components/admin/source-card-actions';
 
+export const dynamic = 'force-dynamic';
+
 // ── Types for raw DB rows ───────────────────────────────────────────
 
 type SourceProfileRow = {

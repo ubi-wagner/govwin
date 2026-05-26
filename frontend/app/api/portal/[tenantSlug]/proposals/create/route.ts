@@ -8,6 +8,7 @@ import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -72,7 +73,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Stripe gate — founding cohort bypass
     // When Stripe is live, check for a valid purchase or active subscription
     // before allowing proposal creation. For now, all tenant_admins can create.
-    const FOUNDING_COHORT_BYPASS = true; // Set to false when Stripe billing is enforced
+    const FOUNDING_COHORT_BYPASS = process.env.FOUNDING_COHORT_BYPASS === 'true';
     if (!FOUNDING_COHORT_BYPASS) {
       return NextResponse.json(
         { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
@@ -81,7 +82,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { topicId?: unknown; productType?: unknown };
+    const DB_STAGES = ['draft', 'review', 'final', 'submitted', 'archived'] as const;
+
+    let body: { topicId?: unknown; productType?: unknown; gateConfig?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -92,6 +95,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (typeof topicId !== 'string' || !topicId.trim()) {
       return NextResponse.json({ error: 'topicId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
+    if (!isValidUUID(topicId)) {
+      return NextResponse.json({ error: 'Invalid topicId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
 
     const validProductTypes = ['proposal_phase1', 'proposal_phase2'] as const;
     const productType = typeof body.productType === 'string' &&
@@ -99,8 +105,23 @@ export async function POST(request: Request, ctx: RouteContext) {
       ? body.productType
       : null;
 
+    // Validate gate_config if provided, otherwise default to ['draft', 'final']
+    let gateConfig: string[] = ['draft', 'final'];
+    if (Array.isArray(body.gateConfig) && body.gateConfig.length >= 2) {
+      const allValid = body.gateConfig.every(
+        (s: unknown) => typeof s === 'string' && (DB_STAGES as readonly string[]).includes(s),
+      );
+      if (!allValid) {
+        return NextResponse.json(
+          { error: `gate_config values must be from: ${DB_STAGES.join(', ')}`, code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
+      }
+      gateConfig = body.gateConfig as string[];
+    }
+
     // ── Find the topic (opportunity) and its parent solicitation ─────
-    const [topic] = await sql<{
+    let topic: {
       id: string;
       title: string;
       solicitationId: string | null;
@@ -108,12 +129,26 @@ export async function POST(request: Request, ctx: RouteContext) {
       topicNumber: string | null;
       programType: string | null;
       solicitationNumber: string | null;
-    }[]>`
-      SELECT id, title, solicitation_id, agency, topic_number,
-             program_type, solicitation_number
-      FROM opportunities
-      WHERE id = ${topicId}
-    `;
+    } | undefined;
+    try {
+      [topic] = await sql<{
+        id: string;
+        title: string;
+        solicitationId: string | null;
+        agency: string | null;
+        topicNumber: string | null;
+        programType: string | null;
+        solicitationNumber: string | null;
+      }[]>`
+        SELECT id, title, solicitation_id, agency, topic_number,
+               program_type, solicitation_number
+        FROM opportunities
+        WHERE id = ${topicId}
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/create] topic query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!topic) {
       return NextResponse.json({ error: 'Topic not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -127,12 +162,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Prevent duplicate proposals for same tenant + topic ──────────
-    const [existing] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE tenant_id = ${tenantId}
-        AND opportunity_id = ${topicId}
-      LIMIT 1
-    `;
+    let existing: { id: string } | undefined;
+    try {
+      [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE tenant_id = ${tenantId}
+          AND opportunity_id = ${topicId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/create] duplicate check failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existing) {
       return NextResponse.json(
         { error: 'Proposal already exists for this topic', code: 'VALIDATION_ERROR' },
@@ -155,22 +196,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
-    // ── Create the proposal ──────────────────────────────────────────
+    // ── Create the proposal + sections in a transaction ─────────────
     const proposalTitle = topic.topicNumber
       ? `${topic.topicNumber}: ${topic.title}`
       : topic.title;
-
-    const [proposal] = await sql<{ id: string }[]>`
-      INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage)
-      VALUES (
-        ${tenantId},
-        ${topicId},
-        ${topic.solicitationId},
-        ${proposalTitle},
-        'draft'
-      )
-      RETURNING id
-    `;
 
     // ── Resolve compliance + volumes via topic -> solicitation -> defaults chain ─
     const resolved = await resolveTopicCompliance(topicId);
@@ -197,7 +226,6 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    // ── Create proposal_sections from required items ─────────────────
     // Build merge-field variables for template interpolation
     const tenantName = (tenant.name as string) ?? '';
     const templateVariables: Record<string, string> = {
@@ -211,70 +239,142 @@ export async function POST(request: Request, ctx: RouteContext) {
       uei: '{uei}',
     };
 
-    let sectionCount = 0;
+    const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
+      const [proposalRow] = await tx<{ id: string }[]>`
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config)
+        VALUES (
+          ${tenantId},
+          ${topicId},
+          ${topic.solicitationId},
+          ${proposalTitle},
+          'draft',
+          ${JSON.stringify(gateConfig)}::jsonb
+        )
+        RETURNING id
+      `;
 
-    if (requiredItems.length > 0) {
-      const programType = topic.programType ?? '';
+      let count = 0;
 
-      for (const item of requiredItems) {
-        // Insert the section row first to get its id
-        const [section] = await sql<{ id: string }[]>`
+      if (requiredItems.length > 0) {
+        const programType = topic.programType ?? '';
+
+        for (const item of requiredItems) {
+          // Insert the section row first to get its id
+          const [section] = await tx<{ id: string }[]>`
+            INSERT INTO proposal_sections (
+              proposal_id, section_number, title, content, status, page_allocation
+            ) VALUES (
+              ${proposalRow.id},
+              ${String(item.itemNumber)},
+              ${item.itemName},
+              ${null},
+              'empty',
+              ${item.pageLimit}
+            )
+            RETURNING id
+          `;
+
+          // Attempt to resolve and apply a template for this section
+          const templateKey = resolveTemplateKey(programType, item.itemType);
+          if (templateKey) {
+            const templateDoc: CanvasDocument | null = getTemplate(templateKey);
+            if (templateDoc) {
+              // Set metadata IDs linking this document to the proposal structure
+              templateDoc.metadata.proposal_id = proposalRow.id;
+              templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
+              templateDoc.metadata.created_at = new Date().toISOString();
+              templateDoc.metadata.last_modified_at = new Date().toISOString();
+              templateDoc.metadata.last_modified_by = userId;
+              templateDoc.document_id = section.id;
+
+              // Interpolate merge fields with available data
+              const interpolated = interpolateTemplate(templateDoc, templateVariables);
+
+              // Store the canvas document JSON and update status to reflect template content
+              const contentJson = JSON.stringify(interpolated);
+              await tx`
+                UPDATE proposal_sections
+                SET content = ${contentJson},
+                    status = 'ai_drafted'
+                WHERE id = ${section.id}
+              `;
+            }
+          }
+
+          count++;
+        }
+      } else {
+        // No required items defined — create a single default section
+        await tx`
           INSERT INTO proposal_sections (
-            proposal_id, section_number, title, content, status, page_allocation
+            proposal_id, section_number, title, content, status
           ) VALUES (
-            ${proposal.id},
-            ${String(item.itemNumber)},
-            ${item.itemName},
+            ${proposalRow.id},
+            '1',
+            'Technical Volume',
             ${null},
-            'empty',
-            ${item.pageLimit}
+            'empty'
           )
-          RETURNING id
+        `;
+        count = 1;
+      }
+
+      // ── Seed supporting documents from compliance matrix ──────────
+      try {
+        const complianceRow = await tx`
+          SELECT required_documents, required_sections FROM solicitation_compliance
+          WHERE solicitation_id = ${topic.solicitationId}::uuid LIMIT 1
         `;
 
-        // Attempt to resolve and apply a template for this section
-        const templateKey = resolveTemplateKey(programType, item.itemType);
-        if (templateKey) {
-          const templateDoc: CanvasDocument | null = getTemplate(templateKey);
-          if (templateDoc) {
-            // Set metadata IDs linking this document to the proposal structure
-            templateDoc.metadata.proposal_id = proposal.id;
-            templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-            templateDoc.metadata.created_at = new Date().toISOString();
-            templateDoc.metadata.last_modified_at = new Date().toISOString();
-            templateDoc.metadata.last_modified_by = userId;
-            templateDoc.document_id = section.id;
+        if (complianceRow.length > 0) {
+          const requiredDocs = complianceRow[0].requiredDocuments;
+          // requiredDocs is JSONB — could be array of strings or array of objects
+          if (Array.isArray(requiredDocs)) {
+            for (const doc of requiredDocs) {
+              const label = typeof doc === 'string' ? doc : (doc.name || doc.label || String(doc));
+              const source = typeof doc === 'object' && doc !== null ? (doc.source || doc.reference || null) : null;
+              const required = typeof doc === 'object' && doc !== null ? (doc.required !== false) : true;
 
-            // Interpolate merge fields with available data
-            const interpolated = interpolateTemplate(templateDoc, templateVariables);
-
-            // Store the canvas document JSON and update status to reflect template content
-            const contentJson = JSON.stringify(interpolated);
-            await sql`
-              UPDATE proposal_sections
-              SET content = ${contentJson},
-                  status = 'ai_drafted'
-              WHERE id = ${section.id}
-            `;
+              await tx`
+                INSERT INTO proposal_supporting_docs
+                  (proposal_id, tenant_id, requirement_label, requirement_source,
+                   category, is_required, status)
+                VALUES (${proposalRow.id}::uuid, ${tenantId}::uuid, ${label}, ${source},
+                        'supporting_document', ${required}, 'missing')
+              `;
+            }
           }
         }
 
-        sectionCount++;
+        // Also create placeholder rows for the user-upload categories
+        await tx`
+          INSERT INTO proposal_supporting_docs
+            (proposal_id, tenant_id, requirement_label, category, is_required, status)
+          VALUES
+            (${proposalRow.id}::uuid, ${tenantId}::uuid, 'Proposal Input Materials', 'proposal_input', false, 'missing'),
+            (${proposalRow.id}::uuid, ${tenantId}::uuid, 'Other Documents', 'other', false, 'missing')
+        `;
+      } catch (seedErr) {
+        // Supporting doc seeding is enrichment — don't fail the whole proposal creation
+        console.error('[api/portal/proposals/create] supporting docs seed failed (non-fatal):', seedErr);
       }
-    } else {
-      // No required items defined — create a single default section
+
+      return { proposal: proposalRow, sectionCount: count };
+    });
+
+    // ── Link matching purchase to the new proposal ─────────────────
+    try {
       await sql`
-        INSERT INTO proposal_sections (
-          proposal_id, section_number, title, content, status
-        ) VALUES (
-          ${proposal.id},
-          '1',
-          'Technical Volume',
-          ${null},
-          'empty'
-        )
+        UPDATE purchases
+        SET proposal_id = ${proposal.id}::uuid,
+            updated_at = now()
+        WHERE tenant_id = ${tenantId}::uuid
+          AND opportunity_id = ${topicId}::uuid
+          AND proposal_id IS NULL
       `;
-      sectionCount = 1;
+    } catch (purchaseErr) {
+      // Non-fatal — purchase linkage is not critical path
+      console.error('[api/portal/proposals/create] purchase link failed (non-fatal):', purchaseErr);
     }
 
     // ── Provision S3 artifacts (non-blocking — failure is logged, not fatal) ─
@@ -366,6 +466,62 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       },
     });
+
+    // ── Activity log ─────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposal.id}::uuid, ${tenantId}::uuid, ${userId}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'proposal_created',
+                ${JSON.stringify({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/create] activity log failed', logErr);
+    }
+
+    // ── Notify RFP admins about new proposal (72-hour review SLA) ───
+    try {
+      const admins = await sql<{ email: string; name: string | null }[]>`
+        SELECT email, name FROM users
+        WHERE role IN ('rfp_admin', 'master_admin') AND is_active = true
+        LIMIT 10
+      `;
+
+      if (admins.length > 0) {
+        const { sendEmail } = await import('@/lib/email');
+        const tenantRow = await sql<{ name: string }[]>`SELECT name FROM tenants WHERE id = ${tenantId}::uuid`;
+        const tenantName = tenantRow[0]?.name || tenantSlug;
+
+        for (const admin of admins) {
+          try {
+            await sendEmail({
+              to: admin.email,
+              subject: `New Proposal Created — ${tenantName} — Review within 72 hours`,
+              html: `
+                <p>Hi ${admin.name || 'Admin'},</p>
+                <p>A new proposal workspace has been created and needs your review within 72 hours:</p>
+                <ul>
+                  <li><strong>Customer:</strong> ${tenantName}</li>
+                  <li><strong>Proposal:</strong> ${proposalTitle}</li>
+                  <li><strong>Sections:</strong> ${sectionCount}</li>
+                  <li><strong>Created:</strong> ${new Date().toISOString()}</li>
+                </ul>
+                <p>Please review the proposal setup (sections, compliance matrix, templates) to ensure quality before the customer begins drafting.</p>
+                <p>— RFP Pipeline System</p>
+              `,
+            });
+          } catch (emailErr) {
+            console.error('[proposals/create] admin alert email failed:', emailErr);
+          }
+        }
+      }
+    } catch (alertErr) {
+      console.error('[proposals/create] admin alert setup failed:', alertErr);
+      // Non-fatal — proposal creation succeeded
+    }
 
     return NextResponse.json({
       data: {

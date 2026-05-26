@@ -40,13 +40,22 @@ logger = logging.getLogger('cms')
 
 
 async def _run_worker(name: str, coro):
-    """Run a worker loop with crash isolation — log errors, don't propagate."""
-    try:
-        await coro()
-    except asyncio.CancelledError:
-        logger.info('Worker %s cancelled', name)
-    except Exception:
-        logger.exception('Worker %s crashed', name)
+    """Run a worker loop with automatic restart on crash."""
+    backoff = 1
+    while True:
+        try:
+            logger.info("Starting worker: %s", name)
+            await coro()
+        except asyncio.CancelledError:
+            logger.info("Worker %s cancelled", name)
+            return
+        except Exception:
+            logger.exception("Worker %s crashed, restarting in %ds", name, backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+        else:
+            logger.info("Worker %s exited cleanly, resetting backoff", name)
+            backoff = 1
 
 
 @asynccontextmanager

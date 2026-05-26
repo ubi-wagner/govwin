@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Customer dashboard — the first page a newly-accepted customer sees.
@@ -48,6 +52,22 @@ export default async function DashboardPage({
   const companyName = (tenant.name as string) ?? tenantSlug;
   const basePath = `/portal/${tenantSlug}`;
 
+  // ── Trial expiration check ──
+  let trialEndsAt: Date | null = null;
+  try {
+    const [tenantRow] = await sql<{ trialEndsAt: Date | null }[]>`
+      SELECT trial_ends_at FROM tenants WHERE id = ${tenantId}
+    `;
+    trialEndsAt = tenantRow?.trialEndsAt ?? null;
+  } catch (e) {
+    console.error('[dashboard] trial check failed', e);
+  }
+
+  const trialDaysRemaining = trialEndsAt
+    ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showTrialBanner = trialDaysRemaining !== null && trialDaysRemaining > 0;
+
   // ---------- Quick stats ----------
   let libraryCount = 0;
   let proposalCount = 0;
@@ -82,6 +102,26 @@ export default async function DashboardPage({
     console.error('[dashboard] pinned count query failed', e);
   }
 
+  // ── Onboarding checklist data ──
+  let hasProfile = false;
+  let spotlightCount = 0;
+  try {
+    const [profileRow] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}
+    `;
+    hasProfile = parseInt(profileRow?.count ?? '0', 10) > 0;
+  } catch (e) {
+    console.error('[dashboard] profile check failed', e);
+  }
+  try {
+    const [spotRow] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM tenant_pipeline_items WHERE tenant_id = ${tenantId}
+    `;
+    spotlightCount = parseInt(spotRow?.count ?? '0', 10);
+  } catch (e) {
+    console.error('[dashboard] spotlight check failed', e);
+  }
+
   // ---------- Recent activity ----------
   interface EventRow {
     id: string;
@@ -105,8 +145,26 @@ export default async function DashboardPage({
     console.error('[dashboard] events query failed', e);
   }
 
+  const docsChecked = libraryCount > 0;
+  const profileChecked = hasProfile;
+  const spotlightChecked = spotlightCount > 0;
+
   return (
     <div>
+      {/* Trial expiration banner */}
+      {showTrialBanner && (
+        <div className={`mb-6 rounded-lg px-4 py-3 text-sm font-medium ${
+          trialDaysRemaining! <= 7
+            ? 'bg-red-50 text-red-700 border border-red-200'
+            : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+        }`}>
+          Your trial expires in {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}.
+          <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">
+            Subscribe to keep your data.
+          </a>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold">Welcome, {companyName}</h1>
       <p className="text-gray-500 mt-1 text-sm">
         Your GovWin portal dashboard
@@ -114,9 +172,9 @@ export default async function DashboardPage({
 
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <StatCard label="Library Units" value={libraryCount} />
-        <StatCard label="Active Proposals" value={proposalCount} />
-        <StatCard label="Pinned Topics" value={pinnedCount} />
+        <Link href={`/portal/${tenantSlug}/library`}><StatCard label="Library Units" value={libraryCount} /></Link>
+        <Link href={`/portal/${tenantSlug}/proposals`}><StatCard label="Active Proposals" value={proposalCount} /></Link>
+        <Link href={`/portal/${tenantSlug}/pipeline`}><StatCard label="Pinned Topics" value={pinnedCount} /></Link>
       </div>
 
       {/* Get Started checklist */}
@@ -124,28 +182,48 @@ export default async function DashboardPage({
         <h2 className="text-lg font-semibold mb-4">Get Started</h2>
         <ul className="space-y-3 text-sm">
           <li className="flex items-start gap-2">
-            <span className="text-gray-400 mt-0.5">&#9744;</span>
+            <span className={`mt-0.5 ${docsChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
+              {docsChecked ? '☑' : '☐'}
+            </span>
             <a
               href={`${basePath}/library/upload`}
-              className="text-blue-600 hover:underline"
+              className={docsChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
             >
               Upload company documents
             </a>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-gray-400 mt-0.5">&#9744;</span>
+            <span className={`mt-0.5 ${profileChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
+              {profileChecked ? '☑' : '☐'}
+            </span>
             <a
-              href={`${basePath}/spotlights`}
-              className="text-blue-600 hover:underline"
+              href={`${basePath}/profile`}
+              className={profileChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
             >
-              Review your Spotlight feed
+              Set up your company profile
             </a>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-gray-400 mt-0.5">&#9744;</span>
-            <span className="text-gray-700">
-              Purchase your first proposal portal
+            <span className={`mt-0.5 ${spotlightChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
+              {spotlightChecked ? '☑' : '☐'}
             </span>
+            <a
+              href={`${basePath}/spotlights`}
+              className={spotlightChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
+            >
+              Create your first Spotlight
+            </a>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className={`mt-0.5 ${proposalCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
+              {proposalCount > 0 ? '☑' : '☐'}
+            </span>
+            <a
+              href={`${basePath}/proposals`}
+              className={proposalCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
+            >
+              Purchase your first proposal portal
+            </a>
           </li>
         </ul>
       </div>
@@ -171,6 +249,12 @@ export default async function DashboardPage({
           </ul>
         )}
       </div>
+      {/* Agent Usage (admin only) */}
+      {(role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin') && (
+        <div className="mt-8">
+          <AgentUsagePanel tenantSlug={tenantSlug} />
+        </div>
+      )}
     </div>
   );
 }

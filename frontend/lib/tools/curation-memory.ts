@@ -170,9 +170,14 @@ export async function writeCurationMemory(
 export async function getSolicitationNamespace(
   solicitationId: string,
 ): Promise<string | null | undefined> {
-  const rows = await sql<{ namespace: string | null }[]>`
-    SELECT namespace FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-  `;
-  if (rows.length === 0) return undefined;
-  return rows[0].namespace;
+  try {
+    const rows = await sql<{ namespace: string | null }[]>`
+      SELECT namespace FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+    `;
+    if (rows.length === 0) return undefined;
+    return rows[0].namespace;
+  } catch (err) {
+    console.error('[curation-memory] getSolicitationNamespace failed:', err);
+    return undefined;
+  }
 }

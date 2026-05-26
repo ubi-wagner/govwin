@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -36,6 +37,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -48,12 +52,18 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -62,6 +72,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     // ── Optional nodeId filter ───────────────────────────────────────
     const url = new URL(request.url);
     const nodeId = url.searchParams.get('nodeId');
+    if (nodeId && !isValidUUID(nodeId)) {
+      return NextResponse.json({ error: 'Invalid nodeId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
 
     let comments: {
       id: string;
@@ -75,6 +88,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       userEmail: string | null;
     }[];
 
+    try {
     if (nodeId) {
       comments = await sql<typeof comments>`
         SELECT
@@ -92,6 +106,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE pc.proposal_id = ${proposalId}
           AND pc.section_id = ${nodeId}
         ORDER BY pc.created_at ASC
+        LIMIT 200
       `;
     } else {
       comments = await sql<typeof comments>`
@@ -109,7 +124,12 @@ export async function GET(request: Request, ctx: RouteContext) {
         LEFT JOIN users u ON u.id = pc.user_id
         WHERE pc.proposal_id = ${proposalId}
         ORDER BY pc.created_at ASC
+        LIMIT 200
       `;
+    }
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] comments query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -162,6 +182,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId } = await ctx.params;
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -190,43 +213,81 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const nodeId = body.nodeId.trim();
+    if (!isValidUUID(nodeId)) {
+      return NextResponse.json({ error: 'Invalid nodeId format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const text = body.text.trim();
 
-    // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    if (text.length > 10000) {
+      return NextResponse.json({ error: 'Comment too long (max 10000 characters)', code: 'VALIDATION_ERROR' }, { status: 422 });
+    }
 
-    if (!proposal) {
+    // ── Verify proposal belongs to tenant ────────────────────────────
+    let proposal2: { id: string } | undefined;
+    try {
+      [proposal2] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] POST proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    if (!proposal2) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Insert comment ───────────────────────────────────────────────
-    const [comment] = await sql<{ id: string; createdAt: Date }[]>`
-      INSERT INTO proposal_comments (proposal_id, section_id, user_id, content)
-      VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text})
-      RETURNING id, created_at
-    `;
+    let comment: { id: string; createdAt: Date };
+    try {
+      [comment] = await sql<{ id: string; createdAt: Date }[]>`
+        INSERT INTO proposal_comments (proposal_id, section_id, user_id, content)
+        VALUES (${proposalId}, ${nodeId}, ${sessionUser.id}, ${text})
+        RETURNING id, created_at
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] POST insert failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'comment.created',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'comment.created',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        commentId: comment.id,
-        commentText: text,
-        nodeId,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          proposalId,
+          commentId: comment.id,
+          commentText: text.slice(0, 100),
+          nodeId,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/comments] event emission failed:', e);
+    }
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, section_id, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'comment_added', ${nodeId}::uuid,
+                ${JSON.stringify({ comment_id: comment.id, text: text.slice(0, 200) })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/comments] activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: {

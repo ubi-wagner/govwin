@@ -9,6 +9,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantId: string }>;
@@ -17,6 +19,12 @@ interface RouteContext {
 export async function GET(request: Request, ctx: RouteContext) {
   try {
     const { tenantId } = await ctx.params;
+    if (!isValidUUID(tenantId)) {
+      return NextResponse.json(
+        { error: 'Invalid tenant ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -115,6 +123,12 @@ export async function GET(request: Request, ctx: RouteContext) {
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
     const { tenantId } = await ctx.params;
+    if (!isValidUUID(tenantId)) {
+      return NextResponse.json(
+        { error: 'Invalid tenant ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
 
     // ── Auth ──────────────────────────────────────────────────────
     const session = await auth();
@@ -170,7 +184,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     // Validate specific field values
     if ('product_tier' in body && body.product_tier !== null) {
-      const validTiers = ['free', 'starter', 'professional', 'enterprise'];
+      const validTiers = ['finder', 'reminder', 'binder', 'grinder'];
       if (!validTiers.includes(body.product_tier as string)) {
         return NextResponse.json(
           { error: `Invalid product_tier. Must be one of: ${validTiers.join(', ')}`, code: 'VALIDATION_ERROR' },
@@ -225,6 +239,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         WHERE id = ${tenantId}::uuid
         RETURNING id, name, slug, status, product_tier, subscription_status, lifecycle_stage, updated_at
       `;
+
+      try {
+        await emitEventSingle({
+          namespace: 'finder',
+          type: 'tenant.updated',
+          actor: userActor(sessionUser.id as string),
+          tenantId: null,
+          payload: { tenantId, fields: Object.keys(body) },
+        });
+      } catch (e) {
+        console.error('[admin/tenants] event emission failed:', e);
+      }
 
       return NextResponse.json({ data: { tenant: updated } });
     } catch (dbErr) {

@@ -45,21 +45,33 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
     const { solicitationId, requestedReviewerId, notes } = input;
     const actorId = ctx.actor.id;
 
-    const rows = await sql<{ id: string; curatedBy: string | null }[]>`
-      UPDATE curated_solicitations
-      SET status = 'review_requested',
-          curated_by = COALESCE(curated_by, ${actorId}::uuid),
-          review_requested_for = ${requestedReviewerId ?? null}::uuid,
-          updated_at = now()
-      WHERE id = ${solicitationId}::uuid
-        AND status = 'curation_in_progress'
-      RETURNING id, curated_by
-    `;
+    let rows: { id: string; curatedBy: string | null }[];
+    try {
+      rows = await sql<{ id: string; curatedBy: string | null }[]>`
+        UPDATE curated_solicitations
+        SET status = 'review_requested',
+            curated_by = COALESCE(curated_by, ${actorId}::uuid),
+            review_requested_for = ${requestedReviewerId ?? null}::uuid,
+            updated_at = now()
+        WHERE id = ${solicitationId}::uuid
+          AND status = 'curation_in_progress'
+        RETURNING id, curated_by
+      `;
+    } catch (err) {
+      console.error('[solicitation.request_review] update failed:', err);
+      throw err;
+    }
 
     if (rows.length === 0) {
-      const existing = await sql<{ status: string }[]>`
-        SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-      `;
+      let existing: { status: string }[];
+      try {
+        existing = await sql<{ status: string }[]>`
+          SELECT status FROM curated_solicitations WHERE id = ${solicitationId}::uuid
+        `;
+      } catch (err) {
+        console.error('[solicitation.request_review] fallback lookup failed:', err);
+        throw err;
+      }
       if (existing.length === 0) {
         throw new NotFoundError(`solicitation not found: ${solicitationId}`);
       }
@@ -69,14 +81,40 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
       );
     }
 
-    await sql`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes, metadata)
-      VALUES
-        (${solicitationId}::uuid, ${actorId}::uuid, 'request_review',
-         'curation_in_progress', 'review_requested', ${notes ?? null},
-         ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null })}::jsonb)
-    `;
+    try {
+      await sql`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes, metadata)
+        VALUES
+          (${solicitationId}::uuid, ${actorId}::uuid, 'request_review',
+           'curation_in_progress', 'review_requested', ${notes ?? null},
+           ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null })}::jsonb)
+      `;
+    } catch (err) {
+      console.error('[solicitation.request_review] triage_actions insert failed:', err);
+      throw err;
+    }
+
+    // ── Curation revision tracking ──────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO curation_revisions
+          (solicitation_id, actor_id, actor_email, revision_type, field_name, old_value, new_value, metadata)
+        VALUES (
+          ${solicitationId}::uuid,
+          ${actorId}::uuid,
+          ${ctx.actor.email ?? null},
+          'review_requested',
+          'status',
+          'curation_in_progress',
+          'review_requested',
+          ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null, notes: notes ?? null })}::jsonb
+        )
+      `;
+    } catch (revErr) {
+      console.error('[solicitation.request_review] curation_revisions insert failed:', revErr);
+      // Non-fatal — continue
+    }
 
     await emitEventSingle({
       namespace: 'finder',

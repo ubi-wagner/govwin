@@ -148,7 +148,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 export async function POST(_request: Request, _ctx: RouteContext) {
   return NextResponse.json(
-    { error: 'Use /proposals/create endpoint', code: 'NOT_IMPLEMENTED' },
-    { status: 501 },
+    { error: 'This endpoint does not accept POST requests. To create a proposal, use POST /api/portal/{tenantSlug}/proposals/create', code: 'WRONG_ENDPOINT' },
+    { status: 400 },
   );
 }

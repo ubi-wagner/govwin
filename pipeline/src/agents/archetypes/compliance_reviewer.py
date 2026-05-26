@@ -142,8 +142,8 @@ Output your compliance matrix as a JSON array where each element contains:
         """Check if this archetype handles the given event type."""
         return event_type in (
             "proposal.compliance.check_requested",
-            "capture.section.drafted",
-            "capture.proposal.stage_changed",
+            "proposal.section.drafted",
+            "proposal.stage.changed",
         )
 
     def get_tools(self) -> list[dict]:
@@ -406,31 +406,65 @@ Output a JSON object with:
             if not sol_id:
                 return {"variables": [], "note": "No solicitation linked to proposal"}
 
-            # Get compliance variables
-            variables = await conn.fetch(
-                """
-                SELECT id, variable_name, variable_type, value, confidence
-                FROM solicitation_compliance
-                WHERE solicitation_id = $1
-                ORDER BY variable_name ASC
-                """,
+            # Get compliance data from real columns
+            comp_row = await conn.fetchrow(
+                """SELECT page_limit_technical, page_limit_cost, page_limit_other,
+                          font_family, font_size, margins, line_spacing,
+                          header_required, footer_required, submission_format,
+                          required_sections, required_documents, evaluation_criteria,
+                          taba_allowed, indirect_rate_cap, partner_max_pct,
+                          cost_sharing_required, pi_must_be_employee,
+                          custom_variables, verified_by, verified_at
+                   FROM solicitation_compliance
+                   WHERE solicitation_id = $1
+                   LIMIT 1""",
                 sol_id,
             )
 
+            if not comp_row:
+                return {"variables": [], "note": "No compliance data found"}
+
+            variables = []
+            if comp_row["page_limit_technical"]:
+                variables.append({"name": "page_limit_technical", "label": "Technical Page Limit", "value": str(comp_row["page_limit_technical"]), "type": "number"})
+            if comp_row["page_limit_cost"]:
+                variables.append({"name": "page_limit_cost", "label": "Cost Page Limit", "value": str(comp_row["page_limit_cost"]), "type": "number"})
+            if comp_row["page_limit_other"]:
+                variables.append({"name": "page_limit_other", "label": "Other Page Limit", "value": str(comp_row["page_limit_other"]), "type": "number"})
+            if comp_row["font_family"]:
+                variables.append({"name": "font_family", "label": "Font Family", "value": comp_row["font_family"], "type": "text"})
+            if comp_row["font_size"]:
+                variables.append({"name": "font_size", "label": "Font Size", "value": str(comp_row["font_size"]), "type": "number"})
+            if comp_row["margins"]:
+                variables.append({"name": "margins", "label": "Margins", "value": comp_row["margins"], "type": "text"})
+            if comp_row["line_spacing"]:
+                variables.append({"name": "line_spacing", "label": "Line Spacing", "value": str(comp_row["line_spacing"]), "type": "text"})
+            if comp_row["submission_format"]:
+                variables.append({"name": "submission_format", "label": "Submission Format", "value": comp_row["submission_format"], "type": "text"})
+            if comp_row["required_sections"]:
+                variables.append({"name": "required_sections", "label": "Required Sections", "value": json.dumps(comp_row["required_sections"]) if isinstance(comp_row["required_sections"], (dict, list)) else str(comp_row["required_sections"]), "type": "json"})
+            if comp_row["required_documents"]:
+                variables.append({"name": "required_documents", "label": "Required Documents", "value": json.dumps(comp_row["required_documents"]) if isinstance(comp_row["required_documents"], (dict, list)) else str(comp_row["required_documents"]), "type": "json"})
+            if comp_row["evaluation_criteria"]:
+                variables.append({"name": "evaluation_criteria", "label": "Evaluation Criteria", "value": json.dumps(comp_row["evaluation_criteria"]) if isinstance(comp_row["evaluation_criteria"], (dict, list)) else str(comp_row["evaluation_criteria"]), "type": "json"})
+            for col in ["taba_allowed", "cost_sharing_required", "pi_must_be_employee", "header_required", "footer_required"]:
+                if comp_row[col] is not None:
+                    variables.append({"name": col, "label": col.replace("_", " ").title(), "value": str(comp_row[col]), "type": "boolean"})
+            if comp_row["indirect_rate_cap"] is not None:
+                variables.append({"name": "indirect_rate_cap", "label": "Indirect Rate Cap", "value": str(comp_row["indirect_rate_cap"]), "type": "number"})
+            if comp_row["partner_max_pct"] is not None:
+                variables.append({"name": "partner_max_pct", "label": "Partner Max Pct", "value": str(comp_row["partner_max_pct"]), "type": "number"})
+            if comp_row["custom_variables"]:
+                custom = comp_row["custom_variables"]
+                if isinstance(custom, list):
+                    for cv in custom:
+                        variables.append({"name": cv.get("name", "custom"), "label": cv.get("label", "Custom"), "value": str(cv.get("value", "")), "type": cv.get("type", "text")})
+
             return {
-                "variables": [
-                    {
-                        "id": str(v["id"]),
-                        "variable_name": v["variable_name"],
-                        "variable_type": v["variable_type"],
-                        "value": v["value"],
-                        "confidence": (
-                            float(v["confidence"]) if v["confidence"] else None
-                        ),
-                    }
-                    for v in variables
-                ],
+                "variables": variables,
                 "total_variables": len(variables),
+                "verified_by": str(comp_row["verified_by"]) if comp_row["verified_by"] else None,
+                "verified_at": comp_row["verified_at"].isoformat() if comp_row["verified_at"] else None,
             }
         except Exception as e:
             logger.warning("get_compliance failed: %s", e)
@@ -441,14 +475,13 @@ Output a JSON object with:
     ) -> dict:
         """Search agent memory for prior compliance patterns."""
         query = tool_input.get("query", "")
-        mem_tenant_id = tool_input.get("tenant_id", tenant_id)
         limit = tool_input.get("limit", 5)
 
         if not query:
             return {"memories": [], "note": "No query provided"}
 
         try:
-            escaped_query = query[:100].replace("%", "\\%").replace("_", "\\_")
+            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{escaped_query}%", limit]
             sql = """
                 SELECT id, content, memory_type, importance, created_at
@@ -457,9 +490,9 @@ Output a JSON object with:
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if mem_tenant_id:
+            if tenant_id:
                 sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(mem_tenant_id))
+                params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 

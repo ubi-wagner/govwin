@@ -14,6 +14,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 interface RouteContext {
@@ -47,6 +48,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId, sectionId } = await ctx.params;
+    if (!isValidUUID(proposalId) || !isValidUUID(sectionId)) {
+      return NextResponse.json(
+        { error: 'Invalid ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json(
@@ -93,12 +100,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant + download gate ──────────
-    const [proposal] = await sql<{ id: string; lockCount: number; isLocked: boolean; stage: string }[]>`
-      SELECT id, lock_count, is_locked, stage FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; lockCount: number; isLocked: boolean; stage: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string; lockCount: number; isLocked: boolean; stage: string }[]>`
+        SELECT id, lock_count, is_locked, stage FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections/export] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json(
@@ -107,8 +120,11 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Download gate: must be locked at final stage with at least one lock
-    if (!(proposal.lockCount >= 1 && proposal.isLocked)) {
+    // Download gate: must have completed at least one stage (lock_count >= 1)
+    // OR proposal is in submitted/archived stage
+    // Downloads are allowed on locked proposals — that's the whole point of locking.
+    // They are also allowed on unlocked proposals that have been previously locked.
+    if (proposal.lockCount < 1 && proposal.stage !== 'submitted' && proposal.stage !== 'archived') {
       return NextResponse.json(
         { error: 'Downloads available after final review and lock', code: 'FORBIDDEN' },
         { status: 403 },
@@ -116,12 +132,18 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ──────────────────────
-    const [section] = await sql<{ id: string; title: string }[]>`
-      SELECT id, title FROM proposal_sections
-      WHERE id = ${sectionId}
-        AND proposal_id = ${proposalId}
-      LIMIT 1
-    `;
+    let section: { id: string; title: string } | undefined;
+    try {
+      [section] = await sql<{ id: string; title: string }[]>`
+        SELECT id, title FROM proposal_sections
+        WHERE id = ${sectionId}
+          AND proposal_id = ${proposalId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections/export] section query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!section) {
       return NextResponse.json(
@@ -138,7 +160,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Increment download count ────────────────────────────────────
     try {
-      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId}`;
+      await sql`UPDATE proposals SET download_count = download_count + 1 WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid`;
     } catch (countErr) {
       console.error('[api/portal/proposals/sections/export] download_count increment error:', countErr);
     }

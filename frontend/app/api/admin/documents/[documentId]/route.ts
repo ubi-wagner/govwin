@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { putObject, getObjectBuffer, deleteObject, listObjects } from '@/lib/storage/s3-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +55,7 @@ async function saveIndex(index: DocumentMeta[]): Promise<void> {
 // ─── Auth helper ───────────────────────────────────────────────────────
 
 async function checkAdmin(): Promise<
-  | { ok: true; email: string }
+  | { ok: true; email: string; userId: string }
   | { ok: false; response: NextResponse }
 > {
   const session = await auth();
@@ -78,7 +79,8 @@ async function checkAdmin(): Promise<
     };
   }
   const email = (session.user as { email?: string }).email || 'unknown';
-  return { ok: true, email };
+  const userId = (session.user as { id?: string }).id || 'unknown';
+  return { ok: true, email, userId };
 }
 
 // ─── GET — load a document ─────────────────────────────────────────────
@@ -226,6 +228,18 @@ export async function PUT(
     }
     await saveIndex(index);
 
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'document.saved',
+        actor: userActor(authResult.userId, authResult.email),
+        tenantId: null,
+        payload: { documentId, title: document.metadata?.title ?? null, version: document.metadata?.version_number ?? 1 },
+      });
+    } catch (e) {
+      console.error('[admin/documents/[id]] event emission failed:', e);
+    }
+
     return NextResponse.json({
       data: { id: documentId, version: document.metadata?.version_number || 1 },
     });
@@ -264,6 +278,18 @@ export async function DELETE(
     const index = await loadIndex();
     const filtered = index.filter(m => m.id !== documentId);
     await saveIndex(filtered);
+
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'document.deleted',
+        actor: userActor(authResult.userId, authResult.email),
+        tenantId: null,
+        payload: { documentId },
+      });
+    } catch (e) {
+      console.error('[admin/documents/[id]] event emission failed:', e);
+    }
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (err) {

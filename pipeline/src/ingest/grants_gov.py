@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -45,7 +45,10 @@ def _parse_date(date_str: Optional[str]) -> Optional[datetime]:
         pass
     for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%Y%m%d"):
         try:
-            return datetime.strptime(date_str, fmt)
+            dt = datetime.strptime(date_str, fmt)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
         except ValueError:
             continue
     log.debug("Failed to parse date: %r", date_str)
@@ -239,7 +242,7 @@ class GrantsGovIngester(BaseIngester):
             "naics_codes": [],
             "classification_code": (raw.get("cfdaNumbers") or "").strip() or None,
             "set_aside_type": None,
-            "program_type": program_type,
+            "program_type": program_type or "other",
             "close_date": _parse_date(raw.get("closeDate")),
             "posted_date": _parse_date(raw.get("openDate")),
             "estimated_value_min": None,

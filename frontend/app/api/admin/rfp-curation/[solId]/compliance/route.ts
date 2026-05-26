@@ -58,10 +58,16 @@ export async function GET(
     }
 
     // ── Query ───────────────────────────────────────────────────────
-    const rows = await sql`
-      SELECT * FROM solicitation_compliance
-      WHERE solicitation_id = ${solId}::uuid
-    `;
+    let rows;
+    try {
+      rows = await sql`
+        SELECT * FROM solicitation_compliance
+        WHERE solicitation_id = ${solId}::uuid
+      `;
+    } catch (e) {
+      console.error('[rfp-curation/compliance] GET query failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { compliance: rows[0] ?? null } });
   } catch (error) {
@@ -155,13 +161,18 @@ export async function POST(
       toolCtx,
     );
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'compliance_value.saved',
-      actor: { type: 'user', id: user.id! },
-      tenantId: null,
-      payload: { correlationId: randomUUID(), solicitationId: solId, variableName: body.variableName as string },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'compliance_value.saved',
+        actor: { type: 'user', id: user.id! },
+        tenantId: null,
+        payload: { correlationId: randomUUID(), solicitationId: solId, variableName: body.variableName as string },
+      });
+    } catch (e) {
+      console.error('[rfp-curation/compliance] event emission failed:', e);
+      // non-fatal, continue
+    }
 
     return NextResponse.json({ data: result });
   } catch (error) {

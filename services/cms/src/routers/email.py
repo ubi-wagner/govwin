@@ -1337,46 +1337,48 @@ async def bulk_approve_outbox(body: OutboxBulkApprove):
         approved = []
         errors = []
 
-        for oid in body.outbox_ids:
-            try:
-                outbox = await pool.fetchrow(
-                    'SELECT id, status, send_id, claimed_by_account_id, default_account_id, priority FROM email_outbox WHERE id = $1',
-                    uuid.UUID(oid),
-                )
-                if not outbox:
-                    errors.append({'id': oid, 'error': 'Not found'})
-                    continue
-                if outbox['status'] in ('approved', 'rejected'):
-                    errors.append({'id': oid, 'error': f'Already {outbox["status"]}'})
-                    continue
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                for oid in body.outbox_ids:
+                    try:
+                        outbox = await conn.fetchrow(
+                            'SELECT id, status, send_id, claimed_by_account_id, default_account_id, priority FROM email_outbox WHERE id = $1',
+                            uuid.UUID(oid),
+                        )
+                        if not outbox:
+                            errors.append({'id': oid, 'error': 'Not found'})
+                            continue
+                        if outbox['status'] in ('approved', 'rejected'):
+                            errors.append({'id': oid, 'error': f'Already {outbox["status"]}'})
+                            continue
 
-                sending_account_id = outbox['claimed_by_account_id'] or outbox['default_account_id']
+                        sending_account_id = outbox['claimed_by_account_id'] or outbox['default_account_id']
 
-                await pool.execute(
-                    '''UPDATE email_sends
-                       SET status = 'queued', approved_by = $1, approved_at = $2,
-                           approved_by_account_id = $3, account_id = COALESCE($3, account_id)
-                       WHERE id = $4''',
-                    body.approved_by, now, sending_account_id, outbox['send_id'],
-                )
+                        await conn.execute(
+                            '''UPDATE email_sends
+                               SET status = 'queued', approved_by = $1, approved_at = $2,
+                                   approved_by_account_id = $3, account_id = COALESCE($3, account_id)
+                               WHERE id = $4''',
+                            body.approved_by, now, sending_account_id, outbox['send_id'],
+                        )
 
-                await pool.execute(
-                    '''UPDATE email_outbox
-                       SET status = 'approved', reviewed_by = $1, reviewed_at = $2,
-                           review_notes = COALESCE($3, review_notes), updated_at = $2
-                       WHERE id = $4''',
-                    body.approved_by, now, body.review_notes, uuid.UUID(oid),
-                )
+                        await conn.execute(
+                            '''UPDATE email_outbox
+                               SET status = 'approved', reviewed_by = $1, reviewed_at = $2,
+                                   review_notes = COALESCE($3, review_notes), updated_at = $2
+                               WHERE id = $4''',
+                            body.approved_by, now, body.review_notes, uuid.UUID(oid),
+                        )
 
-                await pool.execute(
-                    'INSERT INTO email_queue (send_id, priority) VALUES ($1, $2)',
-                    outbox['send_id'], outbox['priority'],
-                )
+                        await conn.execute(
+                            'INSERT INTO email_queue (send_id, priority) VALUES ($1, $2)',
+                            outbox['send_id'], outbox['priority'],
+                        )
 
-                approved.append(oid)
+                        approved.append(oid)
 
-            except Exception as item_err:
-                errors.append({'id': oid, 'error': str(item_err)})
+                    except Exception as item_err:
+                        errors.append({'id': oid, 'error': str(item_err)})
 
         _fire_event(
             'email.outbox.bulk_approved',

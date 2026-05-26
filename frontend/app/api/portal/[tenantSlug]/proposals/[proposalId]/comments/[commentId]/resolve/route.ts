@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; commentId: string }>;
@@ -35,6 +36,9 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     const { tenantSlug, proposalId, commentId } = await ctx.params;
+    if (!isValidUUID(proposalId) || !isValidUUID(commentId)) {
+      return NextResponse.json({ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
@@ -47,44 +51,75 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId}
-        AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId}
+          AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments/resolve] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Resolve the comment ──────────────────────────────────────────
-    const [comment] = await sql<{ id: string; resolved: boolean }[]>`
-      UPDATE proposal_comments
-      SET resolved = true
-      WHERE id = ${commentId}
-        AND proposal_id = ${proposalId}
-      RETURNING id, resolved
-    `;
+    let comment: { id: string; resolved: boolean } | undefined;
+    try {
+      [comment] = await sql<{ id: string; resolved: boolean }[]>`
+        UPDATE proposal_comments
+        SET resolved = true
+        WHERE id = ${commentId}
+          AND proposal_id = ${proposalId}
+        RETURNING id, resolved
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments/resolve] update failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!comment) {
       return NextResponse.json({ error: 'Comment not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'comment.resolved',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'comment.resolved',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        commentId,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          proposalId,
+          commentId,
+        },
+      });
+    } catch (e) {
+      console.error('[api/portal/proposals/comments/resolve] event emission failed:', e);
+    }
+
+    // ── Activity log ────────────────────────────────────────────────
+    try {
+      await sql`
+        INSERT INTO proposal_activity_log
+          (proposal_id, tenant_id, actor_id, actor_email, actor_role,
+           activity_type, details)
+        VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
+                ${sessionUser.email ?? null}, ${role},
+                'comment_resolved',
+                ${JSON.stringify({ comment_id: commentId })}::jsonb)
+      `;
+    } catch (logErr) {
+      console.error('[api/portal/proposals/comments/resolve] activity log failed', logErr);
+    }
 
     return NextResponse.json({
       data: { id: comment.id, resolved: true },

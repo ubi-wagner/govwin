@@ -217,13 +217,17 @@ export async function POST(request: Request, ctx: RouteContext) {
         RETURNING id, name, created_at
       `;
 
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'saved_search.created',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: { spotlightId: spotlight.id, name: body.name },
-      });
+      try {
+        await emitEventSingle({
+          namespace: 'capture',
+          type: 'saved_search.created',
+          actor: userActor(sessionUser.id, sessionUser.email),
+          tenantId,
+          payload: { spotlightId: spotlight.id, name: body.name },
+        });
+      } catch (evtErr) {
+        console.error('[portal/spotlights] event emission failed:', evtErr);
+      }
 
       return NextResponse.json(
         { data: { id: spotlight.id, name: spotlight.name, created_at: spotlight.createdAt } },

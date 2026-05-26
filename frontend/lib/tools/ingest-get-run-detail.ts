@@ -55,7 +55,9 @@ export const ingestGetRunDetailTool = defineTool<Input, Output>({
   async handler(input, ctx) {
     const { jobId } = input;
 
-    const jobRows = await sql<
+    let jobRows;
+    try {
+      jobRows = await sql<
       {
         id: string;
         source: string;
@@ -75,6 +77,10 @@ export const ingestGetRunDetailTool = defineTool<Input, Output>({
       FROM pipeline_jobs
       WHERE id = ${jobId}::uuid
     `;
+    } catch (err) {
+      console.error('[ingest.get_run_detail] job query failed:', err);
+      throw err;
+    }
 
     if (jobRows.length === 0) {
       throw new NotFoundError(`pipeline_jobs not found: ${jobId}`);
@@ -95,17 +101,23 @@ export const ingestGetRunDetailTool = defineTool<Input, Output>({
       payload: Record<string, unknown> | null;
       createdAt: Date;
     };
-    const eventRows = await sql<EventRow[]>`
-      SELECT id, namespace, type, phase, actor_type, actor_id, payload, created_at
-      FROM system_events
-      WHERE namespace = 'finder'
-        AND type LIKE 'ingest.%'
-        AND created_at >= ${j.startedAt ?? j.createdAt}
-        AND (${j.completedAt}::timestamptz IS NULL
-             OR created_at <= ${j.completedAt}::timestamptz + INTERVAL '5 seconds')
-      ORDER BY created_at ASC
-      LIMIT 500
-    `;
+    let eventRows: EventRow[];
+    try {
+      eventRows = await sql<EventRow[]>`
+        SELECT id, namespace, type, phase, actor_type, actor_id, payload, created_at
+        FROM system_events
+        WHERE namespace = 'finder'
+          AND type LIKE 'ingest.%'
+          AND created_at >= ${j.startedAt ?? j.createdAt}
+          AND (${j.completedAt}::timestamptz IS NULL
+               OR created_at <= ${j.completedAt}::timestamptz + INTERVAL '5 seconds')
+        ORDER BY created_at ASC
+        LIMIT 500
+      `;
+    } catch (err) {
+      console.error('[ingest.get_run_detail] events query failed:', err);
+      throw err;
+    }
 
     const events: SystemEvent[] = eventRows.map((e) => ({
       id: e.id,

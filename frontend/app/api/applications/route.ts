@@ -104,32 +104,30 @@ export async function POST(request: Request) {
     if (emailDomain && !commonDomains.has(emailDomain)) {
       const safeDomain = emailDomain.replace(/[%_\\]/g, '\\$&');
       // Check applications table
-      const existingApp = await sql<{ contactName: string; contactEmail: string; status: string }[]>`
-        SELECT contact_name, contact_email, status FROM applications
+      const existingApp = await sql<{ id: string }[]>`
+        SELECT id FROM applications
         WHERE LOWER(contact_email) LIKE ${'%@' + safeDomain}
           AND LOWER(contact_email) != ${input.contactEmail.toLowerCase()}
         LIMIT 1
       `;
 
       if (existingApp.length > 0) {
-        const existing = existingApp[0];
         return NextResponse.json({
-          error: `It looks like someone from your organization (${existing.contactName}, ${existing.contactEmail}) has already ${existing.status === 'pending' ? 'applied' : 'been accepted'}. RFP Pipeline allows one administrator per company. Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
+          error: 'An application from this organization already exists. RFP Pipeline allows one administrator per company. Please contact your organization\'s existing administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',
           code: 'DOMAIN_MATCH',
         }, { status: 409 });
       }
 
       // Check users table too (already onboarded)
-      const existingDomainUser = await sql<{ name: string; email: string }[]>`
-        SELECT name, email FROM users
+      const existingDomainUser = await sql<{ id: string }[]>`
+        SELECT id FROM users
         WHERE LOWER(email) LIKE ${'%@' + safeDomain}
         LIMIT 1
       `;
 
       if (existingDomainUser.length > 0) {
-        const existing = existingDomainUser[0];
         return NextResponse.json({
-          error: `Your organization already has an account on RFP Pipeline (administrator: ${existing.name}, ${existing.email}). Please contact them to be added as a team member, or email eric@rfppipeline.com if this is a different company.`,
+          error: 'Your organization already has an account on RFP Pipeline. Please contact your organization\'s administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',
           code: 'DOMAIN_MATCH_USER',
         }, { status: 409 });
       }

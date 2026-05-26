@@ -6,6 +6,8 @@ import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
 }

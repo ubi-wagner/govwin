@@ -42,6 +42,15 @@ export async function GET(request: Request) {
     const hours = Math.min(Math.max(parseInt(searchParams.get('hours') ?? '24', 10) || 24, 1), 168);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
 
+    // Validate statusFilter
+    const VALID_STATUSES = ['pending', 'running', 'paused', 'retrying', 'completed', 'failed', 'cancelled'] as const;
+    if (statusFilter && !(VALID_STATUSES as readonly string[]).includes(statusFilter)) {
+      return NextResponse.json(
+        { error: `Invalid status filter. Must be one of: ${VALID_STATUSES.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     // ── Active instances ─────────────────────────────────────────
     const active = statusFilter
       ? await sql<{

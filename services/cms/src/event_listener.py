@@ -19,6 +19,7 @@ logger = logging.getLogger('cms.events')
 
 _task: asyncio.Task | None = None
 _last_processed_at: object | None = None
+_last_processed_id: str | None = None
 POLL_INTERVAL = int(os.getenv('EVENT_POLL_INTERVAL', '10'))
 ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
 _SEND_AS = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
@@ -72,7 +73,7 @@ async def _poll_loop():
 
 
 async def _process_new_events():
-    global _last_processed_at
+    global _last_processed_at, _last_processed_id
     pool = get_event_pool()
     if not pool:
         return
@@ -100,24 +101,28 @@ async def _process_new_events():
     if not rules:
         return
 
-    # Fetch new events
+    # Fetch new events (use >= to avoid missing events with identical timestamps)
     try:
         if _last_processed_at:
             events = await pool.fetch(
                 '''SELECT * FROM system_events
-                   WHERE created_at > $1::timestamptz
-                   ORDER BY created_at ASC LIMIT 50''',
+                   WHERE created_at >= $1::timestamptz
+                   ORDER BY created_at ASC, id ASC LIMIT 50''',
                 _last_processed_at,
             )
         else:
             events = await pool.fetch(
                 '''SELECT * FROM system_events
                    WHERE created_at > NOW() - INTERVAL '5 minutes'
-                   ORDER BY created_at ASC LIMIT 50'''
+                   ORDER BY created_at ASC, id ASC LIMIT 50'''
             )
     except Exception as e:
         logger.warning(f'Cannot fetch system_events: {e}')
         return
+
+    # Filter out already-processed events by ID (dedup for >= query)
+    if _last_processed_id is not None:
+        events = [e for e in events if str(e['id']) != _last_processed_id]
 
     # Events that should still be skipped by the CRM because they are
     # handled inline by the frontend (e.g. during the same request).
@@ -126,6 +131,7 @@ async def _process_new_events():
 
     for event in events:
         _last_processed_at = event['created_at']
+        _last_processed_id = str(event['id'])
         ns = event.get('namespace', '')
         etype = event.get('type', '')
 
