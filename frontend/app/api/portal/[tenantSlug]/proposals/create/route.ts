@@ -241,14 +241,15 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
-        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config)
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
         VALUES (
           ${tenantId},
           ${topicId},
           ${topic.solicitationId},
           ${proposalTitle},
           'draft',
-          ${JSON.stringify(gateConfig)}::jsonb
+          ${JSON.stringify(gateConfig)}::jsonb,
+          true
         )
         RETURNING id
       `;
@@ -499,17 +500,24 @@ export async function POST(request: Request, ctx: RouteContext) {
           try {
             await sendEmail({
               to: admin.email,
-              subject: `New Proposal Created — ${tenantName} — Review within 72 hours`,
+              subject: `ACTION REQUIRED — New Proposal Locked for Admin Review — ${tenantName}`,
               html: `
                 <p>Hi ${admin.name || 'Admin'},</p>
-                <p>A new proposal workspace has been created and needs your review within 72 hours:</p>
+                <p>A new proposal workspace has been created and is <strong>locked for admin review</strong>. The customer can see the proposal but cannot edit until you unlock it.</p>
                 <ul>
                   <li><strong>Customer:</strong> ${tenantName}</li>
                   <li><strong>Proposal:</strong> ${proposalTitle}</li>
                   <li><strong>Sections:</strong> ${sectionCount}</li>
                   <li><strong>Created:</strong> ${new Date().toISOString()}</li>
                 </ul>
-                <p>Please review the proposal setup (sections, compliance matrix, templates) to ensure quality before the customer begins drafting.</p>
+                <p><strong>Within 72 hours, please:</strong></p>
+                <ol>
+                  <li>Review the section skeleton and compliance matrix</li>
+                  <li>Co-draft and edit sections as needed (AI draft, manual edits)</li>
+                  <li>Verify compliance variables are accurate</li>
+                  <li>Unlock the proposal to release it to the customer</li>
+                </ol>
+                <p>The customer will be notified when the proposal is unlocked and ready for their input.</p>
                 <p>— RFP Pipeline System</p>
               `,
             });
