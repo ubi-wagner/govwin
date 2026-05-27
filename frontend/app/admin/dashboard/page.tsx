@@ -63,7 +63,7 @@ export default async function DashboardPage() {
 
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
-    redirect('/login');
+    redirect('/');
   }
 
   // Run all stat queries in parallel, each individually protected

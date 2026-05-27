@@ -27,11 +27,11 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   if (!role || !sessionUser.id) redirect('/login?error=session');
 
   const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) redirect('/login');
+  if (!tenant) redirect('/portal');
 
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
-  if (!hasAccess) redirect('/login');
+  if (!hasAccess) redirect('/portal');
 
   // ── Load proposal with opportunity + solicitation context ───────────
   interface ProposalRow {

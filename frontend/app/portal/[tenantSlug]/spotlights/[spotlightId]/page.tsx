@@ -76,11 +76,11 @@ export default async function SpotlightDetailPage({ params }: Props) {
   if (!role || !sessionUser.id) redirect('/login?error=session');
 
   const tenant = await getTenantBySlug(tenantSlug);
-  if (!tenant) redirect('/login');
+  if (!tenant) redirect('/portal');
 
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
-  if (!hasAccess) redirect('/login');
+  if (!hasAccess) redirect('/portal');
 
   // ---------- Load opportunity ----------
   interface OpportunityRow {

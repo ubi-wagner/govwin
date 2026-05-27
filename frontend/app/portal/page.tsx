@@ -45,7 +45,7 @@ export default async function PortalDispatcher() {
   // from a deleted tenant (e.g., after a DB wipe for HITL testing).
   if (tenantSlug) {
     try {
-      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} LIMIT 1`;
+      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' LIMIT 1`;
       if (!t) tenantSlug = null; // Tenant gone — treat as no workspace
     } catch {
       tenantSlug = null;

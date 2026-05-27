@@ -55,7 +55,7 @@ export default async function PortalLayout({
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(userId, role, tenantId);
   if (!hasAccess) {
-    redirect('/login');
+    redirect('/portal');
   }
 
   const companyName = (tenant.name as string) ?? tenantSlug;
