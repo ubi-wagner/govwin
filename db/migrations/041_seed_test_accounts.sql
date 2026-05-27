@@ -27,7 +27,10 @@ VALUES (
   true,
   false
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  temp_password = false,
+  is_active = true;
 
 -- --------------------------------------------------------------------------
 -- 2. Test tenant: Apex Defense Solutions
@@ -59,7 +62,11 @@ VALUES (
   true,
   false
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  tenant_id = EXCLUDED.tenant_id,
+  temp_password = false,
+  is_active = true;
 
 -- --------------------------------------------------------------------------
 -- 4. Tenant employee: James Chen
@@ -75,7 +82,11 @@ VALUES (
   true,
   false
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  tenant_id = EXCLUDED.tenant_id,
+  temp_password = false,
+  is_active = true;
 
 -- --------------------------------------------------------------------------
 -- 5. External partner: Maria Santos
@@ -91,7 +102,11 @@ VALUES (
   true,
   false
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  tenant_id = EXCLUDED.tenant_id,
+  temp_password = false,
+  is_active = true;
 
 -- --------------------------------------------------------------------------
 -- 6. Tenant profile for Apex Defense
