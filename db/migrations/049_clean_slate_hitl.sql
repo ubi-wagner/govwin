@@ -115,7 +115,7 @@ DELETE FROM pipeline_runs;
 DELETE FROM pipeline_jobs;
 
 -- ── Reset pipeline schedule next_run_at so ingesters run fresh ───────
-UPDATE pipeline_schedules SET next_run_at = now() WHERE is_active = true;
+UPDATE pipeline_schedules SET next_run_at = now() WHERE enabled = true;
 
 -- ── Source scout data (keep profiles, clear snapshots/diffs) ─────────
 DELETE FROM source_diffs;
