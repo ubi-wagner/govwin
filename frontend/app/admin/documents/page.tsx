@@ -8,7 +8,7 @@ export default async function DocumentsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
   const role = (session.user as { role?: string }).role;
-  if (role !== 'rfp_admin' && role !== 'master_admin') redirect('/login');
+  if (role !== 'rfp_admin' && role !== 'master_admin') redirect('/');
 
   return (
     <div className="max-w-6xl mx-auto">

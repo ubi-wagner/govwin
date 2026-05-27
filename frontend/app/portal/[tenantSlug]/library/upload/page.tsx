@@ -34,13 +34,13 @@ export default async function LibraryUploadPage({
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
-    redirect('/login');
+    redirect('/portal');
   }
   const tenantId = tenant.id as string;
 
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
-    redirect('/login');
+    redirect('/portal');
   }
 
   return (

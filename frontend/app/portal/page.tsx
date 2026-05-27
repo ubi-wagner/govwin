@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { sql } from '@/lib/db';
 import { getLandingPath, isRole, type Role } from '@/lib/rbac';
 
 /**
@@ -38,7 +39,19 @@ export default async function PortalDispatcher() {
     redirect('/login?error=session');
   }
 
-  const tenantSlug = sessionUser.tenantSlug ?? null;
+  let tenantSlug = sessionUser.tenantSlug ?? null;
+
+  // Validate the tenant still exists — the JWT may carry a stale slug
+  // from a deleted tenant (e.g., after a DB wipe for HITL testing).
+  if (tenantSlug) {
+    try {
+      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' LIMIT 1`;
+      if (!t) tenantSlug = null; // Tenant gone — treat as no workspace
+    } catch {
+      tenantSlug = null;
+    }
+  }
+
   const target = getLandingPath(role, tenantSlug);
 
   if (target) {

@@ -86,7 +86,7 @@ export default async function SourceDetailPage({ params }: PageProps) {
 
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
-    redirect('/login');
+    redirect('/');
   }
 
   const { profileId } = await params;

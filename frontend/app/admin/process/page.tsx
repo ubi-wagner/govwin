@@ -112,7 +112,7 @@ export default async function ProcessMonitorPage() {
 
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
-    redirect('/login');
+    redirect('/');
   }
 
   let activeProcesses: ActiveProcess[] = [];

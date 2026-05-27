@@ -43,13 +43,22 @@ export default async function LoginPage({ searchParams }: PageProps) {
 
   // Already authenticated — redirect to the appropriate workspace.
   if (session?.user) {
-    const sessionUser = session.user as {
-      role?: unknown;
-      tenantSlug?: string | null;
-    };
-    const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
-    const target = resolveRedirectTarget(params.from, role, sessionUser.tenantSlug ?? null);
-    redirect(target);
+    // If we arrived here with error=session, don't auto-redirect —
+    // the session is corrupt and the user needs to sign out.
+    if (params.error === 'session') {
+      // Fall through to render the login form with error message
+    } else {
+      const sessionUser = session.user as {
+        role?: unknown;
+        tenantSlug?: string | null;
+      };
+      const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+      if (!role) {
+        redirect('/login?error=session');
+      }
+      const target = resolveRedirectTarget(params.from, role, sessionUser.tenantSlug ?? null);
+      redirect(target);
+    }
   }
 
   const errorMsg = resolveErrorMessage(params.error);
