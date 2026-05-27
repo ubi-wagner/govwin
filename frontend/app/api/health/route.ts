@@ -44,22 +44,37 @@ const BOOTED_AT = Date.now();
 export const dynamic = 'force-dynamic';
 
 export async function GET(): Promise<NextResponse<HealthResponse>> {
-  const [db, s3] = await Promise.all([checkDb(), checkS3()]);
+  // During startup, DB/S3 may not be ready yet (migrations running,
+  // connections initializing). Always return 200 for the liveness probe
+  // so Railway doesn't kill the container before it's ready.
+  // The checks still run and report status for observability.
+  let db: CheckResult = { ok: false, detail: 'not checked' };
+  let s3: CheckResult = { ok: false, detail: 'not checked' };
+
+  try {
+    [db, s3] = await Promise.all([checkDb(), checkS3()]);
+  } catch (err) {
+    log.warn({ err }, 'health checks threw during startup');
+  }
+
+  const allOk = db.ok && s3.ok;
   const body: HealthResponse = {
-    ok: db.ok && s3.ok,
+    ok: allOk,
     version: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev',
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
     checks: { db, s3 },
   };
 
-  if (body.ok) {
+  if (allOk) {
     log.debug({ checks: body.checks }, 'health check ok');
   } else {
-    log.warn({ checks: body.checks }, 'health check failing');
+    log.warn({ checks: body.checks }, 'health check degraded');
   }
 
-  return NextResponse.json(body, { status: body.ok ? 200 : 503 });
+  // Always return 200 for Railway liveness probe.
+  // Dependency health is reported in the body for monitoring dashboards.
+  return NextResponse.json(body, { status: 200 });
 }
 
 async function checkDb(): Promise<CheckResult> {
