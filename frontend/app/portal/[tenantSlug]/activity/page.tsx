@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { ActivityStreamClient } from './activity-stream-client';
 
 export const dynamic = 'force-dynamic';
@@ -66,6 +66,10 @@ export default async function ActivityPage({
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     redirect('/portal');
+  }
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    redirect(`/portal/${tenantSlug}/proposals`);
   }
 
   const sp = await searchParams;

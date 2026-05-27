@@ -53,21 +53,41 @@ export default async function ProposalsListPage({ params }: Props) {
   }[] = [];
 
   try {
-    proposals = await sql<typeof proposals>`
-      SELECT
-        p.id,
-        p.title,
-        p.stage,
-        p.created_at,
-        o.close_date,
-        o.agency,
-        o.topic_number,
-        (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
-      FROM proposals p
-      JOIN opportunities o ON o.id = p.opportunity_id
-      WHERE p.tenant_id = ${tenantId}
-      ORDER BY p.created_at DESC
-    `;
+    if (role === 'partner_user') {
+      proposals = await sql<typeof proposals>`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.created_at,
+          o.close_date,
+          o.agency,
+          o.topic_number,
+          (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
+        FROM proposals p
+        INNER JOIN proposal_collaborators pc ON pc.proposal_id = p.id AND pc.user_id = ${sessionUser.id}::uuid
+        JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.tenant_id = ${tenantId}::uuid
+        ORDER BY p.created_at DESC
+        LIMIT 50
+      `;
+    } else {
+      proposals = await sql<typeof proposals>`
+        SELECT
+          p.id,
+          p.title,
+          p.stage,
+          p.created_at,
+          o.close_date,
+          o.agency,
+          o.topic_number,
+          (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
+        FROM proposals p
+        JOIN opportunities o ON o.id = p.opportunity_id
+        WHERE p.tenant_id = ${tenantId}
+        ORDER BY p.created_at DESC
+      `;
+    }
   } catch (e) {
     console.error('[portal/proposals] query error:', e);
   }

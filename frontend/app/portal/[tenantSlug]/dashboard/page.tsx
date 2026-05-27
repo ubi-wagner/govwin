@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +47,10 @@ export default async function DashboardPage({
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     redirect('/portal');
+  }
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    redirect(`/portal/${tenantSlug}/proposals`);
   }
 
   const companyName = (tenant.name as string) ?? tenantSlug;

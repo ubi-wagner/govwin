@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import LibraryDashboard from '@/components/portal/library-dashboard';
 import type { LibraryUnit } from '@/components/portal/atom-detail-modal';
 
@@ -46,6 +46,10 @@ export default async function LibraryPage({
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     redirect('/portal');
+  }
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    redirect(`/portal/${tenantSlug}/proposals`);
   }
 
   // ---------- Fetch library units with provenance ----------

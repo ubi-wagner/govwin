@@ -191,6 +191,27 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    // Send invite email with credentials
+    try {
+      const { sendEmail } = await import('@/lib/email');
+      const { collaboratorInviteEmail } = await import('@/lib/email-templates');
+      const loginUrl = `${process.env.NEXTAUTH_URL || ''}/login`;
+      const emailContent = collaboratorInviteEmail({
+        recipientName: name,
+        recipientEmail: email,
+        inviterName: (session.user as { name?: string }).name || 'Your admin',
+        proposalTitle: 'Team Membership',
+        role: memberRole,
+        permission: 'full',
+        isNewUser: true,
+        tempPassword,
+        loginUrl,
+      });
+      await sendEmail({ to: email, subject: emailContent.subject, html: emailContent.html });
+    } catch (e) {
+      console.error('[api/portal/team] invite email failed:', e);
+    }
+
     try {
       await emitEventSingle({
         namespace: 'capture',
