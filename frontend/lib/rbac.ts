@@ -67,8 +67,8 @@ const PATH_MIN_ROLE: Array<{ prefix: string; role: Role }> = [
   { prefix: '/api/admin/system', role: 'master_admin' },
   { prefix: '/admin', role: 'rfp_admin' },
   { prefix: '/api/admin', role: 'rfp_admin' },
-  { prefix: '/portal', role: 'tenant_user' },
-  { prefix: '/api/portal', role: 'tenant_user' },
+  { prefix: '/portal', role: 'partner_user' },
+  { prefix: '/api/portal', role: 'partner_user' },
   { prefix: '/dashboard', role: 'tenant_user' },
 ];
 

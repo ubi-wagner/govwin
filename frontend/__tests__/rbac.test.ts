@@ -6,6 +6,7 @@ import {
   isRole,
   canManageTenant,
   requiredRoleForPath,
+  getLandingPath,
 } from '@/lib/rbac';
 
 describe('isRole', () => {
@@ -92,10 +93,13 @@ describe('requiredRoleForPath', () => {
     expect(requiredRoleForPath('/api/admin/users')).toBe('rfp_admin');
   });
 
-  it('maps /portal and /dashboard to tenant_user', () => {
-    expect(requiredRoleForPath('/portal')).toBe('tenant_user');
-    expect(requiredRoleForPath('/portal/acme')).toBe('tenant_user');
-    expect(requiredRoleForPath('/api/portal/tenants')).toBe('tenant_user');
+  it('maps /portal to partner_user (lowest tenant role)', () => {
+    expect(requiredRoleForPath('/portal')).toBe('partner_user');
+    expect(requiredRoleForPath('/portal/acme')).toBe('partner_user');
+    expect(requiredRoleForPath('/api/portal/tenants')).toBe('partner_user');
+  });
+
+  it('maps /dashboard to tenant_user', () => {
     expect(requiredRoleForPath('/dashboard')).toBe('tenant_user');
   });
 
@@ -108,5 +112,35 @@ describe('requiredRoleForPath', () => {
   it('does not match a prefix substring (no /admin-xyz false positives)', () => {
     expect(requiredRoleForPath('/administrator')).toBeNull();
     expect(requiredRoleForPath('/portal-help')).toBeNull();
+  });
+});
+
+describe('getLandingPath', () => {
+  it('sends master_admin to /admin/dashboard regardless of tenant', () => {
+    expect(getLandingPath('master_admin', null)).toBe('/admin/dashboard');
+    expect(getLandingPath('master_admin', 'acme')).toBe('/admin/dashboard');
+  });
+
+  it('sends rfp_admin to /admin/dashboard', () => {
+    expect(getLandingPath('rfp_admin', null)).toBe('/admin/dashboard');
+    expect(getLandingPath('rfp_admin', 'acme')).toBe('/admin/dashboard');
+  });
+
+  it('sends tenant_admin to /portal/<slug>/dashboard', () => {
+    expect(getLandingPath('tenant_admin', 'apex-defense')).toBe('/portal/apex-defense/dashboard');
+  });
+
+  it('sends tenant_user to /portal/<slug>/dashboard', () => {
+    expect(getLandingPath('tenant_user', 'apex-defense')).toBe('/portal/apex-defense/dashboard');
+  });
+
+  it('sends partner_user to /portal/<slug>/proposals', () => {
+    expect(getLandingPath('partner_user', 'apex-defense')).toBe('/portal/apex-defense/proposals');
+  });
+
+  it('returns null for tenant roles with no slug', () => {
+    expect(getLandingPath('tenant_admin', null)).toBeNull();
+    expect(getLandingPath('tenant_user', null)).toBeNull();
+    expect(getLandingPath('partner_user', null)).toBeNull();
   });
 });

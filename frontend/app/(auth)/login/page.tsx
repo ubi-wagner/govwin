@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth, signIn } from '@/auth';
+import { getLandingPath, isRole, type Role } from '@/lib/rbac';
 
 interface PageProps {
   searchParams: Promise<{
@@ -10,27 +11,69 @@ interface PageProps {
   }>;
 }
 
+/**
+ * Determine where to send the user after login.
+ *
+ * Priority:
+ *   1. `from` query param (middleware stored the original destination)
+ *   2. Role-based landing path via getLandingPath()
+ *   3. Fallback to /portal (the dispatcher handles edge cases)
+ */
+function resolveRedirectTarget(
+  from: string | undefined,
+  role: Role | null,
+  tenantSlug: string | null,
+): string {
+  // If middleware captured the page the user was trying to reach, send
+  // them back there — but only if it's a relative path (never redirect
+  // to an external URL).
+  if (from && from.startsWith('/') && from !== '/login') {
+    return from;
+  }
+  if (role) {
+    const landing = getLandingPath(role, tenantSlug);
+    if (landing) return landing;
+  }
+  return '/portal';
+}
+
 export default async function LoginPage({ searchParams }: PageProps) {
   const session = await auth();
-  if (session?.user) {
-    redirect('/portal');
-  }
   const params = await searchParams;
+
+  // Already authenticated — redirect to the appropriate workspace.
+  if (session?.user) {
+    const sessionUser = session.user as {
+      role?: unknown;
+      tenantSlug?: string | null;
+    };
+    const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+    const target = resolveRedirectTarget(params.from, role, sessionUser.tenantSlug ?? null);
+    redirect(target);
+  }
+
   const errorMsg = resolveErrorMessage(params.error);
   const justChanged = params.justChanged === '1';
 
   async function handleLogin(formData: FormData): Promise<void> {
     'use server';
+    const raw = await searchParams;
     const email = String(formData.get('email') ?? '');
     const password = String(formData.get('password') ?? '');
     if (!email || !password) {
       redirect('/login?error=missing');
     }
+    // Carry the `from` param so the /portal dispatcher (or middleware)
+    // can honour it after sign-in. The actual role-based redirect is
+    // handled by the /portal dispatcher page once the session is live.
+    const redirectTo = raw.from && raw.from.startsWith('/') && raw.from !== '/login'
+      ? raw.from
+      : '/portal';
     try {
       await signIn('credentials', {
         email,
         password,
-        redirectTo: '/portal',
+        redirectTo,
       });
     } catch (e) {
       // NextAuth throws a NEXT_REDIRECT on success — re-throw to let it propagate.
@@ -46,7 +89,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-sm p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
-        <p className="text-sm text-gray-500 mb-6">RFP Pipeline portal</p>
+        <p className="text-sm text-gray-500 mb-6">RFP Pipeline</p>
 
         {justChanged ? (
           <div
