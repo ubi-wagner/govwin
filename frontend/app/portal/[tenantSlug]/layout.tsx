@@ -45,7 +45,11 @@ export default async function PortalLayout({
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) {
-    redirect('/login');
+    // Tenant slug is invalid or tenant was deleted — send to dispatcher
+    // which shows "no workspace" message. Do NOT redirect to /login
+    // or it creates an infinite loop (user is authenticated but their
+    // JWT still has the old tenantSlug).
+    redirect('/portal');
   }
 
   const tenantId = tenant.id as string;
