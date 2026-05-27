@@ -1,4 +1,5 @@
 import { AdminNavLink } from '@/components/admin/admin-nav-link';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -49,8 +50,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             CRM Console &nearr;
           </a>
         </nav>
-        <div className="text-xs text-gray-600 mt-4">
-          <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>
+        <div className="text-xs text-gray-600 mt-4 space-y-2">
+          <a href="/portal" className="block hover:text-gray-400">Portal &rarr;</a>
+          <SignOutButton className="block text-gray-500 hover:text-gray-300">Sign out</SignOutButton>
         </div>
       </aside>
       <main className="flex-1 p-8 bg-gray-50 min-h-screen">{children}</main>
