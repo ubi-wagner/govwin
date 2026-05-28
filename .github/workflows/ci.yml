@@ -56,6 +56,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
+      - name: Verify Google auth imports
+        run: python -c "from google.oauth2.credentials import Credentials; from google.oauth2 import service_account; print('Google auth OK')"
       - name: Python syntax check
         run: python -m py_compile src/main.py && python -m py_compile src/event_listener.py
       - name: Run CMS tests

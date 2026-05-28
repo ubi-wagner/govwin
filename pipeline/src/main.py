@@ -62,6 +62,19 @@ async def main() -> None:
     from health import run_health_server
     from lifecycle_scheduler import run_lifecycle_scheduler
 
+    # Instantiate the AgentFabric so all 10 archetypes are registered
+    # and ready for invocation by the workflow processor (AI_INVOKE
+    # steps) and the agent_task_queue consumer.
+    try:
+        from agents import AgentFabric
+        fabric = AgentFabric()
+        log.info(
+            "AgentFabric initialised with %d archetypes",
+            len(fabric._archetypes),
+        )
+    except Exception as exc:
+        log.error("AgentFabric initialisation failed (non-fatal): %s", exc)
+
     # Run the ingester consumer loop, workflow processor, health
     # server, and lifecycle scheduler concurrently. All manage their
     # own resources and respect shutdown_event.

@@ -40,11 +40,14 @@ export default async function PortalDispatcher() {
     try {
       const userId = (sessionUser as { id?: string }).id;
       const email = (sessionUser as { email?: string }).email;
-      if (userId || email) {
+      if (userId) {
         const [u] = await sql<{ role: string }[]>`
-          SELECT role FROM users
-          WHERE ${userId ? sql`id = ${userId}::uuid` : sql`email = ${email}`}
-          LIMIT 1
+          SELECT role FROM users WHERE id = ${userId}::uuid LIMIT 1
+        `;
+        if (u && isRole(u.role)) role = u.role;
+      } else if (email) {
+        const [u] = await sql<{ role: string }[]>`
+          SELECT role FROM users WHERE email = ${email} LIMIT 1
         `;
         if (u && isRole(u.role)) role = u.role;
       }

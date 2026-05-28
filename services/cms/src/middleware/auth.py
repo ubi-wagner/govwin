@@ -5,10 +5,12 @@ Checks X-CMS-API-Key header against CMS_API_KEY env var.
 Skips auth for health, docs, OpenAPI schema, and SPA routes.
 If CMS_API_KEY is not set, rejects all API requests (fail closed).
 
-SPA users are authenticated via a session cookie set when /cms/ is served.
-External callers (e.g. Next.js frontend) use the X-CMS-API-Key header.
+Auth modes (CMS_AUTH_MODE env var):
+- "session" (default): SPA users authenticate via /api/auth/login which sets
+  a JWT session cookie. The old API-key-derived cookie is also accepted.
+- "basic": Legacy HTTP Basic Auth on /cms/ routes (CMS_BASIC_USER / CMS_BASIC_PASS).
 
-HTTP Basic Auth is enforced on /cms/ SPA routes when CMS_BASIC_PASS is set.
+External callers always use the X-CMS-API-Key header regardless of mode.
 """
 import base64
 import hashlib
@@ -19,49 +21,86 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-CMS_BASIC_USER = os.getenv("CMS_BASIC_USER", "admin")
-CMS_BASIC_PASS = os.getenv("CMS_BASIC_PASS", "")
+_CMS_COOKIE = 'cms_session'
+_CMS_LOGIN_COOKIE = 'cms_login_session'
+
+# ── Basic Auth helpers (legacy fallback) ────────────────────────────
+
+CMS_BASIC_USER = os.getenv('CMS_BASIC_USER', 'admin')
+CMS_BASIC_PASS = os.getenv('CMS_BASIC_PASS', '')
 
 
 def _check_basic_auth(request: Request) -> bool:
     """Check HTTP Basic Auth for CMS SPA access."""
     if not CMS_BASIC_PASS:
         return True  # No password set = open (dev mode)
-    auth_header = request.headers.get("authorization", "")
-    if not auth_header.startswith("Basic "):
+    auth_header = request.headers.get('authorization', '')
+    if not auth_header.startswith('Basic '):
         return False
     try:
         decoded = base64.b64decode(auth_header[6:]).decode()
-        user, passwd = decoded.split(":", 1)
+        user, passwd = decoded.split(':', 1)
         return hmac.compare_digest(user, CMS_BASIC_USER) and hmac.compare_digest(passwd, CMS_BASIC_PASS)
     except Exception:
         return False
 
-_CMS_COOKIE = 'cms_session'
 
+# ── Cookie helpers ──────────────────────────────────────────────────
 
 def _sign_cookie(api_key: str) -> str:
-    """Produce a signed value for the SPA session cookie."""
+    """Produce a signed value for the SPA session cookie (legacy)."""
     return hmac.new(api_key.encode(), b'cms_spa_session', hashlib.sha256).hexdigest()
+
+
+def _has_valid_login_session(request: Request) -> bool:
+    """Check if request has a valid JWT login session cookie."""
+    token = request.cookies.get(_CMS_LOGIN_COOKIE, '')
+    if not token:
+        return False
+    # Lazy import to avoid circular dependency at module load
+    from ..routers.auth import verify_session_token
+    return verify_session_token(token) is not None
+
+
+def _get_auth_mode() -> str:
+    """Get the current auth mode from env var."""
+    return os.getenv('CMS_AUTH_MODE', 'session').lower()
+
+
+# ── Paths that never require auth ──────────────────────────────────
+
+_PUBLIC_API_PATHS = frozenset({'/api/auth/login', '/api/auth/logout'})
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.url.path
+        auth_mode = _get_auth_mode()
 
-        # Always allow health checks, docs, and SPA routes without API auth
-        if path == '/health' or path.startswith('/cms') or path in ('/docs', '/openapi.json'):
-            # Enforce basic auth on CMS SPA pages (not static assets)
-            if path.startswith('/cms') and not path.startswith('/cms/assets'):
-                if not _check_basic_auth(request):
-                    return Response(
-                        "Authentication required",
-                        status_code=401,
-                        headers={"WWW-Authenticate": 'Basic realm="CMS"'},
-                    )
+        # Always allow health checks, docs, OpenAPI schema
+        if path == '/health' or path in ('/docs', '/openapi.json'):
+            return await call_next(request)
+
+        # Always allow auth endpoints (login/logout) without any auth
+        if path in _PUBLIC_API_PATHS:
+            return await call_next(request)
+
+        # ── SPA routes (/cms/...) ───────────────────────────────────
+        if path.startswith('/cms'):
+            if auth_mode == 'basic':
+                # Legacy: enforce HTTP Basic Auth on CMS SPA pages
+                if not path.startswith('/cms/assets'):
+                    if not _check_basic_auth(request):
+                        return Response(
+                            'Authentication required',
+                            status_code=401,
+                            headers={'WWW-Authenticate': 'Basic realm="CMS"'},
+                        )
+
             response = await call_next(request)
-            # Set session cookie when serving SPA pages (not static assets)
-            if path.startswith('/cms') and not path.startswith('/cms/assets'):
+
+            # In basic mode, set the legacy API-key-derived session cookie
+            if auth_mode == 'basic' and not path.startswith('/cms/assets'):
                 api_key = os.getenv('CMS_API_KEY', '')
                 if api_key:
                     is_dev = os.getenv('RAILWAY_ENVIRONMENT_NAME', 'local') == 'local'
@@ -73,7 +112,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                         secure=not is_dev,
                         max_age=86400,
                     )
+
             return response
+
+        # ── API routes (/api/...) ───────────────────────────────────
+        # Allow /api/auth/me without API key (it checks its own cookie)
+        if path == '/api/auth/me':
+            return await call_next(request)
 
         api_key = os.getenv('CMS_API_KEY', '')
 
@@ -89,9 +134,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if hmac.compare_digest(provided, api_key):
             return await call_next(request)
 
-        # Check session cookie (for SPA users)
+        # Check legacy session cookie (API-key-derived)
         cookie = request.cookies.get(_CMS_COOKIE, '')
         if cookie and hmac.compare_digest(cookie, _sign_cookie(api_key)):
+            return await call_next(request)
+
+        # Check JWT login session cookie (new session-based auth)
+        if _has_valid_login_session(request):
             return await call_next(request)
 
         return JSONResponse(

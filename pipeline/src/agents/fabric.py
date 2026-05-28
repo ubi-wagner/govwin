@@ -58,9 +58,35 @@ from datetime import datetime, timezone
 
 import anthropic
 
+from .archetypes import (
+    CaptureStrategistArchetype,
+    ColorTeamReviewerArchetype,
+    ComplianceReviewerArchetype,
+    LibrarianArchetype,
+    OpportunityAnalystArchetype,
+    PackagingSpecialistArchetype,
+    PartnerCoordinatorArchetype,
+    ProposalArchitectArchetype,
+    ScoringStrategistArchetype,
+    SectionDrafterArchetype,
+)
 from .context import ContextAssembler
 from .memory import MemoryStore
 from .tools import ToolRegistry, create_default_registry
+
+# All archetype classes to auto-register on fabric init
+_ARCHETYPE_CLASSES = [
+    CaptureStrategistArchetype,
+    ColorTeamReviewerArchetype,
+    ComplianceReviewerArchetype,
+    LibrarianArchetype,
+    OpportunityAnalystArchetype,
+    PackagingSpecialistArchetype,
+    PartnerCoordinatorArchetype,
+    ProposalArchitectArchetype,
+    ScoringStrategistArchetype,
+    SectionDrafterArchetype,
+]
 
 logger = logging.getLogger("pipeline.agents")
 
@@ -93,6 +119,19 @@ class AgentFabric:
         self.context_assembler = ContextAssembler()
         self.tool_registry = create_default_registry()
         self._archetypes: dict[str, object] = {}
+        self._register_all_archetypes()
+
+    def _register_all_archetypes(self) -> None:
+        """Instantiate and register all known agent archetypes."""
+        for archetype_cls in _ARCHETYPE_CLASSES:
+            try:
+                instance = archetype_cls()
+                self.register_archetype(instance.role_name, instance)
+            except Exception as exc:
+                logger.error(
+                    "Failed to register archetype %s: %s",
+                    archetype_cls.__name__, exc,
+                )
 
     # ------------------------------------------------------------------
     # Lazy client initialisation
@@ -236,7 +275,8 @@ class AgentFabric:
             tenant_id=tenant_id,
             payload={
                 "archetype": archetype_name,
-                "task_type": context.get("type", "unknown"),
+                "tenantId": tenant_id,
+                "taskType": context.get("type", "unknown"),
             },
         )
 
@@ -467,12 +507,14 @@ class AgentFabric:
                 tenant_id=tenant_id,
                 payload={
                     "archetype": archetype_name,
+                    "tenantId": tenant_id,
+                    "durationMs": duration_ms,
+                    "tokensUsed": total_input_tokens + total_output_tokens,
                     "input_tokens": total_input_tokens,
                     "output_tokens": total_output_tokens,
                     "tool_calls": tool_calls_count,
                     "rounds": rounds,
                     "cost_usd": float(cost_usd),
-                    "duration_ms": duration_ms,
                     "status": "completed",
                 },
                 parent_event_id=start_event_id,
@@ -523,9 +565,12 @@ class AgentFabric:
                 tenant_id=tenant_id,
                 payload={
                     "archetype": archetype_name,
+                    "tenantId": tenant_id,
+                    "durationMs": duration_ms,
+                    "tokensUsed": 0,
                     "status": "rejected",
                     "error": error_msg,
-                    "duration_ms": duration_ms,
+                    "stage": "guardrail",
                 },
                 parent_event_id=start_event_id,
             )
@@ -570,13 +615,16 @@ class AgentFabric:
                     phase="end",
                     tenant_id=tenant_id,
                     payload={
-                    "archetype": archetype_name,
-                    "status": "error",
-                    "error": error_msg,
-                    "duration_ms": duration_ms,
-                    "input_tokens": total_input_tokens,
-                    "output_tokens": total_output_tokens,
-                },
+                        "archetype": archetype_name,
+                        "tenantId": tenant_id,
+                        "durationMs": duration_ms,
+                        "tokensUsed": total_input_tokens + total_output_tokens,
+                        "status": "error",
+                        "error": error_msg,
+                        "stage": "execution",
+                        "input_tokens": total_input_tokens,
+                        "output_tokens": total_output_tokens,
+                    },
                     parent_event_id=start_event_id,
                 )
             except Exception as event_exc:

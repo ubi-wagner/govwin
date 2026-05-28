@@ -75,9 +75,16 @@ def _extract_top_level_agency(full_parent_path: Optional[str]) -> Optional[str]:
 
 
 def _detect_program_type(notice_type: Optional[str], title: Optional[str]) -> str:
-    """Detect SBIR/STTR/BAA/OTA program type from notice type + title keywords."""
-    text = (title or "").upper()
+    """Detect SBIR/STTR/BAA/OTA program type from notice type + title keywords.
 
+    Uses both the SAM.gov notice type field (Solicitation, Presolicitation,
+    Combined Synopsis/Solicitation, etc.) and the title text for keyword
+    matching to produce the most accurate program_type.
+    """
+    text = (title or "").upper()
+    nt = (notice_type or "").upper().strip()
+
+    # ── Title-based detection (most specific) ────────────────────────
     if "STTR" in text:
         if re.search(r"PHASE\s*(II|2)", text):
             return "sttr_phase_2"
@@ -95,6 +102,23 @@ def _detect_program_type(notice_type: Optional[str], title: Optional[str]) -> st
 
     if "OTA" in text or "OTHER TRANSACTION" in text:
         return "ota"
+
+    # ── Notice-type-based detection (fallback) ───────────────────────
+    # SAM.gov notice types: Solicitation, Presolicitation,
+    # Combined Synopsis/Solicitation, Sources Sought, Special Notice,
+    # Award Notice, Intent to Bundle, Justification
+    if nt in ("PRESOLICITATION", "PRE-SOLICITATION"):
+        return "presolicitation"
+    if nt == "SOURCES SOUGHT":
+        return "sources_sought"
+    if nt == "SPECIAL NOTICE":
+        return "special_notice"
+    if nt in ("AWARD NOTICE", "AWARD"):
+        return "award_notice"
+    if nt in ("SOLICITATION", "COMBINED SYNOPSIS/SOLICITATION"):
+        return "solicitation"
+    if nt == "JUSTIFICATION":
+        return "justification"
 
     return "other"
 

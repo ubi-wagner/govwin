@@ -26,6 +26,8 @@ from typing import Any, Optional
 import asyncpg
 import httpx
 
+from events import emit_event
+
 
 @dataclass
 class IngestResult:
@@ -83,6 +85,10 @@ class BaseIngester(ABC):
         source, source_id, title, agency, office, solicitation_number,
         naics_codes, classification_code, set_aside_type, program_type,
         close_date, posted_date, description, content_hash.
+
+        Optional topic-level keys (013):
+        topic_number, topic_branch, topic_status, tech_focus_areas,
+        solicitation_id, poc_name, poc_email, topic_metadata.
 
         Must be PURE — no DB access, no side effects.
         """
@@ -242,10 +248,14 @@ class BaseIngester(ABC):
                                    classification_code, set_aside_type,
                                    program_type, close_date, posted_date,
                                    estimated_value_min, estimated_value_max,
-                                   description, content_hash, is_active)
+                                   description, content_hash, is_active,
+                                   solicitation_id, topic_number, topic_branch,
+                                   topic_status, tech_focus_areas,
+                                   poc_name, poc_email, topic_metadata)
                                 VALUES
                                   ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-                                   $10, $11, $12, $13, $14, $15, $16, true)
+                                   $10, $11, $12, $13, $14, $15, $16, true,
+                                   $17, $18, $19, $20, $21, $22, $23, $24)
                                 ON CONFLICT (source, source_id) DO UPDATE SET
                                   title = EXCLUDED.title,
                                   agency = EXCLUDED.agency,
@@ -261,6 +271,22 @@ class BaseIngester(ABC):
                                   estimated_value_max = EXCLUDED.estimated_value_max,
                                   description = EXCLUDED.description,
                                   content_hash = EXCLUDED.content_hash,
+                                  solicitation_id = COALESCE(EXCLUDED.solicitation_id, opportunities.solicitation_id),
+                                  topic_number = COALESCE(EXCLUDED.topic_number, opportunities.topic_number),
+                                  topic_branch = COALESCE(EXCLUDED.topic_branch, opportunities.topic_branch),
+                                  topic_status = COALESCE(EXCLUDED.topic_status, opportunities.topic_status),
+                                  tech_focus_areas = CASE
+                                    WHEN EXCLUDED.tech_focus_areas != '{}'::text[]
+                                    THEN EXCLUDED.tech_focus_areas
+                                    ELSE opportunities.tech_focus_areas
+                                  END,
+                                  poc_name = COALESCE(EXCLUDED.poc_name, opportunities.poc_name),
+                                  poc_email = COALESCE(EXCLUDED.poc_email, opportunities.poc_email),
+                                  topic_metadata = CASE
+                                    WHEN EXCLUDED.topic_metadata != '{}'::jsonb
+                                    THEN EXCLUDED.topic_metadata
+                                    ELSE opportunities.topic_metadata
+                                  END,
                                   updated_at = now()
                                 WHERE opportunities.content_hash != EXCLUDED.content_hash
                                 RETURNING id, (xmax = 0) AS was_insert
@@ -281,6 +307,15 @@ class BaseIngester(ABC):
                                 row.get("estimated_value_max"),
                                 (row.get("description") or "")[:50000],
                                 row.get("content_hash"),
+                                # Topic-level columns (013)
+                                uuid.UUID(row["solicitation_id"]) if row.get("solicitation_id") else None,
+                                row.get("topic_number"),
+                                row.get("topic_branch"),
+                                row.get("topic_status"),
+                                row.get("tech_focus_areas", []),
+                                row.get("poc_name"),
+                                row.get("poc_email"),
+                                json.dumps(row.get("topic_metadata") or {}),
                             )
 
                             if upsert_row is None:
@@ -325,6 +360,19 @@ class BaseIngester(ABC):
                             self.log.warning(
                                 "failed to process item: %s", str(e)[:200]
                             )
+                            await emit_event(
+                                conn,
+                                namespace="finder",
+                                type="ingest.failed",
+                                phase="single",
+                                actor_type="pipeline",
+                                actor_id=f"ingest:{self.name}",
+                                payload={
+                                    "source": self.source,
+                                    "error": str(e)[:200],
+                                    "stage": "normalize",
+                                },
+                            )
 
                     cursor = next_cursor
                     if cursor is None:
@@ -334,10 +382,26 @@ class BaseIngester(ABC):
             result.errors.append(str(e)[:500])
             self.log.error("ingest run failed: %s", e)
 
+            # Emit failure event via events.emit_event
+            result.finished_at = datetime.now(timezone.utc)
+            await emit_event(
+                conn,
+                namespace="finder",
+                type="ingest.failed",
+                phase="single",
+                actor_type="pipeline",
+                actor_id=f"ingest:{self.name}",
+                payload={
+                    "source": self.source,
+                    "error": str(e)[:500],
+                    "stage": "fetch",
+                },
+            )
+
         result.finished_at = datetime.now(timezone.utc)
         result.last_cursor = cursor
 
-        # Emit end event
+        # Emit end event (legacy run tracking)
         await self._emit_event(
             conn,
             "finder",
@@ -355,6 +419,24 @@ class BaseIngester(ABC):
             },
             phase="end",
             parent_event_id=start_event_id,
+        )
+
+        # Emit closed-loop completion event via events.emit_event
+        await emit_event(
+            conn,
+            namespace="finder",
+            type="ingest.completed",
+            phase="single",
+            actor_type="pipeline",
+            actor_id=f"ingest:{self.name}",
+            payload={
+                "source": self.source,
+                "opportunitiesInserted": result.inserted,
+                "opportunitiesUpdated": result.updated,
+                "duplicatesSkipped": result.skipped,
+                "errors": result.failed,
+                "durationMs": result.duration_ms,
+            },
         )
 
         self.log.info(

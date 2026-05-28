@@ -22,6 +22,7 @@ from starlette.responses import FileResponse
 
 from .models.database import init_db, close_db, init_event_bridge, close_event_bridge
 from .routers import health, email, content
+from .routers.auth import router as auth_router
 from .routers.media import router as media_router
 from .routers.social import router as social_router
 from .routers.drip import router as drip_router
@@ -95,6 +96,7 @@ app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True
 app.add_middleware(APIKeyMiddleware)
 
 app.include_router(health.router, tags=["health"])
+app.include_router(auth_router, prefix="/api", tags=["auth"])
 app.include_router(email.router, prefix="/api/email", tags=["email"])
 app.include_router(content.router, prefix="/api/content", tags=["content"])
 app.include_router(media_router, prefix="/api/media", tags=["media"])

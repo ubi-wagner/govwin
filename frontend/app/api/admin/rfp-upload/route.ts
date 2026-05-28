@@ -4,8 +4,9 @@
  * Admin-only manual RFP upload. Accepts multipart form data with
  * one or more files + metadata, stores each file to the bucket
  * under `rfp-pipeline/{opp-uuid}/...`, creates the opportunity +
- * curated_solicitations + solicitation_documents rows, and
- * enqueues a shred job so the pipeline extracts text + runs Claude.
+ * curated_solicitations + solicitation_documents rows, and emits a
+ * finder:rfp.uploaded event so the OnRfpUploaded workflow shreds
+ * the document via the workflow processor (crash-recoverable).
  *
  * Supports two modes:
  *
@@ -460,22 +461,12 @@ export async function POST(request: Request) {
     }
   }
 
-  // Enqueue a shred job so the pipeline extracts text + runs Claude.
-  // Picked up by the dispatcher on the next tick. Even though we already
-  // extracted text above, the pipeline may do additional processing
-  // (embeddings, Claude analysis, etc.).
-  if (shouldExtract) {
-    try {
-      await sql`
-        INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
-        VALUES ('system', 'shred_solicitation', 'pending', 2,
-                ${JSON.stringify({ solicitation_id: solId, triggered_by: existingSolId ? 'doc_attach' : 'manual_upload' })}::jsonb)
-      `;
-    } catch (err) {
-      // Non-fatal — admin can manually retry via "Release for AI" in the workspace
-      console.error('[rfp-upload] shred job enqueue failed (non-fatal)', err);
-    }
-  }
+  // Shredding is triggered by the OnRfpUploaded workflow, which picks up
+  // the finder:rfp.uploaded:end event emitted below. No direct pipeline_jobs
+  // INSERT here — that would cause a double-shred (both the dispatcher
+  // consumer and the workflow processor would shred the same document,
+  // wasting Claude API tokens). The workflow path is preferred because it
+  // has crash recovery via process_instances.
 
   await emitEventEnd(eventId, {
     result: {

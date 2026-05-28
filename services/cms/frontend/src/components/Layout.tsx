@@ -1,5 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
+interface LayoutProps {
+  user?: { id: string; email: string; name: string; role: string }
+  onLogout?: () => void
+}
+
 const navGroups = [
   { label: 'Overview', items: [{ to: '/', label: 'Dashboard' }] },
   {
@@ -29,7 +34,7 @@ const navGroups = [
   { label: 'Tasks', items: [{ to: '/todos', label: 'TODOs' }] },
 ]
 
-export default function Layout() {
+export default function Layout({ user, onLogout }: LayoutProps) {
   return (
     <div className="min-h-screen flex">
       <aside className="w-60 bg-slate-900 text-white p-5 flex flex-col shrink-0">
@@ -61,6 +66,23 @@ export default function Layout() {
             </div>
           ))}
         </nav>
+        {user && (
+          <div className="border-t border-slate-700 pt-3 mt-3">
+            <div className="text-xs text-gray-400 truncate" title={user.email}>
+              {user.name || user.email}
+            </div>
+            <div className="text-xs text-gray-600 mb-2">{user.role}</div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                Sign out
+              </button>
+            )}
+          </div>
+        )}
         <div className="text-xs text-gray-600 mt-4">CMS/CRM Service</div>
       </aside>
       <main className="flex-1 p-8 bg-gray-50 min-h-screen overflow-auto">
