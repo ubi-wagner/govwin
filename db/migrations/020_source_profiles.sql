@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS source_profiles (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_source_profiles_name ON source_profiles(name);
+
 CREATE INDEX IF NOT EXISTS idx_source_profiles_active
   ON source_profiles (site_type) WHERE is_active = true;
 
@@ -120,4 +122,4 @@ INSERT INTO source_profiles (name, site_type, base_url, bookmark_url, agency, pr
     NULL,
     NULL
   )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;

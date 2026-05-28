@@ -21,6 +21,13 @@ ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS trigger_type TEXT NOT NULL
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id);
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
+-- Relax old 001_baseline NOT NULL columns so INSERTs without them don't crash
+ALTER TABLE automation_rules ALTER COLUMN trigger_bus DROP NOT NULL;
+ALTER TABLE automation_rules ALTER COLUMN trigger_bus SET DEFAULT '';
+ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_trigger_bus_check;
+ALTER TABLE automation_rules ALTER COLUMN trigger_events DROP NOT NULL;
+ALTER TABLE automation_rules ALTER COLUMN trigger_events SET DEFAULT '{}';
+
 -- Widen action_type CHECK to accept both old (001) and new (019) values
 ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
 ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
