@@ -89,7 +89,7 @@ from workflows.base import Workflow, Step, StepType, EventTrigger
 
 
 class OnProposalCreated(Workflow):
-    description = "AI-draft proposal sections and notify customer"
+    description = "Notify admin of new proposal requiring 72-hour review"
 
     trigger = EventTrigger(
         namespace="proposal",
@@ -100,26 +100,15 @@ class OnProposalCreated(Workflow):
 
     steps = [
         Step(
-            name="draft_sections",
-            step_type=StepType.AI_INVOKE,
-            action="tool.proposal.draft_all_sections",
-            input_map={
-                "proposal_id": "payload.proposalId",
-                "tenant_id": "payload.tenantId",
-            },
-            timeout_minutes=15,
-            retry_count=1,
-        ),
-        Step(
-            name="notify_customer",
+            name="notify_admin_review",
             step_type=StepType.NOTIFY,
             action="system.notify",
-            depends_on="draft_sections",
             input_map={
                 "channel": '"email"',
-                "template": '"proposal_workspace_ready"',
+                "template": '"admin_proposal_review_required"',
                 "tenant_id": "payload.tenantId",
                 "proposal_id": "payload.proposalId",
+                "proposal_title": "payload.proposalTitle",
             },
         ),
     ]
