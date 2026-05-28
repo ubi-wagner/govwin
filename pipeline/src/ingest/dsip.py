@@ -74,6 +74,54 @@ _AGENCY_MAP: dict[str, str] = {
 }
 
 
+def _extract_dsip_tech_focus(raw: dict[str, Any]) -> list[str]:
+    """Extract technology focus areas from DSIP topic data.
+
+    Checks explicit focus area fields first, then falls back to keyword
+    extraction from the topic description.
+    """
+    areas: list[str] = []
+
+    # DSIP sometimes provides explicit focus/keyword fields
+    for key in ("focusAreas", "focus_areas", "keywords", "technologyAreas"):
+        val = raw.get(key)
+        if isinstance(val, list):
+            areas.extend(str(v).strip() for v in val if v)
+        elif isinstance(val, str) and val.strip():
+            areas.extend(k.strip() for k in val.split(",") if k.strip())
+
+    # Fall back to keyword extraction from description
+    if not areas:
+        desc = raw.get("description", "")
+        if desc:
+            tech_patterns = [
+                "hypersonic", "autonomy", "autonomous", "directed energy",
+                "propulsion", "quantum", "cybersecurity", "cyber",
+                "machine learning", "artificial intelligence", "AI/ML",
+                "radar", "lidar", "sensor", "electronic warfare",
+                "unmanned", "UAV", "UAS", "robotics", "biotechnology",
+                "nanotechnology", "space", "satellite", "communications",
+                "signal processing", "materials science", "composite",
+                "additive manufacturing", "3D printing", "microelectronics",
+                "acoustic", "piezoelectric", "MEMS", "computer vision",
+                "chemical agent", "multi-sensor fusion",
+            ]
+            desc_upper = desc.upper()
+            for pat in tech_patterns:
+                if pat.upper() in desc_upper:
+                    areas.append(pat.lower())
+
+    # Deduplicate preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for a in areas:
+        lower = a.lower()
+        if lower not in seen:
+            seen.add(lower)
+            unique.append(a)
+    return unique
+
+
 # ── Stub data for development/testing ─────────────────────────────────
 
 def _generate_stub_topics() -> list[dict[str, Any]]:
@@ -390,6 +438,9 @@ class DsipIngester(BaseIngester):
     def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         """Map a raw DSIP topic dict to opportunities table columns.
 
+        Populates topic-level columns (013): topic_number, topic_branch,
+        topic_status, tech_focus_areas, topic_metadata.
+
         This function is PURE -- no DB access, no side effects.
         Handles both the JSON API shape and the HTML-scraped shape.
         """
@@ -423,6 +474,28 @@ class DsipIngester(BaseIngester):
         # Use topic_number as source_id for dedup
         source_id = topic_number or raw.get("id", "")
 
+        # ── Topic-level columns (013) ────────────────────────────────
+        # Map DSIP status to topic_status enum
+        raw_status = (raw.get("status") or "").strip().lower()
+        if raw_status in ("open", "pre_release", "closed", "awarded", "withdrawn"):
+            topic_status = raw_status
+        elif raw_status in ("pre-release", "prerelease"):
+            topic_status = "pre_release"
+        else:
+            topic_status = "open" if raw_status else None
+
+        # Extract tech focus areas
+        tech_focus = _extract_dsip_tech_focus(raw)
+
+        # Build topic_metadata with extra fields
+        topic_meta: dict[str, Any] = {}
+        if solic_type:
+            topic_meta["solicType"] = solic_type
+        if phase:
+            topic_meta["phase"] = phase
+        if raw.get("id"):
+            topic_meta["dsip_id"] = raw["id"]
+
         return {
             "source": self.source,
             "source_id": source_id,
@@ -437,4 +510,10 @@ class DsipIngester(BaseIngester):
             "close_date": close_date,
             "posted_date": posted_date,
             "description": description,
+            # Topic-level columns (013)
+            "topic_number": topic_number or None,
+            "topic_branch": component,
+            "topic_status": topic_status,
+            "tech_focus_areas": tech_focus,
+            "topic_metadata": topic_meta if topic_meta else {},
         }

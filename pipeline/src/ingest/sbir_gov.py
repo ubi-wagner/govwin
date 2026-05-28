@@ -11,9 +11,11 @@ No authentication required. Public data.
 
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
+import asyncpg
 import httpx
 
 import config
@@ -73,6 +75,52 @@ def _detect_program_type(program: Optional[str], phase: Optional[str]) -> str:
             return "sbir_phase_2"
         return "sbir_phase_1"
     return "other"
+
+
+def _extract_tech_focus_areas(raw: dict) -> list[str]:
+    """Extract technology focus area keywords from SBIR.gov topic data.
+
+    Pulls from explicit keyword fields when present, otherwise extracts
+    technology-related terms from the topic title and description.
+    """
+    areas: list[str] = []
+
+    # Explicit keyword fields that SBIR.gov sometimes includes
+    for key in ("keywords", "technology_areas", "tech_areas", "focus_areas"):
+        val = raw.get(key)
+        if isinstance(val, list):
+            areas.extend(str(v).strip() for v in val if v)
+        elif isinstance(val, str) and val.strip():
+            areas.extend(k.strip() for k in val.split(",") if k.strip())
+
+    # If no explicit keywords, derive from title/description
+    if not areas:
+        text = f"{raw.get('solicitation_title', '')} {raw.get('description', '')}"
+        # Common DoD SBIR technology domains
+        tech_patterns = [
+            "hypersonic", "autonomy", "autonomous", "directed energy",
+            "propulsion", "quantum", "cybersecurity", "cyber",
+            "machine learning", "artificial intelligence", "AI/ML",
+            "radar", "lidar", "sensor", "electronic warfare",
+            "unmanned", "UAV", "UAS", "robotics", "biotechnology",
+            "nanotechnology", "space", "satellite", "communications",
+            "signal processing", "materials science", "composite",
+            "additive manufacturing", "3D printing", "microelectronics",
+        ]
+        text_upper = text.upper()
+        for pat in tech_patterns:
+            if pat.upper() in text_upper:
+                areas.append(pat.lower())
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for a in areas:
+        lower = a.lower()
+        if lower not in seen:
+            seen.add(lower)
+            unique.append(a)
+    return unique
 
 
 # ── Stub Data Generator ──────────────────────────────────────────────
@@ -179,10 +227,124 @@ class SbirGovIngester(BaseIngester):
 
     Each solicitation may contain multiple topics. We treat each topic
     as its own opportunity row (topic_number -> source_id).
+
+    Parent BAA solicitations are tracked so that all topics from the same
+    BAA share a single curated_solicitations row (the parent). The cache
+    maps solicitation_number -> curated_solicitations.id.
     """
 
     name = "sbir_gov"
     source = "sbir_gov"
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Cache: solicitation_number -> curated_solicitations.id
+        self._baa_cache: dict[str, str] = {}
+
+    async def _ensure_parent_solicitation(
+        self,
+        conn: asyncpg.Connection,
+        row: dict[str, Any],
+    ) -> Optional[str]:
+        """Ensure a parent curated_solicitations row exists for the BAA.
+
+        Returns the curated_solicitations.id for this BAA, creating it
+        if it doesn't exist yet. Caches the result for the duration of
+        the ingest run so we only create one row per BAA.
+        """
+        from shredder.namespace import compute_namespace_key
+
+        sol_number = row.get("solicitation_number")
+        if not sol_number:
+            return None
+
+        # Return cached value if we already created/found this BAA
+        if sol_number in self._baa_cache:
+            return self._baa_cache[sol_number]
+
+        namespace = compute_namespace_key(
+            row.get("agency"),
+            row.get("office"),
+            row.get("program_type"),
+        ) or "pending"
+
+        try:
+            # Look up existing curated_solicitations by solicitation_number
+            existing = await conn.fetchrow(
+                """
+                SELECT id FROM curated_solicitations
+                WHERE solicitation_number = $1
+                LIMIT 1
+                """,
+                sol_number,
+            )
+            if existing:
+                sol_id = str(existing["id"])
+                self._baa_cache[sol_number] = sol_id
+                return sol_id
+
+            # Create a new parent curated_solicitations row for this BAA
+            new_row = await conn.fetchrow(
+                """
+                INSERT INTO curated_solicitations
+                  (namespace, status, solicitation_type,
+                   solicitation_title, solicitation_number, full_text)
+                VALUES ($1, 'new', 'multi_topic', $2, $3, $4)
+                RETURNING id
+                """,
+                namespace,
+                row.get("title") or sol_number,
+                sol_number,
+                (row.get("description") or "")[:50000] or None,
+            )
+            if new_row:
+                sol_id = str(new_row["id"])
+                self._baa_cache[sol_number] = sol_id
+                self.log.info(
+                    "created parent curated_solicitation %s for BAA %s",
+                    sol_id, sol_number,
+                )
+                return sol_id
+        except Exception as e:
+            self.log.warning(
+                "failed to ensure parent solicitation for %s: %s",
+                sol_number, e,
+            )
+
+        return None
+
+    async def _create_triage_row(
+        self,
+        conn: asyncpg.Connection,
+        opp_id: Any,
+        row: dict[str, Any],
+    ) -> None:
+        """Override: link topic opportunity to parent BAA's curated_solicitations.
+
+        Instead of creating a new curated_solicitations row per topic,
+        we ensure one parent row per BAA and set the opportunity's
+        solicitation_id FK to point to it.
+        """
+        sol_id = await self._ensure_parent_solicitation(conn, row)
+        if sol_id:
+            try:
+                await conn.execute(
+                    """
+                    UPDATE opportunities
+                    SET solicitation_id = $1
+                    WHERE id = $2 AND solicitation_id IS NULL
+                    """,
+                    uuid.UUID(sol_id),
+                    opp_id,
+                )
+            except Exception as e:
+                self.log.warning(
+                    "failed to link opp %s to solicitation %s: %s",
+                    opp_id, sol_id, e,
+                )
+        else:
+            # Fallback: create a per-opportunity triage row (base behavior)
+            await super()._create_triage_row(conn, opp_id, row)
 
     async def fetch_page(
         self,
@@ -271,21 +433,48 @@ class SbirGovIngester(BaseIngester):
         Each solicitation topic becomes its own opportunity. The topic_number
         field is used as the source_id for per-topic granularity.
 
+        Populates topic-level columns (013): topic_number, topic_branch,
+        topic_status, tech_focus_areas, poc_name, poc_email, topic_metadata.
+
         This function is PURE -- no DB access, no side effects.
         """
         # Use topic_number as the unique identifier for each topic/opportunity.
         # Fall back to solicitation_number if topic_number is absent.
-        source_id = raw.get("topic_number") or raw.get("solicitation_number")
+        topic_num = raw.get("topic_number")
+        source_id = topic_num or raw.get("solicitation_number")
 
         program = raw.get("program")
         phase = raw.get("phase")
+        branch = raw.get("branch")
+
+        # Extract tech focus areas from available data
+        tech_focus = _extract_tech_focus_areas(raw)
+
+        # Build topic_metadata with any extra fields not mapped to columns
+        topic_meta: dict[str, Any] = {}
+        if raw.get("solicitation_year"):
+            topic_meta["solicitation_year"] = raw["solicitation_year"]
+        if program:
+            topic_meta["program"] = program
+        if phase:
+            topic_meta["phase"] = phase
+        if raw.get("application_close_date"):
+            topic_meta["application_close_date"] = raw["application_close_date"]
+        # Include embedded topics list for reference
+        topics_list = raw.get("topics")
+        if topics_list and isinstance(topics_list, list):
+            topic_meta["embedded_topics"] = topics_list
+
+        # POC info — SBIR.gov sometimes provides contact info
+        poc_name = raw.get("poc_name") or raw.get("contact_name")
+        poc_email = raw.get("poc_email") or raw.get("contact_email")
 
         return {
             "source": self.source,
             "source_id": source_id,
             "title": raw.get("solicitation_title") or "",
             "agency": raw.get("agency"),
-            "office": raw.get("branch"),
+            "office": branch,
             "solicitation_number": raw.get("solicitation_number"),
             "naics_codes": [],
             "classification_code": None,
@@ -294,4 +483,12 @@ class SbirGovIngester(BaseIngester):
             "close_date": _parse_date(raw.get("solicitation_close_date")),
             "posted_date": _parse_date(raw.get("release_date")),
             "description": raw.get("description") or "",
+            # Topic-level columns (013)
+            "topic_number": topic_num,
+            "topic_branch": branch,
+            "topic_status": "open",
+            "tech_focus_areas": tech_focus,
+            "poc_name": poc_name,
+            "poc_email": poc_email,
+            "topic_metadata": topic_meta if topic_meta else {},
         }

@@ -121,6 +121,11 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     // ── 2. Fetch scored items matching spotlight filters ─────
+    const hasNaics = spotlight.naicsCodes && spotlight.naicsCodes.length > 0;
+    const hasKeywords = spotlight.keywords && spotlight.keywords.length > 0;
+    const hasAgencies = spotlight.agencies && spotlight.agencies.length > 0;
+    const hasProgramTypes = spotlight.programTypes && spotlight.programTypes.length > 0;
+
     let items: {
       opportunityId: string;
       title: string;
@@ -141,6 +146,10 @@ export async function GET(request: Request, ctx: RouteContext) {
         JOIN opportunities o ON o.id = tpi.opportunity_id
         WHERE tpi.tenant_id = ${tenantId}::uuid
           AND tpi.total_score >= ${spotlight.minScore}
+          AND (${!hasNaics} OR o.naics_codes && ${sql.array(hasNaics ? spotlight.naicsCodes : [])}::text[])
+          AND (${!hasAgencies} OR o.agency = ANY(${sql.array(hasAgencies ? spotlight.agencies : [])}::text[]))
+          AND (${!hasProgramTypes} OR o.program_type = ANY(${sql.array(hasProgramTypes ? spotlight.programTypes : [])}::text[]))
+          AND (${!hasKeywords} OR o.tech_focus_areas && ${sql.array(hasKeywords ? spotlight.keywords : [])}::text[])
         ORDER BY tpi.total_score DESC
         LIMIT 50
       `;

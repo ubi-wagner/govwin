@@ -113,9 +113,10 @@ export default async function SpotlightDetailPage({ params }: Props) {
       SELECT
         o.*,
         cs.status AS curation_status,
-        cs.namespace
+        cs.namespace,
+        cs.solicitation_type
       FROM opportunities o
-      LEFT JOIN curated_solicitations cs ON cs.opportunity_id = o.id
+      LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
       WHERE o.id = ${spotlightId}::uuid
       LIMIT 1
     `;
@@ -174,8 +175,9 @@ export default async function SpotlightDetailPage({ params }: Props) {
     const [row] = await sql<Record<string, unknown>[]>`
       SELECT sc.*
       FROM solicitation_compliance sc
-      JOIN curated_solicitations cs ON cs.id = sc.solicitation_id
-      WHERE cs.opportunity_id = ${spotlightId}::uuid
+      WHERE sc.solicitation_id = (
+        SELECT solicitation_id FROM opportunities WHERE id = ${spotlightId}::uuid
+      )
       LIMIT 1
     `;
     if (row) {
