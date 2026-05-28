@@ -367,8 +367,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       await sql`
         UPDATE purchases
-        SET proposal_id = ${proposal.id}::uuid,
-            updated_at = now()
+        SET proposal_id = ${proposal.id}::uuid
         WHERE tenant_id = ${tenantId}::uuid
           AND opportunity_id = ${topicId}::uuid
           AND proposal_id IS NULL

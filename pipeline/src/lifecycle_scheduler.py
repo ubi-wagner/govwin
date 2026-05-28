@@ -126,13 +126,25 @@ async def run_lifecycle_scheduler(
         except Exception:
             pass
         conn = None
-        # Wait before reconnecting, then restart the loop
-        if not shutdown_event.is_set():
-            await asyncio.sleep(30)
+        # Reconnect loop with exponential backoff (non-recursive)
+        backoff = 30
+        while not shutdown_event.is_set() and backoff <= 480:
+            logger.info("lifecycle scheduler reconnecting in %ds...", backoff)
             try:
-                await run_lifecycle_scheduler(database_url, shutdown_event)
+                await asyncio.wait_for(shutdown_event.wait(), timeout=backoff)
+                break  # shutdown was requested
+            except asyncio.TimeoutError:
+                pass
+            try:
+                conn = await asyncpg.connect(database_url)
+                logger.info("lifecycle scheduler reconnected")
+                # Re-enter the main scheduling loop
+                return await run_lifecycle_scheduler(
+                    database_url=database_url, shutdown_event=shutdown_event
+                )
             except Exception as re_err:
-                logger.error("lifecycle scheduler reconnect loop failed: %s", re_err)
+                logger.error("lifecycle scheduler reconnect failed: %s", re_err)
+                backoff = min(backoff * 2, 480)
     except Exception as e:
         logger.error("lifecycle scheduler fatal: %s", e)
     finally:

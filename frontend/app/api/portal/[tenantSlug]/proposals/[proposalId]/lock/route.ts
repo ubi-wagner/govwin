@@ -292,10 +292,6 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Workspace is not locked', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
-    if (proposal.lockCount === 0) {
-      return NextResponse.json({ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }, { status: 409 });
-    }
-
     const userRole = isRole(sessionUser.role) ? sessionUser.role : role;
     const isAdminRole = userRole === 'master_admin' || userRole === 'rfp_admin';
 

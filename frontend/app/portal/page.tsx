@@ -33,10 +33,25 @@ export default async function PortalDispatcher() {
     role?: unknown;
     tenantSlug?: string | null;
   };
-  const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+  let role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+
+  // If JWT role is missing/invalid, try to recover from DB before forcing re-login
   if (!role) {
-    // Authenticated but the JWT has no (or an invalid) role. Safest
-    // action is to force a fresh sign-in.
+    try {
+      const userId = (sessionUser as { id?: string }).id;
+      const email = (sessionUser as { email?: string }).email;
+      if (userId || email) {
+        const [u] = await sql<{ role: string }[]>`
+          SELECT role FROM users
+          WHERE ${userId ? sql`id = ${userId}::uuid` : sql`email = ${email}`}
+          LIMIT 1
+        `;
+        if (u && isRole(u.role)) role = u.role;
+      }
+    } catch { /* fall through to redirect */ }
+  }
+
+  if (!role) {
     redirect('/login?error=session');
   }
 
@@ -51,6 +66,21 @@ export default async function PortalDispatcher() {
     } catch {
       tenantSlug = null;
     }
+  }
+
+  // If JWT has no tenant but user has one in DB (stale JWT), refresh
+  if (!tenantSlug && role !== 'master_admin' && role !== 'rfp_admin') {
+    try {
+      const userId = (sessionUser as { id?: string }).id;
+      if (userId) {
+        const [u] = await sql<{ slug: string }[]>`
+          SELECT t.slug FROM users u
+          JOIN tenants t ON t.id = u.tenant_id
+          WHERE u.id = ${userId}::uuid AND t.status != 'suspended'
+        `;
+        if (u) tenantSlug = u.slug;
+      }
+    } catch { /* best effort */ }
   }
 
   const target = getLandingPath(role, tenantSlug);
