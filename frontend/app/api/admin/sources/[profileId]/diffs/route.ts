@@ -54,7 +54,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         SELECT sd.id, sd.profile_id, sd.region_id, sd.is_meaningful,
                sd.summary, sd.severity, sd.claude_model,
                sd.claude_tokens_used, sd.reviewed_by, sd.reviewed_at,
-               sd.created_at,
+               sd.created_at, sd.extracted_opportunities,
                sr.name AS region_name
         FROM source_diffs sd
         LEFT JOIN source_regions sr ON sr.id = sd.region_id

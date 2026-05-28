@@ -16,7 +16,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const VALID_ACTIONS = ['visit', 'download', 'upload', 'paste_topics', 'import_topics', 'note'] as const;
+const VALID_ACTIONS = ['visit', 'download', 'upload', 'paste_topics', 'import_topics', 'shred', 'note'] as const;
 type VisitAction = (typeof VALID_ACTIONS)[number];
 
 interface RouteContext {
