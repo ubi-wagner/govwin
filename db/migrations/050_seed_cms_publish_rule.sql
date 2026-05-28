@@ -3,6 +3,14 @@
 -- the event_listener's _action_publish_content upserts into cms_content.
 -- Without this rule, the publish event fires but nothing happens.
 
+-- Widen action_type CHECK to include unpublish_content
+ALTER TABLE automation_rules DROP CONSTRAINT IF EXISTS automation_rules_action_type_check;
+ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
+    CHECK (action_type IN ('log_only','queue_notification','queue_job','emit_event',
+                           'send_email','notify_admin','webhook','update_status',
+                           'create_todo','distribute_social','publish_content',
+                           'unpublish_content','enroll_drip'));
+
 INSERT INTO automation_rules (
   name, description, is_active,
   trigger_namespace, trigger_type,
