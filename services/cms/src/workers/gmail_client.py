@@ -45,7 +45,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
 ]
 
-_cached_credentials: OAuthCredentials | service_account.Credentials | None = None
+_cached_credentials: "OAuthCredentials | service_account.Credentials | None" = None
 
 
 def _get_credentials(delegate_email: str):
