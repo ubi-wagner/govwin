@@ -6,8 +6,7 @@
 INSERT INTO automation_rules (
   name, description, is_active,
   trigger_namespace, trigger_type,
-  action_type, action_config,
-  created_by
+  action_type, action_config
 ) VALUES (
   'CMS Content Publish Bridge',
   'When content is published in the CMS SPA, upsert it into the Main DB cms_content table for the marketing site to render.',
@@ -15,16 +14,14 @@ INSERT INTO automation_rules (
   'system',
   'content_pipeline.post.published',
   'publish_content',
-  '{"target_table": "cms_content", "upsert_by": "slug"}'::jsonb,
-  'system'
+  '{"target_table": "cms_content", "upsert_by": "slug"}'::jsonb
 ) ON CONFLICT DO NOTHING;
 
 -- Also add the unpublish bridge rule
 INSERT INTO automation_rules (
   name, description, is_active,
   trigger_namespace, trigger_type,
-  action_type, action_config,
-  created_by
+  action_type, action_config
 ) VALUES (
   'CMS Content Unpublish Bridge',
   'When content is unpublished in the CMS SPA, update the Main DB cms_content row to draft/unpublished.',
@@ -32,6 +29,5 @@ INSERT INTO automation_rules (
   'system',
   'content_pipeline.post.unpublished',
   'unpublish_content',
-  '{"target_table": "cms_content"}'::jsonb,
-  'system'
+  '{"target_table": "cms_content"}'::jsonb
 ) ON CONFLICT DO NOTHING;
