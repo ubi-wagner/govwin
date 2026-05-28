@@ -1,16 +1,20 @@
 """
 Gmail API client for sending and sweeping emails.
 
-Uses Google Workspace domain-wide delegation:
-  1. Service account authenticates
-  2. Impersonates the sweep account email
-  3. Sends on behalf of the sweep account
-  4. Sweeps inbox/sent for reply tracking
+Supports two auth modes (auto-detected from env vars):
 
-Requires:
-  - Google Cloud service account with Gmail API enabled
-  - Domain-wide delegation configured in Google Admin
-  - Scopes: gmail.send, gmail.readonly, gmail.modify
+1. OAuth2 Refresh Token (current default):
+   - GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
+   - Uses the token owner's Gmail account directly
+   - Simplest setup — works with any Gmail/Workspace account
+
+2. Service Account Delegation (future):
+   - GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_PATH
+   - Requires Google Workspace domain-wide delegation
+   - Better for multi-user send-as scenarios
+
+The auth mode is auto-detected: if GOOGLE_SERVICE_ACCOUNT_JSON is set,
+service account mode is used. Otherwise falls back to OAuth2 refresh token.
 """
 import asyncio
 import os
@@ -20,7 +24,9 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from google.oauth2.credentials import Credentials as OAuthCredentials
 from google.oauth2 import service_account
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 logger = logging.getLogger('cms.gmail')
@@ -31,25 +37,58 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
 ]
 
+_cached_credentials: OAuthCredentials | service_account.Credentials | None = None
 
-def _get_credentials(delegate_email: str) -> service_account.Credentials:
-    """Build delegated credentials for the given email address."""
+
+def _get_credentials(delegate_email: str):
+    """Build credentials using either service account or OAuth2 refresh token."""
+    global _cached_credentials
+
+    # Mode 1: Service account delegation (preferred for Workspace)
     sa_key_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if not sa_key_json:
-        sa_key_path = os.getenv('GOOGLE_SERVICE_ACCOUNT_PATH')
-        if not sa_key_path:
-            raise RuntimeError(
-                'Set GOOGLE_SERVICE_ACCOUNT_JSON (inline JSON) or '
-                'GOOGLE_SERVICE_ACCOUNT_PATH (file path) for Gmail API access'
-            )
-        with open(sa_key_path) as f:
-            sa_key_json = f.read()
+    if sa_key_json:
+        sa_info = json.loads(sa_key_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=SCOPES
+        )
+        return credentials.with_subject(delegate_email)
 
-    sa_info = json.loads(sa_key_json)
-    credentials = service_account.Credentials.from_service_account_info(
-        sa_info, scopes=SCOPES
+    sa_key_path = os.getenv('GOOGLE_SERVICE_ACCOUNT_PATH')
+    if sa_key_path:
+        with open(sa_key_path) as f:
+            sa_info = json.loads(f.read())
+        credentials = service_account.Credentials.from_service_account_info(
+            sa_info, scopes=SCOPES
+        )
+        return credentials.with_subject(delegate_email)
+
+    # Mode 2: OAuth2 refresh token (simpler setup)
+    client_id = os.getenv('GOOGLE_CLIENT_ID')
+    client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+    refresh_token = os.getenv('GOOGLE_REFRESH_TOKEN')
+
+    if not all([client_id, client_secret, refresh_token]):
+        raise RuntimeError(
+            'Gmail API credentials not configured. Set either:\n'
+            '  - GOOGLE_SERVICE_ACCOUNT_JSON (service account delegation), or\n'
+            '  - GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_REFRESH_TOKEN (OAuth2)'
+        )
+
+    if _cached_credentials and _cached_credentials.valid:
+        return _cached_credentials
+
+    credentials = OAuthCredentials(
+        token=None,
+        refresh_token=refresh_token,
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=SCOPES,
     )
-    return credentials.with_subject(delegate_email)
+    credentials.refresh(Request())
+    _cached_credentials = credentials
+    logger.info('Gmail OAuth2 credentials refreshed successfully')
+    return credentials
 
 
 def _get_gmail_service(delegate_email: str):
@@ -69,14 +108,13 @@ async def send_email(
     thread_id: str | None = None,
 ) -> dict:
     """
-    Send an email via Gmail API using delegated credentials.
+    Send an email via Gmail API.
 
     Returns: {message_id, thread_id, label_ids}
     """
     try:
         service = _get_gmail_service(delegate_email)
 
-        # Build MIME message
         msg = MIMEMultipart('alternative')
         msg['To'] = to_email
         from_header = f'{from_name} <{delegate_email}>' if from_name else delegate_email
@@ -91,7 +129,6 @@ async def send_email(
             msg.attach(MIMEText(body_text, 'plain'))
         msg.attach(MIMEText(body_html, 'html'))
 
-        # Encode and send
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
         send_body: dict = {'raw': raw}
         if thread_id:
@@ -135,7 +172,6 @@ async def sweep_inbox(
         service = _get_gmail_service(delegate_email)
 
         if history_id:
-            # Incremental sync via history API
             loop = asyncio.get_event_loop()
             results = await asyncio.wait_for(
                 loop.run_in_executor(
@@ -162,7 +198,6 @@ async def sweep_inbox(
                 'new_history_id': results.get('historyId', history_id),
             }
         else:
-            # Full sync — get recent inbox messages
             loop = asyncio.get_event_loop()
             results = await asyncio.wait_for(
                 loop.run_in_executor(
@@ -176,7 +211,6 @@ async def sweep_inbox(
                 timeout=30,
             )
 
-            # On first sync, get actual history ID from profile
             profile = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
@@ -229,15 +263,12 @@ def extract_body_text(message: dict) -> str:
     """Extract plain text body from a Gmail message."""
     payload = message.get('payload', {})
 
-    # Simple single-part message
     if payload.get('mimeType') == 'text/plain' and payload.get('body', {}).get('data'):
         return base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='replace')
 
-    # Multipart — find text/plain part
     for part in payload.get('parts', []):
         if part.get('mimeType') == 'text/plain' and part.get('body', {}).get('data'):
             return base64.urlsafe_b64decode(part['body']['data']).decode('utf-8', errors='replace')
-        # Nested multipart
         for subpart in part.get('parts', []):
             if subpart.get('mimeType') == 'text/plain' and subpart.get('body', {}).get('data'):
                 return base64.urlsafe_b64decode(subpart['body']['data']).decode('utf-8', errors='replace')
