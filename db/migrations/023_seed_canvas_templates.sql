@@ -7,6 +7,10 @@
 --
 -- Purely additive. Idempotent.
 
+-- Ensure unique index on name for ON CONFLICT to work
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_templates_name
+  ON document_templates(name) WHERE is_system = true;
+
 -- ─── 1. SBIR Phase I Technical Volume (15 pages, Word) ────────────────
 INSERT INTO document_templates (
   name, description, template_type, agency, program_type,
@@ -48,7 +52,7 @@ INSERT INTO document_templates (
     "typical_eval_criteria": ["technical_merit", "qualifications", "price_reasonableness", "commercialization_potential"]
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;
 
 -- ─── 2. DoD SBIR Phase II Technical Volume (30 pages, Word) ───────────
 INSERT INTO document_templates (
@@ -94,7 +98,7 @@ INSERT INTO document_templates (
     "typical_eval_criteria": ["technical_merit", "phase1_results", "qualifications", "work_plan", "commercialization_potential", "price_reasonableness"]
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;
 
 -- ─── 3. CSO Phase I Briefing (10 slides, PPTX) ───────────────────────
 INSERT INTO document_templates (
@@ -138,7 +142,7 @@ INSERT INTO document_templates (
     "typical_eval_criteria": ["innovation", "technical_feasibility", "team", "commercialization", "schedule_risk"]
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;
 
 -- ─── 4. Cost Volume — SBIR Phase I (Excel-style, Word) ────────────────
 INSERT INTO document_templates (
@@ -179,7 +183,7 @@ INSERT INTO document_templates (
     "compliance_notes": "SBIR Phase I budget typically $50K-$275K for 6-12 month PoP. Fee/profit capped at reasonable rate (typically 7-10%)."
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;
 
 -- ─── 5. Key Personnel Bio Template ────────────────────────────────────
 INSERT INTO document_templates (
@@ -211,7 +215,7 @@ INSERT INTO document_templates (
     "fields": ["name", "title", "role", "education", "experience", "publications", "current_pending_support"]
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;
 
 -- ─── 6. Past Performance Template ─────────────────────────────────────
 INSERT INTO document_templates (
@@ -243,4 +247,4 @@ INSERT INTO document_templates (
     "fields": ["contract_number", "agency", "period_of_performance", "contract_value", "relevance", "technical_outcomes", "schedule_performance", "cost_performance", "reference_name", "reference_phone", "reference_email"]
   }'::jsonb
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) WHERE is_system = true DO NOTHING;

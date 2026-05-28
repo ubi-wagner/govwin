@@ -51,4 +51,4 @@ INSERT INTO legal_document_versions (document_type, version, effective_date) VAL
 ('terms_of_service', '2026-04-v1', '2026-04-07'),
 ('privacy_policy', '2026-04-v1', '2026-04-07'),
 ('ai_disclosure', '2026-04-v1', '2026-04-07')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (document_type, version) DO NOTHING;

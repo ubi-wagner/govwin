@@ -1,6 +1,6 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-05-09 (full-stack stability audit)
+**Last updated:** 2026-05-28 (full migration audit + schema reconciliation)
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -10,7 +10,7 @@ that have been caught and fixed.
 
 ## 1. Database Schema Quick Reference
 
-The schema is defined across 36 migration files (000-035). These are the
+The schema is defined across 51 migration files (000-050). These are the
 tables most frequently queried and the exact column names. **Do NOT guess
 column names. Look them up here.**
 
@@ -20,7 +20,8 @@ column names. Look them up here.**
 tenants
   id, slug, name, legal_name, website, status, product_tier,
   billing_email, trial_ends_at, storage_root, created_at, updated_at
-  + stripe_customer_id (022), subscription_status (022)
+  + stripe_customer_id, subscription_status (022)
+  + lifecycle_stage (040) CHECK IN ('lead','target','customer','at_risk','churned')
 
 users
   id, email, name, role, tenant_id, password_hash, is_active,
@@ -34,7 +35,6 @@ opportunities
   awardee, is_active, created_at, updated_at
   + solicitation_id, topic_number, topic_branch, topic_status,
     tech_focus_areas, poc_name, poc_email, topic_metadata (013)
-  + solicitation_type, solicitation_title, solicitation_number (013 on curated_solicitations)
 
 curated_solicitations
   id, opportunity_id, namespace, status, claimed_by, claimed_at,
@@ -51,13 +51,60 @@ proposals
   stripe_payment_id, is_locked, created_at, updated_at
   + gate_config (JSONB), lock_count, download_count,
     last_locked_at, last_unlocked_at, unlock_deadline (029)
-  GOTCHA: stage CHECK changed in 029 to: draft, review, final, submitted, archived
+  + version, last_modified_by (044)
+  CHECK stage IN ('draft', 'review', 'final', 'submitted', 'archived')
 
 proposal_sections
   id, proposal_id, section_number, title, content (TEXT), page_allocation,
   status, assigned_to, requirement_ids, ai_confidence, version,
   created_at, updated_at
+  + last_modified_by, editing_by, editing_since (044)
   + completed_stage, completed_at, accepted_by, accepted_at (046)
+
+proposal_comments
+  id, proposal_id, section_id, user_id, content, resolved, created_at
+  GOTCHA: "section_id" not "node_id", "user_id" not "actor_id",
+          "content" not "text"
+
+proposal_stage_history
+  id, proposal_id, from_stage, to_stage, changed_by, notes, created_at
+  GOTCHA: "changed_by" not "actor_id", no "gate_results" column
+
+purchases
+  id, tenant_id, opportunity_id, proposal_id, stripe_session_id,
+  stripe_payment_intent, product_type, amount_cents, status, created_at
+  + metadata (JSONB) (035)
+  CHECK product_type IN ('finder_subscription', 'proposal_phase1',
+        'proposal_phase2', 'expert_consulting')
+```
+
+### Proposal Workspace Extensions (044-047)
+
+```
+proposal_activity_log (044)
+  id, proposal_id, tenant_id, actor_id, actor_email, actor_role,
+  activity_type, section_id, section_title, details (JSONB),
+  entity_version, created_at
+  CHECK activity_type IN (
+    'section_edited', 'section_saved', 'section_reverted',
+    'section_assigned', 'section_unassigned',
+    'stage_advanced', 'stage_reverted',
+    'proposal_locked', 'proposal_unlocked',
+    'collaborator_invited', 'collaborator_removed',
+    'collaborator_access_changed',
+    'comment_added', 'comment_resolved',
+    'ai_draft_requested', 'ai_review_requested',
+    'compliance_checked', 'outcome_recorded',
+    'document_uploaded', 'document_deleted',
+    'proposal_created', 'proposal_exported'
+  )
+
+stage_gate_requirements (044)
+  id, proposal_id, stage, requirement_type, label, description,
+  is_met, met_by, met_at, evidence (JSONB), created_at, updated_at
+  CHECK requirement_type IN ('all_sections_complete',
+    'compliance_check_passed', 'min_sections_approved',
+    'admin_review_complete', 'collaborator_signoff', 'custom')
 
 stage_completion_snapshots (046)
   id, proposal_id, stage, completed_by, completed_at,
@@ -72,21 +119,22 @@ proposal_supporting_docs (047)
   CHECK category IN ('supporting_document', 'proposal_input', 'other')
   CHECK status IN ('missing', 'uploaded', 'reviewed', 'approved', 'waived')
 
-proposal_comments
-  id, proposal_id, section_id, user_id, content, resolved, created_at
-  NOTE: column is "section_id" not "node_id", "user_id" not "actor_id",
-        "content" not "text"
+canvas_versions (045 additions)
+  Base: id, section_id, version_number, document (JSONB), created_at, created_by
+  + source, ai_instruction, ai_model, parent_version_id,
+    char_count, word_count, edit_summary (045)
+  CHECK source IN ('ai_draft', 'human_edit', 'ai_revision',
+                   'library_import', 'template', 'system')
 
-proposal_stage_history
-  id, proposal_id, from_stage, to_stage, changed_by, notes, created_at
-  NOTE: column is "changed_by" not "actor_id", no "gate_results" column
-
-purchases
-  id, tenant_id, opportunity_id, proposal_id, stripe_session_id,
-  stripe_payment_intent, product_type, amount_cents, status, created_at
-  + metadata (JSONB) (035)
-  GOTCHA: product_type CHECK includes: finder_subscription, proposal_phase1,
-          proposal_phase2, expert_consulting (035)
+curation_revisions (045)
+  id, solicitation_id, actor_id, actor_email, revision_type,
+  field_name, old_value, new_value, metadata (JSONB), created_at
+  CHECK revision_type IN ('compliance_updated', 'annotation_added',
+    'annotation_removed', 'outline_updated', 'volume_added',
+    'volume_removed', 'item_added', 'item_updated', 'item_removed',
+    'document_uploaded', 'ai_extracted', 'review_requested',
+    'review_approved', 'review_rejected', 'status_changed',
+    'namespace_set')
 ```
 
 ### Solicitation Structure (012_volumes_documents.sql)
@@ -106,8 +154,8 @@ volume_required_items
   format_rules, custom_fields, source_excerpts, metadata,
   verified_by, verified_at, created_at, updated_at
   + applies_to_phase (014)
-  GOTCHA: column is "item_number" NOT "item_order"
-  GOTCHA: column is "item_name" NOT "label"
+  GOTCHA: "item_number" NOT "item_order"
+  GOTCHA: "item_name" NOT "label"
   GOTCHA: there is NO "description" column
 
 solicitation_documents
@@ -119,44 +167,91 @@ solicitation_documents
   GOTCHA: document_type CHECK includes 'topic' (015+021 fix)
 ```
 
-### Automation & CMS (019, 028, 031, 034)
+### Automation & CMS (019, 028, 040, 050)
 
 ```
 automation_rules
-  id, name, description, is_active, trigger_namespace, trigger_type,
-  action_type, action_config, created_by, created_at, updated_at
-  GOTCHA: action_type includes BOTH old (log_only, queue_notification,
-          queue_job, emit_event) AND new (send_email, notify_admin,
-          webhook, update_status) values
+  id, name (UNIQUE), description, is_active, trigger_namespace, trigger_type,
+  action_type, action_config, created_by (UUID, nullable), created_at, updated_at
+  Also has legacy columns: trigger_bus (nullable), trigger_events (nullable), enabled
+  CHECK action_type IN ('log_only', 'queue_notification', 'queue_job', 'emit_event',
+    'send_email', 'notify_admin', 'webhook', 'update_status',
+    'create_todo', 'distribute_social', 'publish_content',
+    'unpublish_content', 'enroll_drip')
+  GOTCHA: created_by is UUID REFERENCES users(id) — NOT a string
 
 automation_log
   id, rule_id, trigger_event_id, action_type, status, result,
   error_message, executed_at
+  Also has legacy columns: action_taken
+  CHECK status IN ('success', 'failed', 'skipped')
 
 cms_content
   id, slug (UNIQUE), title, content_type, body, excerpt, author,
   tags, published, published_at, featured_image, external_url,
-  display_order, metadata, created_by, created_at, updated_at
-  + content_type expanded in 031: blog_post, resource, guide,
-    announcement, faq, testimonial, team_member, social_post, page_block
+  display_order, metadata, status, created_by, created_at, updated_at
+  CHECK content_type IN ('blog_post', 'resource', 'guide', 'announcement',
+    'faq', 'testimonial', 'team_member', 'social_post', 'page_block')
+  CHECK status IN ('draft', 'pending', 'published', 'private', 'archived')
 ```
 
-### Source Scout (025)
+### Source Scout (020 + 025)
 
 ```
-source_profiles
-  id, name, url, description, auto_crawl_enabled, crawl_cron,
-  last_crawled_at, created_at, updated_at
+source_profiles (020)
+  id, name (UNIQUE), site_type, base_url, bookmark_url, agency,
+  program_type, admin_notes, visit_instructions, topic_url_pattern,
+  pdf_url_pattern, is_active, last_visited_at, last_visited_by,
+  created_by, created_at, updated_at
+  + auto_crawl_enabled, crawl_cron, last_crawl_at, crawl_config (025)
+  CHECK site_type IN ('dsip', 'sam_gov', 'sbir_gov', 'grants_gov',
+                      'afwerx', 'xtech', 'nsf', 'custom')
+  GOTCHA: "base_url" NOT "url"
+  GOTCHA: "admin_notes" NOT "description"
+  GOTCHA: "last_crawl_at" NOT "last_crawled_at"
 
-source_regions
-  id, profile_id, css_selector, label, guidance, created_at
+source_regions (025)
+  id, profile_id, name, selector_hint, content_context, region_type,
+  sample_html, sample_text, is_active, created_at, updated_at
+  GOTCHA: "name" NOT "label"
+  GOTCHA: "selector_hint" NOT "css_selector"
 
-source_snapshots
-  id, profile_id, content_hash, storage_key, created_at
+source_snapshots (025)
+  id, profile_id, region_id, content_hash, content_text,
+  raw_html_s3_key, captured_at
+  GOTCHA: "raw_html_s3_key" NOT "storage_key"
 
-source_diffs
-  id, profile_id, from_snapshot_id, to_snapshot_id, diff_summary,
-  significance, storage_key, created_at
+source_diffs (025)
+  id, profile_id, region_id, prev_snapshot_id, next_snapshot_id,
+  is_meaningful, summary, extracted_opportunities, severity,
+  claude_model, claude_tokens_used, reviewed_by, reviewed_at, created_at
+  GOTCHA: "prev_snapshot_id" NOT "from_snapshot_id"
+  GOTCHA: "next_snapshot_id" NOT "to_snapshot_id"
+  GOTCHA: "summary" NOT "diff_summary"
+  GOTCHA: "severity" NOT "significance"
+```
+
+### Workflow Engine (043)
+
+```
+process_instances (043)
+  id, workflow_name, trigger_event_id, correlation_id,
+  status, current_step, current_step_index,
+  step_results (JSONB), step_status (JSONB),
+  started_at, completed_at, last_heartbeat_at, deadline,
+  retry_count, max_retries, last_error, last_error_step, recovered_from,
+  tenant_id, actor_id, actor_email, payload (JSONB),
+  source, created_at, updated_at
+  CHECK status IN ('pending', 'running', 'paused', 'completed',
+                   'failed', 'cancelled', 'retrying')
+  CHECK source IN ('pipeline', 'cms')
+  UNIQUE(workflow_name, trigger_event_id)
+
+process_instance_transitions (043 + 045)
+  id, instance_id, from_status, to_status, step_name,
+  actor, reason, metadata (JSONB), created_at
+  + affected_entity_type, affected_entity_id,
+    content_version_before, content_version_after (045)
 ```
 
 ### Compliance Presets (027)
@@ -185,13 +280,12 @@ There is NO table called `opportunity_topics` or `solicitation_topics`.
 Topics are stored in the `opportunities` table with a non-null
 `solicitation_id` pointing to the parent `curated_solicitations.id`.
 
-To query topics for a solicitation:
 ```sql
 SELECT * FROM opportunities WHERE solicitation_id = ${solId}::uuid
 ```
 
 NOT: `SELECT * FROM opportunity_topics` (does not exist)
-NOT: `SELECT * FROM solicitation_topics` (dropped in 035)
+NOT: `SELECT * FROM solicitation_topics` (dropped in 030a)
 
 ---
 
@@ -257,10 +351,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // 6. EVENT EMISSION — after successful mutation
     await emitEventSingle({
-      namespace: 'finder',           // see namespace rules below
-      type: 'entity.action_done',    // snake_case, past tense
+      namespace: 'finder',
+      type: 'entity.action_done',
       actor: { type: 'user', id: userId ?? 'unknown' },
-      tenantId: null,                // null for admin, real ID for portal
+      tenantId: null,
       payload: { entityId: rows[0].id },
     });
 
@@ -299,8 +393,7 @@ if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBID
 ```
 
 NEVER let a portal route query by proposalId alone without also
-filtering by tenant_id. This was the #1 critical bug found in the
-pre-launch audit.
+filtering by tenant_id.
 
 ---
 
@@ -334,7 +427,10 @@ Events that match a workflow trigger automatically instantiate a job:
 - `proposal:proposal.created:end` → OnProposalCreated (AI draft → notify)
 - `proposal:proposal.advanced:single` → OnProposalAdvanced (review → notify → HITL wait)
 
-See docs/EVENT_CONTRACT.md for the full registry and workflow architecture.
+### CMS Event Bridge (services/cms/src/event_listener.py)
+- `system:content_pipeline.post.published` → automation_rules → `_action_publish_content` → upserts cms_content
+- `system:content_pipeline.post.unpublished` → automation_rules → `_action_unpublish_content` → sets status=draft
+- Both actions emit completion/failure events back via `_emit_completion_event`
 
 ---
 
@@ -423,8 +519,7 @@ values being inserted into that column before removing any.
 
 ### Mistake 11: solicitation_compliance is NOT an EAV table
 The table has individual columns (page_limit_technical, font_family, etc.),
-NOT variable_name/value rows. Code that queries `SELECT variable_name,
-value FROM solicitation_compliance` crashes.
+NOT variable_name/value rows.
 
 **Rule:** Always verify the table structure in section 1 before writing
 queries. solicitation_compliance uses per-variable columns.
@@ -434,14 +529,28 @@ The columns are `requirement_text` and `notes`, NOT `requirement` and
 `details`. postgres.js camelCase transform means results use
 `requirementText` and `notes`.
 
+### Mistake 13: Migration INSERT type mismatches (May 28 deploy failure)
+Migration 050 inserted `created_by = 'system'` into a UUID column,
+and `action_type = 'unpublish_content'` before widening the CHECK.
+
+**Rule:** Before writing migration INSERTs:
+1. Check column types — UUID columns need UUIDs or NULL, not strings
+2. Check all CHECK constraints on the target table
+3. Use explicit `ON CONFLICT (column_name)` — never bare `ON CONFLICT DO NOTHING`
+4. If inserting a new value, widen the CHECK constraint FIRST
+
+### Mistake 14: Source Scout column name drift
+CLAUDE_CLIFFNOTES had wrong column names for 4 tables. See section 1
+for the corrected names with GOTCHA annotations.
+
 ---
 
 ## 5. Project Architecture Quick Reference
 
 ### Services
 - **Frontend** (Next.js 15): `frontend/` — UI + all API routes
-- **Pipeline** (Python 3.12): `pipeline/` — ingestion, scoring, agents
-- **CRM** (FastAPI): `services/cms/` — email automation, event listener
+- **Pipeline** (Python 3.12): `pipeline/` — ingestion, scoring, agents, workflows
+- **CMS** (FastAPI): `services/cms/` — email automation, CMS SPA (Vite/React/TipTap), event listener
 
 ### Storage
 - Single Railway S3 bucket: `rfp-pipeline-prod-r8t7tr6`
@@ -450,9 +559,10 @@ The columns are `requirement_text` and `notes`, NOT `requirement` and
 
 ### Auth
 - NextAuth v5 with Credentials provider + JWT
-- 5-role hierarchy: master_admin > rfp_admin > tenant_admin > tenant_user > partner_user
+- 5-role hierarchy: master_admin(100) > rfp_admin(80) > tenant_admin(60) > tenant_user(40) > partner_user(20)
 - `temp_password` flow for first login
 - Middleware enforces role gates on all routes
+- CMS SPA: separate HTTP Basic Auth (CMS_BASIC_USER/CMS_BASIC_PASS)
 
 ### Canvas Model
 - `CanvasDocument` = version + canvas rules + nodes[] + metadata
@@ -463,18 +573,26 @@ The columns are `requirement_text` and `notes`, NOT `requirement` and
 - 4 presets: letter_standard, letter_sbir_phase1, letter_sbir_phase2, slide_cso
 - Stored as JSON string in `proposal_sections.content` (TEXT column)
 
-### Proposal Stages (updated in migration 029)
+### Proposal Stages (migration 029)
 ```
 draft → review → final → submitted → archived
 ```
 Workspace auto-locks on `final` and `submitted`.
 Gate config is stored as JSONB array in `proposals.gate_config`.
+Proposals created locked (`is_locked=true`) for 72-hour admin review.
+
+### CMS Architecture
+- CMS SPA: Separate Vite/React app at its own Railway URL
+- Event bridge: CMS publishes → system_events → automation_rules → upsert cms_content
+- Marketing pages use `getPageBlocks(page)` + ISR (60s revalidation)
+- Content types: blog_post, resource, guide, page_block, etc.
+- Workflow: draft → review → approved → published (in CMS SPA)
 
 ### Deployment
 - Single environment: `main` branch → Railway production auto-deploy
-- Staging environment exists on Railway but is dormant until first paying customer
-- Migration workflow supports both environments when needed
-- DO NOT add staging ceremony (dual secrets, dual migrations) until explicitly asked
+- Migration runner: `db/migrations/migrate.mjs` — runs in transaction per migration
+- Tracks applied migrations in `_migration_history` table (filename + SHA-256)
+- CAUTION: `scripts/migrate.sh` has NO tracking — never use it
 
 ### Source Scout (Opportunity Monitoring)
 - `source_profiles` table with `auto_crawl_enabled`, `crawl_cron`
@@ -483,6 +601,14 @@ Gate config is stored as JSONB array in `proposals.gate_config`.
 - Scout tool: HTTP fetch + Claude classification (no Playwright)
 - Workflow: `on_source_change_detected` → draft RFP → notify admin
 - Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
+
+### Agent Fabric (pipeline/src/agents/)
+- 10 archetypes: section_drafter, compliance_reviewer, color_team_reviewer,
+  proposal_architect, capture_strategist, opportunity_analyst,
+  scoring_strategist, packaging_specialist, partner_coordinator, librarian
+- Memory: episodic, semantic, procedural (with decay, GC, compaction)
+- WorkflowManager: crash recovery, heartbeat, stuck detection
+- Rate limiting: 50 invocations/hr/tenant, $50/mo budget default
 
 ---
 
@@ -502,11 +628,28 @@ Templates:      frontend/lib/templates/{template-name}.ts
 
 Migrations:     db/migrations/{NNN}_{description}.sql
 Pipeline:       pipeline/src/{module}/{file}.py
+CMS:            services/cms/src/{module}.py
+CMS SPA:        services/cms/frontend/src/
 ```
 
 ---
 
-## 7. Testing Checklist (Before Every Commit)
+## 7. Migration Writing Rules
+
+```
+1. Always use IF NOT EXISTS / IF EXISTS guards on CREATE/DROP
+2. Widen CHECK constraints BEFORE inserting new values
+3. Use explicit ON CONFLICT (column) targets — never bare ON CONFLICT DO NOTHING
+4. UUID columns need UUIDs or NULL — never insert strings
+5. Verify FK target rows exist before inserting references
+6. Test migrations on fresh DB (all 51 in sequence), not just incremental
+7. The production runner (migrate.mjs) wraps each migration in a transaction
+   — partial failures roll back cleanly
+```
+
+---
+
+## 8. Testing Checklist (Before Every Commit)
 
 ```bash
 cd frontend && npx tsc --noEmit     # zero type errors
@@ -517,3 +660,4 @@ Before touching any SQL: verify column names against section 1.
 Before any API route: follow the template in section 2.
 Before any event: check namespace rules in section 3.
 Before any portal route: include tenant verification.
+Before any migration: follow rules in section 7.
