@@ -33,4 +33,5 @@ INSERT INTO automation_rules (id, name, trigger_namespace, trigger_type, action_
   (gen_random_uuid(), 'Auto-todo on application', 'capture', 'application.submitted', 'create_todo', '{"title_template": "Review application from {company_name}", "todo_type": "general", "priority": "high"}', true, 'Auto-create admin todo on new application'),
   (gen_random_uuid(), 'Social distribute on publish', 'system', 'content.published', 'distribute_social', '{"platforms": ["linkedin"]}', true, 'Post published content to LinkedIn'),
   (gen_random_uuid(), 'Auto-todo on source change', 'finder', 'source.change_detected', 'create_todo', '{"title_template": "Review scout changes: {source_name}", "todo_type": "curation", "priority": "medium"}', true, 'Auto-create curation todo on source change'),
-  (gen_random_uuid(), 'Publish CMS content to site', 'system', 'content_pipeline.post.publish', 'publish_content', '{"content_type": "blog_post"}', true, 'Push published CMS content to public website');
+  (gen_random_uuid(), 'Publish CMS content to site', 'system', 'content_pipeline.post.publish', 'publish_content', '{"content_type": "blog_post"}', true, 'Push published CMS content to public website')
+ON CONFLICT (name) DO NOTHING;

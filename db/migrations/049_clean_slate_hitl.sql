@@ -89,9 +89,12 @@ DELETE FROM tenant_profiles;
 
 -- ── Tenants (remove all tenants — users keep their tenant_id but
 --    tenants themselves are gone; HITL creates new ones via accept flow)
--- First detach users from tenants so FK doesn't block
-UPDATE users SET tenant_id = NULL WHERE tenant_id IS NOT NULL
-  AND role NOT IN ('master_admin', 'rfp_admin');
+-- Detach ALL users from tenants so FK doesn't block (including admins)
+UPDATE users SET tenant_id = NULL WHERE tenant_id IS NOT NULL;
+
+-- Clear tables with tenant FK that aren't covered above
+DELETE FROM audit_log;
+DELETE FROM document_templates;
 
 DELETE FROM tenants;
 

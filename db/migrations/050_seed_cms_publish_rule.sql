@@ -11,6 +11,10 @@ ALTER TABLE automation_rules ADD CONSTRAINT automation_rules_action_type_check
                            'create_todo','distribute_social','publish_content',
                            'unpublish_content','enroll_drip'));
 
+-- Remove the stale rule from migration 040 that has the wrong trigger_type
+-- (content_pipeline.post.publish vs the correct content_pipeline.post.published)
+DELETE FROM automation_rules WHERE name = 'Publish CMS content to site';
+
 INSERT INTO automation_rules (
   name, description, is_active,
   trigger_namespace, trigger_type,
@@ -23,7 +27,7 @@ INSERT INTO automation_rules (
   'content_pipeline.post.published',
   'publish_content',
   '{"target_table": "cms_content", "upsert_by": "slug"}'::jsonb
-) ON CONFLICT DO NOTHING;
+) ON CONFLICT (name) DO NOTHING;
 
 -- Also add the unpublish bridge rule
 INSERT INTO automation_rules (
@@ -38,4 +42,4 @@ INSERT INTO automation_rules (
   'content_pipeline.post.unpublished',
   'unpublish_content',
   '{"target_table": "cms_content"}'::jsonb
-) ON CONFLICT DO NOTHING;
+) ON CONFLICT (name) DO NOTHING;
