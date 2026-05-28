@@ -77,7 +77,9 @@ export default async function BlogPostPage({ params }: Props) {
 
       <div
         className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(post.body)) }}
+        dangerouslySetInnerHTML={{ __html: post.body?.startsWith('<')
+          ? sanitizeHtml(post.body)
+          : sanitizeHtml(renderMarkdown(post.body)) }}
       />
 
       {(post.tags ?? []).length > 0 && (

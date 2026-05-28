@@ -80,12 +80,25 @@ export default async function ContentPage() {
   const archivedCount = rows.filter((r) => r.status === 'archived').length;
 
   return (
-    <CmsPageManager
-      grouped={grouped}
-      totalBlocks={totalBlocks}
-      publishedCount={publishedCount}
-      draftCount={draftCount}
-      archivedCount={archivedCount}
-    />
+    <>
+      <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 flex items-center justify-between">
+        <span>Content is managed in the CMS portal. This page shows what is currently published.</span>
+        <a
+          href={process.env.CMS_SERVICE_URL || 'https://rfp-crm-production.up.railway.app/cms/'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-4 px-3 py-1 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700"
+        >
+          Open CMS Editor &rarr;
+        </a>
+      </div>
+      <CmsPageManager
+        grouped={grouped}
+        totalBlocks={totalBlocks}
+        publishedCount={publishedCount}
+        draftCount={draftCount}
+        archivedCount={archivedCount}
+      />
+    </>
   );
 }

@@ -218,7 +218,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -234,7 +234,7 @@ async def _execute_rule(rule, col_names: set, event):
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -720,6 +720,42 @@ async def _action_publish_content(config: dict, payload: dict, event):
     logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
 
 
+async def _action_unpublish_content(config: dict, payload: dict, event):
+    """When content is unpublished in CMS, update Main DB to draft."""
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning("No event_pool — cannot unpublish content to shared DB")
+        return {"status": "skipped", "reason": "no_event_pool"}
+
+    slug = payload.get("slug")
+    if not slug:
+        # Try to resolve slug from post_id
+        post_id = payload.get("post_id") or config.get("post_id")
+        if post_id:
+            from .models.database import get_pool as get_cms_pool
+            cms_pool = get_cms_pool()
+            row = await cms_pool.fetchrow(
+                "SELECT slug FROM cms_posts WHERE id = $1",
+                uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
+            )
+            if row:
+                slug = row["slug"]
+
+    if not slug:
+        return {"status": "skipped", "reason": "no_slug_in_payload"}
+
+    async with shared_pool.acquire() as conn:
+        await conn.execute(
+            """UPDATE cms_content
+               SET status = 'draft', published = false, updated_at = now()
+               WHERE slug = $1""",
+            slug,
+        )
+
+    logger.info(f'unpublish_content: set "{slug}" to draft in cms_content')
+    return {"status": "unpublished", "slug": slug}
+
+
 async def _do_action(action_type: str, config: dict, payload: dict, event):
     if action_type == 'create_todo':
         await _action_create_todo(config, payload, event)
@@ -735,6 +771,10 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
 
     elif action_type == 'publish_content':
         await _action_publish_content(config, payload, event)
+        return
+
+    elif action_type == 'unpublish_content':
+        await _action_unpublish_content(config, payload, event)
         return
 
     elif action_type == 'send_email':

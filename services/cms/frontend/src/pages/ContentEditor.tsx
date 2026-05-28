@@ -136,10 +136,17 @@ export default function ContentEditor() {
     setSaving(true)
     setError('')
     try {
+      const payload = {
+        ...form,
+        body_format: 'html',  // TipTap outputs HTML, not markdown
+        tags: typeof form.tags === 'string'
+          ? form.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+          : form.tags,
+      };
       if (isEditing) {
-        await api.patch(`/content/posts/${id}`, form)
+        await api.patch(`/content/posts/${id}`, payload)
       } else {
-        await api.post('/content/posts', form)
+        await api.post('/content/posts', payload)
       }
       navigate('/content')
     } catch (err) {
