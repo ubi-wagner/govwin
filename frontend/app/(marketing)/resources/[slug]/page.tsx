@@ -112,7 +112,9 @@ export default async function ResourceArticlePage({ params }: RouteContext) {
 
           <div
             className="prose prose-navy max-w-none text-navy-700 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(article.body)) }}
+            dangerouslySetInnerHTML={{ __html: article.body?.startsWith('<')
+              ? sanitizeHtml(article.body)
+              : sanitizeHtml(renderMarkdown(article.body)) }}
           />
 
           {article.externalUrl && (

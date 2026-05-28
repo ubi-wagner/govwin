@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { getLandingPath, isRole, type Role } from '@/lib/rbac';
 
 /**
@@ -69,14 +70,9 @@ export default async function PortalDispatcher() {
           yet. Ask your administrator to grant you access, or contact
           support if you think this is an error.
         </p>
-        <form action="/api/auth/signout" method="POST" className="mt-6">
-          <button
-            type="submit"
-            className="w-full rounded-md bg-gray-100 hover:bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="mt-6">
+          <SignOutButton className="w-full rounded-md bg-gray-100 hover:bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700" />
+        </div>
       </div>
     </div>
   );

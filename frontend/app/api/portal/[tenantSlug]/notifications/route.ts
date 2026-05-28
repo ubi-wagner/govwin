@@ -81,25 +81,53 @@ export async function GET(request: Request, ctx: RouteContext) {
         namespace: string;
         payload: Record<string, unknown>;
         createdAt: string;
+        actorType: string | null;
       }[]>`
-        SELECT id, type, namespace, payload, created_at
+        SELECT id, type, namespace, payload, created_at, actor_type
         FROM system_events
         WHERE tenant_id = ${tenantId}::uuid
-          AND namespace IN ('proposal', 'capture', 'library')
+          AND namespace IN ('proposal', 'capture', 'library', 'system')
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
       `;
 
-      const items = notifications.map((n) => ({
-        id: n.id,
-        type: n.type,
-        namespace: n.namespace,
-        title: (n.payload as Record<string, unknown>)?.title ?? n.type,
-        summary: (n.payload as Record<string, unknown>)?.summary ?? null,
-        created_at: n.createdAt,
-        is_read: false, // V1: no per-user read tracking; all shown as unread
-      }));
+      const items = notifications.map((n) => {
+        const p = (n.payload ?? {}) as Record<string, unknown>;
+        let title: string = (p.title as string) ?? n.type;
+        let summary: string | null = (p.summary as string) ?? null;
+
+        // Human-readable titles for closed-loop completion events
+        if (n.type === 'email.delivery_completed' || n.type === 'email.invite_delivered' || n.type === 'email.team_invite_delivered') {
+          const status = p.status === 'sent' ? 'sent' : 'failed';
+          title = `Email ${status} to ${(p.recipientEmail as string) ?? 'recipient'}`;
+          summary = p.error ? `Error: ${p.error as string}` : null;
+        } else if (n.type === 'email.admin_alert_delivered') {
+          title = `Admin alert sent (${(p.adminsNotified as number) ?? 0} admins notified)`;
+        } else if (n.type === 'notification.delivered') {
+          title = `Notification delivered to ${(p.recipientEmail as string) ?? 'recipient'}`;
+        } else if (n.type === 'notification.delivery_failed') {
+          title = `Notification failed for ${(p.recipientEmail as string) ?? 'recipient'}`;
+          summary = p.error ? `Error: ${p.error as string}` : null;
+        } else if (n.type === 'content_pipeline.post.publish_completed') {
+          title = `Blog post "${(p.title as string) ?? (p.slug as string) ?? ''}" published`;
+        } else if (n.type === 'content_pipeline.post.unpublish_completed') {
+          title = `Blog post "${(p.slug as string) ?? ''}" unpublished`;
+        } else if (n.type.endsWith('.failed') && n.namespace === 'system') {
+          title = `Action failed: ${(p.actionType as string) ?? n.type}`;
+          summary = p.error ? `${p.error as string}` : null;
+        }
+
+        return {
+          id: n.id,
+          type: n.type,
+          namespace: n.namespace,
+          title,
+          summary,
+          created_at: n.createdAt,
+          is_read: false, // V1: no per-user read tracking; all shown as unread
+        };
+      });
 
       return NextResponse.json({ data: { notifications: items } });
     } catch (dbErr) {

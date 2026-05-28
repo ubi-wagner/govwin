@@ -157,6 +157,14 @@ export async function PATCH(
       );
     }
 
+    // Status changes require tenant_admin or above
+    if (!hasRoleAtLeast(ctx.role, 'tenant_admin')) {
+      return NextResponse.json(
+        { error: 'Status changes require admin permissions', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
     // Validate status transition: fetch current status
     try {
       const [current] = await sql<{ status: string }[]>`

@@ -313,7 +313,9 @@ export function ProposalWorkspace({
       {/* Locked notice */}
       {isLocked && userRole !== 'admin' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-          This proposal is locked. Contact your admin to unlock it for editing.
+          {lockCount === 0
+            ? 'This proposal is under admin review. Our team is reviewing the section skeleton and compliance matrix to ensure quality. You will be notified when it is ready for your input.'
+            : 'This proposal is locked. Contact your admin to unlock it for editing.'}
         </div>
       )}
 

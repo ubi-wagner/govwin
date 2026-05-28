@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import LibraryUploadForm from '@/components/portal/library-upload-form';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +41,10 @@ export default async function LibraryUploadPage({
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) {
     redirect('/portal');
+  }
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    redirect(`/portal/${tenantSlug}/proposals`);
   }
 
   return (

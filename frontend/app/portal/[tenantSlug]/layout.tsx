@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { isRole, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
@@ -94,14 +95,9 @@ export default async function PortalLayout({
             <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
           </nav>
         </div>
-        <form action="/api/auth/signout" method="POST" className="mt-8">
-          <button
-            type="submit"
-            className="text-xs text-gray-400 hover:text-white"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="mt-8">
+          <SignOutButton className="text-xs text-gray-400 hover:text-white" />
+        </div>
       </aside>
       <main className="flex-1 p-8">
         {children}

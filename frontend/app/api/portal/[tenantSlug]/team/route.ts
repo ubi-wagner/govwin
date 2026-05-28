@@ -191,6 +191,48 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    // Send invite email with credentials
+    let teamEmailResult: { provider: string; error?: string } = { provider: 'skipped' };
+    try {
+      const { sendEmail } = await import('@/lib/email');
+      const { collaboratorInviteEmail } = await import('@/lib/email-templates');
+      const loginUrl = `${process.env.NEXTAUTH_URL || ''}/login`;
+      const emailContent = collaboratorInviteEmail({
+        recipientName: name,
+        recipientEmail: email,
+        inviterName: (session.user as { name?: string }).name || 'Your admin',
+        proposalTitle: 'Team Membership',
+        role: memberRole,
+        permission: 'full',
+        isNewUser: true,
+        tempPassword,
+        loginUrl,
+      });
+      teamEmailResult = await sendEmail({ to: email, subject: emailContent.subject, html: emailContent.html });
+    } catch (e) {
+      console.error('[api/portal/team] invite email failed:', e);
+      teamEmailResult = { provider: 'skipped', error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // Emit email delivery completion event (closed-loop)
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'email.team_invite_delivered',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: {
+          recipientEmail: email,
+          userId: newUser.id,
+          status: teamEmailResult.provider !== 'skipped' && !teamEmailResult.error ? 'sent' : 'failed',
+          provider: teamEmailResult.provider,
+          error: teamEmailResult.error ?? null,
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
+    }
+
     try {
       await emitEventSingle({
         namespace: 'capture',

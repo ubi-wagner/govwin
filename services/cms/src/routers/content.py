@@ -280,7 +280,7 @@ async def post_action(post_id: str, body: WorkflowAction):
             entity_id=post_id,
             user_id=body.user_id,
             diff_summary=f'Post {action.replace("_", " ")}: "{post["title"]}"',
-            payload={'post_id': post_id, 'notes': body.notes, 'from_status': post['status'], 'to_status': transition['to']},
+            payload={'post_id': post_id, 'slug': post['slug'], 'notes': body.notes, 'from_status': post['status'], 'to_status': transition['to']},
         )
 
         return {'data': dict(row)}

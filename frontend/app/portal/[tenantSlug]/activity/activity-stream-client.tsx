@@ -104,6 +104,51 @@ function describeEvent(
     return `AI tool completed${durationMs != null ? ` (${durationMs}ms)` : ''}`;
   }
 
+  // Closed-loop completion events (system namespace)
+  if (namespace === 'system') {
+    if (type === 'content_pipeline.post.publish_completed') {
+      const slug = payload?.slug ?? '';
+      const title = payload?.title ?? slug;
+      return `Blog post "${title}" published to website`;
+    }
+    if (type === 'content_pipeline.post.unpublish_completed') {
+      const slug = payload?.slug ?? '';
+      return `Blog post "${slug}" unpublished from website`;
+    }
+    if (type === 'email.delivery_completed' || type === 'email.admin_notification_completed') {
+      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
+      const status = payload?.status === 'sent' ? 'sent' : 'failed';
+      return `Email ${status} to ${recipient}`;
+    }
+    if (type === 'email.invite_delivered') {
+      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
+      const status = payload?.status === 'sent' ? 'sent' : 'failed';
+      return `Invite email ${status} to ${recipient}`;
+    }
+    if (type === 'email.team_invite_delivered') {
+      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
+      const status = payload?.status === 'sent' ? 'sent' : 'failed';
+      return `Team invite email ${status} to ${recipient}`;
+    }
+    if (type === 'email.admin_alert_delivered') {
+      const count = payload?.adminsNotified ?? 0;
+      return `Admin alert sent (${count} admin${count === 1 ? '' : 's'} notified)`;
+    }
+    if (type === 'notification.delivered') {
+      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
+      return `Notification delivered to ${recipient}`;
+    }
+    if (type === 'notification.delivery_failed') {
+      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
+      return `Notification failed for ${recipient}`;
+    }
+    if (type.endsWith('.failed')) {
+      const error = (payload?.error as string) ?? 'unknown error';
+      const actionType = (payload?.actionType as string) ?? type;
+      return `Action failed: ${actionType} - ${error}`;
+    }
+  }
+
   // Default
   return `${namespace}.${type}`;
 }

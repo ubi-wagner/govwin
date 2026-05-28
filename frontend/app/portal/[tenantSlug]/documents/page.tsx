@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { SupportingDocActions } from '@/components/portal/supporting-doc-actions';
 
@@ -72,6 +72,10 @@ export default async function DocumentsPage({ params }: Props) {
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+
+  if (!hasRoleAtLeast(role, 'tenant_user')) {
+    redirect(`/portal/${tenantSlug}/proposals`);
+  }
 
   const basePath = `/portal/${tenantSlug}`;
 
@@ -152,7 +156,7 @@ export default async function DocumentsPage({ params }: Props) {
   let libraryItems: LibraryRow[] = [];
   try {
     libraryItems = await sql<LibraryRow[]>`
-      SELECT id, title, source_type, content_type, storage_key, created_at
+      SELECT id, heading_text AS title, source_type, source_type AS content_type, source_storage_key AS storage_key, created_at
       FROM library_units
       WHERE tenant_id = ${tenantId}
         AND source_type = 'upload'

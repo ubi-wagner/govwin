@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { isRole, getLandingPath, type Role } from '@/lib/rbac';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 
 /**
  * Post-login redirect for non-admin users.
@@ -51,14 +52,13 @@ export default async function DashboardRedirectPage() {
             eric@rfppipeline.com
           </a>
         </p>
-        <form action="/api/auth/signout" method="POST">
-          <button
-            type="submit"
+        <div>
+          <SignOutButton
             className="text-sm text-gray-500 hover:text-gray-700 underline"
           >
             Sign out
-          </button>
-        </form>
+          </SignOutButton>
+        </div>
       </div>
     </div>
   );

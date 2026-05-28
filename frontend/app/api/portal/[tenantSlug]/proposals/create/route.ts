@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
@@ -241,14 +241,15 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
-        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config)
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
         VALUES (
           ${tenantId},
           ${topicId},
           ${topic.solicitationId},
           ${proposalTitle},
           'draft',
-          ${JSON.stringify(gateConfig)}::jsonb
+          ${JSON.stringify(gateConfig)}::jsonb,
+          true
         )
         RETURNING id
       `;
@@ -483,6 +484,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Notify RFP admins about new proposal (72-hour review SLA) ───
+    let adminsNotifiedCount = 0;
     try {
       const admins = await sql<{ email: string; name: string | null }[]>`
         SELECT email, name FROM users
@@ -499,20 +501,28 @@ export async function POST(request: Request, ctx: RouteContext) {
           try {
             await sendEmail({
               to: admin.email,
-              subject: `New Proposal Created — ${tenantName} — Review within 72 hours`,
+              subject: `ACTION REQUIRED — New Proposal Locked for Admin Review — ${tenantName}`,
               html: `
                 <p>Hi ${admin.name || 'Admin'},</p>
-                <p>A new proposal workspace has been created and needs your review within 72 hours:</p>
+                <p>A new proposal workspace has been created and is <strong>locked for admin review</strong>. The customer can see the proposal but cannot edit until you unlock it.</p>
                 <ul>
                   <li><strong>Customer:</strong> ${tenantName}</li>
                   <li><strong>Proposal:</strong> ${proposalTitle}</li>
                   <li><strong>Sections:</strong> ${sectionCount}</li>
                   <li><strong>Created:</strong> ${new Date().toISOString()}</li>
                 </ul>
-                <p>Please review the proposal setup (sections, compliance matrix, templates) to ensure quality before the customer begins drafting.</p>
+                <p><strong>Within 72 hours, please:</strong></p>
+                <ol>
+                  <li>Review the section skeleton and compliance matrix</li>
+                  <li>Co-draft and edit sections as needed (AI draft, manual edits)</li>
+                  <li>Verify compliance variables are accurate</li>
+                  <li>Unlock the proposal to release it to the customer</li>
+                </ol>
+                <p>The customer will be notified when the proposal is unlocked and ready for their input.</p>
                 <p>— RFP Pipeline System</p>
               `,
             });
+            adminsNotifiedCount++;
           } catch (emailErr) {
             console.error('[proposals/create] admin alert email failed:', emailErr);
           }
@@ -521,6 +531,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (alertErr) {
       console.error('[proposals/create] admin alert setup failed:', alertErr);
       // Non-fatal — proposal creation succeeded
+    }
+
+    // Emit admin alert delivery summary event (closed-loop)
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'email.admin_alert_delivered',
+        actor: userActor(userId, sessionUser.email),
+        tenantId,
+        payload: {
+          proposalId: proposal.id,
+          proposalTitle,
+          adminsNotified: adminsNotifiedCount,
+          status: adminsNotifiedCount > 0 ? 'sent' : 'no_admins',
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
     }
 
     return NextResponse.json({

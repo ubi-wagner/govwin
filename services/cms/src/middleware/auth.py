@@ -7,13 +7,35 @@ If CMS_API_KEY is not set, rejects all API requests (fail closed).
 
 SPA users are authenticated via a session cookie set when /cms/ is served.
 External callers (e.g. Next.js frontend) use the X-CMS-API-Key header.
+
+HTTP Basic Auth is enforced on /cms/ SPA routes when CMS_BASIC_PASS is set.
 """
+import base64
 import hashlib
 import hmac
 import os
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+
+CMS_BASIC_USER = os.getenv("CMS_BASIC_USER", "admin")
+CMS_BASIC_PASS = os.getenv("CMS_BASIC_PASS", "")
+
+
+def _check_basic_auth(request: Request) -> bool:
+    """Check HTTP Basic Auth for CMS SPA access."""
+    if not CMS_BASIC_PASS:
+        return True  # No password set = open (dev mode)
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(auth_header[6:]).decode()
+        user, passwd = decoded.split(":", 1)
+        return hmac.compare_digest(user, CMS_BASIC_USER) and hmac.compare_digest(passwd, CMS_BASIC_PASS)
+    except Exception:
+        return False
 
 _CMS_COOKIE = 'cms_session'
 
@@ -29,6 +51,14 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         # Always allow health checks, docs, and SPA routes without API auth
         if path == '/health' or path.startswith('/cms') or path in ('/docs', '/openapi.json'):
+            # Enforce basic auth on CMS SPA pages (not static assets)
+            if path.startswith('/cms') and not path.startswith('/cms/assets'):
+                if not _check_basic_auth(request):
+                    return Response(
+                        "Authentication required",
+                        status_code=401,
+                        headers={"WWW-Authenticate": 'Basic realm="CMS"'},
+                    )
             response = await call_next(request)
             # Set session cookie when serving SPA pages (not static assets)
             if path.startswith('/cms') and not path.startswith('/cms/assets'):
