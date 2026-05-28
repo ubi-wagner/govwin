@@ -128,6 +128,9 @@ export default async function SpotlightsPage({
       LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
       WHERE o.topic_status = 'open'
         AND o.is_active = true
+        AND o.solicitation_id IN (
+          SELECT id FROM curated_solicitations WHERE status = 'pushed_to_pipeline'
+        )
       ORDER BY o.close_date ASC NULLS LAST
     `;
   } catch (e) {

@@ -704,9 +704,10 @@ async def run_workflow_processor(
         else:
             log.info("process_instances table not found — using fire-and-forget execution")
 
-        # Seed last_processed_at to now so we only process new events
+        # Seed last_processed_at to 5 minutes ago so events emitted during
+        # pipeline restart are not missed (duplicate detection prevents re-runs)
         row = await conn.fetchrow(
-            "SELECT COALESCE(MAX(created_at), now()) AS ts FROM system_events"
+            "SELECT COALESCE(MAX(created_at), now()) - interval '5 minutes' AS ts FROM system_events"
         )
         last_processed_at: datetime = row["ts"] if row else datetime.now(timezone.utc)
         log.info("workflow processor seeded last_processed_at = %s", last_processed_at)

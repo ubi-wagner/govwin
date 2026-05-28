@@ -86,10 +86,9 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
             )
             inserted += 1
 
-            # Advance next_run_at using a simple interval-based approach
-            # (a proper croniter implementation is deferred to Phase 1.5;
-            # for now we just add 24 hours for daily, 7 days for weekly)
-            interval_hours = 168 if "1" in (sched["cron_expression"] or "") else 24
+            # Advance next_run_at based on run_type
+            run_type = sched["run_type"] or "incremental"
+            interval_hours = 168 if run_type == "weekly" else 24
             await conn.execute(
                 """
                 UPDATE pipeline_schedules
