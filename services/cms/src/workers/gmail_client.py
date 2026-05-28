@@ -24,10 +24,18 @@ import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from google.oauth2.credentials import Credentials as OAuthCredentials
-from google.oauth2 import service_account
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
+try:
+    from google.oauth2.credentials import Credentials as OAuthCredentials
+    from google.oauth2 import service_account
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    _GOOGLE_AVAILABLE = True
+except ImportError:
+    _GOOGLE_AVAILABLE = False
+    OAuthCredentials = None  # type: ignore[assignment,misc]
+    service_account = None  # type: ignore[assignment]
+    Request = None  # type: ignore[assignment,misc]
+    build = None  # type: ignore[assignment]
 
 logger = logging.getLogger('cms.gmail')
 
@@ -42,6 +50,8 @@ _cached_credentials: OAuthCredentials | service_account.Credentials | None = Non
 
 def _get_credentials(delegate_email: str):
     """Build credentials using either service account or OAuth2 refresh token."""
+    if not _GOOGLE_AVAILABLE:
+        raise RuntimeError('google-auth / google-api-python-client not installed')
     global _cached_credentials
 
     # Mode 1: Service account delegation (preferred for Workspace)
