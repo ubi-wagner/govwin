@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
@@ -484,6 +484,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Notify RFP admins about new proposal (72-hour review SLA) ───
+    let adminsNotifiedCount = 0;
     try {
       const admins = await sql<{ email: string; name: string | null }[]>`
         SELECT email, name FROM users
@@ -521,6 +522,7 @@ export async function POST(request: Request, ctx: RouteContext) {
                 <p>— RFP Pipeline System</p>
               `,
             });
+            adminsNotifiedCount++;
           } catch (emailErr) {
             console.error('[proposals/create] admin alert email failed:', emailErr);
           }
@@ -529,6 +531,24 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (alertErr) {
       console.error('[proposals/create] admin alert setup failed:', alertErr);
       // Non-fatal — proposal creation succeeded
+    }
+
+    // Emit admin alert delivery summary event (closed-loop)
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'email.admin_alert_delivered',
+        actor: userActor(userId, sessionUser.email),
+        tenantId,
+        payload: {
+          proposalId: proposal.id,
+          proposalTitle,
+          adminsNotified: adminsNotifiedCount,
+          status: adminsNotifiedCount > 0 ? 'sent' : 'no_admins',
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
     }
 
     return NextResponse.json({

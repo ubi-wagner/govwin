@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import uuid
+from datetime import datetime, timezone
 
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
@@ -231,6 +232,12 @@ async def _execute_rule(rule, col_names: set, event):
                 if pool:
                     await _log_rule_execution(pool, rule_id, event_id, act_type, 'failed',
                                               error_message=str(e))
+                # Emit failure completion event back to Main DB
+                await _emit_completion_event(
+                    f'{act_type}.failed',
+                    event_id,
+                    {'error': str(e), 'actionType': act_type},
+                )
     elif action_type:
         try:
             # Dedup check
@@ -247,6 +254,12 @@ async def _execute_rule(rule, col_names: set, event):
             if pool:
                 await _log_rule_execution(pool, rule_id, event_id, action_type, 'failed',
                                           error_message=str(e))
+            # Emit failure completion event back to Main DB
+            await _emit_completion_event(
+                f'{action_type}.failed',
+                event_id,
+                {'error': str(e), 'actionType': action_type},
+            )
     else:
         # Try to infer action from the config structure
         if config.get('template') or config.get('to'):
@@ -265,6 +278,12 @@ async def _execute_rule(rule, col_names: set, event):
                 if pool:
                     await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'failed',
                                               error_message=str(e))
+                # Emit failure completion event back to Main DB
+                await _emit_completion_event(
+                    f'{inferred_type}.failed',
+                    event_id,
+                    {'error': str(e), 'actionType': inferred_type},
+                )
 
 
 async def _log_rule_execution(conn, rule_id, trigger_event_id, action_type, status, result=None, error_message=None):
@@ -290,6 +309,41 @@ async def _check_dedup(conn, trigger_event_id, action_type):
         LIMIT 1
     """, str(trigger_event_id), action_type)
     return row is not None
+
+
+async def _emit_completion_event(
+    event_type: str,
+    trigger_event_id,
+    payload_dict: dict,
+    tenant_id: str | None = None,
+) -> None:
+    """Emit a completion/result event back to the shared system_events table.
+
+    This closes the loop so the originating service (RFP Pipeline) can
+    surface the result in notifications and activity feeds without
+    searching CMS logs.
+    """
+    pool = get_event_pool()
+    if not pool:
+        return
+    try:
+        payload_dict['correlationId'] = str(uuid.uuid4())
+        if trigger_event_id is not None:
+            payload_dict['originalEventId'] = str(trigger_event_id)
+        payload_dict['completedAt'] = datetime.now(timezone.utc).isoformat()
+
+        if tenant_id:
+            await pool.execute("""
+                INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, tenant_id, payload)
+                VALUES ('system', $1, 'single', 'system', 'cms', $2::uuid, $3::jsonb)
+            """, event_type, tenant_id, json.dumps(payload_dict))
+        else:
+            await pool.execute("""
+                INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, payload)
+                VALUES ('system', $1, 'single', 'system', 'cms', $2::jsonb)
+            """, event_type, json.dumps(payload_dict))
+    except Exception as e:
+        logger.error(f'completion event [{event_type}] failed: {e}')
 
 
 async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) -> str | None:
@@ -450,6 +504,21 @@ async def _handle_notification_requested(event) -> None:
                         'source': 'notification.requested'})
         except Exception as e:
             logger.error(f'Failed to log notification.requested to automation_log: {e}')
+
+    # Emit completion event back to Main DB
+    email_status = 'sent' if not result.get('error') else 'failed'
+    tenant_id_val = payload.get('tenant_id') or payload.get('tenantId')
+    await _emit_completion_event(
+        'notification.delivered' if email_status == 'sent' else 'notification.delivery_failed',
+        event.get('id'),
+        {
+            'recipientEmail': to_email,
+            'templateName': template_name,
+            'status': email_status,
+            'error': result.get('error'),
+        },
+        tenant_id=tenant_id_val,
+    )
 
 
 async def _action_create_todo(config: dict, payload: dict, event):
@@ -719,6 +788,18 @@ async def _action_publish_content(config: dict, payload: dict, event):
 
     logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
 
+    # Emit completion event back to Main DB
+    await _emit_completion_event(
+        'content_pipeline.post.publish_completed',
+        event.get('id'),
+        {
+            'slug': post['slug'],
+            'title': post['title'],
+            'contentType': content_type,
+            'status': 'success',
+        },
+    )
+
 
 async def _action_unpublish_content(config: dict, payload: dict, event):
     """When content is unpublished in CMS, update Main DB to draft."""
@@ -753,6 +834,17 @@ async def _action_unpublish_content(config: dict, payload: dict, event):
         )
 
     logger.info(f'unpublish_content: set "{slug}" to draft in cms_content')
+
+    # Emit completion event back to Main DB
+    await _emit_completion_event(
+        'content_pipeline.post.unpublish_completed',
+        event.get('id'),
+        {
+            'slug': slug,
+            'status': 'success',
+        },
+    )
+
     return {"status": "unpublished", "slug": slug}
 
 
@@ -856,6 +948,21 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
 
         logger.info(f'Sent email "{template_name}" to {to_email}: {result}')
 
+        # Emit completion event back to Main DB
+        email_status = 'sent' if not result.get('error') else 'failed'
+        tenant_id_val = payload.get('tenantId') or payload.get('tenant_id')
+        await _emit_completion_event(
+            'email.delivery_completed',
+            event.get('id'),
+            {
+                'recipientEmail': to_email,
+                'templateName': template_name,
+                'status': email_status,
+                'error': result.get('error'),
+            },
+            tenant_id=tenant_id_val,
+        )
+
     elif action_type == 'notify_admin':
         to_email = config.get('to', ADMIN_EMAIL)
         admin_template = config.get('template', 'admin_notification')
@@ -872,3 +979,17 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
                 html=html,
             )
             logger.info(f'Notified admin {to_email}: {result}')
+
+            # Emit completion event back to Main DB
+            email_status = 'sent' if not result.get('error') else 'failed'
+            await _emit_completion_event(
+                'email.admin_notification_completed',
+                event.get('id'),
+                {
+                    'recipientEmail': to_email,
+                    'templateName': admin_template,
+                    'status': email_status,
+                    'error': result.get('error'),
+                    'eventType': event.get('type', ''),
+                },
+            )

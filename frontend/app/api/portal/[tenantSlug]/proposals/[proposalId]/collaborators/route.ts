@@ -308,6 +308,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Send collaborator invite email (non-blocking — failure is logged, not fatal)
     const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
     const inviterName = (session.user as { name?: string }).name || sessionUser.email || 'A team member';
+    let emailResult: { provider: string; error?: string } = { provider: 'skipped' };
     try {
       const emailContent = collaboratorInviteEmail({
         recipientName: name,
@@ -320,7 +321,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         tempPassword,
         loginUrl,
       });
-      await sendEmail({
+      emailResult = await sendEmail({
         to: email,
         subject: emailContent.subject,
         html: emailContent.html,
@@ -330,6 +331,26 @@ export async function POST(request: Request, ctx: RouteContext) {
         email,
         err: emailErr instanceof Error ? emailErr.message : String(emailErr),
       });
+      emailResult = { provider: 'skipped', error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
+    }
+
+    // Emit email delivery completion event (closed-loop)
+    try {
+      await emitEventSingle({
+        namespace: 'system',
+        type: 'email.invite_delivered',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: {
+          recipientEmail: email,
+          proposalId,
+          status: emailResult.provider !== 'skipped' && !emailResult.error ? 'sent' : 'failed',
+          provider: emailResult.provider,
+          error: emailResult.error ?? null,
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
     }
 
     // Emit event
