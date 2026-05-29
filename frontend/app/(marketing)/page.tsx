@@ -9,8 +9,10 @@ export const metadata = {
     'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.',
 };
 
-export default async function LandingPage() {
-  const blocks = await getPageBlocks('homepage');
+export default async function LandingPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const searchParams = await props.searchParams;
+  const isPreview = searchParams?._preview === '1';
+  const blocks = await getPageBlocks('homepage', isPreview);
   const lookup = buildLookup(blocks, 'homepage');
   const hero = single(lookup['hero']);
   const stats = many(lookup['stats']);

@@ -28,6 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
           <AdminNavLink href="/admin/content">CMS Content</AdminNavLink>
+          <AdminNavLink href="/admin/content/editor">Visual Editor</AdminNavLink>
           <AdminNavLink href="/admin/documents">Document Builder</AdminNavLink>
           <AdminNavLink href="/admin/storage">S3 Storage</AdminNavLink>
 
@@ -36,8 +37,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/agents">Agents</AdminNavLink>
           <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
           <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
-          <AdminNavLink href="/admin/email-outbox">Email Outbox</AdminNavLink>
-          <AdminNavLink href="/admin/automation">Automation Rules</AdminNavLink>
           <AdminNavLink href="/admin/system">System Health</AdminNavLink>
           <AdminNavLink href="/admin/analytics">Analytics</AdminNavLink>
 

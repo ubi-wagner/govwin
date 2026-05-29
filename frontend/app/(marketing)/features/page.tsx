@@ -20,8 +20,10 @@ const DEFAULT_FEATURES = [
   { heading: 'Export Package', description: 'Generate submission-ready document packages that meet federal formatting requirements. Page limits, font specifications, margin requirements, and section ordering are all enforced by the canvas rules engine.' },
 ];
 
-export default async function FeaturesPage() {
-  const blocks = await getPageBlocks('features');
+export default async function FeaturesPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const searchParams = await props.searchParams;
+  const isPreview = searchParams?._preview === '1';
+  const blocks = await getPageBlocks('features', isPreview);
   const lookup = buildLookup(blocks, 'features');
   const hero = single(lookup['hero']);
   const cmsFeatures = many(lookup['items']);

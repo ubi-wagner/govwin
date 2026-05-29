@@ -92,8 +92,10 @@ const expertTier = {
   highlighted: false,
 };
 
-export default async function Page() {
-  const blocks = await getPageBlocks('pricing');
+export default async function Page(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const searchParams = await props.searchParams;
+  const isPreview = searchParams?._preview === '1';
+  const blocks = await getPageBlocks('pricing', isPreview);
   const lookup = buildLookup(blocks, 'pricing');
   const hero = single(lookup['hero']);
   const ctaBlock = single(lookup['cta']);
