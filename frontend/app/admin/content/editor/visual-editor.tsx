@@ -124,6 +124,7 @@ function StatusBadge({ status, modified }: { status: string; modified?: boolean 
   const styles: Record<string, string> = {
     published: 'bg-green-100 text-green-700',
     draft: 'bg-yellow-100 text-yellow-800',
+    pending: 'bg-indigo-100 text-indigo-700',
     archived: 'bg-gray-100 text-gray-600',
   };
   return (
@@ -733,6 +734,93 @@ export default function VisualEditor({ pages }: VisualEditorProps) {
     }
   }, [selectedPage, fetchBlocks, refreshPreview, showToast]);
 
+  // Submit drafts for review (rfp_admin → master_admin review)
+  const [submitting, setSubmitting] = useState(false);
+  const handleSubmitForReview = useCallback(async () => {
+    const allEntries = Object.entries(localEdits) as [string, LocalEdit][];
+    const editEntries = allEntries.filter(([, edit]) => Object.keys(edit).length > 0);
+    if (editEntries.length > 0) {
+      const saveRes = await fetch('/api/admin/content/page-blocks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: editEntries.map(([id, edit]) => ({ id, ...edit })) }),
+      });
+      if (!saveRes.ok) {
+        showToast('Failed to save edits before submitting', 'error');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/content/page-blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit_review', page: selectedPage }),
+      });
+      if (res.ok) {
+        const json = await res.json() as { data?: { submitted?: number } };
+        setLocalEdits({});
+        await fetchBlocks();
+        showToast(`${json.data?.submitted ?? 0} block(s) submitted for review`);
+      } else {
+        const json = await res.json() as { error?: string };
+        showToast(json.error ?? 'Submit failed', 'error');
+      }
+    } catch {
+      showToast('Network error', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedPage, localEdits, fetchBlocks, showToast]);
+
+  // Approve pending blocks (master_admin only)
+  const [approving, setApproving] = useState(false);
+  const handleApprove = useCallback(async () => {
+    setApproving(true);
+    try {
+      const res = await fetch('/api/admin/content/page-blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', page: selectedPage }),
+      });
+      if (res.ok) {
+        const json = await res.json() as { data?: { approved?: number } };
+        await fetchBlocks();
+        refreshPreview();
+        showToast(`${json.data?.approved ?? 0} block(s) approved and published`);
+      } else {
+        const json = await res.json() as { error?: string };
+        showToast(json.error ?? 'Approve failed', 'error');
+      }
+    } catch {
+      showToast('Network error', 'error');
+    } finally {
+      setApproving(false);
+    }
+  }, [selectedPage, fetchBlocks, refreshPreview, showToast]);
+
+  // Reject pending blocks back to draft
+  const handleReject = useCallback(async () => {
+    const notes = window.prompt('Rejection notes (optional):');
+    if (notes === null) return;
+
+    try {
+      const res = await fetch('/api/admin/content/page-blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', page: selectedPage, notes }),
+      });
+      if (res.ok) {
+        const json = await res.json() as { data?: { rejected?: number } };
+        await fetchBlocks();
+        showToast(`${json.data?.rejected ?? 0} block(s) sent back for revision`);
+      }
+    } catch {
+      showToast('Network error', 'error');
+    }
+  }, [selectedPage, fetchBlocks, showToast]);
+
   // Group blocks by section tag
   const groupedBlocks: Record<string, Block[]> = {};
   for (const block of blocks) {
@@ -745,7 +833,9 @@ export default function VisualEditor({ pages }: VisualEditorProps) {
   const editValues: LocalEdit[] = Object.values(localEdits);
   const hasLocalEdits = editValues.some((e: LocalEdit) => Object.keys(e).length > 0);
   const hasDraftBlocks = blocks.some((b: Block) => b.status === 'draft');
+  const hasPendingBlocks = blocks.some((b: Block) => b.status === 'pending');
   const draftCount = blocks.filter((b: Block) => b.status === 'draft').length;
+  const pendingCount = blocks.filter((b: Block) => b.status === 'pending').length;
   const modifiedCount = editValues.filter((e: LocalEdit) => Object.keys(e).length > 0).length;
 
   const previewUrl = `${PAGE_TO_PATH[selectedPage] ?? '/'}?_preview=1`;
@@ -772,6 +862,11 @@ export default function VisualEditor({ pages }: VisualEditorProps) {
             {draftCount > 0 && (
               <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-800 rounded">
                 {draftCount} draft
+              </span>
+            )}
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">
+                {pendingCount} pending review
               </span>
             )}
             {modifiedCount > 0 && (
@@ -801,11 +896,35 @@ export default function VisualEditor({ pages }: VisualEditorProps) {
                 {discarding ? 'Discarding...' : 'Discard Drafts'}
               </button>
               <button
+                onClick={handleSubmitForReview}
+                disabled={submitting}
+                className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-200 disabled:opacity-50"
+              >
+                {submitting ? 'Submitting...' : 'Submit for Review'}
+              </button>
+              <button
                 onClick={handlePublish}
                 disabled={publishing}
                 className="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-md disabled:opacity-50"
               >
                 {publishing ? 'Publishing...' : 'Publish All Changes'}
+              </button>
+            </>
+          )}
+          {hasPendingBlocks && (
+            <>
+              <button
+                onClick={handleReject}
+                className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-md border border-orange-200"
+              >
+                Reject to Draft
+              </button>
+              <button
+                onClick={handleApprove}
+                disabled={approving}
+                className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md disabled:opacity-50"
+              >
+                {approving ? 'Approving...' : 'Approve & Publish'}
               </button>
             </>
           )}

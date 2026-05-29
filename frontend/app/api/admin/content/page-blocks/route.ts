@@ -1,10 +1,14 @@
 /**
  * Page-block API for the visual editor.
  *
- * GET   ?page=homepage  — All blocks for a page (published + draft), ordered by section + display_order
- * PATCH                 — Batch-save draft edits (versioned)
- * POST  ?action=publish — Batch-publish all drafts for a page
- * POST  ?action=discard — Discard all drafts for a page (revert to published)
+ * GET   ?page=homepage        — All blocks for a page (published + draft + pending)
+ * GET   ?review=1             — All pending-review blocks across all pages
+ * PATCH                       — Batch-save draft edits (versioned)
+ * POST  action=submit_review  — Submit drafts for admin review (draft → pending)
+ * POST  action=approve        — Approve pending blocks (pending → published) [master_admin only]
+ * POST  action=reject         — Reject pending blocks back to draft with notes
+ * POST  action=publish        — Direct publish (skip review) [master_admin only]
+ * POST  action=discard        — Discard all drafts for a page (revert to published)
  */
 
 import { NextResponse } from 'next/server';
@@ -48,7 +52,7 @@ function adminGuard(session: unknown): NextResponse | null {
   return null;
 }
 
-// ─── GET: list blocks for a page ──────────────────────────────────────
+// ─── GET: list blocks for a page OR review queue ────────────────────
 
 export async function GET(request: Request) {
   try {
@@ -58,9 +62,24 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = searchParams.get('page');
+    const review = searchParams.get('review');
+
+    if (review === '1') {
+      const rows = await sql`
+        SELECT id, slug, title, content_type, body, excerpt, author, tags,
+               published, COALESCE(status, 'draft') AS status,
+               published_at, featured_image, external_url,
+               display_order, metadata, created_at, updated_at
+        FROM cms_content
+        WHERE content_type = 'page_block'
+          AND status = 'pending'
+        ORDER BY updated_at DESC
+      `;
+      return NextResponse.json({ data: { blocks: rows, mode: 'review' } });
+    }
 
     if (!page) {
-      return NextResponse.json({ error: 'Missing required param: page', code: 'VALIDATION_ERROR' }, { status: 422 });
+      return NextResponse.json({ error: 'Missing required param: page or review=1', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
     const rows = await sql`
@@ -71,7 +90,7 @@ export async function GET(request: Request) {
       FROM cms_content
       WHERE content_type = 'page_block'
         AND ${page} = ANY(tags)
-        AND status IN ('published', 'draft')
+        AND status IN ('published', 'draft', 'pending')
       ORDER BY display_order ASC, created_at ASC
     `;
 
@@ -175,6 +194,8 @@ export async function PATCH(request: Request) {
         ...cleanIncomingMeta,
         _versions: versions,
         _currentVersion: newVersion,
+        _draftedBy: userEmail ?? userId,
+        _draftedAt: new Date().toISOString(),
       };
 
       // 4. Update the block to draft status
@@ -227,17 +248,155 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required field: page', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
+    const userRole = (session!.user as { role?: string }).role;
+
+    if (action === 'submit_review') {
+      const rows = await sql<{ id: string }[]>`
+        UPDATE cms_content
+        SET status = 'pending',
+            metadata = jsonb_set(
+              jsonb_set(metadata, '{_submittedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+              '{_submittedAt}', ${JSON.stringify(new Date().toISOString())}::jsonb
+            ),
+            updated_at = now()
+        WHERE content_type = 'page_block'
+          AND ${page} = ANY(tags)
+          AND status = 'draft'
+        RETURNING id
+      `;
+
+      try {
+        await emitEventSingle({
+          namespace: 'system',
+          type: 'content.submitted_for_review',
+          actor: userActor(userId, userEmail),
+          payload: { correlationId: randomUUID(), page, blocksSubmitted: rows.length, submittedBy: userEmail ?? userId },
+        });
+      } catch { /* non-critical */ }
+
+      return NextResponse.json({ data: { submitted: rows.length, page } });
+    }
+
+    if (action === 'approve') {
+      if (userRole !== 'master_admin') {
+        return NextResponse.json({ error: 'Only master_admin can approve content', code: 'FORBIDDEN' }, { status: 403 });
+      }
+
+      const blockIds = Array.isArray(body.blockIds) ? body.blockIds as string[] : null;
+
+      let rows;
+      if (blockIds && blockIds.length > 0) {
+        rows = await sql<{ id: string }[]>`
+          UPDATE cms_content
+          SET status = 'published',
+              published = true,
+              published_at = COALESCE(published_at, now()),
+              metadata = jsonb_set(
+                jsonb_set(metadata, '{_approvedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+                '{_approvedAt}', ${JSON.stringify(new Date().toISOString())}::jsonb
+              ),
+              updated_at = now()
+          WHERE id = ANY(${blockIds}::uuid[])
+            AND status = 'pending'
+          RETURNING id
+        `;
+      } else {
+        rows = await sql<{ id: string }[]>`
+          UPDATE cms_content
+          SET status = 'published',
+              published = true,
+              published_at = COALESCE(published_at, now()),
+              metadata = jsonb_set(
+                jsonb_set(metadata, '{_approvedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+                '{_approvedAt}', ${JSON.stringify(new Date().toISOString())}::jsonb
+              ),
+              updated_at = now()
+          WHERE content_type = 'page_block'
+            AND ${page} = ANY(tags)
+            AND status = 'pending'
+          RETURNING id
+        `;
+      }
+
+      const publicPath = PAGE_TO_PATH[page];
+      if (publicPath) revalidatePath(publicPath);
+
+      try {
+        await emitEventSingle({
+          namespace: 'system',
+          type: 'content.approved',
+          actor: userActor(userId, userEmail),
+          payload: { correlationId: randomUUID(), page, blocksApproved: rows.length, approvedBy: userEmail ?? userId },
+        });
+      } catch { /* non-critical */ }
+
+      return NextResponse.json({ data: { approved: rows.length, page } });
+    }
+
+    if (action === 'reject') {
+      const notes = typeof body.notes === 'string' ? body.notes : '';
+      const blockIds = Array.isArray(body.blockIds) ? body.blockIds as string[] : null;
+
+      let rows;
+      if (blockIds && blockIds.length > 0) {
+        rows = await sql<{ id: string }[]>`
+          UPDATE cms_content
+          SET status = 'draft',
+              metadata = jsonb_set(
+                jsonb_set(metadata, '{_rejectedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+                '{_rejectionNotes}', ${JSON.stringify(notes)}::jsonb
+              ),
+              updated_at = now()
+          WHERE id = ANY(${blockIds}::uuid[])
+            AND status = 'pending'
+          RETURNING id
+        `;
+      } else {
+        rows = await sql<{ id: string }[]>`
+          UPDATE cms_content
+          SET status = 'draft',
+              metadata = jsonb_set(
+                jsonb_set(metadata, '{_rejectedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+                '{_rejectionNotes}', ${JSON.stringify(notes)}::jsonb
+              ),
+              updated_at = now()
+          WHERE content_type = 'page_block'
+            AND ${page} = ANY(tags)
+            AND status = 'pending'
+          RETURNING id
+        `;
+      }
+
+      try {
+        await emitEventSingle({
+          namespace: 'system',
+          type: 'content.rejected',
+          actor: userActor(userId, userEmail),
+          payload: { correlationId: randomUUID(), page, blocksRejected: rows.length, rejectedBy: userEmail ?? userId, notes },
+        });
+      } catch { /* non-critical */ }
+
+      return NextResponse.json({ data: { rejected: rows.length, page } });
+    }
+
     if (action === 'publish') {
-      // Batch-publish all draft blocks for this page
+      if (userRole !== 'master_admin') {
+        return NextResponse.json({ error: 'Only master_admin can direct-publish. Use submit_review.', code: 'FORBIDDEN' }, { status: 403 });
+      }
+
       const rows = await sql<{ id: string }[]>`
         UPDATE cms_content
         SET status = 'published',
             published = true,
             published_at = COALESCE(published_at, now()),
+            metadata = jsonb_set(
+              jsonb_set(metadata, '{_approvedBy}', ${JSON.stringify(userEmail ?? userId)}::jsonb),
+              '{_approvedAt}', ${JSON.stringify(new Date().toISOString())}::jsonb
+            ),
             updated_at = now()
         WHERE content_type = 'page_block'
           AND ${page} = ANY(tags)
-          AND status = 'draft'
+          AND status IN ('draft', 'pending')
         RETURNING id
       `;
 
