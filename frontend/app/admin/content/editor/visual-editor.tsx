@@ -248,6 +248,10 @@ function BlockEditor({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const [aiMode, setAiMode] = useState<'idle' | 'generate' | 'revise' | 'from_url'>('idle');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInstructions, setAiInstructions] = useState('');
+  const [aiUrl, setAiUrl] = useState('');
 
   const isModified = localEdit !== undefined && Object.keys(localEdit).length > 0;
 
@@ -265,6 +269,59 @@ function BlockEditor({
   void _cv;
 
   const sectionTag = block.tags.find((t) => !Object.keys(PAGE_LABELS).includes(t) && t !== block.tags[0]) ?? block.tags[1] ?? 'unknown';
+
+  const handleAi = async () => {
+    setAiLoading(true);
+    try {
+      const payload: Record<string, string> = {
+        page: block.tags[0] ?? 'homepage',
+        section: sectionTag,
+        instructions: aiInstructions,
+      };
+
+      if (aiMode === 'generate') {
+        payload.action = 'generate';
+        payload.existingTitle = title;
+      } else if (aiMode === 'revise') {
+        payload.action = 'revise';
+        payload.title = title;
+        payload.body = body;
+        payload.excerpt = excerpt ?? '';
+      } else if (aiMode === 'from_url') {
+        payload.action = 'from_url';
+        payload.url = aiUrl;
+      }
+
+      const res = await fetch('/api/admin/content/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || 'AI request failed');
+      }
+
+      const json = await res.json() as { data: { title?: string; body?: string; excerpt?: string; metadata?: Record<string, unknown> } };
+      const d = json.data;
+
+      if (d.title) onFieldChange(block.id, 'title', d.title);
+      if (d.body) onFieldChange(block.id, 'body', d.body);
+      if (d.excerpt) onFieldChange(block.id, 'excerpt', d.excerpt);
+      if (d.metadata && Object.keys(d.metadata).length > 0) {
+        onFieldChange(block.id, 'metadata', { ...editableMetadata, ...d.metadata });
+      }
+
+      setAiMode('idle');
+      setAiInstructions('');
+      setAiUrl('');
+    } catch (err) {
+      alert(`AI error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   return (
     <div className={`border rounded-lg transition-colors ${isModified ? 'border-amber-300 bg-amber-50/30' : 'border-gray-200 bg-white'}`}>
@@ -359,6 +416,73 @@ function BlockEditor({
               metadata={editableMetadata}
               onChange={(newMeta: Record<string, unknown>) => onFieldChange(block.id, 'metadata', newMeta)}
             />
+          </div>
+
+          {/* AI Tools */}
+          <div className="border-t border-gray-100 pt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-medium text-indigo-600">AI Tools:</span>
+              <button
+                onClick={() => setAiMode(aiMode === 'generate' ? 'idle' : 'generate')}
+                className={`px-2 py-1 text-xs rounded-md ${aiMode === 'generate' ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                Generate
+              </button>
+              <button
+                onClick={() => setAiMode(aiMode === 'revise' ? 'idle' : 'revise')}
+                disabled={!title && !body}
+                className={`px-2 py-1 text-xs rounded-md disabled:opacity-40 ${aiMode === 'revise' ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                Revise
+              </button>
+              <button
+                onClick={() => setAiMode(aiMode === 'from_url' ? 'idle' : 'from_url')}
+                className={`px-2 py-1 text-xs rounded-md ${aiMode === 'from_url' ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                From URL
+              </button>
+            </div>
+
+            {aiMode !== 'idle' && (
+              <div className="bg-indigo-50 rounded-lg p-3 space-y-2">
+                {aiMode === 'from_url' && (
+                  <input
+                    type="url"
+                    placeholder="https://competitor-site.com/page"
+                    value={aiUrl}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiUrl(e.target.value)}
+                    className="w-full rounded-md border border-indigo-200 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                )}
+                <textarea
+                  placeholder={
+                    aiMode === 'generate' ? 'Optional: specific instructions for the AI...'
+                    : aiMode === 'revise' ? 'How should it be revised? (e.g. "make it shorter", "more technical")'
+                    : 'Optional: what to focus on from the source page...'
+                  }
+                  value={aiInstructions}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAiInstructions(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-md border border-indigo-200 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAi}
+                    disabled={aiLoading || (aiMode === 'from_url' && !aiUrl)}
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50"
+                  >
+                    {aiLoading ? 'Generating...' : aiMode === 'generate' ? 'Generate Content' : aiMode === 'revise' ? 'Revise Content' : 'Generate from URL'}
+                  </button>
+                  <button
+                    onClick={() => { setAiMode('idle'); setAiInstructions(''); setAiUrl(''); }}
+                    className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  {aiLoading && <span className="text-xs text-indigo-500 animate-pulse">Claude is writing...</span>}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
