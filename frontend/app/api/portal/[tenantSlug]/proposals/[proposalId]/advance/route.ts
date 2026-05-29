@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -161,6 +161,20 @@ export async function POST(request: Request, ctx: RouteContext) {
     // When advancing to 'final' AND auto-locking, also advance to 'submitted'
     const finalStageValue = shouldLock ? 'submitted' : targetStage;
 
+    // ── Start event for stage advancement ────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.advanced',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: {
+        proposalId,
+        proposalTitle: proposal.title,
+        previousStage,
+        targetStage,
+      },
+    });
+
     // ── Update proposal stage + record history (transactional) ──────
     // Gate check is inside the transaction to prevent TOCTOU races.
     let sectionsSnapshot: { section_id: string; title: string; version: number; status: string; char_count: number }[] = [];
@@ -300,10 +314,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (e) {
       if (e instanceof Error && e.message === 'CONFLICT') {
+        await emitEventEnd(startId, { error: { message: 'Stage already changed', code: 'CONFLICT' } });
         return NextResponse.json({ error: 'Stage already changed', code: 'CONFLICT' }, { status: 409 });
       }
       if (e instanceof Error && e.message.startsWith('GATE_REQUIREMENTS_NOT_MET:')) {
         const unmetLabels = JSON.parse(e.message.replace('GATE_REQUIREMENTS_NOT_MET:', ''));
+        await emitEventEnd(startId, { error: { message: 'Unmet gate requirements', code: 'GATE_REQUIREMENTS_NOT_MET' } });
         return NextResponse.json({
           error: 'Unmet gate requirements',
           code: 'GATE_REQUIREMENTS_NOT_MET',
@@ -311,16 +327,13 @@ export async function POST(request: Request, ctx: RouteContext) {
         }, { status: 422 });
       }
       console.error('[portal/proposals/advance] stage update failed:', e);
+      await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.advanced',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
+    // ── End event ────────────────────────────────────────────────────
+    await emitEventEnd(startId, {
+      result: {
         correlationId: randomUUID(),
         tenantId,
         tenantSlug,

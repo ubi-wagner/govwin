@@ -17,8 +17,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { emitEventSingle } from '@/lib/events';
-import { randomUUID } from 'crypto';
+import { emitEventStart, emitEventEnd } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -163,6 +162,20 @@ export async function POST(request: Request, ctx: RouteContext) {
       { status: 500 },
     );
   }
+
+  // ── Start event ─────────────────────────────────────────────────
+  const startId = await emitEventStart({
+    namespace: 'finder',
+    type: 'compliance.preset_applied',
+    actor: { type: 'user', id: user.id ?? 'unknown' },
+    tenantId: null,
+    payload: {
+      solicitationId: solId,
+      topicIds,
+      presetId: (body.presetId as string) ?? null,
+      topicCount: topicIds.length,
+    },
+  });
 
   // ── Apply to each topic ─────────────────────────────────────────
   try {
@@ -319,30 +332,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'compliance.preset_applied',
-        actor: { type: 'user', id: user.id ?? 'unknown' },
-        tenantId: null,
-        payload: {
-          correlationId: randomUUID(),
-          solicitationId: solId,
-          topicIds,
-          presetId: (body.presetId as string) ?? null,
-          topicCount: topicIds.length,
-        },
-      });
-    } catch (e) {
-      console.error('[apply-preset] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { applied: topicIds.length, topicIds },
+    });
 
     return NextResponse.json({
       data: { applied: topicIds.length, topicIds },
     });
   } catch (err) {
     console.error('[apply-preset] apply failed:', err);
+    await emitEventEnd(startId, { error: { message: err instanceof Error ? err.message : String(err), code: 'DB_ERROR' } });
     return NextResponse.json(
       { error: 'Failed to apply compliance preset', code: 'DB_ERROR' },
       { status: 500 },

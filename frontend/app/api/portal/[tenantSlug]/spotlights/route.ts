@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -188,6 +188,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for spotlight creation ──────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'capture',
+      type: 'saved_search.created',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { name: body.name },
+    });
+
     // ── Business logic ───────────────────────────────────────────
     try {
       const programTypes = Array.isArray(body.program_types) ? body.program_types : [];
@@ -217,17 +226,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         RETURNING id, name, created_at
       `;
 
-      try {
-        await emitEventSingle({
-          namespace: 'capture',
-          type: 'saved_search.created',
-          actor: userActor(sessionUser.id, sessionUser.email),
-          tenantId,
-          payload: { spotlightId: spotlight.id, name: body.name },
-        });
-      } catch (evtErr) {
-        console.error('[portal/spotlights] event emission failed:', evtErr);
-      }
+      await emitEventEnd(startId, {
+        result: { spotlightId: spotlight.id, name: body.name },
+      });
 
       return NextResponse.json(
         { data: { id: spotlight.id, name: spotlight.name, created_at: spotlight.createdAt } },
@@ -235,6 +236,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     } catch (dbErr) {
       console.error('[portal/spotlights/create] DB error:', dbErr);
+      await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'Failed to create spotlight', code: 'DB_ERROR' },
         { status: 500 },

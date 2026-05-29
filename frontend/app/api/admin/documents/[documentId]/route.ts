@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { putObject, getObjectBuffer, deleteObject, listObjects } from '@/lib/storage/s3-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -198,6 +198,15 @@ export async function PUT(
       );
     }
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'document.saved',
+      actor: userActor(authResult.userId, authResult.email),
+      tenantId: null,
+      payload: { documentId, title: document.metadata?.title ?? null },
+    });
+
     // Save previous version to history
     const docKey = `reference/documents/${documentId}.json`;
     const currentBuf = await getObjectBuffer(docKey);
@@ -228,17 +237,9 @@ export async function PUT(
     }
     await saveIndex(index);
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'document.saved',
-        actor: userActor(authResult.userId, authResult.email),
-        tenantId: null,
-        payload: { documentId, title: document.metadata?.title ?? null, version: document.metadata?.version_number ?? 1 },
-      });
-    } catch (e) {
-      console.error('[admin/documents/[id]] event emission failed:', e);
-    }
+    await emitEventEnd(startId, {
+      result: { documentId, version: document.metadata?.version_number ?? 1 },
+    });
 
     return NextResponse.json({
       data: { id: documentId, version: document.metadata?.version_number || 1 },
@@ -270,6 +271,15 @@ export async function DELETE(
       );
     }
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'document.deleted',
+      actor: userActor(authResult.userId, authResult.email),
+      tenantId: null,
+      payload: { documentId },
+    });
+
     // Delete from S3
     const docKey = `reference/documents/${documentId}.json`;
     await deleteObject(docKey);
@@ -279,17 +289,9 @@ export async function DELETE(
     const filtered = index.filter(m => m.id !== documentId);
     await saveIndex(filtered);
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'document.deleted',
-        actor: userActor(authResult.userId, authResult.email),
-        tenantId: null,
-        payload: { documentId },
-      });
-    } catch (e) {
-      console.error('[admin/documents/[id]] event emission failed:', e);
-    }
+    await emitEventEnd(startId, {
+      result: { documentId, deleted: true },
+    });
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (err) {

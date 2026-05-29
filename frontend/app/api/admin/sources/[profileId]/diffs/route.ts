@@ -10,8 +10,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -134,6 +133,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event ──────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'source_diff.reviewed',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: { sourceId: profileId, diffId },
+    });
+
     // ── Update ──────────────────────────────────────────────────────
     let diff: { id: string } | undefined;
     try {
@@ -149,32 +156,21 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       diff = rows[0];
     } catch (e) {
       console.error('[admin/sources/diffs] PATCH update query failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (!diff) {
+      await emitEventEnd(startId, { error: { message: 'Diff not found or already reviewed', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Diff not found or already reviewed', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    // ── Emit event (non-fatal) ─────────────────────────────────────
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'source_diff.reviewed',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        payload: {
-          correlationId: randomUUID(),
-          sourceId: profileId,
-          diffId: diff.id,
-        },
-      });
-    } catch (e) {
-      console.error('[admin/sources/diffs] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { sourceId: profileId, diffId: diff.id, reviewed: true },
+    });
 
     return NextResponse.json({ data: { reviewed: true } });
   } catch (e) {

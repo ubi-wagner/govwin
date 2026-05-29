@@ -9,8 +9,8 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
-from datetime import datetime, timezone
 
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
@@ -219,7 +219,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -232,16 +232,10 @@ async def _execute_rule(rule, col_names: set, event):
                 if pool:
                     await _log_rule_execution(pool, rule_id, event_id, act_type, 'failed',
                                               error_message=str(e))
-                # Emit failure completion event back to Main DB
-                await _emit_completion_event(
-                    f'{act_type}.failed',
-                    event_id,
-                    {'error': str(e), 'actionType': act_type},
-                )
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -254,12 +248,6 @@ async def _execute_rule(rule, col_names: set, event):
             if pool:
                 await _log_rule_execution(pool, rule_id, event_id, action_type, 'failed',
                                           error_message=str(e))
-            # Emit failure completion event back to Main DB
-            await _emit_completion_event(
-                f'{action_type}.failed',
-                event_id,
-                {'error': str(e), 'actionType': action_type},
-            )
     else:
         # Try to infer action from the config structure
         if config.get('template') or config.get('to'):
@@ -278,12 +266,6 @@ async def _execute_rule(rule, col_names: set, event):
                 if pool:
                     await _log_rule_execution(pool, rule_id, event_id, inferred_type, 'failed',
                                               error_message=str(e))
-                # Emit failure completion event back to Main DB
-                await _emit_completion_event(
-                    f'{inferred_type}.failed',
-                    event_id,
-                    {'error': str(e), 'actionType': inferred_type},
-                )
 
 
 async def _log_rule_execution(conn, rule_id, trigger_event_id, action_type, status, result=None, error_message=None):
@@ -309,41 +291,6 @@ async def _check_dedup(conn, trigger_event_id, action_type):
         LIMIT 1
     """, str(trigger_event_id), action_type)
     return row is not None
-
-
-async def _emit_completion_event(
-    event_type: str,
-    trigger_event_id,
-    payload_dict: dict,
-    tenant_id: str | None = None,
-) -> None:
-    """Emit a completion/result event back to the shared system_events table.
-
-    This closes the loop so the originating service (RFP Pipeline) can
-    surface the result in notifications and activity feeds without
-    searching CMS logs.
-    """
-    pool = get_event_pool()
-    if not pool:
-        return
-    try:
-        payload_dict['correlationId'] = str(uuid.uuid4())
-        if trigger_event_id is not None:
-            payload_dict['originalEventId'] = str(trigger_event_id)
-        payload_dict['completedAt'] = datetime.now(timezone.utc).isoformat()
-
-        if tenant_id:
-            await pool.execute("""
-                INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, tenant_id, payload)
-                VALUES ('system', $1, 'single', 'system', 'cms', $2::uuid, $3::jsonb)
-            """, event_type, tenant_id, json.dumps(payload_dict))
-        else:
-            await pool.execute("""
-                INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, payload)
-                VALUES ('system', $1, 'single', 'system', 'cms', $2::jsonb)
-            """, event_type, json.dumps(payload_dict))
-    except Exception as e:
-        logger.error(f'completion event [{event_type}] failed: {e}')
 
 
 async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) -> str | None:
@@ -504,21 +451,6 @@ async def _handle_notification_requested(event) -> None:
                         'source': 'notification.requested'})
         except Exception as e:
             logger.error(f'Failed to log notification.requested to automation_log: {e}')
-
-    # Emit completion event back to Main DB
-    email_status = 'sent' if not result.get('error') else 'failed'
-    tenant_id_val = payload.get('tenant_id') or payload.get('tenantId')
-    await _emit_completion_event(
-        'notification.delivered' if email_status == 'sent' else 'notification.delivery_failed',
-        event.get('id'),
-        {
-            'recipientEmail': to_email,
-            'templateName': template_name,
-            'status': email_status,
-            'error': result.get('error'),
-        },
-        tenant_id=tenant_id_val,
-    )
 
 
 async def _action_create_todo(config: dict, payload: dict, event):
@@ -788,67 +720,58 @@ async def _action_publish_content(config: dict, payload: dict, event):
 
     logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
 
-    # Emit completion event back to Main DB
-    await _emit_completion_event(
-        'content_pipeline.post.publish_completed',
-        event.get('id'),
-        {
-            'slug': post['slug'],
-            'title': post['title'],
-            'contentType': content_type,
-            'status': 'success',
-        },
-    )
 
-
-async def _action_unpublish_content(config: dict, payload: dict, event):
-    """When content is unpublished in CMS, update Main DB to draft."""
-    shared_pool = get_event_pool()
-    if not shared_pool:
-        logger.warning("No event_pool — cannot unpublish content to shared DB")
-        return {"status": "skipped", "reason": "no_event_pool"}
-
-    slug = payload.get("slug")
-    if not slug:
-        # Try to resolve slug from post_id
-        post_id = payload.get("post_id") or config.get("post_id")
-        if post_id:
-            from .models.database import get_pool as get_cms_pool
-            cms_pool = get_cms_pool()
-            row = await cms_pool.fetchrow(
-                "SELECT slug FROM cms_posts WHERE id = $1",
-                uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
-            )
-            if row:
-                slug = row["slug"]
-
-    if not slug:
-        return {"status": "skipped", "reason": "no_slug_in_payload"}
-
-    async with shared_pool.acquire() as conn:
-        await conn.execute(
-            """UPDATE cms_content
-               SET status = 'draft', published = false, updated_at = now()
-               WHERE slug = $1""",
-            slug,
+async def _emit_action_event(*, event_type: str, phase: str, payload: dict,
+                              parent_event_id: str | None = None) -> str:
+    """Emit an action event to the shared system_events table."""
+    pool = get_event_pool()
+    if not pool:
+        return ""
+    event_id = str(uuid.uuid4())
+    try:
+        payload['correlationId'] = payload.get('correlationId', str(uuid.uuid4()))
+        await pool.execute(
+            """INSERT INTO system_events
+                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
+               VALUES ($1, 'system', $2, $3, 'system', 'event_listener', $4, $5::jsonb)""",
+            uuid.UUID(event_id), event_type, phase,
+            uuid.UUID(parent_event_id) if parent_event_id else None,
+            json.dumps(payload),
         )
-
-    logger.info(f'unpublish_content: set "{slug}" to draft in cms_content')
-
-    # Emit completion event back to Main DB
-    await _emit_completion_event(
-        'content_pipeline.post.unpublish_completed',
-        event.get('id'),
-        {
-            'slug': slug,
-            'status': 'success',
-        },
-    )
-
-    return {"status": "unpublished", "slug": slug}
+        return event_id
+    except Exception as e:
+        logger.error('_emit_action_event failed: %s', e)
+        return ""
 
 
 async def _do_action(action_type: str, config: dict, payload: dict, event):
+    action_start_ms = time.monotonic()
+    start_event_id = await _emit_action_event(
+        event_type=f"action.{action_type}", phase="start",
+        payload={"actionType": action_type, "eventId": str(event.get('id', ''))},
+    )
+
+    try:
+        await _do_action_inner(action_type, config, payload, event)
+        action_duration_ms = int((time.monotonic() - action_start_ms) * 1000)
+        await _emit_action_event(
+            event_type=f"action.{action_type}", phase="end",
+            parent_event_id=start_event_id,
+            payload={"actionType": action_type, "status": "completed",
+                     "durationMs": action_duration_ms},
+        )
+    except Exception as exc:
+        action_duration_ms = int((time.monotonic() - action_start_ms) * 1000)
+        await _emit_action_event(
+            event_type=f"action.{action_type}", phase="end",
+            parent_event_id=start_event_id,
+            payload={"actionType": action_type, "status": "failed",
+                     "error": str(exc)[:500], "durationMs": action_duration_ms},
+        )
+        raise
+
+
+async def _do_action_inner(action_type: str, config: dict, payload: dict, event):
     if action_type == 'create_todo':
         await _action_create_todo(config, payload, event)
         return
@@ -863,10 +786,6 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
 
     elif action_type == 'publish_content':
         await _action_publish_content(config, payload, event)
-        return
-
-    elif action_type == 'unpublish_content':
-        await _action_unpublish_content(config, payload, event)
         return
 
     elif action_type == 'send_email':
@@ -948,21 +867,6 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
 
         logger.info(f'Sent email "{template_name}" to {to_email}: {result}')
 
-        # Emit completion event back to Main DB
-        email_status = 'sent' if not result.get('error') else 'failed'
-        tenant_id_val = payload.get('tenantId') or payload.get('tenant_id')
-        await _emit_completion_event(
-            'email.delivery_completed',
-            event.get('id'),
-            {
-                'recipientEmail': to_email,
-                'templateName': template_name,
-                'status': email_status,
-                'error': result.get('error'),
-            },
-            tenant_id=tenant_id_val,
-        )
-
     elif action_type == 'notify_admin':
         to_email = config.get('to', ADMIN_EMAIL)
         admin_template = config.get('template', 'admin_notification')
@@ -979,17 +883,3 @@ async def _do_action(action_type: str, config: dict, payload: dict, event):
                 html=html,
             )
             logger.info(f'Notified admin {to_email}: {result}')
-
-            # Emit completion event back to Main DB
-            email_status = 'sent' if not result.get('error') else 'failed'
-            await _emit_completion_event(
-                'email.admin_notification_completed',
-                event.get('id'),
-                {
-                    'recipientEmail': to_email,
-                    'templateName': admin_template,
-                    'status': email_status,
-                    'error': result.get('error'),
-                    'eventType': event.get('type', ''),
-                },
-            )

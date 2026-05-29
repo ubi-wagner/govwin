@@ -8,7 +8,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle } from '@/lib/events';
+import { emitEventStart, emitEventEnd } from '@/lib/events';
 
 export async function GET(
   request: Request,
@@ -268,6 +268,15 @@ export async function POST(
     );
   }
 
+  // ── Start event for bulk library operation ──────────────────────
+    const startId = await emitEventStart({
+      namespace: 'library',
+      type: `unit.${action === 'approve' ? 'approved' : action === 'archive' ? 'archived' : action === 'delete' ? 'deleted' : action === 'set_category' ? 'categorized' : 'tagged'}`,
+      actor: { type: 'user', id: sessionUser.id },
+      tenantId,
+      payload: { action, unitCount: unitIds.length },
+    });
+
   // ---------- Execute ----------
     let result: { count: number };
 
@@ -320,20 +329,13 @@ export async function POST(
       }
     } catch (e) {
       console.error('[library/bulk] query failed:', e);
+      await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'library',
-        type: `unit.${action === 'approve' ? 'approved' : action === 'archive' ? 'archived' : action === 'delete' ? 'deleted' : action === 'set_category' ? 'categorized' : 'tagged'}`,
-        actor: { type: 'user', id: sessionUser.id },
-        tenantId,
-        payload: { correlationId: randomUUID(), action, unitCount: unitIds.length, affected: result },
-      });
-    } catch (evtErr) {
-      console.error('[library/bulk] event emission failed:', evtErr);
-    }
+    await emitEventEnd(startId, {
+      result: { correlationId: randomUUID(), action, unitCount: unitIds.length, affected: result.count },
+    });
 
     return NextResponse.json({ data: { updated: result.count } });
   } catch (err) {

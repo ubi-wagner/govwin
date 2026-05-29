@@ -55,9 +55,12 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 import asyncpg
+
+from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.generate_preview")
 
@@ -88,12 +91,24 @@ async def generate_preview(
     import uuid as uuid_mod
     import zipfile
 
+    start_ms = time.monotonic()
+
     # Validate proposal_id format
     try:
         proposal_uuid = uuid_mod.UUID(proposal_id)
     except (ValueError, TypeError):
         log.error("generate_preview: invalid proposal_id: %s", proposal_id)
         return {"status": "skipped", "reason": "invalid_proposal_id"}
+
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="proposal", type="preview.generated", phase="start",
+            payload={"proposalId": proposal_id},
+        )
+    except Exception as exc:
+        log.error("generate_preview: failed to emit start event: %s", exc)
 
     # 1. Fetch proposal + verify it exists
     try:
@@ -190,6 +205,19 @@ async def generate_preview(
         log.info("generate_preview: storage module unavailable, skipping S3 upload")
     except Exception as e:
         log.error("generate_preview: S3 upload failed: %s", e)
+
+    duration_ms = int((time.monotonic() - start_ms) * 1000)
+    try:
+        await emit_event(
+            conn, namespace="proposal", type="preview.generated", phase="end",
+            parent_event_id=start_event_id,
+            tenant_id=tenant_id,
+            payload={"proposalId": proposal_id, "sectionsExported": sections_exported,
+                     "totalBytes": total_bytes, "hasPreviewUrl": preview_url is not None,
+                     "durationMs": duration_ms},
+        )
+    except Exception as exc:
+        log.error("generate_preview: failed to emit end event: %s", exc)
 
     return {
         "previewUrl": preview_url,

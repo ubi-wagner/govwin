@@ -84,6 +84,8 @@ const SECTION_LABELS: Record<string, string> = {
   form: 'Form',
 };
 
+const BLOG_TYPES = ['blog_post', 'resource', 'guide'];
+
 const STATUS_BADGES: Record<string, { bg: string; text: string; label: string }> = {
   draft: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
   pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
@@ -100,6 +102,16 @@ function getSectionLabel(tag: string): string {
     .split(/[-_]/)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
 }
 
 function getPageCount(grouped: GroupedData, tab: string): number {
@@ -121,6 +133,297 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Inline Editor Component ─────────────────────────────────────────────────
+
+interface InlineEditorProps {
+  block: CmsBlock;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
+  const [title, setTitle] = useState(block.title);
+  const [body, setBody] = useState(block.body);
+  const [excerpt, setExcerpt] = useState(block.excerpt ?? '');
+  const [displayOrder, setDisplayOrder] = useState(block.displayOrder);
+  const [metadata, setMetadata] = useState(
+    Object.keys(block.metadata).length > 0 ? JSON.stringify(block.metadata, null, 2) : ''
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = useCallback(async () => {
+    if (!title.trim() || !body.trim()) {
+      setError('Title and body are required.');
+      return;
+    }
+
+    let parsedMetadata: Record<string, unknown> = {};
+    if (metadata.trim()) {
+      try {
+        parsedMetadata = JSON.parse(metadata);
+      } catch {
+        setError('Metadata must be valid JSON.');
+        return;
+      }
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/admin/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: block.slug,
+          title: title.trim(),
+          contentType: block.contentType,
+          body,
+          excerpt: excerpt.trim() || null,
+          author: block.author,
+          tags: block.tags,
+          externalUrl: block.externalUrl,
+          featuredImage: block.featuredImage,
+          displayOrder,
+          status: 'published',
+          metadata: parsedMetadata,
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? 'Failed to save');
+        return;
+      }
+
+      onSave();
+    } catch {
+      setError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [title, body, excerpt, displayOrder, metadata, block, onSave]);
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 p-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Body</label>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={4}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Excerpt</label>
+        <input
+          type="text"
+          value={excerpt}
+          onChange={(e) => setExcerpt(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      <div className="flex gap-4">
+        <div className="w-32">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Display Order</label>
+          <input
+            type="number"
+            value={displayOrder}
+            onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 0)}
+            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            min={0}
+          />
+        </div>
+      </div>
+
+      {(metadata.trim() || Object.keys(block.metadata).length > 0) && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Metadata (JSON)</label>
+          <textarea
+            value={metadata}
+            onChange={(e) => setMetadata(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            placeholder="{}"
+          />
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <Link
+          href={`/admin/content/${block.slug}`}
+          className="ml-auto text-sm text-blue-600 hover:text-blue-800"
+        >
+          Full Editor
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ─── New Block Form Component ────────────────────────────────────────────────
+
+interface NewBlockFormProps {
+  pageTag: string;
+  sectionTag: string;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function NewBlockForm({ pageTag, sectionTag, onSave, onCancel }: NewBlockFormProps) {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [excerpt, setExcerpt] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = useCallback(async () => {
+    if (!title.trim() || !body.trim()) {
+      setError('Title and body are required.');
+      return;
+    }
+
+    const slug = slugify(title);
+    if (!slug) {
+      setError('Title must produce a valid slug.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/admin/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          title: title.trim(),
+          contentType: 'page_block',
+          body,
+          excerpt: excerpt.trim() || null,
+          author: null,
+          tags: [pageTag, sectionTag],
+          externalUrl: null,
+          featuredImage: null,
+          displayOrder: 0,
+          status: 'draft',
+          metadata: {},
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        setError(json.error ?? 'Failed to create block');
+        return;
+      }
+
+      onSave();
+    } catch {
+      setError('Failed to create block. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }, [title, body, excerpt, pageTag, sectionTag, onSave]);
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-blue-300 bg-blue-50/50 p-4 space-y-3">
+      <div className="text-sm font-medium text-blue-800">New Block</div>
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 p-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+          placeholder="Block title"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Body</label>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={3}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+          placeholder="Block content"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Excerpt</label>
+        <input
+          type="text"
+          value={excerpt}
+          onChange={(e) => setExcerpt(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+          placeholder="Short description (optional)"
+        />
+      </div>
+
+      <div className="text-xs text-gray-500">
+        Tags: <span className="font-mono">{pageTag}, {sectionTag}</span> | Type: page_block | Status: draft
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? 'Creating...' : 'Create as Draft'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Content Block Card Component ────────────────────────────────────────────
 
 interface BlockCardProps {
@@ -128,9 +431,50 @@ interface BlockCardProps {
   onRefresh: () => void;
 }
 
-function BlockCard({ block }: BlockCardProps) {
+function BlockCard({ block, onRefresh }: BlockCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const handleStatusChange = useCallback(async (newStatus: 'published' | 'archived' | 'draft') => {
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug: block.slug,
+          title: block.title,
+          contentType: block.contentType,
+          body: block.body,
+          excerpt: block.excerpt,
+          author: block.author,
+          tags: block.tags,
+          externalUrl: block.externalUrl,
+          featuredImage: block.featuredImage,
+          displayOrder: block.displayOrder,
+          status: newStatus,
+          metadata: block.metadata,
+        }),
+      });
+
+      if (res.ok) {
+        onRefresh();
+      }
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setActionLoading(false);
+    }
+  }, [block, onRefresh]);
+
+  const handleSaveInline = useCallback(() => {
+    setExpanded(false);
+    onRefresh();
+  }, [onRefresh]);
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      {/* Collapsed header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -138,7 +482,7 @@ function BlockCard({ block }: BlockCardProps) {
             <h4 className="text-sm font-medium text-gray-900 truncate">{block.title}</h4>
             <StatusBadge status={block.status} />
           </div>
-          {block.body && (
+          {!expanded && block.body && (
             <p className="mt-1 text-sm text-gray-500 line-clamp-2">{block.body}</p>
           )}
         </div>
@@ -151,8 +495,57 @@ function BlockCard({ block }: BlockCardProps) {
           >
             Preview
           </Link>
+          <Link
+            href={`/admin/content/${block.slug}`}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+            title="Full Editor"
+          >
+            Full Edit
+          </Link>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          >
+            {expanded ? 'Collapse' : 'Quick Edit'}
+          </button>
+          {block.status === 'draft' && (
+            <button
+              onClick={() => handleStatusChange('published')}
+              disabled={actionLoading}
+              className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50 disabled:opacity-50"
+            >
+              Publish
+            </button>
+          )}
+          {block.status === 'published' && (
+            <button
+              onClick={() => handleStatusChange('archived')}
+              disabled={actionLoading}
+              className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 disabled:opacity-50"
+            >
+              Archive
+            </button>
+          )}
+          {block.status === 'archived' && (
+            <button
+              onClick={() => handleStatusChange('draft')}
+              disabled={actionLoading}
+              className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            >
+              Restore
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Expanded inline editor */}
+      {expanded && (
+        <InlineEditor
+          block={block}
+          onSave={handleSaveInline}
+          onCancel={() => setExpanded(false)}
+        />
+      )}
     </div>
   );
 }
@@ -166,7 +559,9 @@ interface SectionGroupProps {
   onRefresh: () => void;
 }
 
-function SectionGroup({ sectionTag, blocks, onRefresh }: SectionGroupProps) {
+function SectionGroup({ pageTag, sectionTag, blocks, onRefresh }: SectionGroupProps) {
+  const [showNewForm, setShowNewForm] = useState(false);
+
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
@@ -184,6 +579,33 @@ function SectionGroup({ sectionTag, blocks, onRefresh }: SectionGroupProps) {
           {blocks.map((block) => (
             <BlockCard key={block.id} block={block} onRefresh={onRefresh} />
           ))}
+        </div>
+      )}
+
+      {showNewForm ? (
+        <NewBlockForm
+          pageTag={pageTag}
+          sectionTag={sectionTag}
+          onSave={() => {
+            setShowNewForm(false);
+            onRefresh();
+          }}
+          onCancel={() => setShowNewForm(false)}
+        />
+      ) : (
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={() => setShowNewForm(true)}
+            className="inline-flex items-center rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50"
+          >
+            + Quick Add
+          </button>
+          <Link
+            href={`/admin/content/new?page=${encodeURIComponent(pageTag)}&section=${encodeURIComponent(sectionTag)}`}
+            className="inline-flex items-center rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-green-400 hover:text-green-600 hover:bg-green-50/50"
+          >
+            + Add via Full Editor
+          </Link>
         </div>
       )}
     </div>
@@ -226,6 +648,12 @@ function ArticleCard({ block }: { block: CmsBlock }) {
           >
             Preview
           </Link>
+          <Link
+            href={`/admin/content/${block.slug}`}
+            className="inline-flex items-center rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+          >
+            Edit
+          </Link>
         </div>
       </div>
     </div>
@@ -263,6 +691,12 @@ export default function CmsPageManager({
         <div className="text-center py-12 text-gray-400">
           <p className="text-sm">No content blocks for this page yet.</p>
           <p className="text-xs mt-1">Create blocks with the tag &ldquo;{tab}&rdquo; to populate this page.</p>
+          <Link
+            href={`/admin/content/new?page=${encodeURIComponent(tab)}`}
+            className="mt-4 inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Add First Block
+          </Link>
         </div>
       );
     }
@@ -291,8 +725,14 @@ export default function CmsPageManager({
   const renderBlogContent = () => {
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-gray-500">{grouped.blog.length} article{grouped.blog.length !== 1 ? 's' : ''}</p>
+          <Link
+            href="/admin/content/new"
+            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            New Article
+          </Link>
         </div>
         {grouped.blog.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
@@ -312,10 +752,16 @@ export default function CmsPageManager({
   const renderOtherContent = () => {
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-gray-500">
             {grouped.other.length} item{grouped.other.length !== 1 ? 's' : ''} (testimonials, team members, announcements, etc.)
           </p>
+          <Link
+            href="/admin/content/new"
+            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            New Item
+          </Link>
         </div>
         {grouped.other.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
@@ -335,14 +781,22 @@ export default function CmsPageManager({
   return (
     <div>
       {/* Summary Bar */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {totalBlocks} total &middot;{' '}
-          <span className="text-green-600">{publishedCount} published</span> &middot;{' '}
-          <span className="text-gray-600">{draftCount} draft</span> &middot;{' '}
-          <span className="text-purple-600">{archivedCount} archived</span>
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {totalBlocks} total &middot;{' '}
+            <span className="text-green-600">{publishedCount} published</span> &middot;{' '}
+            <span className="text-gray-600">{draftCount} draft</span> &middot;{' '}
+            <span className="text-purple-600">{archivedCount} archived</span>
+          </p>
+        </div>
+        <Link
+          href="/admin/content/new"
+          className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          New Content
+        </Link>
       </div>
 
       {/* Tab Bar */}

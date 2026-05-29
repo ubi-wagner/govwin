@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -156,9 +156,20 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for outcome recording ──────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'outcome.recorded',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, outcome, notes },
+    });
+
     // ── Record outcome in a transaction ────────────────────────────
     // Wrap proposal archive + library_units update in transaction
-    const atomsUpdated = await sql.begin(async (tx: any) => {
+    let atomsUpdated: number;
+    try {
+    atomsUpdated = await sql.begin(async (tx: any) => {
       // The proposals table doesn't have an 'outcome' column, so we
       // store it in the stage field (archive the proposal) and record
       // in stage_history with detailed notes.
@@ -245,14 +256,25 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       return updated;
     });
+    } catch (txErr) {
+      if (txErr instanceof Error && txErr.message === 'CONFLICT') {
+        await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
+        return NextResponse.json(
+          { error: 'Proposal was modified by another user', code: 'CONFLICT' },
+          { status: 409 },
+        );
+      }
+      console.error('[api/portal/proposals/outcome] transaction failed:', txErr);
+      await emitEventEnd(startId, { error: { message: String(txErr), code: 'DB_ERROR' } });
+      return NextResponse.json(
+        { error: 'Internal server error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'outcome.recorded',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
+    // ── End event ────────────────────────────────────────────────────
+    await emitEventEnd(startId, {
+      result: {
         correlationId: randomUUID(),
         tenantId,
         tenantSlug,

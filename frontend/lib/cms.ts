@@ -134,9 +134,28 @@ export async function getContentBlocks(tag: string): Promise<ContentRow[]> {
 /**
  * Fetch all published page_block entries for a given page tag.
  * Returns rows ordered by display_order for use in marketing page rendering.
+ *
+ * When `includeDrafts` is true (preview mode via `?_preview=1`), draft
+ * blocks are included alongside published blocks so the visual editor
+ * iframe can show pending changes before they go live.
  */
-export async function getPageBlocks(page: string): Promise<ContentRow[]> {
+export async function getPageBlocks(page: string, includeDrafts = false): Promise<ContentRow[]> {
   try {
+    if (!includeDrafts) {
+      const rows = await sql<ContentRow[]>`
+        SELECT id, slug, title, content_type, body, excerpt, author, tags,
+               published, status, published_at, featured_image, external_url,
+               display_order, metadata, created_at, updated_at
+        FROM cms_content
+        WHERE content_type = 'page_block'
+          AND ${page} = ANY(tags)
+          AND status = 'published'
+        ORDER BY display_order ASC, created_at ASC
+      `;
+      return rows;
+    }
+
+    // Preview mode: return published + draft blocks for the page.
     const rows = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
              published, status, published_at, featured_image, external_url,
@@ -144,7 +163,7 @@ export async function getPageBlocks(page: string): Promise<ContentRow[]> {
       FROM cms_content
       WHERE content_type = 'page_block'
         AND ${page} = ANY(tags)
-        AND status = 'published'
+        AND status IN ('published', 'draft')
       ORDER BY display_order ASC, created_at ASC
     `;
     return rows;

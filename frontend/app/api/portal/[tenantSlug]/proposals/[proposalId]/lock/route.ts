@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { harvestProposalToLibrary } from '@/lib/proposal-harvest';
 import { isValidUUID } from '@/lib/validation';
 
@@ -115,6 +115,20 @@ export async function POST(_request: Request, ctx: RouteContext) {
     const newLockCount = proposal.lockCount + 1;
     const autoAdvanceToSubmitted = proposal.stage === 'final';
     const previousStage = proposal.stage;
+
+    // ── Start event for proposal locking ─────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.locked',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: {
+        proposalId,
+        lockCount: proposal.lockCount,
+        stage: proposal.stage,
+      },
+    });
+
     let lockResult;
     try {
       lockResult = await sql`
@@ -132,10 +146,12 @@ export async function POST(_request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[portal/proposals/lock] lock update failed:', e);
+      await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (lockResult.count === 0) {
+      await emitEventEnd(startId, { error: { message: 'Lock state already changed', code: 'CONFLICT' } });
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
     }
 
@@ -151,12 +167,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
       }
     }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.locked',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
+    await emitEventEnd(startId, {
+      result: {
         correlationId: randomUUID(),
         tenantId,
         tenantSlug,
@@ -292,6 +304,10 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Workspace is not locked', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
+    if (proposal.lockCount === 0) {
+      return NextResponse.json({ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }, { status: 409 });
+    }
+
     const userRole = isRole(sessionUser.role) ? sessionUser.role : role;
     const isAdminRole = userRole === 'master_admin' || userRole === 'rfp_admin';
 
@@ -318,6 +334,19 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     const unlockDeadline = new Date();
     unlockDeadline.setDate(unlockDeadline.getDate() + 7);
 
+    // ── Start event for proposal unlocking ───────────────────────────
+    const unlockStartId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.unlocked',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: {
+        proposalId,
+        lockCount: proposal.lockCount,
+        stage: proposal.stage,
+      },
+    });
+
     // Revert stage from 'submitted' back to 'final' on unlock so the proposal can be edited
     let unlockResult;
     try {
@@ -335,10 +364,12 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[portal/proposals/lock] unlock update failed:', e);
+      await emitEventEnd(unlockStartId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (unlockResult.count === 0) {
+      await emitEventEnd(unlockStartId, { error: { message: 'Lock state already changed', code: 'CONFLICT' } });
       return NextResponse.json({ error: 'Lock state already changed', code: 'CONFLICT' }, { status: 409 });
     }
 
@@ -354,12 +385,8 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       }
     }
 
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'proposal.unlocked',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
+    await emitEventEnd(unlockStartId, {
+      result: {
         correlationId: randomUUID(),
         tenantId,
         tenantSlug,

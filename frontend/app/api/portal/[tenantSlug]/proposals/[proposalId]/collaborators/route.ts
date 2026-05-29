@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { collaboratorInviteEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
@@ -251,6 +251,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
+    // ── Start event for collaborator invitation ──────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'collaborator.invited',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: {
+        proposalId,
+        email: email.slice(0, 320),
+        name: name.slice(0, 200),
+        role: collabRole,
+        permission,
+      },
+    });
+
     // Wrap user + collaborator + stage_access creation in transaction
     let isNewUser = false;
     let tempPassword: string | undefined;
@@ -353,30 +368,21 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    // Emit event
-    try {
-      const correlationId = randomUUID();
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'proposal.collaborator_invited',
-        actor: userActor(sessionUser.id, sessionUser.email),
+    // ── End event for collaborator invitation ──────────────────────
+    await emitEventEnd(startId, {
+      result: {
+        correlationId: randomUUID(),
         tenantId,
-        payload: {
-          correlationId,
-          tenantId,
-          tenantSlug,
-          proposalId,
-          collaboratorId,
-          email: email.slice(0, 320),
-          name: name.slice(0, 200),
-          role: collabRole,
-          permission,
-          isNewUser,
-        },
-      });
-    } catch (e) {
-      console.error('[api/portal/proposals/collaborators] event emission failed:', e);
-    }
+        tenantSlug,
+        proposalId,
+        collaboratorId,
+        email: email.slice(0, 320),
+        name: name.slice(0, 200),
+        role: collabRole,
+        permission,
+        isNewUser,
+      },
+    });
 
     // ── Activity log ────────────────────────────────────────────────
     try {

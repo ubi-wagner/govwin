@@ -7,8 +7,11 @@ Vector search (embedding-based recall) deferred to V2 when embedding pipeline is
 
 import json
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
+
+from events import emit_event
 
 logger = logging.getLogger("pipeline.agents.memory")
 
@@ -36,8 +39,20 @@ class MemoryStore:
         Returns:
             UUID of the created memory row
         """
+        start_ms = time.monotonic()
         memory_id = str(uuid.uuid4())
         content = json.dumps(memory_data)
+
+        # Emit start event
+        start_event_id = ""
+        try:
+            start_event_id = await emit_event(
+                conn, namespace="tool", type="memory.stored", phase="start",
+                tenant_id=tenant_id,
+                payload={"agentRole": agent_name, "tenantId": tenant_id},
+            )
+        except Exception:
+            pass
 
         try:
             await conn.execute(
@@ -64,9 +79,29 @@ class MemoryStore:
                 "stored memory %s for tenant=%s agent=%s",
                 memory_id, tenant_id, agent_name,
             )
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            try:
+                await emit_event(
+                    conn, namespace="tool", type="memory.stored", phase="end",
+                    parent_event_id=start_event_id, tenant_id=tenant_id,
+                    payload={"agentRole": agent_name, "memoryId": memory_id,
+                             "durationMs": duration_ms},
+                )
+            except Exception:
+                pass
             return memory_id
         except Exception as e:
             logger.error("failed to store memory: %s", e)
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            try:
+                await emit_event(
+                    conn, namespace="tool", type="memory.stored", phase="end",
+                    parent_event_id=start_event_id, tenant_id=tenant_id,
+                    payload={"agentRole": agent_name, "error": str(e)[:200],
+                             "durationMs": duration_ms},
+                )
+            except Exception:
+                pass
             return ""
 
     async def recall(self, conn, tenant_id: str, agent_name: str, limit: int = 10) -> list[dict]:
@@ -84,6 +119,19 @@ class MemoryStore:
         Returns:
             List of memory dicts with content and metadata
         """
+        start_ms = time.monotonic()
+
+        # Emit start event
+        start_event_id = ""
+        try:
+            start_event_id = await emit_event(
+                conn, namespace="tool", type="memory.recalled", phase="start",
+                tenant_id=tenant_id,
+                payload={"agentRole": agent_name, "tenantId": tenant_id, "limit": limit},
+            )
+        except Exception:
+            pass
+
         try:
             rows = await conn.fetch(
                 """
@@ -125,9 +173,30 @@ class MemoryStore:
                     "occurred_at": row["occurred_at"].isoformat() if row["occurred_at"] else None,
                 })
 
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            try:
+                await emit_event(
+                    conn, namespace="tool", type="memory.recalled", phase="end",
+                    parent_event_id=start_event_id, tenant_id=tenant_id,
+                    payload={"agentRole": agent_name, "memoriesReturned": len(memories),
+                             "durationMs": duration_ms},
+                )
+            except Exception:
+                pass
+
             return memories
         except Exception as e:
             logger.error("failed to recall memories: %s", e)
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            try:
+                await emit_event(
+                    conn, namespace="tool", type="memory.recalled", phase="end",
+                    parent_event_id=start_event_id, tenant_id=tenant_id,
+                    payload={"agentRole": agent_name, "error": str(e)[:200],
+                             "durationMs": duration_ms},
+                )
+            except Exception:
+                pass
             return []
 
     async def search(self, conn, tenant_id: str, query_embedding: list[float], memory_type: str | None = None, agent_role: str | None = None, limit: int = 10) -> list[dict]:

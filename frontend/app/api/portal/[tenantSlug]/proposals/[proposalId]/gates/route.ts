@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -355,6 +355,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for gate requirement creation ──────────────────
+    const gateStartId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'gate_requirement.created',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, stage, label, requirementType },
+    });
+
     let requirement: { id: string; createdAt: Date };
     try {
       [requirement] = await sql<{ id: string; createdAt: Date }[]>`
@@ -365,20 +374,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[portal/proposals/gates] requirement insert failed:', e);
+      await emitEventEnd(gateStartId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'gate_requirement.created',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: { proposalId, requirementId: requirement.id, stage, label, requirementType },
-      });
-    } catch (e) {
-      console.error('[portal/proposals/gates] event emission failed:', e);
-    }
+    await emitEventEnd(gateStartId, {
+      result: { proposalId, requirementId: requirement.id, stage, label, requirementType },
+    });
 
     return NextResponse.json({
       data: {
@@ -535,6 +537,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for gate requirement toggle ──────────────────
+    const toggleStartId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'gate_requirement.toggled',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, requirementId, isMet },
+    });
+
     let updateResult;
     try {
       if (isMet) {
@@ -562,10 +573,12 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     } catch (e) {
       console.error('[portal/proposals/gates] requirement update failed:', e);
+      await emitEventEnd(toggleStartId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (updateResult.count === 0) {
+      await emitEventEnd(toggleStartId, { error: { message: 'Requirement not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Requirement not found', code: 'NOT_FOUND' },
         { status: 404 },
@@ -585,17 +598,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       // Non-fatal — stage is just for the event payload
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'gate_requirement.toggled',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: { proposalId, requirementId, isMet, stage: reqStage ?? null },
-      });
-    } catch (e) {
-      console.error('[portal/proposals/gates] event emission failed:', e);
-    }
+    await emitEventEnd(toggleStartId, {
+      result: { proposalId, requirementId, isMet, stage: reqStage ?? null },
+    });
 
     return NextResponse.json({
       data: {

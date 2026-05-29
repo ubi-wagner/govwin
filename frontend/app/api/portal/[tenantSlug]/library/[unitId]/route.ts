@@ -10,7 +10,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
 import { readDocx } from '@/lib/import/docx-reader';
 import { readPptx } from '@/lib/import/pptx-reader';
@@ -157,14 +157,6 @@ export async function PATCH(
       );
     }
 
-    // Status changes require tenant_admin or above
-    if (!hasRoleAtLeast(ctx.role, 'tenant_admin')) {
-      return NextResponse.json(
-        { error: 'Status changes require admin permissions', code: 'FORBIDDEN' },
-        { status: 403 },
-      );
-    }
-
     // Validate status transition: fetch current status
     try {
       const [current] = await sql<{ status: string }[]>`
@@ -217,6 +209,15 @@ export async function PATCH(
   // Always update the timestamp
   updates.push(sql`updated_at = now()`);
 
+  // ── Start event for library unit update ──────────────────────────
+  const patchStartId = await emitEventStart({
+    namespace: 'library',
+    type: 'unit.updated',
+    actor: { type: 'user', id: ctx.userId },
+    tenantId: ctx.tenantId,
+    payload: { unitId: ctx.unitId, updatedFields: providedKeys },
+  });
+
   // ---------- Execute ----------
   try {
     const setClause = updates.reduce(
@@ -230,23 +231,21 @@ export async function PATCH(
     `;
 
     if (result.count === 0) {
+      await emitEventEnd(patchStartId, { error: { message: 'Library unit not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    await emitEventSingle({
-      namespace: 'library',
-      type: 'unit.updated',
-      actor: { type: 'user', id: ctx.userId },
-      tenantId: ctx.tenantId,
-      payload: { correlationId: randomUUID(), unitId: ctx.unitId, updatedFields: providedKeys },
+    await emitEventEnd(patchStartId, {
+      result: { correlationId: randomUUID(), unitId: ctx.unitId, updatedFields: providedKeys },
     });
 
     return NextResponse.json({ data: { updated: true } });
   } catch (err) {
     console.error('[library/unit/patch] DB update failed', err);
+    await emitEventEnd(patchStartId, { error: { message: String(err), code: 'DB_ERROR' } });
     return NextResponse.json(
       { error: 'Failed to update library unit', code: 'DB_ERROR' },
       { status: 500 },
@@ -261,6 +260,15 @@ export async function DELETE(
   const ctx = await authorize(request, routeParams, 'tenant_admin');
   if ('error' in ctx) return ctx.error;
 
+  // ── Start event for library unit deletion ──────────────────────
+  const deleteStartId = await emitEventStart({
+    namespace: 'library',
+    type: 'unit.deleted',
+    actor: { type: 'user', id: ctx.userId },
+    tenantId: ctx.tenantId,
+    payload: { unitId: ctx.unitId },
+  });
+
   try {
     // Check if this is a seminal unit — seminal units cannot be deleted
     const [unit] = await sql<{ isSeminal: boolean | null }[]>`
@@ -269,6 +277,7 @@ export async function DELETE(
     `;
 
     if (!unit) {
+      await emitEventEnd(deleteStartId, { error: { message: 'Library unit not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
@@ -276,6 +285,7 @@ export async function DELETE(
     }
 
     if (unit.isSeminal) {
+      await emitEventEnd(deleteStartId, { error: { message: 'Cannot delete seminal documents', code: 'FORBIDDEN' } });
       return NextResponse.json(
         { error: 'Cannot delete original documents. Archive them instead.', code: 'FORBIDDEN' },
         { status: 403 },
@@ -288,23 +298,21 @@ export async function DELETE(
     `;
 
     if (result.count === 0) {
+      await emitEventEnd(deleteStartId, { error: { message: 'Library unit not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Library unit not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
     }
 
-    await emitEventSingle({
-      namespace: 'library',
-      type: 'unit.deleted',
-      actor: { type: 'user', id: ctx.userId },
-      tenantId: ctx.tenantId,
-      payload: { correlationId: randomUUID(), unitId: ctx.unitId },
+    await emitEventEnd(deleteStartId, {
+      result: { correlationId: randomUUID(), unitId: ctx.unitId },
     });
 
     return NextResponse.json({ data: { deleted: true } });
   } catch (err) {
     console.error('[library/unit/delete] DB delete failed', err);
+    await emitEventEnd(deleteStartId, { error: { message: String(err), code: 'STORAGE_ERROR' } });
     return NextResponse.json(
       { error: 'Failed to delete library unit', code: 'STORAGE_ERROR' },
       { status: 500 },

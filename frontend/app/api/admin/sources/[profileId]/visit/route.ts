@@ -11,8 +11,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,6 +90,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Source profile not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
+    // ── Start event ──────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'source.visited',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: {
+        action,
+        sourceName: profile.name,
+        sourceId: profileId,
+      },
+    });
+
     // ── Insert visit ────────────────────────────────────────────────
     let visit: { id: string };
     try {
@@ -109,6 +120,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       visit = rows[0];
     } catch (e) {
       console.error('[admin/sources/visit] insert failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
@@ -126,25 +138,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       // non-fatal, continue
     }
 
-    // ── Emit event (non-fatal) ─────────────────────────────────────
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'source.visited',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        payload: {
-          correlationId: randomUUID(),
-          action,
-          sourceName: profile.name,
-          sourceId: profileId,
-          filesCount,
-          topicsCount,
-        },
-      });
-    } catch (e) {
-      console.error('[admin/sources/visit] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { visitId: visit.id, action, filesCount, topicsCount },
+    });
 
     return NextResponse.json({ data: { visitId: visit.id } });
   } catch (e) {

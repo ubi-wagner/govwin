@@ -10,8 +10,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -113,6 +112,18 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event ──────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'source.updated',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: {
+        sourceId: profileId,
+        sourceName: profile.name,
+        updatedFields: Object.keys(values),
+      },
+    });
+
     // ── Update ──────────────────────────────────────────────────────
     // Build dynamic update using postgres.js tagged template
     const autoCrawlVal = values.autoCrawlEnabled != null ? Boolean(values.autoCrawlEnabled) : null;
@@ -134,27 +145,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[admin/sources/profile] update query failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // ── Emit event (non-fatal) ─────────────────────────────────────
-    try {
-      const correlationId = randomUUID();
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'source.updated',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        payload: {
-          correlationId,
-          sourceId: profileId,
-          sourceName: profile.name,
-          updatedFields: Object.keys(values),
-        },
-      });
-    } catch (e) {
-      console.error('[admin/sources/profile] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { sourceId: profileId, updatedFields: Object.keys(values) },
+    });
 
     return NextResponse.json({ data: { updated: true } });
   } catch (e) {

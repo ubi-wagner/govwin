@@ -56,8 +56,9 @@ TENANT ISOLATION:
       managed by rfp_admin. No tenant_id filtering required.
 
 EVENT EMISSIONS:
-    - None directly — events are emitted by the workflow processor at
-      the step level (workflow.step_completed / workflow.step_failed).
+    - finder:shred.executed:start/end — shred() start/end with duration
+    - finder:compliance.extracted:start/end — extract_compliance()
+      start/end with duration and match counts
 
 CHANGE LOG:
     PR #140 (2026-05-22) — Initial implementation: shred wrapper,
@@ -65,6 +66,8 @@ CHANGE LOG:
                            fallback
     PR #xxx (2026-05-22) — Added comprehensive documentation header,
                            error handling documentation, idempotency notes
+    PR #xxx (2026-05-29) — Added start/end event pairs for shred and
+                           extract_compliance actions
 ================================================================================
 """
 from __future__ import annotations
@@ -72,10 +75,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import uuid
 from typing import Any, Optional
 
 import asyncpg
+
+from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.shred")
 
@@ -105,6 +111,8 @@ async def shred(
     Returns:
         Dict with status, section count, compliance match count, token usage.
     """
+    start_ms = time.monotonic()
+
     # Validate solicitation_id format
     try:
         uuid.UUID(solicitation_id)
@@ -115,32 +123,80 @@ async def shred(
             "reason": "invalid_solicitation_id",
         }
 
-    from shredder import runner as shredder_runner
-    from shredder.runner import shred_solicitation
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="finder", type="shred.executed", phase="start",
+            payload={"solicitationId": solicitation_id},
+        )
+    except Exception as exc:
+        log.error("shred: failed to emit start event: %s", exc)
 
-    # Use the module-level override if set (e.g. by tests), otherwise
-    # instantiate a real Anthropic client from the SDK.
-    client = getattr(shredder_runner, "ANTHROPIC_CLIENT", None)
-    if client is None:
+    try:
+        from shredder import runner as shredder_runner
+        from shredder.runner import shred_solicitation
+
+        # Use the module-level override if set (e.g. by tests), otherwise
+        # instantiate a real Anthropic client from the SDK.
+        client = getattr(shredder_runner, "ANTHROPIC_CLIENT", None)
+        if client is None:
+            try:
+                from anthropic import AsyncAnthropic
+                client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+            except ImportError:
+                log.error("anthropic SDK not available -- cannot shred")
+                duration_ms = int((time.monotonic() - start_ms) * 1000)
+                try:
+                    await emit_event(
+                        conn, namespace="finder", type="shred.executed", phase="end",
+                        parent_event_id=start_event_id,
+                        payload={"solicitationId": solicitation_id,
+                                 "error": "anthropic_sdk_not_installed", "durationMs": duration_ms},
+                    )
+                except Exception:
+                    pass
+                return {
+                    "status": "shredder_failed",
+                    "reason": "anthropic_sdk_not_installed",
+                }
+
+        # Delegate to the runner. ShredderBudgetError is intentionally not
+        # caught here -- it propagates so the workflow processor records the
+        # step as failed.
+        result = await shred_solicitation(
+            conn=conn,
+            solicitation_id=solicitation_id,
+            anthropic_client=client,
+        )
+
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
         try:
-            from anthropic import AsyncAnthropic
-            client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
-        except ImportError:
-            log.error("anthropic SDK not available -- cannot shred")
-            return {
-                "status": "shredder_failed",
-                "reason": "anthropic_sdk_not_installed",
-            }
+            await emit_event(
+                conn, namespace="finder", type="shred.executed", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "status": result.get("status", "unknown"),
+                         "sectionsExtracted": result.get("sections_extracted", 0),
+                         "durationMs": duration_ms},
+            )
+        except Exception as exc:
+            log.error("shred: failed to emit end event: %s", exc)
 
-    # Delegate to the runner. ShredderBudgetError is intentionally not
-    # caught here -- it propagates so the workflow processor records the
-    # step as failed.
-    result = await shred_solicitation(
-        conn=conn,
-        solicitation_id=solicitation_id,
-        anthropic_client=client,
-    )
-    return result
+        return result
+
+    except Exception as exc:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="shred.executed", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "error": str(exc)[:500], "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
+        raise
 
 
 async def extract_compliance(
@@ -164,12 +220,24 @@ async def extract_compliance(
     Returns:
         Dict with compliance match counts and any errors.
     """
+    start_ms = time.monotonic()
+
     # Validate solicitation_id format
     try:
         sol_uuid = uuid.UUID(solicitation_id)
     except (ValueError, TypeError):
         log.error("extract_compliance: invalid solicitation_id: %s", solicitation_id)
         return {"status": "skipped", "reason": "invalid_solicitation_id"}
+
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="finder", type="compliance.extracted", phase="start",
+            payload={"solicitationId": solicitation_id},
+        )
+    except Exception as exc:
+        log.error("extract_compliance: failed to emit start event: %s", exc)
 
     # 1. Fetch ai_extracted JSONB from curated_solicitations
     try:
@@ -179,13 +247,45 @@ async def extract_compliance(
         )
     except Exception as exc:
         log.error("extract_compliance: DB query failed: %s", exc)
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="compliance.extracted", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "error": f"db_error: {exc}", "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
         return {"status": "skipped", "reason": f"db_error: {exc}"}
 
     if row is None:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="compliance.extracted", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "status": "skipped", "reason": "solicitation_not_found",
+                         "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
         return {"status": "skipped", "reason": "solicitation_not_found"}
 
     raw_extracted = row["ai_extracted"]
     if raw_extracted is None:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="compliance.extracted", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "status": "skipped", "reason": "not_yet_shredded",
+                         "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
         return {"status": "skipped", "reason": "not_yet_shredded"}
 
     # asyncpg may return JSONB as str or dict depending on codec registration
@@ -199,6 +299,17 @@ async def extract_compliance(
 
     sections = ai_extracted.get("sections", [])
     if not sections:
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="compliance.extracted", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "complianceMatches": 0, "status": "completed",
+                         "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
         return {"status": "completed", "compliance_matches": 0, "reason": "no_sections"}
 
     # 2. Attempt to re-run compliance extraction via Claude
@@ -266,7 +377,7 @@ async def extract_compliance(
         column_updates, custom_vars, skipped = split_matches(all_matches)
         await _upsert_compliance(conn, sol_uuid, column_updates, custom_vars)
 
-        return {
+        result = {
             "status": "completed",
             "compliance_matches": len(all_matches),
             "column_updates": len(column_updates),
@@ -275,6 +386,19 @@ async def extract_compliance(
             "total_input_tokens": total_in_tokens,
             "total_output_tokens": total_out_tokens,
         }
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="compliance.extracted", phase="end",
+                parent_event_id=start_event_id,
+                payload={"solicitationId": solicitation_id,
+                         "complianceMatches": len(all_matches),
+                         "extractionMethod": "claude",
+                         "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
+        return result
 
     except ImportError:
         log.info("anthropic SDK not available, using pattern-based compliance extraction")
@@ -353,8 +477,21 @@ async def extract_compliance(
                 "db_error": str(exc)[:200],
             }
 
-    return {
+    result = {
         "status": "completed",
         "compliance_matches": len(compliance_vars),
         "extraction_method": "pattern_based",
     }
+    duration_ms = int((time.monotonic() - start_ms) * 1000)
+    try:
+        await emit_event(
+            conn, namespace="finder", type="compliance.extracted", phase="end",
+            parent_event_id=start_event_id,
+            payload={"solicitationId": solicitation_id,
+                     "complianceMatches": len(compliance_vars),
+                     "extractionMethod": "pattern_based",
+                     "durationMs": duration_ms},
+        )
+    except Exception:
+        pass
+    return result

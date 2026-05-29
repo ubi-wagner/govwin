@@ -9,17 +9,43 @@ Runs as an async background loop:
   5. On failure, increment retry count or mark as failed
 """
 import asyncio
+import json
 import logging
 import os
+import time
+import uuid as uuid_mod
 from datetime import datetime, timezone
 
-from ..models.database import get_pool
+from ..models.database import get_pool, get_event_pool
 from ..models.events import emit_event
 
 
 def _fire_event(event_type: str, **kwargs):
     """Fire-and-forget event emission."""
     asyncio.create_task(emit_event(event_type, entity_type='email', **kwargs))
+
+
+async def _emit_shared_event(*, namespace: str, event_type: str, phase: str,
+                              payload: dict, parent_event_id: str | None = None) -> str:
+    """Emit an event to the shared system_events table. Returns event id."""
+    pool = get_event_pool()
+    if not pool:
+        return ""
+    event_id = str(uuid_mod.uuid4())
+    try:
+        payload['correlationId'] = payload.get('correlationId', str(uuid_mod.uuid4()))
+        await pool.execute(
+            """INSERT INTO system_events
+                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
+               VALUES ($1, $2, $3, $4, 'system', 'email_queue', $5, $6::jsonb)""",
+            uuid_mod.UUID(event_id), namespace, event_type, phase,
+            uuid_mod.UUID(parent_event_id) if parent_event_id else None,
+            json.dumps(payload),
+        )
+        return event_id
+    except Exception as e:
+        logger.error('_emit_shared_event failed: %s', e)
+        return ""
 
 logger = logging.getLogger('cms.email_queue')
 
@@ -55,6 +81,11 @@ async def process_queue_batch() -> int:
     processed = 0
     for queue_item in rows:
         send_id = queue_item['send_id']
+        send_start_ms = time.monotonic()
+        start_event_id = await _emit_shared_event(
+            namespace="system", event_type="email.sent", phase="start",
+            payload={"sendId": str(send_id)},
+        )
         try:
             # Fetch the send record
             send = await pool.fetchrow(
@@ -175,11 +206,27 @@ async def process_queue_batch() -> int:
                 },
             )
 
+            send_duration_ms = int((time.monotonic() - send_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="email.sent", phase="end",
+                parent_event_id=start_event_id,
+                payload={"sendId": str(send_id),
+                         "recipient": send['recipient_email'],
+                         "durationMs": send_duration_ms},
+            )
+
             processed += 1
             logger.info(f'Sent email {send_id} to {send["recipient_email"]}')
 
         except Exception as e:
             logger.error(f'[email_queue] Failed to send {send_id}: {e}')
+            send_duration_ms = int((time.monotonic() - send_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="email.sent", phase="end",
+                parent_event_id=start_event_id,
+                payload={"sendId": str(send_id), "error": str(e)[:500],
+                         "durationMs": send_duration_ms},
+            )
             attempts = queue_item['attempts'] + 1
 
             if attempts >= queue_item['max_attempts']:

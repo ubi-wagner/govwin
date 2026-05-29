@@ -10,7 +10,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantId: string }>;
@@ -216,6 +216,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         );
       }
 
+      // ── Start event ────────────────────────────────────────────────
+      const startId = await emitEventStart({
+        namespace: 'finder',
+        type: 'tenant.updated',
+        actor: userActor(sessionUser.id as string),
+        tenantId: null,
+        payload: { tenantId, fields: Object.keys(body) },
+      });
+
       // Build dynamic update — use individual SET clauses for each provided field
       // to avoid SQL injection while supporting partial updates
       const setClauses = [];
@@ -240,17 +249,9 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         RETURNING id, name, slug, status, product_tier, subscription_status, lifecycle_stage, updated_at
       `;
 
-      try {
-        await emitEventSingle({
-          namespace: 'finder',
-          type: 'tenant.updated',
-          actor: userActor(sessionUser.id as string),
-          tenantId: null,
-          payload: { tenantId, fields: Object.keys(body) },
-        });
-      } catch (e) {
-        console.error('[admin/tenants] event emission failed:', e);
-      }
+      await emitEventEnd(startId, {
+        result: { tenantId, updatedFields: Object.keys(body) },
+      });
 
       return NextResponse.json({ data: { tenant: updated } });
     } catch (dbErr) {
