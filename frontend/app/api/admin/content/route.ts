@@ -176,11 +176,23 @@ export async function POST(request: Request) {
       RETURNING id
     `;
 
+    const eventType = contentType === 'page_block'
+      ? 'content.block_updated'
+      : published ? 'content.published' : 'content.updated';
+
     await emitEventSingle({
       namespace: 'system',
-      type: published ? 'content.published' : 'content.updated',
+      type: eventType,
       actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { correlationId: randomUUID(), slug, title, contentType },
+      payload: {
+        correlationId: randomUUID(),
+        slug,
+        title,
+        contentType,
+        ...(contentType === 'page_block' && tags.length >= 2
+          ? { page: tags[0], section: tags[1] }
+          : {}),
+      },
     });
 
     return NextResponse.json({ data: { id: row.id, slug } });
