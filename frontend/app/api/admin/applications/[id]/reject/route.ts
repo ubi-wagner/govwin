@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
@@ -71,6 +70,19 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'capture',
+      type: 'application.rejected',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: {
+        applicationId: id,
+        companyName: app.companyName,
+        contactEmail: app.contactEmail,
+      },
+    });
+
     // Update application status
     try {
       await sql`
@@ -83,28 +95,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[admin/applications/reject] update query failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // Emit system event (non-fatal)
-    try {
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'application.rejected',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        tenantId: null,
-        payload: {
-          correlationId: randomUUID(),
-          applicationId: id,
-          reason: reason || null,
-        },
-      });
-    } catch (e) {
-      console.error('[admin/applications/reject] event emission failed:', e);
-      // non-fatal, continue
-    }
-
     // Send rejection email (non-fatal)
+    let emailSent = false;
     try {
       const emailContent = applicationRejectedEmail({
         contactName: app.contactName,
@@ -116,10 +112,15 @@ export async function POST(request: Request, ctx: RouteContext) {
         subject: emailContent.subject,
         html: emailContent.html,
       });
+      emailSent = true;
     } catch (e) {
       console.error('[admin/applications/reject] email send failed:', e);
       // non-fatal, continue
     }
+
+    await emitEventEnd(startId, {
+      result: { applicationId: id, reason, emailSent },
+    });
 
     return NextResponse.json({ data: { rejected: true } });
   } catch (e) {

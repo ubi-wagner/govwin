@@ -14,13 +14,37 @@ import asyncio
 import base64
 import logging
 import re
+import uuid as uuid_mod
 
-from ..models.database import get_pool
+from ..models.database import get_pool, get_event_pool
 from ..models.events import emit_event
 
 logger = logging.getLogger('cms.generator')
 
 POLL_INTERVAL = int(os.getenv('GENERATION_POLL_INTERVAL', '30'))  # seconds
+
+
+async def _emit_shared_event(*, namespace: str, event_type: str, phase: str,
+                              payload: dict, parent_event_id: str | None = None) -> str:
+    """Emit an event to the shared system_events table. Returns event id."""
+    pool = get_event_pool()
+    if not pool:
+        return ""
+    event_id = str(uuid_mod.uuid4())
+    try:
+        payload['correlationId'] = payload.get('correlationId', str(uuid_mod.uuid4()))
+        await pool.execute(
+            """INSERT INTO system_events
+                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
+               VALUES ($1, $2, $3, $4, 'system', 'content_generator', $5, $6::jsonb)""",
+            uuid_mod.UUID(event_id), namespace, event_type, phase,
+            uuid_mod.UUID(parent_event_id) if parent_event_id else None,
+            json.dumps(payload),
+        )
+        return event_id
+    except Exception as e:
+        logger.error('_emit_shared_event failed: %s', e)
+        return ""
 
 DEFAULT_SYSTEM_PROMPT = (
     'You are a content writer for the SBIR Engine. Write clear, actionable content '
@@ -194,6 +218,11 @@ async def process_generation(gen_id: str, prompt: str, category: str,
     pool = get_pool()
     start_ms = time.monotonic()
 
+    start_event_id = await _emit_shared_event(
+        namespace="system", event_type="content.generated", phase="start",
+        payload={"generationId": gen_id, "sourceType": source_type, "model": model},
+    )
+
     try:
         # Mark as generating
         await pool.execute(
@@ -309,6 +338,13 @@ async def process_generation(gen_id: str, prompt: str, category: str,
             payload={'model': model, 'tokens': tokens, 'duration_ms': duration_ms, 'source_type': source_type},
         )
 
+        await _emit_shared_event(
+            namespace="system", event_type="content.generated", phase="end",
+            parent_event_id=start_event_id,
+            payload={"generationId": gen_id, "tokens": tokens,
+                     "durationMs": duration_ms, "sourceType": source_type},
+        )
+
         logger.info(f'Generation {gen_id} completed: "{result.get("title")}" ({duration_ms}ms, source={source_type})')
 
     except json.JSONDecodeError as e:
@@ -320,6 +356,12 @@ async def process_generation(gen_id: str, prompt: str, category: str,
         )
         await emit_event('content_pipeline.generation.failed', entity_type='generation',
             entity_id=str(gen_id), diff_summary=error_msg)
+        await _emit_shared_event(
+            namespace="system", event_type="content.generated", phase="end",
+            parent_event_id=start_event_id,
+            payload={"generationId": gen_id, "error": error_msg[:500],
+                     "durationMs": duration_ms},
+        )
         logger.error(f'Generation {gen_id} failed: {error_msg}')
 
     except Exception as e:
@@ -331,6 +373,12 @@ async def process_generation(gen_id: str, prompt: str, category: str,
         )
         await emit_event('content_pipeline.generation.failed', entity_type='generation',
             entity_id=str(gen_id), diff_summary=f'Generation failed: {error_msg}')
+        await _emit_shared_event(
+            namespace="system", event_type="content.generated", phase="end",
+            parent_event_id=start_event_id,
+            payload={"generationId": gen_id, "error": error_msg[:500],
+                     "durationMs": duration_ms},
+        )
         logger.error(f'Generation {gen_id} failed: {error_msg}')
 
 

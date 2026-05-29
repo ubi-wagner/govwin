@@ -11,8 +11,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,6 +68,17 @@ export async function POST(_request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event ──────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'source.scout_triggered',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: {
+        sourceId: profileId,
+        sourceName: profile.name,
+      },
+    });
+
     // ── Enqueue scout job ───────────────────────────────────────────
     const [job] = await sql<{ id: string }[]>`
       INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
@@ -82,17 +92,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
       RETURNING id
     `;
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'source.scout_triggered',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId: randomUUID(),
-        sourceId: profileId,
-        sourceName: profile.name,
-        jobId: job.id,
-      },
+    await emitEventEnd(startId, {
+      result: { jobId: job.id, sourceId: profileId },
     });
 
     return NextResponse.json({ data: { jobId: job.id } }, { status: 201 });

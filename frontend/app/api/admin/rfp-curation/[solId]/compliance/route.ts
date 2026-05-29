@@ -16,8 +16,7 @@ import { invoke } from '@/lib/tools';
 import type { ToolContext } from '@/lib/tools';
 import { createLogger } from '@/lib/logger';
 import type { Role } from '@/lib/rbac';
-import { emitEventSingle } from '@/lib/events';
-import { randomUUID } from 'crypto';
+import { emitEventStart, emitEventEnd } from '@/lib/events';
 
 const log = createLogger('rfp-curation');
 
@@ -146,6 +145,15 @@ export async function POST(
       log: log.child({ tool: 'compliance.save_variable_value', requestId }),
     };
 
+    // ── Start event ─────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'compliance_value.saved',
+      actor: { type: 'user', id: user.id! },
+      tenantId: null,
+      payload: { solicitationId: solId, variableName: body.variableName as string },
+    });
+
     // ── Invoke tool ─────────────────────────────────────────────────
     const result = await invoke(
       'compliance.save_variable_value',
@@ -161,18 +169,9 @@ export async function POST(
       toolCtx,
     );
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'compliance_value.saved',
-        actor: { type: 'user', id: user.id! },
-        tenantId: null,
-        payload: { correlationId: randomUUID(), solicitationId: solId, variableName: body.variableName as string },
-      });
-    } catch (e) {
-      console.error('[rfp-curation/compliance] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { solicitationId: solId, variableName: body.variableName as string },
+    });
 
     return NextResponse.json({ data: result });
   } catch (error) {

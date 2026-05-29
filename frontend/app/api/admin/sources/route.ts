@@ -8,8 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 // ─── GET: list active sources ─────────────────────────────────────
 
@@ -118,6 +117,14 @@ export async function POST(request: Request) {
     const adminNotes = typeof body.adminNotes === 'string' ? body.adminNotes.trim() || null : null;
     const visitInstructions = typeof body.visitInstructions === 'string' ? body.visitInstructions.trim() || null : null;
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'source.created',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: { name, siteType, baseUrl },
+    });
+
     // ── Insert ────────────────────────────────────────────────────
     let row: { id: string; name: string };
     try {
@@ -136,20 +143,13 @@ export async function POST(request: Request) {
       row = rows[0];
     } catch (e) {
       console.error('[admin/sources] POST insert failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'source.created',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        payload: { correlationId: randomUUID(), sourceId: row.id, name: row.name, siteType },
-      });
-    } catch (e) {
-      console.error('[admin/sources] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { sourceId: row.id, name: row.name, siteType },
+    });
 
     return NextResponse.json({ data: { id: row.id, name: row.name } });
   } catch (e) {

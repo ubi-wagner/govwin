@@ -53,10 +53,13 @@ CHANGE LOG:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any
 
 import asyncpg
+
+from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.create_library_defaults")
 
@@ -114,12 +117,25 @@ async def create_default_categories(
     Returns:
         {"categoriesCreated": N, "categoriesSkipped": M}
     """
+    start_ms = time.monotonic()
+
     # Validate tenant_id format
     try:
         tenant_uuid = uuid.UUID(tenant_id)
     except (ValueError, TypeError):
         log.error("create_default_categories: invalid tenant_id: %s", tenant_id)
         return {"status": "skipped", "reason": "invalid_tenant_id"}
+
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="library", type="defaults.created", phase="start",
+            tenant_id=tenant_id,
+            payload={"tenantId": tenant_id},
+        )
+    except Exception as exc:
+        log.error("create_default_categories: failed to emit start event: %s", exc)
 
     # 1. Verify tenant exists
     try:
@@ -173,5 +189,17 @@ async def create_default_categories(
                 "failed to create default category '%s' for tenant %s: %s",
                 cat["name"], tenant_id, e,
             )
+
+    duration_ms = int((time.monotonic() - start_ms) * 1000)
+    try:
+        await emit_event(
+            conn, namespace="library", type="defaults.created", phase="end",
+            parent_event_id=start_event_id,
+            tenant_id=tenant_id,
+            payload={"tenantId": tenant_id, "categoriesCreated": created,
+                     "categoriesSkipped": skipped, "durationMs": duration_ms},
+        )
+    except Exception as exc:
+        log.error("create_default_categories: failed to emit end event: %s", exc)
 
     return {"categoriesCreated": created, "categoriesSkipped": skipped}

@@ -13,6 +13,8 @@ import asyncio
 import json
 import logging
 import os
+import time
+import uuid as uuid_mod
 from datetime import datetime, timezone
 
 from ..models.database import get_pool, get_event_pool
@@ -28,6 +30,29 @@ BATCH_SIZE = 5
 def _fire_event(event_type: str, **kwargs):
     """Fire-and-forget event emission."""
     asyncio.create_task(emit_event(event_type, entity_type='campaign', **kwargs))
+
+
+async def _emit_shared_event(*, namespace: str, event_type: str, phase: str,
+                              payload: dict, parent_event_id: str | None = None) -> str:
+    """Emit an event to the shared system_events table. Returns event id."""
+    pool = get_event_pool()
+    if not pool:
+        return ""
+    event_id = str(uuid_mod.uuid4())
+    try:
+        payload['correlationId'] = payload.get('correlationId', str(uuid_mod.uuid4()))
+        await pool.execute(
+            """INSERT INTO system_events
+                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
+               VALUES ($1, $2, $3, $4, 'system', 'campaign_executor', $5, $6::jsonb)""",
+            uuid_mod.UUID(event_id), namespace, event_type, phase,
+            uuid_mod.UUID(parent_event_id) if parent_event_id else None,
+            json.dumps(payload),
+        )
+        return event_id
+    except Exception as e:
+        logger.error('_emit_shared_event failed: %s', e)
+        return ""
 
 
 async def _enumerate_audience(campaign) -> list[dict]:
@@ -370,6 +395,12 @@ async def process_campaigns() -> int:
     for campaign in rows:
         campaign_id = campaign['id']
         campaign_type = campaign['campaign_type']
+        campaign_start_ms = time.monotonic()
+
+        start_event_id = await _emit_shared_event(
+            namespace="system", event_type="campaign.executed", phase="start",
+            payload={"campaignId": str(campaign_id), "campaignType": campaign_type},
+        )
 
         try:
             # Log execution start
@@ -411,6 +442,15 @@ async def process_campaigns() -> int:
                 },
             )
 
+            campaign_duration_ms = int((time.monotonic() - campaign_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="campaign.executed", phase="end",
+                parent_event_id=start_event_id,
+                payload={"campaignId": str(campaign_id), "campaignType": campaign_type,
+                         "sendsCreated": result['created'], "targeted": result['targeted'],
+                         "durationMs": campaign_duration_ms},
+            )
+
             processed += 1
             logger.info(
                 f'Campaign {campaign_id} ({campaign_type}): '
@@ -419,6 +459,13 @@ async def process_campaigns() -> int:
 
         except Exception as e:
             logger.error(f'[campaign_executor] Error executing campaign {campaign_id}: {e}')
+            campaign_duration_ms = int((time.monotonic() - campaign_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="campaign.executed", phase="end",
+                parent_event_id=start_event_id,
+                payload={"campaignId": str(campaign_id), "error": str(e)[:500],
+                         "durationMs": campaign_duration_ms},
+            )
             # Update log with error
             try:
                 await pool.execute(

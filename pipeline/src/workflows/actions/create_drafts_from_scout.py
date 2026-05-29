@@ -59,10 +59,13 @@ CHANGE LOG:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any, Optional
 
 import asyncpg
+
+from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.create_drafts_from_scout")
 
@@ -104,6 +107,8 @@ async def create_drafts_from_scout(
             "sourceName": "Air Force CSO Portal",
         }
     """
+    start_ms = time.monotonic()
+
     # Validate source_id format
     try:
         source_uuid = uuid.UUID(source_id)
@@ -118,8 +123,28 @@ async def create_drafts_from_scout(
             "reason": "invalid_source_id",
         }
 
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="finder", type="scout.drafts_created", phase="start",
+            payload={"sourceId": source_id, "sourceName": source_name or ""},
+        )
+    except Exception as exc:
+        log.error("create_drafts_from_scout: failed to emit start event: %s", exc)
+
     # 1. Validate inputs
     if not region_results or not isinstance(region_results, list):
+        duration_ms = int((time.monotonic() - start_ms) * 1000)
+        try:
+            await emit_event(
+                conn, namespace="finder", type="scout.drafts_created", phase="end",
+                parent_event_id=start_event_id,
+                payload={"sourceId": source_id, "draftsCreated": 0,
+                         "reason": "no_region_results", "durationMs": duration_ms},
+            )
+        except Exception:
+            pass
         return {
             "draftsCreated": 0,
             "draftsUpdated": 0,
@@ -228,6 +253,18 @@ async def create_drafts_from_scout(
                 # Continue with next opportunity -- one failure should not
                 # block creation of other opportunities
                 continue
+
+    duration_ms = int((time.monotonic() - start_ms) * 1000)
+    try:
+        await emit_event(
+            conn, namespace="finder", type="scout.drafts_created", phase="end",
+            parent_event_id=start_event_id,
+            payload={"sourceId": source_id, "draftsCreated": drafts_created,
+                     "duplicatesSkipped": duplicates_skipped,
+                     "durationMs": duration_ms},
+        )
+    except Exception as exc:
+        log.error("create_drafts_from_scout: failed to emit end event: %s", exc)
 
     return {
         "draftsCreated": drafts_created,

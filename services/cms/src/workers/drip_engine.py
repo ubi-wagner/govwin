@@ -13,9 +13,11 @@ import asyncio
 import json
 import logging
 import os
+import time
+import uuid as uuid_mod
 from datetime import datetime, timedelta, timezone
 
-from ..models.database import get_pool
+from ..models.database import get_pool, get_event_pool
 from ..models.events import emit_event
 
 logger = logging.getLogger('cms.drip_engine')
@@ -28,6 +30,29 @@ BATCH_SIZE = 20
 def _fire_event(event_type: str, **kwargs):
     """Fire-and-forget event emission."""
     asyncio.create_task(emit_event(event_type, entity_type='drip', **kwargs))
+
+
+async def _emit_shared_event(*, namespace: str, event_type: str, phase: str,
+                              payload: dict, parent_event_id: str | None = None) -> str:
+    """Emit an event to the shared system_events table. Returns event id."""
+    pool = get_event_pool()
+    if not pool:
+        return ""
+    event_id = str(uuid_mod.uuid4())
+    try:
+        payload['correlationId'] = payload.get('correlationId', str(uuid_mod.uuid4()))
+        await pool.execute(
+            """INSERT INTO system_events
+                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
+               VALUES ($1, $2, $3, $4, 'system', 'drip_engine', $5, $6::jsonb)""",
+            uuid_mod.UUID(event_id), namespace, event_type, phase,
+            uuid_mod.UUID(parent_event_id) if parent_event_id else None,
+            json.dumps(payload),
+        )
+        return event_id
+    except Exception as e:
+        logger.error('_emit_shared_event failed: %s', e)
+        return ""
 
 
 async def process_due_enrollments() -> int:
@@ -60,6 +85,14 @@ async def process_due_enrollments() -> int:
         campaign_id = enrollment['campaign_id']
         current_step = enrollment['current_step']
         next_step_number = current_step + 1
+        step_start_ms = time.monotonic()
+
+        start_event_id = await _emit_shared_event(
+            namespace="system", event_type="drip.step_sent", phase="start",
+            payload={"enrollmentId": str(enrollment_id),
+                     "campaignId": str(campaign_id),
+                     "stepNumber": next_step_number},
+        )
 
         try:
             # Look up the next step in the drip sequence
@@ -226,6 +259,17 @@ async def process_due_enrollments() -> int:
                 },
             )
 
+            step_duration_ms = int((time.monotonic() - step_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="drip.step_sent", phase="end",
+                parent_event_id=start_event_id,
+                payload={"enrollmentId": str(enrollment_id),
+                         "campaignId": str(campaign_id),
+                         "stepNumber": next_step_number,
+                         "recipient": recipient_email,
+                         "durationMs": step_duration_ms},
+            )
+
             processed += 1
             logger.info(
                 f'Drip step {next_step_number} sent for enrollment {enrollment_id} '
@@ -234,6 +278,15 @@ async def process_due_enrollments() -> int:
 
         except Exception as e:
             logger.error(f'[drip_engine] Error processing enrollment {enrollment_id}: {e}')
+            step_duration_ms = int((time.monotonic() - step_start_ms) * 1000)
+            await _emit_shared_event(
+                namespace="system", event_type="drip.step_sent", phase="end",
+                parent_event_id=start_event_id,
+                payload={"enrollmentId": str(enrollment_id),
+                         "campaignId": str(campaign_id),
+                         "error": str(e)[:500],
+                         "durationMs": step_duration_ms},
+            )
             # Don't fail the whole batch — mark this enrollment as failed if persistent
             try:
                 await pool.execute(

@@ -15,8 +15,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -132,6 +131,19 @@ export async function POST(
     // ── Update solicitation status ──────────────────────────────────
     const toState = mapping.to;
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'solicitation.triaged',
+      actor: userActor(actorId, user.email),
+      payload: {
+        solicitationId: solId,
+        action,
+        fromState,
+        toState,
+      },
+    });
+
     const updateFields: Record<string, string | null> = {};
     if (action === 'claim' || action === 'reclaim') {
       updateFields.claimedBy = actorId;
@@ -155,6 +167,7 @@ export async function POST(
     `;
 
     if (updated.length === 0) {
+      await emitEventEnd(startId, { error: { message: 'Status changed concurrently', code: 'CONFLICT' } });
       return NextResponse.json(
         { error: 'Status changed concurrently, please retry', code: 'CONFLICT' },
         { status: 409 },
@@ -170,13 +183,10 @@ export async function POST(
       RETURNING id
     `;
 
-    // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'solicitation.triaged',
-      actor: userActor(actorId, user.email),
-      payload: {
-        correlationId: randomUUID(),
+    // ── End event ──────────────────────────────────────────────────
+    await emitEventEnd(startId, {
+      result: {
+        triageActionId: triageRow.id,
         solicitationId: solId,
         action,
         fromState,

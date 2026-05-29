@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -67,6 +66,20 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const previousStatus = app.status;
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'capture',
+      type: 'application.status_changed',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      tenantId: null,
+      payload: {
+        applicationId: id,
+        companyName: app.companyName,
+        previousStatus,
+        newStatus: body.status,
+      },
+    });
+
     try {
       await sql`
         UPDATE applications
@@ -78,29 +91,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (e) {
       console.error('[admin/applications/status] update query failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'application.status_changed',
-        actor: userActor(userId, (session.user as { email?: string }).email),
-        tenantId: null,
-        payload: {
-          correlationId: randomUUID(),
-          applicationId: id,
-          companyName: app.companyName,
-          contactEmail: app.contactEmail,
-          previousStatus,
-          newStatus: body.status,
-          note: body.note.trim(),
-        },
-      });
-    } catch (e) {
-      console.error('[admin/applications/status] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { applicationId: id, previousStatus, newStatus: body.status },
+    });
 
     return NextResponse.json({
       data: { previousStatus, newStatus: body.status },

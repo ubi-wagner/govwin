@@ -43,9 +43,10 @@ TENANT ISOLATION:
       pipeline items)
 
 EVENT EMISSIONS:
-    - finder:scoring.completed:single — on success, includes tenantsScored,
-      topicsScored, tenantsNotified, avgScore, durationMs
-    - finder:scoring.failed:single — on DB errors, includes error details
+    - finder:scoring.completed:start — emitted at scoring start
+    - finder:scoring.completed:end — emitted on success or failure,
+      linked via parent_event_id, includes tenantsScored, avgScore,
+      durationMs (or error details on failure)
 
 CHANGE LOG:
     PR #140 (2026-05-22) — Initial implementation: multi-factor scoring,
@@ -55,9 +56,7 @@ CHANGE LOG:
                            per-tenant error handling with continue,
                            idempotency via ON CONFLICT upsert, batch
                            processing documentation
-    PR #xxx (2026-05-28) — Score individual topics (opportunities with
-                           solicitation_id), emit scoring.completed /
-                           scoring.failed events
+    PR #xxx (2026-05-29) — Converted to start/end event pairs
 ================================================================================
 """
 from __future__ import annotations
@@ -109,6 +108,16 @@ async def match_tenants(
     sol_uuid = uuid.UUID(solicitation_id)
     start_ms = time.monotonic()
 
+    # Emit start event
+    start_event_id = ""
+    try:
+        start_event_id = await emit_event(
+            conn, namespace="finder", type="scoring.completed", phase="start",
+            payload={"solicitationId": str(sol_uuid)},
+        )
+    except Exception as exc:
+        log.error("match_tenants: failed to emit start event: %s", exc)
+
     # 1. Fetch the solicitation + opportunity metadata
     #    Note: opportunities table has no 'keywords' column; use
     #    tech_focus_areas (added in migration 013) instead.
@@ -126,12 +135,14 @@ async def match_tenants(
     except Exception as exc:
         log.error("match_tenants: failed to fetch solicitation %s: %s", solicitation_id, exc)
         duration_ms = int((time.monotonic() - start_ms) * 1000)
-        await emit_event(conn, namespace="finder", type="scoring.failed", phase="single", payload={
-            "solicitationId": str(sol_uuid),
-            "error": str(exc),
-            "stage": "fetch_solicitation",
-            "durationMs": duration_ms,
-        })
+        try:
+            await emit_event(conn, namespace="finder", type="scoring.completed", phase="end",
+                parent_event_id=start_event_id, payload={
+                    "solicitationId": str(sol_uuid), "error": str(exc),
+                    "stage": "fetch_solicitation", "durationMs": duration_ms,
+                })
+        except Exception:
+            pass
         return {"status": "error", "reason": f"db_error: {exc}"}
 
     if sol is None:
@@ -154,12 +165,14 @@ async def match_tenants(
     except Exception as exc:
         log.error("match_tenants: failed to fetch tenant profiles: %s", exc)
         duration_ms = int((time.monotonic() - start_ms) * 1000)
-        await emit_event(conn, namespace="finder", type="scoring.failed", phase="single", payload={
-            "solicitationId": str(sol_uuid),
-            "error": str(exc),
-            "stage": "fetch_profiles",
-            "durationMs": duration_ms,
-        })
+        try:
+            await emit_event(conn, namespace="finder", type="scoring.completed", phase="end",
+                parent_event_id=start_event_id, payload={
+                    "solicitationId": str(sol_uuid), "error": str(exc),
+                    "stage": "fetch_profiles", "durationMs": duration_ms,
+                })
+        except Exception:
+            pass
         return {"status": "error", "reason": f"db_error: {exc}"}
 
     if not profiles:
@@ -170,13 +183,12 @@ async def match_tenants(
             "avgScore": 0,
         }
 
-    # 3. Score each tenant against the landing opportunity and upsert
+    # 3. Score each tenant and upsert pipeline items
     notification_threshold = 50
     tenant_ids_above_threshold: list[str] = []
     total_score_sum = 0
     tenants_scored = 0
     tenants_errored = 0
-    topics_scored = 0
 
     for profile in profiles:
         try:
@@ -192,7 +204,34 @@ async def match_tenants(
             total_score_sum += total_score
 
             # Upsert into tenant_pipeline_items
-            await _upsert_pipeline_item(conn, profile["tenant_id"], opportunity_id, scores)
+            await conn.execute(
+                """INSERT INTO tenant_pipeline_items
+                     (tenant_id, opportunity_id, total_score,
+                      naics_score, keyword_score, agency_score,
+                      set_aside_score, type_score, timeline_score,
+                      matched_keywords, pursuit_status)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unreviewed')
+                   ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
+                     total_score = $3,
+                     naics_score = $4,
+                     keyword_score = $5,
+                     agency_score = $6,
+                     set_aside_score = $7,
+                     type_score = $8,
+                     timeline_score = $9,
+                     matched_keywords = $10,
+                     updated_at = now()""",
+                profile["tenant_id"],
+                opportunity_id,
+                scores["total_score"],
+                scores["naics_score"],
+                scores["keyword_score"],
+                scores["agency_score"],
+                scores["set_aside_score"],
+                scores["type_score"],
+                scores["timeline_score"],
+                scores["matched_keywords"],
+            )
 
             if total_score >= notification_threshold:
                 tenant_ids_above_threshold.append(str(profile["tenant_id"]))
@@ -207,51 +246,6 @@ async def match_tenants(
             # Continue with next tenant — one failure should not block others
             continue
 
-    # 4. Score individual topics (opportunities with solicitation_id = sol_uuid)
-    try:
-        topics = await conn.fetch(
-            """SELECT id, naics_codes, tech_focus_areas, topic_branch,
-                      agency, program_type, set_aside_type, close_date, title,
-                      description
-               FROM opportunities
-               WHERE solicitation_id = $1
-                 AND (close_date IS NULL OR close_date > now())""",
-            sol_uuid,
-        )
-    except Exception as exc:
-        log.error("match_tenants: failed to fetch topics for %s: %s", solicitation_id, exc)
-        topics = []
-
-    for topic in topics:
-        for profile in profiles:
-            try:
-                scores = _calculate_match_scores(topic, profile)
-                total_score = scores["total_score"]
-
-                min_score = profile["min_surface_score"] or 40
-                if total_score < min_score:
-                    continue
-
-                topics_scored += 1
-                total_score_sum += total_score
-                tenants_scored += 1
-
-                await _upsert_pipeline_item(conn, profile["tenant_id"], topic["id"], scores)
-
-                tid_str = str(profile["tenant_id"])
-                if total_score >= notification_threshold and tid_str not in tenant_ids_above_threshold:
-                    tenant_ids_above_threshold.append(tid_str)
-
-            except Exception as exc:
-                tenants_errored += 1
-                log.error(
-                    "match_tenants: failed to score topic %s for tenant %s: %s",
-                    topic["id"],
-                    profile["tenant_id"],
-                    exc,
-                )
-                continue
-
     if tenants_errored > 0:
         log.warning(
             "match_tenants: %d tenant(s) failed scoring (out of %d total)",
@@ -262,18 +256,18 @@ async def match_tenants(
     avg_score = round(total_score_sum / tenants_scored, 2) if tenants_scored else 0
     duration_ms = int((time.monotonic() - start_ms) * 1000)
 
-    # 5. Emit closed-loop scoring event
+    # Emit end event
     try:
-        await emit_event(conn, namespace="finder", type="scoring.completed", phase="single", payload={
-            "solicitationId": str(sol_uuid),
-            "tenantsScored": tenants_scored,
-            "topicsScored": topics_scored,
-            "tenantsNotified": len(tenant_ids_above_threshold),
-            "avgScore": avg_score,
-            "durationMs": duration_ms,
-        })
+        await emit_event(conn, namespace="finder", type="scoring.completed", phase="end",
+            parent_event_id=start_event_id, payload={
+                "solicitationId": str(sol_uuid),
+                "tenantsScored": tenants_scored,
+                "tenantsNotified": len(tenant_ids_above_threshold),
+                "avgScore": avg_score,
+                "durationMs": duration_ms,
+            })
     except Exception as exc:
-        log.error("match_tenants: failed to emit scoring.completed event: %s", exc)
+        log.error("match_tenants: failed to emit end event: %s", exc)
 
     return {
         "tenantIds": tenant_ids_above_threshold,
@@ -281,43 +275,6 @@ async def match_tenants(
         "tenantsNotified": len(tenant_ids_above_threshold),
         "avgScore": avg_score,
     }
-
-
-async def _upsert_pipeline_item(
-    conn: asyncpg.Connection,
-    tenant_id: Any,
-    opportunity_id: Any,
-    scores: dict[str, Any],
-) -> None:
-    """Upsert a single tenant_pipeline_items row with computed scores."""
-    await conn.execute(
-        """INSERT INTO tenant_pipeline_items
-             (tenant_id, opportunity_id, total_score,
-              naics_score, keyword_score, agency_score,
-              set_aside_score, type_score, timeline_score,
-              matched_keywords, pursuit_status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unreviewed')
-           ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
-             total_score = $3,
-             naics_score = $4,
-             keyword_score = $5,
-             agency_score = $6,
-             set_aside_score = $7,
-             type_score = $8,
-             timeline_score = $9,
-             matched_keywords = $10,
-             updated_at = now()""",
-        tenant_id,
-        opportunity_id,
-        scores["total_score"],
-        scores["naics_score"],
-        scores["keyword_score"],
-        scores["agency_score"],
-        scores["set_aside_score"],
-        scores["type_score"],
-        scores["timeline_score"],
-        scores["matched_keywords"],
-    )
 
 
 def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:

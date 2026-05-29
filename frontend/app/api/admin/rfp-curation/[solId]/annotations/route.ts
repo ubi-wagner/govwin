@@ -13,8 +13,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
-import { emitEventSingle } from '@/lib/events';
-import { randomUUID } from 'crypto';
+import { emitEventStart, emitEventEnd } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ solId: string }>;
@@ -167,6 +166,15 @@ export async function POST(
       );
     }
 
+    // ── Start event ────────────────────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'finder',
+      type: 'annotation.saved',
+      actor: { type: 'user', id: actorId },
+      tenantId: null,
+      payload: { solicitationId: solId, kind: kind as string },
+    });
+
     // ── Insert annotation ───────────────────────────────────────────
     let annotation: Record<string, unknown>;
     try {
@@ -183,21 +191,13 @@ export async function POST(
       annotation = rows[0];
     } catch (e) {
       console.error('[rfp-curation/annotations] insert failed:', e);
+      await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'annotation.saved',
-        actor: { type: 'user', id: actorId },
-        tenantId: null,
-        payload: { correlationId: randomUUID(), solicitationId: solId, annotationId: (annotation as { id: string }).id },
-      });
-    } catch (e) {
-      console.error('[rfp-curation/annotations] event emission failed:', e);
-      // non-fatal, continue
-    }
+    await emitEventEnd(startId, {
+      result: { solicitationId: solId, annotationId: (annotation as { id: string }).id },
+    });
 
     return NextResponse.json({ data: { annotation } });
   } catch (error) {

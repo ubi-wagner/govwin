@@ -9,8 +9,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 // ─── GET: public listing ───────────────────────────────────────────
 
@@ -141,6 +140,17 @@ export async function POST(request: Request) {
     const displayOrder = typeof body.displayOrder === 'number' ? body.displayOrder : 0;
     const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
 
+    const eventType = contentType === 'page_block'
+      ? 'content.block_updated'
+      : published ? 'content.published' : 'content.updated';
+
+    const startId = await emitEventStart({
+      namespace: 'system',
+      type: eventType,
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: { slug, title, contentType },
+    });
+
     const [row] = await sql<{ id: string }[]>`
       INSERT INTO cms_content (
         slug, title, content_type, body, excerpt, author, tags,
@@ -176,23 +186,8 @@ export async function POST(request: Request) {
       RETURNING id
     `;
 
-    const eventType = contentType === 'page_block'
-      ? 'content.block_updated'
-      : published ? 'content.published' : 'content.updated';
-
-    await emitEventSingle({
-      namespace: 'system',
-      type: eventType,
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: {
-        correlationId: randomUUID(),
-        slug,
-        title,
-        contentType,
-        ...(contentType === 'page_block' && tags.length >= 2
-          ? { page: tags[0], section: tags[1] }
-          : {}),
-      },
+    await emitEventEnd(startId, {
+      result: { contentId: row.id, slug, contentType },
     });
 
     return NextResponse.json({ data: { id: row.id, slug } });
@@ -226,19 +221,24 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Missing required param: slug', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
 
+    const startId = await emitEventStart({
+      namespace: 'system',
+      type: 'content.deleted',
+      actor: userActor(userId, (session.user as { email?: string }).email),
+      payload: { slug },
+    });
+
     const rows = await sql<{ id: string }[]>`
       DELETE FROM cms_content WHERE slug = ${slug} RETURNING id
     `;
 
     if (rows.length === 0) {
+      await emitEventEnd(startId, { error: { message: 'Article not found', code: 'NOT_FOUND' } });
       return NextResponse.json({ error: 'Article not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    await emitEventSingle({
-      namespace: 'system',
-      type: 'content.deleted',
-      actor: userActor(userId, (session.user as { email?: string }).email),
-      payload: { correlationId: randomUUID(), slug, deletedId: rows[0].id },
+    await emitEventEnd(startId, {
+      result: { slug, deletedId: rows[0].id },
     });
 
     return NextResponse.json({ data: { deleted: true } });
