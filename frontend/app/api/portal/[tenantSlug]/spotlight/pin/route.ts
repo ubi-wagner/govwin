@@ -12,7 +12,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle } from '@/lib/events';
+import { emitEventStart, emitEventEnd } from '@/lib/events';
 
 const BodySchema = z.object({
   opportunityId: z.string().uuid(),
@@ -79,12 +79,22 @@ export async function POST(request: Request, ctx: RouteContext) {
 
   const { opportunityId } = parsed.data;
 
+  // ── Start event for topic pinning ────────────────────────────
+  const pinStartId = await emitEventStart({
+    namespace: 'capture',
+    type: 'topic.pinned',
+    actor: { type: 'user', id: userId },
+    tenantId,
+    payload: { tenantSlug, opportunityId },
+  });
+
   try {
     // Verify opportunity exists and fetch title for event payload
     const [opp] = await sql<{ id: string; title: string }[]>`
       SELECT id, title FROM opportunities WHERE id = ${opportunityId}
     `;
     if (!opp) {
+      await emitEventEnd(pinStartId, { error: { message: 'Opportunity not found', code: 'NOT_FOUND' } });
       return NextResponse.json({ error: 'Opportunity not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
@@ -96,21 +106,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       DO UPDATE SET is_pinned = true
     `;
 
-    try {
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'topic.pinned',
-        actor: { type: 'user', id: userId },
-        tenantId,
-        payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId, topicTitle: opp.title },
-      });
-    } catch (evtErr) {
-      console.error('[spotlight/pin POST] event emission failed:', evtErr);
-    }
+    await emitEventEnd(pinStartId, {
+      result: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId, topicTitle: opp.title },
+    });
 
     return NextResponse.json({ data: { pinned: true, opportunityId } });
   } catch (e) {
     console.error('[spotlight/pin POST] Error:', e);
+    await emitEventEnd(pinStartId, { error: { message: String(e), code: 'STORAGE_ERROR' } });
     return NextResponse.json({ error: 'Failed to pin topic', code: 'STORAGE_ERROR' }, { status: 500 });
   }
 }
@@ -137,6 +140,15 @@ export async function DELETE(request: Request, ctx: RouteContext) {
 
   const { opportunityId } = parsed.data;
 
+  // ── Start event for topic unpinning ────────────────────────────
+  const unpinStartId = await emitEventStart({
+    namespace: 'capture',
+    type: 'topic.unpinned',
+    actor: { type: 'user', id: userId },
+    tenantId,
+    payload: { tenantSlug, opportunityId },
+  });
+
   try {
     await sql`
       UPDATE tenant_pipeline_items
@@ -144,21 +156,14 @@ export async function DELETE(request: Request, ctx: RouteContext) {
       WHERE tenant_id = ${tenantId} AND opportunity_id = ${opportunityId}
     `;
 
-    try {
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'topic.unpinned',
-        actor: { type: 'user', id: userId },
-        tenantId,
-        payload: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId },
-      });
-    } catch (evtErr) {
-      console.error('[spotlight/pin DELETE] event emission failed:', evtErr);
-    }
+    await emitEventEnd(unpinStartId, {
+      result: { correlationId: randomUUID(), tenantId, tenantSlug, opportunityId },
+    });
 
     return NextResponse.json({ data: { pinned: false, opportunityId } });
   } catch (e) {
     console.error('[spotlight/pin DELETE] Error:', e);
+    await emitEventEnd(unpinStartId, { error: { message: String(e), code: 'STORAGE_ERROR' } });
     return NextResponse.json({ error: 'Failed to unpin topic', code: 'STORAGE_ERROR' }, { status: 500 });
   }
 }

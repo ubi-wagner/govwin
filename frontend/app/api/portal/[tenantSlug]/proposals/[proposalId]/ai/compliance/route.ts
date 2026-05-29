@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -160,6 +161,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for compliance check ────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'compliance.checked',
+      actor: userActor(sessionUser.id),
+      tenantId,
+      payload: { proposalId, sectionId: body.sectionId ?? null },
+    });
+
     // ── Verify proposal belongs to tenant ────────────────────────
     let proposalRows: { id: string; solicitationId: string | null }[];
     try {
@@ -170,6 +180,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (err) {
       console.error('[portal/proposals/ai/compliance] proposal query failed:', err);
+      await emitEventEnd(startId, { error: { message: 'Failed to fetch proposal', code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'Failed to fetch proposal', code: 'DB_ERROR' },
         { status: 500 },
@@ -177,6 +188,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     if (proposalRows.length === 0) {
+      await emitEventEnd(startId, { error: { message: 'Proposal not found', code: 'NOT_FOUND' } });
       return NextResponse.json(
         { error: 'Proposal not found', code: 'NOT_FOUND' },
         { status: 404 },
@@ -185,6 +197,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const solicitationId = proposalRows[0].solicitationId;
     if (!solicitationId) {
+      await emitEventEnd(startId, { error: { message: 'Proposal has no linked solicitation', code: 'VALIDATION_ERROR' } });
       return NextResponse.json(
         { error: 'Proposal has no linked solicitation', code: 'VALIDATION_ERROR' },
         { status: 422 },
@@ -472,6 +485,19 @@ Return ONLY the JSON array. No markdown fences, no explanation.`;
         excerpt: check.excerpt || null,
         suggestion: check.suggestion || null,
       };
+    });
+
+    // ── End event for compliance check ─────────────────────────────
+    await emitEventEnd(startId, {
+      result: {
+        proposalId,
+        sectionId: sectionId || null,
+        totalVariables: complianceVariables.length,
+        passed,
+        failed,
+        partial,
+        notApplicable,
+      },
     });
 
     return NextResponse.json({

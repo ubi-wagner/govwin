@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -220,6 +220,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     const reviewerIds = body.reviewerIds ?? [];
     const notes = body.notes ?? '';
 
+    // ── Start event for review creation ──────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'review.created',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, reviewType: body.reviewType, reviewerIds },
+    });
+
     // Record the review round in stage history as a note
     let stageEntry: { id: string };
     try {
@@ -231,21 +240,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (dbErr) {
       console.error('[portal/proposals/reviews] stage history insert failed:', dbErr);
+      await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // 3. Emit event
-    try {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'review.created',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: { proposalId, reviewType: body.reviewType, reviewerIds },
-      });
-    } catch (evtErr) {
-      console.error('[portal/proposals/reviews] event emission failed:', evtErr);
-    }
+    // 3. End event
+    await emitEventEnd(startId, {
+      result: { proposalId, reviewType: body.reviewType, reviewerIds, reviewId: stageEntry.id },
+    });
 
     // 4. Return response
     return NextResponse.json({

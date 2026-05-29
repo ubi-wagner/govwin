@@ -16,7 +16,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -84,6 +84,15 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 400 },
       );
     }
+
+    // ── Start event for AI draft ──────────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.draft_requested',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, sectionId: body.sectionId ?? null, instructions: body.instructions ?? null },
+    });
 
     // ── Business logic ───────────────────────────────────────────
     try {
@@ -176,13 +185,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         sectionsQueued++;
       }
 
-      // Emit event for pipeline to pick up
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'proposal.draft_requested',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: {
+      // ── End event for AI draft ──────────────────────────────────
+      await emitEventEnd(startId, {
+        result: {
           proposalId,
           sectionsQueued,
           instructions: body.instructions ?? null,
@@ -209,6 +214,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (dbErr) {
       console.error('[portal/proposals/ai/draft] DB error:', dbErr);
+      await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
       return NextResponse.json(
         { error: 'AI draft queuing failed', code: 'DB_ERROR' },
         { status: 500 },

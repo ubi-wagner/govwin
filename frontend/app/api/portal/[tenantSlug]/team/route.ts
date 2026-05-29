@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -175,6 +175,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    // ── Start event for team member invitation ────────────────────
+    const startId = await emitEventStart({
+      namespace: 'capture',
+      type: 'team_member.invited',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { email, name, role: memberRole },
+    });
+
     // Create new user with temp password
     const tempPassword = randomUUID().slice(0, 12);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
@@ -188,6 +197,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (dbErr) {
       console.error('[api/portal/team] POST user insert failed:', dbErr);
+      await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
@@ -233,25 +243,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'capture',
-        type: 'team_member.invited',
-        actor: userActor(sessionUser.id, sessionUser.email),
+    // ── End event for team member invitation ────────────────────────
+    await emitEventEnd(startId, {
+      result: {
+        correlationId: randomUUID(),
         tenantId,
-        payload: {
-          correlationId: randomUUID(),
-          tenantId,
-          tenantSlug,
-          userId: newUser.id,
-          email,
-          name,
-          role: memberRole,
-        },
-      });
-    } catch (evtErr) {
-      console.error('[api/portal/team] event emission failed:', evtErr);
-    }
+        tenantSlug,
+        userId: newUser.id,
+        email,
+        name,
+        role: memberRole,
+      },
+    });
 
     return NextResponse.json({
       data: {

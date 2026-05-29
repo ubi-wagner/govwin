@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -230,6 +230,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     // When advancing to 'final' AND auto-locking, also advance to 'submitted'
     const actualStage = shouldLock ? 'submitted' : nextStage;
 
+    // ── Start event for stage advancement ────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'proposal.stage_advanced',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, proposalTitle: proposal.title, previousStage, nextStage },
+    });
+
     // Update proposal
     try {
       if (shouldLock) {
@@ -245,6 +254,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
             AND version = ${proposal.version}
         `;
         if (lockResult.count === 0) {
+          await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
           return NextResponse.json(
             { error: 'Proposal was modified by another user', code: 'CONFLICT' },
             { status: 409 },
@@ -260,6 +270,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
             AND version = ${proposal.version}
         `;
         if (updateResult.count === 0) {
+          await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
           return NextResponse.json(
             { error: 'Proposal was modified by another user', code: 'CONFLICT' },
             { status: 409 },
@@ -268,6 +279,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     } catch (e) {
       console.error('[portal/proposals/stage] PATCH stage update failed:', e);
+      await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
@@ -289,27 +301,19 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    try {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'proposal.stage_advanced',
-        actor: userActor(sessionUser.id, sessionUser.email),
+    await emitEventEnd(startId, {
+      result: {
+        correlationId: randomUUID(),
         tenantId,
-        payload: {
-          correlationId: randomUUID(),
-          tenantId,
-          tenantSlug,
-          proposalId,
-          proposalTitle: proposal.title,
-          previousStage,
-          nextStage: actualStage,
-          locked: shouldLock,
-          notes: notes ?? undefined,
-        },
-      });
-    } catch (e) {
-      console.error('[api/portal/proposals/stage] event emission failed:', e);
-    }
+        tenantSlug,
+        proposalId,
+        proposalTitle: proposal.title,
+        previousStage,
+        nextStage: actualStage,
+        locked: shouldLock,
+        notes: notes ?? undefined,
+      },
+    });
 
     return NextResponse.json({
       data: {

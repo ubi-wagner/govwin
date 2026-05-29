@@ -5,7 +5,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -363,6 +363,15 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
     }
 
+    // ── Start event for document upload ────────────────────────────
+    const startId = await emitEventStart({
+      namespace: 'proposal',
+      type: 'supporting_doc.uploaded',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, filename: filename as string },
+    });
+
     let targetDocId: string;
 
     if (typeof body.docId === 'string' && isValidUUID(body.docId)) {
@@ -382,6 +391,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
 
       if (!existingDoc) {
+        await emitEventEnd(startId, { error: { message: 'Supporting doc slot not found', code: 'NOT_FOUND' } });
         return NextResponse.json(
           { error: 'Supporting doc slot not found', code: 'NOT_FOUND' },
           { status: 404 },
@@ -459,17 +469,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       ? body.requirementLabel.trim()
       : (filename as string);
 
-    try {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'supporting_doc.uploaded',
-        actor: userActor(sessionUser.id, sessionUser.email),
-        tenantId,
-        payload: { proposalId, docId: targetDocId, requirementLabel: eventLabel, filename, category: eventCategory },
-      });
-    } catch (e) {
-      console.error('[portal/proposals/supporting-docs] event emission failed:', e);
-    }
+    await emitEventEnd(startId, {
+      result: { proposalId, docId: targetDocId, requirementLabel: eventLabel, filename, category: eventCategory },
+    });
 
     return NextResponse.json({
       data: {

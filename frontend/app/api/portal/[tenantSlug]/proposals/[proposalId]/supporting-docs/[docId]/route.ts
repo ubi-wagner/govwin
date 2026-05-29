@@ -4,7 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl, deleteObject } from '@/lib/storage/s3-client';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; docId: string }>;
@@ -314,6 +314,15 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     }
 
+    // ── Start event for status change ─────────────────────────
+    const startId = newStatus ? await emitEventStart({
+      namespace: 'proposal',
+      type: 'supporting_doc.status_changed',
+      actor: userActor(sessionUser.id, sessionUser.email),
+      tenantId,
+      payload: { proposalId, docId, fromStatus: existingDoc.status, toStatus: newStatus },
+    }) : '';
+
     // ── Apply update ─────────────────────────────────────────
     try {
       if (newStatus && newNotes !== null) {
@@ -345,21 +354,16 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       }
     } catch (e) {
       console.error('[portal/proposals/supporting-docs/detail] update failed:', e);
+      if (newStatus) {
+        await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
+      }
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (newStatus) {
-      try {
-        await emitEventSingle({
-          namespace: 'proposal',
-          type: 'supporting_doc.status_changed',
-          actor: userActor(sessionUser.id, sessionUser.email),
-          tenantId,
-          payload: { proposalId, docId, fromStatus: existingDoc.status, toStatus: newStatus, actorRole: role },
-        });
-      } catch (e) {
-        console.error('[portal/proposals/supporting-docs/detail] event emission failed:', e);
-      }
+      await emitEventEnd(startId, {
+        result: { proposalId, docId, fromStatus: existingDoc.status, toStatus: newStatus, actorRole: role },
+      });
     }
 
     return NextResponse.json({ data: { id: docId, status: newStatus ?? 'unchanged' } });
