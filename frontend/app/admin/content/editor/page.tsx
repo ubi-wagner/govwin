@@ -34,8 +34,15 @@ export default async function VisualEditorPage() {
     console.error('[admin/content/editor] query failed:', e);
   }
 
+  const cmsUrl = process.env.CMS_PUBLIC_URL || process.env.CMS_SERVICE_URL || '/cms';
+
   return (
     <div className="-m-8 h-screen">
+      <div className="flex items-center justify-end px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <a href={cmsUrl} target="_blank" rel="noopener" className="text-xs text-blue-600 hover:underline">
+          Open in CMS Portal &rarr;
+        </a>
+      </div>
       <VisualEditor pages={pages} />
     </div>
   );
