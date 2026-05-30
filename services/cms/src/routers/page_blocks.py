@@ -529,6 +529,10 @@ async def add_blank_block(request: Request, body: AddBlankRequest):
     user_id = claims.get('sub', 'unknown')
 
     try:
+        # Look up user UUID from email for created_by FK
+        user_row = await pool.fetchrow("SELECT id FROM users WHERE email = $1", user_email)
+        creator_id = user_row['id'] if user_row else None
+
         # Get current max display_order for the page
         max_order = await pool.fetchval(
             """
@@ -556,7 +560,7 @@ async def add_blank_block(request: Request, body: AddBlankRequest):
             tags,
             new_order,
             json.dumps({'_currentVersion': 0, '_versions': [], '_draftedBy': user_email}),
-            user_email,
+            creator_id,
         )
 
         await _emit_shared_event(pool, 'content.page_block_created', user_id, {
@@ -722,6 +726,14 @@ async def ai_revise(request: Request, body: AiReviseRequest):
     user_prompt = '\n'.join(user_prompt_parts)
 
     try:
+        await _emit_shared_event(pool, 'content.ai_revision_started', user_id, {
+            'action': 'revise',
+            'instructions': body.instructions,
+        })
+    except Exception:
+        pass
+
+    try:
         result = await _call_claude(AI_SYSTEM_PROMPT, user_prompt)
 
         await _emit_shared_event(pool, 'content.ai_revision_completed', user_id, {
@@ -844,10 +856,10 @@ async def revalidate(request: Request, body: RevalidateRequest):
         'how-it-works': '/how-it-works',
         'engine': '/engine',
         'the-expert': '/the-expert',
-        'security': '/security',
+        'security': '/infosec',
         'infosec': '/infosec',
         'apply': '/apply',
-        'get-started': '/get-started',
+        'get-started': '/pricing',
         'resources': '/resources',
     }
 

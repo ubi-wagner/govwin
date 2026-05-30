@@ -100,8 +100,10 @@ const guardrails = [
   },
 ];
 
-export default async function Page() {
-  const blocks = await getPageBlocks('how-it-works');
+export default async function Page({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('how-it-works', isPreview);
   const lookup = buildLookup(blocks, 'how-it-works');
   const hero = single(lookup['hero']);
   const cmsSteps = many(lookup['steps']);

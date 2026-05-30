@@ -50,7 +50,7 @@ interface LocalEdit {
 const PAGES = [
   'homepage', 'about', 'features', 'value', 'pricing',
   'how-it-works', 'engine', 'the-expert', 'security',
-  'infosec', 'apply', 'get-started', 'resources',
+  'infosec', 'apply', 'resources', 'team', 'customers',
 ]
 
 const PAGE_LABELS: Record<string, string> = {
@@ -65,8 +65,9 @@ const PAGE_LABELS: Record<string, string> = {
   security: 'Security',
   infosec: 'InfoSec',
   apply: 'Apply',
-  'get-started': 'Get Started',
   resources: 'Resources',
+  team: 'Team',
+  customers: 'Customers',
 }
 
 const PAGE_TO_PATH: Record<string, string> = {
@@ -81,8 +82,9 @@ const PAGE_TO_PATH: Record<string, string> = {
   security: '/security',
   infosec: '/infosec',
   apply: '/apply',
-  'get-started': '/get-started',
   resources: '/resources',
+  team: '/team',
+  customers: '/customers',
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -104,7 +106,14 @@ const SECTION_LABELS: Record<string, string> = {
   flywheel: 'Value Flywheel',
   steps: 'Steps',
   guardrails: 'Guardrails',
-  form: 'Form',
+  collab: 'Collaboration',
+  differentiators: 'Differentiators',
+  credentials: 'Credentials',
+  timeline: 'Timeline',
+  isolation: 'Isolation',
+  promise: 'Promise',
+  certifications: 'Certifications',
+  bottom: 'Bottom Section',
 }
 
 function getSectionLabel(tag: string): string {
@@ -178,10 +187,10 @@ function VersionHistoryPanel({
                 </p>
               </div>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setReverting(v.version)
                   onRevert(v)
-                  setReverting(null)
+                  setTimeout(() => setReverting(null), 500)
                 }}
                 disabled={reverting !== null}
                 className="ml-2 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50 shrink-0"
@@ -246,7 +255,8 @@ function BlockEditor({
     }
   }
 
-  const sectionTag = block.tags.find((t) => !Object.keys(PAGE_LABELS).includes(t) && t !== block.tags[0]) ?? block.tags[1] ?? 'unknown'
+  const pageTag = block.tags[0]
+  const sectionTag = block.tags.find((t) => t !== pageTag) ?? 'unknown'
 
   const handleAi = async () => {
     setAiLoading(true)
@@ -304,6 +314,7 @@ function BlockEditor({
       setAiInstructions('')
       setAiUrl('')
     } catch (err) {
+      setAiMode('idle')
       alert(`AI error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setAiLoading(false)

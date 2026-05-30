@@ -354,8 +354,8 @@ function StepsMetadataEditor({
           <label className="block text-xs text-gray-500 mb-1">Number</label>
           <input
             type="text"
-            value={number || num}
-            onChange={(e) => onChange({ ...metadata, number: e.target.value, num: e.target.value })}
+            value={num || number || ''}
+            onChange={(e) => onChange({ ...metadata, num: e.target.value })}
             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             placeholder="01"
           />

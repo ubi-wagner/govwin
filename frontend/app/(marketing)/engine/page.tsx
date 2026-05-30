@@ -23,8 +23,10 @@ const DEFAULT_DIFFERENTIATORS = [
   { label: 'Structure', title: 'Stage-Gated Quality.', body: 'Proposals progress through defined stages with compliance checks at every gate. No shortcutting the review process. No submitting without verification.' },
 ];
 
-export default async function EnginePage() {
-  const blocks = await getPageBlocks('engine');
+export default async function EnginePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('engine', isPreview);
   const lookup = buildLookup(blocks, 'engine');
   const hero = single(lookup['hero']);
   const cmsSteps = many(lookup['steps']);

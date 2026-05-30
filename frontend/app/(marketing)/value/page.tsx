@@ -14,8 +14,10 @@ const DEFAULT_FLYWHEEL = [
   { title: 'Your win rate compounds.', body: 'More proposals submitted. Higher quality per submission. Less time per cycle. Your cost-per-proposal drops. Your BD pipeline scales without hiring a BD department.' },
 ];
 
-export default async function ValuePage() {
-  const blocks = await getPageBlocks('value');
+export default async function ValuePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('value', isPreview);
   const lookup = buildLookup(blocks, 'value');
   const hero = single(lookup['hero']);
   const spotlight = single(lookup['spotlight']);
