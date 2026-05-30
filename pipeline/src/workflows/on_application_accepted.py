@@ -110,17 +110,6 @@ class OnApplicationAccepted(Workflow):
 
     steps = [
         Step(
-            name="send_welcome_email",
-            step_type=StepType.NOTIFY,
-            action="system.notify",
-            input_map={
-                "channel": '"email"',
-                "template": '"welcome_accepted"',
-                "tenant_id": "result.tenantId",
-                "user_id": "result.userId",
-            },
-        ),
-        Step(
             name="create_library_defaults",
             action="workflows.actions.create_library_defaults.create_default_categories",
             input_map={"tenant_id": "result.tenantId"},

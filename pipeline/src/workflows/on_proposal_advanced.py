@@ -158,7 +158,7 @@ class OnProposalAdvancedToReview(Workflow):
     trigger = EventTrigger(
         namespace="proposal",
         type="proposal.advanced",
-        phase="single",
+        phase="end",
         condition=lambda p: p.get("targetStage") == "review",
     )
 
@@ -204,7 +204,7 @@ class OnProposalAdvancedToFinal(Workflow):
     trigger = EventTrigger(
         namespace="proposal",
         type="proposal.advanced",
-        phase="single",
+        phase="end",
         condition=lambda p: p.get("targetStage") == "final",
     )
 
