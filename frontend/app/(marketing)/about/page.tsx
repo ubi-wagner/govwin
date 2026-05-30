@@ -16,8 +16,10 @@ const DEFAULT_PILLARS = [
   { label: 'The Collaboration', heading: 'Your team. Your rules.', body: 'Invite internal team members and external collaborators to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly. Every edit is audited. Every version is tracked.' },
 ];
 
-export default async function AboutPage() {
-  const blocks = await getPageBlocks('about');
+export default async function AboutPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams;
+  const isPreview = params?._preview === '1';
+  const blocks = await getPageBlocks('about', isPreview);
   const lookup = buildLookup(blocks, 'about');
   const hero = single(lookup['hero']);
   const pillars = many(lookup['pillars']);
