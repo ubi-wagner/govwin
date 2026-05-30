@@ -216,6 +216,17 @@ export async function PATCH(request: Request) {
       savedIds.push(upd.id);
     }
 
+    if (savedIds.length > 0) {
+      try {
+        await emitEventSingle({
+          namespace: 'system',
+          type: 'content.drafts_saved',
+          actor: userActor(userId, userEmail),
+          payload: { blocksSaved: savedIds.length, blockIds: savedIds },
+        });
+      } catch { /* non-critical */ }
+    }
+
     return NextResponse.json({ data: { saved: savedIds.length, ids: savedIds } });
   } catch (e) {
     console.error('[api/admin/content/page-blocks PATCH] error:', e);
