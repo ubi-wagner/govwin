@@ -37,59 +37,64 @@ export async function GET() {
       );
     }
 
-    // 1. Task queue summary by status
-    const taskCounts = await sql<{ status: string; count: number }[]>`
-      SELECT status, count(*)::int AS count
-      FROM agent_task_queue
-      GROUP BY status
-    `;
+    try {
+      // 1. Task queue summary by status
+      const taskCounts = await sql<{ status: string; count: number }[]>`
+        SELECT status, count(*)::int AS count
+        FROM agent_task_queue
+        GROUP BY status
+      `;
 
-    // 2. Tasks by agent role and status
-    const tasksByRole = await sql<{ agentRole: string; status: string; count: number }[]>`
-      SELECT agent_role, status, count(*)::int AS count
-      FROM agent_task_queue
-      GROUP BY agent_role, status
-      ORDER BY agent_role, status
-    `;
+      // 2. Tasks by agent role and status
+      const tasksByRole = await sql<{ agentRole: string; status: string; count: number }[]>`
+        SELECT agent_role, status, count(*)::int AS count
+        FROM agent_task_queue
+        GROUP BY agent_role, status
+        ORDER BY agent_role, status
+      `;
 
-    // 3. Recent failures (last 10)
-    const recentFailures = await sql<{
-      id: string;
-      agentRole: string;
-      taskType: string;
-      error: string | null;
-      createdAt: string;
-    }[]>`
-      SELECT id, agent_role, task_type, error, created_at
-      FROM agent_task_queue
-      WHERE status = 'failed'
-      ORDER BY created_at DESC
-      LIMIT 10
-    `;
+      // 3. Recent failures (last 10)
+      const recentFailures = await sql<{
+        id: string;
+        agentRole: string;
+        taskType: string;
+        error: string | null;
+        createdAt: string;
+      }[]>`
+        SELECT id, agent_role, task_type, error, created_at
+        FROM agent_task_queue
+        WHERE status = 'failed'
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
 
-    // 4. Recent tool invocation events (from system_events)
-    const recentToolEvents = await sql<{
-      id: string;
-      type: string;
-      phase: string;
-      payload: unknown;
-      createdAt: string;
-    }[]>`
-      SELECT id, type, phase, payload, created_at
-      FROM system_events
-      WHERE namespace = 'tool'
-      ORDER BY created_at DESC
-      LIMIT 20
-    `;
+      // 4. Recent tool invocation events (from system_events)
+      const recentToolEvents = await sql<{
+        id: string;
+        type: string;
+        phase: string;
+        payload: unknown;
+        createdAt: string;
+      }[]>`
+        SELECT id, type, phase, payload, created_at
+        FROM system_events
+        WHERE namespace = 'tool'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
 
-    return NextResponse.json({
-      data: {
-        taskCounts,
-        tasksByRole,
-        recentFailures,
-        recentToolEvents,
-      },
-    });
+      return NextResponse.json({
+        data: {
+          taskCounts,
+          tasksByRole,
+          recentFailures,
+          recentToolEvents,
+        },
+      });
+    } catch (err) {
+      console.error('[AGENTS] DB query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
   } catch (err) {
     console.error('[admin/agents] error:', err);
     return NextResponse.json(

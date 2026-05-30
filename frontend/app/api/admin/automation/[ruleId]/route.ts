@@ -67,9 +67,16 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     }
 
     // 3. CHECK RULE EXISTS
-    const [existing] = await sql<{ id: string; name: string; isActive: boolean }[]>`
-      SELECT id, name, is_active FROM automation_rules WHERE id = ${ruleId}::uuid
-    `;
+    let existing: { id: string; name: string; isActive: boolean } | undefined;
+    try {
+      const [row] = await sql<{ id: string; name: string; isActive: boolean }[]>`
+        SELECT id, name, is_active FROM automation_rules WHERE id = ${ruleId}::uuid
+      `;
+      existing = row;
+    } catch (err) {
+      console.error('[AUTOMATION_RULE] DB query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!existing) {
       return NextResponse.json(
@@ -81,42 +88,47 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     // 4. BUILD UPDATE — only update provided fields
     const changes: string[] = [];
 
-    if (typeof body.isActive === 'boolean') {
-      await sql`
-        UPDATE automation_rules
-        SET is_active = ${body.isActive}, updated_at = now()
-        WHERE id = ${ruleId}::uuid
-      `;
-      changes.push(`is_active: ${existing.isActive} -> ${body.isActive}`);
-    }
+    try {
+      if (typeof body.isActive === 'boolean') {
+        await sql`
+          UPDATE automation_rules
+          SET is_active = ${body.isActive}, updated_at = now()
+          WHERE id = ${ruleId}::uuid
+        `;
+        changes.push(`is_active: ${existing.isActive} -> ${body.isActive}`);
+      }
 
-    if (typeof body.description === 'string') {
-      await sql`
-        UPDATE automation_rules
-        SET description = ${body.description.trim()}, updated_at = now()
-        WHERE id = ${ruleId}::uuid
-      `;
-      changes.push('description updated');
-    }
+      if (typeof body.description === 'string') {
+        await sql`
+          UPDATE automation_rules
+          SET description = ${body.description.trim()}, updated_at = now()
+          WHERE id = ${ruleId}::uuid
+        `;
+        changes.push('description updated');
+      }
 
-    if (typeof body.actionConfig === 'object' && body.actionConfig !== null) {
-      await sql`
-        UPDATE automation_rules
-        SET action_config = ${JSON.stringify(body.actionConfig)}::jsonb, updated_at = now()
-        WHERE id = ${ruleId}::uuid
-      `;
-      changes.push('action_config updated');
-    }
+      if (typeof body.actionConfig === 'object' && body.actionConfig !== null) {
+        await sql`
+          UPDATE automation_rules
+          SET action_config = ${JSON.stringify(body.actionConfig)}::jsonb, updated_at = now()
+          WHERE id = ${ruleId}::uuid
+        `;
+        changes.push('action_config updated');
+      }
 
-    if (typeof body.triggerNamespace === 'string' && typeof body.triggerType === 'string') {
-      await sql`
-        UPDATE automation_rules
-        SET trigger_namespace = ${body.triggerNamespace.trim()},
-            trigger_type = ${body.triggerType.trim()},
-            updated_at = now()
-        WHERE id = ${ruleId}::uuid
-      `;
-      changes.push('trigger updated');
+      if (typeof body.triggerNamespace === 'string' && typeof body.triggerType === 'string') {
+        await sql`
+          UPDATE automation_rules
+          SET trigger_namespace = ${body.triggerNamespace.trim()},
+              trigger_type = ${body.triggerType.trim()},
+              updated_at = now()
+          WHERE id = ${ruleId}::uuid
+        `;
+        changes.push('trigger updated');
+      }
+    } catch (err) {
+      console.error('[AUTOMATION_RULE] DB update failed:', err);
+      return NextResponse.json({ error: 'Database update failed', code: 'DB_ERROR' }, { status: 500 });
     }
 
     if (changes.length === 0) {
@@ -179,7 +191,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       );
     }
 
-    const [rule] = await sql<{
+    let rule: {
       id: string;
       name: string;
       description: string | null;
@@ -191,12 +203,32 @@ export async function GET(_request: Request, ctx: RouteContext) {
       createdBy: string | null;
       createdAt: Date;
       updatedAt: Date;
-    }[]>`
-      SELECT id, name, description, is_active, trigger_namespace, trigger_type,
-             action_type, action_config, created_by, created_at, updated_at
-      FROM automation_rules
-      WHERE id = ${ruleId}::uuid
-    `;
+    } | undefined;
+
+    try {
+      const [row] = await sql<{
+        id: string;
+        name: string;
+        description: string | null;
+        isActive: boolean;
+        triggerNamespace: string;
+        triggerType: string;
+        actionType: string;
+        actionConfig: Record<string, unknown>;
+        createdBy: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }[]>`
+        SELECT id, name, description, is_active, trigger_namespace, trigger_type,
+               action_type, action_config, created_by, created_at, updated_at
+        FROM automation_rules
+        WHERE id = ${ruleId}::uuid
+      `;
+      rule = row;
+    } catch (err) {
+      console.error('[AUTOMATION_RULE] DB query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     if (!rule) {
       return NextResponse.json(
@@ -206,20 +238,34 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // Also fetch recent automation_log entries for this rule
-    const logs = await sql<{
+    let logs: {
       id: string;
       actionType: string;
       status: string;
       result: unknown;
       errorMessage: string | null;
       executedAt: Date;
-    }[]>`
-      SELECT id, action_type, status, result, error_message, executed_at
-      FROM automation_log
-      WHERE rule_id = ${ruleId}::uuid
-      ORDER BY executed_at DESC
-      LIMIT 20
-    `;
+    }[];
+
+    try {
+      logs = await sql<{
+        id: string;
+        actionType: string;
+        status: string;
+        result: unknown;
+        errorMessage: string | null;
+        executedAt: Date;
+      }[]>`
+        SELECT id, action_type, status, result, error_message, executed_at
+        FROM automation_log
+        WHERE rule_id = ${ruleId}::uuid
+        ORDER BY executed_at DESC
+        LIMIT 20
+      `;
+    } catch (err) {
+      console.error('[AUTOMATION_RULE] DB logs query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({ data: { rule, logs } });
   } catch (err) {

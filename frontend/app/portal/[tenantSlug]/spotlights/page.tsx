@@ -8,15 +8,20 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Spotlight feed — ranked list of open topics scored against the
- * customer's profile (tech areas, target agencies, target programs).
+ * customer's profile.
  *
- * Scoring:
+ * Scoring uses pre-computed pipeline scores from tenant_pipeline_items
+ * when available (authoritative). For opportunities not yet scored by
+ * the pipeline, a lightweight estimation is computed from the tenant's
+ * application profile data:
  *   - tech_focus_areas overlap with application.tech_areas  → 15pts each
  *   - agency match (topic agency vs application.target_agencies) → 20pts
  *   - program_type match → 15pts
  *   - Has library content for topic category → 10pt bonus
+ *   - Capped at 100
  *
- * Results capped at 100.
+ * Pipeline-scored items sort first, then estimated items.
+ * tenant_profiles.min_surface_score filters out low-scoring items.
  */
 export default async function SpotlightsPage({
   params,
@@ -55,6 +60,21 @@ export default async function SpotlightsPage({
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     redirect(`/portal/${tenantSlug}/proposals`);
+  }
+
+  // ---------- Tenant profile (min_surface_score threshold) ----------
+  let minSurfaceScore = 0;
+  try {
+    const [tp] = await sql<{ minSurfaceScore: number | null }[]>`
+      SELECT min_surface_score FROM tenant_profiles
+      WHERE tenant_id = ${tenantId}
+      LIMIT 1
+    `;
+    if (tp?.minSurfaceScore != null) {
+      minSurfaceScore = tp.minSurfaceScore;
+    }
+  } catch (e) {
+    console.error('[spotlight] tenant_profiles query failed', e);
   }
 
   // ---------- Customer profile from application ----------
@@ -96,7 +116,7 @@ export default async function SpotlightsPage({
     console.error('[spotlight] application profile query failed', e);
   }
 
-  // ---------- Active topics ----------
+  // ---------- Active topics with pipeline scores ----------
   interface TopicRow {
     id: string;
     topicNumber: string | null;
@@ -108,6 +128,10 @@ export default async function SpotlightsPage({
     postedDate: string | null;
     techFocusAreas: string[];
     namespace: string | null;
+    pipelineScore: number | null;
+    priorityTier: string | null;
+    isPinned: boolean | null;
+    pursuitStatus: string | null;
   }
 
   let topics: TopicRow[] = [];
@@ -123,9 +147,15 @@ export default async function SpotlightsPage({
         o.close_date,
         o.posted_date,
         o.tech_focus_areas,
-        cs.namespace
+        cs.namespace,
+        tpi.total_score AS pipeline_score,
+        tpi.priority_tier,
+        tpi.is_pinned,
+        tpi.pursuit_status
       FROM opportunities o
       LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
+      LEFT JOIN tenant_pipeline_items tpi
+        ON tpi.opportunity_id = o.id AND tpi.tenant_id = ${tenantId}
       WHERE o.topic_status = 'open'
         AND o.is_active = true
         AND o.solicitation_id IN (
@@ -135,20 +165,6 @@ export default async function SpotlightsPage({
     `;
   } catch (e) {
     console.error('[spotlight] topics query failed', e);
-  }
-
-  // ---------- Pinned items lookup ----------
-  const pinnedSet = new Set<string>();
-  try {
-    const pinRows = await sql<{ opportunityId: string }[]>`
-      SELECT opportunity_id FROM tenant_pipeline_items
-      WHERE tenant_id = ${tenantId} AND is_pinned = true
-    `;
-    for (const row of pinRows) {
-      pinnedSet.add(row.opportunityId);
-    }
-  } catch (e) {
-    console.error('[spotlight] pinned items query failed', e);
   }
 
   // ---------- Library content counts by category ----------
@@ -170,16 +186,18 @@ export default async function SpotlightsPage({
   const profileAgenciesLower = new Set(profile.targetAgencies.map((a) => a.toLowerCase()));
   const profileProgramsLower = new Set(profile.targetPrograms.map((p) => p.toLowerCase()));
 
-  const scoredTopics: ScoredTopic[] = topics.map((topic) => {
-    let score = 0;
+  const scoredTopics: ScoredTopic[] = [];
+
+  for (const topic of topics) {
+    // --- Lightweight estimation (always computed for match reasons) ---
+    let estimatedScore = 0;
     const matchReasons: string[] = [];
 
     // Tech focus overlap: 15pts per match
     const topicTechLower = (topic.techFocusAreas ?? []).map((t) => t.toLowerCase());
     for (const tech of topicTechLower) {
       if (profileTechLower.has(tech)) {
-        score += 15;
-        // Find original-case version for display
+        estimatedScore += 15;
         const original =
           profile.techAreas.find((a) => a.toLowerCase() === tech) ?? tech;
         matchReasons.push(original);
@@ -188,27 +206,37 @@ export default async function SpotlightsPage({
 
     // Agency match: 20pts
     if (topic.agency && profileAgenciesLower.has(topic.agency.toLowerCase())) {
-      score += 20;
+      estimatedScore += 20;
       matchReasons.push(`Agency: ${topic.agency}`);
     }
 
     // Program type match: 15pts
     if (topic.programType && profileProgramsLower.has(topic.programType.toLowerCase())) {
-      score += 15;
+      estimatedScore += 15;
       matchReasons.push(`Program: ${topic.programType}`);
     }
 
     // Library content bonus: 10pts if category matches any tech focus
     const hasLibrary = topicTechLower.some((t) => libraryCategories.has(t));
     if (hasLibrary) {
-      score += 10;
+      estimatedScore += 10;
       matchReasons.push('Library content available');
     }
 
     // Cap at 100
-    score = Math.min(100, score);
+    estimatedScore = Math.min(100, estimatedScore);
 
-    return {
+    // --- Determine authoritative score ---
+    const pipelineScore = topic.pipelineScore;
+    const isEstimated = pipelineScore === null;
+    const displayScore = pipelineScore ?? estimatedScore;
+
+    // --- Apply min_surface_score filter ---
+    if (minSurfaceScore > 0 && displayScore < minSurfaceScore) {
+      continue;
+    }
+
+    scoredTopics.push({
       id: topic.id,
       topicNumber: topic.topicNumber,
       title: topic.title,
@@ -217,15 +245,31 @@ export default async function SpotlightsPage({
       programType: topic.programType,
       closeDate: topic.closeDate,
       postedDate: topic.postedDate,
-      matchScore: score,
+      matchScore: displayScore,
       matchReasons,
-      isPinned: pinnedSet.has(topic.id),
+      isPinned: topic.isPinned ?? false,
       namespace: topic.namespace,
-    };
-  });
+      pipelineScore: pipelineScore,
+      isEstimated,
+      priorityTier: topic.priorityTier ?? null,
+    });
+  }
 
-  // Sort by score DESC
-  scoredTopics.sort((a, b) => b.matchScore - a.matchScore);
+  // Sort: pipeline-scored first by score DESC, then estimated by score DESC.
+  // Within each group, secondary sort by close_date ASC.
+  scoredTopics.sort((a, b) => {
+    // Pipeline-scored items come first
+    if (!a.isEstimated && b.isEstimated) return -1;
+    if (a.isEstimated && !b.isEstimated) return 1;
+
+    // Within same group, sort by score DESC
+    if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+
+    // Secondary sort: close_date ASC (nulls last)
+    if (!a.closeDate) return 1;
+    if (!b.closeDate) return -1;
+    return new Date(a.closeDate).getTime() - new Date(b.closeDate).getTime();
+  });
 
   // ---------- Derive filter options ----------
   const agencySet = new Set<string>();
