@@ -27,6 +27,7 @@ from .routers.media import router as media_router
 from .routers.social import router as social_router
 from .routers.drip import router as drip_router
 from .routers.todos import router as todos_router
+from .routers.page_blocks import router as page_blocks_router
 from .event_listener import start_event_listener, stop_event_listener
 from .middleware.auth import APIKeyMiddleware
 from .workers.content_generator import generation_loop
@@ -103,6 +104,7 @@ app.include_router(media_router, prefix="/api/media", tags=["media"])
 app.include_router(social_router, prefix="/api/social", tags=["social"])
 app.include_router(drip_router, prefix="/api/drip", tags=["drip"])
 app.include_router(todos_router, prefix="/api/todos", tags=["todos"])
+app.include_router(page_blocks_router, prefix="/api", tags=["page-blocks"])
 
 # ── CMS Frontend SPA (static files) ───────────────────────────────
 _static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
