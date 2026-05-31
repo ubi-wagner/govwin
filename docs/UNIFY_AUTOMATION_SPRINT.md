@@ -15,7 +15,7 @@
 
 | Inc | Gap (V3 §11) | Title | Sev | Surface | Status |
 |-----|--------------|-------|-----|---------|--------|
-| **1** | 1 | HITL: derive `wait_deadline` from binding + wire resume path | 🔴 P0 | `manager.py`, `processor.py` | ☑ `<pending>` |
+| **1** | 1 | HITL: derive `wait_deadline` from binding + wire resume path | 🔴 P0 | `manager.py`, `processor.py` | ☑ `418b9d5` |
 | **2** | 3 | SCOUT field-name break (`extractedOpportunities` vs `opportunities`) | 🔴 P0 | `create_drafts_from_scout.py` + scouts | ☐ |
 | **3** | 4 | Phase-aware + single-owner matching (kill multi-fire) | 🔴 P0 | `event_listener.py`, rule seeds | ☐ |
 | **4** | 2 | Job Contract: intrinsic timeout+retry; enforce in `invoke()` + CMS + AI_INVOKE | 🔴 P0 | `registry.ts`, `base.ts`, `event_listener.py` | ☐ |
@@ -293,4 +293,6 @@ has a handler; every route-referenced tool is registered.
 ---
 
 ## Change log (append per increment)
-- 2026-05-31 — Plan created. Docs (V3 + CLIFFNOTES) locked at `13411c5`.
+- 2026-05-31 — Plan created. Docs (V3 + CLIFFNOTES) locked at `13411c5`. Plan at `3194423`.
+- 2026-05-31 — INC-1 (HITL deadline + resume) shipped at `418b9d5`. 5 targeted tests green,
+  116-test importable suite no regressions. Next: INC-2 (SCOUT field-name break).
