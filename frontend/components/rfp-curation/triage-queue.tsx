@@ -26,6 +26,7 @@ interface TriageItem {
 interface Props {
   initialItems: TriageItem[];
   currentUserId: string;
+  currentUserRole?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -57,11 +58,19 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function TriageQueue({ initialItems, currentUserId }: Props) {
+function isStale(item: TriageItem): boolean {
+  if (item.status !== 'claimed' || !item.claimedAt) return false;
+  const claimedMs = Date.now() - new Date(item.claimedAt).getTime();
+  return claimedMs > 24 * 60 * 60 * 1000;
+}
+
+export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Props) {
   const [items, setItems] = useState(initialItems);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [forceReleasing, setForceReleasing] = useState<string | null>(null);
   const { invoke, loading, error } = useTool();
   const router = useRouter();
+  const isMasterAdmin = currentUserRole === 'master_admin';
 
   const filteredItems = statusFilter === 'all'
     ? items
@@ -116,6 +125,30 @@ export function TriageQueue({ initialItems, currentUserId }: Props) {
 
   const handleOpenWorkspace = (solId: string) => {
     router.push(`/admin/rfp-curation/${solId}`);
+  };
+
+  const handleForceRelease = async (solId: string) => {
+    if (!confirm('Force release this claim and return the solicitation to the queue? This cannot be undone.')) return;
+    setForceReleasing(solId);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${solId}/force-release`, { method: 'POST' });
+      if (!res.ok) {
+        const json = await res.json();
+        alert(json.error || 'Force release failed');
+        return;
+      }
+      setItems((prev) =>
+        prev.map((i) =>
+          i.solicitationId === solId
+            ? { ...i, status: 'new', claimedBy: null, claimedAt: null }
+            : i,
+        ),
+      );
+    } catch {
+      alert('Network error during force release');
+    } finally {
+      setForceReleasing(null);
+    }
   };
 
   const uniqueStatuses = [...new Set(items.map((i) => i.status))].sort();
@@ -187,7 +220,17 @@ export function TriageQueue({ initialItems, currentUserId }: Props) {
                   {item.agency ?? '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={item.status} />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <StatusBadge status={item.status} />
+                    {isStale(item) && (
+                      <span
+                        className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800"
+                        title={`Claimed ${Math.floor((Date.now() - new Date(item.claimedAt!).getTime()) / 3_600_000)}h ago with no progress`}
+                      >
+                        stale
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs font-mono max-w-[180px] truncate">
                   {item.namespace ?? '—'}
@@ -230,6 +273,15 @@ export function TriageQueue({ initialItems, currentUserId }: Props) {
                         className="px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700"
                       >
                         Open
+                      </button>
+                    )}
+                    {isMasterAdmin && isStale(item) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleForceRelease(item.solicitationId); }}
+                        disabled={forceReleasing === item.solicitationId}
+                        className="px-3 py-1 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {forceReleasing === item.solicitationId ? '...' : 'Force Release'}
                       </button>
                     )}
                   </div>

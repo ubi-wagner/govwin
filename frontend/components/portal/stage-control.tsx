@@ -1,7 +1,18 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+interface GateRequirement {
+  id: string;
+  stage: string;
+  requirementType: string;
+  label: string;
+  description: string | null;
+  isMet: boolean;
+  metBy: string | null;
+  metAt: Date | null;
+}
 
 interface StageControlProps {
   proposalId: string;
@@ -14,6 +25,7 @@ interface StageControlProps {
   unlockDeadline: string | null;
   canAdvance: boolean;
   canExport: boolean;
+  userRole?: 'admin' | 'contributor' | 'external';
   closeDate?: string | null;
 }
 
@@ -28,12 +40,59 @@ export function StageControl({
   unlockDeadline,
   canAdvance,
   canExport,
+  userRole = 'contributor',
   closeDate,
 }: StageControlProps) {
   const router = useRouter();
   const [advancing, setAdvancing] = useState(false);
   const [locking, setLocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requirements, setRequirements] = useState<GateRequirement[]>([]);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [markingMet, setMarkingMet] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadRequirements() {
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/gates?stage=${currentStage}`,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        setRequirements(json.data?.requirements ?? []);
+      } catch {
+        // Non-fatal
+      }
+    }
+    loadRequirements();
+  }, [tenantSlug, proposalId, currentStage]);
+
+  const handleMarkMet = useCallback(async (requirementId: string, currentMet: boolean) => {
+    if (markingMet) return;
+    setMarkingMet(requirementId);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/gates`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requirementId, isMet: !currentMet }),
+        },
+      );
+      if (!res.ok) return;
+      setRequirements((prev) =>
+        prev.map((r) => r.id === requirementId ? { ...r, isMet: !currentMet } : r),
+      );
+    } catch {
+      // Non-fatal
+    } finally {
+      setMarkingMet(null);
+    }
+  }, [markingMet, tenantSlug, proposalId]);
+
+  const unmets = requirements.filter((r) => !r.isMet);
+  const hasUnmetRequirements = unmets.length > 0;
+  const isAdmin = userRole === 'admin';
 
   const currentIndex = gateConfig.indexOf(currentStage);
   const isAtFinal = currentStage === 'final';
@@ -177,7 +236,20 @@ export function StageControl({
             </span>
           )}
 
-          {canAdvance && !isAtLastGate && !isLocked && (
+          {requirements.length > 0 && (
+            <button
+              onClick={() => setShowChecklist((v) => !v)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                hasUnmetRequirements
+                  ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              {hasUnmetRequirements ? `${unmets.length} requirement${unmets.length > 1 ? 's' : ''} pending` : 'All gates met ✓'}
+            </button>
+          )}
+
+          {canAdvance && !isAtLastGate && !isLocked && (!hasUnmetRequirements || isAdmin) && (
             <button
               onClick={handleAdvance}
               disabled={advancing}
@@ -185,6 +257,12 @@ export function StageControl({
             >
               {advancing ? 'Advancing...' : `Advance to ${gateConfig[currentIndex + 1]?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} →`}
             </button>
+          )}
+
+          {canAdvance && !isAtLastGate && !isLocked && hasUnmetRequirements && !isAdmin && (
+            <span className="px-4 py-2 text-xs font-semibold bg-gray-100 text-gray-400 rounded-md cursor-not-allowed">
+              Requirements not met
+            </span>
           )}
 
           {canAdvance && isAtFinal && isLocked && (
@@ -238,6 +316,58 @@ export function StageControl({
       {error && (
         <div className="mt-2 text-xs text-red-600 bg-red-50 rounded px-3 py-1.5">
           {error}
+        </div>
+      )}
+
+      {/* ─── Gate Requirements Checklist ──────────────────────────── */}
+      {showChecklist && requirements.length > 0 && (
+        <div className="mt-4 border-t border-gray-100 pt-4">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
+            Stage Gate Requirements — {currentStage.replace(/_/g, ' ')}
+          </p>
+          <div className="space-y-2">
+            {requirements.map((req) => (
+              <div
+                key={req.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border ${
+                  req.isMet ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold ${
+                  req.isMet ? 'bg-emerald-500 text-white' : 'bg-amber-200 text-amber-700'
+                }`}>
+                  {req.isMet ? '✓' : '!'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${req.isMet ? 'text-emerald-800' : 'text-amber-800'}`}>
+                    {req.label}
+                  </p>
+                  {req.description && (
+                    <p className="text-xs text-gray-500 mt-0.5">{req.description}</p>
+                  )}
+                  {req.isMet && req.metAt && (
+                    <p className="text-xs text-emerald-600 mt-0.5">
+                      Met {new Date(req.metAt).toLocaleDateString()}
+                      {req.metBy && ` by ${req.metBy}`}
+                    </p>
+                  )}
+                </div>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleMarkMet(req.id, req.isMet)}
+                    disabled={markingMet === req.id}
+                    className={`text-xs font-medium px-2 py-1 rounded border transition-colors flex-shrink-0 ${
+                      req.isMet
+                        ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+                        : 'border-amber-300 text-amber-700 hover:bg-amber-100'
+                    } disabled:opacity-50`}
+                  >
+                    {markingMet === req.id ? '...' : req.isMet ? 'Unmark' : 'Mark Met'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

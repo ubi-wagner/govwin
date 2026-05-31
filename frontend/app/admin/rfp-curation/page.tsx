@@ -93,7 +93,11 @@ export default async function RFPCurationPage() {
           + Upload RFP
         </a>
       </div>
-      <TriageQueue initialItems={items} currentUserId={session.user.id ?? ''} />
+      <TriageQueue
+        initialItems={items}
+        currentUserId={session.user.id ?? ''}
+        currentUserRole={(session.user as { role?: string }).role ?? ''}
+      />
     </div>
   );
 }

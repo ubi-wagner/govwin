@@ -134,6 +134,24 @@ export function TeamManager({
     );
   }, []);
 
+  const handleRemoveCollaborator = useCallback(async (collaboratorId: string, email: string) => {
+    if (!confirm(`Remove ${email} from this proposal? Their access will be revoked immediately.`)) return;
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/collaborators/${collaboratorId}`,
+        { method: 'DELETE' },
+      );
+      if (!res.ok) {
+        const json = await res.json();
+        alert(json.error || 'Failed to remove collaborator');
+        return;
+      }
+      setCollaborators((prev) => prev.filter((c) => c.id !== collaboratorId));
+    } catch {
+      alert('Network error');
+    }
+  }, [tenantSlug, proposalId]);
+
   return (
     <div className="space-y-5">
       {/* Team members */}
@@ -170,14 +188,25 @@ export function TeamManager({
                   </div>
                   <div className="text-xs text-gray-400 truncate">{collab.email}</div>
                 </div>
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}
-                >
-                  {badge.label}
-                </span>
-                {!collab.acceptedAt && (
-                  <span className="text-[10px] text-amber-500 font-medium">Pending</span>
-                )}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}
+                  >
+                    {badge.label}
+                  </span>
+                  {!collab.acceptedAt && (
+                    <span className="text-[10px] text-amber-500 font-medium">Pending</span>
+                  )}
+                  {canManage && (
+                    <button
+                      onClick={() => handleRemoveCollaborator(collab.id, collab.email)}
+                      className="text-[10px] text-red-400 hover:text-red-600 font-medium px-1 py-0.5 rounded hover:bg-red-50 transition-colors"
+                      title="Remove collaborator"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
