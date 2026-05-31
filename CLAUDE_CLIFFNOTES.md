@@ -451,6 +451,19 @@ All use namespace `system`, phase `single`:
 NOTE: The admin dashboard queries BOTH legacy event name (`content.drafts_saved`)
 and new event name (`content.page_blocks_updated`) for backward compatibility.
 
+### V1 E2E Events (2026-05-31)
+New proposal lifecycle events added:
+
+| Namespace | Event Type | Trigger | Phase |
+|-----------|------------|---------|-------|
+| `proposal` | `proposal.ready_for_customer` | Admin unlocks proposal | single |
+| `proposal` | `collaborator.access_revoked` | Collaborator removed from proposal | single |
+| `finder` | `solicitation.force_released` | Master admin force-releases stale claim | single |
+
+New workflow tracking:
+- `process_instances` row with `workflow_name='AdminProposalSetup'` created on proposal creation (72h deadline)
+- Completed (status→'completed') when admin unlocks the proposal
+
 ---
 
 ## 4. Common Mistakes We've Fixed (Do NOT Repeat)
@@ -570,6 +583,16 @@ the tool registry (`frontend/lib/tools/registry.ts`) instead.
 
 **Rule:** Proposal AI drafting and review go through the `invoke()` tool
 registry. Never create `pipeline_jobs` rows for these operations.
+
+### Mistake 17: Filtering sections for partner_user
+The sections GET route uses `role` from the session (system role `partner_user`),
+NOT `access.role` from `resolveUserAccess()` (which maps to `'contributor'` or
+`'external'`). Always compare `role === 'partner_user'` to distinguish section
+visibility rules.
+
+**Rule:** For partner_user, return ONLY sections with `permission !== 'none'`
+(filter out completely). For tenant_user/tenant_admin, keep hidden sections
+in the list (tagged `status: 'hidden'`) so admins can see the full structure.
 
 ### Mistake 16: Recomputing scores in the frontend
 The Spotlights page uses `tenant_pipeline_items.total_score` as the
