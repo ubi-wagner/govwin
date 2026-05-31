@@ -370,7 +370,7 @@ runs; the human edge was broken. Fix order being executed:
 | # | Finding | Severity | Status |
 |---|---------|----------|--------|
 | 1 | Proposal HITL `wait_for` phase `single`→`end` (gate never resumed via events) | 🔴 | fix |
-| 1b | Source-change HITL has NO review-complete producer (agent claim was wrong; diffs route is GET-only) | 🔴 | force-advance-only (#5) |
+| 1b | Source-change HITL waited on phantom `source.changes_reviewed:single`; real producer is the diffs-route PATCH `source_diff.reviewed:end` (agent + truncated read both wrongly called it GET-only) | 🔴 | fixed |
 | 2 | 6 workflow NOTIFY templates missing → silent no-send; my 052 deactivated the working rules | 🔴 | fix |
 | 3 | No error-gating: failed ops emit `end` and trigger automation | 🟡 | fix |
 | 4 | "Run AI Review" promises results; agent loop dormant → dead-end | 🔴 | fix (honest UI) |

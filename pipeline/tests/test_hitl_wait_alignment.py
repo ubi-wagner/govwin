@@ -43,10 +43,20 @@ def test_proposal_review_gate_condition_still_scopes_to_review():
     }) is False
 
 
-def test_source_gate_dead_condition_removed():
-    # No producer exists; the gate is force-advance-only. The bogus
-    # previousStage=="review" condition (copy-paste) must be gone.
+def test_source_gate_matches_real_diff_reviewed_producer():
+    # The diffs route PATCH emits finder:source_diff.reviewed (start/end). The
+    # gate now matches that real producer on phase="end" (was the phantom
+    # source.changes_reviewed:single nothing emits). Launch Review #1b.
     step = next(
         s for s in OnSourceChangeDetected.steps if s.name == "wait_for_admin_review"
     )
-    assert step.wait_for.condition is None
+    wf = step.wait_for
+    assert wf.condition is None
+    assert wf.matches({
+        "namespace": "finder", "type": "source_diff.reviewed", "phase": "end",
+        "payload": {"sourceId": "s1", "diffId": "d1"},
+    }) is True
+    assert wf.matches({
+        "namespace": "finder", "type": "source.changes_reviewed", "phase": "single",
+        "payload": {},
+    }) is False

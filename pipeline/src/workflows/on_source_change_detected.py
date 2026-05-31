@@ -51,7 +51,7 @@ HITL GATES:
       solicitations in the triage queue and either accept or dismiss
       each one.
       Timeout: 24h -> re-notify rfp_admin
-      Resume event: finder:source.changes_reviewed:single
+      Resume event: finder:source_diff.reviewed:end
 
 ERROR HANDLING:
     - Step failure: Log error, emit system:workflow.step_failed event,
