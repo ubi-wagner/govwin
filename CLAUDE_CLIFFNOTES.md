@@ -871,10 +871,13 @@ the **human edge** was broken in several places. The durable truths:
   promises agent output (the "Run AI Review" toast was corrected).
 - **HITL resume needs a real producer** whose event matches the parked step's
   `wait_for`. Proposal gate: fixed to `proposal.advanced:end` (its `end` event carries
-  `previousStage`). Source-change gate: **no producer exists** for review-complete —
-  resolve it via the **process ledger force-advance**, not an event.
+  `previousStage`). Source-change gate: fixed to `source_diff.reviewed:end` (the diffs
+  route PATCH emits it). That event is per-diff and not yet correlated to the instance's
+  sourceId, so the **process ledger force-advance** is the precise per-instance override.
 - **Ops:** the CMS automation listener silently disables ALL CMS automation if
   `SHARED_DATABASE_URL` is unset. Source Scout has no scheduler (manual-only).
-- **Verify, don't trust the audit/subagent.** This review's own agent claimed the
-  diffs route emits `source_diff.reviewed` — it is GET-only and emits nothing. Read
-  the target before acting.
+- **Verify against the actual file, not a truncated read or a subagent summary.** A
+  review agent AND a truncated read both wrongly called the diffs route GET-only; it
+  actually has a PATCH that emits `source_diff.reviewed`. Read the whole target before
+  acting — and re-run a test before committing it (a batched commit shipped a red test
+  and 6 broken templates once this session before being corrected).
