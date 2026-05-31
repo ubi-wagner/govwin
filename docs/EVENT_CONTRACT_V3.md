@@ -466,3 +466,31 @@ changes.** This doc is the source of truth for the vocabulary.
 ---
 
 *End of EVENT_CONTRACT_V3.md*
+
+## Launch Review Corrections (2026-05-31)
+
+Amendments to the contract from the end-to-end launch review. These supersede any
+earlier text that conflicts.
+
+1. **Phase matching is exact** (`EventTrigger.matches`): a `trigger`/`wait_for` only
+   fires when `namespace`+`type`+`phase` all equal the event. Frontend producers:
+   `emitEventStart→start`, `emitEventEnd→end`, `emitEventSingle→single`.
+2. **End-event payload = `result` only.** `emitEventEnd` does not merge the start
+   payload; the `result` must carry all fields downstream consumers/conditions read.
+3. **Error-gating is mandatory.** Failed operations still emit `phase:'end'` with an
+   `error`. Consumers now skip events where `error` is set (`matches()` + CMS loop).
+   Producers should treat a terminal `end` with `error` as "do not propagate".
+4. **NOTIFY delivery contract:** a NOTIFY step's `template` must resolve in the CMS
+   `TEMPLATES` registry or it silently sends nothing. Template name is part of the
+   contract; changing a NOTIFY template requires a matching registry entry.
+5. **HITL resume producers:** every `wait_for` must name an event a real producer
+   emits at the matching phase, OR be designated force-advance-only. The
+   source-change review gate is force-advance-only (no event producer). The proposal
+   review gate resumes on `proposal.advanced:end` with `previousStage=='review'`.
+6. **Agent dispatch is V2.** Events addressed to agent archetypes
+   (`*.review_requested`, `*.draft_requested`, `compliance.checked`) have no runtime
+   consumer yet; do not contract UI on their results.
+7. **Tenant process surface:** `process_instances` state is exposed to tenants at
+   `portal/<slug>/processes` (ledger + force-advance for `tenant_admin`, own-tenant
+   scoped via `canForceAdvanceInstance`). rfp_admin gets the cross-tenant view at
+   `admin/workflows` (tenant filter). Force-advance is the sanctioned HITL override.

@@ -359,3 +359,25 @@ has a handler; every route-referenced tool is registered.
 - **INC-11/12/13 (V2):** loop/depth guardrail; RLS policies (or document `WHERE tenant_id`);
   agent-loop activation + LISTEN/NOTIFY. Note: removing `tools/dispatcher.py` in INC-8 means the
   agent fabric is rebuilt fresh on activation (not carried as a dead stub).
+
+---
+
+## Launch Readiness Review (2026-05-31) — findings + fix status
+
+End-to-end review (3 read-only agents + manual phase/error-gating trace). The engine
+runs; the human edge was broken. Fix order being executed:
+
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | Proposal HITL `wait_for` phase `single`→`end` (gate never resumed via events) | 🔴 | fix |
+| 1b | Source-change HITL has NO review-complete producer (agent claim was wrong; diffs route is GET-only) | 🔴 | force-advance-only (#5) |
+| 2 | 6 workflow NOTIFY templates missing → silent no-send; my 052 deactivated the working rules | 🔴 | fix |
+| 3 | No error-gating: failed ops emit `end` and trigger automation | 🟡 | fix |
+| 4 | "Run AI Review" promises results; agent loop dormant → dead-end | 🔴 | fix (honest UI) |
+| 5 | Tenant process ledger + force-advance; rfp_admin cross-tenant filter | 🟢 | build |
+| — | Agent loop dormant (all archetypes dead); `agent_task_queue` no consumer | 🟡 | V2 |
+| — | CMS listener needs `SHARED_DATABASE_URL`; Source Scout has no scheduler | 🟡 | ops/V2 |
+
+Accountability: INC-3 (052) regressed two admin notifications; INC-1 resume path was
+verified only against synthetic events (real `wait_for`s had phase/type bugs); INC-6
+escalation fired through a missing template. All addressed by fixes 1–2.

@@ -839,3 +839,42 @@ Before any API route: follow the template in section 2.
 Before any event: check namespace rules in section 3.
 Before any portal route: include tenant verification.
 Before any migration: follow rules in section 7.
+
+## 11. Launch Readiness Review — Wiring Truths & Gotchas (2026-05-31)
+
+A full end-to-end review (event wiring + runtime + UX) found the engine is sound but
+the **human edge** was broken in several places. The durable truths:
+
+- **Phase is exact.** `EventTrigger.matches()` requires `namespace AND type AND phase`
+  to be equal. Producers: `emitEventStart`→`start`, `emitEventEnd`→`end`,
+  `emitEventSingle`→`single` (frontend `lib/events.ts`). A `trigger`/`wait_for` MUST
+  match the producer's ACTUAL phase. Start/end-pair domain events are consumed on
+  `end`; point events on `single`.
+- **`emitEventEnd` payload == the `result` arg only** (not merged with the start
+  payload). The `end` event must itself carry every field the workflow steps and the
+  trigger `condition` need (e.g. `previousStage`). Verify the success-path `result`.
+- **Failed ops still emit `phase:'end'`** (with `error` set, empty `result`).
+  Consumers MUST error-gate. FIX: `EventTrigger.matches()` and the CMS event loop now
+  skip events whose `error` is set. Never trigger automation on a failed operation.
+- **NOTIFY template must exist** in `services/cms/src/templates.py` `TEMPLATES` (or be
+  inline `{{...}}`), or `render_template` returns `None` → **silent no-send**. Keep
+  every workflow NOTIFY-step template name in that dict. (6 were missing → added.)
+- **Single-owner regression lesson (my 052):** do NOT deactivate a *working*
+  `automation_rule` in favor of a NOTIFY step unless that step's template actually
+  renders. 052 deactivated the rules whose templates rendered and left NOTIFY steps
+  whose templates were missing → admin notifications went dark. Verify delivery, not
+  just ownership.
+- **Agent archetypes are V2-DORMANT.** `AgentFabric` registers archetypes
+  (`pipeline/src/main.py`) but no loop dispatches events to them; `agent_task_queue`
+  has no consumer. `proposal.review_requested` / `compliance.checked` /
+  `*.draft_requested` are dead-ends until the agent loop ships. Do NOT surface UI that
+  promises agent output (the "Run AI Review" toast was corrected).
+- **HITL resume needs a real producer** whose event matches the parked step's
+  `wait_for`. Proposal gate: fixed to `proposal.advanced:end` (its `end` event carries
+  `previousStage`). Source-change gate: **no producer exists** for review-complete —
+  resolve it via the **process ledger force-advance**, not an event.
+- **Ops:** the CMS automation listener silently disables ALL CMS automation if
+  `SHARED_DATABASE_URL` is unset. Source Scout has no scheduler (manual-only).
+- **Verify, don't trust the audit/subagent.** This review's own agent claimed the
+  diffs route emits `source_diff.reviewed` — it is GET-only and emits nothing. Read
+  the target before acting.
