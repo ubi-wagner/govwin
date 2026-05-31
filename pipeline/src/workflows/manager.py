@@ -365,13 +365,25 @@ class WorkflowManager:
             if step.step_type == StepType.HITL_WAIT:
                 step_status[step_name] = "waiting"
                 await self._persist_step_status(conn, instance_id, step_results, step_status)
+                # Derive the park deadline from the binding's DECLARED timeout, not
+                # the create-time 1h default. A 72h HITL review must get a 72h
+                # deadline or the paused-deadline sweep force-fails it ~1h in.
+                # (EVENT_CONTRACT_V3 §3.1 / §6; CLAUDE_CLIFFNOTES Mistake 17.)
+                wait_minutes = (
+                    step.timeout_minutes
+                    if step.timeout_minutes and step.timeout_minutes > 0
+                    else 1440
+                )
+                wait_deadline = datetime.now(timezone.utc) + timedelta(minutes=wait_minutes)
                 await conn.execute(
                     """
-                    UPDATE process_instances SET status = 'paused', current_step = $2
+                    UPDATE process_instances
+                    SET status = 'paused', current_step = $2, deadline = $3
                     WHERE id = $1
                     """,
                     uuid.UUID(instance_id),
                     step_name,
+                    wait_deadline,
                 )
                 await self._record_transition(
                     conn,
@@ -714,6 +726,58 @@ class WorkflowManager:
         )
         return True
 
+    async def match_waiting_instances(
+        self, conn: asyncpg.Connection, event: dict[str, Any]
+    ) -> list[str]:
+        """Resume paused instances whose current HITL step is waiting for this event.
+
+        This is the missing link that made HITL a dead end: instances could pause
+        but nothing matched an incoming event against the parking step's `wait_for`
+        trigger to wake them. For each paused instance of this source, resolve its
+        workflow class, find the current step, and if that step's `wait_for` matches
+        the event, resume it (paused -> retrying) so poll_retrying_instances re-drives
+        it from the next step. (EVENT_CONTRACT_V3 §6; CLAUDE_CLIFFNOTES Mistake 18.)
+
+        Returns the list of resumed instance IDs.
+        """
+        from workflows.base import EventTrigger  # local import: avoid cycle at module load
+
+        resumed: list[str] = []
+        rows = await conn.fetch(
+            """
+            SELECT id, workflow_name, current_step FROM process_instances
+            WHERE status = 'paused' AND source = $1
+            """,
+            self.source,
+        )
+        for row in rows:
+            wf_cls = self._resolve_workflow_class(row["workflow_name"])
+            if wf_cls is None:
+                continue
+            step = next(
+                (s for s in wf_cls.steps if s.name == row["current_step"]), None
+            )
+            wait_for: Optional[EventTrigger] = getattr(step, "wait_for", None)
+            if wait_for is None:
+                continue
+            if wait_for.matches(event):
+                if await self.resume_instance(
+                    conn, str(row["id"]), resume_data={"resumed_by_event": event.get("id")}
+                ):
+                    resumed.append(str(row["id"]))
+        return resumed
+
+    @staticmethod
+    def _resolve_workflow_class(workflow_name: str):
+        """Look up a registered Workflow subclass by its class name."""
+        from workflows.base import _registry
+
+        for candidates in _registry.values():
+            for c in candidates:
+                if c.__name__ == workflow_name:
+                    return c
+        return None
+
     async def poll_retrying_instances(self, conn: asyncpg.Connection) -> list[str]:
         """Find instances that need re-execution (retrying status).
 
@@ -936,41 +1000,66 @@ class WorkflowManager:
 
                 for pt_row in paused_timeout:
                     pt_id = str(pt_row["id"])
+                    # A park-and-wait that crosses its (now binding-derived)
+                    # wait_deadline is an ESCALATION, not a silent kill. Emit an
+                    # observable event and record the timeout; the on_timeout Job
+                    # is executed by INC-6. The instance is still marked failed as
+                    # the terminal state, but with reason 'wait_deadline_exceeded'
+                    # and a step pointer so escalation can act on it.
+                    # (EVENT_CONTRACT_V3 §3.1 / §6; CLAUDE_CLIFFNOTES Mistake 17.)
                     logger.warning(
-                        "[stuck_detection] Paused instance %s (%s) past deadline",
-                        pt_id, pt_row["workflow_name"],
+                        "[stuck_detection] Paused instance %s (%s) past wait_deadline at step %s",
+                        pt_id, pt_row["workflow_name"], pt_row["current_step"],
+                    )
+                    tenant_str = (
+                        str(pt_row["tenant_id"]) if pt_row["tenant_id"] else None
                     )
                     if pool:
                         async with pool.acquire() as u_conn:
                             await u_conn.execute(
                                 """
                                 UPDATE process_instances
-                                SET status = 'failed', last_error = 'hitl_timeout',
-                                    completed_at = now()
+                                SET status = 'failed',
+                                    last_error = 'wait_deadline_exceeded',
+                                    last_error_step = $2, completed_at = now()
                                 WHERE id = $1
                                 """,
-                                pt_row["id"],
+                                pt_row["id"], pt_row["current_step"],
+                            )
+                            await self._record_transition(
+                                u_conn, pt_id, "paused", "failed",
+                                actor="cron", reason="wait_deadline_exceeded",
+                            )
+                            await self._emit_event(
+                                u_conn, "system", "workflow.wait_timed_out", tenant_str,
+                                {
+                                    "instance_id": pt_id,
+                                    "workflow_name": pt_row["workflow_name"],
+                                    "current_step": pt_row["current_step"],
+                                },
                             )
                     else:
                         await conn.execute(
                             """
                             UPDATE process_instances
-                            SET status = 'failed', last_error = 'hitl_timeout',
-                                completed_at = now()
+                            SET status = 'failed',
+                                last_error = 'wait_deadline_exceeded',
+                                last_error_step = $2, completed_at = now()
                             WHERE id = $1
                             """,
-                            pt_row["id"],
+                            pt_row["id"], pt_row["current_step"],
                         )
-                    if pool:
-                        async with pool.acquire() as tr_conn:
-                            await self._record_transition(
-                                tr_conn, pt_id, "paused", "failed",
-                                actor="cron", reason="hitl_timeout",
-                            )
-                    else:
                         await self._record_transition(
                             conn, pt_id, "paused", "failed",
-                            actor="cron", reason="hitl_timeout",
+                            actor="cron", reason="wait_deadline_exceeded",
+                        )
+                        await self._emit_event(
+                            conn, "system", "workflow.wait_timed_out", tenant_str,
+                            {
+                                "instance_id": pt_id,
+                                "workflow_name": pt_row["workflow_name"],
+                                "current_step": pt_row["current_step"],
+                            },
                         )
 
             except asyncio.CancelledError:

@@ -802,6 +802,20 @@ async def run_workflow_processor(
                                     emit_exc,
                                 )
 
+                    # Resume any paused HITL instance waiting for THIS event.
+                    # (The missing link that made HITL a dead end — see
+                    # manager.match_waiting_instances / CLAUDE_CLIFFNOTES Mistake 18.)
+                    if manager:
+                        try:
+                            woke = await manager.match_waiting_instances(conn, event_dict)
+                            if woke:
+                                log.info(
+                                    "resumed %d paused instance(s) on event %s",
+                                    len(woke), event_dict["id"],
+                                )
+                        except Exception as e:
+                            log.error("match_waiting_instances failed: %s", e)
+
                     # Advance the high-water mark
                     last_processed_at = event_row["created_at"]
 
