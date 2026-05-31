@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
+import { TaskQueue } from '@/components/tasks/task-queue';
 
 export const dynamic = 'force-dynamic';
 
