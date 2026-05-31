@@ -949,6 +949,23 @@ class WorkflowManager:
         await self._record_transition(
             conn, instance_id, "paused", "retrying", actor=actor, reason=reason,
         )
+        # Reconcile any open task(s) for this instance. A TODO gate can resume
+        # three ways — task completion, a matching wait_for event, or a manual
+        # force-advance — and only the first closes the task itself. Cancel any
+        # still-open tasks here so an event/force resume never leaves an orphan
+        # ToDo sitting in someone's queue. (If resume came FROM completing the
+        # task, it's already 'completed' and this no-ops.)
+        try:
+            await conn.execute(
+                """
+                UPDATE tasks SET status = 'cancelled', updated_at = now()
+                WHERE process_instance_id = $1 AND status IN ('open', 'in_progress')
+                """,
+                uuid.UUID(instance_id),
+            )
+        except Exception as e:
+            logger.error("[resume_instance] task reconcile failed for %s: %s",
+                         instance_id, e)
         # Observable audit of who resumed — distinguishes a human force-advance
         # (forced=True) from the event-driven resume (forced=False).
         await self._emit_event(
