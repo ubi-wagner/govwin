@@ -100,6 +100,23 @@ export async function forceAdvanceProcess(opts: {
     return { ok: false, status: 409, error: 'Process is no longer paused', code: 'NOT_PAUSED' };
   }
 
+  // ── Reconcile sibling ToDos — part of advancing the process ────────
+  // A gate can be assigned to several people (Eric AND Bob). Advancing it marks
+  // EVERY still-open task for this instance COMPLETED, attributed to whoever
+  // advanced it — the work was done, just by someone else (your scenario). In
+  // the task-completion path the actor's own row is already 'completed', so this
+  // WHERE skips it and only closes the siblings (Bob's). Mirrors pipeline
+  // resume_instance's reconcile so both engines behave identically.
+  await sql`
+    UPDATE tasks
+    SET status = 'completed',
+        completed_by = ${actor.id}::uuid,
+        completed_at = now(),
+        updated_at = now()
+    WHERE process_instance_id = ${instanceId}::uuid
+      AND status IN ('open', 'in_progress')
+  `;
+
   // ── Durable audit: who forced it ───────────────────────────────────
   await sql`
     INSERT INTO process_instance_transitions

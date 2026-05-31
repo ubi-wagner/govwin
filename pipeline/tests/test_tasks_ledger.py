@@ -185,6 +185,90 @@ async def test_complete_task_noop_when_already_closed():
     mgr.resume_instance.assert_not_awaited()
 
 
+async def test_complete_task_forwards_attribution_for_1n_reconcile():
+    """Eric completes the gate → resume must carry Eric's id (completed_by) and
+    skip Eric's own row (skip_task_id) so it only closes the SIBLINGS (Bob's)."""
+    mgr = WorkflowManager(source="pipeline")
+    mgr.resume_instance = AsyncMock(return_value=True)
+    conn = _CompleteConn(status="open")
+    eric = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+    task_id = "44444444-4444-4444-4444-444444444444"
+
+    await mgr.complete_task(conn, task_id, result={"approved": True},
+                            actor="eric@gov", actor_id=eric)
+
+    _, kw = mgr.resume_instance.await_args
+    assert kw["completed_by"] == eric        # siblings attributed to Eric
+    assert kw["skip_task_id"] == task_id      # Eric's own row protected
+
+
+# ── 1:N sibling reconcile (Eric AND Bob both have the ToDo) ──────────────────
+
+class _ResumeReconcileConn:
+    """Paused instance + captures the sibling-reconcile UPDATE."""
+
+    def __init__(self):
+        self.reconcile_sql = None
+        self.reconcile_args = None
+
+    async def fetchrow(self, q, *a):
+        if "current_step, step_results, step_status" in q:
+            return {"current_step": "approve", "step_results": {}, "step_status": {}}
+        return None
+
+    async def execute(self, q, *a):
+        if "UPDATE tasks" in q:
+            self.reconcile_sql = q
+            self.reconcile_args = a
+        return "UPDATE 1"
+
+    async def fetchval(self, q, *a):
+        return None
+
+
+async def test_resume_completes_siblings_attributed_not_cancelled():
+    mgr = WorkflowManager(source="pipeline")
+    mgr._record_transition = AsyncMock()
+    mgr._emit_event = AsyncMock()
+    conn = _ResumeReconcileConn()
+    eric = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+    iid = "11111111-1111-1111-1111-111111111111"
+    own = "44444444-4444-4444-4444-444444444444"
+
+    ok = await mgr.resume_instance(
+        conn, iid, resume_data={"approved": True},
+        actor="eric@gov", reason="task_completed",
+        completed_by=eric, skip_task_id=own,
+    )
+    assert ok is True
+    # siblings COMPLETED (work was done, by someone else) — never 'cancelled'
+    assert "status = 'completed'" in conn.reconcile_sql
+    assert "cancelled" not in conn.reconcile_sql
+    assert "COALESCE($2" in conn.reconcile_sql      # attribute to completer
+    assert "id <> $3" in conn.reconcile_sql          # but skip the actor's own row
+    # args: $1 instance, $2 completed_by=Eric, $3 skip=Eric's row
+    assert str(conn.reconcile_args[1]) == eric
+    assert str(conn.reconcile_args[2]) == own
+
+
+async def test_event_resume_completes_all_siblings_no_skip():
+    """A wait_for-event resume (no completing actor) still closes every open
+    sibling ToDo for the instance — none orphaned. completed_by is NULL."""
+    mgr = WorkflowManager(source="pipeline")
+    mgr._record_transition = AsyncMock()
+    mgr._emit_event = AsyncMock()
+    conn = _ResumeReconcileConn()
+
+    ok = await mgr.resume_instance(
+        conn, "11111111-1111-1111-1111-111111111111",
+        resume_data={"resumed_by_event": "e1"},
+    )
+    assert ok is True
+    assert "status = 'completed'" in conn.reconcile_sql
+    assert conn.reconcile_args[1] is None   # no completer -> COALESCE keeps existing
+    assert conn.reconcile_args[2] is None   # no skip -> closes ALL siblings
+
+
 # ── (d) nudge sweep fires due nudges once each ──────────────────────────────
 
 class _NudgeConn:

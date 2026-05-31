@@ -829,10 +829,14 @@ class WorkflowManager:
 
         instance_id = row["process_instance_id"]
         if instance_id is not None:
+            # Advancing the process also closes the SIBLING ToDos (e.g. Bob's
+            # copy), attributed to the completer (Eric). skip_task_id protects
+            # this row's own result/completed_by from being overwritten.
             await self.resume_instance(
                 conn, str(instance_id),
                 resume_data={"task_id": task_id, **(result or {})},
                 actor=actor, reason="task_completed",
+                completed_by=actor_id, skip_task_id=task_id,
             )
         return True
 
@@ -904,6 +908,8 @@ class WorkflowManager:
         resume_data: Optional[dict[str, Any]] = None,
         actor: str = "system",
         reason: str = "hitl_resumed",
+        completed_by: Optional[str] = None,
+        skip_task_id: Optional[str] = None,
     ) -> bool:
         """Resume a paused (HITL_WAIT) instance.
 
@@ -949,19 +955,27 @@ class WorkflowManager:
         await self._record_transition(
             conn, instance_id, "paused", "retrying", actor=actor, reason=reason,
         )
-        # Reconcile any open task(s) for this instance. A TODO gate can resume
-        # three ways — task completion, a matching wait_for event, or a manual
-        # force-advance — and only the first closes the task itself. Cancel any
-        # still-open tasks here so an event/force resume never leaves an orphan
-        # ToDo sitting in someone's queue. (If resume came FROM completing the
-        # task, it's already 'completed' and this no-ops.)
+        # Reconcile sibling ToDos as part of advancing the process. A TODO gate
+        # can be assigned to several people (e.g. Eric AND Bob both have it). When
+        # one of them satisfies it — or an event / force-advance does — the OTHERS'
+        # copies are marked COMPLETED and attributed to whoever advanced it, not
+        # cancelled: the work WAS done, just by someone else. completed_by stamps
+        # the actor onto every sibling; skip_task_id is the row already closed by
+        # complete_task (so we don't overwrite its own completed_by).
         try:
             await conn.execute(
                 """
-                UPDATE tasks SET status = 'cancelled', updated_at = now()
-                WHERE process_instance_id = $1 AND status IN ('open', 'in_progress')
+                UPDATE tasks
+                SET status = 'completed',
+                    completed_by = COALESCE($2, completed_by),
+                    completed_at = now(), updated_at = now()
+                WHERE process_instance_id = $1
+                  AND status IN ('open', 'in_progress')
+                  AND ($3::uuid IS NULL OR id <> $3::uuid)
                 """,
                 uuid.UUID(instance_id),
+                self._safe_uuid(completed_by),
+                self._safe_uuid(skip_task_id),
             )
         except Exception as e:
             logger.error("[resume_instance] task reconcile failed for %s: %s",

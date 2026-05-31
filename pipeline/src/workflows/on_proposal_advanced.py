@@ -183,9 +183,19 @@ class OnProposalAdvancedToReview(Workflow):
         ),
         Step(
             name="wait_for_review",
-            step_type=StepType.HITL_WAIT,
-            action="hitl_wait",
+            step_type=StepType.TODO,
+            action="todo",
             depends_on="notify_reviewers",
+            # The reviewer is the CUSTOMER — this ToDo lands in the tenant_admin
+            # queue (fixing the launch-review gap where customer-intended HITL
+            # gates were invisible to customers). It resumes EITHER by completing
+            # the task OR by the reviewer advancing the proposal (wait_for below);
+            # whichever fires first, resume_instance completes the sibling ToDos.
+            task_type='"proposal_review"',
+            task_title='"Review proposal and advance to the next stage"',
+            assignee_role='"tenant_admin"',
+            entity_type='"proposal"',
+            entity_ref="payload.proposalId",
             wait_for=EventTrigger(
                 namespace="proposal",
                 type="proposal.advanced",
