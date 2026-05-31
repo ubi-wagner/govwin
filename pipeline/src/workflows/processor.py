@@ -463,22 +463,29 @@ async def _run_workflow(
     for step in steps:
         step_start_time = time.monotonic()
 
-        # If this step depends on a skipped HITL_WAIT step, skip it too
+        # The fire-and-forget fallback (no process_instances table) CANNOT park
+        # at a human gate. STOP the workflow here rather than silently skipping
+        # human review and proceeding — that bypass was the old behavior and is
+        # dangerous. A properly-migrated deployment uses the managed engine,
+        # which parks correctly at HITL_WAIT. (INC-5; EVENT_CONTRACT_V3 gap 5.)
+        if step.step_type == StepType.HITL_WAIT:
+            log.warning(
+                "workflow '%s' reached HITL_WAIT '%s' in fire-and-forget mode "
+                "(process_instances missing) — stopping, NOT bypassing human review",
+                workflow_cls.__name__, step.name,
+            )
+            try:
+                await emit_event(
+                    conn, namespace="system", type="workflow.hitl_unsupported",
+                    payload={"workflow": workflow_cls.__name__, "step": step.name},
+                    tenant_id=tenant_id,
+                )
+            except Exception as exc:
+                log.error("failed to emit workflow.hitl_unsupported: %s", exc)
+            break
+
         if step.depends_on:
             dep_result = step_results.get(step.depends_on, {})
-            if dep_result.get("skipped") and dep_result.get("reason") == "hitl_wait_v1":
-                log.info(
-                    "skipping step '%s' because dependency '%s' is a HITL_WAIT (V1)",
-                    step.name,
-                    step.depends_on,
-                )
-                step_results[step.name] = {
-                    "result": None,
-                    "skipped": True,
-                    "reason": "dependency_hitl_wait",
-                }
-                continue
-
             # If dependency failed, log but continue (inputs will be None)
             if "error" in dep_result:
                 log.warning(
