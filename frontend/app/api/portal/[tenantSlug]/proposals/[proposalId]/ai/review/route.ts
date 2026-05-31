@@ -145,27 +145,10 @@ export async function POST(request: Request, ctx: RouteContext) {
         });
       }
 
-      // Queue review jobs
-      let sectionsQueued = 0;
-      for (const section of reviewable) {
-        const jobPayload = JSON.stringify({
-          kind: 'review_section',
-          section_id: section.id,
-          proposal_id: proposalId,
-          tenant_id: tenantId,
-          section_title: section.title,
-          solicitation_id: proposal.solicitationId,
-          review_type: reviewType,
-          content_length: section.content?.length ?? 0,
-        });
-
-        await sql`
-          INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
-          VALUES ('portal', 'review_section', 'pending', 5, ${jobPayload}::jsonb)
-        `;
-
-        sectionsQueued++;
-      }
+      // Count sections that will be reviewed via the tool-invoke path.
+      // The actual review happens client-side via invoke('proposal.review_section')
+      // — this route only validates and records the request.
+      const sectionsQueued = reviewable.length;
 
       // Emit event
       await emitEventSingle({

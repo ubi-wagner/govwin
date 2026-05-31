@@ -265,6 +265,101 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 
 ---
 
+## 11. CMS Visual Page Editor
+
+**Goal:** Verify the CMS SPA visual page editor, content review workflow, and the redirect from admin content page to the CMS Portal.
+
+> :warning: **Prerequisite:** You must be logged in as master_admin (Step 1).
+
+| # | Action | Expected Result |
+|---|--------|-----------------|
+| 1 | Navigate to [{BASE_URL}/admin/content]({BASE_URL}/admin/content) | Content management page loads |
+| 2 | Verify "Open in CMS Portal" link is visible | Link present, pointing to CMS SPA `/pages` editor |
+| 3 | Click "Open in CMS Portal" | CMS SPA visual page editor loads (may open in new tab) |
+| 4 | Navigate to [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor) directly | Redirects to or renders the CMS SPA page editor |
+| 5 | Verify page list is displayed | All managed pages visible with block counts and statuses |
+| 6 | Click into a page | Block editor opens showing ordered content blocks |
+| 7 | Add a blank block | New empty block appears at the correct position |
+| 8 | Edit the new block's content | Block body accepts input and renders preview |
+| 9 | Move a block up | Block reorders correctly, sort_order updated |
+| 10 | Move a block down | Block reorders correctly |
+| 11 | Save as draft | Draft saved, status badge shows "draft" |
+| 12 | Click "Submit for Review" | Status changes to "submitted_for_review" |
+| 13 | Click "Approve" (as reviewer) | Status changes to "approved" |
+| 14 | Click "Publish" | Content published, ISR revalidation triggered |
+| 15 | Navigate to the corresponding public page | Updated content visible within 60 seconds |
+| 16 | Return to editor, click "Reject" on a submitted item | Status returns to "draft", rejection reason visible |
+| 17 | Test AI Generate: click AI generate button, enter prompt | AI-generated content appears in block body |
+| 18 | Test AI Revise: select existing block, click revise | Revised content returned as suggestion |
+| 19 | Test AI from URL: enter an external URL, click generate | Content extracted and generated from URL |
+
+**Content review workflow state machine:**
+```
+draft -> submitted_for_review -> approved -> published
+                              -> rejected -> draft
+```
+
+**Events emitted:**
+- `system:content.submitted_for_review` -- content submitted
+- `system:content.approved` -- content approved
+- `system:content.rejected` -- content rejected
+- `system:content.published` -- content published (triggers ISR revalidation)
+
+**Clickable links:**
+- [{BASE_URL}/admin/content]({BASE_URL}/admin/content)
+- [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor)
+
+---
+
+## 12. System-State Dashboard -- Content Pipeline & Email Automation Tabs
+
+**Goal:** Verify the two new tabs on the system-state dashboard: Content Pipeline and Email Automation.
+
+> :warning: **Prerequisite:** You must be logged in as master_admin (Step 1). CMS content and email automation activity should exist from Steps 11 and earlier testing.
+
+| # | Action | Expected Result |
+|---|--------|-----------------|
+| 1 | Navigate to [{BASE_URL}/admin/system-state]({BASE_URL}/admin/system-state) | System-state dashboard loads with all tabs visible |
+| **Content Pipeline Tab** | | |
+| 2 | Click the "Content Pipeline" tab | Tab activates, content pipeline view renders |
+| 3 | Verify block status summary | Counts displayed for each status: draft, submitted_for_review, approved, published |
+| 4 | Verify recent content events | Table of recent `system:content.*` events with timestamps, actor, and content ID |
+| 5 | Verify content types breakdown | Blog posts vs. page blocks counts shown |
+| **Email Automation Tab** | | |
+| 6 | Click the "Email Automation" tab | Tab activates, email automation view renders |
+| 7 | Verify rule execution log | Table of automation rule executions with: rule name, trigger event, execution time, result (success/failure) |
+| 8 | Verify email events displayed | Recent `system:email.*` events shown: queued, sent, rejected, failed |
+| 9 | Verify rule status indicators | Active rules show green indicator, paused rules show yellow |
+| 10 | Check for error counts | Any failed rule executions highlighted with error details |
+
+**Clickable link:** [{BASE_URL}/admin/system-state]({BASE_URL}/admin/system-state)
+
+---
+
+## 13. Admin Sidebar -- Automation & Email Outbox
+
+**Goal:** Verify the reorganized admin sidebar includes direct links to Automation and Email Outbox pages.
+
+> :warning: **Prerequisite:** You must be logged in as master_admin (Step 1).
+
+| # | Action | Expected Result |
+|---|--------|-----------------|
+| 1 | Inspect the admin sidebar navigation | Sidebar renders with all sections |
+| 2 | Verify "Automation" link is visible in sidebar | Link present under the appropriate nav section |
+| 3 | Click "Automation" | Navigates to [{BASE_URL}/admin/automation]({BASE_URL}/admin/automation) |
+| 4 | Verify automation page loads | Page renders with automation rules list, rule creation form, and execution log |
+| 5 | Navigate back via sidebar | Sidebar still visible and functional |
+| 6 | Verify "Email Outbox" link is visible in sidebar | Link present under the appropriate nav section |
+| 7 | Click "Email Outbox" | Navigates to [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox) |
+| 8 | Verify email outbox page loads | Page renders with pending/claimed/sent email list, approve/reject buttons per email |
+| 9 | Verify outbox count badge (if emails are pending) | Badge shows count of pending emails next to nav link |
+
+**Clickable links:**
+- [{BASE_URL}/admin/automation]({BASE_URL}/admin/automation)
+- [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox)
+
+---
+
 ## Quick Reference: All Admin Routes
 
 | Page | URL | Nav Section |
@@ -275,11 +370,15 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 | RFP Upload | [{BASE_URL}/admin/rfp-curation/upload]({BASE_URL}/admin/rfp-curation/upload) | Operations |
 | Tenants | [{BASE_URL}/admin/tenants]({BASE_URL}/admin/tenants) | Operations |
 | Purchases | [{BASE_URL}/admin/purchases]({BASE_URL}/admin/purchases) | Operations |
+| Automation | [{BASE_URL}/admin/automation]({BASE_URL}/admin/automation) | Operations |
+| Email Outbox | [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox) | Operations |
 | Event Stream | [{BASE_URL}/admin/events]({BASE_URL}/admin/events) | Monitoring |
 | Pipeline Jobs | [{BASE_URL}/admin/pipeline]({BASE_URL}/admin/pipeline) | Monitoring |
 | System Health | [{BASE_URL}/admin/system]({BASE_URL}/admin/system) | Monitoring |
+| System State | [{BASE_URL}/admin/system-state]({BASE_URL}/admin/system-state) | Monitoring |
 | Sources | [{BASE_URL}/admin/sources]({BASE_URL}/admin/sources) | Intelligence |
 | CMS Content | [{BASE_URL}/admin/content]({BASE_URL}/admin/content) | Content |
+| CMS Editor | [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor) | Content |
 | S3 Storage | [{BASE_URL}/admin/storage]({BASE_URL}/admin/storage) | Content |
 
 ---

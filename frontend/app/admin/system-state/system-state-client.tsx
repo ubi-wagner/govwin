@@ -9,6 +9,8 @@ import type {
   EventTreeNode,
   ErrorEvent,
   EventVolumeRow,
+  ContentPipelineData,
+  EmailAutomationData,
 } from './page';
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'workflows', label: 'Active Workflows' },
   { key: 'pipeline', label: 'Pipeline' },
+  { key: 'content', label: 'Content Pipeline' },
+  { key: 'email', label: 'Email Automation' },
   { key: 'trees', label: 'Process Trees' },
   { key: 'errors', label: 'Errors' },
   { key: 'volume', label: 'Event Volume' },
@@ -712,6 +716,274 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
   );
 }
 
+// ─── Content Pipeline sub-components ─────────────────────────────────
+
+const CONTENT_STATUS_COLORS: Record<string, string> = {
+  published: 'bg-green-100 text-green-700',
+  draft: 'bg-gray-100 text-gray-700',
+  pending: 'bg-yellow-100 text-yellow-700',
+  private: 'bg-purple-100 text-purple-700',
+  archived: 'bg-gray-100 text-gray-500',
+};
+
+const CONTENT_EVENT_LABELS: Record<string, { label: string; color: string }> = {
+  'content.page_published': { label: 'Published', color: 'bg-green-100 text-green-700' },
+  'content.submitted_for_review': { label: 'Submitted', color: 'bg-yellow-100 text-yellow-700' },
+  'content.approved': { label: 'Approved', color: 'bg-blue-100 text-blue-700' },
+  'content.rejected': { label: 'Rejected', color: 'bg-red-100 text-red-700' },
+  'content.drafts_saved': { label: 'Draft Saved', color: 'bg-gray-100 text-gray-700' },
+  'content.ai_generation_completed': { label: 'AI Generated', color: 'bg-purple-100 text-purple-700' },
+};
+
+function ContentPipelineSection({ data }: { data: ContentPipelineData }) {
+  const published = data.blocksByStatus.find((s) => s.status === 'published')?.count ?? 0;
+  const draft = data.blocksByStatus.find((s) => s.status === 'draft')?.count ?? 0;
+  const pending = data.blocksByStatus.find((s) => s.status === 'pending')?.count ?? 0;
+  const recentPublications = data.recentEvents.filter((e) => e.type === 'content.page_published').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="border-l-4 border-green-400 bg-green-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Published Blocks</p>
+          <p className="text-2xl font-bold mt-1 text-green-700">{published}</p>
+        </div>
+        <div className="border-l-4 border-gray-400 bg-gray-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Draft Blocks</p>
+          <p className="text-2xl font-bold mt-1 text-gray-700">{draft}</p>
+        </div>
+        <div className="border-l-4 border-yellow-400 bg-yellow-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Pending Review</p>
+          <p className={`text-2xl font-bold mt-1 ${pending > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>{pending}</p>
+        </div>
+        <div className="border-l-4 border-blue-400 bg-blue-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Recent Publications</p>
+          <p className="text-2xl font-bold mt-1 text-blue-700">{recentPublications}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Per-page status */}
+        <div className="border border-gray-200 rounded-lg bg-white p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Blocks by Status</h3>
+          {data.blocksByStatus.length === 0 ? (
+            <p className="text-sm text-gray-400">No content blocks found</p>
+          ) : (
+            <div className="space-y-2">
+              {data.blocksByStatus.map((s) => (
+                <div key={s.status} className="flex items-center justify-between text-sm">
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${CONTENT_STATUS_COLORS[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {s.status}
+                  </span>
+                  <span className="font-bold text-gray-700">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pages with pending reviews */}
+        <div className="border border-gray-200 rounded-lg bg-white p-4">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Pages with Pending Reviews</h3>
+          {data.pendingByPage.length === 0 ? (
+            <p className="text-sm text-gray-400">No pending reviews</p>
+          ) : (
+            <div className="space-y-2">
+              {data.pendingByPage.map((p) => (
+                <div key={p.page} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-gray-700">{p.page}</span>
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                    {p.pendingCount} pending
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Content Event Timeline */}
+      <div className="border border-gray-200 rounded-lg bg-white">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900">Content Event Timeline (7d)</h3>
+        </div>
+        {data.recentEvents.length === 0 ? (
+          <div className="p-6 text-center text-sm text-gray-400">No content events in the last 7 days</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {data.recentEvents.map((evt) => {
+              const evtMeta = CONTENT_EVENT_LABELS[evt.type] ?? { label: evt.type, color: 'bg-gray-100 text-gray-600' };
+              const actor = evt.publishedBy || evt.submittedBy || '--';
+              return (
+                <div key={evt.id} className="px-4 py-2.5 flex items-center gap-3 text-sm">
+                  <span className="text-xs text-gray-400 whitespace-nowrap w-16 flex-shrink-0">
+                    {relativeTime(evt.createdAt)}
+                  </span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${evtMeta.color}`}>
+                    {evtMeta.label}
+                  </span>
+                  {evt.page && (
+                    <span className="text-xs text-gray-600 font-medium">{evt.page}</span>
+                  )}
+                  {evt.blocksPublished && (
+                    <span className="text-xs text-gray-500">{evt.blocksPublished} blocks</span>
+                  )}
+                  <span className="text-xs text-gray-400 ml-auto">{actor}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Email Automation sub-components ────────────────────────────────
+
+const AUTOMATION_STATUS_COLORS: Record<string, string> = {
+  success: 'bg-green-100 text-green-700',
+  failed: 'bg-red-100 text-red-700',
+  skipped: 'bg-gray-100 text-gray-600',
+};
+
+const EMAIL_EVENT_LABELS: Record<string, { label: string; color: string }> = {
+  'email.sent': { label: 'Sent', color: 'bg-green-100 text-green-700' },
+  'email.approved': { label: 'Approved', color: 'bg-blue-100 text-blue-700' },
+  'email.rejected': { label: 'Rejected', color: 'bg-red-100 text-red-700' },
+  'email.claimed': { label: 'Claimed', color: 'bg-yellow-100 text-yellow-700' },
+  'action.send_email': { label: 'Send Email', color: 'bg-teal-100 text-teal-700' },
+  'action.notify_admin': { label: 'Notify Admin', color: 'bg-purple-100 text-purple-700' },
+  'action.enroll_drip': { label: 'Enroll Drip', color: 'bg-indigo-100 text-indigo-700' },
+};
+
+function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  const recentLogs = data.automationLogs.filter((l) => new Date(l.executedAt).getTime() > oneDayAgo);
+  const rulesFired24h = recentLogs.length;
+  const emailsSent = data.emailEvents.filter((e) => e.type === 'email.sent').length;
+  const emailsPendingHitl = data.emailEvents.filter((e) => e.type === 'email.claimed').length;
+  const failures = recentLogs.filter((l) => l.status === 'failed').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="border-l-4 border-blue-400 bg-blue-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Rules Fired (24h)</p>
+          <p className="text-2xl font-bold mt-1 text-blue-700">{rulesFired24h}</p>
+        </div>
+        <div className="border-l-4 border-green-400 bg-green-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Emails Sent</p>
+          <p className="text-2xl font-bold mt-1 text-green-700">{emailsSent}</p>
+        </div>
+        <div className="border-l-4 border-yellow-400 bg-yellow-50 rounded-lg p-3">
+          <p className="text-xs text-gray-500 uppercase font-medium">Emails Pending HITL</p>
+          <p className={`text-2xl font-bold mt-1 ${emailsPendingHitl > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>{emailsPendingHitl}</p>
+        </div>
+        <div className="border-l-4 rounded-lg p-3" style={{ borderColor: failures > 0 ? '#f87171' : '#d1d5db', backgroundColor: failures > 0 ? '#fef2f2' : '#f9fafb' }}>
+          <p className="text-xs text-gray-500 uppercase font-medium">Failures (24h)</p>
+          <p className={`text-2xl font-bold mt-1 ${failures > 0 ? 'text-red-700' : 'text-gray-400'}`}>{failures}</p>
+        </div>
+      </div>
+
+      {/* Automation Rule Execution Log */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900">Automation Rule Execution Log</h3>
+        </div>
+        {data.automationLogs.length === 0 ? (
+          <div className="p-6 text-center text-sm text-gray-400">No automation executions recorded</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                <th className="px-3 py-2 font-medium">Time</th>
+                <th className="px-3 py-2 font-medium">Rule</th>
+                <th className="px-3 py-2 font-medium">Trigger</th>
+                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.automationLogs.map((log) => (
+                <tr key={log.id} className="border-t border-gray-100 hover:bg-gray-50">
+                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    {relativeTime(log.executedAt)}
+                  </td>
+                  <td className="px-3 py-2 text-xs font-medium text-gray-700">
+                    {log.ruleName}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-gray-500 font-mono">
+                    {log.triggerNamespace}.{log.triggerType}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-gray-600">
+                    {log.actionType.replace(/_/g, ' ')}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${AUTOMATION_STATUS_COLORS[log.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {log.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-red-700 font-mono max-w-xs truncate">
+                    {log.errorMessage ?? '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Email Lifecycle Events */}
+      <div className="border border-gray-200 rounded-lg bg-white">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900">Email Lifecycle Events (7d)</h3>
+        </div>
+        {data.emailEvents.length === 0 ? (
+          <div className="p-6 text-center text-sm text-gray-400">No email events in the last 7 days</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                <th className="px-3 py-2 font-medium">Time</th>
+                <th className="px-3 py-2 font-medium">Event</th>
+                <th className="px-3 py-2 font-medium">Phase</th>
+                <th className="px-3 py-2 font-medium">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.emailEvents.map((evt) => {
+                const evtMeta = EMAIL_EVENT_LABELS[evt.type] ?? { label: evt.type, color: 'bg-gray-100 text-gray-600' };
+                const details = evt.payload ? truncateJson(evt.payload, 100) : '';
+                return (
+                  <tr key={evt.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                      {relativeTime(evt.createdAt)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${evtMeta.color}`}>
+                        {evtMeta.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{evt.phase}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500 font-mono max-w-xs truncate">
+                      {details || '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────
 
 export function SystemStateClient({
@@ -721,6 +993,8 @@ export function SystemStateClient({
   eventTrees,
   recentErrors,
   eventVolume,
+  contentPipeline,
+  emailAutomation,
 }: {
   health: HealthSummary;
   activeWorkflows: ActiveWorkflow[];
@@ -728,6 +1002,8 @@ export function SystemStateClient({
   eventTrees: EventTreeNode[];
   recentErrors: ErrorEvent[];
   eventVolume: EventVolumeRow[];
+  contentPipeline: ContentPipelineData;
+  emailAutomation: EmailAutomationData;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -813,6 +1089,16 @@ export function SystemStateClient({
               {tab.key === 'workflows' && activeWorkflows.length > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700">
                   {activeWorkflows.length}
+                </span>
+              )}
+              {tab.key === 'content' && contentPipeline.pendingByPage.reduce((sum, p) => sum + p.pendingCount, 0) > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700">
+                  {contentPipeline.pendingByPage.reduce((sum, p) => sum + p.pendingCount, 0)}
+                </span>
+              )}
+              {tab.key === 'email' && emailAutomation.automationLogs.filter((l) => l.status === 'failed' && (Date.now() - new Date(l.executedAt).getTime()) < 86_400_000).length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-red-100 text-red-700">
+                  {emailAutomation.automationLogs.filter((l) => l.status === 'failed' && (Date.now() - new Date(l.executedAt).getTime()) < 86_400_000).length}
                 </span>
               )}
             </button>
@@ -939,6 +1225,22 @@ export function SystemStateClient({
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Pipeline State</h2>
           <PipelineSection pipeline={pipelineState} />
+        </section>
+      )}
+
+      {/* ── Content Pipeline Tab ────────────────────────────────────── */}
+      {activeTab === 'content' && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Content Pipeline</h2>
+          <ContentPipelineSection data={contentPipeline} />
+        </section>
+      )}
+
+      {/* ── Email Automation Tab ─────────────────────────────────────── */}
+      {activeTab === 'email' && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Email Automation</h2>
+          <EmailAutomationSection data={emailAutomation} />
         </section>
       )}
 

@@ -1,6 +1,6 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-05-28 (full migration audit + schema reconciliation)
+**Last updated:** 2026-05-31 (CMS visual editor migration + pipeline E2E audit)
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -432,6 +432,25 @@ Events that match a workflow trigger automatically instantiate a job:
 - `system:content_pipeline.post.unpublished` → automation_rules → `_action_unpublish_content` → sets status=draft
 - Both actions emit completion/failure events back via `_emit_completion_event`
 
+### CMS SPA Event Types (emitted by page_blocks.py)
+All use namespace `system`, phase `single`:
+
+| Event Type | Trigger |
+|------------|---------|
+| `content.page_blocks_updated` | Block content saved |
+| `content.page_blocks_published` | Page published + ISR revalidated |
+| `content.page_blocks_submitted` | Page submitted for review |
+| `content.page_blocks_approved` | Page approved by reviewer |
+| `content.page_blocks_rejected` | Page rejected by reviewer |
+| `content.page_blocks_reordered` | Blocks reordered on a page |
+| `content.page_block_created` | New block created |
+| `content.page_block_deleted` | Block deleted |
+| `content.ai_revision_started` | AI revision request initiated |
+| `content.ai_revision_completed` | AI revision finished |
+
+NOTE: The admin dashboard queries BOTH legacy event name (`content.drafts_saved`)
+and new event name (`content.page_blocks_updated`) for backward compatibility.
+
 ---
 
 ## 4. Common Mistakes We've Fixed (Do NOT Repeat)
@@ -543,6 +562,24 @@ and `action_type = 'unpublish_content'` before widening the CHECK.
 CLAUDE_CLIFFNOTES had wrong column names for 4 tables. See section 1
 for the corrected names with GOTCHA annotations.
 
+### Mistake 15: Dead-end pipeline_jobs for AI drafting/review
+Do NOT insert `pipeline_jobs` with `kind='draft_section'` or
+`kind='review_section'`. These are dead-end jobs never consumed by the
+Pipeline dispatcher. The AI draft and review routes use `invoke()` from
+the tool registry (`frontend/lib/tools/registry.ts`) instead.
+
+**Rule:** Proposal AI drafting and review go through the `invoke()` tool
+registry. Never create `pipeline_jobs` rows for these operations.
+
+### Mistake 16: Recomputing scores in the frontend
+The Spotlights page uses `tenant_pipeline_items.total_score` as the
+authoritative score when available. It falls back to lightweight estimation
+(labeled "Est." in the UI) only for items not yet scored by the pipeline.
+
+**Rule:** Do NOT recompute opportunity scores from scratch in the frontend.
+Use `tenant_pipeline_items.total_score` when present. Only the pipeline
+scoring engine should compute full scores.
+
 ---
 
 ## 5. Project Architecture Quick Reference
@@ -586,7 +623,45 @@ Proposals created locked (`is_locked=true`) for 72-hour admin review.
 - Event bridge: CMS publishes → system_events → automation_rules → upsert cms_content
 - Marketing pages use `getPageBlocks(page)` + ISR (60s revalidation)
 - Content types: blog_post, resource, guide, page_block, etc.
-- Workflow: draft → review → approved → published (in CMS SPA)
+- Workflow: draft → pending (submitted) → approved → published (in CMS SPA)
+- Rejected pages return to draft. Revert restores last published state.
+
+### CMS Page Blocks API (services/cms/src/routers/page_blocks.py)
+13 endpoints registered at `/api` prefix via `page_blocks_router`:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/page-blocks/{page}` | GET | List all blocks for a page |
+| `/api/page-blocks/{page}` | POST | Create a new block |
+| `/api/page-blocks/{page}/{blockId}` | GET | Get single block |
+| `/api/page-blocks/{page}/{blockId}` | PUT | Update block content |
+| `/api/page-blocks/{page}/{blockId}` | DELETE | Delete block |
+| `/api/page-blocks/{page}/reorder` | PUT | Reorder blocks on a page |
+| `/api/page-blocks/{page}/submit` | POST | Submit page for review |
+| `/api/page-blocks/{page}/approve` | POST | Approve submitted page |
+| `/api/page-blocks/{page}/reject` | POST | Reject submitted page |
+| `/api/page-blocks/{page}/publish` | POST | Publish + ISR revalidation |
+| `/api/page-blocks/{page}/revert` | POST | Revert to last published state |
+| `/api/page-blocks/{page}/{blockId}/ai-revise` | POST | AI content generation for block |
+| `/api/page-blocks/{page}/status` | GET | Get workflow status |
+
+ISR revalidation path mapping: security→/infosec, get-started→/pricing (see page_blocks.py).
+
+### CMS SPA Pages
+- **PageEditor** (`services/cms/frontend/src/pages/PageEditor.tsx`): Split-pane visual editor (1104 lines). Routes: `/pages`, `/pages/:page`.
+- **MetadataEditor** (`services/cms/frontend/src/components/MetadataEditor.tsx`): Structured metadata editing for steps, features, stats (690 lines). Uses standardized `num` field for steps.
+
+### Dual-Editor Architecture
+Two valid editors exist for marketing page content:
+1. **Legacy Next.js Editor** at `/admin/content/editor` — quick edits from admin dashboard
+2. **CMS SPA PageEditor** at CMS Portal `/pages/:page` — full visual editing with AI revision, workflow
+Both read/write the same `cms_content` rows (content_type='page_block'). `/admin/content` now redirects to `/admin/content/editor`.
+
+### Admin Sidebar
+- Content → links to `/admin/content/editor`
+- CMS Portal → external link to CMS SPA
+- Automation → `/admin/automation` (automation rules)
+- Email Outbox → `/admin/email-outbox` (sent email archive)
 
 ### Deployment
 - Single environment: `main` branch → Railway production auto-deploy

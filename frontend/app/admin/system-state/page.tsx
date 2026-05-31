@@ -73,6 +73,46 @@ export type EventVolumeRow = {
   count: number;
 };
 
+export type ContentPipelineData = {
+  blocksByStatus: { status: string; count: number }[];
+  pendingByPage: { page: string; pendingCount: number }[];
+  recentEvents: {
+    id: string;
+    type: string;
+    phase: string;
+    payload: Record<string, unknown> | null;
+    createdAt: string;
+    page: string | null;
+    blocksPublished: string | null;
+    publishedBy: string | null;
+    submittedBy: string | null;
+  }[];
+};
+
+export type AutomationLogEntry = {
+  id: string;
+  ruleId: string;
+  actionType: string;
+  status: string;
+  result: unknown;
+  errorMessage: string | null;
+  executedAt: string;
+  ruleName: string;
+  triggerNamespace: string;
+  triggerType: string;
+};
+
+export type EmailAutomationData = {
+  automationLogs: AutomationLogEntry[];
+  emailEvents: {
+    id: string;
+    type: string;
+    phase: string;
+    payload: Record<string, unknown> | null;
+    createdAt: string;
+  }[];
+};
+
 // ─── Row types for SQL queries ────────────────────────────────────────
 
 type HealthRow = {
@@ -134,6 +174,42 @@ type ErrorRow = {
 };
 
 type VolumeRow = { hour: Date; namespace: string; count: number };
+
+type ContentEventRow = {
+  id: string;
+  type: string;
+  phase: string;
+  payload: Record<string, unknown> | null;
+  createdAt: Date;
+  page: string | null;
+  blocksPublished: string | null;
+  publishedBy: string | null;
+  submittedBy: string | null;
+};
+
+type BlockStatusRow = { status: string; count: number };
+type PendingPageRow = { page: string; pendingCount: number };
+
+type AutomationLogRow = {
+  id: string;
+  ruleId: string;
+  actionType: string;
+  status: string;
+  result: unknown;
+  errorMessage: string | null;
+  executedAt: Date;
+  ruleName: string;
+  triggerNamespace: string;
+  triggerType: string;
+};
+
+type EmailEventRow = {
+  id: string;
+  type: string;
+  phase: string;
+  payload: Record<string, unknown> | null;
+  createdAt: Date;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -413,6 +489,145 @@ async function fetchEventVolume(): Promise<EventVolumeRow[]> {
   }
 }
 
+// ─── Content Pipeline data fetching ──────────────────────────────────
+
+async function fetchContentPipeline(): Promise<ContentPipelineData> {
+  const data: ContentPipelineData = {
+    blocksByStatus: [],
+    pendingByPage: [],
+    recentEvents: [],
+  };
+
+  try {
+    const statusRows = await sql<BlockStatusRow[]>`
+      SELECT status, COUNT(*)::int AS count
+      FROM cms_content
+      WHERE content_type = 'page_block'
+      GROUP BY status
+    `;
+    data.blocksByStatus = statusRows.map((r: BlockStatusRow) => ({
+      status: r.status,
+      count: Number(r.count) || 0,
+    }));
+  } catch (e) {
+    console.error('[admin/system-state] content blocks by status query failed:', e);
+  }
+
+  try {
+    const pendingRows = await sql<PendingPageRow[]>`
+      SELECT tags[1] AS page, COUNT(*)::int AS pending_count
+      FROM cms_content
+      WHERE content_type = 'page_block' AND status = 'pending'
+      GROUP BY tags[1]
+    `;
+    data.pendingByPage = pendingRows.map((r: PendingPageRow) => ({
+      page: r.page ?? 'unknown',
+      pendingCount: Number(r.pendingCount) || 0,
+    }));
+  } catch (e) {
+    console.error('[admin/system-state] content pending by page query failed:', e);
+  }
+
+  try {
+    const eventRows = await sql<ContentEventRow[]>`
+      SELECT id, type, phase, payload, created_at,
+             payload->>'page' AS page,
+             COALESCE(payload->>'blocksPublished', payload->>'publishedCount') AS blocks_published,
+             COALESCE(payload->>'publishedBy', payload->>'draftedBy') AS published_by,
+             COALESCE(payload->>'submittedBy', payload->>'submittedCount') AS submitted_by
+      FROM system_events
+      WHERE namespace = 'system'
+        AND type IN (
+              -- legacy Next.js editor (/admin/content/editor)
+              'content.submitted_for_review', 'content.approved', 'content.rejected',
+              'content.page_published', 'content.drafts_saved',
+              -- new CMS SPA editor (/pages → FastAPI page_blocks)
+              'content.page_blocks_submitted', 'content.page_blocks_approved',
+              'content.page_blocks_rejected', 'content.page_blocks_published',
+              'content.page_blocks_updated', 'content.page_block_created',
+              'content.page_block_deleted', 'content.page_blocks_reordered',
+              -- AI (shared)
+              'content.ai_generation_completed', 'content.ai_revision_completed')
+        AND created_at > now() - interval '7 days'
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    data.recentEvents = eventRows.map((r: ContentEventRow) => ({
+      id: r.id,
+      type: r.type,
+      phase: r.phase,
+      payload: r.payload,
+      createdAt: r.createdAt.toISOString(),
+      page: r.page,
+      blocksPublished: r.blocksPublished,
+      publishedBy: r.publishedBy,
+      submittedBy: r.submittedBy,
+    }));
+  } catch (e) {
+    console.error('[admin/system-state] content events query failed:', e);
+  }
+
+  return data;
+}
+
+// ─── Email Automation data fetching ─────────────────────────────────
+
+async function fetchEmailAutomation(): Promise<EmailAutomationData> {
+  const data: EmailAutomationData = {
+    automationLogs: [],
+    emailEvents: [],
+  };
+
+  try {
+    const logRows = await sql<AutomationLogRow[]>`
+      SELECT al.id, al.rule_id, al.action_type, al.status, al.result, al.error_message, al.executed_at,
+             ar.name AS rule_name, ar.trigger_namespace, ar.trigger_type
+      FROM automation_log al
+      JOIN automation_rules ar ON ar.id = al.rule_id
+      ORDER BY al.executed_at DESC
+      LIMIT 50
+    `;
+    data.automationLogs = logRows.map((r: AutomationLogRow) => ({
+      id: r.id,
+      ruleId: r.ruleId,
+      actionType: r.actionType,
+      status: r.status,
+      result: r.result,
+      errorMessage: r.errorMessage,
+      executedAt: r.executedAt.toISOString(),
+      ruleName: r.ruleName,
+      triggerNamespace: r.triggerNamespace,
+      triggerType: r.triggerType,
+    }));
+  } catch (e) {
+    console.error('[admin/system-state] automation log query failed:', e);
+  }
+
+  try {
+    const eventRows = await sql<EmailEventRow[]>`
+      SELECT id, type, phase, payload, created_at
+      FROM system_events
+      WHERE namespace = 'system'
+        AND type IN ('email.sent', 'email.approved', 'email.rejected', 'email.claimed',
+                     'action.send_email', 'action.notify_admin', 'action.enroll_drip')
+        AND created_at > now() - interval '7 days'
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+    data.emailEvents = eventRows.map((r: EmailEventRow) => ({
+      id: r.id,
+      type: r.type,
+      phase: r.phase,
+      payload: r.payload,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  } catch (e) {
+    console.error('[admin/system-state] email events query failed:', e);
+  }
+
+  return data;
+}
+
 // ─── Page component ───────────────────────────────────────────────────
 
 export default async function SystemStatePage() {
@@ -425,7 +640,7 @@ export default async function SystemStatePage() {
   }
 
   // Fetch all data in parallel
-  const [health, activeWorkflows, pipelineState, eventTrees, recentErrors, eventVolume] =
+  const [health, activeWorkflows, pipelineState, eventTrees, recentErrors, eventVolume, contentPipeline, emailAutomation] =
     await Promise.all([
       fetchHealthSummary(),
       fetchActiveWorkflows(),
@@ -433,6 +648,8 @@ export default async function SystemStatePage() {
       fetchEventTrees(),
       fetchRecentErrors(),
       fetchEventVolume(),
+      fetchContentPipeline(),
+      fetchEmailAutomation(),
     ]);
 
   return (
@@ -463,6 +680,8 @@ export default async function SystemStatePage() {
         eventTrees={eventTrees}
         recentErrors={recentErrors}
         eventVolume={eventVolume}
+        contentPipeline={contentPipeline}
+        emailAutomation={emailAutomation}
       />
     </div>
   );

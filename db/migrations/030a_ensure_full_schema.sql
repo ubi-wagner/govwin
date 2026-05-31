@@ -518,6 +518,14 @@ CREATE TABLE IF NOT EXISTS cms_content (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ensure columns exist on a pre-existing cms_content table (migration 019
+-- created it without these). CREATE TABLE IF NOT EXISTS above is a no-op
+-- when the table already exists, so the columns must be added explicitly
+-- before any index references them.
+ALTER TABLE cms_content ADD COLUMN IF NOT EXISTS external_url TEXT;
+ALTER TABLE cms_content ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
+ALTER TABLE cms_content ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft';
+
 CREATE INDEX IF NOT EXISTS idx_cms_content_type_published
   ON cms_content (content_type, published_at DESC) WHERE published = true;
 CREATE INDEX IF NOT EXISTS idx_cms_content_slug

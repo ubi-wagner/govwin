@@ -145,45 +145,10 @@ export async function POST(request: Request, ctx: RouteContext) {
         });
       }
 
-      // For each section, find relevant library context and queue a job
-      let sectionsQueued = 0;
-      for (const section of sections) {
-        // Search library for relevant units by section title
-        const escaped = section.title.replace(/[%_\\]/g, '\\$&');
-        const pattern = `%${escaped}%`;
-        const libraryContext = await sql<{ id: string; content: string; category: string }[]>`
-          SELECT id, content, category
-          FROM library_units
-          WHERE tenant_id = ${tenantId}::uuid
-            AND status = 'approved'
-            AND (content ILIKE ${pattern} OR category ILIKE ${pattern})
-          ORDER BY outcome_score DESC NULLS LAST
-          LIMIT 5
-        `;
-
-        // Queue via pipeline_jobs
-        const jobPayload = JSON.stringify({
-          kind: 'draft_section',
-          section_id: section.id,
-          proposal_id: proposalId,
-          tenant_id: tenantId,
-          section_title: section.title,
-          solicitation_id: proposal.solicitationId,
-          library_context: libraryContext.map((u) => ({
-            id: u.id,
-            content: u.content.substring(0, 2000),
-            category: u.category,
-          })),
-          instructions: body.instructions ?? null,
-        });
-
-        await sql`
-          INSERT INTO pipeline_jobs (source, kind, status, priority, metadata)
-          VALUES ('portal', 'draft_section', 'pending', 5, ${jobPayload}::jsonb)
-        `;
-
-        sectionsQueued++;
-      }
+      // Count sections that will be drafted via the tool-invoke path.
+      // The actual drafting happens client-side via invoke('proposal.draft_section')
+      // in draft-all-sections.tsx — this route only validates and records the request.
+      const sectionsQueued = sections.length;
 
       // ── End event for AI draft ──────────────────────────────────
       await emitEventEnd(startId, {

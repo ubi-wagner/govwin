@@ -9,8 +9,10 @@ export const metadata = {
     'Apply to join the RFP Pipeline founding cohort. Limited to 20 small businesses pursuing SBIR, STTR, BAA, or OTA funding. Eric personally reviews every application within 72 hours.',
 };
 
-export default async function Page() {
-  const blocks = await getPageBlocks('apply');
+export default async function Page({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('apply', isPreview);
   const lookup = buildLookup(blocks, 'apply');
   const hero = single(lookup['hero']);
 

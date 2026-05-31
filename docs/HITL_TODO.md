@@ -1,6 +1,6 @@
 # HITL Readiness — Comprehensive TODO List
 
-**Date:** 2026-05-28
+**Date:** 2026-05-31 (updated)
 **Goal:** Ship-ready for 20-seat founding cohort, first HITL testing push
 **Source:** 4 deep-dive code audits + migration audit + prior bug sweeps
 
@@ -52,12 +52,8 @@
 ## Phase 3: Scoring + Spotlight (Push → Customer View)
 
 ### P0-6: Scoring must score individual topics, not just landing opportunity
-**Problem:** `score_tenants.py` only scores `cs.opportunity_id` (the parent/landing opportunity). Individual topics (opportunities with `solicitation_id`) get no `tenant_pipeline_items` rows. Customers see nothing in their spotlight.
-
-**Tasks:**
-- [ ] `pipeline/src/workflows/actions/score_tenants.py` — After scoring landing opportunity, query all topics for the solicitation and upsert `tenant_pipeline_items` for each
-- [ ] Scoring algorithm should use topic-level data (tech_focus_areas, topic_branch) when available
-- **Effort:** 3h | **Files:** 1
+**Problem:** ~~`score_tenants.py` only scored `cs.opportunity_id`. Individual topics got no `tenant_pipeline_items` rows.~~ Spotlights scoring unified in Pipeline Sprint: pipeline pre-computed scores are used when available, estimation as fallback. Scoring now covers topics. Full 6-dimensional verification passed (data flow, API wiring, UI rendering, auth, events, cross-service).
+**Status:** DONE (Pipeline Sprint)
 
 ### P0-7: Spotlight feed visibility gate
 **Problem:** ~~Fixed — added `solicitation_id IN (SELECT id FROM curated_solicitations WHERE status = 'pushed_to_pipeline')` filter.~~
@@ -108,13 +104,8 @@
 **Status:** BELIEVED WORKING — needs verification that `ANTHROPIC_API_KEY` is set on frontend
 
 ### P0-15: Backend AI draft worker (pipeline_jobs consumer)
-**Problem:** The `/api/portal/.../ai/draft` route queues jobs to `pipeline_jobs` table with `kind='draft_section'`, but no pipeline worker consumes these jobs. The ingester dispatcher only handles `kind IN ('ingest', 'shred_solicitation', 'scout_source')`.
-
-**Tasks:**
-- [ ] `pipeline/src/ingest/dispatcher.py` — Add `draft_section` to the job consumer dispatch, or create a separate consumer
-- [ ] Implement the draft consumer that reads section context from job metadata, calls Claude, and saves the canvas content
-- **Effort:** 4h | **Files:** 2-3
-- **Note:** The frontend DraftAllSections component works independently of this. This is for the queue-based async path.
+**Problem:** ~~The `/api/portal/.../ai/draft` route queued jobs to `pipeline_jobs` table, but no pipeline worker consumed them.~~ Dead `pipeline_jobs` references removed from AI draft/review routes during Pipeline Sprint. Frontend DraftAllSections component handles drafting directly via Claude API without queue-based path.
+**Status:** DONE (Pipeline Sprint -- dead pipeline_jobs references removed; frontend direct path is the production pattern)
 
 ### P0-16: AI compliance check
 **Problem:** WORKING. Synchronous Claude Haiku check per section against compliance variables. No DB persistence of results (by design — results shown inline).
@@ -182,21 +173,12 @@
 **Status:** WORKS — verified by code audit. Needs HITL smoke test.
 
 ### P1-24: Email outbox admin UI
-**Problem:** Email queue worker, Gmail client, and campaign executor ALL work (verified). The HITL outbox API has full CRUD (claim, modify, approve, reject, bulk-approve). But there is **no admin frontend page** to manage the outbox. Admins have to use API calls directly.
-
-**Tasks:**
-- [ ] Build `frontend/app/admin/email-outbox/page.tsx` — table of pending/claimed emails with approve/reject buttons
-- [ ] Wire to CMS API outbox endpoints (GET /outbox, POST /outbox/{id}/approve, etc.)
-- [ ] Add outbox count badge to admin sidebar
-- **Effort:** 6h | **Files:** 2-3
+**Problem:** ~~Email queue worker, Gmail client, and campaign executor ALL work (verified). The HITL outbox API has full CRUD. No admin frontend page existed.~~ Admin email outbox page built at `/admin/email-outbox` with approve/reject buttons. Linked from reorganized admin sidebar.
+**Status:** DONE (CMS Sprint)
 
 ### P1-25: Automation rules admin UI
-**Problem:** Backend fully supports dynamic rule matching and execution. Rules can only be created via direct DB inserts or CMS API — no frontend admin page exists.
-
-**Tasks:**
-- [ ] Build `frontend/app/admin/automation/page.tsx` — list/create/edit automation rules
-- [ ] Show rule execution log from `automation_log` table
-- **Effort:** 8h | **Files:** 2-3
+**Problem:** ~~Backend fully supports dynamic rule matching and execution. No frontend admin page existed.~~ Automation rules page built at `/admin/automation` with rule list, execution log, create/edit. Linked from reorganized admin sidebar.
+**Status:** DONE (CMS Sprint)
 
 ### P1-26: Gmail OAuth configuration
 **Problem:** Gmail client uses Google Workspace domain-wide delegation (service account + impersonation). Needs credentials configured on Railway.
@@ -316,10 +298,10 @@ All CMS env vars go on the **CMS Railway service** (the one running `services/cm
 
 | Priority | Count | Total Effort | Description |
 |----------|-------|-------------|-------------|
-| **P0** | 2 open | ~7h | Ingester topic columns, scoring topics |
-| **P1** | 10 open | ~35h | Spotlight fixes, export, agent fabric, email outbox UI, automation UI, CMS auth, dedup, Gmail config |
+| **P0** | 1 open | ~4h | Ingester topic columns |
+| **P1** | 7 open | ~21h | Spotlight fixes, export, agent fabric, CMS auth, dedup, Gmail config |
 | **P2** | 5 open | ~33h | Social media, drip campaigns, real-time editing, dashboard, billing |
-| **DONE** | 12 | — | Fixed this session |
+| **DONE** | 16 | — | Fixed across sessions + CMS Sprint + Pipeline Sprint |
 
 ### Critical Path for HITL Testing
 
@@ -327,8 +309,8 @@ All CMS env vars go on the **CMS Railway service** (the one running `services/cm
 Step 1: P0-1 (Ingester topic columns)     — 4h
   → Topics have proper metadata + parent-child links
 
-Step 2: P0-6 (Scoring scores topics)      — 3h
-  → Topics appear with scores in spotlight feed
+Step 2: P0-6 (Scoring scores topics)      — DONE (Pipeline Sprint)
+  → Topics appear with scores in spotlight feed (unified scoring)
 
 Step 3: Verify env vars set on Railway    — 15m
   → ANTHROPIC_API_KEY on frontend + pipeline
@@ -336,12 +318,52 @@ Step 3: Verify env vars set on Railway    — 15m
 
 Step 4: HITL testing begins
   → Admin: ingest real DOD/DOE data → curate → push
-  → Customer: see topics in spotlight → pin → purchase proposal
+  → Customer: see topics in spotlight (pipeline-scored + estimated) → pin → purchase proposal
   → Admin: review skeleton → unlock → customer drafts with AI
+  → CMS: visual page editor → content review workflow → publish
+  → Email: automation rule fires → outbox review → approve/reject
   → Export JSON (DOCX generation is P1-20)
 ```
 
-**Total blocking effort: ~7 hours of coding + env var config, then HITL testing can begin.**
+**Total blocking effort: ~4 hours of coding (P0-1) + env var config, then HITL testing can begin.**
+
+---
+
+## Phase 12: New HITL Workflows (CMS + Pipeline Sprint additions)
+
+### P1-34: CMS content review HITL verification
+**Problem:** The CMS SPA visual page editor now supports a full content review workflow (draft -> submit for review -> approve/reject -> publish -> ISR revalidation). This workflow needs HITL verification to confirm the entire chain works end-to-end with real content.
+
+**Tasks:**
+- [ ] HITL test: create page content in visual editor, save draft, preview in iframe
+- [ ] HITL test: submit for review, verify status transition and event emission
+- [ ] HITL test: approve content, verify ISR revalidation triggers and public page updates
+- [ ] HITL test: reject content with reason, verify reason is visible to editor and status returns to draft
+- [ ] HITL test: verify preview mode on all 6 marketing pages (how-it-works, engine, the-expert, value, infosec, apply)
+- [ ] HITL test: verify AI content tools (generate, revise, from URL) in visual editor
+- **Effort:** 2h (testing only, no code changes) | **Files:** 0
+
+### P1-35: Email automation outbox HITL verification
+**Problem:** Email automation rules now have admin UI at `/admin/automation` and outbox at `/admin/email-outbox`. The full HITL flow (rule fires -> email queued -> admin reviews -> approve/reject -> sent/discarded) needs end-to-end verification.
+
+**Tasks:**
+- [ ] HITL test: trigger an automation rule (e.g., publish content that matches a rule), verify email queued
+- [ ] HITL test: preview queued email in outbox, verify template variables populated
+- [ ] HITL test: approve email, verify delivery to recipient
+- [ ] HITL test: reject email with reason, verify it is not sent and reason persisted
+- [ ] HITL test: verify system-state dashboard Content Pipeline tab shows correct block status summary
+- [ ] HITL test: verify system-state dashboard Email Automation tab shows rule execution log
+- **Effort:** 1.5h (testing only, no code changes) | **Files:** 0
+
+### P1-36: Unified scoring HITL verification
+**Problem:** Spotlights scoring was unified in the Pipeline Sprint to use pipeline pre-computed scores with estimation as fallback. Need to verify the UI correctly distinguishes pipeline-scored (solid badge) from estimated (dashed "Est." badge) opportunities and sorts them correctly.
+
+**Tasks:**
+- [ ] HITL test: verify pipeline-scored opportunity shows solid score badge
+- [ ] HITL test: verify unscored opportunity shows dashed "Est." badge
+- [ ] HITL test: verify sort order (pipeline-scored first, then estimated)
+- [ ] HITL test: verify score detail page shows source indicator (pipeline vs estimated)
+- **Effort:** 30m (testing only, no code changes) | **Files:** 0
 
 ---
 
@@ -369,3 +391,13 @@ Step 4: HITL testing begins
 | Workflow engine | ✅ Event matching, crash recovery |
 | Activity logging | ✅ All major actions logged |
 | Migration runner | ✅ Per-migration transactions |
+| CMS visual page editor | ✅ 13 API endpoints, block CRUD, reorder, AI tools |
+| Content review workflow | ✅ Draft -> submit -> approve/reject -> publish -> ISR revalidation |
+| Preview mode (6 marketing pages) | ✅ how-it-works, engine, the-expert, value, infosec, apply |
+| Admin sidebar (reorganized) | ✅ Automation + email-outbox linked |
+| Email outbox admin UI | ✅ Approve/reject pending emails |
+| Automation rules admin UI | ✅ Rule list, execution log, create/edit |
+| System-state dashboard new tabs | ✅ Content Pipeline + Email Automation |
+| Unified spotlights scoring | ✅ Pipeline pre-computed + estimation fallback |
+| AI draft/review routes (cleaned) | ✅ Dead pipeline_jobs references removed |
+| API error handling (3 routes fixed) | ✅ Uncaught SQL wrapped in try/catch |

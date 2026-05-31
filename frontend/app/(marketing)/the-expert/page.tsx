@@ -97,8 +97,10 @@ const timeline = [
   },
 ];
 
-export default async function Page() {
-  const blocks = await getPageBlocks('the-expert');
+export default async function Page({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('the-expert', isPreview);
   const lookup = buildLookup(blocks, 'the-expert');
   const hero = single(lookup['hero']);
   const cmsCredentials = many(lookup['credentials']);

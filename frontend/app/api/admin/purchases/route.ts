@@ -60,75 +60,86 @@ export async function GET(request: Request) {
 
     let purchases: PurchaseRow[];
 
-    if (startDate && endDate) {
-      purchases = await sql<PurchaseRow[]>`
-        SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
-               pu.stripe_session_id, pu.created_at,
-               t.name AS tenant_name, t.slug AS tenant_slug,
-               p.title AS proposal_title,
-               o.title AS opportunity_title
-        FROM purchases pu
-        JOIN tenants t ON t.id = pu.tenant_id
-        LEFT JOIN proposals p ON p.id = pu.proposal_id
-        LEFT JOIN opportunities o ON o.id = pu.opportunity_id
-        WHERE pu.created_at >= ${startDate}::timestamptz
-          AND pu.created_at <= ${endDate}::timestamptz
-        ORDER BY pu.created_at DESC
-        LIMIT ${limit}
-      `;
-    } else if (startDate) {
-      purchases = await sql<PurchaseRow[]>`
-        SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
-               pu.stripe_session_id, pu.created_at,
-               t.name AS tenant_name, t.slug AS tenant_slug,
-               p.title AS proposal_title,
-               o.title AS opportunity_title
-        FROM purchases pu
-        JOIN tenants t ON t.id = pu.tenant_id
-        LEFT JOIN proposals p ON p.id = pu.proposal_id
-        LEFT JOIN opportunities o ON o.id = pu.opportunity_id
-        WHERE pu.created_at >= ${startDate}::timestamptz
-        ORDER BY pu.created_at DESC
-        LIMIT ${limit}
-      `;
-    } else if (endDate) {
-      purchases = await sql<PurchaseRow[]>`
-        SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
-               pu.stripe_session_id, pu.created_at,
-               t.name AS tenant_name, t.slug AS tenant_slug,
-               p.title AS proposal_title,
-               o.title AS opportunity_title
-        FROM purchases pu
-        JOIN tenants t ON t.id = pu.tenant_id
-        LEFT JOIN proposals p ON p.id = pu.proposal_id
-        LEFT JOIN opportunities o ON o.id = pu.opportunity_id
-        WHERE pu.created_at <= ${endDate}::timestamptz
-        ORDER BY pu.created_at DESC
-        LIMIT ${limit}
-      `;
-    } else {
-      purchases = await sql<PurchaseRow[]>`
-        SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
-               pu.stripe_session_id, pu.created_at,
-               t.name AS tenant_name, t.slug AS tenant_slug,
-               p.title AS proposal_title,
-               o.title AS opportunity_title
-        FROM purchases pu
-        JOIN tenants t ON t.id = pu.tenant_id
-        LEFT JOIN proposals p ON p.id = pu.proposal_id
-        LEFT JOIN opportunities o ON o.id = pu.opportunity_id
-        ORDER BY pu.created_at DESC
-        LIMIT ${limit}
-      `;
+    try {
+      if (startDate && endDate) {
+        purchases = await sql<PurchaseRow[]>`
+          SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
+                 pu.stripe_session_id, pu.created_at,
+                 t.name AS tenant_name, t.slug AS tenant_slug,
+                 p.title AS proposal_title,
+                 o.title AS opportunity_title
+          FROM purchases pu
+          JOIN tenants t ON t.id = pu.tenant_id
+          LEFT JOIN proposals p ON p.id = pu.proposal_id
+          LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+          WHERE pu.created_at >= ${startDate}::timestamptz
+            AND pu.created_at <= ${endDate}::timestamptz
+          ORDER BY pu.created_at DESC
+          LIMIT ${limit}
+        `;
+      } else if (startDate) {
+        purchases = await sql<PurchaseRow[]>`
+          SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
+                 pu.stripe_session_id, pu.created_at,
+                 t.name AS tenant_name, t.slug AS tenant_slug,
+                 p.title AS proposal_title,
+                 o.title AS opportunity_title
+          FROM purchases pu
+          JOIN tenants t ON t.id = pu.tenant_id
+          LEFT JOIN proposals p ON p.id = pu.proposal_id
+          LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+          WHERE pu.created_at >= ${startDate}::timestamptz
+          ORDER BY pu.created_at DESC
+          LIMIT ${limit}
+        `;
+      } else if (endDate) {
+        purchases = await sql<PurchaseRow[]>`
+          SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
+                 pu.stripe_session_id, pu.created_at,
+                 t.name AS tenant_name, t.slug AS tenant_slug,
+                 p.title AS proposal_title,
+                 o.title AS opportunity_title
+          FROM purchases pu
+          JOIN tenants t ON t.id = pu.tenant_id
+          LEFT JOIN proposals p ON p.id = pu.proposal_id
+          LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+          WHERE pu.created_at <= ${endDate}::timestamptz
+          ORDER BY pu.created_at DESC
+          LIMIT ${limit}
+        `;
+      } else {
+        purchases = await sql<PurchaseRow[]>`
+          SELECT pu.id, pu.product_type, pu.amount_cents, pu.status,
+                 pu.stripe_session_id, pu.created_at,
+                 t.name AS tenant_name, t.slug AS tenant_slug,
+                 p.title AS proposal_title,
+                 o.title AS opportunity_title
+          FROM purchases pu
+          JOIN tenants t ON t.id = pu.tenant_id
+          LEFT JOIN proposals p ON p.id = pu.proposal_id
+          LEFT JOIN opportunities o ON o.id = pu.opportunity_id
+          ORDER BY pu.created_at DESC
+          LIMIT ${limit}
+        `;
+      }
+    } catch (err) {
+      console.error('[PURCHASES] DB query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
     }
 
     // Summary stats
-    const summary = await sql<{ totalCents: string; purchaseCount: number }[]>`
-      SELECT COALESCE(sum(amount_cents), 0)::bigint AS total_cents,
-             count(*)::int AS purchase_count
-      FROM purchases
-      WHERE status = 'completed'
-    `;
+    let summary: { totalCents: string; purchaseCount: number }[];
+    try {
+      summary = await sql<{ totalCents: string; purchaseCount: number }[]>`
+        SELECT COALESCE(sum(amount_cents), 0)::bigint AS total_cents,
+               count(*)::int AS purchase_count
+        FROM purchases
+        WHERE status = 'completed'
+      `;
+    } catch (err) {
+      console.error('[PURCHASES] Summary query failed:', err);
+      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     return NextResponse.json({
       data: {

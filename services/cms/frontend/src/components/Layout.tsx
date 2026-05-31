@@ -21,6 +21,7 @@ const navGroups = [
       { to: '/content', label: 'Pipeline' },
       { to: '/content/generations', label: 'AI Generations' },
       { to: '/content/new', label: 'New Post' },
+      { to: '/pages', label: 'Page Editor' },
     ],
   },
   {

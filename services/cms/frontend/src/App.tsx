@@ -13,6 +13,7 @@ import DripCampaigns from './pages/DripCampaigns'
 import SocialAccounts from './pages/SocialAccounts'
 import SocialPosts from './pages/SocialPosts'
 import Todos from './pages/Todos'
+import PageEditor from './pages/PageEditor'
 import Login from './pages/Login'
 
 interface User {
@@ -79,6 +80,8 @@ export default function App() {
           <Route path="content/new" element={<ContentEditor />} />
           <Route path="content/:id/edit" element={<ContentEditor />} />
           <Route path="content/:id/preview" element={<ContentPreview />} />
+          <Route path="pages" element={<PageEditor />} />
+          <Route path="pages/:page" element={<PageEditor />} />
           <Route path="drip" element={<DripCampaigns />} />
           <Route path="social/accounts" element={<SocialAccounts />} />
           <Route path="social/posts" element={<SocialPosts />} />

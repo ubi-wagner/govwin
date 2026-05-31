@@ -15,8 +15,10 @@ export const metadata = {
   description: 'Pre-trained isolated agents per customer. No model training on your IP. Structured memory architecture. Collaboration controls you own.',
 };
 
-export default async function InfoSecPage() {
-  const blocks = await getPageBlocks('infosec');
+export default async function InfoSecPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams
+  const isPreview = params?._preview === '1'
+  const blocks = await getPageBlocks('infosec', isPreview);
   const lookup = buildLookup(blocks, 'infosec');
   const hero = single(lookup['hero']);
   const cmsIsolation = many(lookup['isolation']);

@@ -3,8 +3,8 @@
 **Version:** 2.1
 **Date:** 2026-05-24
 **Launch Target:** June 1, 2026
-**Scope:** All 15 user journeys + CMS content pipeline across 7 structured test sessions
-**Estimated Total Time:** ~6 hours (one tester) or 3.5 hours (two testers in parallel)
+**Scope:** All 15 user journeys + CMS content pipeline + content review HITL + email automation HITL across 7 structured test sessions
+**Estimated Total Time:** ~7 hours (one tester) or 4 hours (two testers in parallel)
 
 ---
 
@@ -1235,6 +1235,137 @@ Verify all error responses include both `error` and `code` fields per the projec
 
 ---
 
+#### Test 7.13: CMS SPA Visual Page Editor -- Content Editing HITL
+
+**Route:** `/admin/content/editor` (CMS SPA) or via "Open in CMS Portal" from `/admin/content`
+
+**Goal:** Verify an editor can make changes in the visual page editor, save a draft, preview in iframe, and submit for review.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/admin/content` | Content management page loads |
+| 2 | Click "Open in CMS Portal" link | CMS SPA visual page editor loads |
+| 3 | Select a page from the page list (e.g., "How It Works") | Block editor opens with existing blocks displayed in order |
+| 4 | Click on a text block to edit | Inline editor activates, cursor appears |
+| 5 | Modify the block's body text | Changes appear in the editor |
+| 6 | Add a new blank block below the edited block | Blank block inserted at the correct position |
+| 7 | Fill the new block with content | Content accepted |
+| 8 | Reorder blocks: move the new block up one position | Block moves up, sort_order recalculated atomically |
+| 9 | Click "Save Draft" | Draft saved. All blocks persisted with current content and ordering |
+| 10 | Click "Preview" | Preview iframe opens showing the page as it would appear publicly |
+| 11 | Verify preview renders all blocks in correct order | Content and ordering match the editor state |
+| 12 | Click "Submit for Review" | Status changes from "draft" to "submitted_for_review" |
+| 13 | Verify the page appears in the review queue | Page visible with "submitted_for_review" badge |
+
+**Pass criteria:** Full editor workflow -- edit, add, reorder, save draft, preview, submit -- completes without errors. All changes persist across page refreshes.
+
+---
+
+#### Test 7.14: Content Review HITL Flow
+
+**Route:** `/admin/content/editor` (CMS SPA)
+
+**Goal:** Verify the human-in-the-loop content review workflow: submit -> approve/reject -> publish/return to draft.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Ensure a page is in "submitted_for_review" status (from Test 7.13) | Page shows "submitted_for_review" badge |
+| **Approval Path** | | |
+| 2 | As reviewer (master_admin), open the submitted page | Page content visible with review controls |
+| 3 | Click "Approve" | Status changes to "approved" |
+| 4 | Verify `system:content.approved` event emitted | Event visible in `/admin/events` with `contentId` and `approvedBy` |
+| 5 | Click "Publish" on the approved page | Status changes to "published". ISR revalidation triggered |
+| 6 | Navigate to the corresponding public marketing page | Updated content visible within 60 seconds |
+| 7 | Verify `system:content.published` event emitted | Event visible with `contentId`, `contentType`, `slug` |
+| **Rejection Path** | | |
+| 8 | Submit another page for review (repeat Test 7.13 steps 3-12 with a different page) | Second page in "submitted_for_review" status |
+| 9 | As reviewer, click "Reject" | Rejection reason input appears |
+| 10 | Enter rejection reason: "Needs updated statistics for Q2 2026" | Reason accepted |
+| 11 | Confirm rejection | Status returns to "draft". Rejection reason persisted and visible to the editor |
+| 12 | Verify `system:content.rejected` event emitted | Event visible with `contentId`, `rejectedBy`, `reason` |
+| 13 | As editor, reopen the rejected page | Page shows "draft" status with rejection reason displayed |
+| 14 | Make corrections based on feedback, re-submit | Status cycles back to "submitted_for_review" |
+
+**Content review state machine:**
+```
+draft -> submitted_for_review -> approved -> published
+                              -> rejected -> draft (with reason)
+```
+
+**Pass criteria:** Approval path publishes content with ISR revalidation. Rejection path returns content to draft with reason visible. Events emitted at each transition.
+
+---
+
+#### Test 7.15: Preview Mode on Marketing Pages
+
+**Route:** Six marketing pages with newly added preview mode
+
+**Goal:** Verify preview mode works on all 6 additional marketing pages.
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/admin/content` | Content manager loads |
+| 2 | Select "How It Works" page, click Preview | Preview loads with admin toolbar at top |
+| 3 | Verify admin toolbar shows status badge, Edit button, Publish button | All controls rendered |
+| 4 | Verify page content renders correctly in preview | Layout matches public page structure |
+| 5 | Repeat steps 2-4 for "Engine" page | Preview renders correctly |
+| 6 | Repeat for "The Expert" page | Preview renders correctly |
+| 7 | Repeat for "Value" page | Preview renders correctly |
+| 8 | Repeat for "Infosec" page | Preview renders correctly |
+| 9 | Repeat for "Apply" page | Preview renders correctly |
+
+**Pages with preview mode:**
+- `/how-it-works` -- How It Works
+- `/engine` -- Engine
+- `/the-expert` -- The Expert
+- `/value` -- Value
+- `/infosec` -- Infosec
+- `/apply` -- Apply
+
+**Pass criteria:** All 6 marketing pages render in preview mode with admin toolbar and correct content layout.
+
+---
+
+#### Test 7.16: Email Automation HITL Flow
+
+**Route:** `/admin/automation`, `/admin/email-outbox`
+
+**Goal:** Verify the human-in-the-loop email automation flow: rule fires -> email queued -> admin reviews in outbox -> approves/rejects -> sent/discarded.
+
+**Prerequisite:** Automation rules seeded (migration 050). Email configuration set (Gmail or Resend).
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Navigate to `/admin/automation` | Automation rules page loads with seeded rules |
+| 2 | Verify at least one active rule is visible | Rule shows: name, trigger event pattern, action type, status (active/paused) |
+| 3 | Trigger the rule's event (e.g., publish a blog post if a rule fires on `system:content.published`) | Rule should match and execute |
+| 4 | Navigate to `/admin/email-outbox` | Email outbox page loads |
+| 5 | Verify a new email is queued from the automation rule | Email visible with status "pending", recipient, subject, template reference |
+| 6 | Click to preview the email | Email body rendered with template variables populated |
+| 7 | Verify `system:email.queued` event emitted | Event visible in `/admin/events` |
+| **Approval Path** | | |
+| 8 | Click "Approve" on the queued email | Email status changes to "approved", delivery initiated |
+| 9 | Wait for delivery (5-30 seconds) | Email status changes to "sent" |
+| 10 | Verify `system:email.sent` event emitted | Event visible with `emailId`, `recipientEmail` |
+| 11 | (Optional) Check recipient inbox | Email received with correct content |
+| **Rejection Path** | | |
+| 12 | Trigger another automation rule to queue a second email | New email appears in outbox with "pending" status |
+| 13 | Click "Reject" on the queued email | Rejection reason input appears |
+| 14 | Enter reason: "Incorrect recipient for this campaign" | Reason accepted |
+| 15 | Confirm rejection | Email status changes to "rejected". Email NOT sent |
+| 16 | Verify `system:email.rejected` event emitted | Event visible with `emailId`, `rejectedBy` |
+| 17 | Verify rejected email remains in outbox history | Visible with "rejected" badge and reason |
+
+**Email automation state machine:**
+```
+automation rule fires -> email queued (pending) -> approved -> sent
+                                                -> rejected (discarded, with reason)
+```
+
+**Pass criteria:** Automation rules fire on matching events. Queued emails appear in outbox for HITL review. Approve sends the email. Reject discards it with reason. Events emitted at each step.
+
+---
+
 ## Test Results Template
 
 Copy this template for each test:
@@ -1315,6 +1446,10 @@ Defect: {defect ID if FAIL, or "N/A"}
 | 7 | 7.10 | Sitemap | | |
 | 7 | 7.11 | SEO Meta Tags | | |
 | 7 | 7.12 | Content List Management | | |
+| 7 | 7.13 | CMS SPA Visual Page Editor | | |
+| 7 | 7.14 | Content Review HITL Flow | | |
+| 7 | 7.15 | Preview Mode Marketing Pages | | |
+| 7 | 7.16 | Email Automation HITL Flow | | |
 
 ---
 
@@ -1399,6 +1534,10 @@ After completing all 7 sessions:
 - [ ] SEO meta tags present on blog posts
 - [ ] Admin preview toolbar functional
 - [ ] ISR revalidation confirmed (content appears within 60s)
+- [ ] CMS SPA visual page editor functional (edit, add, reorder, save draft, preview)
+- [ ] Content review HITL workflow verified (submit -> approve/reject -> publish/return to draft)
+- [ ] Preview mode verified on all 6 marketing pages (how-it-works, engine, the-expert, value, infosec, apply)
+- [ ] Email automation HITL flow verified (rule fires -> email queued -> approve/reject -> sent/discarded)
 
 ### System Integrity
 
@@ -1507,6 +1646,10 @@ After completing all 7 sessions:
 | `/admin/storage` | Storage overview | S3 bucket usage |
 | `/admin/templates` | Section templates | Template management |
 | `/admin/system` | System admin (master_admin only) | System configuration |
+| `/admin/system-state` | System-state dashboard | Content Pipeline tab, Email Automation tab |
+| `/admin/automation` | Automation rules | Rule list, execution log, create/edit rules |
+| `/admin/email-outbox` | Email outbox (HITL) | Pending/claimed/sent emails, approve/reject actions |
+| `/admin/content/editor` | CMS visual page editor | Block editor, reordering, AI tools, review workflow |
 
 ---
 

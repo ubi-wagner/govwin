@@ -19,6 +19,9 @@ export interface ScoredTopic {
   matchReasons: string[];
   isPinned: boolean;
   namespace: string | null;
+  pipelineScore: number | null;
+  isEstimated: boolean;
+  priorityTier: string | null;
 }
 
 type SortField = 'score' | 'closeDate' | 'postedDate';
@@ -82,7 +85,17 @@ export default function SpotlightFeed({
 
     const sorted = [...list];
     if (sortBy === 'score') {
-      sorted.sort((a, b) => b.matchScore - a.matchScore);
+      sorted.sort((a, b) => {
+        // Pipeline-scored items first
+        if (!a.isEstimated && b.isEstimated) return -1;
+        if (a.isEstimated && !b.isEstimated) return 1;
+        // Within same group, sort by score DESC
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        // Secondary: close_date ASC (nulls last)
+        if (!a.closeDate) return 1;
+        if (!b.closeDate) return -1;
+        return new Date(a.closeDate).getTime() - new Date(b.closeDate).getTime();
+      });
     } else if (sortBy === 'closeDate') {
       sorted.sort((a, b) => {
         if (!a.closeDate) return 1;
@@ -251,20 +264,36 @@ export default function SpotlightFeed({
                     </div>
                   </div>
 
-                  {/* Score circle */}
+                  {/* Score circle — solid for pipeline, dashed outline for estimated */}
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                        topic.matchScore >= 75
-                          ? 'bg-green-500'
-                          : topic.matchScore >= 50
-                            ? 'bg-yellow-500'
-                            : 'bg-gray-400'
-                      }`}
-                    >
-                      {topic.matchScore}
-                    </div>
-                    <span className="text-[10px] text-gray-400 uppercase">Score</span>
+                    {topic.isEstimated ? (
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold border-2 border-dashed ${
+                          topic.matchScore >= 75
+                            ? 'border-green-500 text-green-600'
+                            : topic.matchScore >= 50
+                              ? 'border-yellow-500 text-yellow-600'
+                              : 'border-gray-400 text-gray-500'
+                        }`}
+                      >
+                        {topic.matchScore}
+                      </div>
+                    ) : (
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                          topic.matchScore >= 75
+                            ? 'bg-green-500'
+                            : topic.matchScore >= 50
+                              ? 'bg-yellow-500'
+                              : 'bg-gray-400'
+                        }`}
+                      >
+                        {topic.matchScore}
+                      </div>
+                    )}
+                    <span className="text-[10px] text-gray-400 uppercase">
+                      {topic.isEstimated ? 'Est.' : 'Score'}
+                    </span>
                   </div>
                 </div>
 
@@ -273,11 +302,13 @@ export default function SpotlightFeed({
                   <div className="w-full bg-gray-100 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${
-                        topic.matchScore >= 75
-                          ? 'bg-green-500'
-                          : topic.matchScore >= 50
-                            ? 'bg-yellow-500'
-                            : 'bg-gray-400'
+                        topic.isEstimated
+                          ? 'bg-gray-300'
+                          : topic.matchScore >= 75
+                            ? 'bg-green-500'
+                            : topic.matchScore >= 50
+                              ? 'bg-yellow-500'
+                              : 'bg-gray-400'
                       }`}
                       style={{ width: `${Math.min(100, topic.matchScore)}%` }}
                     />
