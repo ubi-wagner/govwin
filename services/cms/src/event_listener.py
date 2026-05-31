@@ -247,7 +247,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -263,7 +263,7 @@ async def _execute_rule(rule, col_names: set, event):
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -749,6 +749,46 @@ async def _action_publish_content(config: dict, payload: dict, event):
     logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
 
 
+async def _action_unpublish_content(config: dict, payload: dict, event):
+    """Mark previously-published CMS content as unpublished in Main Postgres.
+
+    Symmetric to _action_publish_content: resolve the post's slug and flip the
+    Main DB cms_content row to status='draft', published=false. Wired to the
+    'CMS Content Unpublish Bridge' rule (migration 050), which previously had a
+    live rule but NO handler — every unpublish event fell through to a silent
+    no-op. (EVENT_CONTRACT_V3 gap 8; CLAUDE_CLIFFNOTES Mistake 21.)
+    """
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning('unpublish_content: shared pool not available, skipping')
+        return
+
+    slug = payload.get('slug') or config.get('slug')
+    post_id = payload.get('post_id') or config.get('post_id')
+    if not slug and post_id:
+        from .models.database import get_pool as get_cms_pool
+        cms_pool = get_cms_pool()
+        rows = await cms_pool.fetch(
+            "SELECT slug FROM cms_posts WHERE id = $1",
+            uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
+        )
+        if rows:
+            slug = rows[0]['slug']
+    if not slug:
+        logger.warning('unpublish_content: no slug/post_id to resolve target — skipping')
+        return
+
+    result = await shared_pool.execute(
+        """
+        UPDATE cms_content
+        SET status = 'draft', published = false, updated_at = now()
+        WHERE slug = $1
+        """,
+        slug,
+    )
+    logger.info(f'unpublish_content: marked "{slug}" draft in cms_content ({result})')
+
+
 async def _emit_action_event(*, event_type: str, phase: str, payload: dict,
                               parent_event_id: str | None = None) -> str:
     """Emit an action event to the shared system_events table."""
@@ -814,6 +854,10 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
 
     elif action_type == 'publish_content':
         await _action_publish_content(config, payload, event)
+        return
+
+    elif action_type == 'unpublish_content':
+        await _action_unpublish_content(config, payload, event)
         return
 
     elif action_type == 'send_email':

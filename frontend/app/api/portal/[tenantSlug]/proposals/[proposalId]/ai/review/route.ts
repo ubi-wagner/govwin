@@ -145,9 +145,12 @@ export async function POST(request: Request, ctx: RouteContext) {
         });
       }
 
-      // Count sections that will be reviewed via the tool-invoke path.
-      // The actual review happens client-side via invoke('proposal.review_section')
-      // — this route only validates and records the request.
+      // This route validates the request and emits proposal.review_requested,
+      // which the color_team_reviewer agent archetype handles
+      // (pipeline/src/agents/archetypes/color_team_reviewer.py) once the agent
+      // loop is active. It does NOT invoke a client-side review tool — there is
+      // no proposal.review_section tool; section drafting/revision is the
+      // separate, registered proposal.draft_section tool.
       const sectionsQueued = reviewable.length;
 
       // Emit event
