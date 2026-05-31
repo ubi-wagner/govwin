@@ -137,6 +137,12 @@ async def _process_new_events():
         etype = event.get('type', '')
         phase = event.get('phase', '') or ''
 
+        # Never run automation for a FAILED operation. A failed op still emits a
+        # terminal phase='end' event with error set; matching rules on it would
+        # e.g. send a welcome email for an acceptance that failed. (Launch Review #3.)
+        if event.get('error') or event.get('error_json'):
+            continue
+
         if (ns, etype) in FRONTEND_HANDLED:
             continue
 

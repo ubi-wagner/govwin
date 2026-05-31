@@ -62,6 +62,11 @@ class EventTrigger:
     condition: Optional[Callable[[dict[str, Any]], bool]] = None
 
     def matches(self, event: dict[str, Any]) -> bool:
+        # Never trigger or resume on a FAILED operation. A failed op still emits
+        # a terminal phase='end' event (with error set + empty payload); matching
+        # it spawns junk workflow instances with no inputs. (Launch Review #3.)
+        if event.get("error"):
+            return False
         if event.get("namespace") != self.namespace:
             return False
         if event.get("type") != self.type:
