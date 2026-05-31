@@ -684,12 +684,19 @@ class WorkflowManager:
         conn: asyncpg.Connection,
         instance_id: str,
         resume_data: Optional[dict[str, Any]] = None,
+        actor: str = "system",
+        reason: str = "hitl_resumed",
     ) -> bool:
         """Resume a paused (HITL_WAIT) instance.
 
-        Marks the HITL_WAIT step as completed (with resume_data as result)
-        and sets status to 'retrying' so execute_instance can pick it up
-        and continue from the next step.
+        Marks the HITL_WAIT step as completed (with resume_data as result) and
+        sets status to 'retrying' so execute_instance picks it up and continues
+        from the next step. `actor`/`reason` are recorded on the transition and
+        emitted for audit: the event-driven path uses the defaults
+        ('system'/'hitl_resumed'); a human force-advance (rfp_admin now,
+        tenant_admin later) passes the operator's identity and 'hitl_forced'.
+        The frontend force-advance lib (lib/process/force-advance.ts) mirrors
+        this exact state transition — keep the two in sync.
         """
         row = await conn.fetchrow(
             "SELECT current_step, step_results, step_status FROM process_instances WHERE id = $1 AND status = 'paused'",
@@ -722,7 +729,18 @@ class WorkflowManager:
             return False
 
         await self._record_transition(
-            conn, instance_id, "paused", "retrying", actor="system", reason="hitl_resumed"
+            conn, instance_id, "paused", "retrying", actor=actor, reason=reason,
+        )
+        # Observable audit of who resumed — distinguishes a human force-advance
+        # (forced=True) from the event-driven resume (forced=False).
+        await self._emit_event(
+            conn, "system", "workflow.resumed", None,
+            {
+                "instance_id": instance_id,
+                "actor": actor,
+                "reason": reason,
+                "forced": reason != "hitl_resumed",
+            },
         )
         return True
 

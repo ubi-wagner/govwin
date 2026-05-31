@@ -330,6 +330,14 @@ has a handler; every route-referenced tool is registered.
 - 2026-05-31 — INC-6 (on_timeout/on_failure live: validate + execute) `b57cc40`. 8 tests;
   fixed 2 dangling template refs.
 - 2026-05-31 — INC-5 (fallback stops at HITL, no bypass) `871b1d7`. 2 tests.
+- 2026-05-31 — **INC-5b (manual HITL force-advance)** — authorized operator advances a
+  paused process as the human it waited for. Engine: `resume_instance` is actor-aware
+  (records who + emits `workflow.resumed{forced}`). Frontend: `canForceAdvanceInstance`
+  predicate (rfp_admin/master_admin → any; **tenant_admin → own tenant only**, wired for
+  the later customer path), shared `lib/process/force-advance.ts`, admin route
+  `POST /api/admin/workflows/[id]/advance`, and an "Advance" button on paused instances
+  in the workflow monitor. Tests: pipeline 4 (force contract) + frontend 3 (predicate);
+  full gate green — pipeline 135, frontend tsc 0 / vitest 185, CMS 29.
 - 2026-05-31 — **Mandate met & verified.** Dead-code/dead-end/unmanaged sweep complete:
   8 dead modules removed (0 stray imports), no dangling escalation, no phantom executors,
   all 7 templates registered + all action Jobs referenced. Local CI: pipeline 131 passed,

@@ -211,6 +211,35 @@ export function WorkflowMonitorClient({
     }
   }, [router]);
 
+  // Force-advance a paused (HITL-waiting) instance — admin acts as the human
+  // the workflow was parked for. Mirrors handleCancel/handleRetry.
+  const handleAdvance = useCallback(async (instanceId: string) => {
+    setActionLoading((prev) => ({ ...prev, [instanceId]: true }));
+    setActionErrors((prev) => {
+      const next = { ...prev };
+      delete next[instanceId];
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/admin/workflows/${instanceId}/advance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: 'Advanced from the workflow monitor' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Request failed' }));
+        setActionErrors((prev) => ({ ...prev, [instanceId]: body.error ?? 'Advance failed' }));
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setActionErrors((prev) => ({ ...prev, [instanceId]: 'Network error' }));
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [instanceId]: false }));
+    }
+  }, [router]);
+
   const toggleError = (id: string) => {
     setExpandedErrors((prev) => {
       const next = new Set(prev);
@@ -308,6 +337,16 @@ export function WorkflowMonitorClient({
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {w.status === 'paused' && (
+                        <button
+                          onClick={() => handleAdvance(w.id)}
+                          disabled={isLoading}
+                          title="Advance this step as the human reviewer (HITL override)"
+                          className="px-2.5 py-1 text-xs font-medium rounded border border-yellow-400 bg-white text-yellow-700 hover:bg-yellow-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isLoading ? '...' : 'Advance'}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleCancel(w.id)}
                         disabled={isLoading}
