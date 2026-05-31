@@ -822,6 +822,65 @@ class WorkflowManager:
 
         return await processor_execute_step(conn, step, inputs, trigger_event=event_dict)
 
+    async def _run_on_timeout(
+        self,
+        conn: asyncpg.Connection,
+        workflow_name: str,
+        current_step: Optional[str],
+        payload: dict[str, Any],
+        tenant_str: Optional[str],
+        instance_id: str,
+    ) -> Optional[str]:
+        """Run a parked step's declared on_timeout escalation, if any.
+
+        This is what makes on_timeout a live binding instead of a dead field
+        (EVENT_CONTRACT_V3 §6 gap 6). When a HITL wait crosses its deadline, the
+        parked step may name an on_timeout step (e.g. re-notify the admin); we
+        resolve and execute it, then emit workflow.escalation_ran. Best-effort:
+        any failure is logged and swallowed so the sweep still fails the instance
+        cleanly. Semantics: escalate once, then the caller marks the instance
+        terminally failed (a re-notify-and-repark loop is intentionally V2).
+
+        Returns the on_timeout step name if it ran, else None.
+        """
+        wf_cls = self._resolve_workflow_class(workflow_name)
+        if wf_cls is None or not current_step:
+            return None
+        parked = next((s for s in wf_cls.steps if s.name == current_step), None)
+        target_name = getattr(parked, "on_timeout", None) if parked else None
+        if not target_name:
+            return None
+        target = next((s for s in wf_cls.steps if s.name == target_name), None)
+        if target is None:
+            # validate() should prevent this; guard anyway.
+            logger.warning(
+                "[on_timeout] %s.%s names missing step '%s'",
+                workflow_name, current_step, target_name,
+            )
+            return None
+        try:
+            await self._execute_step(conn, target, payload or {}, {})
+            await self._emit_event(
+                conn, "system", "workflow.escalation_ran", tenant_str,
+                {
+                    "instance_id": instance_id,
+                    "workflow_name": workflow_name,
+                    "timed_out_step": current_step,
+                    "on_timeout_step": target.name,
+                },
+            )
+            logger.info(
+                "[on_timeout] ran %s.%s for instance %s",
+                workflow_name, target.name, instance_id,
+            )
+            return target.name
+        except Exception as e:
+            logger.error(
+                "[on_timeout] escalation step %s failed for instance %s: %s",
+                target_name, instance_id, e,
+            )
+            return None
+
     async def _heartbeat_loop(
         self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None
     ) -> None:
@@ -982,7 +1041,7 @@ class WorkflowManager:
                     async with pool.acquire() as pt_conn:
                         paused_timeout = await pt_conn.fetch(
                             """
-                            SELECT id, workflow_name, current_step, tenant_id
+                            SELECT id, workflow_name, current_step, tenant_id, payload
                             FROM process_instances
                             WHERE status = 'paused' AND deadline IS NOT NULL
                               AND deadline < now()
@@ -991,7 +1050,7 @@ class WorkflowManager:
                 else:
                     paused_timeout = await conn.fetch(
                         """
-                        SELECT id, workflow_name, current_step, tenant_id
+                        SELECT id, workflow_name, current_step, tenant_id, payload
                         FROM process_instances
                         WHERE status = 'paused' AND deadline IS NOT NULL
                           AND deadline < now()
@@ -1000,13 +1059,12 @@ class WorkflowManager:
 
                 for pt_row in paused_timeout:
                     pt_id = str(pt_row["id"])
-                    # A park-and-wait that crosses its (now binding-derived)
-                    # wait_deadline is an ESCALATION, not a silent kill. Emit an
-                    # observable event and record the timeout; the on_timeout Job
-                    # is executed by INC-6. The instance is still marked failed as
-                    # the terminal state, but with reason 'wait_deadline_exceeded'
-                    # and a step pointer so escalation can act on it.
-                    # (EVENT_CONTRACT_V3 §3.1 / §6; CLAUDE_CLIFFNOTES Mistake 17.)
+                    # A park-and-wait that crosses its (binding-derived) wait_deadline
+                    # is an ESCALATION, not a silent kill. Run the parked step's
+                    # on_timeout (e.g. re-notify the admin) before recording the
+                    # timeout and failing the instance, and emit an observable
+                    # workflow.wait_timed_out event with a step pointer.
+                    # (EVENT_CONTRACT_V3 §6 gaps 1+6; CLAUDE_CLIFFNOTES Mistake 17.)
                     logger.warning(
                         "[stuck_detection] Paused instance %s (%s) past wait_deadline at step %s",
                         pt_id, pt_row["workflow_name"], pt_row["current_step"],
@@ -1014,6 +1072,25 @@ class WorkflowManager:
                     tenant_str = (
                         str(pt_row["tenant_id"]) if pt_row["tenant_id"] else None
                     )
+                    pt_payload = pt_row.get("payload")
+                    if isinstance(pt_payload, str):
+                        try:
+                            pt_payload = json.loads(pt_payload)
+                        except (json.JSONDecodeError, TypeError):
+                            pt_payload = {}
+                    # INC-6: run on_timeout escalation (best-effort) before failing.
+                    if pool:
+                        async with pool.acquire() as esc_conn:
+                            await self._run_on_timeout(
+                                esc_conn, pt_row["workflow_name"],
+                                pt_row["current_step"], pt_payload or {},
+                                tenant_str, pt_id,
+                            )
+                    else:
+                        await self._run_on_timeout(
+                            conn, pt_row["workflow_name"], pt_row["current_step"],
+                            pt_payload or {}, tenant_str, pt_id,
+                        )
                     if pool:
                         async with pool.acquire() as u_conn:
                             await u_conn.execute(

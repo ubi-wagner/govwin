@@ -193,7 +193,10 @@ class OnProposalAdvancedToReview(Workflow):
                 condition=lambda p: p.get("previousStage") == "review",
             ),
             timeout_minutes=4320,
-            on_timeout="send_review_reminder",
+            # Reminder escalation is V2 — no send_review_reminder step exists.
+            # On timeout the engine emits system:workflow.wait_timed_out (and runs
+            # any resolving on_timeout step); wire a notify rule to that event for
+            # re-notify. Declaring a non-existent step now fails validate() (INC-6).
         ),
     ]
 

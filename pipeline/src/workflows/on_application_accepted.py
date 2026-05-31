@@ -126,6 +126,8 @@ class OnApplicationAccepted(Workflow):
                 phase="single",
             ),
             timeout_minutes=2880,
-            on_timeout="send_login_reminder",
+            # Login-reminder escalation is V2 — no send_login_reminder step exists.
+            # Timeout emits system:workflow.wait_timed_out as the escalation hook
+            # (INC-6: validate() rejects dangling on_timeout refs).
         ),
     ]

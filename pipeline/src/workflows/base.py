@@ -140,6 +140,18 @@ class Workflow:
                     f"{cls.__name__}.{step.name}: hitl_wait step "
                     f"must define wait_for trigger"
                 )
+            # on_timeout / on_failure must name a real step in this workflow,
+            # or the declared escalation/compensation is a dead-end (gap 6).
+            if step.on_timeout and step.on_timeout not in step_names:
+                errors.append(
+                    f"{cls.__name__}.{step.name}: on_timeout "
+                    f"'{step.on_timeout}' not found in steps"
+                )
+            if step.on_failure and step.on_failure not in step_names:
+                errors.append(
+                    f"{cls.__name__}.{step.name}: on_failure "
+                    f"'{step.on_failure}' not found in steps"
+                )
         return errors
 
     @classmethod
