@@ -16,18 +16,42 @@
 | Inc | Gap (V3 §11) | Title | Sev | Surface | Status |
 |-----|--------------|-------|-----|---------|--------|
 | **1** | 1 | HITL: derive `wait_deadline` from binding + wire resume path | 🔴 P0 | `manager.py`, `processor.py` | ☑ `418b9d5` |
-| **2** | 3 | SCOUT field-name break (`extractedOpportunities` vs `opportunities`) | 🔴 P0 | `create_drafts_from_scout.py` + scouts | ☐ |
-| **3** | 4 | Phase-aware + single-owner matching (kill multi-fire) | 🔴 P0 | `event_listener.py`, rule seeds | ☐ |
-| **4** | 2 | Job Contract: intrinsic timeout+retry; enforce in `invoke()` + CMS + AI_INVOKE | 🔴 P0 | `registry.ts`, `base.ts`, `event_listener.py` | ☐ |
-| **5** | 5 | One engine (WorkflowManager); delete processor's dead HITL path | 🟡 P1 | `processor.py` | ☐ |
-| **6** | 6 | Wire `on_timeout`/`on_failure` → escalation Jobs | 🟡 P1 | `manager.py`, templates | ☐ |
-| **7** | 7 | Collapse SHRED + SCOUT duplicates to one canonical each | 🟡 P1 | `workers/`, `actions/`, tools | ☐ |
-| **8** | 8 | Remove dead mechanisms; fix silent no-ops; phantom executor | 🟡 P1 | CMS, workers, `ai/review` | ☐ |
-| **9** | 9 | Golden-test gate + tests for 5 action Jobs + costly tools | 🟡 P1 | `pipeline/tests/`, CI | ☐ |
-| **10** | — | Author `proposal_build` by reference; relocate `jobs/`+`process_templates/` | 🟢 | pipeline | ☐ |
-| **11** | 10 | Loop/depth guardrail per `correlationId` | 🟢 P2 | engine | ☐ |
-| **12** | 11 | RLS policies (or document isolation = `WHERE tenant_id`) | 🟢 P2 | migration/doc | ☐ |
-| **13** | 12 | Agent loop activation; LISTEN/NOTIFY transport | 🟢 V2 | pipeline | ☐ |
+| **2** | 3 | SCOUT field-name break (`extractedOpportunities` vs `opportunities`) | 🔴 P0 | `create_drafts_from_scout.py` + scouts | ☑ `1211d59` |
+| **3** | 4 | Phase-aware + single-owner matching (kill multi-fire) | 🔴 P0 | `event_listener.py`, rule seeds | ☑ `7b02d8d` |
+| **4** | 2 | Job Contract: intrinsic timeout+retry; enforce in `invoke()` + CMS + AI_INVOKE | 🔴 P0 | `registry.ts`, `base.ts`, `event_listener.py` | ☐ forward-hardening |
+| **5** | 5 | One engine: fallback stops at HITL instead of bypassing review | 🟡 P1 | `processor.py` | ☑ `871b1d7` |
+| **6** | 6 | `on_timeout`/`on_failure` live (validate + execute escalation) | 🟡 P1 | `manager.py`, `base.py`, templates | ☑ `b57cc40` |
+| **7** | 7 | Remove dead `RfpShredderWorker`; SCOUT confirmed dual-path | 🟡 P1 | `workers/` | ☑ `908d5d7` |
+| **8** | 8 | Remove dead mechanisms; wire unpublish handler; fix phantom comment | 🟡 P1 | CMS, workers, `ai/review` | ☑ `97af653` |
+| **9** | 9 | Golden-test gate + tests for 5 action Jobs + costly tools | 🟡 P1 | `pipeline/tests/`, CI | ☐ forward-hardening |
+| **10** | — | Author `proposal_build` by reference; relocate `jobs/`+`process_templates/` | 🟢 | pipeline | ☐ forward-hardening |
+| **11** | 10 | Loop/depth guardrail per `correlationId` | 🟢 P2 | engine | ☐ V2 |
+| **12** | 11 | RLS policies (or document isolation = `WHERE tenant_id`) | 🟢 P2 | migration/doc | ☐ V2 |
+| **13** | 12 | Agent loop activation; LISTEN/NOTIFY transport | 🟢 V2 | pipeline | ☐ V2 |
+
+**Status (2026-05-31): 7/13 shipped** — all P0 bugs (1,2,3) + the entire dead-code /
+dead-end / engine-consolidation sweep (5,6,7,8). The "no deprecated code / no dead-end /
+no unmanaged jobs or templates" mandate is **met and verified** (see §0.1). Remaining
+(4, 9, 10) are additive forward-hardening, not cleanup; 11–13 are V2.
+
+## 0.1 Verified inventory corrections (background sweep + migration cross-check)
+
+A read-only inventory sweep verified every claimed-dead item before deletion. It **confirmed**
+the safe removals but **corrected three audit/CLIFFNOTES false alarms** — recorded here so the
+contract docs stay honest:
+
+- ✅ **Confirmed dead → removed:** 5 stub workers (embedder/emailer/grinder/reminder/
+  document_fetcher), `AutomationEngine` (`automation/engine.py`), the `tools/dispatcher.py`
+  Phase-0.5b skeleton, and the unreferenced `RfpShredderWorker` wrapper. All zero-reference.
+- ❌ **`distribute_social` is NOT a no-op** — it has a full implementation (social_accounts →
+  social_posts). The audit's "always fails" claim was wrong; left untouched.
+- ❌ **SCOUT Python vs TS are NOT a dead duplicate** — they're intentional dual-path (cron
+  worker vs manual "Scout Now" tool), made contract-consistent by INC-2. No collapse.
+- ❌ **`_run_workflow` is NOT dead** — it's the fire-and-forget fallback when `process_instances`
+  is missing. Real issue was its silent HITL bypass (fixed in INC-5), not its existence.
+- ⚠️ **`unpublish_content` correction:** the sweep said "not seeded," but migration 050 **does**
+  seed a live `CMS Content Unpublish Bridge` rule with no handler → a real silent no-op.
+  Caught by reading the migration directly; handler added in INC-8.
 
 **Dependency notes (why this order):** INC-1 uses the existing `Step.timeout_minutes` (no
 dependency on the Job Contract, so it goes first as a live-bug fix). INC-1's resume-path
@@ -294,5 +318,36 @@ has a handler; every route-referenced tool is registered.
 
 ## Change log (append per increment)
 - 2026-05-31 — Plan created. Docs (V3 + CLIFFNOTES) locked at `13411c5`. Plan at `3194423`.
-- 2026-05-31 — INC-1 (HITL deadline + resume) shipped at `418b9d5`. 5 targeted tests green,
-  116-test importable suite no regressions. Next: INC-2 (SCOUT field-name break).
+- 2026-05-31 — INC-1 (HITL deadline + resume) `418b9d5`. 5 tests; missing link was the
+  event→paused matcher (machinery already existed).
+- 2026-05-31 — INC-2 (SCOUT `extractedOpportunities`) `1211d59`. 3 tests; canonical-key
+  constant + docstring fixes; regression lock on the legacy key.
+- 2026-05-31 — INC-3 (phase guard + single-owner) `7b02d8d` + migration 052. 8 tests; kills
+  start/end double-fire and template-vs-rule duplicate admin notify.
+- 2026-05-31 — INC-8 (dead-code sweep + unpublish handler) `97af653`. 12 files removed/changed;
+  4 tests. (Done before 5/6/7 once the verified inventory was in hand.)
+- 2026-05-31 — INC-7 (remove dead RfpShredderWorker) `908d5d7`. 3 tests.
+- 2026-05-31 — INC-6 (on_timeout/on_failure live: validate + execute) `b57cc40`. 8 tests;
+  fixed 2 dangling template refs.
+- 2026-05-31 — INC-5 (fallback stops at HITL, no bypass) `871b1d7`. 2 tests.
+- 2026-05-31 — **Mandate met & verified.** Dead-code/dead-end/unmanaged sweep complete:
+  8 dead modules removed (0 stray imports), no dangling escalation, no phantom executors,
+  all 7 templates registered + all action Jobs referenced. Local CI: pipeline 131 passed,
+  CMS 29 passed (frontend tsc/vitest gate in CI; only change was a comment). Remaining
+  4/9/10 = forward-hardening; 11–13 = V2.
+
+## Remaining work — precise scope (forward-hardening, not cleanup)
+
+- **INC-4 (Job Contract, gap 2):** add `timeoutMs`+`retry` to the tool definition (`base.ts`),
+  enforce in `registry.ts invoke()` via `AbortController`+bounded retry, thread `signal` into
+  `proposal-draft-section.ts`; mirror per-action `asyncio.wait_for`+retry in CMS `_do_action`.
+  Frontend-heavy → needs `tsc`+vitest (no `node_modules` in this sandbox). Tests:
+  `registry-timeout.test.ts` + a CMS action-timeout test.
+- **INC-9 (golden-test gate, gap 9):** `pipeline/tests/jobs/` harness (fixture in → assert
+  output + emitted events, external services stubbed) + goldens for the 5 action Jobs; CI gate
+  that a Job cited by a template has a golden.
+- **INC-10 (compose + relocate):** author `proposal_build` by reference; move Jobs→`jobs/` and
+  templates→`process_templates/` with re-export shims. Net-new + mechanical moves.
+- **INC-11/12/13 (V2):** loop/depth guardrail; RLS policies (or document `WHERE tenant_id`);
+  agent-loop activation + LISTEN/NOTIFY. Note: removing `tools/dispatcher.py` in INC-8 means the
+  agent fabric is rebuilt fresh on activation (not carried as a dead stub).
