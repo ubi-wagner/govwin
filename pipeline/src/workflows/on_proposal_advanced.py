@@ -189,7 +189,12 @@ class OnProposalAdvancedToReview(Workflow):
             wait_for=EventTrigger(
                 namespace="proposal",
                 type="proposal.advanced",
-                phase="single",
+                # Resume when the reviewer advances the proposal OUT of review.
+                # advance/route.ts emits proposal.advanced as a start/end pair and
+                # the END event carries previousStage — so match phase="end".
+                # (Was "single", which no producer emits → the gate never resumed
+                # via events. EVENT_CONTRACT Launch Review #1 / INC-1.)
+                phase="end",
                 condition=lambda p: p.get("previousStage") == "review",
             ),
             timeout_minutes=4320,
