@@ -538,3 +538,60 @@ async def resolve_profile_variables(
         logger.error(f'[resolve_profile_variables] Error resolving profile for tenant={tenant_id}: {e}')
 
     return result
+
+
+# ── Launch Review Fix 2: workflow NOTIFY-step templates ──────────────────────
+# These 6 templates back NOTIFY steps in the Process Templates. They were absent
+# from TEMPLATES, so render_template returned None -> silent no-send (every
+# "a human should look at this" email was dark). After migration 052 deactivated
+# the duplicate automation_rules, these NOTIFY steps became the SOLE owners, so
+# their absence meant rfp_admin stopped being notified (the 052 regression).
+# Defensive p.get() guarantees a non-None render even if a payload field is
+# missing, so the email always sends. (CLAUDE_CLIFFNOTES §11; Launch Review #2.)
+TEMPLATES.update({
+    "rfp_ready_for_curation": lambda p: _layout(
+        f"""<h2>RFP ready for curation</h2>
+        <p>An uploaded RFP has been shredded and is ready for triage.</p>
+        <p><strong>Solicitation:</strong> {p.get("solicitationId") or p.get("title") or "see triage queue"}<br>
+        <strong>Documents:</strong> {p.get("documentCount", "")} &nbsp;
+        <strong>Compliance extracted:</strong> {"yes" if p.get("textExtracted") else "pending"}</p>
+        <p>Open the RFP Curation queue to review and push.</p>""",
+        title="RFP ready for curation",
+        preheader="An uploaded RFP is ready for triage."),
+
+    "review_ready": lambda p: _layout(
+        f"""<h2>Proposal ready for review</h2>
+        <p><strong>{p.get("proposalTitle") or "A proposal"}</strong> has advanced to the review stage.</p>
+        <p>Open the proposal workspace to complete your review and advance it to the next gate.</p>""",
+        title="Proposal ready for review",
+        preheader="A proposal advanced to review."),
+
+    "proposal_final_ready": lambda p: _layout(
+        f"""<h2>Final package ready</h2>
+        <p><strong>{p.get("proposalTitle") or "A proposal"}</strong> reached the final stage and its
+        compliance-checked export package has been generated.</p>""",
+        title="Final package ready",
+        preheader="A proposal reached final."),
+
+    "admin_proposal_review_required": lambda p: _layout(
+        f"""<h2>New proposal &mdash; admin review required</h2>
+        <p>A new proposal workspace was created and needs admin review.</p>
+        <p><strong>Proposal:</strong> {p.get("proposalId") or "see admin dashboard"}</p>""",
+        title="New proposal - review required",
+        preheader="A new proposal needs admin review."),
+
+    "spotlight_new_topics": lambda p: _layout(
+        f"""<h2>New topics in Spotlight</h2>
+        <p>A solicitation was pushed with new topics for matched tenants.</p>
+        <p><strong>Solicitation:</strong> {p.get("solicitationId") or p.get("title") or "see Spotlight"}</p>""",
+        title="New topics in Spotlight",
+        preheader="New topics are available."),
+
+    "source_scout_changes": lambda p: _layout(
+        f"""<h2>Source Scout detected changes</h2>
+        <p>Source Scout found changes on a monitored source and created draft solicitations for review.</p>
+        <p><strong>Source:</strong> {p.get("sourceName") or p.get("sourceId") or "see Sources"}<br>
+        <strong>Drafts created:</strong> {p.get("draftsCreated", "")}</p>""",
+        title="Source Scout detected changes",
+        preheader="New source changes need review."),
+})
