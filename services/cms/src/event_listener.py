@@ -135,6 +135,7 @@ async def _process_new_events():
         _last_processed_id = str(event['id'])
         ns = event.get('namespace', '')
         etype = event.get('type', '')
+        phase = event.get('phase', '') or ''
 
         if (ns, etype) in FRONTEND_HANDLED:
             continue
@@ -150,37 +151,64 @@ async def _process_new_events():
             continue
 
         for rule in rules:
-            if _rule_matches(rule, col_names, ns, etype):
+            if _rule_matches(rule, col_names, ns, etype, phase):
                 try:
                     await _execute_rule(rule, col_names, event)
                 except Exception as e:
                     logger.error(f'Rule execution failed for {etype}: {e}')
 
 
-def _rule_matches(rule, col_names: set, namespace: str, event_type: str) -> bool:
-    """Check if an event matches a rule, adapting to the actual column names."""
+def _rule_matches(
+    rule, col_names: set, namespace: str, event_type: str, phase: str = ''
+) -> bool:
+    """Check if an event matches a rule, adapting to the actual column names.
+
+    Phase-aware (EVENT_CONTRACT_V3 gap 4; CLAUDE_CLIFFNOTES Mistake 20): a rule
+    fires ONCE, on the event's terminal phase. Events emitted as start/end pairs
+    would otherwise double-fire — the (event_id, action_type) dedup can't catch
+    it because 'start' and 'end' are distinct events with distinct ids. A rule
+    may opt into a specific phase via a trigger_phase column; absent that, it
+    matches terminal phases (end / single / unphased) and never 'start'.
+    """
+    matched = False
+
     # Schema variant 1: trigger_namespace + trigger_type (migration 019)
     if 'trigger_namespace' in col_names and 'trigger_type' in col_names:
-        return rule.get('trigger_namespace') == namespace and rule.get('trigger_type') == event_type
+        matched = (
+            rule.get('trigger_namespace') == namespace
+            and rule.get('trigger_type') == event_type
+        )
 
-    # Schema variant 2: trigger_bus + trigger_events (pre-existing)
-    if 'trigger_bus' in col_names and 'trigger_events' in col_names:
+    # Schema variant 2: trigger_bus + trigger_events (baseline)
+    elif 'trigger_bus' in col_names and 'trigger_events' in col_names:
         bus = rule.get('trigger_bus', '')
         events_val = rule.get('trigger_events')
-        # trigger_events might be a string, array, or JSON
         if isinstance(events_val, list):
-            return bus == namespace and event_type in events_val
+            matched = bus == namespace and event_type in events_val
         elif isinstance(events_val, str):
+            events_list = None
             try:
-                events_list = json.loads(events_val)
-                if isinstance(events_list, list):
-                    return bus == namespace and event_type in events_list
+                parsed = json.loads(events_val)
+                if isinstance(parsed, list):
+                    events_list = parsed
             except (json.JSONDecodeError, TypeError):
                 pass
-            return bus == namespace and events_val == event_type
-        return bus == namespace
+            if events_list is not None:
+                matched = bus == namespace and event_type in events_list
+            else:
+                matched = bus == namespace and events_val == event_type
+        else:
+            matched = bus == namespace
 
-    return False
+    if not matched:
+        return False
+
+    # Phase guard. Explicit opt-in via trigger_phase, else fire on terminal
+    # phases only — never on 'start' (kills the start/end double-fire).
+    rule_phase = rule.get('trigger_phase') if 'trigger_phase' in col_names else None
+    if rule_phase:
+        return phase == rule_phase
+    return phase != 'start'
 
 
 async def _execute_rule(rule, col_names: set, event):
