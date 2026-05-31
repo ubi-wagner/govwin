@@ -58,3 +58,25 @@ export function healthSortWeight(h: ProcessHealth): number {
     case 'done': return 4;
   }
 }
+
+/**
+ * Cross-tenant ledger filter (admin view). Pure: filter rows by an optional
+ * tenant and/or health bucket, then sort problems-first. Shared so the admin
+ * "any or all tenants" view and its tests use the exact same logic.
+ */
+export function filterAndSortProcesses<
+  T extends ProcessHealthInput & { tenantId?: string | null },
+>(
+  rows: T[],
+  opts: { tenantId?: string | null; health?: ProcessHealth | 'all' } = {},
+  now: number = Date.now(),
+): Array<T & { health: ProcessHealth }> {
+  const wantTenant = opts.tenantId ?? null;
+  const wantHealth = opts.health ?? 'all';
+  return rows
+    .map((r) => ({ ...r, health: classifyProcessHealth(r, now) }))
+    .filter((r) => (wantTenant === null ? true : (r.tenantId ?? null) === wantTenant))
+    .filter((r) => (wantHealth === 'all' ? true : r.health === wantHealth))
+    .sort((a, b) => healthSortWeight(a.health) - healthSortWeight(b.health));
+}
+

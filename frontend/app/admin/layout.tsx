@@ -40,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/email-outbox">Email Outbox</AdminNavLink>
           <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
           <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
+          <AdminNavLink href="/admin/processes">Process Ledger</AdminNavLink>
           <AdminNavLink href="/admin/system">System Health</AdminNavLink>
           <AdminNavLink href="/admin/analytics">Analytics</AdminNavLink>
 
