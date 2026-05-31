@@ -416,6 +416,100 @@ describe('memory.search tool', () => {
 
 ---
 
+## CMS Visual Editor Test Scenarios
+
+The CMS SPA visual page editor (`/pages`) exposes 13 API endpoints for page/block CRUD, ordering, AI content tools, and the review workflow. The following scenarios must be covered.
+
+### Unit tests (`lib/` helpers)
+
+| Subject | File | Scenarios |
+|---|---|---|
+| Block ordering logic | `lib/cms/blocks.ts` (or equivalent) | move-up first block is no-op, move-down last block is no-op, add blank block at correct index, atomic reorder preserves sort_order contiguity |
+| Content status transitions | `lib/cms/status.ts` (or equivalent) | draft->submitted, submitted->approved, submitted->rejected, approved->published, reject returns to draft, cannot publish from draft directly |
+
+### Integration tests (API routes)
+
+| Route | Happy path | Error paths |
+|---|---|---|
+| `POST /api/admin/content/pages` | Create page, verify slug auto-generated and persisted | Missing title returns 422 |
+| `PATCH /api/admin/content/pages/[pageId]/blocks/[blockId]` | Update block body, verify new content persists | Stale version returns 409 |
+| `POST /api/admin/content/pages/[pageId]/blocks/[blockId]/move` | Move block up/down, verify sort_order recalculated | Move-up on first block returns 400 or is no-op |
+| `POST /api/admin/content/pages/[pageId]/blocks` | Add blank block, verify inserted at correct position | Invalid position returns 422 |
+| `POST /api/admin/content/pages/[pageId]/blocks/reorder` | Atomic reorder, verify all sort_order values updated in one transaction | Partial reorder (missing block IDs) returns 422 |
+| `POST /api/admin/content/pages/[pageId]/submit-for-review` | Status transitions from draft to submitted_for_review | Already-submitted page returns 409 |
+| `POST /api/admin/content/pages/[pageId]/approve` | Status transitions from submitted to approved, ISR revalidation triggered | Approving own submission blocked (if enforced) |
+| `POST /api/admin/content/pages/[pageId]/reject` | Status returns to draft, rejection reason persisted | Missing reason returns 422 |
+| `POST /api/admin/content/pages/[pageId]/publish` | Status transitions to published, ISR revalidation fires | Publishing unapproved content returns 403 |
+| `POST /api/admin/content/ai/generate` | AI generates content block body, returns structured content | Missing prompt returns 422; ANTHROPIC_API_KEY unset returns 503 |
+| `POST /api/admin/content/ai/revise` | AI revises existing block body, returns revised text | Empty body returns 422 |
+| `POST /api/admin/content/ai/from-url` | AI extracts and generates content from external URL | Invalid URL returns 422; unreachable URL returns 502 |
+
+### Scenario tests (multi-actor workflows)
+
+| Scenario | Actors | Steps |
+|---|---|---|
+| Save draft -> preview -> publish | master_admin | Create page, add blocks, save draft, preview in iframe, publish, verify public page renders |
+| Content review workflow | editor (rfp_admin), reviewer (master_admin) | Editor creates content, submits for review, reviewer approves, content published, ISR revalidation confirmed |
+| Content rejection | editor, reviewer | Editor submits, reviewer rejects with reason, editor sees rejection reason, content reverts to draft |
+| Block reorder | master_admin | Add 4 blocks, reorder via move-up/move-down, verify final order matches expectations after page reload |
+| AI generate + revise | master_admin | Generate block content via AI, revise with "make shorter" prompt, verify both versions tracked |
+| Preview mode on marketing pages | master_admin | Navigate to preview for each of the 6 marketing pages (how-it-works, engine, the-expert, value, infosec, apply), verify admin toolbar renders and content displays correctly |
+
+---
+
+## Scoring Unification Test Scenarios
+
+Spotlights scoring is now unified: pipeline pre-computed scores are used when available, with estimation as fallback. Dead `pipeline_jobs` references have been removed from AI draft/review routes. Three API routes have been fixed with proper try/catch on SQL calls.
+
+### Unit tests
+
+| Subject | Scenarios |
+|---|---|
+| Score display logic | Pipeline-scored opportunity shows solid badge with numeric score; unscored opportunity shows dashed "Est." badge; null score shows no badge |
+| Score sorting | Pipeline-scored items sort before estimated items at equal score values; within each group, higher scores sort first |
+
+### Integration tests
+
+| Route | Happy path | Error paths |
+|---|---|---|
+| `GET /api/portal/[slug]/spotlights` | Returns opportunities with `score_source` field (`pipeline` or `estimated`); pipeline-scored items sorted first | Unauthenticated returns 401 |
+| `GET /api/portal/[slug]/spotlights/[id]` | Detail page returns score breakdown with source indicator | Non-existent spotlight returns 404 |
+| AI draft/review routes (post-cleanup) | Draft and review routes operate without referencing `pipeline_jobs` table | Verify no SQL errors from removed `pipeline_jobs` references |
+
+### Scenario tests
+
+| Scenario | Steps |
+|---|---|
+| Mixed scoring display | Push solicitation with pipeline scores for Tenant A, create Tenant B with no scores yet. Tenant A spotlight shows solid badges, Tenant B shows dashed "Est." badges. Both feeds sort correctly. |
+| Score refresh after profile update | Tenant updates profile (new NAICS, keywords), re-scoring runs, spotlight scores update and pipeline-scored items retain priority over estimated |
+
+---
+
+## Content Pipeline Event Tracking Tests
+
+Content pipeline events use the `system` namespace for infrastructure-level actions and the `finder` namespace for content curation.
+
+### Integration tests
+
+| Event | Trigger | Verification |
+|---|---|---|
+| `system:content.published` | Publish a CMS page or blog post | Event logged with `contentId`, `contentType`, `slug` in payload; `tenantId` is null (admin action) |
+| `system:content.unpublished` | Unpublish a CMS page or blog post | Event logged with `contentId` |
+| `system:content.submitted_for_review` | Submit content for review | Event logged with `contentId`, `submittedBy` |
+| `system:content.approved` | Approve submitted content | Event logged with `contentId`, `approvedBy` |
+| `system:content.rejected` | Reject submitted content | Event logged with `contentId`, `rejectedBy`, `reason` |
+| `system:email.queued` | Automation rule fires and queues an email | Event logged with `ruleId`, `recipientEmail`, `templateId` |
+| `system:email.sent` | Queued email approved and sent | Event logged with `emailId`, `recipientEmail` |
+| `system:email.rejected` | Admin rejects queued email | Event logged with `emailId`, `rejectedBy` |
+
+### Scenario test
+
+| Scenario | Steps |
+|---|---|
+| Full content lifecycle event chain | Create draft -> submit for review -> approve -> publish -> unpublish. Query `/admin/events` filtered by `system` namespace and `content.*` type. Verify 5 events in chronological order with correct `parent_event_id` links where applicable. |
+
+---
+
 ## Deviations
 
 If you cannot follow this strategy for a specific test, call it out in the PR description and propose an amendment. "I couldn't figure out how to test it" is not a valid excuse — ask for help before skipping.

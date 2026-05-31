@@ -1,6 +1,6 @@
 # RFP Pipeline Portal — V6 System Architecture (V1 Launch Baseline)
 
-**Date:** 2026-05-20
+**Date:** 2026-05-31
 **Status:** Authoritative — supersedes ARCHITECTURE_V5.md for all V1 decisions
 **Audience:** Engineering, DevOps, Security review, onboarding
 
@@ -177,7 +177,7 @@ cycle to improve the next.
 
 ### 2.3 CMS/CRM (FastAPI)
 
-**Purpose:** Email delivery via Gmail API, event-driven automation rule execution, CMS content management, and email campaign orchestration.
+**Purpose:** Email delivery via Gmail API, event-driven automation rule execution, CMS content management (including visual page editing), and email campaign orchestration.
 
 **Entry point:** `services/cms/src/main.py`
 
@@ -185,7 +185,7 @@ cycle to improve the next.
 
 **Database connection:** SQLAlchemy to CMS Postgres via `CMS_DATABASE_URL`, reads Main Postgres via `SHARED_DATABASE_URL`
 
-**Source files:** 23 Python files
+**Source files:** 25 Python files
 
 | Component | Files | Status |
 |-----------|-------|--------|
@@ -195,6 +195,7 @@ cycle to improve the next.
 | Email queue + sweep workers | 3 | Built |
 | Content routers (CRUD for CMS) | 4 | Built |
 | Content generator + template drafter | 2 | Built |
+| Page blocks router (visual editor API) | 1 | Built (13 endpoints) |
 
 **HTTP endpoints:**
 
@@ -205,8 +206,41 @@ cycle to improve the next.
 | `/api/media` | CRUD | Media uploads |
 | `/api/email/send` | POST | Trigger email delivery |
 | `/api/email/campaigns` | CRUD | Campaign management |
+| `/api/page-blocks/{page}` | GET | List all blocks for a page |
+| `/api/page-blocks/{page}` | POST | Create a new block |
+| `/api/page-blocks/{page}/{blockId}` | GET | Get single block |
+| `/api/page-blocks/{page}/{blockId}` | PUT | Update block content |
+| `/api/page-blocks/{page}/{blockId}` | DELETE | Delete block |
+| `/api/page-blocks/{page}/reorder` | PUT | Reorder blocks on a page |
+| `/api/page-blocks/{page}/submit` | POST | Submit page for review |
+| `/api/page-blocks/{page}/approve` | POST | Approve submitted page |
+| `/api/page-blocks/{page}/reject` | POST | Reject submitted page |
+| `/api/page-blocks/{page}/publish` | POST | Publish approved page + ISR revalidation |
+| `/api/page-blocks/{page}/revert` | POST | Revert to last published state |
+| `/api/page-blocks/{page}/{blockId}/ai-revise` | POST | AI content generation for a block |
+| `/api/page-blocks/{page}/status` | GET | Get workflow status for a page |
+
+**CMS SPA pages (Vite/React):**
+
+| Component | Path | Description | Lines |
+|-----------|------|-------------|-------|
+| PageEditor | `/pages`, `/pages/:page` | Split-pane visual editor with live preview | 1104 |
+| MetadataEditor | (component within PageEditor) | Structured metadata editing (steps, features, stats) | 690 |
+
+**Dual-Editor Architecture:**
+
+The platform maintains two valid editors for marketing page content, both operating on the same `cms_content` rows (content_type='page_block'):
+
+| Editor | Location | Origin | Use Case |
+|--------|----------|--------|----------|
+| Legacy Next.js Editor | `/admin/content/editor` | Frontend service | Quick edits by admins already in the admin dashboard |
+| CMS SPA Editor (PageEditor) | CMS Portal `/pages/:page` | CMS service | Full visual editing with split-pane preview, AI revision, workflow (submit/approve/reject/publish) |
+
+Both editors read/write the same `cms_content` table via `SHARED_DATABASE_URL`. The admin content page (`/admin/content`) redirects to the editor, and the admin sidebar includes an "Open in CMS Portal" external link to the CMS SPA.
 
 **Event consumption:** Polls `system_events` via `SHARED_DATABASE_URL`, matches events against `automation_rules`, executes actions (send_email, notify_admin).
+
+**Event emission:** The page_blocks router emits events to `system_events` via `SHARED_DATABASE_URL` for all content workflow actions (see Content Pipeline section below).
 
 **Email templates (5):**
 
@@ -455,7 +489,7 @@ system_events (
 | `identity` | user.logged_in, user.password_changed | 2 |
 | `proposal` | proposal.created, section.saved, comment.created/resolved, proposal.advanced/locked/unlocked | ~7 |
 | `library` | file.uploaded, document.atomized, atom.saved, unit.updated/deleted | ~5 |
-| `system` | file.uploaded/deleted, content.published/updated/deleted, ingester.rate_limited, shredder.budget_exceeded | ~8 |
+| `system` | file.uploaded/deleted, content.published/updated/deleted, content.page_blocks_updated/published/submitted/approved/rejected/reordered, content.page_block_created/deleted, content.ai_revision_started/completed, ingester.rate_limited, shredder.budget_exceeded | ~20 |
 | `tool` | invoke.start, invoke.end (auto-emitted per invocation) | 2 |
 
 ### 4.4 Workflows (7 Definitions)
@@ -574,6 +608,7 @@ system_events (
 | Pipeline Monitor | `/admin/pipeline` | Job queue, run history, failure rates | Working |
 | Process Monitor | `/admin/process` | Workflow instances and step status | Working |
 | System Dashboard | `/admin/system` | Tool metrics, capacity, health | Working |
+| System State | `/admin/system-state` | Content Pipeline + Email Automation status tabs | Working |
 | Storage Browser | `/admin/storage` | S3 bucket explorer | Working |
 | Billing Admin | `/admin/billing` | Stripe dashboard integration | Working |
 
@@ -586,22 +621,25 @@ system_events (
 | Analytics | `/admin/analytics` | Platform metrics and charts | Stub |
 | Agents Monitor | `/admin/agents` | Agent performance, memories, config | Stub |
 
-**Content (4 pages)**
+**Content (5 pages)**
 
 | Page | Path | Description | Status |
 |------|------|-------------|--------|
-| CMS Content | `/admin/content` | Blog/resource/guide management | Working |
-| Content Editor | `/admin/content/[contentId]` | Content authoring | Working |
+| CMS Content | `/admin/content` | Redirects to `/admin/content/editor` | Working |
+| Content Editor | `/admin/content/editor` | Page block editor with "Open in CMS Portal" link | Working |
+| Content Detail | `/admin/content/[contentId]` | Content authoring | Working |
 | Templates | `/admin/templates` | Document template management | Working |
 | Waitlist | `/admin/waitlist` | Waitlist management | Working |
 
-**Other (3 pages)**
+**Other (5 pages)**
 
 | Page | Path | Description | Status |
 |------|------|-------------|--------|
 | Purchases | `/admin/purchases` | Purchase/payment history | Working |
 | Documents Hub | `/admin/documents` | Document management | Working |
 | Document Detail | `/admin/documents/[documentId]` | Document detail view | Working |
+| Automation | `/admin/automation` | Automation rules management | Working |
+| Email Outbox | `/admin/email-outbox` | Sent email archive | Working |
 
 ### 6.2 Portal Pages (17)
 
@@ -964,7 +1002,48 @@ Workflow: OnSourceChangeDetected
   ├── Auto-triage if confidence > 0.9
 ```
 
-### 8.5 Flow: Library Upload → Atomization → Search → Insert into Proposal
+### 8.5 Flow: Content Pipeline (CMS Page Blocks → Review → Publish → ISR)
+
+```
+Admin edits page blocks in CMS SPA (PageEditor)
+  ├── CMS SPA: CRUD via /api/page-blocks/{page} endpoints
+  ├── Each save: UPDATE cms_content SET body = ..., status = 'draft'
+  ├── Emit system:content.page_blocks_updated:single
+  │
+  ▼
+Admin submits page for review
+  ├── POST /api/page-blocks/{page}/submit
+  ├── UPDATE all page blocks SET status = 'pending'
+  ├── Emit system:content.page_blocks_submitted:single
+  │
+  ▼
+Reviewer approves or rejects
+  ├── POST /api/page-blocks/{page}/approve
+  │     └── Emit system:content.page_blocks_approved:single
+  ├── POST /api/page-blocks/{page}/reject
+  │     └── Emit system:content.page_blocks_rejected:single
+  │     └── Blocks revert to 'draft' status
+  │
+  ▼
+Admin publishes approved page
+  ├── POST /api/page-blocks/{page}/publish
+  ├── UPDATE all page blocks SET published = true, status = 'published'
+  ├── ISR revalidation: HTTP call to Frontend /api/admin/revalidate
+  │     with mapped path (e.g., security→/infosec, get-started→/pricing)
+  ├── Emit system:content.page_blocks_published:single
+  │
+  ▼
+Frontend serves updated content
+  ├── Marketing pages call getPageBlocks(page) at ISR interval (60s)
+  ├── Fresh content visible after ISR revalidation completes
+```
+
+**Content workflow states:** draft → pending (submitted) → approved → published
+Rejected pages return to draft. Revert restores last published snapshot.
+
+**AI revision flow:** POST `/api/page-blocks/{page}/{blockId}/ai-revise` triggers Claude to regenerate block content based on instructions. Emits `system:content.ai_revision_started:single` and `system:content.ai_revision_completed:single`.
+
+### 8.6 Flow: Library Upload → Atomization → Search → Insert into Proposal
 
 ```
 Customer uploads document (/portal/{slug}/library/upload)
@@ -1017,7 +1096,7 @@ V1 is a full platform launch with automated workflows. The CMS service operates 
 
 | Requirement | Description |
 |-------------|-------------|
-| Scoring | Score curated opportunities against tenant profiles |
+| Scoring | Pipeline pre-computes scores into `tenant_pipeline_items.total_score` (authoritative). Spotlights page uses these scores when available, falling back to lightweight estimation (labeled "Est.") for items not yet scored by the pipeline. Do NOT recompute scores from scratch in the frontend. |
 | Display | Ranked opportunity feed with compliance summaries |
 | Pin/unpin | Customer marks opportunities of interest |
 | Purchase | Stripe checkout → proposal workspace creation |
@@ -1087,6 +1166,7 @@ V1 is a full platform launch with automated workflows. The CMS service operates 
 | Pipeline | Job queue depth, run history, failure rates |
 | Process | Workflow instance status and step tracking |
 | System | Tool metrics, capacity indicators, health checks |
+| System State | Tabbed dashboard with Content Pipeline status (page block workflow states, recent publish activity) and Email Automation status (automation rule health, email queue depth, recent sends) |
 
 ---
 
@@ -1114,7 +1194,7 @@ This section details every component that needs work before V1 launch. Organized
 | Shredder text extraction | Framework built (extractor, runner) | PDF text → Claude → compliance | Shredder worker dequeues jobs but does not invoke Claude for compliance extraction | 3 days |
 | Shredder compliance mapping | compliance_mapping.py exists | Auto-populate solicitation_compliance | Not wired: Claude output not persisted to compliance rows | Included above |
 | Topic auto-extraction | Heuristic (regex pattern matching) | Claude-based topic extraction from BAA text | Only regex, no Claude call for structured extraction | 1 day |
-| AI section drafting | proposal.draft_section tool exists | Draft from library + RFP + compliance | Tool built but not tested end-to-end with real data | 1 day |
+| AI section drafting | proposal.draft_section tool via `invoke()` registry | Draft from library + RFP + compliance. Uses `invoke()` tool registry, NOT `pipeline_jobs` (kind='draft_section'/'review_section' are dead-end jobs never consumed by the dispatcher). | Tool built but not tested end-to-end with real data | 1 day |
 
 ### 10.3 Proposal Export
 
@@ -1194,8 +1274,8 @@ This section details every component that needs work before V1 launch. Organized
 
 | Component | Current Status | V1 Required | Gap | Effort |
 |-----------|---------------|-------------|-----|--------|
-| Scoring engine | scoring/engine.py exists | Score opportunities against profiles | Not triggered on solicitation push | 1 day |
-| Tenant pipeline items | Table exists | Scored items per tenant | No rows populated (scoring not running) | Included above |
+| Scoring engine | scoring/engine.py exists, pipeline computes scores | Score opportunities against profiles | Scoring runs and populates `tenant_pipeline_items.total_score` | Done |
+| Tenant pipeline items | Table populated by pipeline | Scored items per tenant | Spotlights page uses pipeline scores as authoritative, with lightweight estimation fallback (labeled "Est.") | Done |
 | Spotlight filters | Table exists (spotlights) | Customer saved search buckets | API stub (501), needs implementation | 1 day |
 | FOMO signals | Designed | "X companies pursuing this" indicators | Not implemented | 1 day (V2) |
 

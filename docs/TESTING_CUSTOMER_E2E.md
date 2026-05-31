@@ -138,11 +138,42 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 
 ---
 
+## 4b. Library Upload, Atomize, and Review Flow
+
+> :warning: **Prerequisite:** Step 4 must be completed. At least one document must be uploaded to the library.
+
+**Goal:** Verify the complete library lifecycle: upload a document, atomize it into reusable content atoms, and review the atoms for quality.
+
+| # | Action | Expected Result |
+|---|--------|-----------------|
+| 1 | Navigate to Library: `{BASE_URL}/portal/{slug}/library` | Library page loads showing uploaded documents from Step 4 |
+| 2 | Select an uploaded document (e.g., capability statement) | Document detail visible with metadata |
+| 3 | Click "Atomize" on the document | Atomization job starts, progress indicator or toast shown |
+| 4 | Wait for atomization to complete (30-120 seconds) | Atom count updates to a non-zero value |
+| 5 | Verify atoms created with categories | Atoms visible with assigned categories: `key_personnel`, `past_performance`, `technical_approach`, `corporate_overview`, etc. |
+| 6 | Navigate to Library Review: `{BASE_URL}/portal/{slug}/library/review` | Review page loads showing atoms awaiting quality review |
+| 7 | Verify review page displays atom previews | Each atom shows: content preview, category, confidence score, source document reference |
+| 8 | Approve a high-quality atom | Atom status changes to "approved" |
+| 9 | Reject a low-quality atom with reason | Atom status changes to "rejected", reason stored |
+| 10 | Return to Library list | Approved atoms show correct status; rejected atoms filtered or marked |
+| 11 | Search library for content from the atomized document | Search returns matching atoms |
+| 12 | Filter by category (e.g., "past_performance") | Only atoms in that category shown |
+
+**Events emitted:**
+- `library:document.atomized:start` and `library:document.atomized:end` -- payload includes `atomsCreated` count
+- `library:atom.reviewed:single` -- per atom review action, payload includes `atomId`, `status`, `reviewerId`
+
+**Clickable links:**
+- `{BASE_URL}/portal/{slug}/library`
+- `{BASE_URL}/portal/{slug}/library/review`
+
+---
+
 ## 5. Browse Spotlight Feed
 
 > :warning: **Prerequisite:** Step 3 must be completed (logged in as customer). Admin must have pushed at least one solicitation to Spotlight (see Admin E2E Guide, Step 4).
 
-**Goal:** View curated opportunities in the Spotlight feed.
+**Goal:** View curated opportunities in the Spotlight feed with unified scoring (pipeline pre-computed scores with estimation fallback).
 
 | # | Action | Expected Result |
 |---|--------|-----------------|
@@ -153,12 +184,16 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 |   | - Agency | e.g., "Department of Defense" |
 |   | - Close date | Submission deadline |
 |   | - Program type | e.g., "SBIR Phase I" |
-|   | - AI score | Match score (if scoring is active) |
-| 4 | Click into an opportunity | Detail page loads at `{BASE_URL}/portal/{slug}/spotlights/{spotlightId}` |
-| 5 | Verify detail view shows: | |
+|   | - Score badge | Pipeline-scored: solid badge with numeric score. Unscored/estimated: dashed border badge with "Est." label |
+| 4 | Verify scoring display for pipeline-scored opportunities | Score badge is solid (filled background), showing the numeric score from pipeline pre-computation |
+| 5 | Verify scoring display for unscored/estimated opportunities | Score badge has dashed border with "Est." label, indicating estimation fallback |
+| 6 | Verify sort order | Pipeline-scored opportunities appear first, then estimated. Within each group, higher scores sort first |
+| 7 | Click into a pipeline-scored opportunity | Detail page loads at `{BASE_URL}/portal/{slug}/spotlights/{spotlightId}` |
+| 8 | Verify detail view shows: | |
 |   | - Full topic description | Complete text from the solicitation |
 |   | - Compliance summary | Page limits, font requirements, margin requirements |
 |   | - Evaluation criteria | If extracted during curation |
+|   | - Score breakdown with source | Factor breakdown visible, source labeled as "pipeline" or "estimated" |
 |   | - "Pin" button | Visible and clickable |
 |   | - "Build Proposal" button | Visible and clickable |
 
