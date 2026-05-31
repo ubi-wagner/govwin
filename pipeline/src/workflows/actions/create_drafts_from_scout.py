@@ -21,7 +21,7 @@ INPUTS:
         - region_results: Optional[list[dict]] — list of dicts from the
           scout worker, each containing:
             - region_id, region_name, content_hash, previous_hash
-            - extracted_text, opportunities (list of opportunity dicts)
+            - extracted_text, extractedOpportunities (list of opportunity dicts)
 
 OUTPUTS:
         - draftsCreated: int — new curated_solicitations created
@@ -69,6 +69,13 @@ from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.create_drafts_from_scout")
 
+# Canonical key for the per-region opportunities array. BOTH scout emitters use
+# this exact key — pipeline/src/workers/source_scout.py and
+# frontend/lib/tools/source-scout.ts. The consumer previously read "opportunities"
+# (a key nothing emits), so OnSourceChangeDetected always created 0 drafts.
+# (EVENT_CONTRACT_V3 gap 3; CLAUDE_CLIFFNOTES Mistake 19.)
+REGION_OPPORTUNITIES_KEY = "extractedOpportunities"
+
 
 async def create_drafts_from_scout(
     conn: asyncpg.Connection,
@@ -95,7 +102,7 @@ async def create_drafts_from_scout(
             - content_hash: hash of current content
             - previous_hash: hash of previous content (None if first scan)
             - extracted_text: raw text from the region
-            - opportunities: list of extracted opportunity dicts with:
+            - extractedOpportunities: list of extracted opportunity dicts with:
                 - title, agency, description, url, close_date (optional)
 
     Returns:
@@ -160,7 +167,7 @@ async def create_drafts_from_scout(
 
     # 2. Process each region result
     for region in region_results:
-        opportunities = region.get("opportunities", [])
+        opportunities = region.get(REGION_OPPORTUNITIES_KEY, [])
         if not opportunities:
             continue
 
