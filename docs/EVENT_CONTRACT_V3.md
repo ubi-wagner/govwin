@@ -484,9 +484,10 @@ earlier text that conflicts.
    `TEMPLATES` registry or it silently sends nothing. Template name is part of the
    contract; changing a NOTIFY template requires a matching registry entry.
 5. **HITL resume producers:** every `wait_for` must name an event a real producer
-   emits at the matching phase, OR be designated force-advance-only. The
-   source-change review gate is force-advance-only (no event producer). The proposal
-   review gate resumes on `proposal.advanced:end` with `previousStage=='review'`.
+   emits at the matching phase. The proposal review gate resumes on
+   `proposal.advanced:end` (`previousStage=='review'`); the source-change gate resumes
+   on `source_diff.reviewed:end` (the diffs-route PATCH emits it — NOT GET-only), with
+   the process-ledger force-advance as the precise per-instance override.
 6. **Agent dispatch is V2.** Events addressed to agent archetypes
    (`*.review_requested`, `*.draft_requested`, `compliance.checked`) have no runtime
    consumer yet; do not contract UI on their results.
