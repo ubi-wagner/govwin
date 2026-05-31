@@ -139,10 +139,16 @@ class OnSourceChangeDetected(Workflow):
             step_type=StepType.HITL_WAIT,
             action="hitl.wait",
             depends_on="notify_rfp_admin",
+            # Resumes when an admin marks a source diff reviewed: the diffs route
+            # PATCH emits finder:source_diff.reviewed (start/end), so match
+            # phase="end". (Earlier notes calling that route GET-only were wrong —
+            # it has a PATCH. Launch Review #1b.) The event is per-diff, not yet
+            # correlated to this instance's sourceId, so the process-ledger
+            # force-advance is the precise per-instance override.
             wait_for=EventTrigger(
                 namespace="finder",
-                type="source.changes_reviewed",
-                phase="single",
+                type="source_diff.reviewed",
+                phase="end",
             ),
             timeout_minutes=1440,  # 24 hours
             on_timeout="notify_rfp_admin",  # re-notify if no review
