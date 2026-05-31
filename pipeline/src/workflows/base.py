@@ -88,6 +88,13 @@ class StepType(str, Enum):
     HITL_WAIT = "hitl_wait"
     NOTIFY = "notify"
     CONDITION = "condition"
+    # A TODO is a HITL_WAIT that also writes a row to the unified `tasks` ledger:
+    # park-and-wait PLUS an assignee, a nudge cadence, and an entity reference.
+    # The static step declares "this is a human task"; the per-instance payload
+    # supplies the specifics (assignee, nudges, due, entity UUID) via the
+    # task_* fields below, resolved through the same resolve_input() paths as
+    # input_map. Completing the task resumes the instance from the next step.
+    TODO = "todo"
 
 
 @dataclass
@@ -106,6 +113,17 @@ class Step:
     on_timeout: Optional[str] = None
     on_failure: Optional[str] = None
     condition: Optional[Callable[[dict[str, Any]], bool]] = None
+    # ── TODO step fields (StepType.TODO) ──────────────────────────────────
+    # All resolved per-instance via resolve_input() (payload.X / "literal"), so
+    # the static template stays generic and the payload carries the specifics.
+    task_type: Optional[str] = None          # e.g. "admin_approval", "content_publish"
+    task_title: Optional[str] = None         # human-readable; resolved or literal
+    assignee_role: Optional[str] = None      # role bucket, e.g. "payload.approverRole"
+    assignee_user: Optional[str] = None      # specific user id (optional)
+    entity_type: Optional[str] = None        # e.g. "content_pipeline"
+    entity_ref: Optional[str] = None         # e.g. "payload.contentPipelineId"
+    nudge_days: Optional[str] = None         # e.g. "payload.nudgeDays" -> [1,3,5]
+    due_in_minutes: Optional[str] = None     # overrides timeout_minutes for the due date
 
 
 # ─── Workflow base ──────────────────────────────────────────────────
@@ -145,6 +163,19 @@ class Workflow:
                     f"{cls.__name__}.{step.name}: hitl_wait step "
                     f"must define wait_for trigger"
                 )
+            # A TODO is a parameterized human gate: it must declare what kind of
+            # task and who it's for, or the ledger row is meaningless. wait_for is
+            # optional (a TODO usually resumes via task-completion, not an event).
+            if step.step_type == StepType.TODO:
+                if not step.task_type:
+                    errors.append(
+                        f"{cls.__name__}.{step.name}: todo step must define task_type"
+                    )
+                if not step.assignee_role and not step.assignee_user:
+                    errors.append(
+                        f"{cls.__name__}.{step.name}: todo step must define "
+                        f"assignee_role or assignee_user"
+                    )
             # on_timeout / on_failure must name a real step in this workflow,
             # or the declared escalation/compensation is a dead-end (gap 6).
             if step.on_timeout and step.on_timeout not in step_names:

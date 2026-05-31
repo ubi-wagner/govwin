@@ -361,8 +361,10 @@ class WorkflowManager:
                 },
             )
 
-            # Handle HITL_WAIT steps
-            if step.step_type == StepType.HITL_WAIT:
+            # Handle TODO + HITL_WAIT steps — both park the instance. TODO also
+            # writes a row to the unified `tasks` ledger so it shows up in the
+            # assignee's queue and gets nudged. (Tasks epic keystone.)
+            if step.step_type in (StepType.TODO, StepType.HITL_WAIT):
                 step_status[step_name] = "waiting"
                 await self._persist_step_status(conn, instance_id, step_results, step_status)
                 # Derive the park deadline from the binding's DECLARED timeout, not
@@ -385,14 +387,19 @@ class WorkflowManager:
                     step_name,
                     wait_deadline,
                 )
-                await self._record_transition(
-                    conn,
-                    instance_id,
-                    "running",
-                    "paused",
-                    actor="system",
-                    reason=f"hitl_wait:{step_name}",
+                reason = (
+                    f"todo:{step_name}"
+                    if step.step_type == StepType.TODO
+                    else f"hitl_wait:{step_name}"
                 )
+                await self._record_transition(
+                    conn, instance_id, "running", "paused",
+                    actor="system", reason=reason,
+                )
+                if step.step_type == StepType.TODO:
+                    await self._create_task(
+                        conn, step, instance_id, trigger_payload, step_results,
+                    )
                 self._running_instances.pop(instance_id, None)
                 return {
                     "status": "paused",
@@ -679,6 +686,217 @@ class WorkflowManager:
         self._running_instances.pop(instance_id, None)
         return True
 
+    async def _create_task(
+        self,
+        conn: asyncpg.Connection,
+        step: Any,
+        instance_id: str,
+        trigger_payload: dict[str, Any],
+        step_results: dict[str, Any],
+    ) -> Optional[str]:
+        """Write a row to the `tasks` ledger for a TODO step.
+
+        Every task_* field is resolved per-instance via the SAME resolve_input
+        paths as input_map (payload.X / "literal"), so the static template stays
+        generic and the payload carries the specifics — the assignee, the entity
+        UUID to act on, the nudge cadence, the due date. The instance is already
+        being parked by the caller; this just makes the gate visible + nudgeable.
+        """
+        from workflows.processor import resolve_input
+
+        event_dict = {"payload": trigger_payload}
+
+        def r(path: Optional[str]) -> Any:
+            if not path:
+                return None
+            return resolve_input(path, event_dict, step_results)
+
+        # tenant scope from the instance
+        tenant_id = await conn.fetchval(
+            "SELECT tenant_id FROM process_instances WHERE id = $1",
+            uuid.UUID(instance_id),
+        )
+
+        task_type = r(step.task_type) or step.task_type or "task"
+        title = r(step.task_title) or step.task_title or task_type
+        assignee_role = r(step.assignee_role) or step.assignee_role
+        assignee_user = r(step.assignee_user)
+        entity_type = r(step.entity_type) or step.entity_type
+        entity_ref = r(step.entity_ref)
+
+        # Due date: explicit due_in_minutes overrides the step timeout.
+        due_minutes = r(step.due_in_minutes)
+        try:
+            due_minutes = int(due_minutes) if due_minutes is not None else step.timeout_minutes
+        except (TypeError, ValueError):
+            due_minutes = step.timeout_minutes
+        due_at = datetime.now(timezone.utc) + timedelta(minutes=due_minutes or 1440)
+
+        nudge_days = r(step.nudge_days)
+        if not isinstance(nudge_days, list):
+            nudge_days = []
+
+        params = {
+            k: v for k, v in {
+                "task_type_raw": step.task_type,
+                "entity_ref": step.entity_ref,
+            }.items() if v
+        }
+
+        task_id = str(uuid.uuid4())
+        try:
+            await conn.execute(
+                """
+                INSERT INTO tasks
+                    (id, tenant_id, assignee_role, assignee_user_id, task_type,
+                     title, entity_type, entity_id, process_instance_id, step_name,
+                     status, due_at, nudge_schedule, params)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open', $11, $12::jsonb, $13::jsonb)
+                """,
+                uuid.UUID(task_id),
+                tenant_id,
+                assignee_role,
+                self._safe_uuid(assignee_user),
+                task_type,
+                str(title)[:500],
+                entity_type,
+                self._safe_uuid(entity_ref),
+                uuid.UUID(instance_id),
+                step.name,
+                due_at,
+                json.dumps(nudge_days),
+                json.dumps(params, default=str),
+            )
+        except Exception as e:
+            # A task-write failure must NOT crash the park — the instance is
+            # already paused; log and continue (the gate still exists, just
+            # unsurfaced). Better degraded than a lost workflow.
+            logger.error("[_create_task] failed for instance %s step %s: %s",
+                         instance_id, step.name, e)
+            return None
+
+        await self._emit_event(
+            conn, "system", "task.created",
+            str(tenant_id) if tenant_id else None,
+            {
+                "task_id": task_id,
+                "instance_id": instance_id,
+                "step_name": step.name,
+                "task_type": task_type,
+                "assignee_role": assignee_role,
+            },
+        )
+        logger.info("[_create_task] %s (%s) for instance %s step %s",
+                    task_id, task_type, instance_id, step.name)
+        return task_id
+
+    async def complete_task(
+        self,
+        conn: asyncpg.Connection,
+        task_id: str,
+        result: Optional[dict[str, Any]] = None,
+        actor: str = "system",
+        actor_id: Optional[str] = None,
+    ) -> bool:
+        """Mark a task completed and resume its parked process instance.
+
+        The human's decision (`result`) is recorded on the task AND passed to
+        resume_instance, which merges it into the parked TODO step's result so
+        downstream steps can read it (e.g. step.<todo>.result.approved). Returns
+        False if the task is missing or already closed.
+        """
+        row = await conn.fetchrow(
+            """
+            SELECT process_instance_id, step_name, status
+            FROM tasks WHERE id = $1
+            """,
+            uuid.UUID(task_id),
+        )
+        if not row or row["status"] not in ("open", "in_progress"):
+            return False
+
+        await conn.execute(
+            """
+            UPDATE tasks
+            SET status = 'completed', result = $2::jsonb,
+                completed_by = $3, completed_at = now(), updated_at = now()
+            WHERE id = $1
+            """,
+            uuid.UUID(task_id),
+            json.dumps(result or {}, default=str),
+            self._safe_uuid(actor_id),
+        )
+
+        instance_id = row["process_instance_id"]
+        if instance_id is not None:
+            await self.resume_instance(
+                conn, str(instance_id),
+                resume_data={"task_id": task_id, **(result or {})},
+                actor=actor, reason="task_completed",
+            )
+        return True
+
+    async def _sweep_task_nudges(self, conn: asyncpg.Connection) -> int:
+        """Fire any due nudges for open tasks (idempotent).
+
+        For each open task with a due date and a nudge_schedule like [1,3,5]
+        (days-before-due), emit system:task.nudge once per threshold as it is
+        crossed, recording it in nudges_sent so it never double-fires. The
+        landing-page nudge surface reads tasks directly; this event is the push
+        signal (email/in-app) layered on top. Best-effort.
+        """
+        fired = 0
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT id, tenant_id, assignee_role, title, due_at,
+                       nudge_schedule, nudges_sent
+                FROM tasks
+                WHERE status IN ('open', 'in_progress') AND due_at IS NOT NULL
+                  AND nudge_schedule <> '[]'::jsonb
+                """
+            )
+        except Exception as e:
+            logger.error("[_sweep_task_nudges] query failed: %s", e)
+            return 0
+
+        now = datetime.now(timezone.utc)
+        for t in rows:
+            schedule = t["nudge_schedule"]
+            sent = t["nudges_sent"]
+            if isinstance(schedule, str):
+                schedule = json.loads(schedule or "[]")
+            if isinstance(sent, str):
+                sent = json.loads(sent or "[]")
+            sent_set = set(sent or [])
+            due_at = t["due_at"]
+            for days_before in (schedule or []):
+                if days_before in sent_set:
+                    continue
+                threshold = due_at - timedelta(days=float(days_before))
+                if now >= threshold:
+                    tenant_str = str(t["tenant_id"]) if t["tenant_id"] else None
+                    try:
+                        await self._emit_event(
+                            conn, "system", "task.nudge", tenant_str,
+                            {
+                                "task_id": str(t["id"]),
+                                "title": t["title"],
+                                "assignee_role": t["assignee_role"],
+                                "days_before_due": days_before,
+                                "due_at": due_at.isoformat(),
+                            },
+                        )
+                        sent_set.add(days_before)
+                        await conn.execute(
+                            "UPDATE tasks SET nudges_sent = $2::jsonb, updated_at = now() WHERE id = $1",
+                            t["id"], json.dumps(sorted(sent_set, reverse=True)),
+                        )
+                        fired += 1
+                    except Exception as e:
+                        logger.error("[_sweep_task_nudges] nudge failed for %s: %s", t["id"], e)
+        return fired
+
     async def resume_instance(
         self,
         conn: asyncpg.Connection,
@@ -941,6 +1159,15 @@ class WorkflowManager:
         while True:
             try:
                 await asyncio.sleep(60)
+
+                # Fire any due task nudges (1/3/5-day reminders, etc.). Shares the
+                # 60s cadence with stuck-detection; idempotent via nudges_sent.
+                if pool:
+                    async with pool.acquire() as nudge_conn:
+                        await self._sweep_task_nudges(nudge_conn)
+                else:
+                    await self._sweep_task_nudges(conn)
+
                 # Check for stale heartbeats on running instances
                 if pool:
                     async with pool.acquire() as sd_conn:
