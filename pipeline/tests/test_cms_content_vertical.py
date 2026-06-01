@@ -29,6 +29,14 @@ from workflows.actions import cms_content
 _CID = "c0000000-0000-0000-0000-000000000001"
 
 
+@pytest.fixture(autouse=True)
+def _no_ai_by_default(monkeypatch):
+    # Deterministic + no network: default draft_content to the brief-seed fallback.
+    # The AI-path test overrides this with a stub generation result.
+    monkeypatch.setattr(cms_content, "_generate_body", AsyncMock(return_value=None))
+    yield
+
+
 # ── (a) template validity + topology ────────────────────────────────────────
 
 def test_workflow_validates():
@@ -114,6 +122,38 @@ async def test_draft_content_slugifies_when_slug_omitted(monkeypatch):
     conn = _DraftConn()
     out = await cms_content.draft_content(conn, title="Hello, World!")
     assert out["slug"] == "hello-world"
+
+
+async def test_draft_content_uses_ai_body_when_available(monkeypatch):
+    # When generation succeeds, the AI body REPLACES the brief seed, and excerpt/
+    # tags are filled from the AI result when the overlay omitted them.
+    import json
+
+    monkeypatch.setattr(cms_content, "emit_event", AsyncMock())
+    monkeypatch.setattr(
+        cms_content,
+        "_generate_body",
+        AsyncMock(return_value={
+            "title": "AI Title",
+            "excerpt": "AI excerpt",
+            "body": "# AI body\n\nReal generated content about SBIR.",
+            "tags": ["ai", "sbir"],
+            "meta_title": "MT",
+            "meta_description": "MD",
+        }),
+    )
+    conn = _DraftConn()
+    out = await cms_content.draft_content(
+        conn, title="Why SBIR", brief="write about sbir", slug="why-sbir",
+    )
+    assert out["generated"] is True
+    a = conn.insert_args
+    assert a[4] == "# AI body\n\nReal generated content about SBIR."  # AI body, not seed
+    assert a[5] == "AI excerpt"           # excerpt filled from AI (overlay omitted it)
+    assert a[7] == ["ai", "sbir"]         # tags filled from AI
+    meta = json.loads(a[8])
+    assert meta["generated"] is True
+    assert meta["metaTitle"] == "MT"
 
 
 # ── (c) review ToDo writes a content_publish task for the drafted content ────

@@ -16,11 +16,11 @@ WHY:    The template definition is code (on_cms_content_requested.py; revision
         switch, and the overlay is the frozen process_instances.payload. This
         vertical is the smallest real content lifecycle that exercises all of it.
 
-NOTE:   The actual AI body-generation already lives in the CMS content_generator
-        worker (services/cms). This action seeds the reviewable draft body from
-        the overlay's `brief` and is the exact slot where a Claude call can later
-        replace the seed — the gate + lifecycle is what the keystone proves, not
-        the model invocation.
+NOTE:   draft_content generates the body with Claude, mirroring the CMS
+        content_generator contract (same system prompt + JSON shape:
+        title/excerpt/body/tags/meta). It falls back to the overlay `brief` as the
+        body when no ANTHROPIC_API_KEY is set or generation fails, so the vertical
+        works with or without a key and a model hiccup never hard-fails the draft.
 
 ERROR HANDLING:
     - draft_content is idempotent on slug (ON CONFLICT re-drafts, never 500s on
@@ -33,6 +33,7 @@ ERROR HANDLING:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from typing import Any, Optional
@@ -51,12 +52,81 @@ _ALLOWED_CONTENT_TYPES = {
 }
 _DEFAULT_CONTENT_TYPE = "blog_post"
 
+# Mirror the CMS content_generator's contract so a draft body matches its voice and
+# JSON shape (title/excerpt/body/tags/meta). Keep in sync with
+# services/cms/src/workers/content_generator.py.
+_DEFAULT_SYSTEM_PROMPT = (
+    "You are a content writer for the SBIR Engine. Write clear, actionable content "
+    "for small businesses pursuing federal R&D funding. Use short sentences. Be specific. "
+    "No fluff. Focus on SBIR/STTR, proposal writing, and federal procurement strategy."
+)
+_JSON_OUTPUT_INSTRUCTIONS = (
+    'Respond with a JSON object containing:\n'
+    '- "title": string (compelling, SEO-friendly)\n'
+    '- "excerpt": string (1-2 sentences, hooks the reader)\n'
+    '- "body": string (full article in markdown format, 400-800 words)\n'
+    '- "tags": array of strings (3-6 relevant tags)\n'
+    '- "meta_title": string (for SEO, under 60 chars)\n'
+    '- "meta_description": string (for SEO, under 160 chars)\n\n'
+    'Return ONLY valid JSON, no markdown fences.'
+)
+
 
 def _slugify(text: str) -> str:
     out = "".join(c if c.isalnum() else "-" for c in (text or "").lower()).strip("-")
     while "--" in out:
         out = out.replace("--", "-")
     return out[:80] or f"draft-{uuid.uuid4().hex[:8]}"
+
+
+async def _generate_body(brief: str, content_type: str) -> Optional[dict[str, Any]]:
+    """Generate article fields with Claude, mirroring the CMS content_generator
+    contract: {title, excerpt, body, tags, meta_title, meta_description}.
+
+    Returns None — caller falls back to the brief as the body — when no
+    ANTHROPIC_API_KEY is configured, the brief is empty, or generation/parse fails.
+    So the vertical works with or without a key, and a model hiccup never hard-fails
+    the draft step (the human still gets a reviewable draft).
+    """
+    if not (brief or "").strip():
+        return None
+    try:
+        from config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+    except Exception:
+        return None
+    if not ANTHROPIC_API_KEY:
+        return None
+    try:
+        import anthropic
+
+        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        category = (content_type or "blog_post").replace("_", " ")
+        user = (
+            f"Write a {category} article.\n\n"
+            f"Topic/instructions: {brief}\n\n"
+            f"{_JSON_OUTPUT_INSTRUCTIONS}"
+        )
+        resp = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=4096,
+            temperature=0.7,
+            system=_DEFAULT_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user}],
+        )
+        text = resp.content[0].text if resp.content else ""
+        json_text = text.strip()
+        if json_text.startswith("```"):
+            json_text = json_text.split("\n", 1)[1] if "\n" in json_text else json_text[3:]
+            if json_text.endswith("```"):
+                json_text = json_text[:-3]
+            json_text = json_text.strip()
+        data = json.loads(json_text)
+        if not isinstance(data, dict) or not data.get("body"):
+            return None
+        return data
+    except Exception as exc:
+        log.error("draft_content: AI generation failed, falling back to brief: %s", exc)
+        return None
 
 
 async def draft_content(
@@ -81,8 +151,29 @@ async def draft_content(
     title = (title or "").strip()[:500] or "Untitled draft"
     ctype = content_type if content_type in _ALLOWED_CONTENT_TYPES else _DEFAULT_CONTENT_TYPE
     slug_val = (slug or _slugify(title))[:200]
-    body = (brief or "").strip()  # seed body from the brief; AI fill is a follow-up
     tag_list = [str(t)[:60] for t in (tags or [])][:20]
+    excerpt_val = excerpt
+
+    # Generate the body with Claude (reusing the CMS content_generator contract).
+    # Falls back to the brief as the body when no key is configured or generation
+    # fails, so the vertical works with or without AI and never hard-fails here.
+    body = (brief or "").strip()
+    meta: dict[str, Any] = {"generated": False}
+    generated = False
+    gen = await _generate_body(brief, ctype)
+    if gen:
+        generated = True
+        body = (gen.get("body") or body).strip()
+        if not excerpt_val:
+            excerpt_val = gen.get("excerpt")
+        if not tag_list:
+            tag_list = [str(t)[:60] for t in (gen.get("tags") or [])][:20]
+        meta = {
+            "generated": True,
+            "generator": "draft_content",
+            "metaTitle": gen.get("meta_title"),
+            "metaDescription": gen.get("meta_description"),
+        }
 
     created_by_uuid: Optional[uuid.UUID] = None
     if created_by:
@@ -97,7 +188,7 @@ async def draft_content(
             (id, slug, title, content_type, body, excerpt, author, tags,
              published, status, metadata, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                false, 'pending', '{}'::jsonb, $9, now(), now())
+                false, 'pending', $9::jsonb, $10, now(), now())
         ON CONFLICT (slug) DO UPDATE
             SET title = EXCLUDED.title,
                 content_type = EXCLUDED.content_type,
@@ -105,28 +196,30 @@ async def draft_content(
                 excerpt = EXCLUDED.excerpt,
                 author = EXCLUDED.author,
                 tags = EXCLUDED.tags,
+                metadata = EXCLUDED.metadata,
                 status = 'pending',
                 published = false,
                 updated_at = now()
         RETURNING id::text AS id
         """,
-        uuid.uuid4(), slug_val, title, ctype, body, excerpt, author, tag_list,
-        created_by_uuid,
+        uuid.uuid4(), slug_val, title, ctype, body, excerpt_val, author, tag_list,
+        json.dumps(meta), created_by_uuid,
     )
     content_id = row["id"] if row else None
 
     try:
         await emit_event(
             conn, namespace="library", type="content.drafted", phase="single",
-            payload={"contentId": content_id, "slug": slug_val,
-                     "contentType": ctype, "status": "pending"},
+            payload={"contentId": content_id, "slug": slug_val, "contentType": ctype,
+                     "status": "pending", "generated": generated},
         )
     except Exception as exc:
         log.error("draft_content: failed to emit content.drafted: %s", exc)
 
-    log.info("draft_content: pending cms_content %s (slug=%s)", content_id, slug_val)
+    log.info("draft_content: pending cms_content %s (slug=%s, generated=%s)",
+             content_id, slug_val, generated)
     return {"contentId": content_id, "slug": slug_val, "status": "pending",
-            "contentType": ctype}
+            "contentType": ctype, "generated": generated}
 
 
 async def publish_content(
