@@ -15,6 +15,7 @@ import uuid
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
 from .templates import render_template, render_db_template, build_trigger_metadata
+from .sender_identity import resolve_sender
 
 logger = logging.getLogger('cms.events')
 
@@ -26,11 +27,16 @@ ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
 _SEND_AS = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
 
 
-async def send_email(to: str, subject: str, html: str) -> dict:
-    """Send via service account delegation (gmail_client), matching legacy signature."""
+async def send_email(to: str, subject: str, html: str, sender: str | None = None) -> dict:
+    """Send via service account delegation (gmail_client), matching legacy signature.
+
+    `sender` is the From identity (the delegated mailbox to send AS); it defaults to
+    _SEND_AS so existing callers are unchanged. Callers select a per-namespace sender
+    via sender_identity.resolve_sender().
+    """
     try:
         result = await _gmail_send(
-            delegate_email=_SEND_AS,
+            delegate_email=sender or _SEND_AS,
             to_email=to,
             subject=subject,
             body_html=html,
@@ -469,12 +475,22 @@ async def _handle_notification_requested(event) -> None:
             logger.info("Skipping duplicate notification.requested for trigger event %s", trigger_event_id)
             return
 
+    # Per-namespace sender identity (abstraction + config only — see
+    # docs/EMAIL_SENDERS.md). Falls back to _SEND_AS, so an unmapped notification
+    # keeps today's sender (no regression).
+    sender = resolve_sender(
+        identity=payload.get('fromIdentity'),
+        namespace=payload.get('senderNamespace'),
+        template=template_name,
+        default=_SEND_AS,
+    )
     result = await send_email(
         to=to_email,
         subject=subject,
         html=html,
+        sender=sender,
     )
-    logger.info(f'notification.requested: sent "{template_name}" to {to_email}: {result}')
+    logger.info(f'notification.requested: sent "{template_name}" as {sender} to {to_email}: {result}')
 
     # Log to automation_log for dedup cross-referencing
     if trigger_event_id and pool:
