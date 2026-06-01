@@ -213,7 +213,6 @@ function BlockEditor({
   onFieldChange,
   onSaveDraft,
   saving,
-  onRefresh,
   onMoveUp,
   onMoveDown,
   isFirst,
@@ -224,7 +223,6 @@ function BlockEditor({
   onFieldChange: (blockId: string, field: string, value: unknown) => void
   onSaveDraft: (blockId: string) => void
   saving: boolean
-  onRefresh: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   isFirst: boolean
@@ -1042,7 +1040,6 @@ export default function PageEditor() {
                         onFieldChange={handleFieldChange}
                         onSaveDraft={handleSaveDraft}
                         saving={savingBlocks.has(block.id)}
-                        onRefresh={fetchBlocks}
                         onMoveUp={() => handleMoveBlock(block.id, 'up')}
                         onMoveDown={() => handleMoveBlock(block.id, 'down')}
                         isFirst={idx === 0}
