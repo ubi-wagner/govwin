@@ -44,6 +44,7 @@ from workflows.actions.score_tenants import match_tenants
 from workflows.actions.create_library_defaults import create_default_categories
 from workflows.actions.generate_preview import generate_preview
 from workflows.actions.create_drafts_from_scout import create_drafts_from_scout
+from workflows.actions.cms_content import draft_content, publish_content
 
 __all__ = [
     "shred",
@@ -52,4 +53,6 @@ __all__ = [
     "create_default_categories",
     "generate_preview",
     "create_drafts_from_scout",
+    "draft_content",
+    "publish_content",
 ]
