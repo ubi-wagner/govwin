@@ -34,6 +34,20 @@ Legacy fallback: if `SENDER_AUTOMATION_EMAIL` is unset, `automation` falls back 
 `GOOGLE_WORKSPACE_EMAIL` (the previous single-sender var), so existing deployments
 keep working until the new vars are set.
 
+## Admin-editable addresses (CRM DB)
+
+The addresses are also stored in the CRM database in `sender_identities`
+(migration `services/cms/db/009_sender_identities.sql`), so an admin can change a
+From address — or add a new identity key — without a redeploy. The CMS event
+listener loads the table at startup and refreshes it every 5 minutes. Resolution
+precedence is:
+
+    explicit env var  >  sender_identities row (active)  >  hardcoded default
+
+i.e. env stays the per-deploy ops override, the table is the live config, and the
+hardcoded defaults are the last resort. Custom keys added to the table are
+selectable via a notification's `payload.fromIdentity`.
+
 ## How a message is mapped to an identity
 
 `resolve_sender()` (`services/cms/src/sender_identity.py`) picks the address by this

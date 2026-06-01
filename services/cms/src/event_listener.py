@@ -15,7 +15,7 @@ import uuid
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
 from .templates import render_template, render_db_template, build_trigger_metadata
-from .sender_identity import resolve_sender
+from .sender_identity import resolve_sender, load_sender_identities
 
 logger = logging.getLogger('cms.events')
 
@@ -69,8 +69,20 @@ async def stop_event_listener():
 
 
 async def _poll_loop():
+    # Load DB-backed sender identities once at start, then refresh on a cadence so
+    # admin edits to the sender_identities table propagate without a redeploy.
+    last_identity_load = 0.0
     while True:
         try:
+            now = time.monotonic()
+            if now - last_identity_load > 300:
+                try:
+                    loaded = await load_sender_identities(_get_cms_pool())
+                    if loaded:
+                        logger.info('Loaded %d sender identities from CRM DB', loaded)
+                except Exception as e:
+                    logger.warning(f'sender identity load failed: {e}')
+                last_identity_load = now
             await _process_new_events()
         except asyncio.CancelledError:
             raise
