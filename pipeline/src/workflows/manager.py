@@ -137,11 +137,28 @@ class WorkflowManager:
         tenant_id: Optional[str] = None,
         actor_id: Optional[str] = None,
         actor_email: Optional[str] = None,
-    ) -> str:
+    ) -> Optional[str]:
         """Create a new workflow instance (status=pending).
 
-        Returns the instance ID.
+        Returns the instance ID, or None if the template is inactive in the
+        process_templates catalog (the launch is refused, not an error).
         """
+        # Launch gate: a template marked inactive in the process_templates catalog
+        # cannot be launched (in-flight instances are unaffected). The .py file is
+        # the definition; the catalog row is the on/off switch + audit. Fail OPEN —
+        # a missing row/table or any query error treats the template as active, so
+        # the activation layer can never strand a live launch.
+        if not await self._template_is_active(conn, workflow_name):
+            logger.info(
+                "[create_instance] template %s inactive — refusing launch (trigger=%s)",
+                workflow_name, trigger_event_id,
+            )
+            await self._emit_event(
+                conn, "system", "workflow.skipped_inactive", tenant_id,
+                {"workflow_name": workflow_name, "trigger_event_id": trigger_event_id},
+            )
+            return None
+
         instance_id = str(uuid.uuid4())
 
         # Calculate deadline from workflow definition (default 1 hour)
@@ -202,6 +219,85 @@ class WorkflowManager:
         )
 
         return instance_id
+
+    async def _template_is_active(
+        self, conn: asyncpg.Connection, workflow_name: str
+    ) -> bool:
+        """Return False only if the catalog explicitly marks this template inactive.
+
+        Fail-open: a missing row, the process_templates table not yet existing
+        (054 unapplied), or any query error returns True — the activation layer
+        must never strand the launch path.
+        """
+        try:
+            row = await conn.fetchrow(
+                "SELECT active FROM process_templates WHERE workflow_name = $1",
+                workflow_name,
+            )
+        except Exception:
+            return True
+        if row is None:
+            return True
+        return bool(row["active"])
+
+    async def sync_template_catalog(self, conn: asyncpg.Connection) -> int:
+        """Reflect the live workflow registry into process_templates (boot-sync).
+
+        Code is the source of truth: upsert one catalog row per registered template
+        so the activation/audit layer lists exactly what the running build defines.
+        New templates land active; known templates get description / trigger_key /
+        last_seen_at refreshed, but their admin-owned active, inactive_date,
+        inactivated_by and memo columns are left UNTOUCHED. Best effort — if the
+        table is absent (054 unapplied) it is skipped; per-row errors are logged
+        and do not abort the sync.
+        """
+        from workflows.base import all_registered_workflows
+
+        try:
+            exists = await conn.fetchval(
+                "SELECT to_regclass('public.process_templates') IS NOT NULL"
+            )
+        except Exception:
+            exists = False
+        if not exists:
+            logger.info(
+                "[sync_template_catalog] process_templates absent — skipping (054 unapplied?)"
+            )
+            return 0
+
+        synced = 0
+        for cls in all_registered_workflows():
+            trig = getattr(cls, "trigger", None)
+            trigger_key = (
+                f"{trig.namespace}:{trig.type}:{trig.phase}" if trig else None
+            )
+            try:
+                await conn.execute(
+                    """
+                    INSERT INTO process_templates
+                        (workflow_name, description, trigger_key, source, last_seen_at)
+                    VALUES ($1, $2, $3, $4, now())
+                    ON CONFLICT (workflow_name) DO UPDATE
+                        SET description = EXCLUDED.description,
+                            trigger_key = EXCLUDED.trigger_key,
+                            last_seen_at = now()
+                    """,
+                    cls.__name__,
+                    getattr(cls, "description", "") or "",
+                    trigger_key,
+                    self.source,
+                )
+                synced += 1
+            except Exception as e:
+                logger.error(
+                    "[sync_template_catalog] upsert failed for %s: %s", cls.__name__, e
+                )
+        if synced:
+            logger.info(
+                "[sync_template_catalog] synced %d template(s) for source=%s",
+                synced, self.source,
+            )
+        return synced
 
     async def execute_instance(
         self,

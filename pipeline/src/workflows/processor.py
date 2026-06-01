@@ -652,6 +652,15 @@ async def _run_workflow_managed(
         actor_email=None,
     )
 
+    if instance_id is None:
+        # Template is inactive in the process_templates catalog — launch refused
+        # (not an error). create_instance already emitted workflow.skipped_inactive.
+        log.info(
+            "workflow %s not launched (inactive template) for event %s",
+            workflow_name, trigger_event_id,
+        )
+        return
+
     log.info(
         "created process instance %s for workflow %s (event=%s)",
         instance_id,
@@ -708,6 +717,13 @@ async def run_workflow_processor(
             manager = WorkflowManager(source="pipeline")
             await manager.start(conn, pool=pool)
             log.info("WorkflowManager enabled — persistent execution with crash recovery")
+            # Reflect the discovered .py templates into the process_templates
+            # catalog (the activation + audit layer). Best-effort; never blocks boot.
+            try:
+                synced = await manager.sync_template_catalog(conn)
+                log.info("template catalog synced (%d templates)", synced)
+            except Exception as exc:
+                log.error("template catalog sync failed (non-fatal): %s", exc)
         else:
             log.info("process_instances table not found — using fire-and-forget execution")
 

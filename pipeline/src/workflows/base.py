@@ -254,6 +254,21 @@ def list_workflows() -> dict[str, type[Workflow]]:
     return dict(_registry)
 
 
+def all_registered_workflows() -> list[type[Workflow]]:
+    """Return every registered Workflow subclass, de-duplicated by class name.
+
+    The registry is keyed by trigger and holds a LIST per key (a file may define
+    several templates; several may share a trigger). This flattens it to the
+    distinct template classes — what the process_templates catalog sync and any
+    admin listing iterate over.
+    """
+    seen: dict[str, type[Workflow]] = {}
+    for candidates in _registry.values():
+        for c in candidates:
+            seen[c.__name__] = c
+    return list(seen.values())
+
+
 def discover_workflows() -> int:
     """Auto-import all modules in the workflows package to trigger registration."""
     import workflows as pkg
