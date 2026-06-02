@@ -3,7 +3,7 @@
 # Pre-V2 parity restoration: `migrate`, `railway-vars`, `shell-db` targets
 # are back. See RAILWAY.md for the full deployment runbook.
 
-.PHONY: up down migrate seed dev type-check shell-db test railway-vars
+.PHONY: up down migrate seed dev type-check shell-db test test-integration railway-vars
 
 # ---------------------------------------------------------------------
 # Local dev stack
@@ -51,6 +51,19 @@ type-check:
 
 test:
 	bash scripts/test-all.sh
+
+# Real-DB integration tests: the CMS content bridge (cms_posts -> cms_content)
+# and the pipeline content vertical (draft/publish). They SKIP automatically
+# unless these point at *test* Postgres databases (never prod):
+#   TEST_DATABASE_URL      Main/Pipeline DB (cms_content lives here)
+#   TEST_CMS_DATABASE_URL  CMS DB (cms_posts) — only needed for the CMS test
+# Example:
+#   TEST_DATABASE_URL=postgresql://u:p@localhost:5432/main_test \
+#   TEST_CMS_DATABASE_URL=postgresql://u:p@localhost:5432/cms_test \
+#   make test-integration
+test-integration:
+	cd pipeline && python -m pytest tests/test_cms_content_integration.py -q
+	cd services/cms && python -m pytest tests/test_page_blocks_integration.py -q
 
 # ---------------------------------------------------------------------
 # DB shell (works locally AND against Railway — whatever $DATABASE_URL is)
