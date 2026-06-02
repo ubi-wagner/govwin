@@ -538,7 +538,7 @@ async function fetchContentPipeline(): Promise<ContentPipelineData> {
       FROM system_events
       WHERE namespace = 'system'
         AND type IN (
-              -- legacy Next.js editor (/admin/content/editor)
+              -- legacy Next.js editor (removed; historical events retained)
               'content.submitted_for_review', 'content.approved', 'content.rejected',
               'content.page_published', 'content.drafts_saved',
               -- new CMS SPA editor (/pages → FastAPI page_blocks)
