@@ -1,8 +1,10 @@
 """
 Page Block management API routes.
 
-Visual editor CRUD + workflow for page_block content items in cms_content.
-All operations use the shared database (Main DB) since cms_content lives there.
+Visual editor CRUD + workflow for page blocks. Editing and version history live
+in the CMS-local database (cms_posts, the staging + version store); publish and
+approve bridge blocks to the Main DB public reference (cms_content) that the
+marketing pages read. Drafts never touch the live cms_content rows.
 """
 import json
 import logging
@@ -15,7 +17,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..models.database import get_event_pool
+from ..models.database import get_event_pool, get_pool
 from ..routers.auth import verify_session_token
 
 logger = logging.getLogger('cms.page_blocks')
@@ -49,7 +51,7 @@ def _require_admin(request: Request) -> dict:
 
 
 def _get_shared_pool():
-    """Get the shared database pool. Raises 503 if not configured."""
+    """Get the shared (Main DB) pool — the public cms_content reference + events."""
     pool = get_event_pool()
     if not pool:
         raise HTTPException(
@@ -59,8 +61,18 @@ def _get_shared_pool():
     return pool
 
 
+def _get_cms_pool():
+    """Get the CMS-local pool (cms_posts — the page-block editing + version store)."""
+    try:
+        return get_pool()
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail='CMS database not connected')
+
+
 async def _emit_shared_event(pool, event_type: str, user_id: str, payload: dict) -> None:
     """Emit event to shared system_events table (best-effort)."""
+    if not pool:
+        return
     try:
         await pool.execute(
             """
@@ -165,7 +177,11 @@ AI_SYSTEM_PROMPT = (
 # ── Helper: serialize row ────────────────────────────────────────────────────
 
 def _row_to_block(row) -> dict:
-    """Convert an asyncpg Record to a block dict with camelCase keys."""
+    """Convert a cms_posts asyncpg Record to a block dict with camelCase keys.
+
+    Shape is identical to the pre-Phase-2 cms_content serializer so the editor
+    frontend is unchanged: only the backing store moved (cms_content -> cms_posts).
+    """
     d = dict(row)
     metadata = d.get('metadata')
     if isinstance(metadata, str):
@@ -176,20 +192,21 @@ def _row_to_block(row) -> dict:
     elif metadata is None:
         metadata = {}
 
+    status = d.get('status', 'draft')
     return {
         'id': str(d['id']),
         'slug': d.get('slug', ''),
         'title': d.get('title', ''),
-        'contentType': d.get('content_type', 'page_block'),
+        'contentType': d.get('category', 'page_block'),
         'body': d.get('body', ''),
         'excerpt': d.get('excerpt'),
-        'author': d.get('author'),
-        'tags': d.get('tags', []),
-        'published': d.get('published', False),
-        'status': d.get('status', 'draft'),
+        'author': d.get('author_name'),
+        'tags': list(d.get('tags') or []),
+        'published': status == 'published',
+        'status': status,
         'publishedAt': d['published_at'].isoformat() if d.get('published_at') else None,
-        'featuredImage': d.get('featured_image'),
-        'externalUrl': d.get('external_url'),
+        'featuredImage': d.get('featured_image_url'),
+        'externalUrl': metadata.get('external_url') if isinstance(metadata, dict) else None,
         'displayOrder': d.get('display_order', 0),
         'metadata': metadata,
         'createdAt': d['created_at'].isoformat() if d.get('created_at') else None,
@@ -197,19 +214,101 @@ def _row_to_block(row) -> dict:
     }
 
 
+# Metadata keys that are editing bookkeeping (not public display fields). Stripped
+# from the published cms_content copy; the full history stays in cms_posts.
+_BOOKKEEPING_META_KEYS = ('_versions', '_currentVersion', '_draftedBy')
+
+
+async def _bridge_publish(
+    cms_pool, shared_pool, *, page: str,
+    block_ids: list | None = None, from_statuses: tuple = ('draft', 'pending'),
+) -> int:
+    """Publish page-block cms_posts rows to the public cms_content reference.
+
+    Flips matching cms_posts rows to 'published' (CMS DB), then upserts each into
+    Main DB cms_content (content_type='page_block', status='published') keyed by
+    slug — preserving tags, display_order and display metadata. Editing bookkeeping
+    (_versions etc.) is stripped from the public copy. Returns the bridged count.
+    """
+    if block_ids:
+        ids = [uuid.UUID(b) for b in block_ids]
+        rows = await cms_pool.fetch(
+            """
+            UPDATE cms_posts
+            SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
+            WHERE category = 'page_block' AND $1 = ANY(tags)
+              AND status = ANY($2::text[]) AND id = ANY($3::uuid[])
+            RETURNING slug, title, body, excerpt, tags, metadata, display_order,
+                      author_name, featured_image_url, published_at
+            """,
+            page, list(from_statuses), ids,
+        )
+    else:
+        rows = await cms_pool.fetch(
+            """
+            UPDATE cms_posts
+            SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
+            WHERE category = 'page_block' AND $1 = ANY(tags)
+              AND status = ANY($2::text[])
+            RETURNING slug, title, body, excerpt, tags, metadata, display_order,
+                      author_name, featured_image_url, published_at
+            """,
+            page, list(from_statuses),
+        )
+
+    for r in rows:
+        meta = r['metadata']
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        public_meta = {k: v for k, v in meta.items() if k not in _BOOKKEEPING_META_KEYS}
+        await shared_pool.execute(
+            """
+            INSERT INTO cms_content
+                (slug, title, body, excerpt, content_type, author, tags,
+                 status, published, published_at, featured_image, metadata,
+                 display_order, updated_at)
+            VALUES ($1, $2, $3, $4, 'page_block', $5, $6,
+                    'published', true, COALESCE($7, now()), $8, $9::jsonb, $10, now())
+            ON CONFLICT (slug) DO UPDATE SET
+                title = EXCLUDED.title,
+                body = EXCLUDED.body,
+                excerpt = EXCLUDED.excerpt,
+                author = EXCLUDED.author,
+                tags = EXCLUDED.tags,
+                status = 'published',
+                published = true,
+                published_at = COALESCE(cms_content.published_at, EXCLUDED.published_at),
+                featured_image = EXCLUDED.featured_image,
+                metadata = EXCLUDED.metadata,
+                display_order = EXCLUDED.display_order,
+                updated_at = now()
+            """,
+            r['slug'], r['title'], r['body'], r['excerpt'], r['author_name'],
+            list(r['tags'] or []), r['published_at'], r['featured_image_url'],
+            json.dumps(public_meta), r['display_order'],
+        )
+
+    return len(rows)
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/")
 async def list_page_blocks(request: Request, page: str):
-    """Return all blocks for a page, ordered by display_order."""
+    """Return all page blocks for a page from cms_posts, ordered by display_order."""
     _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
 
     try:
         rows = await pool.fetch(
             """
-            SELECT * FROM cms_content
-            WHERE content_type = 'page_block'
+            SELECT * FROM cms_posts
+            WHERE category = 'page_block'
               AND $1 = ANY(tags)
               AND status IN ('published', 'draft', 'pending')
             ORDER BY display_order ASC
@@ -232,7 +331,8 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
     Sets status='draft' and tracks _draftedBy.
     """
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
+    shared_pool = get_event_pool()
     user_email = claims.get('email', 'unknown')
     user_id = claims.get('sub', 'unknown')
 
@@ -245,7 +345,7 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
 
                     # Fetch current state for version snapshot
                     current = await conn.fetchrow(
-                        'SELECT * FROM cms_content WHERE id = $1',
+                        'SELECT * FROM cms_posts WHERE id = $1',
                         block_id,
                     )
                     if not current:
@@ -272,7 +372,7 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
                         'title': current['title'] or '',
                         'body': current['body'] or '',
                         'excerpt': current.get('excerpt'),
-                        'featuredImage': current.get('featured_image'),
+                        'featuredImage': current.get('featured_image_url'),
                         'displayOrder': current.get('display_order', 0),
                         'metadata': {
                             k: v for k, v in current_meta.items()
@@ -298,6 +398,7 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
                     set_parts = [
                         "status = 'draft'",
                         "metadata = $2::jsonb",
+                        "version = version + 1",
                         "updated_at = NOW()",
                     ]
                     params: list = [block_id, json.dumps(new_meta)]
@@ -321,13 +422,13 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
                         idx += 1
 
                     await conn.execute(
-                        f"UPDATE cms_content SET {', '.join(set_parts)} WHERE id = $1",
+                        f"UPDATE cms_posts SET {', '.join(set_parts)} WHERE id = $1",
                         *params,
                     )
                     saved += 1
 
-        # Emit events
-        await _emit_shared_event(pool, 'content.page_blocks_updated', user_id, {
+        # Emit events to the shared (Main DB) event bus
+        await _emit_shared_event(shared_pool, 'content.page_blocks_updated', user_id, {
             'blockCount': saved,
             'draftedBy': user_email,
         })
@@ -342,26 +443,21 @@ async def update_page_blocks(request: Request, body: BatchUpdateRequest):
 
 @router.post("/publish")
 async def publish_page(request: Request, body: PageRequest):
-    """Publish all drafts for a page."""
+    """Publish all draft/pending page blocks for a page to the public reference."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    cms_pool = _get_cms_pool()
+    shared_pool = _get_shared_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
-        result = await pool.execute(
-            """
-            UPDATE cms_content
-            SET status = 'published', published = true, published_at = NOW(), updated_at = NOW()
-            WHERE content_type = 'page_block'
-              AND $1 = ANY(tags)
-              AND status IN ('draft', 'pending')
-            """,
-            body.page,
+        # Publish = push the page's full current state live (draft + pending +
+        # published), so content edits AND reorders of already-live blocks land.
+        count = await _bridge_publish(
+            cms_pool, shared_pool, page=body.page,
+            from_statuses=('draft', 'pending', 'published'),
         )
-        # asyncpg returns "UPDATE N"
-        count = int(result.split()[-1]) if result else 0
 
-        await _emit_shared_event(pool, 'content.page_blocks_published', user_id, {
+        await _emit_shared_event(shared_pool, 'content.page_blocks_published', user_id, {
             'page': body.page,
             'publishedCount': count,
         })
@@ -376,17 +472,17 @@ async def publish_page(request: Request, body: PageRequest):
 
 @router.post("/submit-review")
 async def submit_for_review(request: Request, body: PageRequest):
-    """Move drafts to pending status for review."""
+    """Move draft page blocks to pending (review-queued) in cms_posts."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
         result = await pool.execute(
             """
-            UPDATE cms_content
+            UPDATE cms_posts
             SET status = 'pending', updated_at = NOW()
-            WHERE content_type = 'page_block'
+            WHERE category = 'page_block'
               AND $1 = ANY(tags)
               AND status = 'draft'
             """,
@@ -394,7 +490,7 @@ async def submit_for_review(request: Request, body: PageRequest):
         )
         count = int(result.split()[-1]) if result else 0
 
-        await _emit_shared_event(pool, 'content.page_blocks_submitted', user_id, {
+        await _emit_shared_event(get_event_pool(), 'content.page_blocks_submitted', user_id, {
             'page': body.page,
             'submittedCount': count,
         })
@@ -409,42 +505,19 @@ async def submit_for_review(request: Request, body: PageRequest):
 
 @router.post("/approve")
 async def approve_blocks(request: Request, body: ApproveRequest):
-    """Approve pending blocks (publish them)."""
+    """Approve pending page blocks — publish them to the public reference."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    cms_pool = _get_cms_pool()
+    shared_pool = _get_shared_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
-        if body.blockIds:
-            # Approve specific blocks
-            block_uuids = [uuid.UUID(bid) for bid in body.blockIds]
-            result = await pool.execute(
-                """
-                UPDATE cms_content
-                SET status = 'published', published = true, published_at = NOW(), updated_at = NOW()
-                WHERE content_type = 'page_block'
-                  AND $1 = ANY(tags)
-                  AND status = 'pending'
-                  AND id = ANY($2::uuid[])
-                """,
-                body.page,
-                block_uuids,
-            )
-        else:
-            # Approve all pending for page
-            result = await pool.execute(
-                """
-                UPDATE cms_content
-                SET status = 'published', published = true, published_at = NOW(), updated_at = NOW()
-                WHERE content_type = 'page_block'
-                  AND $1 = ANY(tags)
-                  AND status = 'pending'
-                """,
-                body.page,
-            )
-        count = int(result.split()[-1]) if result else 0
+        count = await _bridge_publish(
+            cms_pool, shared_pool, page=body.page,
+            block_ids=body.blockIds, from_statuses=('pending',),
+        )
 
-        await _emit_shared_event(pool, 'content.page_blocks_approved', user_id, {
+        await _emit_shared_event(shared_pool, 'content.page_blocks_approved', user_id, {
             'page': body.page,
             'approvedCount': count,
         })
@@ -459,17 +532,17 @@ async def approve_blocks(request: Request, body: ApproveRequest):
 
 @router.post("/reject")
 async def reject_blocks(request: Request, body: RejectRequest):
-    """Reject pending blocks back to draft."""
+    """Reject pending page blocks back to draft in cms_posts."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
         result = await pool.execute(
             """
-            UPDATE cms_content
+            UPDATE cms_posts
             SET status = 'draft', updated_at = NOW()
-            WHERE content_type = 'page_block'
+            WHERE category = 'page_block'
               AND $1 = ANY(tags)
               AND status = 'pending'
             """,
@@ -477,7 +550,7 @@ async def reject_blocks(request: Request, body: RejectRequest):
         )
         count = int(result.split()[-1]) if result else 0
 
-        await _emit_shared_event(pool, 'content.page_blocks_rejected', user_id, {
+        await _emit_shared_event(get_event_pool(), 'content.page_blocks_rejected', user_id, {
             'page': body.page,
             'rejectedCount': count,
             'notes': body.notes,
@@ -493,9 +566,9 @@ async def reject_blocks(request: Request, body: RejectRequest):
 
 @router.post("/reorder")
 async def reorder_blocks(request: Request, body: ReorderRequest):
-    """Atomically reorder blocks by setting display_order 0, 1, 2, ..."""
+    """Atomically reorder page blocks by setting display_order 0, 1, 2, ... in cms_posts."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
@@ -504,11 +577,11 @@ async def reorder_blocks(request: Request, body: ReorderRequest):
                 for i, block_id_str in enumerate(body.blockIds):
                     block_id = uuid.UUID(block_id_str)
                     await conn.execute(
-                        "UPDATE cms_content SET display_order = $1, updated_at = NOW() WHERE id = $2",
+                        "UPDATE cms_posts SET display_order = $1, updated_at = NOW() WHERE id = $2",
                         i, block_id,
                     )
 
-        await _emit_shared_event(pool, 'content.page_blocks_reordered', user_id, {
+        await _emit_shared_event(get_event_pool(), 'content.page_blocks_reordered', user_id, {
             'blockCount': len(body.blockIds),
         })
 
@@ -524,35 +597,31 @@ async def reorder_blocks(request: Request, body: ReorderRequest):
 async def add_blank_block(request: Request, body: AddBlankRequest):
     """Create a blank block with page/section tags at the end of the section."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     user_email = claims.get('email', 'unknown')
     user_id = claims.get('sub', 'unknown')
 
     try:
-        # Look up user UUID from email for created_by FK
-        user_row = await pool.fetchrow("SELECT id FROM users WHERE email = $1", user_email)
-        creator_id = user_row['id'] if user_row else None
-
         # Get current max display_order for the page
         max_order = await pool.fetchval(
             """
-            SELECT COALESCE(MAX(display_order), -1) FROM cms_content
-            WHERE content_type = 'page_block' AND $1 = ANY(tags)
+            SELECT COALESCE(MAX(display_order), -1) FROM cms_posts
+            WHERE category = 'page_block' AND $1 = ANY(tags)
             """,
             body.page,
         )
-        new_order = (max_order or 0) + 1
+        new_order = (max_order if max_order is not None else -1) + 1
 
         slug = f"page-block-{body.page}-{body.section}-{uuid.uuid4().hex[:8]}"
         tags = [body.page, body.section]
 
         row = await pool.fetchrow(
             """
-            INSERT INTO cms_content
-                (slug, title, content_type, body, excerpt, tags, display_order,
-                 metadata, status, published, created_by)
+            INSERT INTO cms_posts
+                (slug, title, category, body, excerpt, tags, display_order,
+                 metadata, status, author_name, author_email)
             VALUES ($1, $2, 'page_block', '', NULL, $3, $4,
-                    $5::jsonb, 'draft', false, $6)
+                    $5::jsonb, 'draft', $6, $6)
             RETURNING *
             """,
             slug,
@@ -560,10 +629,10 @@ async def add_blank_block(request: Request, body: AddBlankRequest):
             tags,
             new_order,
             json.dumps({'_currentVersion': 0, '_versions': [], '_draftedBy': user_email}),
-            creator_id,
+            user_email,
         )
 
-        await _emit_shared_event(pool, 'content.page_block_created', user_id, {
+        await _emit_shared_event(get_event_pool(), 'content.page_block_created', user_id, {
             'page': body.page,
             'section': body.section,
             'blockId': str(row['id']),
@@ -579,22 +648,32 @@ async def add_blank_block(request: Request, body: AddBlankRequest):
 
 @router.delete("/{block_id}")
 async def delete_block(request: Request, block_id: str):
-    """Delete a page block."""
+    """Delete a page block from cms_posts and remove its public cms_content copy."""
     claims = _require_admin(request)
-    pool = _get_shared_pool()
+    pool = _get_cms_pool()
     user_id = claims.get('sub', 'unknown')
 
     try:
         bid = uuid.UUID(block_id)
-        result = await pool.execute(
-            "DELETE FROM cms_content WHERE id = $1 AND content_type = 'page_block'",
+        row = await pool.fetchrow(
+            "DELETE FROM cms_posts WHERE id = $1 AND category = 'page_block' RETURNING slug",
             bid,
         )
-        count = int(result.split()[-1]) if result else 0
-        if count == 0:
+        if not row:
             raise HTTPException(status_code=404, detail='Block not found')
 
-        await _emit_shared_event(pool, 'content.page_block_deleted', user_id, {
+        # Remove the published copy from the public reference too (best-effort).
+        shared_pool = get_event_pool()
+        if shared_pool:
+            try:
+                await shared_pool.execute(
+                    "DELETE FROM cms_content WHERE slug = $1 AND content_type = 'page_block'",
+                    row['slug'],
+                )
+            except Exception as e:
+                logger.error('[DELETE /page-blocks] cms_content cleanup failed: %s', e)
+
+        await _emit_shared_event(shared_pool, 'content.page_block_deleted', user_id, {
             'blockId': block_id,
         })
 
