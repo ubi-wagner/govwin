@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { harvestProposalToLibrary } from '@/lib/proposal-harvest';
 import { isValidUUID } from '@/lib/validation';
 
@@ -410,6 +410,82 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/lock] unlock activity log failed', logErr);
+    }
+
+    // ── Notify tenant members that proposal is ready for editing ────
+    try {
+      const tenantMembers = await sql<{ email: string; name: string | null }[]>`
+        SELECT u.email, u.name
+        FROM users u
+        JOIN tenant_memberships tm ON tm.user_id = u.id
+        WHERE tm.tenant_id = ${tenantId}::uuid
+          AND tm.role IN ('tenant_admin', 'tenant_user')
+          AND u.is_active = true
+        LIMIT 20
+      `;
+
+      if (tenantMembers.length > 0) {
+        const { sendEmail } = await import('@/lib/email');
+        const [tenantRow] = await sql<{ name: string }[]>`
+          SELECT name FROM tenants WHERE id = ${tenantId}::uuid
+        `;
+        const tName = tenantRow?.name || tenantSlug;
+        const [proposalRow] = await sql<{ title: string }[]>`
+          SELECT title FROM proposals WHERE id = ${proposalId}
+        `;
+        const pTitle = proposalRow?.title || 'your proposal';
+        const proposalUrl = `${process.env.NEXT_PUBLIC_URL || ''}/portal/${tenantSlug}/proposals/${proposalId}`;
+
+        for (const member of tenantMembers) {
+          try {
+            await sendEmail({
+              to: member.email,
+              subject: `Your proposal is ready — ${pTitle}`,
+              html: `
+                <p>Hi ${member.name || 'there'},</p>
+                <p>Your proposal workspace has been reviewed by our team and is now <strong>unlocked and ready for your input</strong>.</p>
+                <ul>
+                  <li><strong>Proposal:</strong> ${pTitle}</li>
+                  <li><strong>Organization:</strong> ${tName}</li>
+                </ul>
+                <p>Please log in to review the draft sections, collaborate with your team, and complete the proposal before the deadline.</p>
+                <p><a href="${proposalUrl}" style="display:inline-block;padding:10px 20px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-weight:bold;">Open Your Proposal</a></p>
+                <p>— RFP Pipeline System</p>
+              `,
+            });
+          } catch (emailErr) {
+            console.error('[portal/proposals/lock] customer notification email failed:', emailErr);
+          }
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[portal/proposals/lock] customer notification setup failed:', notifyErr);
+    }
+
+    // ── Mark AdminProposalSetup process_instance complete ────────────
+    try {
+      await sql`
+        UPDATE process_instances
+        SET status = 'completed', completed_at = now()
+        WHERE workflow_name = 'AdminProposalSetup'
+          AND status = 'running'
+          AND payload->>'proposalId' = ${proposalId}
+      `;
+    } catch (piErr) {
+      console.error('[portal/proposals/lock] process_instance completion failed (non-fatal)', piErr);
+    }
+
+    // ── Emit proposal.ready_for_customer event ───────────────────────
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.ready_for_customer',
+        actor: userActor(sessionUser.id, sessionUser.email),
+        tenantId,
+        payload: { proposalId, tenantSlug },
+      });
+    } catch {
+      // Best-effort
     }
 
     return NextResponse.json({

@@ -102,15 +102,18 @@ export async function GET(_request: Request, ctx: RouteContext) {
       };
     });
 
-    // Filter: for non-admins, include sections they have some access to
-    // but mark hidden sections as 'none' permission (still in list for UI)
+    // partner_user: only return sections they have explicit access to.
+    // tenant_admin/tenant_user: show all sections (hidden ones tagged so UI can grey them).
+    // admin (resolveUserAccess): return all with full edit permission.
+    const isPartner = role === 'partner_user';
     const data = access.role === 'admin'
       ? sections
-      : sections.map((s) => ({
-          ...s,
-          // Non-admins see the title but not content for 'none' sections
-          ...(s.permission === 'none' ? { status: 'hidden' } : {}),
-        }));
+      : isPartner
+        ? sections.filter((s) => s.permission !== 'none')
+        : sections.map((s) => ({
+            ...s,
+            ...(s.permission === 'none' ? { status: 'hidden' } : {}),
+          }));
 
     return NextResponse.json({
       data: {

@@ -147,7 +147,9 @@ export function ProposalWorkspace({
   const router = useRouter();
   const [sections, setSections] = useState(initialSections);
   const [showDrafter, setShowDrafter] = useState(hasEmptySections && userRole === 'admin');
-  const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'timeline'>('workspace');
+  const [workspaceTab, setWorkspaceTab] = useState<'workspace' | 'my-sections' | 'timeline'>(
+    userRole !== 'admin' ? 'my-sections' : 'workspace',
+  );
 
   const handleSectionDrafted = useCallback(
     (sectionId: string, nodes: CanvasNode[]) => {
@@ -184,13 +186,15 @@ export function ProposalWorkspace({
         unlockDeadline={unlockDeadline}
         canAdvance={canAdvance}
         canExport={canExport}
+        userRole={userRole}
         closeDate={closeDate}
       />
 
       {/* Workspace-level tab bar */}
       <div className="flex gap-0 border-b border-gray-200">
         {([
-          { key: 'workspace' as const, label: 'Workspace' },
+          { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },
+          { key: 'my-sections' as const, label: 'My Sections' },
           { key: 'timeline' as const, label: 'Timeline' },
         ]).map((tab) => (
           <button
@@ -252,6 +256,58 @@ export function ProposalWorkspace({
           </div>
         </div>
       )}
+
+      {/* ─── My Sections Tab ─────────────────────────────────────────── */}
+      {workspaceTab === 'my-sections' && (() => {
+        const mySections = sections.filter(
+          (s) => s.assignedTo === currentUserId || s.permission === 'edit' || s.permission === 'comment',
+        );
+        return (
+          <div className="space-y-3">
+            {mySections.length === 0 ? (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
+                No sections are assigned to you yet.
+                {userRole === 'admin' && ' Use the All Sections tab to assign sections to team members.'}
+              </div>
+            ) : (
+              mySections.map((section) => {
+                const config = STATUS_CONFIG[section.status] ?? STATUS_CONFIG['empty'];
+                return (
+                  <a
+                    key={section.id}
+                    href={`/portal/${tenantSlug}/proposals/${proposalId}/sections/${section.id}`}
+                    className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${config.dotColor}`} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {section.sectionNumber}. {section.title}
+                          </p>
+                          {section.pageAllocation && (
+                            <p className="text-xs text-gray-400 mt-0.5">{section.pageAllocation} pages</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          section.permission === 'edit' ? 'bg-blue-100 text-blue-700' :
+                          section.permission === 'comment' ? 'bg-amber-100 text-amber-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          {section.permission}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── Workspace Tab ───────────────────────────────────────────── */}
       {workspaceTab === 'workspace' && <>

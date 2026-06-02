@@ -550,6 +550,29 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
+    // ── Create process_instance for 72hr Admin SLA tracking ─────────
+    try {
+      await sql`
+        INSERT INTO process_instances
+          (workflow_name, status, source, tenant_id, deadline, payload)
+        VALUES (
+          'AdminProposalSetup',
+          'running',
+          'pipeline',
+          ${tenantId}::uuid,
+          NOW() + INTERVAL '72 hours',
+          ${JSON.stringify({
+            proposalId: proposal.id,
+            opportunityTitle: proposalTitle,
+            tenantName,
+            adminEmailsSent: adminsNotifiedCount,
+          })}::jsonb
+        )
+      `;
+    } catch (piErr) {
+      console.error('[proposals/create] process_instance creation failed (non-fatal)', piErr);
+    }
+
     return NextResponse.json({
       data: {
         proposalId: proposal.id,
