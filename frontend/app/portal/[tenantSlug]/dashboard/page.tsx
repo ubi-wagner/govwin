@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
+import { TaskQueue } from '@/components/tasks/task-queue';
 
 export const dynamic = 'force-dynamic';
 
@@ -179,6 +180,11 @@ export default async function DashboardPage({
         <Link href={`/portal/${tenantSlug}/library`}><StatCard label="Library Units" value={libraryCount} /></Link>
         <Link href={`/portal/${tenantSlug}/proposals`}><StatCard label="Active Proposals" value={proposalCount} /></Link>
         <Link href={`/portal/${tenantSlug}/pipeline`}><StatCard label="Pinned Topics" value={pinnedCount} /></Link>
+      </div>
+
+      {/* To-Do queue + in-app deadline nudges (reads the unified tasks ledger) */}
+      <div className="mt-6">
+        <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} />
       </div>
 
       {/* Get Started checklist */}

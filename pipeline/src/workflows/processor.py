@@ -463,22 +463,29 @@ async def _run_workflow(
     for step in steps:
         step_start_time = time.monotonic()
 
-        # If this step depends on a skipped HITL_WAIT step, skip it too
+        # The fire-and-forget fallback (no process_instances table) CANNOT park
+        # at a human gate. STOP the workflow here rather than silently skipping
+        # human review and proceeding — that bypass was the old behavior and is
+        # dangerous. A properly-migrated deployment uses the managed engine,
+        # which parks correctly at HITL_WAIT. (INC-5; EVENT_CONTRACT_V3 gap 5.)
+        if step.step_type == StepType.HITL_WAIT:
+            log.warning(
+                "workflow '%s' reached HITL_WAIT '%s' in fire-and-forget mode "
+                "(process_instances missing) — stopping, NOT bypassing human review",
+                workflow_cls.__name__, step.name,
+            )
+            try:
+                await emit_event(
+                    conn, namespace="system", type="workflow.hitl_unsupported",
+                    payload={"workflow": workflow_cls.__name__, "step": step.name},
+                    tenant_id=tenant_id,
+                )
+            except Exception as exc:
+                log.error("failed to emit workflow.hitl_unsupported: %s", exc)
+            break
+
         if step.depends_on:
             dep_result = step_results.get(step.depends_on, {})
-            if dep_result.get("skipped") and dep_result.get("reason") == "hitl_wait_v1":
-                log.info(
-                    "skipping step '%s' because dependency '%s' is a HITL_WAIT (V1)",
-                    step.name,
-                    step.depends_on,
-                )
-                step_results[step.name] = {
-                    "result": None,
-                    "skipped": True,
-                    "reason": "dependency_hitl_wait",
-                }
-                continue
-
             # If dependency failed, log but continue (inputs will be None)
             if "error" in dep_result:
                 log.warning(
@@ -645,6 +652,15 @@ async def _run_workflow_managed(
         actor_email=None,
     )
 
+    if instance_id is None:
+        # Template is inactive in the process_templates catalog — launch refused
+        # (not an error). create_instance already emitted workflow.skipped_inactive.
+        log.info(
+            "workflow %s not launched (inactive template) for event %s",
+            workflow_name, trigger_event_id,
+        )
+        return
+
     log.info(
         "created process instance %s for workflow %s (event=%s)",
         instance_id,
@@ -701,6 +717,13 @@ async def run_workflow_processor(
             manager = WorkflowManager(source="pipeline")
             await manager.start(conn, pool=pool)
             log.info("WorkflowManager enabled — persistent execution with crash recovery")
+            # Reflect the discovered .py templates into the process_templates
+            # catalog (the activation + audit layer). Best-effort; never blocks boot.
+            try:
+                synced = await manager.sync_template_catalog(conn)
+                log.info("template catalog synced (%d templates)", synced)
+            except Exception as exc:
+                log.error("template catalog sync failed (non-fatal): %s", exc)
         else:
             log.info("process_instances table not found — using fire-and-forget execution")
 
@@ -801,6 +824,20 @@ async def run_workflow_processor(
                                     "failed to emit workflow.failed event: %s",
                                     emit_exc,
                                 )
+
+                    # Resume any paused HITL instance waiting for THIS event.
+                    # (The missing link that made HITL a dead end — see
+                    # manager.match_waiting_instances / CLAUDE_CLIFFNOTES Mistake 18.)
+                    if manager:
+                        try:
+                            woke = await manager.match_waiting_instances(conn, event_dict)
+                            if woke:
+                                log.info(
+                                    "resumed %d paused instance(s) on event %s",
+                                    len(woke), event_dict["id"],
+                                )
+                        except Exception as e:
+                            log.error("match_waiting_instances failed: %s", e)
 
                     # Advance the high-water mark
                     last_processed_at = event_row["created_at"]

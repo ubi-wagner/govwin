@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { launchTemplate } from '@/lib/process/launch-template';
 
 export async function GET(request: Request) {
   try {
@@ -132,6 +133,96 @@ export async function GET(request: Request) {
     console.error('[admin/workflows] error:', err);
     return NextResponse.json(
       { error: 'Workflow query failed', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/admin/workflows — Launch a process template by name with an overlay.
+ *
+ * Body: { workflowName: string, overlay?: object, tenantId?: string | null }
+ * Auth: master_admin or rfp_admin.
+ *
+ * Emits the template's trigger event with the overlay as payload; the pipeline
+ * creates the process_instance (overlay frozen) on its next poll. Returns the
+ * trigger event id for correlation — NOT an instance id (creation is async).
+ *
+ * Returns: { data: { eventId, workflowName, trigger } } | { error, code }
+ */
+export async function POST(request: Request) {
+  try {
+    // ── Auth ──────────────────────────────────────────────────────
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+
+    const sessionUser = session.user as {
+      id?: string;
+      email?: string | null;
+      role?: unknown;
+      tenantId?: string | null;
+    };
+    const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
+    if (!role || !hasRoleAtLeast(role, 'rfp_admin')) {
+      return NextResponse.json(
+        { error: 'Admin access required', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    // ── Validate input ────────────────────────────────────────────
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+    const b = (body ?? {}) as Record<string, unknown>;
+    const workflowName = typeof b.workflowName === 'string' ? b.workflowName.trim() : '';
+    if (!workflowName) {
+      return NextResponse.json(
+        { error: 'workflowName is required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+    const overlay =
+      b.overlay && typeof b.overlay === 'object' && !Array.isArray(b.overlay)
+        ? (b.overlay as Record<string, unknown>)
+        : {};
+    const tenantId = typeof b.tenantId === 'string' ? b.tenantId : null;
+
+    // ── Launch ────────────────────────────────────────────────────
+    const result = await launchTemplate({
+      workflowName,
+      overlay,
+      actor: {
+        id: sessionUser.id ?? '',
+        email: sessionUser.email ?? null,
+        role,
+        tenantId: sessionUser.tenantId ?? null,
+      },
+      tenantId,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error, code: result.code },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json({ data: result.data });
+  } catch (err) {
+    console.error('[admin/workflows POST] error:', err);
+    return NextResponse.json(
+      { error: 'Launch failed', code: 'INTERNAL_ERROR' },
       { status: 500 },
     );
   }

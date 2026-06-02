@@ -183,17 +183,35 @@ class OnProposalAdvancedToReview(Workflow):
         ),
         Step(
             name="wait_for_review",
-            step_type=StepType.HITL_WAIT,
-            action="hitl_wait",
+            step_type=StepType.TODO,
+            action="todo",
             depends_on="notify_reviewers",
+            # The reviewer is the CUSTOMER — this ToDo lands in the tenant_admin
+            # queue (fixing the launch-review gap where customer-intended HITL
+            # gates were invisible to customers). It resumes EITHER by completing
+            # the task OR by the reviewer advancing the proposal (wait_for below);
+            # whichever fires first, resume_instance completes the sibling ToDos.
+            task_type='"proposal_review"',
+            task_title='"Review proposal and advance to the next stage"',
+            assignee_role='"tenant_admin"',
+            entity_type='"proposal"',
+            entity_ref="payload.proposalId",
             wait_for=EventTrigger(
                 namespace="proposal",
                 type="proposal.advanced",
-                phase="single",
+                # Resume when the reviewer advances the proposal OUT of review.
+                # advance/route.ts emits proposal.advanced as a start/end pair and
+                # the END event carries previousStage — so match phase="end".
+                # (Was "single", which no producer emits → the gate never resumed
+                # via events. EVENT_CONTRACT Launch Review #1 / INC-1.)
+                phase="end",
                 condition=lambda p: p.get("previousStage") == "review",
             ),
             timeout_minutes=4320,
-            on_timeout="send_review_reminder",
+            # Reminder escalation is V2 — no send_review_reminder step exists.
+            # On timeout the engine emits system:workflow.wait_timed_out (and runs
+            # any resolving on_timeout step); wire a notify rule to that event for
+            # re-notify. Declaring a non-existent step now fails validate() (INC-6).
         ),
     ]
 

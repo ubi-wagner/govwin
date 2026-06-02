@@ -5,6 +5,7 @@ import {
   isMasterAdmin,
   isRole,
   canManageTenant,
+  canForceAdvanceInstance,
   requiredRoleForPath,
   getLandingPath,
 } from '@/lib/rbac';
@@ -83,6 +84,28 @@ describe('canManageTenant', () => {
     expect(canManageTenant('tenant_admin')).toBe(true);
     expect(canManageTenant('tenant_user')).toBe(false);
     expect(canManageTenant('partner_user')).toBe(false);
+  });
+});
+
+describe('canForceAdvanceInstance', () => {
+  it('lets system admins advance ANY instance (own/other/admin-owned)', () => {
+    for (const role of ['master_admin', 'rfp_admin'] as const) {
+      expect(canForceAdvanceInstance(role, null, null)).toBe(true);
+      expect(canForceAdvanceInstance(role, null, 'tenant-1')).toBe(true);
+      expect(canForceAdvanceInstance(role, 'tenant-9', 'tenant-1')).toBe(true);
+    }
+  });
+
+  it('lets a tenant_admin advance ONLY their own tenant (the later customer path)', () => {
+    expect(canForceAdvanceInstance('tenant_admin', 'tenant-1', 'tenant-1')).toBe(true);
+    expect(canForceAdvanceInstance('tenant_admin', 'tenant-1', 'tenant-2')).toBe(false);
+    expect(canForceAdvanceInstance('tenant_admin', 'tenant-1', null)).toBe(false);
+    expect(canForceAdvanceInstance('tenant_admin', null, null)).toBe(false);
+  });
+
+  it('denies tenant_user and partner_user outright', () => {
+    expect(canForceAdvanceInstance('tenant_user', 'tenant-1', 'tenant-1')).toBe(false);
+    expect(canForceAdvanceInstance('partner_user', 'tenant-1', 'tenant-1')).toBe(false);
   });
 });
 

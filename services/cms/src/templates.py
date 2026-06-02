@@ -538,3 +538,58 @@ async def resolve_profile_variables(
         logger.error(f'[resolve_profile_variables] Error resolving profile for tenant={tenant_id}: {e}')
 
     return result
+
+
+# ── Launch Review Fix 2: workflow NOTIFY-step templates ──────────────────────
+# These 6 templates back NOTIFY steps in the Process Templates. They were absent
+# from TEMPLATES, so render_template returned None -> silent no-send. After
+# migration 052 made these NOTIFY steps the sole notification owners, their
+# absence meant rfp_admin stopped being notified (the 052 regression). _layout()
+# takes only the body; defensive p.get(...) guarantees a render. (Launch Review #2.)
+TEMPLATES.update({
+    'rfp_ready_for_curation': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">RFP ready for curation</h2>
+        <p>An uploaded RFP has been shredded and is ready for triage.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Solicitation</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('solicitationId') or p.get('title') or 'see triage queue'))}</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;">Documents</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('documentCount', '')))}</td></tr>
+        </table>
+        {_button('Review in Admin Dashboard', '/admin/curation')}
+    '''),
+    'review_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Proposal ready for review</h2>
+        <p><strong>{_e(str(p.get('proposalTitle') or 'A proposal'))}</strong> has advanced to the review stage.</p>
+        <p>Open the proposal workspace to complete your review and advance it to the next gate.</p>
+        {_button('Open Workspace', p.get('workspaceUrl', '/portal'))}
+    '''),
+    'proposal_final_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Final package ready</h2>
+        <p><strong>{_e(str(p.get('proposalTitle') or 'A proposal'))}</strong> reached the final stage and its
+        compliance-checked export package has been generated.</p>
+        {_button('Open Workspace', p.get('workspaceUrl', '/portal'))}
+    '''),
+    'admin_proposal_review_required': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">New proposal &mdash; admin review required</h2>
+        <p>A new proposal workspace was created and needs admin review.</p>
+        <p><strong>Proposal:</strong> {_e(str(p.get('proposalId') or 'see admin dashboard'))}</p>
+        {_button('View in Admin Dashboard', '/admin')}
+    '''),
+    'spotlight_new_topics': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">New topics in Spotlight</h2>
+        <p>A solicitation was pushed with new topics for matched tenants.</p>
+        <p><strong>Solicitation:</strong> {_e(str(p.get('solicitationId') or p.get('title') or 'see Spotlight'))}</p>
+    '''),
+    'source_scout_changes': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Source Scout detected changes</h2>
+        <p>Source Scout found changes on a monitored source and created draft solicitations for review.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:140px;">Source</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('sourceName') or p.get('sourceId') or 'see Sources'))}</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;">Drafts created</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('draftsCreated', '')))}</td></tr>
+        </table>
+        {_button('Review in Admin Dashboard', '/admin/curation')}
+    '''),
+})

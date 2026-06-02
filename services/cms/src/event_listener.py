@@ -15,6 +15,7 @@ import uuid
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .workers.gmail_client import send_email as _gmail_send
 from .templates import render_template, render_db_template, build_trigger_metadata
+from .sender_identity import resolve_sender, load_sender_identities
 
 logger = logging.getLogger('cms.events')
 
@@ -26,11 +27,16 @@ ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
 _SEND_AS = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
 
 
-async def send_email(to: str, subject: str, html: str) -> dict:
-    """Send via service account delegation (gmail_client), matching legacy signature."""
+async def send_email(to: str, subject: str, html: str, sender: str | None = None) -> dict:
+    """Send via service account delegation (gmail_client), matching legacy signature.
+
+    `sender` is the From identity (the delegated mailbox to send AS); it defaults to
+    _SEND_AS so existing callers are unchanged. Callers select a per-namespace sender
+    via sender_identity.resolve_sender().
+    """
     try:
         result = await _gmail_send(
-            delegate_email=_SEND_AS,
+            delegate_email=sender or _SEND_AS,
             to_email=to,
             subject=subject,
             body_html=html,
@@ -63,8 +69,20 @@ async def stop_event_listener():
 
 
 async def _poll_loop():
+    # Load DB-backed sender identities once at start, then refresh on a cadence so
+    # admin edits to the sender_identities table propagate without a redeploy.
+    last_identity_load = 0.0
     while True:
         try:
+            now = time.monotonic()
+            if now - last_identity_load > 300:
+                try:
+                    loaded = await load_sender_identities(_get_cms_pool())
+                    if loaded:
+                        logger.info('Loaded %d sender identities from CRM DB', loaded)
+                except Exception as e:
+                    logger.warning(f'sender identity load failed: {e}')
+                last_identity_load = now
             await _process_new_events()
         except asyncio.CancelledError:
             raise
@@ -135,6 +153,13 @@ async def _process_new_events():
         _last_processed_id = str(event['id'])
         ns = event.get('namespace', '')
         etype = event.get('type', '')
+        phase = event.get('phase', '') or ''
+
+        # Never run automation for a FAILED operation. A failed op still emits a
+        # terminal phase='end' event with error set; matching rules on it would
+        # e.g. send a welcome email for an acceptance that failed. (Launch Review #3.)
+        if event.get('error') or event.get('error_json'):
+            continue
 
         if (ns, etype) in FRONTEND_HANDLED:
             continue
@@ -150,37 +175,64 @@ async def _process_new_events():
             continue
 
         for rule in rules:
-            if _rule_matches(rule, col_names, ns, etype):
+            if _rule_matches(rule, col_names, ns, etype, phase):
                 try:
                     await _execute_rule(rule, col_names, event)
                 except Exception as e:
                     logger.error(f'Rule execution failed for {etype}: {e}')
 
 
-def _rule_matches(rule, col_names: set, namespace: str, event_type: str) -> bool:
-    """Check if an event matches a rule, adapting to the actual column names."""
+def _rule_matches(
+    rule, col_names: set, namespace: str, event_type: str, phase: str = ''
+) -> bool:
+    """Check if an event matches a rule, adapting to the actual column names.
+
+    Phase-aware (EVENT_CONTRACT_V3 gap 4; CLAUDE_CLIFFNOTES Mistake 20): a rule
+    fires ONCE, on the event's terminal phase. Events emitted as start/end pairs
+    would otherwise double-fire — the (event_id, action_type) dedup can't catch
+    it because 'start' and 'end' are distinct events with distinct ids. A rule
+    may opt into a specific phase via a trigger_phase column; absent that, it
+    matches terminal phases (end / single / unphased) and never 'start'.
+    """
+    matched = False
+
     # Schema variant 1: trigger_namespace + trigger_type (migration 019)
     if 'trigger_namespace' in col_names and 'trigger_type' in col_names:
-        return rule.get('trigger_namespace') == namespace and rule.get('trigger_type') == event_type
+        matched = (
+            rule.get('trigger_namespace') == namespace
+            and rule.get('trigger_type') == event_type
+        )
 
-    # Schema variant 2: trigger_bus + trigger_events (pre-existing)
-    if 'trigger_bus' in col_names and 'trigger_events' in col_names:
+    # Schema variant 2: trigger_bus + trigger_events (baseline)
+    elif 'trigger_bus' in col_names and 'trigger_events' in col_names:
         bus = rule.get('trigger_bus', '')
         events_val = rule.get('trigger_events')
-        # trigger_events might be a string, array, or JSON
         if isinstance(events_val, list):
-            return bus == namespace and event_type in events_val
+            matched = bus == namespace and event_type in events_val
         elif isinstance(events_val, str):
+            events_list = None
             try:
-                events_list = json.loads(events_val)
-                if isinstance(events_list, list):
-                    return bus == namespace and event_type in events_list
+                parsed = json.loads(events_val)
+                if isinstance(parsed, list):
+                    events_list = parsed
             except (json.JSONDecodeError, TypeError):
                 pass
-            return bus == namespace and events_val == event_type
-        return bus == namespace
+            if events_list is not None:
+                matched = bus == namespace and event_type in events_list
+            else:
+                matched = bus == namespace and events_val == event_type
+        else:
+            matched = bus == namespace
 
-    return False
+    if not matched:
+        return False
+
+    # Phase guard. Explicit opt-in via trigger_phase, else fire on terminal
+    # phases only — never on 'start' (kills the start/end double-fire).
+    rule_phase = rule.get('trigger_phase') if 'trigger_phase' in col_names else None
+    if rule_phase:
+        return phase == rule_phase
+    return phase != 'start'
 
 
 async def _execute_rule(rule, col_names: set, event):
@@ -219,7 +271,7 @@ async def _execute_rule(rule, col_names: set, event):
             act_type = action.get('type', '')
             try:
                 # Dedup check
-                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+                if act_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                     if await _check_dedup(pool, event_id, act_type):
                         logger.info("Skipping duplicate action %s for event %s", act_type, event_id)
                         continue
@@ -235,7 +287,7 @@ async def _execute_rule(rule, col_names: set, event):
     elif action_type:
         try:
             # Dedup check
-            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content') and pool:
+            if action_type in ('send_email', 'notify_admin', 'create_todo', 'enroll_drip', 'distribute_social', 'publish_content', 'unpublish_content') and pool:
                 if await _check_dedup(pool, event_id, action_type):
                     logger.info("Skipping duplicate action %s for event %s", action_type, event_id)
                     return
@@ -435,12 +487,22 @@ async def _handle_notification_requested(event) -> None:
             logger.info("Skipping duplicate notification.requested for trigger event %s", trigger_event_id)
             return
 
+    # Per-namespace sender identity (abstraction + config only — see
+    # docs/EMAIL_SENDERS.md). Falls back to _SEND_AS, so an unmapped notification
+    # keeps today's sender (no regression).
+    sender = resolve_sender(
+        identity=payload.get('fromIdentity'),
+        namespace=payload.get('senderNamespace'),
+        template=template_name,
+        default=_SEND_AS,
+    )
     result = await send_email(
         to=to_email,
         subject=subject,
         html=html,
+        sender=sender,
     )
-    logger.info(f'notification.requested: sent "{template_name}" to {to_email}: {result}')
+    logger.info(f'notification.requested: sent "{template_name}" as {sender} to {to_email}: {result}')
 
     # Log to automation_log for dedup cross-referencing
     if trigger_event_id and pool:
@@ -721,6 +783,46 @@ async def _action_publish_content(config: dict, payload: dict, event):
     logger.info(f'publish_content: pushed "{post["slug"]}" to cms_content (type={content_type})')
 
 
+async def _action_unpublish_content(config: dict, payload: dict, event):
+    """Mark previously-published CMS content as unpublished in Main Postgres.
+
+    Symmetric to _action_publish_content: resolve the post's slug and flip the
+    Main DB cms_content row to status='draft', published=false. Wired to the
+    'CMS Content Unpublish Bridge' rule (migration 050), which previously had a
+    live rule but NO handler — every unpublish event fell through to a silent
+    no-op. (EVENT_CONTRACT_V3 gap 8; CLAUDE_CLIFFNOTES Mistake 21.)
+    """
+    shared_pool = get_event_pool()
+    if not shared_pool:
+        logger.warning('unpublish_content: shared pool not available, skipping')
+        return
+
+    slug = payload.get('slug') or config.get('slug')
+    post_id = payload.get('post_id') or config.get('post_id')
+    if not slug and post_id:
+        from .models.database import get_pool as get_cms_pool
+        cms_pool = get_cms_pool()
+        rows = await cms_pool.fetch(
+            "SELECT slug FROM cms_posts WHERE id = $1",
+            uuid.UUID(post_id) if isinstance(post_id, str) else post_id,
+        )
+        if rows:
+            slug = rows[0]['slug']
+    if not slug:
+        logger.warning('unpublish_content: no slug/post_id to resolve target — skipping')
+        return
+
+    result = await shared_pool.execute(
+        """
+        UPDATE cms_content
+        SET status = 'draft', published = false, updated_at = now()
+        WHERE slug = $1
+        """,
+        slug,
+    )
+    logger.info(f'unpublish_content: marked "{slug}" draft in cms_content ({result})')
+
+
 async def _emit_action_event(*, event_type: str, phase: str, payload: dict,
                               parent_event_id: str | None = None) -> str:
     """Emit an action event to the shared system_events table."""
@@ -786,6 +888,10 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
 
     elif action_type == 'publish_content':
         await _action_publish_content(config, payload, event)
+        return
+
+    elif action_type == 'unpublish_content':
+        await _action_unpublish_content(config, payload, event)
         return
 
     elif action_type == 'send_email':

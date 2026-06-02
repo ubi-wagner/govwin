@@ -109,7 +109,7 @@ export function ProposalAiActions({
         } else {
           setMessage({
             type: 'success',
-            text: `AI review queued for ${count} section${count > 1 ? 's' : ''}. Results will appear shortly.`,
+            text: `AI review requested for ${count} section${count > 1 ? 's' : ''}.`,
           });
         }
       }

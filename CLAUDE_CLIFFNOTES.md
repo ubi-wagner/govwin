@@ -1,6 +1,6 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-05-31 (CMS visual editor migration + pipeline E2E audit)
+**Last updated:** 2026-05-31 (unified automation architecture — five-track engine audit; see docs/EVENT_CONTRACT_V3.md)
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -10,9 +10,11 @@ that have been caught and fixed.
 
 ## 1. Database Schema Quick Reference
 
-The schema is defined across 51 migration files (000-050). These are the
-tables most frequently queried and the exact column names. **Do NOT guess
-column names. Look them up here.**
+The schema is defined across **53 migration files (000-051, plus the
+interleaved `030a_ensure_full_schema.sql`)** — highest number is `051`.
+(Prior docs said "51 (000-050)" or "40 (000-039)" — both stale/wrong.)
+These are the tables most frequently queried and the exact column names.
+**Do NOT guess column names. Look them up here.**
 
 ### Core Tables (001_baseline.sql)
 
@@ -409,7 +411,9 @@ system.*     — Infrastructure (storage, health, errors, capacity)
 tool.*       — Tool invocations (start, end, error)
 ```
 
-NEVER use: `admin.*`, `cms.*`, `spotlight.*` as namespaces.
+NEVER use: `admin.*`, `cms.*`, `spotlight.*`, `pipeline.*` as event namespaces.
+(NOTE: `solicitation`/`volume`/`compliance`/`opportunity`/`memory`/`ingest` are
+TOOL names, not event namespaces — never emit events under them.)
 
 Event type format: `entity.verb_past_tense` (snake_case)
 Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
@@ -418,19 +422,46 @@ Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
 - `start` + `end` for multi-step operations (enables stuck detection, retry, chaining)
 - `single` for atomic CRUD operations
 - Every payload includes `correlationId: crypto.randomUUID()`
+- **Match on `namespace:type:PHASE`** — matching on namespace+type alone makes a
+  rule fire on BOTH the `start` and `end` rows (double-fire). See Mistake 19.
 
-### Workflow Automation (pipeline/src/workflows/)
-Events that match a workflow trigger automatically instantiate a job:
+### Unified Automation Model (Jobs + Process Templates) — see docs/EVENT_CONTRACT_V3.md
+The canonical vocabulary (retires "workflow" as a design term):
+- **Job** = one discrete, independently testable action (typed I/O, idempotent,
+  posts its own events, **carries its OWN default timeout + retry**). Today: `Step`
+  + `workflows/actions/*.py` + tool-registry tools.
+- **Process Template** = declarative composition citing Jobs by reference (no
+  business logic). Today: `Workflow` subclass in `pipeline/src/workflows/base.py`.
+- **Process Instance** = durable execution row (`process_instances` ledger).
+- Forward-posting: `system_events`=journal, `process_instances`=ledger,
+  `process_instance_transitions`=posting log. A Job posts its outcome; the next Job
+  is triggered by that posting (never a direct call).
+
+**Engine of record = `WorkflowManager` (`manager.py`)**, driven by the poll loop in
+`processor.py` (wired at `main.py:87` — it IS running; older docs saying "not wired"
+are wrong). Transport is **polling, not pg_notify** (no `add_listener` exists).
+
+Process Templates (`pipeline/src/workflows/on_*.py`):
 - `finder:rfp.uploaded:end` → OnRfpUploaded (shred → compliance → notify)
 - `finder:solicitation.pushed:single` → OnSolicitationPushed (match tenants → digest)
-- `capture:application.accepted:end` → OnApplicationAccepted (welcome → library → reminder)
-- `proposal:proposal.created:end` → OnProposalCreated (AI draft → notify)
-- `proposal:proposal.advanced:single` → OnProposalAdvanced (review → notify → HITL wait)
+- `capture:application.accepted:end` → OnApplicationAccepted (library defaults → HITL reminder)
+- `proposal:proposal.created:end` → OnProposalCreated (notify admin — NOT AI-draft; docstring is stale)
+- `proposal:proposal.advanced:end` → OnProposalAdvanced (AI review → notify → HITL wait)
+- `finder:source.change_detected:single` → OnSourceChangeDetected (draft → notify → HITL)
 
-### CMS Event Bridge (services/cms/src/event_listener.py)
-- `system:content_pipeline.post.published` → automation_rules → `_action_publish_content` → upserts cms_content
-- `system:content_pipeline.post.unpublished` → automation_rules → `_action_unpublish_content` → sets status=draft
-- Both actions emit completion/failure events back via `_emit_completion_event`
+⚠️ **HITL is currently BROKEN** (cannot resume + force-killed at +1h via a hardcoded
+deadline). AI_INVOKE / API_CALL are stubbed skips. Agents are written but dormant
+(V2). See EVENT_CONTRACT_V3.md §10–§11 for the full verified gap matrix.
+
+### CMS Event Listener — a SECOND, PARALLEL engine (services/cms/src/event_listener.py)
+The CMS listener is NOT the Jobs/Templates engine — it is a separate polling engine
+matching `automation_rules` and running a flat action ladder (send_email, notify_admin,
+create_todo, enroll_drip, distribute_social, publish_content). It is **fire-and-forget:
+no per-action timeout, no retry, no heartbeat, not auto-restarted.**
+- `system:content_pipeline.post.published` → `_action_publish_content` → upserts cms_content (LIVE)
+- `unpublish_content`: rule live but **handler missing → silent no-op**
+- `distribute_social`: rows created but poster always `raise NotImplementedError` → always fails
+- ⚠️ It ignores event `phase`, so any rule on a start/end-paired event **double-fires**.
 
 ### CMS SPA Event Types (emitted by page_blocks.py)
 All use namespace `system`, phase `single`:
@@ -580,6 +611,65 @@ authoritative score when available. It falls back to lightweight estimation
 Use `tenant_pipeline_items.total_score` when present. Only the pipeline
 scoring engine should compute full scores.
 
+### Mistake 17: Hardcoded instance deadline kills HITL (LIVE BUG)
+`manager.create_instance` sets `deadline = now + 1h` (`manager.py:148`) and never
+reads the step's `timeout_minutes`. The paused-deadline sweep then force-fails any
+parked instance past deadline — so a 72h HITL review dies ~60 min after parking.
+
+**Rule:** A park-and-wait's `wait_deadline` MUST be derived from the binding's
+declared `timeout_minutes`, never a global default. Parked instances are exempt
+from the running-heartbeat sweep but subject to a deadline sweep that routes to
+`on_timeout` (escalate), not to silent failure.
+
+### Mistake 18: HITL can pause but cannot resume (LIVE BUG)
+`resume_instance` (`manager.py:670`) has ZERO callers, there is no resume route, and
+`Step.wait_for` is never matched against incoming events. Every HITL_WAIT is a dead
+end. `on_timeout`/`on_failure` are declared on `Step` but read nowhere.
+
+**Rule:** A park-and-wait requires a resume path — the awaited event, matched against
+`wait_for`, must transition the instance `paused → running`. Wire `on_timeout`/
+`on_failure` to real escalation Jobs.
+
+### Mistake 19: Matching on namespace+type without PHASE → double-fire (LIVE BUG)
+The CMS `event_listener._rule_matches` ignores `phase`, so a rule on `rfp.uploaded`
+fires on BOTH the `start` and `end` rows (distinct event IDs → `automation_log` dedup
+misses). Plus the pipeline template AND a CMS rule can both fire on the same event
+(`finder:rfp.uploaded` → OnRfpUploaded + "New RFP ready" rule).
+
+**Rule:** Always match on `namespace:type:phase`. Each trigger has a SINGLE owner —
+templates own multi-step chains; `automation_rules` own simple single-hop reactions.
+Never both on the same trigger.
+
+### Mistake 20: No timeout/retry on invoke() and CMS actions (LIVE GAP)
+`registry.invoke()` (`registry.ts:196`) imposes NO timeout and NO retry — a hung
+Anthropic call in `proposal-draft-section.ts` has no application deadline anywhere.
+CMS actions are fire-and-forget (no timeout, no retry).
+
+**Rule:** Every Job carries its OWN default timeout + retry (the Job Contract,
+EVENT_CONTRACT_V3 §3.1). `invoke()` must enforce a deadline (`AbortSignal.timeout`)
+and a bounded retry. Do not rely on per-handler ad-hoc timeouts.
+
+### Mistake 21: Duplicated Job logic + a silent field-name break (LIVE BUG)
+SHRED has 1 canonical core (`shredder/runner.py`) wrapped 3×; `workers/rfp_shredder.py`
+is a DEAD duplicate. SCOUT is reimplemented in BOTH `source-scout.ts` and
+`workers/source_scout.py`. The scouts emit `extractedOpportunities` but
+`create_drafts_from_scout.py:163` reads `opportunities` → draftsCreated ALWAYS 0.
+
+**Rule:** One canonical implementation per Job. When porting across TS/Python, the
+emitted payload key contract MUST match the consumer's read key.
+
+### Mistake 22: Phantom executors / soft-success outliers (LIVE BUG)
+The `ai/review` route invokes `proposal.review_section`, which is NOT a registered
+tool (no caller) — "review" reviews nothing. `proposal.draft_section` with no API key
+returns a SUCCESS envelope carrying an in-band `error`, so metrics log a failure as
+success. Dead mechanisms: `agent_task_queue` dispatcher (NotImplementedError),
+`AutomationEngine` (orphan), 5 empty stub workers.
+
+**Rule:** A named executor must exist and be registered before a route references it.
+Jobs signal failure by raising, never by returning a success envelope with an error
+field. RLS is ENABLED with ZERO policies — tenant isolation rests entirely on explicit
+`WHERE tenant_id = $1` in every query (NOT on RLS, despite CLAUDE.md's claim).
+
 ---
 
 ## 5. Project Architecture Quick Reference
@@ -677,13 +767,26 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Workflow: `on_source_change_detected` → draft RFP → notify admin
 - Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
 
-### Agent Fabric (pipeline/src/agents/)
-- 10 archetypes: section_drafter, compliance_reviewer, color_team_reviewer,
-  proposal_architect, capture_strategist, opportunity_analyst,
-  scoring_strategist, packaging_specialist, partner_coordinator, librarian
-- Memory: episodic, semantic, procedural (with decay, GC, compaction)
-- WorkflowManager: crash recovery, heartbeat, stuck detection
-- Rate limiting: 50 invocations/hr/tenant, $50/mo budget default
+### Agent Fabric (pipeline/src/agents/) — WRITTEN BUT DORMANT (V2, not wired today)
+- 10 archetypes auto-register, but the fabric is ORPHANED at runtime: producer
+  `requestAgentTask` has zero callers; `AgentFabric` is instantiated then discarded
+  (`main.py:70`); AI_INVOKE template steps deliberately skip. Agents do NOT act on
+  Jobs/Templates today — that is V2 (EVENT_CONTRACT_V3 §10.8).
+- Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in
+  `fabric.invoke_agent` but it is NEVER reached. Budget column is `monthly_budget`
+  (dollars), NOT `max_cost_per_month_cents`. `human_gate` is never enforced.
+- What runs LIVE: the memory-lifecycle/learning scheduler (`lifecycle_scheduler.py`)
+  — decay, GC, compaction, calibration on existing rows.
+- Memory: episodic/semantic/procedural read/write is wired but only invoked from the
+  (dormant) agent loop. RLS is ENABLED with ZERO `CREATE POLICY` — isolation = explicit
+  `WHERE tenant_id`.
+
+### Execution Engine of Record: WorkflowManager (pipeline/src/workflows/manager.py)
+- Crash recovery, heartbeat (30s), stuck detection (5min stale), orphan recovery.
+- Driven by the `processor.py` poll loop (every 10s, `main.py:87`). Transport is
+  POLLING — there is no pg_notify/add_listener anywhere despite schema triggers.
+- ⚠️ HITL is broken here (Mistakes 17–18). ACTION/NOTIFY enforce timeout+retry;
+  AI_INVOKE/API_CALL are stubbed skips; CONDITION works but no template uses it.
 
 ---
 
@@ -736,3 +839,45 @@ Before any API route: follow the template in section 2.
 Before any event: check namespace rules in section 3.
 Before any portal route: include tenant verification.
 Before any migration: follow rules in section 7.
+
+## 11. Launch Readiness Review — Wiring Truths & Gotchas (2026-05-31)
+
+A full end-to-end review (event wiring + runtime + UX) found the engine is sound but
+the **human edge** was broken in several places. The durable truths:
+
+- **Phase is exact.** `EventTrigger.matches()` requires `namespace AND type AND phase`
+  to be equal. Producers: `emitEventStart`→`start`, `emitEventEnd`→`end`,
+  `emitEventSingle`→`single` (frontend `lib/events.ts`). A `trigger`/`wait_for` MUST
+  match the producer's ACTUAL phase. Start/end-pair domain events are consumed on
+  `end`; point events on `single`.
+- **`emitEventEnd` payload == the `result` arg only** (not merged with the start
+  payload). The `end` event must itself carry every field the workflow steps and the
+  trigger `condition` need (e.g. `previousStage`). Verify the success-path `result`.
+- **Failed ops still emit `phase:'end'`** (with `error` set, empty `result`).
+  Consumers MUST error-gate. FIX: `EventTrigger.matches()` and the CMS event loop now
+  skip events whose `error` is set. Never trigger automation on a failed operation.
+- **NOTIFY template must exist** in `services/cms/src/templates.py` `TEMPLATES` (or be
+  inline `{{...}}`), or `render_template` returns `None` → **silent no-send**. Keep
+  every workflow NOTIFY-step template name in that dict. (6 were missing → added.)
+- **Single-owner regression lesson (my 052):** do NOT deactivate a *working*
+  `automation_rule` in favor of a NOTIFY step unless that step's template actually
+  renders. 052 deactivated the rules whose templates rendered and left NOTIFY steps
+  whose templates were missing → admin notifications went dark. Verify delivery, not
+  just ownership.
+- **Agent archetypes are V2-DORMANT.** `AgentFabric` registers archetypes
+  (`pipeline/src/main.py`) but no loop dispatches events to them; `agent_task_queue`
+  has no consumer. `proposal.review_requested` / `compliance.checked` /
+  `*.draft_requested` are dead-ends until the agent loop ships. Do NOT surface UI that
+  promises agent output (the "Run AI Review" toast was corrected).
+- **HITL resume needs a real producer** whose event matches the parked step's
+  `wait_for`. Proposal gate: fixed to `proposal.advanced:end` (its `end` event carries
+  `previousStage`). Source-change gate: fixed to `source_diff.reviewed:end` (the diffs
+  route PATCH emits it). That event is per-diff and not yet correlated to the instance's
+  sourceId, so the **process ledger force-advance** is the precise per-instance override.
+- **Ops:** the CMS automation listener silently disables ALL CMS automation if
+  `SHARED_DATABASE_URL` is unset. Source Scout has no scheduler (manual-only).
+- **Verify against the actual file, not a truncated read or a subagent summary.** A
+  review agent AND a truncated read both wrongly called the diffs route GET-only; it
+  actually has a PATCH that emits `source_diff.reviewed`. Read the whole target before
+  acting — and re-run a test before committing it (a batched commit shipped a red test
+  and 6 broken templates once this session before being corrected).

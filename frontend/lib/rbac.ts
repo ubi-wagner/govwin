@@ -54,6 +54,34 @@ export function canManageTenant(role: Role): boolean {
 }
 
 /**
+ * Force-advance authorization — may `actorRole` advance (resume) a paused
+ * HITL process instance owned by `instanceTenantId`, acting as the human the
+ * workflow was waiting for?
+ *
+ *   master_admin / rfp_admin  → any instance (system operators).
+ *   tenant_admin              → ONLY instances belonging to their OWN tenant.
+ *   tenant_user / partner_user → never.
+ *
+ * The tenant_admin branch is wired now so the customer-admin portal route can
+ * adopt it without rework — it just isn't exposed by a route yet. `actorTenantId`
+ * is the caller's tenant (null for system admins); `instanceTenantId` is the
+ * process instance's tenant (null for admin/system instances).
+ */
+export function canForceAdvanceInstance(
+  actorRole: Role,
+  actorTenantId: string | null,
+  instanceTenantId: string | null,
+): boolean {
+  if (hasRoleAtLeast(actorRole, 'rfp_admin')) {
+    return true;
+  }
+  if (actorRole === 'tenant_admin') {
+    return actorTenantId != null && actorTenantId === instanceTenantId;
+  }
+  return false;
+}
+
+/**
  * Path-based permission lookup — maps top-level URL segments to the
  * minimum role required. Used by middleware.ts to short-circuit
  * obviously-privileged paths before hitting layout server components.

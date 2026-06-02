@@ -51,7 +51,7 @@ HITL GATES:
       solicitations in the triage queue and either accept or dismiss
       each one.
       Timeout: 24h -> re-notify rfp_admin
-      Resume event: finder:source.changes_reviewed:single
+      Resume event: finder:source_diff.reviewed:end
 
 ERROR HANDLING:
     - Step failure: Log error, emit system:workflow.step_failed event,
@@ -136,13 +136,25 @@ class OnSourceChangeDetected(Workflow):
         ),
         Step(
             name="wait_for_admin_review",
-            step_type=StepType.HITL_WAIT,
-            action="hitl.wait",
+            step_type=StepType.TODO,
+            action="todo",
             depends_on="notify_rfp_admin",
+            # An rfp_admin ToDo: review the scout-detected diffs and curate drafts.
+            # Resumes by completing the task OR by an admin marking a diff reviewed:
+            # the diffs route PATCH emits finder:source_diff.reviewed (start/end),
+            # so match phase="end". (Earlier notes calling that route GET-only were
+            # wrong — it has a PATCH. Launch Review #1b.) The event is per-diff, not
+            # yet correlated to this instance's sourceId, so the process-ledger
+            # force-advance is the precise per-instance override.
+            task_type='"source_review"',
+            task_title='"Review Source Scout changes and curate drafts"',
+            assignee_role='"rfp_admin"',
+            entity_type='"source_profile"',
+            entity_ref="payload.sourceId",
             wait_for=EventTrigger(
                 namespace="finder",
-                type="source.changes_reviewed",
-                phase="single",
+                type="source_diff.reviewed",
+                phase="end",
             ),
             timeout_minutes=1440,  # 24 hours
             on_timeout="notify_rfp_admin",  # re-notify if no review
