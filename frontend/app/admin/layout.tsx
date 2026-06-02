@@ -27,7 +27,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/proposals">Proposals</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
-          <AdminNavLink href="/admin/content/editor">Visual Editor</AdminNavLink>
           <AdminNavLink href={process.env.CMS_PUBLIC_URL || process.env.CMS_SERVICE_URL || '/cms'} external>CMS Portal</AdminNavLink>
           <AdminNavLink href="/admin/documents">Document Builder</AdminNavLink>
           <AdminNavLink href="/admin/storage">S3 Storage</AdminNavLink>
@@ -37,7 +36,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/events">Event Stream</AdminNavLink>
           <AdminNavLink href="/admin/agents">Agents</AdminNavLink>
           <AdminNavLink href="/admin/automation">Automation</AdminNavLink>
-          <AdminNavLink href="/admin/email-outbox">Email Outbox</AdminNavLink>
           <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
           <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
           <AdminNavLink href="/admin/processes">Process Ledger</AdminNavLink>

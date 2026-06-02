@@ -868,9 +868,12 @@ async def revalidate(request: Request, body: RevalidateRequest):
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                f'{frontend_url}/api/admin/content/revalidate',
+                f'{frontend_url}/api/cms/revalidate',
                 json={'path': path},
-                headers={'Content-Type': 'application/json'},
+                headers={
+                    'Content-Type': 'application/json',
+                    'x-revalidate-secret': os.getenv('REVALIDATE_SECRET', ''),
+                },
             )
         return {'data': {'revalidated': resp.status_code == 200, 'path': path}}
     except Exception as e:
