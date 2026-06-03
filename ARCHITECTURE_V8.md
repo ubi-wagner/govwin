@@ -85,7 +85,12 @@ One row per page **version**:
 
 ## 5. AI generation (Pipeline)
 
-- The editor enqueues a generation job (`pipeline_jobs`); the **pipeline** runs Claude and writes a **draft** version (or returns block content). Async — the result shows up as a draft to review. (The pipeline already owns the Claude content vertical.)
+- The **pipeline owns AI content generation** and writes directly into `content_pages` — AI drafts and hand-written drafts share **one** store and **one** lifecycle.
+- The keystone vertical `OnCmsContentRequested` (`pipeline/src/workflows/`) runs the chain **draft → human-review ToDo → publish → notify**:
+  - `draft_content` runs Claude (CMS `content_generator` contract: title/excerpt/body/tags/meta; falls back to the brief with no API key) and inserts a **`status='draft'`** `content_pages` version (body in a `body` block; tags/excerpt/author/SEO in `metadata`). Each call is a new version snapshot.
+  - The review ToDo parks for `rfp_admin`; completing it is the approval.
+  - `publish_content` promotes that draft to **`active`** and archives the prior active + sibling drafts in one transaction — same promote/archive semantics as the admin editor's Publish, so the one-active-per-page invariant always holds.
+- Result: a generated article shows up as a **draft** in the admin Site Content editor (Documents), reviewable/editable/previewable exactly like any other draft before it goes live.
 
 ---
 
@@ -120,7 +125,7 @@ One row per page **version**:
 1. **Data layer** — `content_pages` table + backfill + repoint public read. *Public site renders identically.* ✅
 2. **Editor + API** — list / get / save-draft / publish / versions + the `/admin` nav link. ✅
 3. **Preview** — draft-mode iframe/modal + publish → revalidate. ✅
-4. **AI generation** — pipeline job + editor hook. ✅
+4. **AI generation** — pipeline content vertical (`OnCmsContentRequested`) drafts/publishes into `content_pages`; generated articles land as reviewable drafts in the editor. ✅ *(in-editor "generate" button that enqueues a job is a follow-up.)*
 5. **Cleanup** — CMS → CRM-only; park the bridge; finalize docs. ✅
 
 ---

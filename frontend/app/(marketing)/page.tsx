@@ -216,13 +216,13 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
                   From the <span className="font-prose italic text-brand-500">blog</span>.
                 </h2>
               </div>
-              <Link href="/blog" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors hidden md:block">
+              <Link href="/resources" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors hidden md:block">
                 View all posts &rarr;
               </Link>
             </div>
             <div className="grid md:grid-cols-3 gap-8">
               {blogPosts.map((post) => (
-                <Link key={post.id} href={`/blog/${post.slug}`} className="group">
+                <Link key={post.id} href={`/resources/${post.slug}`} className="group">
                   <article className="h-full flex flex-col">
                     <div className="flex flex-wrap gap-2 mb-3">
                       {(post.tags ?? []).slice(0, 2).map((tag: string) => (
@@ -251,7 +251,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
               ))}
             </div>
             <div className="mt-8 text-center md:hidden">
-              <Link href="/blog" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">
+              <Link href="/resources" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">
                 View all posts &rarr;
               </Link>
             </div>

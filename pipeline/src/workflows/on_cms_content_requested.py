@@ -18,11 +18,12 @@ PURPOSE:  Prove the keystone end to end on the smallest real content chain:
           forward (force-advance aside).
 
 STEPS:
-    1. draft_content   (ACTION) — write a PENDING cms_content row from the overlay.
+    1. draft_content   (ACTION) — write a DRAFT content_pages version from the overlay.
     2. review          (TODO)   — park; write a content_publish task for rfp_admin,
                                   nudged on the overlay cadence. Completing the task
                                   = approval -> resume from the next step.
-    3. publish_content (ACTION, depends_on review) — flip the approved row live.
+    3. publish_content (ACTION, depends_on review) — promote the approved draft to
+                                  active (archiving the prior active + sibling drafts).
     4. notify_author   (NOTIFY, depends_on publish_content) — announce publication.
 
 OVERLAY (payload) fields:
@@ -48,7 +49,7 @@ from workflows.base import Workflow, Step, StepType, EventTrigger
 
 class OnCmsContentRequested(Workflow):
     description = (
-        "CMS content vertical: draft a pending cms_content row from the launch "
+        "CMS content vertical: draft a content_pages version from the launch "
         "overlay, park at a human review ToDo, then publish on approval and notify."
     )
 
@@ -85,7 +86,7 @@ class OnCmsContentRequested(Workflow):
             task_type='"content_publish"',
             task_title='"Review & approve content for publication"',
             assignee_role='"rfp_admin"',
-            entity_type='"cms_content"',
+            entity_type='"content_pages"',
             entity_ref="step.draft_content.result.contentId",
             nudge_days="payload.nudgeDays",
             due_in_minutes="payload.reviewDueMinutes",

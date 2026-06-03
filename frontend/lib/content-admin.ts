@@ -94,6 +94,7 @@ export async function listPages(): Promise<PageSummary[]> {
            bool_or(status = 'draft')                        AS has_draft,
            max(created_at)                                  AS last_updated
     FROM content_pages
+    WHERE content_type = 'page'
     GROUP BY page_key
     ORDER BY page_key
   `;
@@ -112,7 +113,7 @@ export async function getPage(
 ): Promise<{ active: PageVersion | null; draft: PageVersion | null }> {
   const rows = await sql<PageRow[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${pageKey} AND status IN ('active', 'draft')
+    WHERE page_key = ${pageKey} AND content_type = 'page' AND status IN ('active', 'draft')
     ORDER BY version_no DESC
   `;
   const active = rows.find((r) => r.status === 'active') ?? null;
@@ -137,10 +138,10 @@ export async function saveDraft(
     VALUES (
       ${pageKey},
       ${opts.contentType ?? 'page'},
-      (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${pageKey}),
+      (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${pageKey} AND content_type = ${opts.contentType ?? 'page'}),
       'draft',
       ${opts.title ?? pageKey},
-      ${JSON.stringify(blocks)}::jsonb,
+      ${sql.json(blocks as unknown as Parameters<typeof sql.json>[0])},
       ${note},
       ${user.email ?? user.id ?? 'unknown'}
     )
@@ -156,7 +157,7 @@ export async function publishPage(
   return await sql.begin(async (tx: any) => {
     const draftRows = await tx`
       SELECT id, version_no FROM content_pages
-      WHERE page_key = ${pageKey} AND status = 'draft'
+      WHERE page_key = ${pageKey} AND content_type = 'page' AND status = 'draft'
       ORDER BY version_no DESC
       LIMIT 1
     `;
@@ -168,6 +169,7 @@ export async function publishPage(
       UPDATE content_pages
       SET status = 'archived', archived_at = now()
       WHERE page_key = ${pageKey}
+        AND content_type = 'page'
         AND status IN ('active', 'draft')
         AND id <> ${draft.id}
     `;
@@ -185,8 +187,145 @@ export async function publishPage(
 export async function getVersions(pageKey: string): Promise<PageVersion[]> {
   const rows = await sql<PageRow[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${pageKey}
+    WHERE page_key = ${pageKey} AND content_type = 'page'
     ORDER BY version_no DESC
   `;
   return rows.map(toVersion);
+}
+
+// ── Documents (blog_post / resource / guide / testimonial / team_member) ──────
+// A document shares the content_pages store + version model, but is a single body
+// block + metadata (tags / excerpt / featuredImage / externalUrl / author),
+// scoped by content_type so it never collides with a page of the same slug.
+
+export const DOC_TYPES = ['blog_post', 'resource', 'guide', 'testimonial', 'team_member'] as const;
+
+export interface DocSummary {
+  slug: string;
+  contentType: string;
+  title: string | null;
+  activeVersion: number | null;
+  hasDraft: boolean;
+  lastUpdated: Date;
+}
+
+export interface DocFields {
+  title: string;
+  body: string;
+  excerpt?: string | null;
+  tags?: string[];
+  featuredImage?: string | null;
+  externalUrl?: string | null;
+  author?: string | null;
+}
+
+/** All documents (content_type <> 'page'), one row per (type, slug). */
+export async function listDocuments(): Promise<DocSummary[]> {
+  const rows = await sql<{
+    pageKey: string;
+    contentType: string;
+    title: string | null;
+    activeVersion: number | null;
+    hasDraft: boolean;
+    lastUpdated: Date;
+  }[]>`
+    SELECT page_key,
+           content_type,
+           (array_agg(title ORDER BY version_no DESC))[1]   AS title,
+           max(version_no) FILTER (WHERE status = 'active') AS active_version,
+           bool_or(status = 'draft')                        AS has_draft,
+           max(created_at)                                  AS last_updated
+    FROM content_pages
+    WHERE content_type <> 'page'
+    GROUP BY page_key, content_type
+    ORDER BY content_type, page_key
+  `;
+  return rows.map((r) => ({
+    slug: r.pageKey,
+    contentType: r.contentType,
+    title: r.title,
+    activeVersion: r.activeVersion,
+    hasDraft: r.hasDraft,
+    lastUpdated: r.lastUpdated,
+  }));
+}
+
+/** Active + latest draft for one document. */
+export async function getDocument(
+  slug: string,
+  contentType: string,
+): Promise<{ active: PageVersion | null; draft: PageVersion | null }> {
+  const rows = await sql<PageRow[]>`
+    SELECT * FROM content_pages
+    WHERE page_key = ${slug} AND content_type = ${contentType} AND status IN ('active', 'draft')
+    ORDER BY version_no DESC
+  `;
+  const active = rows.find((r) => r.status === 'active') ?? null;
+  const draft = rows.find((r) => r.status === 'draft') ?? null;
+  return { active: active ? toVersion(active) : null, draft: draft ? toVersion(draft) : null };
+}
+
+/** Save a document draft (single body block + metadata) as a new version. */
+export async function saveDocumentDraft(
+  slug: string,
+  contentType: string,
+  fields: DocFields,
+  note: string,
+  user: { id?: string; email?: string },
+): Promise<PageVersion> {
+  const blocks = [{
+    section: 'body',
+    title: fields.title,
+    body: fields.body,
+    excerpt: fields.excerpt ?? null,
+    metadata: {},
+  }];
+  const metadata = {
+    tags: fields.tags ?? [],
+    excerpt: fields.excerpt ?? null,
+    featuredImage: fields.featuredImage ?? null,
+    externalUrl: fields.externalUrl ?? null,
+    author: fields.author ?? null,
+  };
+  const [row] = await sql<PageRow[]>`
+    INSERT INTO content_pages
+      (page_key, content_type, version_no, status, title, blocks, metadata, audit_note, created_by)
+    VALUES (
+      ${slug},
+      ${contentType},
+      (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${slug} AND content_type = ${contentType}),
+      'draft',
+      ${fields.title},
+      ${sql.json(blocks as unknown as Parameters<typeof sql.json>[0])},
+      ${sql.json(metadata as unknown as Parameters<typeof sql.json>[0])},
+      ${note},
+      ${user.email ?? user.id ?? 'unknown'}
+    )
+    RETURNING *
+  `;
+  return toVersion(row);
+}
+
+/** Publish a document: promote its latest draft, archive prior active + drafts. */
+export async function publishDocument(
+  slug: string,
+  contentType: string,
+): Promise<{ published: boolean; versionNo?: number; reason?: string }> {
+  return await sql.begin(async (tx: any) => {
+    const draftRows = await tx`
+      SELECT id, version_no FROM content_pages
+      WHERE page_key = ${slug} AND content_type = ${contentType} AND status = 'draft'
+      ORDER BY version_no DESC
+      LIMIT 1
+    `;
+    const draft = draftRows[0] as { id: string; versionNo: number } | undefined;
+    if (!draft) return { published: false, reason: 'no_draft' };
+    await tx`
+      UPDATE content_pages SET status = 'archived', archived_at = now()
+      WHERE page_key = ${slug} AND content_type = ${contentType}
+        AND status IN ('active', 'draft') AND id <> ${draft.id}
+    `;
+    await tx`UPDATE content_pages SET status = 'active', published_at = now() WHERE id = ${draft.id}`;
+    return { published: true, versionNo: draft.versionNo };
+  });
 }

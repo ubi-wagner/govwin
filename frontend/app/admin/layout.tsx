@@ -28,7 +28,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
           <AdminNavLink href="/admin/site">Site Content</AdminNavLink>
-          <AdminNavLink href={process.env.CMS_PUBLIC_URL || process.env.CMS_SERVICE_URL || '/cms'} external>CMS Portal</AdminNavLink>
           <AdminNavLink href="/admin/documents">Document Builder</AdminNavLink>
           <AdminNavLink href="/admin/storage">S3 Storage</AdminNavLink>
 
