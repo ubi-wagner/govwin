@@ -10,11 +10,9 @@ export const metadata = {
 
 export const revalidate = 60;
 
-export default async function TeamPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const params = await searchParams;
-  const isPreview = params?._preview === '1';
+export default async function TeamPage() {
   const teamMembers = await getPublishedContent('team_member');
-  const blocks = await getPageBlocks('team', isPreview);
+  const blocks = await getPageBlocks('team');
   const lookup = buildLookup(blocks, 'team');
   const hero = single(lookup['hero']);
   const empty = single(lookup['empty']);

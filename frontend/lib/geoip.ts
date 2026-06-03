@@ -6,9 +6,11 @@
  * a short timeout and any failure returns null, so analytics never blocks/breaks.
  *
  * Provider is pluggable via env:
- *   - IPINFO_TOKEN set  → ipinfo.io (HTTPS, commercial-friendly) — recommended for prod.
- *   - otherwise         → ip-api.com (free, no key, HTTP) — fine for dev; ip-api's
- *                         free tier is non-commercial, so set IPINFO_TOKEN in prod.
+ *   - IPINFO_TOKEN set  → IPinfo Lite (https://api.ipinfo.io/lite, Bearer auth):
+ *                         ASN + AS/org name + country (HTTPS, commercial-OK). Free
+ *                         Lite has no city/region/lat-lon/timezone (paid plan only).
+ *   - otherwise         → ip-api.com (free, no key, HTTP) — city-level geo, but its
+ *                         free tier is non-commercial, so prefer IPINFO_TOKEN in prod.
  */
 export interface GeoInfo {
   country: string | null;
@@ -46,11 +48,11 @@ function asnFromOrg(org: string | null | undefined): { asn: string | null; name:
   return { asn: null, name: org };
 }
 
-async function fetchJson(url: string, timeoutMs: number): Promise<Record<string, unknown> | null> {
+async function fetchJson(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<Record<string, unknown> | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json', ...(headers ?? {}) } });
     if (!res.ok) return null;
     return (await res.json()) as Record<string, unknown>;
   } catch {
@@ -63,33 +65,58 @@ async function fetchJson(url: string, timeoutMs: number): Promise<Record<string,
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** Look up connection info for a public IP. Returns null on any failure/timeout. */
+async function viaIpinfo(ip: string, token: string, timeoutMs: number): Promise<GeoInfo | null> {
+  // IPinfo Lite: ASN + AS/org name + country (Bearer auth, HTTPS). Parsed
+  // defensively so a richer paid response (city/region/loc/timezone) also maps.
+  const d = await fetchJson(`https://api.ipinfo.io/lite/${encodeURIComponent(ip)}`, timeoutMs, {
+    Authorization: `Bearer ${token}`,
+  });
+  if (!d || d.bogon || d.error) return null;
+  const fromOrg = asnFromOrg(str(d.org));
+  const asn = str(d.asn) ?? fromOrg.asn;
+  const name = str(d.as_name) ?? fromOrg.name ?? str(d.org);
+  const country = str(d.country) ?? str(d.country_code);
+  if (!asn && !name && !country && !str(d.city)) return null;
+  const parts = str(d.loc)?.split(',').map((n) => Number(n)) ?? [];
+  const [lat, lon] = parts.length === 2 ? parts : [NaN, NaN];
+  return {
+    country,
+    region: str(d.region) ?? str(d.continent),
+    city: str(d.city),
+    isp: name, org: name, asn,
+    timezone: str(d.timezone),
+    latitude: Number.isFinite(lat) ? lat : null,
+    longitude: Number.isFinite(lon) ? lon : null,
+  };
+}
+
+async function viaIpApi(ip: string, timeoutMs: number): Promise<GeoInfo | null> {
+  const fields = 'status,country,regionName,city,isp,org,as,timezone,lat,lon';
+  const d = await fetchJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`, timeoutMs);
+  if (!d || d.status !== 'success') return null;
+  const { asn } = asnFromOrg(str(d.as));
+  return {
+    country: str(d.country), region: str(d.regionName), city: str(d.city),
+    isp: str(d.isp), org: str(d.org) ?? str(d.isp), asn,
+    timezone: str(d.timezone), latitude: num(d.lat), longitude: num(d.lon),
+  };
+}
+
+/**
+ * Look up connection info for a public IP. Returns null on any failure/timeout.
+ * Prefers ipinfo.io when a real token is set, but falls back to ip-api.com on any
+ * failure — so a misconfigured/expired token degrades gracefully rather than
+ * disabling enrichment. (IPINFO_TOKEN must be a real token, not 'true'/'false'.)
+ */
 export async function lookupIp(ip: string, timeoutMs = 2000): Promise<GeoInfo | null> {
   if (!isPublicIp(ip)) return null;
-  const token = process.env.IPINFO_TOKEN;
   try {
-    if (token) {
-      const d = await fetchJson(`https://ipinfo.io/${encodeURIComponent(ip)}/json?token=${token}`, timeoutMs);
-      if (!d || d.bogon) return null;
-      const { asn, name } = asnFromOrg(str(d.org));
-      const [lat, lon] = str(d.loc)?.split(',').map((n) => Number(n)) ?? [null, null];
-      return {
-        country: str(d.country), region: str(d.region), city: str(d.city),
-        isp: name, org: str(d.org), asn,
-        timezone: str(d.timezone),
-        latitude: typeof lat === 'number' && Number.isFinite(lat) ? lat : null,
-        longitude: typeof lon === 'number' && Number.isFinite(lon) ? lon : null,
-      };
+    const token = process.env.IPINFO_TOKEN;
+    if (token && token !== 'true' && token !== 'false') {
+      const g = await viaIpinfo(ip, token, timeoutMs);
+      if (g) return g;
     }
-    const fields = 'status,country,regionName,city,isp,org,as,timezone,lat,lon';
-    const d = await fetchJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`, timeoutMs);
-    if (!d || d.status !== 'success') return null;
-    const { asn } = asnFromOrg(str(d.as));
-    return {
-      country: str(d.country), region: str(d.regionName), city: str(d.city),
-      isp: str(d.isp), org: str(d.org) ?? str(d.isp), asn,
-      timezone: str(d.timezone), latitude: num(d.lat), longitude: num(d.lon),
-    };
+    return await viaIpApi(ip, timeoutMs);
   } catch (e) {
     console.error('[geoip/lookupIp] error:', e);
     return null;

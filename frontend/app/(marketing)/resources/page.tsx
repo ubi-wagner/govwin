@@ -12,11 +12,9 @@ export const metadata = {
 // Revalidate every 60 seconds so published changes show up quickly
 export const revalidate = 60;
 
-export default async function ResourcesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const params = await searchParams;
-  const isPreview = params?._preview === '1';
+export default async function ResourcesPage() {
   const allContent = await getPublishedContentByTypes(['resource', 'guide', 'blog_post']);
-  const blocks = await getPageBlocks('resources', isPreview);
+  const blocks = await getPageBlocks('resources');
   const lookup = buildLookup(blocks, 'resources');
   const hero = single(lookup['hero']);
   const programsHeader = single(lookup['programs-header']);
