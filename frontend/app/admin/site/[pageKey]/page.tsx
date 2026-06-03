@@ -1,12 +1,20 @@
 import Link from 'next/link';
-import { getPage } from '@/lib/content-admin';
+import { getPage, type PageVersion } from '@/lib/content-admin';
 import EditorClient from './editor-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PageEditorPage({ params }: { params: Promise<{ pageKey: string }> }) {
   const { pageKey } = await params;
-  const { active, draft } = await getPage(pageKey);
+  let active: PageVersion | null = null;
+  let draft: PageVersion | null = null;
+  try {
+    const page = await getPage(pageKey);
+    active = page.active;
+    draft = page.draft;
+  } catch (e) {
+    console.error('[admin/site/[pageKey]] getPage failed:', e);
+  }
 
   return (
     <div className="max-w-5xl">

@@ -13,7 +13,13 @@ type AdminOk = { ok: true; userId: string; email?: string };
 type AdminErr = { ok: false; res: NextResponse };
 
 export async function requireAdmin(): Promise<AdminOk | AdminErr> {
-  const session = await auth();
+  const session = await auth().catch((e) => {
+    console.error('[requireAdmin] auth() failed:', e);
+    return 'AUTH_ERROR' as const;
+  });
+  if (session === 'AUTH_ERROR') {
+    return { ok: false, res: NextResponse.json({ error: 'Auth check failed', code: 'AUTH_ERROR' }, { status: 500 }) };
+  }
   if (!session?.user) {
     return { ok: false, res: NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   }
