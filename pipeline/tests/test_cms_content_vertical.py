@@ -1,17 +1,19 @@
 """CMS content vertical (keystone proof) — OnCmsContentRequested + its actions.
 
 Proves the smallest real content chain the keystone targets:
-  launch-with-overlay -> draft (pending cms_content) -> review ToDo (ledger task)
-  -> publish (row goes live) -> notify.
+  launch-with-overlay -> draft (draft content_pages version) -> review ToDo
+  (ledger task) -> publish (draft promoted to active) -> notify.
 
 Unit tests in the house fake-conn style (no live Postgres). They lock:
   (a) the template is valid and wired draft -> review(TODO) -> publish -> notify;
-  (b) draft_content writes a PENDING row from the overlay (off-list content_type
-      falls back safely) and returns contentId + slug for downstream steps;
+  (b) draft_content writes a DRAFT content_pages version from the overlay
+      (off-list content_type falls back safely), with the body in a block and
+      tags/excerpt in metadata, returning contentId + slug for downstream steps;
   (c) the review ToDo writes a content_publish task for rfp_admin against the
       drafted content id, with the overlay's nudge cadence;
-  (d) publish_content flips a pending row live and emits library:content.published;
-      a missing/already-published row is a no-op, not an error.
+  (d) publish_content promotes the draft to active (archiving the prior active +
+      sibling drafts) and emits library:content.published; a missing/already-
+      published row is a no-op, not an error.
 """
 from __future__ import annotations
 
@@ -67,7 +69,7 @@ def test_trigger_requires_a_title():
                              "phase": "single", "payload": {}})
 
 
-# ── (b) draft_content writes a PENDING row ──────────────────────────────────
+# ── (b) draft_content writes a DRAFT content_pages version ───────────────────
 
 class _DraftConn:
     def __init__(self):
@@ -75,7 +77,7 @@ class _DraftConn:
         self.insert_args = None
 
     async def fetchrow(self, q, *a):
-        if "INSERT INTO cms_content" in q:
+        if "INSERT INTO content_pages" in q:
             self.insert_sql = q
             self.insert_args = a
             return {"id": _CID}
@@ -85,7 +87,7 @@ class _DraftConn:
         return "INSERT 0 1"
 
 
-async def test_draft_content_inserts_pending_row(monkeypatch):
+async def test_draft_content_inserts_draft_version(monkeypatch):
     monkeypatch.setattr(cms_content, "emit_event", AsyncMock())
     conn = _DraftConn()
     out = await cms_content.draft_content(
@@ -94,17 +96,22 @@ async def test_draft_content_inserts_pending_row(monkeypatch):
     )
     assert out["contentId"] == _CID
     assert out["slug"] == "why-sbir"
-    assert out["status"] == "pending"
-    # row is written PENDING + not published (locked in the SQL, not after the fact)
-    assert "'pending'" in conn.insert_sql
-    assert "false" in conn.insert_sql
-    # arg order: id, slug, title, content_type, body, excerpt, author, tags, created_by
+    assert out["status"] == "draft"
+    assert out["contentType"] == "blog_post"
+    # row is written as a DRAFT version of content_pages (locked in the SQL)
+    assert "INSERT INTO content_pages" in conn.insert_sql
+    assert "'draft'" in conn.insert_sql
+    # arg order: page_key(slug), content_type, title, blocks(json), metadata(json), created_by
+    import json
     a = conn.insert_args
-    assert a[1] == "why-sbir"
+    assert a[0] == "why-sbir"
+    assert a[1] == "blog_post"
     assert a[2] == "Why SBIR"
-    assert a[3] == "blog_post"
-    assert a[4] == "An intro to SBIR."
-    assert a[7] == ["sbir", "intro"]
+    blocks = json.loads(a[3])
+    assert blocks[0]["section"] == "body"
+    assert blocks[0]["body"] == "An intro to SBIR."
+    meta = json.loads(a[4])
+    assert meta["tags"] == ["sbir", "intro"]
 
 
 async def test_draft_content_falls_back_on_offlist_type(monkeypatch):
@@ -114,7 +121,7 @@ async def test_draft_content_falls_back_on_offlist_type(monkeypatch):
         conn, title="X", content_type="totally_invalid", slug="x",
     )
     assert out["contentType"] == "blog_post"          # safe default
-    assert conn.insert_args[3] == "blog_post"
+    assert conn.insert_args[1] == "blog_post"
 
 
 async def test_draft_content_slugifies_when_slug_omitted(monkeypatch):
@@ -148,10 +155,11 @@ async def test_draft_content_uses_ai_body_when_available(monkeypatch):
     )
     assert out["generated"] is True
     a = conn.insert_args
-    assert a[4] == "# AI body\n\nReal generated content about SBIR."  # AI body, not seed
-    assert a[5] == "AI excerpt"           # excerpt filled from AI (overlay omitted it)
-    assert a[7] == ["ai", "sbir"]         # tags filled from AI
-    meta = json.loads(a[8])
+    blocks = json.loads(a[3])
+    assert blocks[0]["body"] == "# AI body\n\nReal generated content about SBIR."  # AI body, not seed
+    meta = json.loads(a[4])
+    assert meta["excerpt"] == "AI excerpt"   # excerpt filled from AI (overlay omitted it)
+    assert meta["tags"] == ["ai", "sbir"]    # tags filled from AI
     assert meta["generated"] is True
     assert meta["metaTitle"] == "MT"
 
@@ -194,27 +202,42 @@ async def test_review_todo_writes_content_publish_task():
     #            nudge_schedule(json), params(json)
     assert a[2] == "rfp_admin"                  # fixed reviewer role
     assert a[4] == "content_publish"            # task_type
-    assert a[6] == "cms_content"                # entity_type
+    assert a[6] == "content_pages"              # entity_type (V8: content lives in content_pages)
     assert str(a[7]) == _CID                    # entity_id = the drafted content id
     assert a[9] == "review"                     # step_name
     import json
     assert json.loads(a[11]) == [1, 3]          # nudge cadence from the overlay
 
 
-# ── (d) publish_content publishes a pending row + emits the event ───────────
+# ── (d) publish_content promotes the draft to active + emits the event ──────
+
+class _Tx:
+    """Minimal async-context-manager stand-in for conn.transaction()."""
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
 
 class _PublishConn:
     def __init__(self, found=True):
         self.found = found
-        self.update_sql = None
+        self.executed = []  # [(sql, args), ...] in order
 
     async def fetchrow(self, q, *a):
-        if "UPDATE cms_content" in q:
-            self.update_sql = q
-            return {"id": _CID, "slug": "why-sbir"} if self.found else None
+        if "SELECT id, page_key, content_type FROM content_pages" in q:
+            return (
+                {"id": _CID, "page_key": "why-sbir", "content_type": "blog_post"}
+                if self.found else None
+            )
         return None
 
+    def transaction(self):
+        return _Tx()
+
     async def execute(self, q, *a):
+        self.executed.append((q, a))
         return "UPDATE 1"
 
 
@@ -225,9 +248,12 @@ async def test_publish_content_publishes_and_emits(monkeypatch):
     out = await cms_content.publish_content(conn, content_id=_CID, slug="why-sbir")
     assert out["published"] is True
     assert out["slug"] == "why-sbir"
-    # the UPDATE only touches still-pending/draft rows and flips them live
-    assert "status = 'published'" in conn.update_sql
-    assert "status IN ('pending', 'draft')" in conn.update_sql
+    sql = " ".join(q for q, _ in conn.executed)
+    # the target draft is promoted to active...
+    assert "status = 'active'" in sql
+    # ...and the prior active + sibling drafts are archived for that page_key/type
+    assert "status = 'archived'" in sql
+    assert "status IN ('active', 'draft')" in sql
     emit.assert_awaited()
     assert "content.published" in emit.await_args.kwargs.get("type", "")
 

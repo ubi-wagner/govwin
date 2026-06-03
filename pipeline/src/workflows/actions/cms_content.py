@@ -5,16 +5,27 @@ Workflow Actions: CMS content draft + publish (the content vertical)
 
 WHO:    Called by the OnCmsContentRequested workflow (the keystone CMS vertical).
 
-WHAT:   draft_content writes a PENDING cms_content row from the launch overlay;
-        the workflow then parks at a review ToDo; publish_content flips the
-        approved row live once the reviewer completes that task. Together they
-        prove the keystone chain end to end: launch-with-overlay -> draft ->
-        human review (ledger task + nudges) -> publish.
+WHAT:   draft_content writes a DRAFT version into the unified content_pages store
+        (V8) from the launch overlay; the workflow then parks at a review ToDo;
+        publish_content promotes the approved draft to 'active' once the reviewer
+        completes that task. Together they prove the keystone chain end to end:
+        launch-with-overlay -> draft -> human review (ledger task + nudges) ->
+        publish. Generated content lands in the same content_pages document store
+        the admin Site Content editor reads, so AI drafts and hand-written drafts
+        share one lifecycle (V8 consolidation).
 
 WHY:    The template definition is code (on_cms_content_requested.py; revision
         control = filename), the process_templates row is its activation/audit
         switch, and the overlay is the frozen process_instances.payload. This
         vertical is the smallest real content lifecycle that exercises all of it.
+
+CONTENT MODEL (V8):
+    Each save is a whole-document snapshot: a new content_pages row for
+    (page_key=slug, content_type) at version_no = max+1, status='draft'. The body
+    rides in a single 'body' block; tags/excerpt/author/SEO ride in metadata.
+    Publish promotes one draft to 'active' and archives the prior active + sibling
+    drafts, so the partial-unique index (one active per content_type+page_key)
+    always holds and editing never mutates the live row.
 
 NOTE:   draft_content generates the body with Claude, mirroring the CMS
         content_generator contract (same system prompt + JSON shape:
@@ -23,10 +34,10 @@ NOTE:   draft_content generates the body with Claude, mirroring the CMS
         works with or without a key and a model hiccup never hard-fails the draft.
 
 ERROR HANDLING:
-    - draft_content is idempotent on slug (ON CONFLICT re-drafts, never 500s on
-      the UNIQUE(slug) constraint); off-list content_type falls back to a safe
-      default so the CHECK constraint never trips.
-    - publish_content matches only rows still in ('pending','draft'); an already-
+    - draft_content always adds a new draft version (snapshot model, never an
+      in-place mutation); off-list content_type falls back to a safe default so the
+      CHECK constraint never trips.
+    - publish_content matches only rows still in ('draft','pending'); an already-
       published / missing row returns {published: False, reason} (not an error).
     - Event emission is best-effort (wrapped) — a failed emit never fails the step.
 ================================================================================
@@ -44,12 +55,10 @@ from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.cms_content")
 
-# cms_content.content_type is CHECK-constrained (migration 031). Fall back to a
-# safe member if the overlay supplies something off-list.
-_ALLOWED_CONTENT_TYPES = {
-    "blog_post", "resource", "guide", "announcement", "faq",
-    "testimonial", "team_member", "social_post", "page_block",
-}
+# content_pages document types (V8). 'page' is reserved for marketing pages;
+# generated content defaults to blog_post when the overlay supplies an off-list
+# type, so the content_type CHECK on content_pages never trips (migration 057).
+_CONTENT_PAGES_DOC_TYPES = {"blog_post", "resource", "guide", "testimonial", "team_member"}
 _DEFAULT_CONTENT_TYPE = "blog_post"
 
 # Mirror the CMS content_generator's contract so a draft body matches its voice and
@@ -141,15 +150,16 @@ async def draft_content(
     tags: Optional[list[str]] = None,
     created_by: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Create (or re-draft) a PENDING cms_content row from the launch overlay.
+    """Create a DRAFT content_pages document from the launch overlay (V8).
 
-    status='pending' = awaiting human review; published stays false. Idempotent on
-    slug: re-launching the same slug re-drafts the existing row rather than failing
-    the UNIQUE(slug) constraint. Returns contentId + slug for the downstream review
-    and publish steps.
+    status='draft' = awaiting human review; promoted to 'active' on publish. Each
+    call adds a new draft version for (slug, content_type). The body lives in a
+    single block; tags/excerpt/author/SEO ride in metadata. Returns contentId +
+    slug + contentType for the downstream review and publish steps. AI generation
+    falls back to the brief when no key is configured.
     """
     title = (title or "").strip()[:500] or "Untitled draft"
-    ctype = content_type if content_type in _ALLOWED_CONTENT_TYPES else _DEFAULT_CONTENT_TYPE
+    ctype = content_type if content_type in _CONTENT_PAGES_DOC_TYPES else "blog_post"
     slug_val = (slug or _slugify(title))[:200]
     tag_list = [str(t)[:60] for t in (tags or [])][:20]
     excerpt_val = excerpt
@@ -158,8 +168,8 @@ async def draft_content(
     # Falls back to the brief as the body when no key is configured or generation
     # fails, so the vertical works with or without AI and never hard-fails here.
     body = (brief or "").strip()
-    meta: dict[str, Any] = {"generated": False}
     generated = False
+    gen_meta: dict[str, Any] = {}
     gen = await _generate_body(brief, ctype)
     if gen:
         generated = True
@@ -168,42 +178,22 @@ async def draft_content(
             excerpt_val = gen.get("excerpt")
         if not tag_list:
             tag_list = [str(t)[:60] for t in (gen.get("tags") or [])][:20]
-        meta = {
-            "generated": True,
-            "generator": "draft_content",
-            "metaTitle": gen.get("meta_title"),
-            "metaDescription": gen.get("meta_description"),
-        }
+        gen_meta = {"metaTitle": gen.get("meta_title"), "metaDescription": gen.get("meta_description")}
 
-    created_by_uuid: Optional[uuid.UUID] = None
-    if created_by:
-        try:
-            created_by_uuid = uuid.UUID(created_by)
-        except (ValueError, AttributeError):
-            created_by_uuid = None
+    blocks = [{"section": "body", "title": title, "body": body, "excerpt": excerpt_val, "metadata": {}}]
+    metadata = {"tags": tag_list, "excerpt": excerpt_val, "author": author,
+                "generated": generated, "generator": "draft_content", **gen_meta}
 
     row = await conn.fetchrow(
         """
-        INSERT INTO cms_content
-            (id, slug, title, content_type, body, excerpt, author, tags,
-             published, status, metadata, created_by, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                false, 'pending', $9::jsonb, $10, now(), now())
-        ON CONFLICT (slug) DO UPDATE
-            SET title = EXCLUDED.title,
-                content_type = EXCLUDED.content_type,
-                body = EXCLUDED.body,
-                excerpt = EXCLUDED.excerpt,
-                author = EXCLUDED.author,
-                tags = EXCLUDED.tags,
-                metadata = EXCLUDED.metadata,
-                status = 'pending',
-                published = false,
-                updated_at = now()
+        INSERT INTO content_pages
+            (page_key, content_type, version_no, status, title, blocks, metadata, audit_note, created_by)
+        VALUES ($1, $2,
+                (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = $1 AND content_type = $2),
+                'draft', $3, $4::jsonb, $5::jsonb, 'AI draft', $6)
         RETURNING id::text AS id
         """,
-        uuid.uuid4(), slug_val, title, ctype, body, excerpt_val, author, tag_list,
-        json.dumps(meta), created_by_uuid,
+        slug_val, ctype, title, json.dumps(blocks), json.dumps(metadata), created_by,
     )
     content_id = row["id"] if row else None
 
@@ -211,14 +201,14 @@ async def draft_content(
         await emit_event(
             conn, namespace="library", type="content.drafted", phase="single",
             payload={"contentId": content_id, "slug": slug_val, "contentType": ctype,
-                     "status": "pending", "generated": generated},
+                     "status": "draft", "generated": generated},
         )
     except Exception as exc:
         log.error("draft_content: failed to emit content.drafted: %s", exc)
 
-    log.info("draft_content: pending cms_content %s (slug=%s, generated=%s)",
-             content_id, slug_val, generated)
-    return {"contentId": content_id, "slug": slug_val, "status": "pending",
+    log.info("draft_content: draft content_pages %s (slug=%s, type=%s, generated=%s)",
+             content_id, slug_val, ctype, generated)
+    return {"contentId": content_id, "slug": slug_val, "status": "draft",
             "contentType": ctype, "generated": generated}
 
 
@@ -228,52 +218,54 @@ async def publish_content(
     content_id: Optional[str] = None,
     slug: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Publish an approved draft: status->'published', published=true, published_at=now().
+    """Publish an approved draft: promote the content_pages draft -> active and
+    archive the prior active + other drafts for that (page_key, content_type) (V8).
 
     Reached only after the review ToDo is completed — completing the task IS the
     approval; rejection is a cancel / force-fail of the instance, not a publish.
-    Matches by content_id when present, else by slug. Emits library:content.published.
+    Matches by content_id when present, else the latest draft for slug. Emits
+    library:content.published.
     """
     if not content_id and not slug:
         return {"published": False, "reason": "no_target"}
 
-    row = None
     if content_id:
         try:
             cid = uuid.UUID(content_id)
         except (ValueError, AttributeError):
             return {"published": False, "reason": "bad_content_id"}
-        row = await conn.fetchrow(
-            """
-            UPDATE cms_content
-            SET status = 'published', published = true,
-                published_at = now(), updated_at = now()
-            WHERE id = $1 AND status IN ('pending', 'draft')
-            RETURNING id::text AS id, slug
-            """,
+        target = await conn.fetchrow(
+            "SELECT id, page_key, content_type FROM content_pages "
+            "WHERE id = $1 AND status IN ('draft', 'pending')",
             cid,
         )
     else:
-        row = await conn.fetchrow(
-            """
-            UPDATE cms_content
-            SET status = 'published', published = true,
-                published_at = now(), updated_at = now()
-            WHERE slug = $1 AND status IN ('pending', 'draft')
-            RETURNING id::text AS id, slug
-            """,
+        target = await conn.fetchrow(
+            "SELECT id, page_key, content_type FROM content_pages "
+            "WHERE page_key = $1 AND status = 'draft' ORDER BY version_no DESC LIMIT 1",
             slug,
         )
 
-    if not row:
+    if not target:
         # Already published or not found — not an error, just nothing to do.
         log.info("publish_content: nothing to publish (content_id=%s slug=%s)",
                  content_id, slug)
         return {"published": False, "reason": "not_pending_or_missing",
                 "contentId": content_id, "slug": slug}
 
-    published_id = row["id"]
-    published_slug = row["slug"]
+    async with conn.transaction():
+        await conn.execute(
+            "UPDATE content_pages SET status = 'archived', archived_at = now() "
+            "WHERE page_key = $1 AND content_type = $2 AND status IN ('active', 'draft') AND id <> $3",
+            target["page_key"], target["content_type"], target["id"],
+        )
+        await conn.execute(
+            "UPDATE content_pages SET status = 'active', published_at = now() WHERE id = $1",
+            target["id"],
+        )
+
+    published_id = str(target["id"])
+    published_slug = target["page_key"]
     try:
         await emit_event(
             conn, namespace="library", type="content.published", phase="single",
@@ -282,6 +274,6 @@ async def publish_content(
     except Exception as exc:
         log.error("publish_content: failed to emit content.published: %s", exc)
 
-    log.info("publish_content: published cms_content %s (slug=%s)",
+    log.info("publish_content: published content_pages %s (slug=%s)",
              published_id, published_slug)
     return {"published": True, "contentId": published_id, "slug": published_slug}
