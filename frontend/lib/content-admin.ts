@@ -140,7 +140,7 @@ export async function saveDraft(
       (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${pageKey}),
       'draft',
       ${opts.title ?? pageKey},
-      ${JSON.stringify(blocks)}::jsonb,
+      ${sql.json(blocks as unknown as Parameters<typeof sql.json>[0])},
       ${note},
       ${user.email ?? user.id ?? 'unknown'}
     )
