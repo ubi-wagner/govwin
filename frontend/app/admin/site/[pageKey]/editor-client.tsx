@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { PageVersion, PageBlock } from '@/lib/content-admin';
+import { ImageUploadField } from '@/components/admin/image-upload-field';
 
 interface EditBlock {
   section: string;
@@ -192,11 +193,11 @@ export default function EditorClient({
               value={b.excerpt}
               onChange={(e) => update(i, { excerpt: e.target.value })}
             />
-            <input
-              className="w-full border rounded px-2 py-1 mb-2 text-sm"
-              placeholder="Image URL (optional)"
+            <ImageUploadField
+              className="mb-2"
               value={b.featuredImage}
-              onChange={(e) => update(i, { featuredImage: e.target.value })}
+              onChange={(url) => update(i, { featuredImage: url })}
+              placeholder="Image URL (optional), or upload →"
             />
             <textarea
               className="w-full border rounded px-2 py-1 text-xs font-mono"

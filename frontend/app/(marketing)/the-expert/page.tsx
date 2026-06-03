@@ -6,6 +6,7 @@ import {
   CtaSection,
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -258,6 +259,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
         subheadline={ctaBlock?.body ?? "If you're commercializing innovative technology and want non-dilutive federal R&D funding, let's talk."}
         cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Apply Now', href: '/apply' }}
       />
+
+      <CustomSections pageKey="the-expert" blocks={blocks} />
     </>
   );
 }

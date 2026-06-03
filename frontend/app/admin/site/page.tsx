@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { listPages, listDocuments, DOC_TYPES, type PageSummary } from '@/lib/content-admin';
 import { SEED_PAGE_KEYS } from '@/lib/page-content';
-import { getSiteAnalytics, getPageViewCounts, pageKeyToPath, type SiteAnalytics } from '@/lib/analytics-admin';
+import { getSiteAnalytics, getPageViewCounts, getRecentSessions, pageKeyToPath, type SiteAnalytics, type VisitorSession } from '@/lib/analytics-admin';
 import AnalyticsDrawer from './analytics-drawer';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +11,7 @@ export default async function SiteContentPage() {
   let docs: Awaited<ReturnType<typeof listDocuments>> = [];
   let analytics: SiteAnalytics = { ok: false, views7d: 0, views30d: 0, sessions7d: 0, sessions30d: 0, topPages: [] };
   let viewCounts: Record<string, number> = {};
+  let sessions: VisitorSession[] = [];
   try {
     pages = await listPages();
   } catch (e) {
@@ -22,7 +23,7 @@ export default async function SiteContentPage() {
     console.error('[admin/site] listDocuments failed:', e);
   }
   try {
-    [analytics, viewCounts] = await Promise.all([getSiteAnalytics(), getPageViewCounts(30)]);
+    [analytics, viewCounts, sessions] = await Promise.all([getSiteAnalytics(), getPageViewCounts(30), getRecentSessions(30)]);
   } catch (e) {
     console.error('[admin/site] analytics failed:', e);
   }
@@ -43,7 +44,7 @@ export default async function SiteContentPage() {
     <div className="max-w-4xl">
       <div className="flex items-start justify-between mb-1">
         <h1 className="text-2xl font-bold">Site Content</h1>
-        <AnalyticsDrawer data={analytics} />
+        <AnalyticsDrawer data={analytics} sessions={sessions} />
       </div>
       <p className="text-sm text-gray-500 mb-6">
         Edit, preview, and publish website content. Every save is a versioned snapshot;

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPageBlocks, getPublishedContent, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -295,6 +296,8 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
           </div>
         </div>
       </section>
+
+      <CustomSections pageKey="homepage" blocks={blocks} />
     </>
   );
 }

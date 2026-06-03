@@ -8,6 +8,7 @@ import {
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -167,6 +168,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
         subheadline={ctaBlock?.body ?? 'Applications reviewed weekly. $299/month after acceptance. Cancel anytime.'}
         cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Start Your Application', href: '/apply' }}
       />
+
+      <CustomSections pageKey="how-it-works" blocks={blocks} />
     </>
   );
 }

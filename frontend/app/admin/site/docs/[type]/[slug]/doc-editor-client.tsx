@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PageVersion } from '@/lib/content-admin';
+import { ImageUploadField } from '@/components/admin/image-upload-field';
 
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -142,8 +143,8 @@ export default function DocEditorClient({
             <input className={field} value={tags} onChange={(e) => setTags(e.target.value)} />
           </label>
           <label className="block">
-            <span className={lbl}>Featured image URL</span>
-            <input className={field} value={featuredImage} onChange={(e) => setFeaturedImage(e.target.value)} />
+            <span className={lbl}>Featured image</span>
+            <ImageUploadField className="mt-1" value={featuredImage} onChange={setFeaturedImage} />
           </label>
         </div>
         <label className="block">
