@@ -62,7 +62,7 @@ test:
 #   TEST_CMS_DATABASE_URL=postgresql://u:p@localhost:5432/cms_test \
 #   make test-integration
 test-integration:
-	cd pipeline && python -m pytest tests/test_cms_content_integration.py -q
+	cd pipeline && python -m pytest tests/test_cms_content_integration.py tests/test_content_pages_integration.py -q
 	cd services/cms && python -m pytest tests/test_page_blocks_integration.py -q
 
 # ---------------------------------------------------------------------
