@@ -30,12 +30,67 @@ export interface ContentRow {
   updatedAt: Date;
 }
 
+// ── V8 documents: read from content_pages (active doc versions), mapped to the
+// legacy ContentRow shape so existing marketing components render unchanged. ──
+
+/** Map a content_pages document row (camelCase via the sql transform) to ContentRow. */
+function docRowToContentRow(r: Record<string, unknown>): ContentRow {
+  const meta = r.metadata && typeof r.metadata === 'object' ? (r.metadata as Record<string, unknown>) : {};
+  const blocks = Array.isArray(r.blocks) ? (r.blocks as Record<string, unknown>[]) : [];
+  const bodyBlock = blocks[0] ?? {};
+  const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+  return {
+    id: String(r.id ?? ''),
+    slug: typeof r.pageKey === 'string' ? r.pageKey : '',
+    title: typeof r.title === 'string' ? r.title : '',
+    contentType: typeof r.contentType === 'string' ? r.contentType : '',
+    body: typeof bodyBlock.body === 'string' ? bodyBlock.body : '',
+    excerpt: str(meta.excerpt) ?? str(bodyBlock.excerpt),
+    author: str(meta.author),
+    tags: Array.isArray(meta.tags) ? (meta.tags as string[]) : [],
+    published: true,
+    status: 'published',
+    publishedAt: (r.publishedAt as Date) ?? null,
+    featuredImage: str(meta.featuredImage),
+    externalUrl: str(meta.externalUrl),
+    displayOrder: 0,
+    metadata: meta,
+    createdAt: (r.createdAt as Date) ?? new Date(0),
+    updatedAt: (r.createdAt as Date) ?? new Date(0),
+  };
+}
+
+/** Active documents of the given content types from content_pages. */
+async function activeDocs(types: string[], limit?: number): Promise<ContentRow[]> {
+  const rows = await sql<Record<string, unknown>[]>`
+    SELECT * FROM content_pages
+    WHERE content_type = ANY(${types}) AND status = 'active'
+    ORDER BY published_at DESC NULLS LAST, created_at DESC
+    ${limit ? sql`LIMIT ${limit}` : sql``}
+  `;
+  return rows.map(docRowToContentRow);
+}
+
+/** Single active document by slug (page_key), excluding marketing pages. */
+async function activeDocBySlug(slug: string): Promise<ContentRow | null> {
+  const [row] = await sql<Record<string, unknown>[]>`
+    SELECT * FROM content_pages
+    WHERE page_key = ${slug} AND status = 'active' AND content_type <> 'page'
+    ORDER BY published_at DESC NULLS LAST
+    LIMIT 1
+  `;
+  return row ? docRowToContentRow(row) : null;
+}
+
 /**
- * Fetch published content by type, ordered by display_order then published_at.
+ * Fetch published content by type. Reads content_pages active documents first,
+ * falling back to legacy cms_content during transition.
  */
 export async function getPublishedContent(contentType: string, limit?: number): Promise<ContentRow[]> {
   try {
-    const rows = await sql<ContentRow[]>`
+    const docs = await activeDocs([contentType], limit);
+    if (docs.length > 0) return docs;
+    return await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
              published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
@@ -44,7 +99,6 @@ export async function getPublishedContent(contentType: string, limit?: number): 
       ORDER BY display_order ASC, published_at DESC
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;
-    return rows;
   } catch (e) {
     console.error('[cms/getPublishedContent] error:', e);
     return [];
@@ -56,6 +110,8 @@ export async function getPublishedContent(contentType: string, limit?: number): 
  */
 export async function getContentBySlug(slug: string): Promise<ContentRow | null> {
   try {
+    const doc = await activeDocBySlug(slug);
+    if (doc) return doc;
     const [row] = await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
              published, status, published_at, featured_image, external_url,
@@ -259,7 +315,9 @@ export function many(entry: ContentRow | ContentRow[] | undefined): ContentRow[]
  */
 export async function getPublishedContentByTypes(contentTypes: string[], limit?: number): Promise<ContentRow[]> {
   try {
-    const rows = await sql<ContentRow[]>`
+    const docs = await activeDocs(contentTypes, limit);
+    if (docs.length > 0) return docs;
+    return await sql<ContentRow[]>`
       SELECT id, slug, title, content_type, body, excerpt, author, tags,
              published, status, published_at, featured_image, external_url,
              display_order, metadata, created_at, updated_at
@@ -268,7 +326,6 @@ export async function getPublishedContentByTypes(contentTypes: string[], limit?:
       ORDER BY display_order ASC, published_at DESC
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;
-    return rows;
   } catch (e) {
     console.error('[cms/getPublishedContentByTypes] error:', e);
     return [];
