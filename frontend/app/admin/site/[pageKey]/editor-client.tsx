@@ -58,6 +58,9 @@ const PREVIEW_PATHS: Record<string, string> = {
   homepage: '/',
   security: '/infosec',
   'get-started': '/pricing',
+  // Header/footer show on every page; preview against the homepage. (Chrome
+  // preview reflects the published version — publish to see edits live.)
+  'site-chrome': '/',
 };
 
 export default function EditorClient({

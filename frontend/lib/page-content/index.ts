@@ -18,6 +18,7 @@ import { pricing } from './pricing';
 import { team } from './team';
 import { customers } from './customers';
 import { resources } from './resources';
+import { siteChrome } from './site-chrome';
 
 export const PAGE_SEEDS: Record<string, SeedPage> = {
   [homepage.pageKey]: homepage,
@@ -33,6 +34,7 @@ export const PAGE_SEEDS: Record<string, SeedPage> = {
   [team.pageKey]: team,
   [customers.pageKey]: customers,
   [resources.pageKey]: resources,
+  [siteChrome.pageKey]: siteChrome,
 };
 
 export const SEED_PAGE_KEYS: string[] = Object.keys(PAGE_SEEDS);
