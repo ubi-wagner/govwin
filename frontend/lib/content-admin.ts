@@ -94,6 +94,7 @@ export async function listPages(): Promise<PageSummary[]> {
            bool_or(status = 'draft')                        AS has_draft,
            max(created_at)                                  AS last_updated
     FROM content_pages
+    WHERE content_type = 'page'
     GROUP BY page_key
     ORDER BY page_key
   `;
@@ -112,7 +113,7 @@ export async function getPage(
 ): Promise<{ active: PageVersion | null; draft: PageVersion | null }> {
   const rows = await sql<PageRow[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${pageKey} AND status IN ('active', 'draft')
+    WHERE page_key = ${pageKey} AND content_type = 'page' AND status IN ('active', 'draft')
     ORDER BY version_no DESC
   `;
   const active = rows.find((r) => r.status === 'active') ?? null;
@@ -137,7 +138,7 @@ export async function saveDraft(
     VALUES (
       ${pageKey},
       ${opts.contentType ?? 'page'},
-      (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${pageKey}),
+      (SELECT COALESCE(max(version_no), 0) + 1 FROM content_pages WHERE page_key = ${pageKey} AND content_type = ${opts.contentType ?? 'page'}),
       'draft',
       ${opts.title ?? pageKey},
       ${sql.json(blocks as unknown as Parameters<typeof sql.json>[0])},
@@ -156,7 +157,7 @@ export async function publishPage(
   return await sql.begin(async (tx: any) => {
     const draftRows = await tx`
       SELECT id, version_no FROM content_pages
-      WHERE page_key = ${pageKey} AND status = 'draft'
+      WHERE page_key = ${pageKey} AND content_type = 'page' AND status = 'draft'
       ORDER BY version_no DESC
       LIMIT 1
     `;
@@ -168,6 +169,7 @@ export async function publishPage(
       UPDATE content_pages
       SET status = 'archived', archived_at = now()
       WHERE page_key = ${pageKey}
+        AND content_type = 'page'
         AND status IN ('active', 'draft')
         AND id <> ${draft.id}
     `;
@@ -185,7 +187,7 @@ export async function publishPage(
 export async function getVersions(pageKey: string): Promise<PageVersion[]> {
   const rows = await sql<PageRow[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${pageKey}
+    WHERE page_key = ${pageKey} AND content_type = 'page'
     ORDER BY version_no DESC
   `;
   return rows.map(toVersion);
