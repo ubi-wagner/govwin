@@ -104,6 +104,16 @@ export interface VisitorSession {
   pageCount: number | null;
   firstSeen: string | null;
   lastSeen: string | null;
+  // Connection enrichment (derived from the IP at session create; IP not stored).
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  isp: string | null;
+  org: string | null;
+  asn: string | null;
+  timezone: string | null;
+  latitude: number | null;
+  longitude: number | null;
   events: SessionEvent[];
 }
 
@@ -120,10 +130,14 @@ export async function getRecentSessions(limit = 30, eventCap = 80): Promise<Visi
         sessionId: string; ipHash: string | null; deviceType: string | null;
         userAgent: string | null; referrer: string | null; firstPage: string | null;
         pageCount: number | null; createdAt: Date | null; lastSeenAt: Date | null;
+        country: string | null; region: string | null; city: string | null;
+        isp: string | null; org: string | null; asn: string | null; timezone: string | null;
+        latitude: number | null; longitude: number | null;
       }[]
     >`
       SELECT session_id, ip_hash, device_type, user_agent, referrer, first_page,
-             page_count, created_at, last_seen_at
+             page_count, created_at, last_seen_at,
+             country, region, city, isp, org, asn, timezone, latitude, longitude
       FROM visitor_sessions
       ORDER BY last_seen_at DESC NULLS LAST, created_at DESC
       LIMIT ${limit}
@@ -161,6 +175,9 @@ export async function getRecentSessions(limit = 30, eventCap = 80): Promise<Visi
       pageCount: s.pageCount,
       firstSeen: s.createdAt instanceof Date ? s.createdAt.toISOString() : (s.createdAt ? String(s.createdAt) : null),
       lastSeen: s.lastSeenAt instanceof Date ? s.lastSeenAt.toISOString() : (s.lastSeenAt ? String(s.lastSeenAt) : null),
+      country: s.country, region: s.region, city: s.city,
+      isp: s.isp, org: s.org, asn: s.asn, timezone: s.timezone,
+      latitude: s.latitude, longitude: s.longitude,
       events: byId.get(s.sessionId) ?? [],
     }));
   } catch (e) {

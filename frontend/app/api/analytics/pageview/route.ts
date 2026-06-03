@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import crypto from 'crypto';
+import { lookupIp, isPublicIp } from '@/lib/geoip';
 
 function detectDeviceType(ua: string | null): string {
   if (!ua) return 'desktop';
@@ -108,20 +109,43 @@ export async function POST(request: NextRequest) {
   const utmCmp = typeof utmCampaign === 'string' && utmCampaign.trim() !== '' ? utmCampaign : null;
 
   // ── UPSERT visitor session ──────────────────────────────────────────
+  let sessionInserted = false;
   try {
-    await sql`
+    const rows = await sql<{ inserted: boolean }[]>`
       INSERT INTO visitor_sessions (id, session_id, first_page, referrer, user_agent, ip_hash, device_type, last_seen_at, page_count)
       VALUES (gen_random_uuid(), ${sessionId}, ${pagePath}, ${refStr}, ${ua}, ${ipHash}, ${deviceType}, NOW(), 1)
       ON CONFLICT (session_id) DO UPDATE SET
         last_seen_at = NOW(),
         page_count = visitor_sessions.page_count + 1
+      RETURNING (xmax = 0) AS inserted
     `;
+    sessionInserted = rows[0]?.inserted === true;
   } catch (e) {
     console.error('[analytics/pageview] session upsert failed:', e);
     return NextResponse.json(
       { error: 'Failed to record session', code: 'SESSION_UPSERT_FAILED' },
       { status: 500 },
     );
+  }
+
+  // ── Enrich a NEW session with connection info (ISP/org/ASN/geo) ──────
+  // Best-effort, once per session; the raw IP is used only here and discarded
+  // (only the hash + derived fields persist). Never fails the beacon.
+  if (sessionInserted && isPublicIp(rawIp)) {
+    try {
+      const geo = await lookupIp(rawIp);
+      if (geo) {
+        await sql`
+          UPDATE visitor_sessions SET
+            country = ${geo.country}, region = ${geo.region}, city = ${geo.city},
+            isp = ${geo.isp}, org = ${geo.org}, asn = ${geo.asn},
+            timezone = ${geo.timezone}, latitude = ${geo.latitude}, longitude = ${geo.longitude}
+          WHERE session_id = ${sessionId}
+        `;
+      }
+    } catch (e) {
+      console.error('[analytics/pageview] geo enrichment failed:', e);
+    }
   }
 
   // ── INSERT page view ────────────────────────────────────────────────

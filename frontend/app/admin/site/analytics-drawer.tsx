@@ -56,6 +56,8 @@ function SessionRow({ s }: { s: VisitorSession }) {
   const acq = s.referrer
     ? new URL(s.referrer, 'https://x').hostname.replace(/^www\./, '') || s.referrer
     : 'direct';
+  const loc = [s.city, s.region, s.country].filter(Boolean).join(', ');
+  const net = s.isp || s.org;
   return (
     <div>
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left p-3 hover:bg-gray-50 flex items-center justify-between gap-2">
@@ -64,8 +66,8 @@ function SessionRow({ s }: { s: VisitorSession }) {
             <span className="font-mono">{s.firstPage || '/'}</span>
             <span className="text-gray-400"> · {s.pageCount ?? s.events.length} pages</span>
           </div>
-          <div className="text-[11px] text-gray-400 capitalize">
-            {(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)} · {acq}
+          <div className="text-[11px] text-gray-400">
+            {(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)}{loc ? ` · ${loc}` : ''} · {acq}
           </div>
         </div>
         <span className="text-[11px] text-gray-400 whitespace-nowrap">{relTime(s.lastSeen)}</span>
@@ -79,6 +81,10 @@ function SessionRow({ s }: { s: VisitorSession }) {
             </dd>
             <dt className="text-gray-400">Device</dt>
             <dd className="col-span-2 text-gray-600 capitalize">{(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)}</dd>
+            <dt className="text-gray-400">Location</dt>
+            <dd className="col-span-2 text-gray-600">{loc || '—'}{s.timezone ? ` · ${s.timezone}` : ''}</dd>
+            <dt className="text-gray-400">Network</dt>
+            <dd className="col-span-2 text-gray-600 truncate" title={net ?? ''}>{net || '—'}{s.asn ? ` · ${s.asn}` : ''}</dd>
             <dt className="text-gray-400">Source</dt>
             <dd className="col-span-2 text-gray-600 truncate">{s.referrer || 'direct'}{s.events[0]?.utmSource ? ` · utm:${s.events[0].utmSource}` : ''}</dd>
             <dt className="text-gray-400">First seen</dt>
@@ -184,9 +190,9 @@ export default function AnalyticsDrawer({ data, sessions }: { data: SiteAnalytic
               </div>
 
               <p className="text-[11px] text-gray-400">
-                Sessions are de-duplicated by visitor session. The visitor fingerprint is a one-way
-                SHA-256 hash — raw IP addresses are never stored. Time-on-page is captured when the
-                visitor leaves a page.
+                Connection info (ISP, organization, ASN, location) is derived from the visitor&apos;s
+                IP at first visit; the raw IP is then discarded — only a one-way SHA-256 fingerprint
+                and these derived fields are stored. Time-on-page is captured when the visitor leaves a page.
               </p>
             </div>
           </aside>
