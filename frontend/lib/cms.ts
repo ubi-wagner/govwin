@@ -15,6 +15,8 @@ export interface ContentRow {
   slug: string;
   title: string;
   contentType: string;
+  /** Block grouping key (hero, pillars, …). Authoritative over tags for buildLookup. */
+  section?: string;
   body: string;
   excerpt: string | null;
   author: string | null;
@@ -260,6 +262,7 @@ function pageBlockToRow(b: Record<string, unknown>): ContentRow {
     slug: typeof b.slug === 'string' ? b.slug : '',
     title: typeof b.title === 'string' ? b.title : '',
     contentType: 'page_block',
+    section: typeof b.section === 'string' ? b.section : undefined,
     body: typeof b.body === 'string' ? b.body : '',
     excerpt: typeof b.excerpt === 'string' ? b.excerpt : null,
     author: null,
@@ -283,9 +286,11 @@ function pageBlockToRow(b: Record<string, unknown>): ContentRow {
 export function buildLookup(blocks: ContentRow[], page: string): Record<string, ContentRow | ContentRow[]> {
   const grouped: Record<string, ContentRow[]> = {};
   for (const block of blocks) {
-    const sectionTag = block.tags.find((t: string) => t !== page) ?? 'unknown';
-    if (!grouped[sectionTag]) grouped[sectionTag] = [];
-    grouped[sectionTag].push(block);
+    // Prefer the explicit section (what the editor edits); fall back to the
+    // legacy tag-derived section for un-migrated cms_content blocks.
+    const sectionKey = block.section || block.tags.find((t: string) => t !== page) || 'unknown';
+    if (!grouped[sectionKey]) grouped[sectionKey] = [];
+    grouped[sectionKey].push(block);
   }
   const result: Record<string, ContentRow | ContentRow[]> = {};
   for (const [key, items] of Object.entries(grouped)) {

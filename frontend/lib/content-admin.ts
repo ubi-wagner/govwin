@@ -12,6 +12,7 @@ export interface PageBlock {
   title?: string | null;
   body?: string | null;
   excerpt?: string | null;
+  featuredImage?: string | null;
   metadata?: Record<string, unknown>;
   slug?: string;
   tags?: string[];
