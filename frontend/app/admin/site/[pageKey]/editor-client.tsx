@@ -69,6 +69,8 @@ export default function EditorClient({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [preview, setPreview] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   const previewPath = PREVIEW_PATHS[pageKey] ?? `/${pageKey}`;
 
@@ -134,6 +136,12 @@ export default function EditorClient({
     }
   }
 
+  async function openPreview() {
+    await save();
+    setPreviewNonce((n) => n + 1);
+    setPreview(true);
+  }
+
   return (
     <div className="pb-24">
       <div className="flex items-center justify-between mt-2 mb-4">
@@ -197,14 +205,9 @@ export default function EditorClient({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <a
-          href={`${previewPath}?_preview=1`}
-          target="_blank"
-          rel="noreferrer"
-          className="px-4 py-2 rounded border text-sm"
-        >
-          Preview &#8599;
-        </a>
+        <button onClick={openPreview} disabled={busy} className="px-4 py-2 rounded border text-sm disabled:opacity-50">
+          Preview
+        </button>
         <button disabled={busy} onClick={save} className="px-4 py-2 rounded border text-sm disabled:opacity-50">
           Save draft
         </button>
@@ -217,6 +220,35 @@ export default function EditorClient({
         </button>
       </div>
       {msg && <div className="fixed bottom-20 right-8 text-sm bg-gray-900 text-white px-3 py-1.5 rounded shadow">{msg}</div>}
+
+      {preview && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex flex-col">
+          <div className="bg-white px-4 py-2 flex items-center justify-between border-b">
+            <div className="text-sm font-medium">Preview (draft) &mdash; {pageKey}</div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPreview(false)} className="px-3 py-1.5 rounded border text-sm">
+                Close
+              </button>
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  await publish();
+                  setPreview(false);
+                }}
+                className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
+              >
+                Publish
+              </button>
+            </div>
+          </div>
+          <iframe
+            key={previewNonce}
+            src={`${previewPath}?_preview=1&_t=${previewNonce}`}
+            className="flex-1 w-full bg-white"
+            title="Draft preview"
+          />
+        </div>
+      )}
     </div>
   );
 }
