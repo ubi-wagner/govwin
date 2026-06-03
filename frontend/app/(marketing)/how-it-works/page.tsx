@@ -7,6 +7,7 @@ import {
   CtaSection,
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -129,7 +130,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
     <>
       <Hero
         eyebrow={hero?.excerpt ?? 'How It Works'}
-        headline={hero?.title ?? <>From application to <span className="text-brand-400">submitted proposal</span></>}
+        headline={<RichText text={hero?.title ?? 'From application to *submitted proposal*'} accent="brand-400" variant="plain" />}
         subheadline={hero?.body ?? "A single workflow that starts with a qualifying application and ends with a compliant, expert-curated proposal ready to submit. Every step is designed for small businesses that can't afford to waste time on opportunities that won't convert."}
         primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
         secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See Pricing', href: '/pricing' }}

@@ -7,6 +7,7 @@ import {
   type PricingTierProps,
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -168,7 +169,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
       <Hero
         variant="light"
         eyebrow={hero?.excerpt ?? "Simple, Transparent Pricing"}
-        headline={hero?.title ?? <>One subscription. <br /><span className="text-brand-700">Per-proposal portals.</span> <br />No surprises.</>}
+        headline={<RichText text={hero?.title ?? 'One subscription.\n*Per-proposal portals.*\nNo surprises.'} accent="brand-700" variant="plain" />}
         subheadline={hero?.body ?? "We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you."}
         primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
         secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See How It Works', href: '/how-it-works' }}

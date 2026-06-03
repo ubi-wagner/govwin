@@ -16,12 +16,12 @@ export const howItWorks: SeedPage = {
   pageKey: 'how-it-works',
   title: 'How It Works',
   blocks: [
-    // Hero. headline accepts ReactNode; the editable title is plain text.
+    // Hero. headline accepts ReactNode; *accent* = plain brand-400 color (no italic).
     {
       section: 'hero',
       displayOrder: 0,
       excerpt: 'How It Works',
-      title: 'From application to submitted proposal',
+      title: 'From application to *submitted proposal*',
       body: "A single workflow that starts with a qualifying application and ends with a compliant, expert-curated proposal ready to submit. Every step is designed for small businesses that can't afford to waste time on opportunities that won't convert.",
       metadata: {
         primary_cta: { label: 'Apply Now', href: '/apply' },

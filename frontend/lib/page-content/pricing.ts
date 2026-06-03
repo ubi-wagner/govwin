@@ -19,13 +19,12 @@ export const pricing: SeedPage = {
   pageKey: 'pricing',
   title: 'Pricing',
   blocks: [
-    // Hero. The page's ReactNode default carries the <br/>s + brand-700 span; an
-    // edited title renders as a plain string, so the seed default is plain text.
+    // Hero. headline accepts ReactNode; \n = line break, *accent* = plain brand-700.
     {
       section: 'hero',
       displayOrder: 0,
       excerpt: 'Simple, Transparent Pricing',
-      title: 'One subscription. Per-proposal portals. No surprises.',
+      title: 'One subscription.\n*Per-proposal portals.*\nNo surprises.',
       body: 'We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you.',
       metadata: {
         primary_cta: { label: 'Apply Now', href: '/apply' },
