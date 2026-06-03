@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { CmsCard } from '@/components/marketing/cms-card';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -31,7 +32,10 @@ export default async function AboutPage({ searchParams }: { searchParams: Promis
         <div className="max-w-5xl mx-auto px-6 py-24 md:py-32">
           <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'About RFP Pipeline'}</p>
           <h1 className="font-display text-4xl md:text-6xl font-black text-navy-900 leading-tight">
-            {hero?.title ?? <>Expert + AI + Automation + Collaboration = <span className="font-prose italic text-award">Win</span>.</>}
+            <RichText
+              text={hero?.title ?? 'Expert + AI + Automation + Collaboration = *Win*.'}
+              accent={(hero?.metadata as { accent?: string })?.accent ?? 'award'}
+            />
           </h1>
           <p className="mt-8 text-xl text-navy-600 max-w-3xl leading-relaxed">
             {hero?.body ?? 'Most AI tools give you speed without accuracy. Most consultants give you accuracy without scale. We built the thing that does both — and gets better every time you use it.'}

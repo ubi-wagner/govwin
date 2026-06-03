@@ -9,6 +9,7 @@ interface EditBlock {
   title: string;
   body: string;
   excerpt: string;
+  featuredImage: string;
   metaText: string;
   slug?: string;
   tags?: string[];
@@ -21,13 +22,14 @@ function toEdit(b: PageBlock): EditBlock {
     title: b.title ?? '',
     body: b.body ?? '',
     excerpt: b.excerpt ?? '',
+    featuredImage: b.featuredImage ?? '',
     metaText: JSON.stringify(b.metadata ?? {}, null, 2),
     slug: b.slug,
     tags: b.tags,
   };
 }
 
-function toBlocks(edits: EditBlock[]): PageBlock[] {
+function toBlocks(edits: EditBlock[], pageKey: string): PageBlock[] {
   return edits.map((b, i) => {
     let metadata: Record<string, unknown> = {};
     try {
@@ -41,9 +43,12 @@ function toBlocks(edits: EditBlock[]): PageBlock[] {
       title: b.title,
       body: b.body,
       excerpt: b.excerpt,
+      featuredImage: b.featuredImage.trim() || null,
       metadata,
       slug: b.slug,
-      tags: b.tags,
+      // Keep tags in lockstep with the section so the public render (buildLookup)
+      // and the editor agree on grouping — section is authoritative.
+      tags: [pageKey, b.section],
     };
   });
 }
@@ -53,6 +58,9 @@ const PREVIEW_PATHS: Record<string, string> = {
   homepage: '/',
   security: '/infosec',
   'get-started': '/pricing',
+  // Header/footer show on every page; preview against the homepage. (Chrome
+  // preview reflects the published version — publish to see edits live.)
+  'site-chrome': '/',
 };
 
 export default function EditorClient({
@@ -78,7 +86,7 @@ export default function EditorClient({
     setBlocks((bs) => bs.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
   }
   function add() {
-    setBlocks((bs) => [...bs, { section: 'section', displayOrder: bs.length, title: '', body: '', excerpt: '', metaText: '{}' }]);
+    setBlocks((bs) => [...bs, { section: 'section', displayOrder: bs.length, title: '', body: '', excerpt: '', featuredImage: '', metaText: '{}' }]);
   }
   function remove(i: number) {
     setBlocks((bs) => bs.filter((_, idx) => idx !== i));
@@ -104,7 +112,7 @@ export default function EditorClient({
     setMsg(null);
     try {
       const { ok, json } = await postJSON(`/api/admin/site/pages/${encodeURIComponent(pageKey)}/save`, {
-        blocks: toBlocks(blocks),
+        blocks: toBlocks(blocks, pageKey),
         note: note || 'Saved',
       });
       setMsg(ok ? `Saved draft v${versionOf(json)}.` : String(json.error ?? 'Save failed'));
@@ -119,7 +127,7 @@ export default function EditorClient({
     setMsg(null);
     try {
       const saved = await postJSON(`/api/admin/site/pages/${encodeURIComponent(pageKey)}/save`, {
-        blocks: toBlocks(blocks),
+        blocks: toBlocks(blocks, pageKey),
         note: note || 'Pre-publish save',
       });
       if (!saved.ok) {
@@ -184,6 +192,12 @@ export default function EditorClient({
               value={b.excerpt}
               onChange={(e) => update(i, { excerpt: e.target.value })}
             />
+            <input
+              className="w-full border rounded px-2 py-1 mb-2 text-sm"
+              placeholder="Image URL (optional)"
+              value={b.featuredImage}
+              onChange={(e) => update(i, { featuredImage: e.target.value })}
+            />
             <textarea
               className="w-full border rounded px-2 py-1 text-xs font-mono"
               rows={3}
@@ -191,6 +205,9 @@ export default function EditorClient({
               value={b.metaText}
               onChange={(e) => update(i, { metaText: e.target.value })}
             />
+            <p className="mt-1 text-[11px] text-gray-400">
+              Tip: in titles/headings use <code>*text*</code> for an accent and a new line for a line break.
+            </p>
           </div>
         ))}
         <button className="text-sm text-blue-600 hover:underline" onClick={add}>

@@ -7,6 +7,7 @@ import {
   CtaSection,
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -106,7 +107,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
   const blocks = await getPageBlocks('how-it-works', isPreview);
   const lookup = buildLookup(blocks, 'how-it-works');
   const hero = single(lookup['hero']);
+  const workflowHeader = single(lookup['workflow-header']);
   const cmsSteps = many(lookup['steps']);
+  const guardrailsHeader = single(lookup['guardrails-header']);
   const cmsGuardrails = many(lookup['guardrails']);
   const ctaBlock = single(lookup['cta']);
 
@@ -127,7 +130,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
     <>
       <Hero
         eyebrow={hero?.excerpt ?? 'How It Works'}
-        headline={hero?.title ?? <>From application to <span className="text-brand-400">submitted proposal</span></>}
+        headline={<RichText text={hero?.title ?? 'From application to *submitted proposal*'} accent="brand-400" variant="plain" />}
         subheadline={hero?.body ?? "A single workflow that starts with a qualifying application and ends with a compliant, expert-curated proposal ready to submit. Every step is designed for small businesses that can't afford to waste time on opportunities that won't convert."}
         primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
         secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See Pricing', href: '/pricing' }}
@@ -135,9 +138,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
 
       <Section variant="white">
         <SectionHeader
-          eyebrow="The Workflow"
-          title="Six stages from curious applicant to compliant submission"
-          subtitle="Designed so you get value in week one, not month six."
+          eyebrow={workflowHeader?.excerpt ?? 'The Workflow'}
+          title={workflowHeader?.title ?? 'Six stages from curious applicant to compliant submission'}
+          subtitle={workflowHeader?.body ?? 'Designed so you get value in week one, not month six.'}
         />
         <div className="mt-16 max-w-3xl mx-auto relative">
           <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-brand-100" aria-hidden />
@@ -149,9 +152,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
 
       <Section variant="gray">
         <SectionHeader
-          eyebrow="Built-in Guardrails"
-          title="Trust is engineered into every stage"
-          subtitle="Federal R&D buyers care about data security, provenance, and compliance. We designed for that audience from day one."
+          eyebrow={guardrailsHeader?.excerpt ?? 'Built-in Guardrails'}
+          title={guardrailsHeader?.title ?? 'Trust is engineered into every stage'}
+          subtitle={guardrailsHeader?.body ?? 'Federal R&D buyers care about data security, provenance, and compliance. We designed for that audience from day one.'}
         />
         <div className="mt-12">
           <FeatureGrid columns={3} items={resolvedGuardrails} />

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPageBlocks, getPublishedContent, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -16,10 +17,12 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   const lookup = buildLookup(blocks, 'homepage');
   const hero = single(lookup['hero']);
   const stats = many(lookup['stats']);
+  const stagesHeader = single(lookup['stages-header']);
   const stages = many(lookup['stages']);
   const pricingHero = single(lookup['pricing-hero']);
   const pricingCards = many(lookup['pricing']);
   const expertGate = single(lookup['expert-gate']);
+  const insightsHeader = single(lookup['insights-header']);
   const quote = single(lookup['quote']);
   const cta = single(lookup['cta']);
   const blogPosts = await getPublishedContent('blog_post', 3);
@@ -58,7 +61,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             {hero?.excerpt ?? 'AI + Expert · From Application to Submission'}
           </p>
           <h1 className="font-display text-5xl md:text-7xl font-black text-navy-900 leading-[1.05]">
-            {hero?.title ?? <>A proposal<br />engine, <span className="font-prose italic text-brand-500">not</span> a<br />proposal<br />gamble.</>}
+            <RichText text={hero?.title ?? 'A proposal\nengine, *not* a\nproposal\ngamble.'} accent="brand-500" />
           </h1>
           <p className="mt-8 text-xl md:text-2xl text-navy-600 font-prose italic leading-relaxed max-w-2xl">
             {hero?.body ?? 'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.'}
@@ -105,11 +108,10 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
         <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
           <div className="flex flex-col md:flex-row items-baseline gap-6 mb-16">
             <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
-              Six stages from curious <span className="font-prose italic text-brand-500">applicant</span> to
-              compliant proposal <span className="font-prose italic text-brand-500">submission</span>.
+              <RichText text={stagesHeader?.title ?? 'Six stages from curious *applicant* to compliant proposal *submission*.'} accent="brand-500" />
             </h2>
             <p className="text-sm uppercase tracking-widest text-navy-400 shrink-0">
-              Value from Day One —<br />Not Six Months From Now
+              <RichText text={stagesHeader?.excerpt ?? 'Value from Day One —\nNot Six Months From Now'} accent="brand-500" />
             </p>
           </div>
 
@@ -132,7 +134,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
         <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
           <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">{pricingHero?.excerpt ?? 'How We Charge'}</p>
           <h2 className="font-display text-3xl md:text-4xl font-black text-white leading-tight">
-            {pricingHero?.title ?? <>One subscription.<br />Per-proposal <span className="font-prose italic text-citrus">portals</span>.</>}
+            <RichText text={pricingHero?.title ?? 'One subscription.\nPer-proposal *portals*.'} accent="citrus" />
           </h2>
           <p className="mt-4 text-lg text-navy-300 font-prose italic max-w-2xl leading-relaxed">
             {pricingHero?.body ?? 'Priced and built specifically for small businesses, not enterprise. Low cost subscription provides find and remind capabilities. Per proposal pricing ensures you only pay for builds you choose.'}
@@ -166,7 +168,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             <div>
               <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-4">{expertGate?.excerpt ?? 'The Expert Gate'}</p>
               <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900 leading-tight">
-                {expertGate?.title ?? <>The AI drafts.<br />The Expert <span className="font-prose italic text-brand-500">verifies</span>.<br />Your Team collaborates.</>}
+                <RichText text={expertGate?.title ?? 'The AI drafts.\nThe Expert *verifies*.\nYour Team collaborates.'} accent="brand-500" />
               </h2>
             </div>
             <div className="bg-white border border-cream-200 rounded-xl p-8">
@@ -211,9 +213,9 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
           <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
             <div className="flex items-baseline justify-between mb-12">
               <div>
-                <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-3">Latest Insights</p>
+                <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-3">{insightsHeader?.excerpt ?? 'Latest Insights'}</p>
                 <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
-                  From the <span className="font-prose italic text-brand-500">blog</span>.
+                  <RichText text={insightsHeader?.title ?? 'From the *blog*.'} accent="brand-500" />
                 </h2>
               </div>
               <Link href="/resources" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors hidden md:block">
@@ -276,7 +278,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             {cta?.excerpt ?? 'Applications Open · Launch July 2026'}
           </p>
           <h2 className="font-display text-3xl md:text-5xl font-black text-white leading-tight">
-            {cta?.title ?? <>Apply today. Draft your <span className="font-prose italic text-citrus">first</span><br />proposal on launch day.</>}
+            <RichText text={cta?.title ?? 'Apply today. Draft your *first*\nproposal on launch day.'} accent="citrus" />
           </h2>
           <div className="mt-10">
             <Link
@@ -287,9 +289,9 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             </Link>
           </div>
           <div className="mt-8 flex items-center justify-center gap-6 text-sm text-navy-400">
-            <span>Founder &amp; Architect</span>
-            <span className="text-cream-200 font-semibold">Eric Wagner</span>
-            <a href="mailto:eric@rfppipeline.com" className="text-citrus-400 hover:text-citrus-300">eric@rfppipeline.com</a>
+            <span>{(cta?.metadata as { footer?: { role?: string } })?.footer?.role ?? 'Founder & Architect'}</span>
+            <span className="text-cream-200 font-semibold">{(cta?.metadata as { footer?: { name?: string } })?.footer?.name ?? 'Eric Wagner'}</span>
+            <a href={`mailto:${(cta?.metadata as { footer?: { email?: string } })?.footer?.email ?? 'eric@rfppipeline.com'}`} className="text-citrus-400 hover:text-citrus-300">{(cta?.metadata as { footer?: { email?: string } })?.footer?.email ?? 'eric@rfppipeline.com'}</a>
           </div>
         </div>
       </section>

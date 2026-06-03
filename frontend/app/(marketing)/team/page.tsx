@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getPublishedContent } from '@/lib/cms';
+import { getPublishedContent, getPageBlocks, buildLookup, single } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const metadata = {
   title: 'Team — RFP Pipeline',
@@ -8,19 +9,26 @@ export const metadata = {
 
 export const revalidate = 60;
 
-export default async function TeamPage() {
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams;
+  const isPreview = params?._preview === '1';
   const teamMembers = await getPublishedContent('team_member');
+  const lookup = buildLookup(await getPageBlocks('team', isPreview), 'team');
+  const hero = single(lookup['hero']);
+  const empty = single(lookup['empty']);
+  const cta = single(lookup['cta']);
+  const ctaMeta = (cta?.metadata ?? {}) as { ctaLabel?: string; ctaHref?: string };
 
   return (
     <>
       <section className="bg-cream-50">
         <div className="max-w-5xl mx-auto px-6 py-20">
-          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">Team</p>
+          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'Team'}</p>
           <h1 className="font-display text-4xl md:text-5xl font-black text-navy-900">
-            Built by <span className="font-prose italic text-brand-500">practitioners</span>.
+            <RichText text={hero?.title ?? 'Built by *practitioners*.'} accent={(hero?.metadata as { accent?: string })?.accent ?? 'brand-500'} />
           </h1>
           <p className="mt-4 text-lg text-navy-600">
-            25 years of federal R&amp;D experience, translated into software.
+            {hero?.body ?? '25 years of federal R&D experience, translated into software.'}
           </p>
         </div>
       </section>
@@ -29,9 +37,9 @@ export default async function TeamPage() {
         <div className="max-w-6xl mx-auto px-6 py-16">
           {teamMembers.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-navy-500 text-lg">Team page coming soon.</p>
+              <p className="text-navy-500 text-lg">{empty?.title ?? 'Team page coming soon.'}</p>
               <p className="mt-2 text-sm text-navy-400">
-                We are finalizing our team profiles.
+                {empty?.body ?? 'We are finalizing our team profiles.'}
               </p>
             </div>
           ) : (
@@ -117,13 +125,13 @@ export default async function TeamPage() {
       <section className="bg-navy-900">
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
           <h2 className="font-display text-2xl font-bold text-white">
-            Work with our team.
+            {cta?.title ?? 'Work with our team.'}
           </h2>
           <p className="mt-3 text-navy-300 max-w-xl mx-auto">
-            Apply for our founding cohort and get direct access to federal R&amp;D veterans.
+            {cta?.body ?? 'Apply for our founding cohort and get direct access to federal R&D veterans.'}
           </p>
-          <Link href="/apply" className="inline-flex mt-6 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
-            Apply Now
+          <Link href={ctaMeta.ctaHref ?? '/apply'} className="inline-flex mt-6 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
+            {ctaMeta.ctaLabel ?? 'Apply Now'}
           </Link>
         </div>
       </section>

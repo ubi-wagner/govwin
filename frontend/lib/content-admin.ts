@@ -12,6 +12,7 @@ export interface PageBlock {
   title?: string | null;
   body?: string | null;
   excerpt?: string | null;
+  featuredImage?: string | null;
   metadata?: Record<string, unknown>;
   slug?: string;
   tags?: string[];
@@ -105,6 +106,37 @@ export async function listPages(): Promise<PageSummary[]> {
     hasDraft: r.hasDraft,
     lastUpdated: r.lastUpdated,
   }));
+}
+
+/**
+ * Seed a page's default blocks as an active v1 if it has no content_pages row yet.
+ * Idempotent: a page that already has any row (active/draft/archived) is left
+ * untouched, so this never clobbers edited content. Returns true if it seeded.
+ * The seed equals the page's in-code defaults, so the public page is unchanged —
+ * it just makes the editor populated instead of blank.
+ */
+export async function ensurePageSeeded(pageKey: string): Promise<boolean> {
+  const { PAGE_SEEDS } = await import('@/lib/page-content');
+  const seed = PAGE_SEEDS[pageKey];
+  if (!seed) return false;
+  try {
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO content_pages
+        (page_key, content_type, version_no, status, title, blocks, audit_note, created_by, published_at)
+      SELECT ${pageKey}, 'page', 1, 'active', ${seed.title},
+             ${sql.json(seed.blocks as unknown as Parameters<typeof sql.json>[0])},
+             'Seeded from page defaults', 'system', now()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM content_pages WHERE page_key = ${pageKey} AND content_type = 'page'
+      )
+      RETURNING id
+    `;
+    return rows.length > 0;
+  } catch (e) {
+    // A concurrent open can race the partial-unique active index — non-fatal.
+    console.error('[content-admin/ensurePageSeeded] error:', e);
+    return false;
+  }
 }
 
 /** The live (active) version and the working (latest draft) version for a page. */

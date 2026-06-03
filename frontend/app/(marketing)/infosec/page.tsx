@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 function sanitizeHtml(html: string): string {
   return html
@@ -21,8 +22,10 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
   const blocks = await getPageBlocks('infosec', isPreview);
   const lookup = buildLookup(blocks, 'infosec');
   const hero = single(lookup['hero']);
+  const isolationHeader = single(lookup['isolation-header']);
   const cmsIsolation = many(lookup['isolation']);
   const cmsPromise = many(lookup['promise']);
+  const collabHeader = single(lookup['collab-header']);
   const cmsCollab = many(lookup['collab']);
   const certBlock = single(lookup['certifications']);
   const ctaBlock = single(lookup['cta']);
@@ -54,7 +57,10 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
         <div className="max-w-5xl mx-auto px-6 py-24 md:py-32">
           <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'Security & Data Isolation'}</p>
           <h1 className="font-display text-4xl md:text-5xl font-black text-white leading-tight">
-            {hero?.title ?? <>Your data. Your agents.<br /><span className="font-prose italic text-citrus">Nobody else&rsquo;s.</span></>}
+            <RichText
+              text={hero?.title ?? 'Your data. Your agents.\n*Nobody else’s.*'}
+              accent={(hero?.metadata as { accent?: string })?.accent ?? 'citrus'}
+            />
           </h1>
           <p className="mt-6 text-lg text-navy-300 max-w-2xl">
             {hero?.body ?? 'Federal R&D proposals contain sensitive IP, pricing strategy, and team composition. We built the architecture assuming that — not as an afterthought.'}
@@ -64,7 +70,7 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
 
       <section className="bg-cream-50 border-t border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-20">
-          <h2 className="font-display text-2xl font-bold text-navy-900 mb-10">Four layers of isolation. Independently enforced.</h2>
+          <h2 className="font-display text-2xl font-bold text-navy-900 mb-10">{isolationHeader?.title ?? 'Four layers of isolation. Independently enforced.'}</h2>
           <div className="grid md:grid-cols-2 gap-8">
             {isolation.map((item, i) => (
               <div key={i} className="p-8 bg-white border border-cream-200 rounded-xl">
@@ -93,8 +99,8 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
 
       <section className="bg-white border-t border-cream-200">
         <div className="max-w-5xl mx-auto px-6 py-20">
-          <p className="text-xs text-brand-500 uppercase tracking-widest font-semibold mb-4">Collaboration Administration</p>
-          <h2 className="font-display text-3xl font-bold text-navy-900 mb-8">Easy for admins. Clear for collaborators.</h2>
+          <p className="text-xs text-brand-500 uppercase tracking-widest font-semibold mb-4">{collabHeader?.excerpt ?? 'Collaboration Administration'}</p>
+          <h2 className="font-display text-3xl font-bold text-navy-900 mb-8">{collabHeader?.title ?? 'Easy for admins. Clear for collaborators.'}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {collab.map((item, i) => (
               <div key={i} className="p-6 bg-cream-50 border border-cream-200 rounded-lg">
@@ -133,8 +139,8 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
           <p className="mt-3 text-navy-400">
             {ctaBlock?.body ?? 'Raise them in your application. We\'ll tell you honestly whether we\'re a fit today.'}
           </p>
-          <Link href="/apply" className="inline-flex mt-8 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
-            Start an Application
+          <Link href={(ctaBlock?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'} className="inline-flex mt-8 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
+            {(ctaBlock?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Start an Application'}
           </Link>
         </div>
       </section>
