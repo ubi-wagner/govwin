@@ -35,37 +35,39 @@ export interface PageVersion {
   archivedAt: Date | null;
 }
 
+// Result rows arrive camelCase — the sql client maps column names with
+// `transform.column.from = postgres.toCamel` (see lib/db.ts).
 interface PageRow {
   id: string;
-  page_key: string;
-  content_type: string;
-  version_no: number;
+  pageKey: string;
+  contentType: string;
+  versionNo: number;
   status: PageStatus;
   title: string | null;
   blocks: unknown;
   metadata: unknown;
-  audit_note: string | null;
-  created_by: string | null;
-  created_at: Date;
-  published_at: Date | null;
-  archived_at: Date | null;
+  auditNote: string | null;
+  createdBy: string | null;
+  createdAt: Date;
+  publishedAt: Date | null;
+  archivedAt: Date | null;
 }
 
 function toVersion(r: PageRow): PageVersion {
   return {
     id: r.id,
-    pageKey: r.page_key,
-    contentType: r.content_type,
-    versionNo: r.version_no,
+    pageKey: r.pageKey,
+    contentType: r.contentType,
+    versionNo: r.versionNo,
     status: r.status,
     title: r.title,
     blocks: Array.isArray(r.blocks) ? (r.blocks as PageBlock[]) : [],
     metadata: r.metadata && typeof r.metadata === 'object' ? (r.metadata as Record<string, unknown>) : {},
-    auditNote: r.audit_note,
-    createdBy: r.created_by,
-    createdAt: r.created_at,
-    publishedAt: r.published_at,
-    archivedAt: r.archived_at,
+    auditNote: r.auditNote,
+    createdBy: r.createdBy,
+    createdAt: r.createdAt,
+    publishedAt: r.publishedAt,
+    archivedAt: r.archivedAt,
   };
 }
 
@@ -80,11 +82,11 @@ export interface PageSummary {
 /** All pages with their active version and whether an unpublished draft exists. */
 export async function listPages(): Promise<PageSummary[]> {
   const rows = await sql<{
-    page_key: string;
-    content_type: string;
-    active_version: number | null;
-    has_draft: boolean;
-    last_updated: Date;
+    pageKey: string;
+    contentType: string;
+    activeVersion: number | null;
+    hasDraft: boolean;
+    lastUpdated: Date;
   }[]>`
     SELECT page_key,
            min(content_type)                                AS content_type,
@@ -96,11 +98,11 @@ export async function listPages(): Promise<PageSummary[]> {
     ORDER BY page_key
   `;
   return rows.map((r) => ({
-    pageKey: r.page_key,
-    contentType: r.content_type,
-    activeVersion: r.active_version,
-    hasDraft: r.has_draft,
-    lastUpdated: r.last_updated,
+    pageKey: r.pageKey,
+    contentType: r.contentType,
+    activeVersion: r.activeVersion,
+    hasDraft: r.hasDraft,
+    lastUpdated: r.lastUpdated,
   }));
 }
 
@@ -158,7 +160,7 @@ export async function publishPage(
       ORDER BY version_no DESC
       LIMIT 1
     `;
-    const draft = draftRows[0] as { id: string; version_no: number } | undefined;
+    const draft = draftRows[0] as { id: string; versionNo: number } | undefined;
     if (!draft) return { published: false, reason: 'no_draft' };
 
     // Archive the current active and any intermediate drafts (kept as history).
@@ -175,7 +177,7 @@ export async function publishPage(
       SET status = 'active', published_at = now()
       WHERE id = ${draft.id}
     `;
-    return { published: true, versionNo: draft.version_no };
+    return { published: true, versionNo: draft.versionNo };
   });
 }
 
