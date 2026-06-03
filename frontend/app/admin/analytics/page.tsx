@@ -1,6 +1,8 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
+import { getRecentSessions } from '@/lib/analytics-admin';
+import { RecentSessions } from '@/components/admin/recent-sessions';
 
 export const dynamic = 'force-dynamic';
 
@@ -193,6 +195,9 @@ export default async function AnalyticsPage() {
     console.error('[admin/analytics] utm campaign query failed', e);
   }
 
+  // ── Recent sessions with full drill-down (timeline + ISP/org/ASN/geo) ──
+  const recentSessions = await getRecentSessions(40);
+
   const formatVal = (v: number) => (v === -1 ? 'N/A' : v.toLocaleString());
 
   return (
@@ -379,6 +384,16 @@ export default async function AnalyticsPage() {
           </div>
         </div>
       )}
+
+      {/* Recent sessions — expand any row for the full visit journey */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-1">Recent Sessions</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Expand a session for its page-by-page timeline (with time-on-page), device, location,
+          and network (ISP · ASN). The visitor identity is a one-way SHA-256 hash — raw IPs are never stored.
+        </p>
+        <RecentSessions sessions={recentSessions} />
+      </div>
     </div>
   );
 }
