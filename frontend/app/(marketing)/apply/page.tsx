@@ -1,5 +1,6 @@
 import { ApplicationForm } from '@/components/marketing/application-form';
 import { getPageBlocks, buildLookup, single } from '@/lib/cms';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -42,6 +43,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
           <ApplicationForm />
         </div>
       </section>
+
+      <CustomSections pageKey="apply" blocks={blocks} />
     </>
   );
 }

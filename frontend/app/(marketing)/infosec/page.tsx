@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 function sanitizeHtml(html: string): string {
   return html
@@ -144,6 +145,8 @@ export default async function InfoSecPage({ searchParams }: { searchParams: Prom
           </Link>
         </div>
       </section>
+
+      <CustomSections pageKey="infosec" blocks={blocks} />
     </>
   );
 }

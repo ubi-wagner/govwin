@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { CmsCard } from '@/components/marketing/cms-card';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -81,6 +82,8 @@ export default async function AboutPage({ searchParams }: { searchParams: Promis
           </Link>
         </div>
       </section>
+
+      <CustomSections pageKey="about" blocks={blocks} />
     </>
   );
 }

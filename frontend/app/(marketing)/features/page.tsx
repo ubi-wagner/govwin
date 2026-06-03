@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { CmsCard } from '@/components/marketing/cms-card';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -80,6 +81,8 @@ export default async function FeaturesPage(props: { searchParams: Promise<Record
           </Link>
         </div>
       </section>
+
+      <CustomSections pageKey="features" blocks={blocks} />
     </>
   );
 }

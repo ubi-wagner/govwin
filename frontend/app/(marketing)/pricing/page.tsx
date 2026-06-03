@@ -8,6 +8,7 @@ import {
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const revalidate = 60;
 
@@ -235,6 +236,8 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Apply for Founding Cohort', href: '/apply' }}
         note={(ctaBlock?.metadata as { note?: string })?.note ?? "Limited to 20 founding members for the initial cohort."}
       />
+
+      <CustomSections pageKey="pricing" blocks={blocks} />
     </>
   );
 }

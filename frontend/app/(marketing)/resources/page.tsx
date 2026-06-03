@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPublishedContentByTypes, getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import ResourcesFilter from '@/components/marketing/resources-filter';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const metadata = {
   title: 'Resources — RFP Pipeline',
@@ -15,7 +16,8 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const isPreview = params?._preview === '1';
   const allContent = await getPublishedContentByTypes(['resource', 'guide', 'blog_post']);
-  const lookup = buildLookup(await getPageBlocks('resources', isPreview), 'resources');
+  const blocks = await getPageBlocks('resources', isPreview);
+  const lookup = buildLookup(blocks, 'resources');
   const hero = single(lookup['hero']);
   const programsHeader = single(lookup['programs-header']);
   const programs = many(lookup['programs']);
@@ -117,6 +119,8 @@ export default async function ResourcesPage({ searchParams }: { searchParams: Pr
           </Link>
         </div>
       </section>
+
+      <CustomSections pageKey="resources" blocks={blocks} />
     </>
   );
 }

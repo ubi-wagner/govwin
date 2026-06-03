@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPublishedContent, getPageBlocks, buildLookup, single } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
+import { CustomSections } from '@/components/marketing/custom-sections';
 
 export const metadata = {
   title: 'Team — RFP Pipeline',
@@ -13,7 +14,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const isPreview = params?._preview === '1';
   const teamMembers = await getPublishedContent('team_member');
-  const lookup = buildLookup(await getPageBlocks('team', isPreview), 'team');
+  const blocks = await getPageBlocks('team', isPreview);
+  const lookup = buildLookup(blocks, 'team');
   const hero = single(lookup['hero']);
   const empty = single(lookup['empty']);
   const cta = single(lookup['cta']);
@@ -135,6 +137,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           </Link>
         </div>
       </section>
+
+      <CustomSections pageKey="team" blocks={blocks} />
     </>
   );
 }
