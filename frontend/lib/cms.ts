@@ -202,7 +202,7 @@ export async function getPageBlocks(page: string, includeDrafts = false): Promis
     const wantStatus = includeDrafts ? 'draft' : 'active';
     let rows = await sql<{ blocks: unknown }[]>`
       SELECT blocks FROM content_pages
-      WHERE page_key = ${page} AND status = ${wantStatus}
+      WHERE page_key = ${page} AND content_type = 'page' AND status = ${wantStatus}
       ORDER BY version_no DESC
       LIMIT 1
     `;
@@ -210,7 +210,7 @@ export async function getPageBlocks(page: string, includeDrafts = false): Promis
       // Preview with no draft yet → show the live version.
       rows = await sql<{ blocks: unknown }[]>`
         SELECT blocks FROM content_pages
-        WHERE page_key = ${page} AND status = 'active'
+        WHERE page_key = ${page} AND content_type = 'page' AND status = 'active'
         ORDER BY version_no DESC
         LIMIT 1
       `;

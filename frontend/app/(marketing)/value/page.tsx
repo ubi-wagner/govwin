@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -23,6 +24,7 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
   const spotlight = single(lookup['spotlight']);
   const portals = single(lookup['portals']);
   const curation = single(lookup['curation']);
+  const flywheelHeader = single(lookup['flywheel-header']);
   const flywheel = many(lookup['flywheel']);
 
   return (
@@ -31,7 +33,10 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
         <div className="max-w-5xl mx-auto px-6 py-24">
           <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'The Value Loop'}</p>
           <h1 className="font-display text-4xl md:text-5xl font-black text-navy-900 leading-tight">
-            {hero?.title ?? <>The more you use it, the <span className="font-prose italic text-brand-500">better</span> it gets.</>}
+            <RichText
+              text={hero?.title ?? 'The more you use it, the *better* it gets.'}
+              accent={(hero?.metadata as { accent?: string })?.accent ?? 'brand-500'}
+            />
           </h1>
           <p className="mt-6 text-lg text-navy-600 max-w-2xl">
             {hero?.body ?? 'Every verified compliance value, every submitted proposal, every expert decision makes the next cycle cheaper, faster, and more accurate for your company.'}
@@ -98,9 +103,12 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
           <div className="flex items-start gap-6 mb-6">
             <span className="text-5xl font-display font-black text-navy-700">04</span>
             <div>
-              <p className="text-xs text-citrus uppercase tracking-widest font-semibold">The Flywheel</p>
+              <p className="text-xs text-citrus uppercase tracking-widest font-semibold">{flywheelHeader?.excerpt ?? 'The Flywheel'}</p>
               <h2 className="font-display text-3xl font-black text-white mt-1">
-                Use it. Win. Use it <span className="font-prose italic text-citrus">more</span>.
+                <RichText
+                  text={flywheelHeader?.title ?? 'Use it. Win. Use it *more*.'}
+                  accent={(flywheelHeader?.metadata as { accent?: string })?.accent ?? 'citrus'}
+                />
               </h2>
             </div>
           </div>
@@ -112,8 +120,8 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
               </div>
             ))}
           </div>
-          <Link href="/apply" className="inline-flex mt-12 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg transition-colors">
-            Start the Flywheel
+          <Link href={(flywheelHeader?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'} className="inline-flex mt-12 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg transition-colors">
+            {(flywheelHeader?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Start the Flywheel'}
           </Link>
         </div>
       </section>

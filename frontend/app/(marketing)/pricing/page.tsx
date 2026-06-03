@@ -4,6 +4,7 @@ import {
   SectionHeader,
   PricingTier,
   CtaSection,
+  type PricingTierProps,
 } from '@/components/marketing/section-layout';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 
@@ -15,7 +16,7 @@ export const metadata = {
     'Simple, transparent pricing. $299/month Spotlight subscription. $999 Phase I / $1,999 Phase II per-proposal portals. Cancel anytime. No free trial — serious applicants only.',
 };
 
-const subscriptionTier = {
+const subscriptionTier: PricingTierProps = {
   label: 'Monthly Subscription',
   name: 'Spotlight',
   price: '$299',
@@ -34,7 +35,7 @@ const subscriptionTier = {
   highlighted: true,
 };
 
-const proposalTiers = [
+const proposalTiers: PricingTierProps[] = [
   {
     name: 'Proposal Portal — Phase I',
     price: '$999',
@@ -73,24 +74,66 @@ const proposalTiers = [
   },
 ];
 
-const expertTier = {
-  label: 'Expert Access',
-  name: 'Ask the Expert',
-  price: 'Included',
-  period: '15 min / month',
-  description: 'Direct access to Eric for strategic questions. Monthly minutes included with Spotlight and accumulate if unused.',
-  features: [
-    '15 minutes every month included with Spotlight',
-    'Unused minutes roll over (no expiration within subscription)',
-    'Pre-submission strategy calls',
-    'Pursuit / no-pursuit recommendations with rationale',
-    'Agency-specific guidance (DoD, NSF, DOE, DARPA, DOT)',
-    'Additional time available at $500/hour based on availability',
-    'Scheduled via your dashboard after acceptance',
-  ],
-  cta: { label: 'Included with Spotlight', href: '/apply' },
-  highlighted: false,
-};
+const expertTiers: PricingTierProps[] = [
+  {
+    label: 'Expert Access',
+    name: 'Ask the Expert',
+    price: 'Included',
+    period: '15 min / month',
+    description: 'Direct access to Eric for strategic questions. Monthly minutes included with Spotlight and accumulate if unused.',
+    features: [
+      '15 minutes every month included with Spotlight',
+      'Unused minutes roll over (no expiration within subscription)',
+      'Pre-submission strategy calls',
+      'Pursuit / no-pursuit recommendations with rationale',
+      'Agency-specific guidance (DoD, NSF, DOE, DARPA, DOT)',
+      'Additional time available at $500/hour based on availability',
+      'Scheduled via your dashboard after acceptance',
+    ],
+    cta: { label: 'Included with Spotlight', href: '/apply' },
+    highlighted: false,
+  },
+  {
+    label: 'Pre-Paid Consulting',
+    name: 'Expert Consulting',
+    price: '$500',
+    period: '/ hour',
+    description: 'Deep-dive strategy sessions with Eric. Pre-paid in 1-hour increments, up to 10 hours per purchase. For teams that need more than the included monthly minutes.',
+    features: [
+      'Pursuit / no-pursuit deep analysis',
+      'Competitive positioning strategy',
+      'Agency-specific capture planning',
+      'Pre-submission red team review',
+      'Proposal architecture and outlining',
+      'Post-debrief win/loss analysis',
+      'Purchase 1–10 hours per transaction',
+    ],
+    cta: { label: 'Purchase Hours', href: '/apply' },
+    highlighted: false,
+  },
+];
+
+/** Map a CMS pricing block to <PricingTier> props (price/period/features/etc. live in metadata). */
+function tierFromBlock(b: ContentRow, fallback: PricingTierProps): PricingTierProps {
+  const m = (b.metadata ?? {}) as {
+    label?: string;
+    price?: string;
+    period?: string;
+    features?: unknown;
+    cta?: { label: string; href: string };
+    highlighted?: boolean;
+  };
+  return {
+    label: m.label ?? fallback.label,
+    name: b.title || fallback.name,
+    price: m.price ?? fallback.price,
+    period: m.period ?? fallback.period,
+    description: b.body || fallback.description,
+    features: Array.isArray(m.features) ? (m.features as string[]) : fallback.features,
+    cta: m.cta ?? fallback.cta,
+    highlighted: typeof m.highlighted === 'boolean' ? m.highlighted : fallback.highlighted,
+  };
+}
 
 export default async function Page(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const searchParams = await props.searchParams;
@@ -98,8 +141,23 @@ export default async function Page(props: { searchParams: Promise<Record<string,
   const blocks = await getPageBlocks('pricing', isPreview);
   const lookup = buildLookup(blocks, 'pricing');
   const hero = single(lookup['hero']);
+  const subscriptionHeader = single(lookup['subscription-header']);
+  const subscriptionBlock = single(lookup['subscription']);
+  const proposalsHeader = single(lookup['proposals-header']);
+  const cmsProposals = many(lookup['proposals']);
+  const expertHeader = single(lookup['expert-header']);
+  const cmsExpert = many(lookup['expert']);
+  const faqHeader = single(lookup['faq-header']);
   const ctaBlock = single(lookup['cta']);
   const cmsFaqs = many(lookup['faqs']);
+
+  const subscription = subscriptionBlock ? tierFromBlock(subscriptionBlock, subscriptionTier) : subscriptionTier;
+  const resolvedProposalTiers = cmsProposals.length > 0
+    ? cmsProposals.map((b: ContentRow, i: number) => tierFromBlock(b, proposalTiers[i] ?? proposalTiers[0]))
+    : proposalTiers;
+  const resolvedExpertTiers = cmsExpert.length > 0
+    ? cmsExpert.map((b: ContentRow, i: number) => tierFromBlock(b, expertTiers[i] ?? expertTiers[0]))
+    : expertTiers;
 
   const resolvedFaqs = cmsFaqs.length > 0
     ? cmsFaqs.map((f: ContentRow) => ({ q: f.title, a: f.body }))
@@ -119,23 +177,23 @@ export default async function Page(props: { searchParams: Promise<Record<string,
 
       <Section variant="white">
         <SectionHeader
-          eyebrow="Required Subscription"
-          title="Spotlight: the foundation of everything"
-          subtitle="Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers."
+          eyebrow={subscriptionHeader?.excerpt ?? "Required Subscription"}
+          title={subscriptionHeader?.title ?? "Spotlight: the foundation of everything"}
+          subtitle={(subscriptionHeader?.metadata as { subtitle?: string })?.subtitle ?? "Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers."}
         />
         <div className="mt-12 max-w-md mx-auto">
-          <PricingTier {...subscriptionTier} />
+          <PricingTier {...subscription} />
         </div>
       </Section>
 
       <Section variant="gray">
         <SectionHeader
-          eyebrow="Per-Proposal Purchases"
-          title="Pay per proposal. Purchase only what you pursue."
-          subtitle="Proposal Portal fees are one-time per proposal. Buy a portal when you find an opportunity worth pursuing."
+          eyebrow={proposalsHeader?.excerpt ?? "Per-Proposal Purchases"}
+          title={proposalsHeader?.title ?? "Pay per proposal. Purchase only what you pursue."}
+          subtitle={(proposalsHeader?.metadata as { subtitle?: string })?.subtitle ?? "Proposal Portal fees are one-time per proposal. Buy a portal when you find an opportunity worth pursuing."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8">
-          {proposalTiers.map((tier) => (
+          {resolvedProposalTiers.map((tier) => (
             <PricingTier key={tier.name} {...tier} />
           ))}
         </div>
@@ -143,36 +201,20 @@ export default async function Page(props: { searchParams: Promise<Record<string,
 
       <Section variant="white">
         <SectionHeader
-          eyebrow="Expert Access"
-          title="Eric is available when you need him"
-          subtitle="Monthly minutes included. Additional time on demand."
+          eyebrow={expertHeader?.excerpt ?? "Expert Access"}
+          title={expertHeader?.title ?? "Eric is available when you need him"}
+          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "Monthly minutes included. Additional time on demand."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-          <PricingTier {...expertTier} />
-          <PricingTier
-            label="Pre-Paid Consulting"
-            name="Expert Consulting"
-            price="$500"
-            period="/ hour"
-            description="Deep-dive strategy sessions with Eric. Pre-paid in 1-hour increments, up to 10 hours per purchase. For teams that need more than the included monthly minutes."
-            features={[
-              'Pursuit / no-pursuit deep analysis',
-              'Competitive positioning strategy',
-              'Agency-specific capture planning',
-              'Pre-submission red team review',
-              'Proposal architecture and outlining',
-              'Post-debrief win/loss analysis',
-              'Purchase 1–10 hours per transaction',
-            ]}
-            cta={{ label: 'Purchase Hours', href: '/apply' }}
-            highlighted={false}
-          />
+          {resolvedExpertTiers.map((tier) => (
+            <PricingTier key={tier.name} {...tier} />
+          ))}
         </div>
       </Section>
 
       <Section variant="gray">
         <SectionHeader
-          title="Frequently Asked Questions"
+          title={faqHeader?.title ?? "Frequently Asked Questions"}
           align="center"
         />
         <div className="mt-12 max-w-3xl mx-auto space-y-6">

@@ -103,9 +103,49 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
   const blocks = await getPageBlocks('the-expert', isPreview);
   const lookup = buildLookup(blocks, 'the-expert');
   const hero = single(lookup['hero']);
+  const intro = single(lookup['intro']);
+  const credentialsHeader = single(lookup['credentials-header']);
   const cmsCredentials = many(lookup['credentials']);
+  const timelineHeader = single(lookup['timeline-header']);
   const cmsTimeline = many(lookup['timeline']);
+  const educationHeader = single(lookup['education-header']);
+  const cmsEducation = many(lookup['education']);
+  const recognitionHeader = single(lookup['recognition-header']);
+  const cmsRecognition = many(lookup['recognition']);
   const ctaBlock = single(lookup['cta']);
+
+  const DEFAULT_INTRO_PARAGRAPHS = [
+    'I’ve spent the last two and a half decades helping technology companies commercialize innovative work through federal R&D funding. From running a 750-employee aerospace & defense commercialization company, to leading Ohio State’s efforts launching 22+ university startups, to directly managing pursuit and capture for small businesses, one pattern became impossible to ignore:',
+    'Small businesses with genuinely innovative technology routinely lose federal R&D funding to bigger shops with dedicated BD departments — not because their technology is weaker, but because they can’t dedicate the time to the BD work.',
+    'They miss the right opportunities. They misread compliance requirements. They run out of time to write a competitive proposal. And every other tool in the market either drowns them in undifferentiated listings or hands them a generic LLM that confidently produces non-compliant drafts.',
+    'I built RFP Pipeline to solve that problem the way I’ve been solving it manually for 25 years — except now with AI doing the mechanical work (ingestion, pre-extraction, drafting against a verified library) while I handle the high-judgment work (curation, strategy, pursuit calls). The result is my commercialization playbook, delivered as software, but without removing the human expertise that makes it actually work.',
+    'Our initial cohort is small by design. I want to be hands-on with every customer for the first year and prove the value compounds the way I’ve designed it to. If you’re a small business pursuing SBIR, STTR, BAA, OTA, or similar federal R&D funding, I’d like to help.',
+    '— Eric Wagner',
+  ];
+  const introParagraphs = intro?.body ? intro.body.split('\n\n') : DEFAULT_INTRO_PARAGRAPHS;
+  // Preserve the original per-paragraph styling by position so layout is unchanged.
+  const introParagraphClass = (i: number, total: number): string => {
+    if (i === total - 1) return 'pt-4 text-navy-800 font-display font-semibold';
+    if (i === 1) return 'font-semibold text-navy-800';
+    return '';
+  };
+
+  const resolvedEducation = cmsEducation.length > 0
+    ? cmsEducation.map((e: ContentRow) => ({ title: e.title, body: e.body }))
+    : [
+        { title: 'Executive MBA', body: 'Business Administration, Management and Operations · 2008 – 2009' },
+        { title: 'B.S., Computer Science', body: 'The Ohio State University · 1995 – 1998' },
+      ];
+
+  const resolvedRecognition = cmsRecognition.length > 0
+    ? cmsRecognition.map((r: ContentRow) => r.body)
+    : [
+        'Adjunct instructor (3 years) for I-Corps@Ohio — training scientists and engineers in lean startup methods',
+        'Trustee at Clintonville-Beechwold Community Resources Center (2012–2013), on the finance committee during their successful capital campaign',
+        'Awarded patent for early commercial software launch at DSCI',
+        'Employee of the Year (DSCI)',
+        'Active startup investor — OTAF and individual investments in early-stage tech companies',
+      ];
 
   const resolvedCredentials = cmsCredentials.length > 0
     ? cmsCredentials.map((c: ContentRow) => ({ title: c.title, body: c.body, image: c.featuredImage ?? undefined, icon: (c.metadata as { icon?: string })?.icon, href: (c.metadata as { href?: string })?.href }))
@@ -133,56 +173,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
       <Section variant="white">
         <div className="max-w-3xl mx-auto">
           <SectionHeader
-            eyebrow="About"
-            title="Why I built this"
+            eyebrow={intro?.excerpt ?? 'About'}
+            title={intro?.title ?? 'Why I built this'}
             align="left"
           />
           <div className="mt-6 space-y-4 text-lg text-gray-700 leading-relaxed">
-            <p>
-              I&rsquo;ve spent the last two and a half decades helping technology companies
-              commercialize innovative work through federal R&amp;D funding. From running a
-              750-employee aerospace &amp; defense commercialization company, to leading
-              Ohio State&rsquo;s efforts launching 22+ university startups, to directly managing
-              pursuit and capture for small businesses, one pattern became impossible to ignore:
-            </p>
-            <p className="font-semibold text-navy-800">
-              Small businesses with genuinely innovative technology routinely lose federal
-              R&amp;D funding to bigger shops with dedicated BD departments &mdash; not because
-              their technology is weaker, but because they can&rsquo;t dedicate the time to the
-              BD work.
-            </p>
-            <p>
-              They miss the right opportunities. They misread compliance requirements. They
-              run out of time to write a competitive proposal. And every other tool in the
-              market either drowns them in undifferentiated listings or hands them a generic
-              LLM that confidently produces non-compliant drafts.
-            </p>
-            <p>
-              I built RFP Pipeline to solve that problem the way I&rsquo;ve been solving it
-              manually for 25 years &mdash; except now with AI doing the mechanical work
-              (ingestion, pre-extraction, drafting against a verified library) while I
-              handle the high-judgment work (curation, strategy, pursuit calls). The
-              result is my commercialization playbook, delivered as software, but without
-              removing the human expertise that makes it actually work.
-            </p>
-            <p>
-              Our initial cohort is small by design. I want to be hands-on with every
-              customer for the first year and prove the value compounds the way I&rsquo;ve
-              designed it to. If you&rsquo;re a small business pursuing SBIR, STTR, BAA,
-              OTA, or similar federal R&amp;D funding, I&rsquo;d like to help.
-            </p>
-            <p className="pt-4 text-navy-800 font-display font-semibold">
-              &mdash; Eric Wagner
-            </p>
+            {introParagraphs.map((paragraph: string, i: number) => {
+              const cls = introParagraphClass(i, introParagraphs.length);
+              return cls ? <p key={i} className={cls}>{paragraph}</p> : <p key={i}>{paragraph}</p>;
+            })}
           </div>
         </div>
       </Section>
 
       <Section variant="gray">
         <SectionHeader
-          eyebrow="Credentials"
-          title="25+ years of proven commercialization"
-          subtitle="The track record behind every RFP Pipeline curation decision."
+          eyebrow={credentialsHeader?.excerpt ?? 'Credentials'}
+          title={credentialsHeader?.title ?? '25+ years of proven commercialization'}
+          subtitle={credentialsHeader?.body ?? 'The track record behind every RFP Pipeline curation decision.'}
         />
         <div className="mt-12">
           <FeatureGrid columns={2} items={resolvedCredentials} />
@@ -191,9 +199,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
 
       <Section variant="white">
         <SectionHeader
-          eyebrow="Career History"
-          title="From software engineer to CEO to founder"
-          subtitle="Every step has been about turning innovative technology into commercial outcomes, often through federal funding."
+          eyebrow={timelineHeader?.excerpt ?? 'Career History'}
+          title={timelineHeader?.title ?? 'From software engineer to CEO to founder'}
+          subtitle={timelineHeader?.body ?? 'Every step has been about turning innovative technology into commercial outcomes, often through federal funding.'}
         />
         <div className="mt-12 max-w-4xl mx-auto">
           {resolvedTimeline.map((entry, i) => (
@@ -211,19 +219,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
       <Section variant="gray">
         <div className="max-w-3xl mx-auto">
           <SectionHeader
-            eyebrow="Education"
-            title="The Ohio State University"
+            eyebrow={educationHeader?.excerpt ?? 'Education'}
+            title={educationHeader?.title ?? 'The Ohio State University'}
             align="left"
           />
           <div className="mt-8 space-y-6">
-            <div className="p-6 bg-white rounded-lg border border-gray-200">
-              <h3 className="font-display font-bold text-navy-800">Executive MBA</h3>
-              <p className="text-gray-600 mt-1">Business Administration, Management and Operations &middot; 2008 – 2009</p>
-            </div>
-            <div className="p-6 bg-white rounded-lg border border-gray-200">
-              <h3 className="font-display font-bold text-navy-800">B.S., Computer Science</h3>
-              <p className="text-gray-600 mt-1">The Ohio State University &middot; 1995 – 1998</p>
-            </div>
+            {resolvedEducation.map((edu, i) => (
+              <div key={i} className="p-6 bg-white rounded-lg border border-gray-200">
+                <h3 className="font-display font-bold text-navy-800">{edu.title}</h3>
+                <p className="text-gray-600 mt-1">{edu.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </Section>
@@ -231,31 +237,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
       <Section variant="white">
         <div className="max-w-3xl mx-auto">
           <SectionHeader
-            eyebrow="Recognition"
-            title="A recognized lean-launch and commercialization development professional"
+            eyebrow={recognitionHeader?.excerpt ?? 'Recognition'}
+            title={recognitionHeader?.title ?? 'A recognized lean-launch and commercialization development professional'}
             align="left"
           />
           <ul className="mt-8 space-y-3 text-lg text-gray-700 leading-relaxed">
-            <li className="flex items-start gap-3">
-              <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-              Adjunct instructor (3 years) for I-Corps@Ohio &mdash; training scientists and engineers in lean startup methods
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-              Trustee at Clintonville-Beechwold Community Resources Center (2012&ndash;2013), on the finance committee during their successful capital campaign
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-              Awarded patent for early commercial software launch at DSCI
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-              Employee of the Year (DSCI)
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-              Active startup investor &mdash; OTAF and individual investments in early-stage tech companies
-            </li>
+            {resolvedRecognition.map((item, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="mt-2 w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
       </Section>

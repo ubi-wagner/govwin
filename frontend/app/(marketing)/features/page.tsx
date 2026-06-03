@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { CmsCard } from '@/components/marketing/cms-card';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const revalidate = 60;
 
@@ -39,7 +40,10 @@ export default async function FeaturesPage(props: { searchParams: Promise<Record
         <div className="max-w-5xl mx-auto px-6 py-24 md:py-32">
           <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'Platform Features'}</p>
           <h1 className="font-display text-4xl md:text-6xl font-black text-navy-900 leading-tight">
-            {hero?.title ?? <>Everything you need to <span className="font-prose italic text-award">win</span>.</>}
+            <RichText
+              text={hero?.title ?? 'Everything you need to *win*.'}
+              accent={(hero?.metadata as { accent?: string })?.accent ?? 'award'}
+            />
           </h1>
           <p className="mt-8 text-xl text-navy-600 max-w-3xl leading-relaxed">
             {hero?.body ?? 'From opportunity discovery to submission-ready packages. Expert curation, isolated AI, and structured workflows — designed for small businesses pursuing federal R&D funding.'}
@@ -71,8 +75,8 @@ export default async function FeaturesPage(props: { searchParams: Promise<Record
           <p className="text-navy-300 text-lg mb-8">
             {ctaBlock?.body ?? 'Join the founding cohort and get early access to every feature.'}
           </p>
-          <Link href="/apply" className="inline-block px-8 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-semibold transition-colors">
-            Apply Now
+          <Link href={(ctaBlock?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'} className="inline-block px-8 py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-lg font-semibold transition-colors">
+            {(ctaBlock?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Apply Now'}
           </Link>
         </div>
       </section>

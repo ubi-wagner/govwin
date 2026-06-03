@@ -106,7 +106,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
   const blocks = await getPageBlocks('how-it-works', isPreview);
   const lookup = buildLookup(blocks, 'how-it-works');
   const hero = single(lookup['hero']);
+  const workflowHeader = single(lookup['workflow-header']);
   const cmsSteps = many(lookup['steps']);
+  const guardrailsHeader = single(lookup['guardrails-header']);
   const cmsGuardrails = many(lookup['guardrails']);
   const ctaBlock = single(lookup['cta']);
 
@@ -135,9 +137,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
 
       <Section variant="white">
         <SectionHeader
-          eyebrow="The Workflow"
-          title="Six stages from curious applicant to compliant submission"
-          subtitle="Designed so you get value in week one, not month six."
+          eyebrow={workflowHeader?.excerpt ?? 'The Workflow'}
+          title={workflowHeader?.title ?? 'Six stages from curious applicant to compliant submission'}
+          subtitle={workflowHeader?.body ?? 'Designed so you get value in week one, not month six.'}
         />
         <div className="mt-16 max-w-3xl mx-auto relative">
           <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-brand-100" aria-hidden />
@@ -149,9 +151,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
 
       <Section variant="gray">
         <SectionHeader
-          eyebrow="Built-in Guardrails"
-          title="Trust is engineered into every stage"
-          subtitle="Federal R&D buyers care about data security, provenance, and compliance. We designed for that audience from day one."
+          eyebrow={guardrailsHeader?.excerpt ?? 'Built-in Guardrails'}
+          title={guardrailsHeader?.title ?? 'Trust is engineered into every stage'}
+          subtitle={guardrailsHeader?.body ?? 'Federal R&D buyers care about data security, provenance, and compliance. We designed for that audience from day one.'}
         />
         <div className="mt-12">
           <FeatureGrid columns={3} items={resolvedGuardrails} />

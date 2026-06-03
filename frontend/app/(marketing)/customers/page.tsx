@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getPublishedContent } from '@/lib/cms';
+import { getPublishedContent, getPageBlocks, buildLookup, single } from '@/lib/cms';
+import { RichText } from '@/components/marketing/rich-text';
 
 export const metadata = {
   title: 'Customers — RFP Pipeline',
@@ -8,19 +9,26 @@ export const metadata = {
 
 export const revalidate = 60;
 
-export default async function CustomersPage() {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const params = await searchParams;
+  const isPreview = params?._preview === '1';
   const testimonials = await getPublishedContent('testimonial');
+  const lookup = buildLookup(await getPageBlocks('customers', isPreview), 'customers');
+  const hero = single(lookup['hero']);
+  const empty = single(lookup['empty']);
+  const cta = single(lookup['cta']);
+  const ctaMeta = (cta?.metadata ?? {}) as { ctaLabel?: string; ctaHref?: string };
 
   return (
     <>
       <section className="bg-cream-50">
         <div className="max-w-5xl mx-auto px-6 py-20">
-          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">Customers</p>
+          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-6">{hero?.excerpt ?? 'Customers'}</p>
           <h1 className="font-display text-4xl md:text-5xl font-black text-navy-900">
-            Trusted by <span className="font-prose italic text-brand-500">federal innovators</span>.
+            <RichText text={hero?.title ?? 'Trusted by *federal innovators*.'} accent={(hero?.metadata as { accent?: string })?.accent ?? 'brand-500'} />
           </h1>
           <p className="mt-4 text-lg text-navy-600">
-            Hear from the small businesses building their federal R&amp;D pipeline with us.
+            {hero?.body ?? 'Hear from the small businesses building their federal R&D pipeline with us.'}
           </p>
         </div>
       </section>
@@ -29,9 +37,9 @@ export default async function CustomersPage() {
         <div className="max-w-6xl mx-auto px-6 py-16">
           {testimonials.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-navy-500 text-lg">Customer stories coming soon.</p>
+              <p className="text-navy-500 text-lg">{empty?.title ?? 'Customer stories coming soon.'}</p>
               <p className="mt-2 text-sm text-navy-400">
-                We are onboarding our founding cohort. Check back for their stories.
+                {empty?.body ?? 'We are onboarding our founding cohort. Check back for their stories.'}
               </p>
             </div>
           ) : (
@@ -102,13 +110,13 @@ export default async function CustomersPage() {
       <section className="bg-navy-900">
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
           <h2 className="font-display text-2xl font-bold text-white">
-            Join our founding cohort.
+            {cta?.title ?? 'Join our founding cohort.'}
           </h2>
           <p className="mt-3 text-navy-300 max-w-xl mx-auto">
-            Be among the first small businesses to build a federal R&amp;D pipeline powered by AI.
+            {cta?.body ?? 'Be among the first small businesses to build a federal R&D pipeline powered by AI.'}
           </p>
-          <Link href="/apply" className="inline-flex mt-6 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
-            Apply Now
+          <Link href={ctaMeta.ctaHref ?? '/apply'} className="inline-flex mt-6 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
+            {ctaMeta.ctaLabel ?? 'Apply Now'}
           </Link>
         </div>
       </section>
