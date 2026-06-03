@@ -8,6 +8,18 @@
 
 import { sql } from '@/lib/db';
 
+/**
+ * Log a read-path DB error, but stay silent during `next build`. The build
+ * container has no DB connection (Railway injects DB creds only into the running
+ * container), so these reads intentionally fail and fall back to in-code defaults.
+ * Suppressing during the build phase keeps build output clean while still
+ * surfacing genuine failures at runtime.
+ */
+function logReadError(tag: string, e: unknown): void {
+  if (process.env.NEXT_PHASE === 'phase-production-build') return;
+  console.error(`${tag} error:`, e);
+}
+
 export type ContentStatus = 'draft' | 'pending' | 'published' | 'private' | 'archived';
 
 export interface ContentRow {
@@ -102,7 +114,7 @@ export async function getPublishedContent(contentType: string, limit?: number): 
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;
   } catch (e) {
-    console.error('[cms/getPublishedContent] error:', e);
+    logReadError('[cms/getPublishedContent]', e);
     return [];
   }
 }
@@ -124,7 +136,7 @@ export async function getContentBySlug(slug: string): Promise<ContentRow | null>
     `;
     return row ?? null;
   } catch (e) {
-    console.error('[cms/getContentBySlug] error:', e);
+    logReadError('[cms/getContentBySlug]', e);
     return null;
   }
 }
@@ -144,7 +156,7 @@ export async function getContentBySlugAdmin(slug: string): Promise<ContentRow | 
     `;
     return row ?? null;
   } catch (e) {
-    console.error('[cms/getContentBySlugAdmin] error:', e);
+    logReadError('[cms/getContentBySlugAdmin]', e);
     return null;
   }
 }
@@ -164,7 +176,7 @@ export async function getContentByIdAdmin(id: string): Promise<ContentRow | null
     `;
     return row ?? null;
   } catch (e) {
-    console.error('[cms/getContentByIdAdmin] error:', e);
+    logReadError('[cms/getContentByIdAdmin]', e);
     return null;
   }
 }
@@ -184,7 +196,7 @@ export async function getContentBlocks(tag: string): Promise<ContentRow[]> {
     `;
     return rows;
   } catch (e) {
-    console.error('[cms/getContentBlocks] error:', e);
+    logReadError('[cms/getContentBlocks]', e);
     return [];
   }
 }
@@ -222,7 +234,7 @@ export async function getPageBlocks(page: string, includeDrafts = false): Promis
     // Transition safety: no content_pages row yet → fall back to legacy cms_content.
     return await getPageBlocksLegacy(page, includeDrafts);
   } catch (e) {
-    console.error('[cms/getPageBlocks] error:', e);
+    logReadError('[cms/getPageBlocks]', e);
     return [];
   }
 }
@@ -332,7 +344,7 @@ export async function getPublishedContentByTypes(contentTypes: string[], limit?:
       ${limit ? sql`LIMIT ${limit}` : sql``}
     `;
   } catch (e) {
-    console.error('[cms/getPublishedContentByTypes] error:', e);
+    logReadError('[cms/getPublishedContentByTypes]', e);
     return [];
   }
 }

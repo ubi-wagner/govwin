@@ -10,11 +10,9 @@ export const metadata = {
 
 export const revalidate = 60;
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const params = await searchParams;
-  const isPreview = params?._preview === '1';
+export default async function CustomersPage() {
   const testimonials = await getPublishedContent('testimonial');
-  const blocks = await getPageBlocks('customers', isPreview);
+  const blocks = await getPageBlocks('customers');
   const lookup = buildLookup(blocks, 'customers');
   const hero = single(lookup['hero']);
   const empty = single(lookup['empty']);
