@@ -63,33 +63,47 @@ async function fetchJson(url: string, timeoutMs: number): Promise<Record<string,
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** Look up connection info for a public IP. Returns null on any failure/timeout. */
+async function viaIpinfo(ip: string, token: string, timeoutMs: number): Promise<GeoInfo | null> {
+  const d = await fetchJson(`https://ipinfo.io/${encodeURIComponent(ip)}/json?token=${encodeURIComponent(token)}`, timeoutMs);
+  if (!d || d.bogon || d.error) return null;
+  const { asn, name } = asnFromOrg(str(d.org));
+  const parts = str(d.loc)?.split(',').map((n) => Number(n)) ?? [];
+  const [lat, lon] = parts.length === 2 ? parts : [NaN, NaN];
+  return {
+    country: str(d.country), region: str(d.region), city: str(d.city),
+    isp: name, org: str(d.org), asn, timezone: str(d.timezone),
+    latitude: Number.isFinite(lat) ? lat : null,
+    longitude: Number.isFinite(lon) ? lon : null,
+  };
+}
+
+async function viaIpApi(ip: string, timeoutMs: number): Promise<GeoInfo | null> {
+  const fields = 'status,country,regionName,city,isp,org,as,timezone,lat,lon';
+  const d = await fetchJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`, timeoutMs);
+  if (!d || d.status !== 'success') return null;
+  const { asn } = asnFromOrg(str(d.as));
+  return {
+    country: str(d.country), region: str(d.regionName), city: str(d.city),
+    isp: str(d.isp), org: str(d.org) ?? str(d.isp), asn,
+    timezone: str(d.timezone), latitude: num(d.lat), longitude: num(d.lon),
+  };
+}
+
+/**
+ * Look up connection info for a public IP. Returns null on any failure/timeout.
+ * Prefers ipinfo.io when a real token is set, but falls back to ip-api.com on any
+ * failure — so a misconfigured/expired token degrades gracefully rather than
+ * disabling enrichment. (IPINFO_TOKEN must be a real token, not 'true'/'false'.)
+ */
 export async function lookupIp(ip: string, timeoutMs = 2000): Promise<GeoInfo | null> {
   if (!isPublicIp(ip)) return null;
-  const token = process.env.IPINFO_TOKEN;
   try {
-    if (token) {
-      const d = await fetchJson(`https://ipinfo.io/${encodeURIComponent(ip)}/json?token=${token}`, timeoutMs);
-      if (!d || d.bogon) return null;
-      const { asn, name } = asnFromOrg(str(d.org));
-      const [lat, lon] = str(d.loc)?.split(',').map((n) => Number(n)) ?? [null, null];
-      return {
-        country: str(d.country), region: str(d.region), city: str(d.city),
-        isp: name, org: str(d.org), asn,
-        timezone: str(d.timezone),
-        latitude: typeof lat === 'number' && Number.isFinite(lat) ? lat : null,
-        longitude: typeof lon === 'number' && Number.isFinite(lon) ? lon : null,
-      };
+    const token = process.env.IPINFO_TOKEN;
+    if (token && token !== 'true' && token !== 'false') {
+      const g = await viaIpinfo(ip, token, timeoutMs);
+      if (g) return g;
     }
-    const fields = 'status,country,regionName,city,isp,org,as,timezone,lat,lon';
-    const d = await fetchJson(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=${fields}`, timeoutMs);
-    if (!d || d.status !== 'success') return null;
-    const { asn } = asnFromOrg(str(d.as));
-    return {
-      country: str(d.country), region: str(d.regionName), city: str(d.city),
-      isp: str(d.isp), org: str(d.org) ?? str(d.isp), asn,
-      timezone: str(d.timezone), latitude: num(d.lat), longitude: num(d.lon),
-    };
+    return await viaIpApi(ip, timeoutMs);
   } catch (e) {
     console.error('[geoip/lookupIp] error:', e);
     return null;
