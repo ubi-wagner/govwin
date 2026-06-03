@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 const securityHeaders = [
-  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-XSS-Protection', value: '1; mode=block' },
@@ -15,7 +15,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
       "connect-src 'self' https://api.anthropic.com https://api.stripe.com",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
     ].join('; '),
   },
 ];
@@ -34,6 +34,12 @@ const nextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
+    ];
+  },
+  async redirects() {
+    return [
+      // V8: standalone /blog consolidated into /resources. RSS stays at /blog/feed.xml.
+      { source: '/blog', destination: '/resources', permanent: true },
     ];
   },
 };

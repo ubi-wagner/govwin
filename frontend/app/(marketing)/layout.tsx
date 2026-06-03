@@ -17,7 +17,6 @@ const mobileNavLinks = [
   },
   { href: '/about', label: 'About' },
   { href: '/resources', label: 'Resources' },
-  { href: '/blog', label: 'Blog' },
   { href: '/infosec', label: 'Security' },
 ];
 
@@ -82,7 +81,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             </div>
             <Link href="/about" className="hover:text-brand-600 transition-colors">About</Link>
             <Link href="/resources" className="hover:text-brand-600 transition-colors">Resources</Link>
-            <Link href="/blog" className="hover:text-brand-600 transition-colors">Blog</Link>
             <Link href="/infosec" className="hover:text-brand-600 transition-colors">Security</Link>
             <Link
               href="/apply"
@@ -127,7 +125,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <h4 className="text-xs font-semibold text-cream-200 uppercase tracking-widest mb-4">Resources</h4>
             <ul className="space-y-2.5 text-sm">
               <li><Link href="/resources" className="hover:text-cream transition-colors">Resources</Link></li>
-              <li><Link href="/blog" className="hover:text-cream transition-colors">Blog</Link></li>
               <li><Link href="/infosec" className="hover:text-cream transition-colors">Security &amp; Data</Link></li>
             </ul>
           </div>
