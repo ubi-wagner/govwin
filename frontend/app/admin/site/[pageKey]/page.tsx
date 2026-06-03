@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getPage, type PageVersion } from '@/lib/content-admin';
+import { ensurePageSeeded, getPage, type PageVersion } from '@/lib/content-admin';
 import EditorClient from './editor-client';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +9,9 @@ export default async function PageEditorPage({ params }: { params: Promise<{ pag
   let active: PageVersion | null = null;
   let draft: PageVersion | null = null;
   try {
+    // Populate the editor from page defaults the first time a page is opened
+    // (idempotent; never touches an already-seeded/edited page).
+    await ensurePageSeeded(pageKey);
     const page = await getPage(pageKey);
     active = page.active;
     draft = page.draft;

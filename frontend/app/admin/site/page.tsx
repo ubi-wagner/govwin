@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { listPages, listDocuments, DOC_TYPES } from '@/lib/content-admin';
+import { listPages, listDocuments, DOC_TYPES, type PageSummary } from '@/lib/content-admin';
+import { SEED_PAGE_KEYS } from '@/lib/page-content';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SiteContentPage() {
-  let pages: Awaited<ReturnType<typeof listPages>> = [];
+  let pages: PageSummary[] = [];
   let docs: Awaited<ReturnType<typeof listDocuments>> = [];
   try {
     pages = await listPages();
@@ -16,6 +17,18 @@ export default async function SiteContentPage() {
   } catch (e) {
     console.error('[admin/site] listDocuments failed:', e);
   }
+
+  // Surface every known page, even ones not yet seeded into content_pages —
+  // opening one initializes it from its defaults so it's never undiscoverable.
+  const seen = new Set(pages.map((p) => p.pageKey));
+  const unseeded: PageSummary[] = SEED_PAGE_KEYS.filter((k) => !seen.has(k)).map((pageKey) => ({
+    pageKey,
+    contentType: 'page',
+    activeVersion: null,
+    hasDraft: false,
+    lastUpdated: new Date(0),
+  }));
+  pages = [...pages, ...unseeded].sort((a, b) => a.pageKey.localeCompare(b.pageKey));
 
   return (
     <div className="max-w-4xl">
@@ -37,11 +50,14 @@ export default async function SiteContentPage() {
             <div>
               <div className="font-medium">{p.pageKey}</div>
               <div className="text-xs text-gray-500">
-                {p.contentType} · {p.activeVersion ? `live v${p.activeVersion}` : 'no live version'}
+                {p.contentType} · {p.activeVersion ? `live v${p.activeVersion}` : 'using page defaults'}
               </div>
             </div>
             <div className="flex items-center gap-2">
               {p.hasDraft && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">draft</span>}
+              {!p.activeVersion && !p.hasDraft && (
+                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">defaults</span>
+              )}
               <span className="text-gray-400">&rarr;</span>
             </div>
           </Link>
