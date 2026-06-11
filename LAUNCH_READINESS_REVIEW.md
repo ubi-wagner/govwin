@@ -3,6 +3,10 @@
 **Prepared as an outside strategy + creative review (Bain‑style diagnosis, NYC‑ad‑house creative lens).**
 **Status: ANALYSIS ONLY — no page/route changes have been made.** This is a recommendations + TODO document for your review.
 
+> **Approved for implementation (round 2 — Eric):** The dollar figures below are **cleared to publish** ($5,000/mo monitoring, $299/mo Spotlight, 10%-of-award consultants, $999 Phase I / $1,999 Phase II). **No Phase I → Phase II credit** — the prior pricing FAQ that promised a $1,000 upgrade credit is **incorrect and is being removed**; the correct value story is *"Phase II is an exponentially bigger proposal for only $1,000 more."* Implementation is proceeding through **all phases**, shipped as incremental, individually-revertable commits. This document is the running plan of record; a build log is appended at the bottom as work lands.
+>
+> **Unifying principle (Eric):** "Why it wins," "what it saves and adds (pains & gains)," "the value drivers," and "how it works" are **one narrative and one user arc** — not four overlapping pages. So the build collapses them into a single spine — **Pain → Gain (saves + adds) → Why it wins (value drivers / the model + moat + flywheel) → How it works (the journey) → Proof (the expert) → Price → Apply** — told in condensed form on the homepage and in full on a flagship **"Why RFP Pipeline"** page (an upgrade of `/value`). `/engine`'s "Expert + AI + Process" thesis folds into that arc (and `/engine` redirects in), so there is exactly one "why/how" story instead of three competing numbered-step pages. `/how-it-works` remains the operational deep-dive chapter, cross-linked from the arc.
+
 Scope reviewed: every public page and route — `/`, `/about`, `/the-expert`, `/value`, `/engine`, `/features`, `/how-it-works`, `/pricing`, `/infosec` (`/security` redirects here), `/apply`, `/team`, `/customers`, `/resources`, `/resources/[slug]`, `/legal/*`, header/footer/nav, and the redirect routes (`/get-started`→`/pricing`, `/blog/*`→`/resources`).
 
 ---
@@ -183,4 +187,10 @@ This gives each persona a lane: Nadia → *Why RFP Pipeline* → *Federal R&D 10
 
 ---
 
-*Nothing in this document has been implemented. On your go‑ahead we can execute Phase 0 first (highest ROI, lowest risk), then Phase 1, with each item shipped as a reviewable increment.*
+---
+
+## 8. Build log (round 2 — implementation in progress)
+
+Each entry = one pushed, individually-revertable commit. Working through the §6 TODOs.
+
+- _(in progress — entries appended as commits land)_
