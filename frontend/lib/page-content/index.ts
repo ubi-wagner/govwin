@@ -10,7 +10,6 @@ import { homepage } from './homepage';
 import { value } from './value';
 import { theExpert } from './theExpert';
 import { apply } from './apply';
-import { engine } from './engine';
 import { features } from './features';
 import { howItWorks } from './howItWorks';
 import { infosec } from './infosec';
@@ -26,7 +25,6 @@ export const PAGE_SEEDS: Record<string, SeedPage> = {
   [value.pageKey]: value,
   [theExpert.pageKey]: theExpert,
   [apply.pageKey]: apply,
-  [engine.pageKey]: engine,
   [features.pageKey]: features,
   [howItWorks.pageKey]: howItWorks,
   [infosec.pageKey]: infosec,
