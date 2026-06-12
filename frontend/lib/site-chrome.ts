@@ -94,6 +94,7 @@ export const DEFAULT_CHROME: SiteChrome = {
       {
         title: 'Resources',
         links: [
+          { label: 'Federal R&D 101', href: '/federal-rd-101' },
           { label: 'Resources', href: '/resources' },
           { label: 'Security & Data', href: '/infosec' },
         ],

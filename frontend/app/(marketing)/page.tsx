@@ -109,7 +109,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             <p className="text-lg text-navy-700 leading-relaxed">
               {valueBand?.body ?? 'There are billions a year in non-dilutive federal R&D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply. We make it accessible.'}
             </p>
-            <Link href="/value" className="inline-flex mt-3 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">See why it works &rarr;</Link>
+            <Link href="/federal-rd-101" className="inline-flex mt-3 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">Start here &rarr;</Link>
           </div>
           <div className="md:pl-6">
             <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-2">{(valueBand?.metadata as { roiLabel?: string })?.roiLabel ?? 'The math'}</p>
@@ -303,10 +303,10 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
               {(cta?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Apply Now'}
             </Link>
             <Link
-              href={(cta?.metadata as { secondary?: { href?: string } })?.secondary?.href ?? '/value'}
+              href={(cta?.metadata as { secondary?: { href?: string } })?.secondary?.href ?? '/federal-rd-101'}
               className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-600 hover:border-brand-400 text-navy-200 hover:text-white text-lg font-semibold rounded-lg transition-colors"
             >
-              {(cta?.metadata as { secondary?: { label?: string } })?.secondary?.label ?? 'New to federal R&D? See why it works'}
+              {(cta?.metadata as { secondary?: { label?: string } })?.secondary?.label ?? 'New to federal R&D? Start here'}
             </Link>
           </div>
           <div className="mt-8 flex items-center justify-center gap-6 text-sm text-navy-400">

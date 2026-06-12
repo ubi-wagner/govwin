@@ -17,6 +17,7 @@ import { pricing } from './pricing';
 import { team } from './team';
 import { customers } from './customers';
 import { resources } from './resources';
+import { federalRd101 } from './federal-rd-101';
 import { siteChrome } from './site-chrome';
 
 export const PAGE_SEEDS: Record<string, SeedPage> = {
@@ -32,6 +33,7 @@ export const PAGE_SEEDS: Record<string, SeedPage> = {
   [team.pageKey]: team,
   [customers.pageKey]: customers,
   [resources.pageKey]: resources,
+  [federalRd101.pageKey]: federalRd101,
   [siteChrome.pageKey]: siteChrome,
 };
 

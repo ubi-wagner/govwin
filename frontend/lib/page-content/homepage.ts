@@ -109,7 +109,7 @@ export const homepage: SeedPage = {
       title: 'Apply today. Draft your *first*\nproposal on launch day.',
       metadata: {
         cta: { label: 'Apply Now', href: '/apply' },
-        secondary: { label: 'New to federal R&D? See why it works', href: '/value' },
+        secondary: { label: 'New to federal R&D? Start here', href: '/federal-rd-101' },
         footer: { role: 'Founder & Architect', name: 'Eric Wagner', email: 'eric@rfppipeline.com' },
       },
     },
