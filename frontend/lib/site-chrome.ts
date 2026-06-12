@@ -87,7 +87,7 @@ export const DEFAULT_CHROME: SiteChrome = {
         links: [
           { label: 'About', href: '/about' },
           { label: 'Team', href: '/team' },
-          { label: 'Customers', href: '/customers' },
+          { label: 'Track Record', href: '/customers' },
           { label: 'Why RFP Pipeline', href: '/value' },
         ],
       },
