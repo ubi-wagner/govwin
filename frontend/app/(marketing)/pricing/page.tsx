@@ -9,6 +9,7 @@ import {
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
+import { ValueComparison } from '@/components/marketing/value-comparison';
 
 export const revalidate = 60;
 
@@ -177,11 +178,18 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         note={(hero?.metadata as { note?: string })?.note ?? "$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
       />
 
+      <ValueComparison
+        eyebrow="Before you compare our tiers"
+        title="What this replaces — and what it really costs."
+        subtitle="The status quo for chasing federal R&D: a monitoring service, a consultant who takes a cut of your award, a BD hire, or your own nights. Here's the same job, re-priced."
+        cta={null}
+      />
+
       <Section variant="white">
         <SectionHeader
-          eyebrow={subscriptionHeader?.excerpt ?? "Required Subscription"}
+          eyebrow={subscriptionHeader?.excerpt ?? "Start with Spotlight"}
           title={subscriptionHeader?.title ?? "Spotlight: the foundation of everything"}
-          subtitle={(subscriptionHeader?.metadata as { subtitle?: string })?.subtitle ?? "Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers."}
+          subtitle={(subscriptionHeader?.metadata as { subtitle?: string })?.subtitle ?? "Spotlight is your daily federal R&D intelligence feed. Proposal Portals build on it — so they're available to active Spotlight subscribers."}
         />
         <div className="mt-12 max-w-md mx-auto">
           <PricingTier {...subscription} />
@@ -205,7 +213,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         <SectionHeader
           eyebrow={expertHeader?.excerpt ?? "Expert Access"}
           title={expertHeader?.title ?? "Eric is available when you need him"}
-          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "Monthly minutes included. Additional time on demand."}
+          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {resolvedExpertTiers.map((tier) => (

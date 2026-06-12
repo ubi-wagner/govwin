@@ -37,9 +37,9 @@ export const pricing: SeedPage = {
     {
       section: 'subscription-header',
       displayOrder: 1,
-      excerpt: 'Required Subscription',
+      excerpt: 'Start with Spotlight',
       title: 'Spotlight: the foundation of everything',
-      metadata: { subtitle: 'Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers.' },
+      metadata: { subtitle: 'Spotlight is your daily federal R&D intelligence feed. Proposal Portals build on it — so they\'re available to active Spotlight subscribers.' },
     },
 
     // Spotlight subscription tier.
@@ -127,7 +127,7 @@ export const pricing: SeedPage = {
       displayOrder: 6,
       excerpt: 'Expert Access',
       title: 'Eric is available when you need him',
-      metadata: { subtitle: 'Monthly minutes included. Additional time on demand.' },
+      metadata: { subtitle: 'The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand.' },
     },
 
     // Expert-access tiers (2): Ask the Expert + Expert Consulting.
