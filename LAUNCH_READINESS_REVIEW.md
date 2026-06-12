@@ -191,6 +191,28 @@ This gives each persona a lane: Nadia → *Why RFP Pipeline* → *Federal R&D 10
 
 ## 8. Build log (round 2 — implementation in progress)
 
-Each entry = one pushed, individually-revertable commit. Working through the §6 TODOs.
+Each entry = one pushed, individually-revertable commit.
 
-- _(in progress — entries appended as commits land)_
+**Shipped:**
+- `pricing(T1)` — removed the incorrect Phase I→II credit FAQ; reframed to "exponentially bigger proposal for $1,000 more."
+- `value(T2–T3)` — rebuilt `/value` into the flagship **"Why RFP Pipeline"** arc (Pain → Gain → Why it wins → Flywheel → How → Proof → CTA), with the **ValueComparison** money-moment ($5k vs $299, 10% vs flat) and custom vector diagrams (Model Venn, Flywheel). Copy block-editable.
+- `nav(T4)` — folded `/engine` into the arc (redirects to `/value`); nav updated ("Why RFP Pipeline" in; "Engine" out).
+- `home(T5)` — benefit-first hero subhead (acronyms parenthetical), newcomer "non-dilutive" value band + ROI line, **condensed** the duplicate 6-stage section into a teaser linking to `/how-it-works`, dual CTA.
+- `pricing(T8)` — cost-comparison under the hero; "Required Subscription" → "Start with Spotlight"; expert-value line ("$500/hr expert, included in $299/mo").
+- `trackrecord(T7)` — repurposed the empty `/customers` into **Track Record** (expert outcomes + agencies-funded strip); nav relabeled.
+- `newcomer(T6/T12)` — new **`/federal-rd-101`** on-ramp (what it is, eligibility checklist, soft **waitlist capture** → `/api/waitlist`); home + nav route newcomers here.
+- `resources(T11)` — seeded 3 real launch articles (migration 059): SBIR/STTR primer, the ROI story, eligibility check.
+- `deploy(T13)` — migration 060 refreshes untouched auto-seeded pages so the new copy renders, preserving any human edits.
+
+**Deliberately deferred (with reason):**
+- **De-dup pass (T9)** — substantially achieved by folding `/engine` and moving the model onto `/value`; remaining isolation/HITL mentions on `/features` are contextual (a capability catalog), not thesis-repetition. Left as-is.
+- **A/B hero test** — needs an experimentation framework; revisit with live analytics data.
+- **Agency / customer logos** — used a text agencies strip + the expert's record; real logos when defensible / once customers win.
+- **Interactive eligibility quiz** — the `/federal-rd-101` checklist + waitlist covers the on-ramp; a quiz is a fast-follow if conversion warrants.
+
+**Deploy notes (Eric):**
+- Migrations **059** (articles) and **060** (seed refresh) run automatically on deploy.
+- New routes/nav: `/value` = "Why RFP Pipeline", `/federal-rd-101`, `/customers` = "Track Record"; `/engine` → `/value` (308-style redirect).
+- New copy renders immediately on un-edited pages; **any page you hand-edited in the prod editor keeps your version** (re-publish from the editor to pull the new copy).
+- `IPINFO_TOKEN` (analytics) remains optional. All dollar figures are the approved published numbers.
+- Verified each step: `tsc` clean, all 14 registry pages seed/round-trip on a live DB, both migrations validated, section parity across all 13 pages, no RSC-boundary or `console.log` regressions. **No emoji / stock icons — custom drawn SVGs throughout.**
