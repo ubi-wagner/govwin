@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Deploy baseline 2026-06-14 — touch to exercise the frontend build/deploy + main-DB migration runner. No behavior change.
 
 const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
