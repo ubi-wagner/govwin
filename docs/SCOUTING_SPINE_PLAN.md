@@ -164,7 +164,15 @@ solicitations behave exactly as before; topic metadata is editable post-creation
 
 ---
 
-# MILESTONE 2 — Detection → notify + ToDo alerting  ⬜
+# MILESTONE 2 — Detection → notify + ToDo alerting  ✅ DONE (2026-06-14)
+
+> **Status:** T2.1 detection rollup (`2921bf6`), T2.2 OnOpportunitiesDetected workflow
+> + migration 065 (`d257963`), T2.3 template + loud notify-fail (`018afdc`), T2.4 admin
+> triage panel (`3b797fe`) — committed + pushed. Verified per task: py_compile/tsc clean;
+> migration 065 applies on real pg (idempotent, rolled back); workflow auto-discovery
+> routes the C2.a event. Registration is package auto-discovery (no registry file).
+> Full detection→workflow→ToDo→email chain to be exercised in the HITL pass; full
+> migration-chain apply checked at the pre-push gate.
 
 **Why:** scheduled ingest **silently** fills the triage queue today — no signal, no
 ToDo. New finds must announce themselves (your "new solicitation + topic notification
