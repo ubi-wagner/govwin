@@ -13,7 +13,7 @@ export const revalidate = 60;
 export const metadata = {
   title: 'Eric Wagner — Founder & Expert | RFP Pipeline',
   description:
-    '25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $300M aerospace & defense company. The human expert behind every RFP Pipeline curation.',
+    '25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $270M aerospace & defense company. The human expert behind every RFP Pipeline curation.',
 };
 
 const credentials = [
@@ -167,7 +167,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
         variant="light"
         eyebrow={hero?.excerpt ?? 'Your Expert'}
         headline={hero?.title ?? <>Eric Wagner</>}
-        subheadline={hero?.body ?? "Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $300M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups."}
+        subheadline={hero?.body ?? "Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $270M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups."}
       />
 
       {/* Intro */}

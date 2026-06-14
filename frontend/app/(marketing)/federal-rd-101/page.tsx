@@ -103,15 +103,15 @@ export default async function FederalRd101Page() {
       </section>
 
       {/* CTA — ready ones apply */}
-      <section className="bg-navy-900">
+      <section className="bg-cream-100 border-t border-cream-200">
         <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-black text-white leading-tight">{cta?.title ?? 'Already know it’s for you?'}</h2>
-          <p className="mt-3 text-lg text-navy-300 max-w-2xl mx-auto">{cta?.body ?? 'Apply to the founding cohort — Eric reviews every application within 72 hours.'}</p>
+          <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900 leading-tight">{cta?.title ?? 'Already know it’s for you?'}</h2>
+          <p className="mt-3 text-lg text-navy-600 max-w-2xl mx-auto">{cta?.body ?? 'Apply to the founding cohort — Eric reviews every application within 72 hours.'}</p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href={(cta?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'} className="inline-flex items-center justify-center px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg shadow-lg transition-all hover:shadow-xl">
               {(cta?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Apply to the Founding Cohort'}
             </Link>
-            <Link href="/value" className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-600 hover:border-brand-400 text-navy-200 hover:text-white text-lg font-semibold rounded-lg transition-colors">
+            <Link href="/value" className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-200 hover:border-brand-400 text-navy-700 hover:text-brand-700 text-lg font-semibold rounded-lg transition-colors">
               See why it works
             </Link>
           </div>

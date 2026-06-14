@@ -109,7 +109,7 @@ export const howItWorks: SeedPage = {
         details: [
           'Per-proposal purchase — no annual commitment',
           '72-hour expert curation by Eric',
-          'Stage-gated workspace: draft → review → revise → accept',
+          'Stage-gated workspace: draft, review, revise, accept',
           'Collaborator access controls by section and phase',
         ],
       },

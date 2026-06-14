@@ -46,7 +46,7 @@ const proposalTiers: PricingTierProps[] = [
     description: 'Phase I-equivalent effort. Includes SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form proposals.',
     features: [
       'Expert-reviewed compliance matrix within 72 hours',
-      'Stage-gated proposal workspace (draft → review → revise → accept)',
+      'Stage-gated proposal workspace (draft, review, revise, accept)',
       'Custom AI agents trained on YOUR company library',
       'Auto-drafting: technical volume, cost volume, abstract',
       'Collaborator access controls by section, role, and phase',

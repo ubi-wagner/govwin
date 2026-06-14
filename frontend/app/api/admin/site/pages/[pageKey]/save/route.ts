@@ -2,12 +2,18 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { saveDraft, type PageBlock } from '@/lib/content-admin';
+import { SEED_PAGE_KEYS } from '@/lib/page-content';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 export async function POST(req: Request, { params }: { params: Promise<{ pageKey: string }> }) {
   const a = await requireAdmin();
   if (!a.ok) return a.res;
   const { pageKey } = await params;
+  // Only registry pages are editable — blocks junk keys (e.g. 'undefined') and
+  // deprecated/redirected pages (engine, security, get-started).
+  if (!SEED_PAGE_KEYS.includes(pageKey)) {
+    return NextResponse.json({ error: 'Unknown page', code: 'NOT_FOUND' }, { status: 404 });
+  }
 
   let body: { blocks?: unknown; note?: unknown; title?: unknown; contentType?: unknown };
   try {

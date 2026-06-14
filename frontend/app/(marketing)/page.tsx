@@ -77,7 +77,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
               href={(hero?.metadata as { secondary_cta?: { href?: string } })?.secondary_cta?.href ?? '/value'}
               className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-200 hover:border-brand-400 text-navy-700 text-lg font-semibold rounded-lg transition-colors"
             >
-              {(hero?.metadata as { secondary_cta?: { label?: string } })?.secondary_cta?.label ?? 'See How It Works'}
+              {(hero?.metadata as { secondary_cta?: { label?: string } })?.secondary_cta?.label ?? 'See why it works'}
             </Link>
           </div>
           <p className="mt-5 text-sm text-navy-400">
