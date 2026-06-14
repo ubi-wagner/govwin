@@ -118,10 +118,14 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
       - 'ingest'              → ingester (sam_gov, sbir_gov, grants_gov)
       - 'shred_solicitation'  → shredder.runner.shred_solicitation
       - 'scout_source'        → source scout (single source or all due)
+      - 'expand_topics'       → ingest.topic_expander.expand_solicitation_topics
 
     For shred jobs, metadata must contain 'solicitation_id' (UUID str).
     For scout jobs, metadata may contain 'source_id' (UUID str); if
     absent, scouts all sources where auto_crawl is enabled and due.
+    For expand_topics jobs, metadata must contain 'solicitation_id'; it
+    may also carry 'source_profile_id', 'topic_numbers', and
+    'solicitation_number'.
     """
     # Atomically claim the next pending job
     job = await conn.fetchrow(
@@ -163,6 +167,8 @@ async def consume_one_job(conn: asyncpg.Connection) -> bool:
             await _run_shred_job(conn, job_id, metadata)
         elif kind == "scout_source":
             await _run_scout_job(conn, job_id, metadata)
+        elif kind == "expand_topics":
+            await _run_expand_topics_job(conn, job_id, metadata)
         else:  # default: 'ingest'
             await _run_ingest_job(conn, job_id, source, metadata)
     except Exception as e:
@@ -306,6 +312,89 @@ async def _run_shred_job(
             )
         except Exception as e:
             log.error("failed to emit rfp.shredded event for job %s: %s", job_id, e)
+
+
+async def _run_expand_topics_job(
+    conn: asyncpg.Connection,
+    job_id: Any,
+    metadata: dict,
+) -> None:
+    """Execute an expand_topics job.
+
+    On-demand topic expansion: fetch + parse + upsert every topic of a
+    solicitation from its source (DSIP public API or per-topic URLs).
+
+    Expects metadata.solicitation_id (UUID str). May also carry
+    'source_profile_id', 'topic_numbers' (list), and 'solicitation_number'.
+    The expander itself emits the finder:topics.expanded rollup; here we
+    mark the job done and emit a job-level lifecycle event.
+    """
+    solicitation_id = metadata.get("solicitation_id")
+    if not solicitation_id:
+        await conn.execute(
+            """
+            UPDATE pipeline_jobs
+            SET status = 'failed',
+                completed_at = now(),
+                result = $2::jsonb
+            WHERE id = $1
+            """,
+            job_id,
+            json.dumps({"error": "expand_topics job missing metadata.solicitation_id"}),
+        )
+        log.warning("expand_topics job %s missing solicitation_id — marking failed", job_id)
+        return
+
+    # Lazy import so the dispatcher module can be imported without the
+    # topic expander (and its httpx/parsing deps) being fully wired.
+    from ingest.topic_expander import expand_solicitation_topics
+
+    result = await expand_solicitation_topics(
+        conn,
+        solicitation_id=metadata["solicitation_id"],
+        source_profile_id=metadata.get("source_profile_id"),
+        topic_numbers=metadata.get("topic_numbers"),
+        solicitation_number=metadata.get("solicitation_number"),
+    )
+
+    await conn.execute(
+        """
+        UPDATE pipeline_jobs
+        SET status = 'completed',
+            completed_at = now(),
+            result = $2::jsonb
+        WHERE id = $1
+        """,
+        job_id,
+        json.dumps(result),
+    )
+    log.info("expand_topics job %s completed: %s", job_id, result.get("status"))
+
+    # Emit a job-level finder lifecycle event. The expander already emits
+    # the finder:topics.expanded rollup; this records job completion so
+    # downstream systems can correlate the work to its pipeline_job.
+    import uuid as _uuid
+    try:
+        await conn.execute(
+            """
+            INSERT INTO system_events
+              (id, namespace, type, phase, actor_type, actor_id,
+               payload, created_at)
+            VALUES ($1, 'finder', 'topics.expanded', 'single',
+                    'pipeline', 'dispatcher',
+                    $2::jsonb, now())
+            """,
+            _uuid.uuid4(),
+            json.dumps({
+                "solicitation_id": solicitation_id,
+                "job_id": str(job_id),
+                "status": result.get("status"),
+                "topics_upserted": result.get("topics_upserted"),
+                "topics_skipped": result.get("topics_skipped"),
+            }),
+        )
+    except Exception as e:
+        log.error("failed to emit topics.expanded event for job %s: %s", job_id, e)
 
 
 async def _run_scout_job(
