@@ -4,6 +4,7 @@ import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
 import { ValueComparison, rowsFromBlocks } from '@/components/marketing/value-comparison';
 import { ModelDiagram, FlywheelRing } from '@/components/marketing/diagrams';
+import { MarketingIcon } from '@/components/marketing/icons';
 
 export const revalidate = 60;
 
@@ -19,21 +20,21 @@ const DEFAULT_PAINS = [
 ];
 
 const DEFAULT_DRIVERS = [
-  { title: 'Your data. Your AI.', body: 'Every company gets isolated AI agents that see only their data. No shared context, no cross-contamination, no leakage between tenants.' },
-  { title: 'The AI drafts. The expert verifies.', body: 'Every opportunity is curated by a human with 25 years of federal R&D experience. Every AI draft is marked and reviewed. Nothing unvetted reaches your submission.' },
-  { title: 'Stage-gated quality.', body: 'Proposals move through defined stages with compliance checks at every gate. No shortcutting the review. No submitting without verification.' },
+  { title: 'Your data. Your AI.', icon: 'isolation', body: 'Every company gets isolated AI agents that see only their data. No shared context, no cross-contamination, no leakage between tenants.' },
+  { title: 'The AI drafts. The expert verifies.', icon: 'expert', body: 'Every opportunity is curated by a human with 25 years of federal R&D experience. Every AI draft is marked and reviewed. Nothing unvetted reaches your submission.' },
+  { title: 'Stage-gated quality.', icon: 'automation', body: 'Proposals move through defined stages with compliance checks at every gate. No shortcutting the review. No submitting without verification.' },
 ];
 
 const DEFAULT_FLYWHEEL = [
-  { title: 'Your library grows.', body: 'Every upload, every proposal section, every past-performance narrative becomes reusable material. Your AI team gets smarter with every document.' },
-  { title: 'Compliance pre-fills.', body: 'Verified values from your last cycle auto-suggest for the next. Page limits, font rules, submission format — the system remembers what the expert already verified.' },
-  { title: 'Your win rate compounds.', body: 'More proposals submitted. Higher quality each time. Less time per cycle. Your cost-per-proposal drops while your pipeline scales — no BD department required.' },
+  { title: 'Your library grows.', icon: 'growth', body: 'Every upload, every proposal section, every past-performance narrative becomes reusable material. Your AI team gets smarter with every document.' },
+  { title: 'Compliance pre-fills.', icon: 'compliance', body: 'Verified values from your last cycle auto-suggest for the next. Page limits, font rules, submission format — the system remembers what the expert already verified.' },
+  { title: 'Your win rate compounds.', icon: 'trophy', body: 'More proposals submitted. Higher quality each time. Less time per cycle. Your cost-per-proposal drops while your pipeline scales — no BD department required.' },
 ];
 
 const DEFAULT_HOW = [
-  { title: 'Find', body: 'Daily ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — expert-curated and ranked to your tech areas.' },
-  { title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; you and your team revise in a stage-gated workspace.' },
-  { title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle feeds the next — the system gets more accurate and less expensive over time.' },
+  { title: 'Find', icon: 'source-scout', body: 'Daily ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — expert-curated and ranked to your tech areas.' },
+  { title: 'Build', icon: 'workspace', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; you and your team revise in a stage-gated workspace.' },
+  { title: 'Submit & improve', icon: 'export', body: 'Export a compliant, submission-ready package. Every cycle feeds the next — the system gets more accurate and less expensive over time.' },
 ];
 
 export default async function WhyPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -54,9 +55,9 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
   const cta = single(lookup['cta']);
 
   const resolvedPains = pains.length > 0 ? pains.map((p) => ({ excerpt: p.excerpt, title: p.title, body: p.body })) : DEFAULT_PAINS;
-  const resolvedDrivers = drivers.length > 0 ? drivers.map((d) => ({ title: d.title, body: d.body })) : DEFAULT_DRIVERS;
-  const resolvedFlywheel = flywheel.length > 0 ? flywheel.map((f) => ({ title: f.title, body: f.body })) : DEFAULT_FLYWHEEL;
-  const resolvedHow = how.length > 0 ? how.map((h) => ({ title: h.title, body: h.body })) : DEFAULT_HOW;
+  const resolvedDrivers = drivers.length > 0 ? drivers.map((d) => ({ title: d.title, body: d.body, icon: (d.metadata as { icon?: string })?.icon })) : DEFAULT_DRIVERS;
+  const resolvedFlywheel = flywheel.length > 0 ? flywheel.map((f) => ({ title: f.title, body: f.body, icon: (f.metadata as { icon?: string })?.icon })) : DEFAULT_FLYWHEEL;
+  const resolvedHow = how.length > 0 ? how.map((h) => ({ title: h.title, body: h.body, icon: (h.metadata as { icon?: string })?.icon })) : DEFAULT_HOW;
   const cmeta = (comparison?.metadata ?? {}) as { eyebrow?: string };
 
   return (
@@ -120,6 +121,7 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
           <div className="mt-16 grid md:grid-cols-3 gap-8">
             {resolvedDrivers.map((d, i) => (
               <div key={i} className="border-t-2 border-brand-100 pt-5">
+                <MarketingIcon name={d.icon} className="h-8 w-8 text-brand-600 mb-3" />
                 <h3 className="font-display text-lg font-bold text-navy-900">{d.title}</h3>
                 <p className="mt-2 text-sm text-navy-600 leading-relaxed">{d.body}</p>
               </div>
@@ -143,6 +145,7 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
               <div className="mt-8 grid sm:grid-cols-3 gap-6">
                 {resolvedFlywheel.map((f, i) => (
                   <div key={i}>
+                    <MarketingIcon name={f.icon} className="h-7 w-7 text-brand-600 mb-2" />
                     <h3 className="font-display text-base font-bold text-navy-900">{f.title}</h3>
                     <p className="mt-1.5 text-sm text-navy-600 leading-relaxed">{f.body}</p>
                   </div>
@@ -168,7 +171,10 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
           <div className="grid md:grid-cols-3 gap-px bg-cream-200 border border-cream-200 rounded-xl overflow-hidden">
             {resolvedHow.map((h, i) => (
               <div key={i} className="bg-white p-8">
-                <span className="font-display text-3xl font-black text-brand-100">{String(i + 1).padStart(2, '0')}</span>
+                <div className="flex items-center gap-3">
+                  <MarketingIcon name={h.icon} className="h-7 w-7 text-brand-500" />
+                  <span className="font-display text-3xl font-black text-brand-100">{String(i + 1).padStart(2, '0')}</span>
+                </div>
                 <h3 className="font-display text-lg font-bold text-navy-900 mt-2">{h.title}</h3>
                 <p className="mt-2 text-sm text-navy-600 leading-relaxed">{h.body}</p>
               </div>

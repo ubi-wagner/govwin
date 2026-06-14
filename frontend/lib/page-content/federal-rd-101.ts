@@ -16,9 +16,9 @@ export const federalRd101: SeedPage = {
       metadata: { accent: 'award' },
     },
 
-    { section: 'what', displayOrder: 1, title: "It's non-dilutive.", body: "Unlike venture capital, federal R&D funding doesn't take equity. You keep ownership of your company and your IP — it's closer to a grant than an investment.", metadata: {} },
-    { section: 'what', displayOrder: 2, title: "It's billions a year.", body: 'Federal agencies set aside billions every year for small-business R&D through programs like SBIR and STTR — across defense, energy, health, climate, space, and more.', metadata: {} },
-    { section: 'what', displayOrder: 3, title: 'You probably qualify.', body: "If you're a U.S. small business doing genuinely innovative work, there's likely a program for you. Most companies never apply, because the process looks impenetrable. It isn't — with the right help.", metadata: {} },
+    { section: 'what', displayOrder: 1, title: "It's non-dilutive.", body: "Unlike venture capital, federal R&D funding doesn't take equity. You keep ownership of your company and your IP — it's closer to a grant than an investment.", metadata: { icon: 'non-dilutive' } },
+    { section: 'what', displayOrder: 2, title: "It's billions a year.", body: 'Federal agencies set aside billions every year for small-business R&D through programs like SBIR and STTR — across defense, energy, health, climate, space, and more.', metadata: { icon: 'billions' } },
+    { section: 'what', displayOrder: 3, title: 'You probably qualify.', body: "If you're a U.S. small business doing genuinely innovative work, there's likely a program for you. Most companies never apply, because the process looks impenetrable. It isn't — with the right help.", metadata: { icon: 'qualify' } },
 
     {
       section: 'eligibility-header',

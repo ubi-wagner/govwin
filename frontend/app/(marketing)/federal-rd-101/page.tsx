@@ -3,6 +3,7 @@ import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
 import { WaitlistForm } from '@/components/marketing/waitlist-form';
+import { MarketingIcon } from '@/components/marketing/icons';
 
 export const revalidate = 60;
 
@@ -13,9 +14,9 @@ export const metadata = {
 };
 
 const DEFAULT_WHAT = [
-  { title: "It's non-dilutive.", body: "Unlike venture capital, federal R&D funding doesn't take equity. You keep ownership of your company and your IP — it's closer to a grant than an investment." },
-  { title: "It's billions a year.", body: 'Federal agencies set aside billions every year for small-business R&D through programs like SBIR and STTR — across defense, energy, health, climate, space, and more.' },
-  { title: 'You probably qualify.', body: "If you're a U.S. small business doing genuinely innovative work, there's likely a program for you. Most companies never apply, because the process looks impenetrable. It isn't — with the right help." },
+  { title: "It's non-dilutive.", icon: 'non-dilutive', body: "Unlike venture capital, federal R&D funding doesn't take equity. You keep ownership of your company and your IP — it's closer to a grant than an investment." },
+  { title: "It's billions a year.", icon: 'billions', body: 'Federal agencies set aside billions every year for small-business R&D through programs like SBIR and STTR — across defense, energy, health, climate, space, and more.' },
+  { title: 'You probably qualify.', icon: 'qualify', body: "If you're a U.S. small business doing genuinely innovative work, there's likely a program for you. Most companies never apply, because the process looks impenetrable. It isn't — with the right help." },
 ];
 
 const DEFAULT_ELIGIBILITY = [
@@ -43,7 +44,7 @@ export default async function FederalRd101Page() {
   const eligibility = many(lookup['eligibility']);
   const capture = single(lookup['capture']);
   const cta = single(lookup['cta']);
-  const resolvedWhat = what.length > 0 ? what.map((w) => ({ title: w.title, body: w.body })) : DEFAULT_WHAT;
+  const resolvedWhat = what.length > 0 ? what.map((w) => ({ title: w.title, body: w.body, icon: (w.metadata as { icon?: string })?.icon })) : DEFAULT_WHAT;
   const resolvedElig = eligibility.length > 0 ? eligibility.map((e) => e.body || e.title || '') : DEFAULT_ELIGIBILITY;
 
   return (
@@ -66,6 +67,7 @@ export default async function FederalRd101Page() {
         <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-3 gap-8">
           {resolvedWhat.map((w, i) => (
             <div key={i} className="bg-cream-50 border border-cream-200 rounded-xl p-8">
+              <MarketingIcon name={w.icon} className="h-9 w-9 text-brand-600 mb-4" />
               <h2 className="font-display text-2xl font-black text-navy-900">{w.title}</h2>
               <p className="mt-3 text-navy-600 leading-relaxed">{w.body}</p>
             </div>

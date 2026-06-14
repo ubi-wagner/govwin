@@ -90,14 +90,17 @@ const steps = [
 const guardrails = [
   {
     title: 'Data isolation per customer',
+    icon: 'isolation',
     body: 'Your company data, documents, and proposal drafts are fully isolated. Your AI agents only see your data. No data from any other customer ever touches your context window.',
   },
   {
     title: 'Expert gate at every high-stakes step',
+    icon: 'expert',
     body: 'Eric reviews your application, curates every solicitation you pursue, and is available for pre-submission review. The AI drafts; the expert verifies.',
   },
   {
     title: 'Collaborator controls',
+    icon: 'collaboration',
     body: 'Invite partners, subcontractors, and internal reviewers to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly.',
   },
 ];
@@ -124,7 +127,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
     : steps;
 
   const resolvedGuardrails = cmsGuardrails.length > 0
-    ? cmsGuardrails.map((g: ContentRow) => ({ title: g.title, body: g.body }))
+    ? cmsGuardrails.map((g: ContentRow) => ({ title: g.title, body: g.body, icon: (g.metadata as { icon?: string })?.icon }))
     : guardrails;
 
   return (
