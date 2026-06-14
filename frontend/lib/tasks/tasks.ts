@@ -82,6 +82,31 @@ export async function listOpenTasksForActor(opts: {
   `;
 }
 
+/**
+ * The shared ADMIN triage queue — open tasks targeting EITHER admin role bucket
+ * (`rfp_admin` or `master_admin`), regardless of which admin is viewing. Unlike
+ * `listOpenTasksForActor` (role-exact, per-actor), this is the queue surface for
+ * the curation dashboard: a master_admin must see the rfp_admin triage ToDos that
+ * the detection workflow parks (C2.b), not just tasks for their own role.
+ *
+ * Admin-scoped only (tenant_id IS NULL), mirroring the events convention. Soonest
+ * due first, then oldest — the natural urgency order. Read-only; completion stays
+ * with completeTask.
+ */
+export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
+  return await sql<TaskRow[]>`
+    SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
+           description, entity_type, entity_id, process_instance_id, step_name,
+           status, due_at, nudge_schedule, params, created_at
+    FROM tasks
+    WHERE status IN ('open', 'in_progress')
+      AND tenant_id IS NULL
+      AND assignee_role IN ('rfp_admin', 'master_admin')
+    ORDER BY due_at ASC NULLS LAST, created_at ASC
+    LIMIT ${limit}
+  `;
+}
+
 export type CompleteTaskResult =
   | { ok: true; data: { taskId: string; resumed: boolean } }
   | { ok: false; status: number; error: string; code: string };
