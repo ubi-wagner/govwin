@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPageBlocks, getPublishedContent, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
+import { MarketingIcon } from '@/components/marketing/icons';
 
 export const revalidate = 60;
 
@@ -37,9 +38,9 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
 
   // Condensed 3-beat teaser of the journey (the full 6 stages live on /how-it-works).
   const HOME_HOW = [
-    { title: 'Find', body: 'Daily, expert-curated ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — ranked to your tech areas.' },
-    { title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; your team revises in a stage-gated workspace.' },
-    { title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle makes the next cheaper, faster, and more accurate.' },
+    { title: 'Find', icon: 'source-scout', body: 'Daily, expert-curated ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — ranked to your tech areas.' },
+    { title: 'Build', icon: 'workspace', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; your team revises in a stage-gated workspace.' },
+    { title: 'Submit & improve', icon: 'export', body: 'Export a compliant, submission-ready package. Every cycle makes the next cheaper, faster, and more accurate.' },
   ];
 
   const DEFAULT_PRICING = [
@@ -49,7 +50,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   ];
 
   const resolvedStats = stats.length > 0 ? stats.map((s: ContentRow) => ({ title: s.title, body: s.body })) : DEFAULT_STATS;
-  const resolvedHow = how.length > 0 ? how.map((h: ContentRow) => ({ title: h.title, body: h.body })) : HOME_HOW;
+  const resolvedHow = how.length > 0 ? how.map((h: ContentRow) => ({ title: h.title, body: h.body, icon: (h.metadata as { icon?: string })?.icon })) : HOME_HOW;
   const resolvedPricing = pricingCards.length > 0 ? pricingCards.map((p: ContentRow) => ({ excerpt: p.excerpt, title: p.title, body: p.body, metadata: p.metadata })) : DEFAULT_PRICING;
 
   return (
@@ -138,6 +139,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
           <div className="grid md:grid-cols-3 gap-px bg-navy-100 border border-navy-100 rounded-xl overflow-hidden">
             {resolvedHow.map((step, i) => (
               <div key={i} className="bg-cream-50 p-8">
+                <MarketingIcon name={step.icon} className="h-7 w-7 text-brand-600 mb-3" />
                 <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">{String(i + 1).padStart(2, '0')} — {step.title}</p>
                 <p className="mt-1 text-sm text-navy-600 leading-relaxed">{step.body}</p>
               </div>

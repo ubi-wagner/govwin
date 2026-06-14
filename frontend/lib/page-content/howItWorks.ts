@@ -144,18 +144,21 @@ export const howItWorks: SeedPage = {
       section: 'guardrails',
       displayOrder: 9,
       title: 'Data isolation per customer',
+      metadata: { icon: 'isolation' },
       body: 'Your company data, documents, and proposal drafts are fully isolated. Your AI agents only see your data. No data from any other customer ever touches your context window.',
     },
     {
       section: 'guardrails',
       displayOrder: 10,
       title: 'Expert gate at every high-stakes step',
+      metadata: { icon: 'expert' },
       body: 'Eric reviews your application, curates every solicitation you pursue, and is available for pre-submission review. The AI drafts; the expert verifies.',
     },
     {
       section: 'guardrails',
       displayOrder: 11,
       title: 'Collaborator controls',
+      metadata: { icon: 'collaboration' },
       body: 'Invite partners, subcontractors, and internal reviewers to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly.',
     },
 

@@ -3,6 +3,7 @@ import { getPublishedContentByTypes, getPageBlocks, buildLookup, single, many } 
 import { RichText } from '@/components/marketing/rich-text';
 import ResourcesFilter from '@/components/marketing/resources-filter';
 import { CustomSections } from '@/components/marketing/custom-sections';
+import { MarketingIcon } from '@/components/marketing/icons';
 
 export const metadata = {
   title: 'Resources — RFP Pipeline',
@@ -26,19 +27,19 @@ export default async function ResourcesPage() {
   const ctaMeta = (cta?.metadata ?? {}) as { ctaLabel?: string; ctaHref?: string };
 
   const DEFAULT_PROGRAMS = [
-    { title: 'SBIR', body: 'Small Business Innovation Research — Phase I through Phase III across all DoD branches, NSF, DOE, NIH, and more.' },
-    { title: 'STTR', body: 'Small Business Technology Transfer — requires a research institution partner. Same agencies, different collaboration model.' },
-    { title: 'BAA', body: 'Broad Agency Announcements — open-ended R&D solicitations from DARPA, AFRL, Army Research Lab, and others.' },
-    { title: 'OTA', body: 'Other Transaction Authority — non-FAR contracting for prototype development. Faster timelines, different compliance.' },
-    { title: 'CSO', body: 'Commercial Solutions Openings — typically Air Force (AFWERX). Slide-deck format, short-form proposals.' },
-    { title: 'Grants / NOFO', body: 'Grants.gov Notices of Funding Opportunity — NSF, DOE, NIH. CFDA-based, different compliance structure.' },
+    { title: 'SBIR', icon: 'program-sbir', body: 'Small Business Innovation Research — Phase I through Phase III across all DoD branches, NSF, DOE, NIH, and more.' },
+    { title: 'STTR', icon: 'program-sttr', body: 'Small Business Technology Transfer — requires a research institution partner. Same agencies, different collaboration model.' },
+    { title: 'BAA', icon: 'program-baa', body: 'Broad Agency Announcements — open-ended R&D solicitations from DARPA, AFRL, Army Research Lab, and others.' },
+    { title: 'OTA', icon: 'program-ota', body: 'Other Transaction Authority — non-FAR contracting for prototype development. Faster timelines, different compliance.' },
+    { title: 'CSO', icon: 'program-cso', body: 'Commercial Solutions Openings — typically Air Force (AFWERX). Slide-deck format, short-form proposals.' },
+    { title: 'Grants / NOFO', icon: 'program-grants', body: 'Grants.gov Notices of Funding Opportunity — NSF, DOE, NIH. CFDA-based, different compliance structure.' },
   ];
   const DEFAULT_PORTALS = [
     { title: 'Spotlight Dashboard', body: 'Your ranked opportunity feed, deadline reminders, and pinned topics.', linkLabel: 'Login to access', linkHref: '/login' },
     { title: 'Proposal Portals', body: 'Your purchased proposal workspaces — drafts, collaborators, and submission packages.', linkLabel: 'Login to access', linkHref: '/login' },
   ];
   const resolvedPrograms = programs.length > 0
-    ? programs.map((p) => ({ title: p.title, body: p.body }))
+    ? programs.map((p) => ({ title: p.title, body: p.body, icon: (p.metadata as { icon?: string })?.icon }))
     : DEFAULT_PROGRAMS;
   const resolvedPortals = portals.length > 0
     ? portals.map((p) => { const m = (p.metadata ?? {}) as { linkLabel?: string; linkHref?: string }; return { title: p.title, body: p.body, linkLabel: m.linkLabel ?? 'Login to access', linkHref: m.linkHref ?? '/login' }; })
@@ -65,6 +66,7 @@ export default async function ResourcesPage() {
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
             {resolvedPrograms.map((prog) => (
               <div key={prog.title} className="p-5 bg-cream-50 border border-cream-200 rounded-lg">
+                <MarketingIcon name={prog.icon} className="h-7 w-7 text-brand-600 mb-2" />
                 <h3 className="font-display font-bold text-navy-900">{prog.title}</h3>
                 <p className="mt-2 text-sm text-navy-600 leading-relaxed">{prog.body}</p>
               </div>

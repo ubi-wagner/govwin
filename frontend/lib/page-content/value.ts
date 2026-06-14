@@ -46,9 +46,9 @@ export const value: SeedPage = {
       body: 'Not just software. Not just a consultant. A structured system where a human expert, your own isolated AI, and a stage-gated process do what neither people nor tools do alone.',
       metadata: { accent: 'brand-500' },
     },
-    { section: 'drivers', displayOrder: 5, title: 'Your data. Your AI.', body: 'Every company gets isolated AI agents that see only their data. No shared context, no cross-contamination, no leakage between tenants.', metadata: {} },
-    { section: 'drivers', displayOrder: 6, title: 'The AI drafts. The expert verifies.', body: 'Every opportunity is curated by a human with 25 years of federal R&D experience. Every AI draft is marked and reviewed. Nothing unvetted reaches your submission.', metadata: {} },
-    { section: 'drivers', displayOrder: 7, title: 'Stage-gated quality.', body: 'Proposals move through defined stages with compliance checks at every gate. No shortcutting the review. No submitting without verification.', metadata: {} },
+    { section: 'drivers', displayOrder: 5, title: 'Your data. Your AI.', body: 'Every company gets isolated AI agents that see only their data. No shared context, no cross-contamination, no leakage between tenants.', metadata: { icon: 'isolation' } },
+    { section: 'drivers', displayOrder: 6, title: 'The AI drafts. The expert verifies.', body: 'Every opportunity is curated by a human with 25 years of federal R&D experience. Every AI draft is marked and reviewed. Nothing unvetted reaches your submission.', metadata: { icon: 'expert' } },
+    { section: 'drivers', displayOrder: 7, title: 'Stage-gated quality.', body: 'Proposals move through defined stages with compliance checks at every gate. No shortcutting the review. No submitting without verification.', metadata: { icon: 'automation' } },
 
     {
       section: 'flywheel-header',
@@ -57,14 +57,14 @@ export const value: SeedPage = {
       title: 'Every cycle gets *cheaper*, faster, and better.',
       metadata: { accent: 'brand-500' },
     },
-    { section: 'flywheel', displayOrder: 9, title: 'Your library grows.', body: 'Every upload, every proposal section, every past-performance narrative becomes reusable material. Your AI team gets smarter with every document.', metadata: {} },
-    { section: 'flywheel', displayOrder: 10, title: 'Compliance pre-fills.', body: 'Verified values from your last cycle auto-suggest for the next. Page limits, font rules, submission format — the system remembers what the expert already verified.', metadata: {} },
-    { section: 'flywheel', displayOrder: 11, title: 'Your win rate compounds.', body: 'More proposals submitted. Higher quality each time. Less time per cycle. Your cost-per-proposal drops while your pipeline scales — no BD department required.', metadata: {} },
+    { section: 'flywheel', displayOrder: 9, title: 'Your library grows.', body: 'Every upload, every proposal section, every past-performance narrative becomes reusable material. Your AI team gets smarter with every document.', metadata: { icon: 'growth' } },
+    { section: 'flywheel', displayOrder: 10, title: 'Compliance pre-fills.', body: 'Verified values from your last cycle auto-suggest for the next. Page limits, font rules, submission format — the system remembers what the expert already verified.', metadata: { icon: 'compliance' } },
+    { section: 'flywheel', displayOrder: 11, title: 'Your win rate compounds.', body: 'More proposals submitted. Higher quality each time. Less time per cycle. Your cost-per-proposal drops while your pipeline scales — no BD department required.', metadata: { icon: 'trophy' } },
 
     { section: 'how-header', displayOrder: 12, excerpt: 'How it works', title: 'Find. Build. Submit. Improve.', metadata: {} },
-    { section: 'how', displayOrder: 13, title: 'Find', body: 'Daily ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — expert-curated and ranked to your tech areas.', metadata: {} },
-    { section: 'how', displayOrder: 14, title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; you and your team revise in a stage-gated workspace.', metadata: {} },
-    { section: 'how', displayOrder: 15, title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle feeds the next — the system gets more accurate and less expensive over time.', metadata: {} },
+    { section: 'how', displayOrder: 13, title: 'Find', body: 'Daily ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — expert-curated and ranked to your tech areas.', metadata: { icon: 'source-scout' } },
+    { section: 'how', displayOrder: 14, title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; you and your team revise in a stage-gated workspace.', metadata: { icon: 'workspace' } },
+    { section: 'how', displayOrder: 15, title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle feeds the next — the system gets more accurate and less expensive over time.', metadata: { icon: 'export' } },
 
     {
       section: 'proof',

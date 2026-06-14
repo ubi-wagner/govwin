@@ -12,10 +12,10 @@ export const metadata = {
 };
 
 const DEFAULT_PILLARS = [
-  { label: 'The Expert', heading: '25 years in the arena.', body: 'Eric Wagner has personally secured hundreds of millions in SBIR, STTR, BAA, and OTA funding. He reviews every application, curates every solicitation, and is available for strategy calls. You always know who curated your pipeline — and why.' },
-  { label: 'The AI', heading: 'Isolated. Trained on you.', body: 'Your company gets its own AI team provisioned at signup. Your agents only see your data. They learn from your uploads, your past proposals, and your verified compliance decisions. No cross-contamination. No shared context windows.' },
-  { label: 'The Automation', heading: 'Stage-gated, not free-form.', body: 'Proposal development follows a structured pipeline: draft, review, revise, accept. Every stage has compliance checks, deadline tracking, and role-gated access. Your admin controls who sees what at every phase.' },
-  { label: 'The Collaboration', heading: 'Your team. Your rules.', body: 'Invite internal team members and external collaborators to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly. Every edit is audited. Every version is tracked.' },
+  { label: 'The Expert', heading: '25 years in the arena.', body: 'Eric Wagner has personally secured hundreds of millions in SBIR, STTR, BAA, and OTA funding. He reviews every application, curates every solicitation, and is available for strategy calls. You always know who curated your pipeline — and why.', metadata: { icon: 'expert' } },
+  { label: 'The AI', heading: 'Isolated. Trained on you.', body: 'Your company gets its own AI team provisioned at signup. Your agents only see your data. They learn from your uploads, your past proposals, and your verified compliance decisions. No cross-contamination. No shared context windows.', metadata: { icon: 'isolation' } },
+  { label: 'The Automation', heading: 'Stage-gated, not free-form.', body: 'Proposal development follows a structured pipeline: draft, review, revise, accept. Every stage has compliance checks, deadline tracking, and role-gated access. Your admin controls who sees what at every phase.', metadata: { icon: 'automation' } },
+  { label: 'The Collaboration', heading: 'Your team. Your rules.', body: 'Invite internal team members and external collaborators to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly. Every edit is audited. Every version is tracked.', metadata: { icon: 'collaboration' } },
 ];
 
 export default async function AboutPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {

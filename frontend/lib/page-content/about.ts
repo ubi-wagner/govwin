@@ -19,7 +19,7 @@ export const about: SeedPage = {
       excerpt: 'The Expert',
       title: '25 years in the arena.',
       body: 'Eric Wagner has personally secured hundreds of millions in SBIR, STTR, BAA, and OTA funding. He reviews every application, curates every solicitation, and is available for strategy calls. You always know who curated your pipeline — and why.',
-      metadata: {},
+      metadata: { icon: 'expert' },
     },
     {
       section: 'pillars',
@@ -27,7 +27,7 @@ export const about: SeedPage = {
       excerpt: 'The AI',
       title: 'Isolated. Trained on you.',
       body: 'Your company gets its own AI team provisioned at signup. Your agents only see your data. They learn from your uploads, your past proposals, and your verified compliance decisions. No cross-contamination. No shared context windows.',
-      metadata: {},
+      metadata: { icon: 'isolation' },
     },
     {
       section: 'pillars',
@@ -35,7 +35,7 @@ export const about: SeedPage = {
       excerpt: 'The Automation',
       title: 'Stage-gated, not free-form.',
       body: 'Proposal development follows a structured pipeline: draft, review, revise, accept. Every stage has compliance checks, deadline tracking, and role-gated access. Your admin controls who sees what at every phase.',
-      metadata: {},
+      metadata: { icon: 'automation' },
     },
     {
       section: 'pillars',
@@ -43,7 +43,7 @@ export const about: SeedPage = {
       excerpt: 'The Collaboration',
       title: 'Your team. Your rules.',
       body: 'Invite internal team members and external collaborators to specific sections of specific proposals. Control access by role, document, and phase. Revoke instantly. Every edit is audited. Every version is tracked.',
-      metadata: {},
+      metadata: { icon: 'collaboration' },
     },
     {
       section: 'founder',

@@ -14,6 +14,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { MarketingIcon } from '@/components/marketing/icons';
 
 // ─── Hero ────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ export function FeatureGrid({ columns = 3, items, variant = 'bordered' }: Featur
             )}
             <div className={variant === 'bordered' ? 'p-6' : 'p-6'}>
               {item.icon && !item.image && (
-                <span className="text-3xl mb-3 block">{item.icon}</span>
+                <MarketingIcon name={item.icon} className="h-9 w-9 text-brand-600 mb-3" />
               )}
               {item.number && (
                 <span className="text-5xl font-bold text-brand-100 font-display block">{item.number}</span>
