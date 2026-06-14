@@ -77,23 +77,26 @@ export interface PageSummary {
   contentType: string;
   activeVersion: number | null;
   hasDraft: boolean;
-  lastUpdated: Date;
+  lastUpdated: Date | null;
+  lastUpdatedBy: string | null;
 }
 
-/** All pages with their active version and whether an unpublished draft exists. */
+/** All pages with their active version, draft state, and who last touched them. */
 export async function listPages(): Promise<PageSummary[]> {
   const rows = await sql<{
     pageKey: string;
     contentType: string;
     activeVersion: number | null;
     hasDraft: boolean;
-    lastUpdated: Date;
+    lastUpdated: Date | null;
+    lastUpdatedBy: string | null;
   }[]>`
     SELECT page_key,
-           min(content_type)                                AS content_type,
-           max(version_no) FILTER (WHERE status = 'active') AS active_version,
-           bool_or(status = 'draft')                        AS has_draft,
-           max(created_at)                                  AS last_updated
+           min(content_type)                                  AS content_type,
+           max(version_no) FILTER (WHERE status = 'active')   AS active_version,
+           bool_or(status = 'draft')                          AS has_draft,
+           max(created_at)                                    AS last_updated,
+           (array_agg(created_by ORDER BY version_no DESC))[1] AS last_updated_by
     FROM content_pages
     WHERE content_type = 'page'
     GROUP BY page_key
@@ -105,6 +108,7 @@ export async function listPages(): Promise<PageSummary[]> {
     activeVersion: r.activeVersion,
     hasDraft: r.hasDraft,
     lastUpdated: r.lastUpdated,
+    lastUpdatedBy: r.lastUpdatedBy,
   }));
 }
 

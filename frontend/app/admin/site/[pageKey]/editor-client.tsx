@@ -4,6 +4,15 @@ import { useState } from 'react';
 import type { PageVersion, PageBlock } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 
+function shortActor(s: string | null): string {
+  return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
+}
+function fmtWhen(d: Date | string | null): string {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 interface EditBlock {
   section: string;
   displayOrder: number;
@@ -153,12 +162,25 @@ export default function EditorClient({
 
   return (
     <div className="pb-24">
-      <div className="flex items-center justify-between mt-2 mb-4">
+      <div className="mt-2 mb-5">
         <h1 className="text-2xl font-bold">{pageKey}</h1>
-        <div className="text-xs text-gray-500">
-          {active ? `live v${active.versionNo}` : 'no live version'}
-          {draft ? ` · draft v${draft.versionNo}` : ''}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {active ? (
+            <span className="text-gray-500">
+              <span className="text-green-700 font-medium">Live v{active.versionNo}</span> · published {fmtWhen(active.publishedAt)} by {shortActor(active.createdBy)}
+            </span>
+          ) : (
+            <span className="text-gray-500">Using page defaults — publish to make it live</span>
+          )}
+          {draft && (
+            <span className="text-yellow-700">
+              Draft v{draft.versionNo} · saved {fmtWhen(draft.createdAt)} by {shortActor(draft.createdBy)}
+            </span>
+          )}
         </div>
+        {(draft ?? active)?.auditNote && (
+          <div className="mt-1 text-xs text-gray-400">Last note: &ldquo;{(draft ?? active)?.auditNote}&rdquo;</div>
+        )}
       </div>
 
       <div className="space-y-4">

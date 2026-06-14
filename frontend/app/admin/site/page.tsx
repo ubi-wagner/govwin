@@ -5,6 +5,19 @@ import { getPageViewCounts, pageKeyToPath } from '@/lib/analytics-admin';
 
 export const dynamic = 'force-dynamic';
 
+const JUNK_KEYS = new Set(['undefined', 'null', '']);
+
+function shortActor(s: string | null): string {
+  if (!s) return 'system';
+  return s.includes('@') ? s.split('@')[0] : s;
+}
+function fmtWhen(d: Date | null): string {
+  if (!d) return '';
+  const t = new Date(d).getTime();
+  if (!t || t < 1000) return ''; // epoch placeholder = never edited (using defaults)
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default async function SiteContentPage() {
   let pages: PageSummary[] = [];
   let docs: Awaited<ReturnType<typeof listDocuments>> = [];
@@ -25,17 +38,49 @@ export default async function SiteContentPage() {
     console.error('[admin/site] view counts failed:', e);
   }
 
-  // Surface every known page, even ones not yet seeded into content_pages —
-  // opening one initializes it from its defaults so it's never undiscoverable.
+  // Merge DB pages with the registry (so un-seeded pages are still listed), drop
+  // junk keys, and split the site-chrome (header/footer) out from public pages.
   const seen = new Set(pages.map((p) => p.pageKey));
   const unseeded: PageSummary[] = SEED_PAGE_KEYS.filter((k) => !seen.has(k)).map((pageKey) => ({
-    pageKey,
-    contentType: 'page',
-    activeVersion: null,
-    hasDraft: false,
-    lastUpdated: new Date(0),
+    pageKey, contentType: 'page', activeVersion: null, hasDraft: false, lastUpdated: null, lastUpdatedBy: null,
   }));
-  pages = [...pages, ...unseeded].sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+  const all = [...pages, ...unseeded].filter((p) => p.pageKey && !JUNK_KEYS.has(p.pageKey));
+  const chrome = all.find((p) => p.pageKey === 'site-chrome') ?? null;
+  const publicPages = all
+    .filter((p) => p.pageKey !== 'site-chrome')
+    .sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+
+  const row = (p: PageSummary, label?: string) => {
+    const views = viewCounts[pageKeyToPath(p.pageKey)];
+    const when = fmtWhen(p.lastUpdated);
+    return (
+      <Link
+        key={p.pageKey}
+        href={`/admin/site/${encodeURIComponent(p.pageKey)}`}
+        className="flex items-center justify-between gap-4 p-4 hover:bg-gray-50"
+      >
+        <div className="min-w-0">
+          <div className="font-medium">{label ?? p.pageKey}</div>
+          <div className="text-xs text-gray-500 truncate">
+            {p.activeVersion ? `live v${p.activeVersion}` : 'using page defaults'}
+            {when && ` · updated ${when} by ${shortActor(p.lastUpdatedBy)}`}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {views != null && (
+            <span className="text-xs text-gray-400 tabular-nums" title="Page views, last 30 days">
+              {views.toLocaleString()} views
+            </span>
+          )}
+          {p.hasDraft && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">draft</span>}
+          {!p.activeVersion && !p.hasDraft && (
+            <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">defaults</span>
+          )}
+          <span className="text-gray-400">&rarr;</span>
+        </div>
+      </Link>
+    );
+  };
 
   return (
     <div className="max-w-4xl">
@@ -56,34 +101,18 @@ export default async function SiteContentPage() {
 
       <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Pages</h2>
       <div className="border rounded-lg divide-y bg-white mb-8">
-        {pages.length === 0 && <div className="p-4 text-sm text-gray-500">No pages yet.</div>}
-        {pages.map((p) => (
-          <Link
-            key={p.pageKey}
-            href={`/admin/site/${encodeURIComponent(p.pageKey)}`}
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
-          >
-            <div>
-              <div className="font-medium">{p.pageKey}</div>
-              <div className="text-xs text-gray-500">
-                {p.contentType} · {p.activeVersion ? `live v${p.activeVersion}` : 'using page defaults'}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {viewCounts[pageKeyToPath(p.pageKey)] != null && (
-                <span className="text-xs text-gray-400 tabular-nums" title="Page views, last 30 days">
-                  {viewCounts[pageKeyToPath(p.pageKey)].toLocaleString()} views
-                </span>
-              )}
-              {p.hasDraft && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">draft</span>}
-              {!p.activeVersion && !p.hasDraft && (
-                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">defaults</span>
-              )}
-              <span className="text-gray-400">&rarr;</span>
-            </div>
-          </Link>
-        ))}
+        {publicPages.length === 0 && <div className="p-4 text-sm text-gray-500">No pages yet.</div>}
+        {publicPages.map((p) => row(p))}
       </div>
+
+      {chrome && (
+        <>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Site-wide</h2>
+          <div className="border rounded-lg divide-y bg-white mb-8">
+            {row(chrome, 'Header & Footer')}
+          </div>
+        </>
+      )}
 
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Documents</h2>
@@ -103,15 +132,15 @@ export default async function SiteContentPage() {
           <Link
             key={`${d.contentType}:${d.slug}`}
             href={`/admin/site/docs/${d.contentType}/${encodeURIComponent(d.slug)}`}
-            className="flex items-center justify-between p-4 hover:bg-gray-50"
+            className="flex items-center justify-between gap-4 p-4 hover:bg-gray-50"
           >
-            <div>
-              <div className="font-medium">{d.title || d.slug}</div>
-              <div className="text-xs text-gray-500">
-                {d.contentType} · {d.slug} · {d.activeVersion ? `live v${d.activeVersion}` : 'no live version'}
+            <div className="min-w-0">
+              <div className="font-medium truncate">{d.title || d.slug}</div>
+              <div className="text-xs text-gray-500 truncate">
+                {d.contentType.replace('_', ' ')} · {d.slug} · {d.activeVersion ? `live v${d.activeVersion}` : 'no live version'}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {d.hasDraft && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">draft</span>}
               <span className="text-gray-400">&rarr;</span>
             </div>
