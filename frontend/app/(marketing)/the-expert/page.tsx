@@ -19,18 +19,22 @@ export const metadata = {
 const credentials = [
   {
     title: 'Funding Secured',
+    icon: 'funding',
     body: 'Personally secured hundreds of millions of dollars in SBIR, STTR, OTA, BAA, and related federal R&D funding across two decades — both for companies Eric led and for small businesses he advised. Phase I through Phase III, across DoD, NSF, DOE, DARPA, and more.',
   },
   {
     title: 'Operations Scale',
+    icon: 'scale',
     body: 'Former President of D&S Consultants (DSCI), an aerospace and defense commercialization company. Grew the company from 400 to 750+ employees at 70% CAGR, with 15 worldwide office locations and over $270M in annual revenue at time of departure.',
   },
   {
     title: 'Startup Launch Track Record',
+    icon: 'launch',
     body: 'Oversaw the successful launch of 22+ startups through The Ohio State University\'s commercialization office. Co-founded Converge Technologies (commercialization services) and served as Co-Fund Manager at Ohio Gateway Tech Fund (pre-seed venture).',
   },
   {
     title: 'Executive Leadership',
+    icon: 'leadership',
     body: 'Chief Executive Officer at Ubihere (2023-2026), Chief Strategy Officer at Lighthouse Avionics and Converge Technologies, Associate Director at Ohio State\'s Center for Design and Manufacturing Excellence. Active startup investor via OTAF and individually.',
   },
 ];
