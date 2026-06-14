@@ -192,6 +192,8 @@ export function CurationWorkspace({
   const [showTopicCompliance, setShowTopicCompliance] = useState(false);
   const [extractedPasteText, setExtractedPasteText] = useState('');
   const [extractingTopics, setExtractingTopics] = useState(false);
+  const [expandingTopics, setExpandingTopics] = useState(false);
+  const [expandStatus, setExpandStatus] = useState<string | null>(null);
   const [topicsList, setTopicsList] = useState(topics);
 
   // Keep local topicsList in sync with server-provided topics after
@@ -476,6 +478,59 @@ export function CurationWorkspace({
       router.refresh();
     } catch {
       // error shown via useTool
+    }
+  };
+
+  // Import all topics from the source site (DSIP topic-URL expansion,
+  // SCOUTING_SPINE M3 / C3.b). Resolves the source profile by matching
+  // its site_type to this solicitation's source, then enqueues an
+  // expand_topics pipeline job via the admin route. The pipeline worker
+  // fetches + parses + upserts every topic; results land on next refresh.
+  const handleExpandTopics = async () => {
+    setExpandingTopics(true);
+    setExpandStatus(null);
+    try {
+      // 1. Find the source_profiles row whose site_type matches sol.source.
+      const srcResp = await fetch('/api/admin/sources');
+      const srcJson = await srcResp.json().catch(() => ({}));
+      if (!srcResp.ok) {
+        setExpandStatus(srcJson.error ?? 'Could not load source profiles.');
+        return;
+      }
+      const sources: Array<{ id: string; site_type: string }> =
+        srcJson.data?.sources ?? [];
+      const profile = sources.find((s) => s.site_type === sol.source);
+      if (!profile) {
+        setExpandStatus(
+          `No source profile configured for "${sol.source}". Add one under Sources to enable topic import.`,
+        );
+        return;
+      }
+
+      // 2. Enqueue the expand_topics job for this solicitation.
+      const resp = await fetch(
+        `/api/admin/sources/${profile.id}/expand-topics`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            solicitationId: sol.id,
+            solicitationNumber: sol.solicitationNumber ?? undefined,
+          }),
+        },
+      );
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setExpandStatus(json.error ?? `Failed to queue import (HTTP ${resp.status}).`);
+        return;
+      }
+      setExpandStatus(
+        `Topic import queued (job ${String(json.data?.jobId ?? '').slice(0, 8)}). Topics will appear here once the worker finishes — refresh shortly.`,
+      );
+    } catch {
+      setExpandStatus('Failed to queue topic import.');
+    } finally {
+      setExpandingTopics(false);
     }
   };
 
@@ -794,6 +849,14 @@ export function CurationWorkspace({
                   {extractingTopics ? 'Extracting...' : 'Extract Topics'}
                 </button>
                 <button
+                  disabled={expandingTopics}
+                  onClick={handleExpandTopics}
+                  title="Fetch and import every topic for this solicitation directly from its source site"
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {expandingTopics ? 'Queuing...' : 'Import all topics from source'}
+                </button>
+                <button
                   onClick={() => setShowBulkAddTopics(true)}
                   className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded border border-gray-200"
                 >
@@ -807,6 +870,12 @@ export function CurationWorkspace({
                 </button>
               </div>
             </div>
+            {/* Source topic-import status (expand_topics job queueing) */}
+            {expandStatus && (
+              <div className="mb-3 p-2 bg-blue-50 border border-blue-100 rounded text-xs text-blue-800">
+                {expandStatus}
+              </div>
+            )}
             {/* Topic file drop zone */}
             <TopicFileDropZone
               solicitationId={sol.id}
