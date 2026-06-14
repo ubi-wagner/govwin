@@ -446,13 +446,9 @@ async def _handle_notification_requested(event) -> None:
         logger.warning('notification.requested event has no template, skipping')
         return
 
-    # Render the template
-    html = render_template(template_name, payload)
-    if not html:
-        logger.warning(f'No template rendered for "{template_name}" in notification.requested, skipping')
-        return
-
-    # Resolve recipient
+    # Resolve recipient first (hoisted above the render so a render-miss can still
+    # reach the admin via the loud-failure path below — C2.c). The resolution order
+    # is unchanged, so the happy path is identical.
     to_email = None
 
     # Check for admin-targeted notifications (to_role = rfp_admin)
@@ -474,6 +470,56 @@ async def _handle_notification_requested(event) -> None:
     # Fall back to direct email fields in the payload
     if not to_email:
         to_email = payload.get('contactEmail') or payload.get('email') or payload.get('to')
+
+    trigger_event_id = payload.get('trigger_event_id')
+
+    # Render the template
+    html = render_template(template_name, payload)
+    if not html:
+        # Loud failure (Scouting Spine C2.c): a missing/unrenderable template must
+        # NOT silently return. Emit system:notification.failed:single, log at ERROR,
+        # and send a minimal plaintext fallback so the admin still hears about it.
+        logger.error(
+            'notification.requested: template "%s" rendered empty/None (trigger_event_id=%s, recipient=%s) — emitting notification.failed',
+            template_name, trigger_event_id, to_email,
+        )
+        await _emit_action_event(
+            event_type='notification.failed',
+            phase='single',
+            payload={
+                'reason': 'template_render_empty',
+                'template': template_name,
+                'trigger_event_id': str(trigger_event_id) if trigger_event_id else None,
+                'recipient': to_email,
+                'channel': channel,
+            },
+            parent_event_id=str(event.get('id')) if event.get('id') else None,
+        )
+        # Best-effort plaintext fallback so the alert is not lost entirely.
+        if to_email:
+            try:
+                fallback_html = (
+                    '<p>A notification could not be rendered and was not delivered '
+                    'with its intended template.</p>'
+                    f'<p><strong>Template:</strong> {template_name}</p>'
+                    '<p>Check the admin dashboard / triage queue for the underlying event.</p>'
+                )
+                fb_result = await send_email(
+                    to=to_email,
+                    subject=f"[RFP Pipeline] Notification render failed: {template_name}",
+                    html=fallback_html,
+                )
+                logger.error(
+                    'notification.requested: sent plaintext fallback for failed template "%s" to %s: %s',
+                    template_name, to_email, fb_result,
+                )
+            except Exception as fb_err:
+                logger.error(
+                    'notification.requested: plaintext fallback also failed for template "%s": %s',
+                    template_name, fb_err,
+                )
+        return
+
     if not to_email:
         logger.warning(f'No recipient resolved for notification.requested template="{template_name}", skipping')
         return
@@ -481,7 +527,7 @@ async def _handle_notification_requested(event) -> None:
     subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
 
     # Check for dedup using trigger_event_id from the workflow NOTIFY step
-    trigger_event_id = payload.get('trigger_event_id')
+    # (trigger_event_id was resolved above, ahead of the render check).
     if trigger_event_id and pool:
         if await _check_dedup(pool, trigger_event_id, 'send_email'):
             logger.info("Skipping duplicate notification.requested for trigger event %s", trigger_event_id)

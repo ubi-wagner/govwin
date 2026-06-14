@@ -592,4 +592,32 @@ TEMPLATES.update({
         </table>
         {_button('Review in Admin Dashboard', '/admin/curation')}
     '''),
+    # Scouting Spine M2 (C2.b): backs the NOTIFY step of the OnOpportunitiesDetected
+    # workflow. A scheduled ingest/scout run that created >=1 new triage row emits
+    # finder:opportunities.detected, whose workflow posts notification.requested with
+    # this template name. Payload fields { source, newSolicitations, newTopics,
+    # sampleTitles }. Defensive p.get(...) so the render never returns falsy.
+    'new_opportunities_to_triage': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">New opportunities to triage</h2>
+        <p>A scouting run found new opportunities that are waiting in the triage queue.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:16px;">
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;width:160px;">Source</td>
+              <td style="padding:8px 0;font-size:15px;font-weight:600;color:{BRAND_NAVY};">{_e(str(p.get('source') or p.get('sourceName') or p.get('sourceId') or 'see triage queue'))}</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;">New solicitations</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('newSolicitations', 0)))}</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#64748b;">New topics</td>
+              <td style="padding:8px 0;font-size:15px;color:{BRAND_NAVY};">{_e(str(p.get('newTopics', 0)))}</td></tr>
+        </table>
+        {(
+            '<p style="margin:0 0 6px;font-weight:600;">Sample titles</p>'
+            '<ul style="padding-left:20px;margin:0 0 8px;">'
+            + ''.join(
+                f'<li style="margin-bottom:4px;">{_e(str(_t))}</li>'
+                for _t in (p.get('sampleTitles') or [])[:5]
+            )
+            + '</ul>'
+        ) if (p.get('sampleTitles') or []) else ''}
+        <p>Review and curate these in the admin triage queue, then decide which to push to Spotlight.</p>
+        {_button('Open Triage Queue', '/admin/rfp-curation')}
+    '''),
 })
