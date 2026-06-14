@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ContentRow } from '@/lib/cms';
 
 /**
  * ValueComparison — the "cost of doing it the old way" money moment.
@@ -46,6 +47,27 @@ export const DEFAULT_COMPARISON_ROWS: ComparisonRow[] = [
     payoff: 'Stop trading product velocity for proposal paperwork.',
   },
 ];
+
+/**
+ * Map a page's `comparison-row` blocks to ComparisonRow[] (single editable source
+ * of the cost comparison — lives on /value, reused by /pricing). Falls back to the
+ * approved defaults when none are seeded. Block fields: title = what it replaces,
+ * excerpt = status-quo cost, body = payoff; metadata = { statusQuoNote, ours }.
+ */
+export function rowsFromBlocks(blocks: ContentRow[]): ComparisonRow[] {
+  const rows = blocks.filter((b) => b.section === 'comparison-row');
+  if (rows.length === 0) return DEFAULT_COMPARISON_ROWS;
+  return rows.map((b) => {
+    const m = (b.metadata ?? {}) as { statusQuoNote?: string; ours?: string };
+    return {
+      replaces: b.title ?? '',
+      statusQuo: b.excerpt ?? '',
+      statusQuoNote: m.statusQuoNote,
+      ours: m.ours ?? '',
+      payoff: b.body ?? '',
+    };
+  });
+}
 
 export function ValueComparison({
   eyebrow = 'The cost of the old way',

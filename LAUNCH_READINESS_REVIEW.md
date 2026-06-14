@@ -216,3 +216,43 @@ Each entry = one pushed, individually-revertable commit.
 - New copy renders immediately on un-edited pages; **any page you hand-edited in the prod editor keeps your version** (re-publish from the editor to pull the new copy).
 - `IPINFO_TOKEN` (analytics) remains optional. All dollar figures are the approved published numbers.
 - Verified each step: `tsc` clean, all 14 registry pages seed/round-trip on a live DB, both migrations validated, section parity across all 13 pages, no RSC-boundary or `console.log` regressions. **No emoji / stock icons — custom drawn SVGs throughout.**
+
+---
+
+## 9. Round 3 — end-to-end editability + link/orphan audit
+
+**Goal:** every aspect of every public page reviewable, editable, and publishable from the admin CMS (`/admin/site`); no broken links or orphans anywhere.
+
+### Link / orphan / breadcrumb audit — clean
+- **0 broken internal links** across all marketing pages, components, and the header/footer chrome (automated href→route check, dynamic-aware).
+- **No problem orphans.** The only unlinked routes are intentional: `/engine`, `/security`, `/get-started` (redirects that catch old URLs), the auth-flow pages (`/login` family, reached from flows), `/dashboard` (post-login), and `/blog/feed.xml` (RSS). The 3 seeded articles' in-body links (`/federal-rd-101`, `/pricing`, `/value`, `/apply`) all resolve.
+- **Breadcrumbs:** the marketing site is flat with global header/footer nav (no trail needed); article pages have "← Back to Resources"; the admin editors have "← Site Content". All valid.
+
+### Editability — every section is a block in the CMS
+Two launch sections had been rendering from code (not editable); both are now block-backed: the **home "how it works" teaser** and the **cost-comparison rows** (edited once on `/value`, mirrored to `/pricing`).
+
+Editable pages in `/admin/site` → **Pages** (open → edit blocks → Save draft → Preview → Publish; "+ Add block" for new sections, which render via the generic renderer):
+
+| Page | Editable sections (block count) |
+|---|---|
+| homepage | hero, stats(4), value-band, stages-header, how(3), pricing-hero, pricing(3), expert-gate, insights-header, quote, cta |
+| value ("Why") | hero, pains(2), comparison + comparison-row(4), why-header, drivers(3), flywheel-header, flywheel(3), how-header, how(3), proof, cta |
+| the-expert | hero, intro, credentials(+hdr,4), timeline(+hdr,10), education(+hdr,2), recognition(+hdr,5), cta |
+| pricing | hero, subscription(+hdr), proposals(+hdr,2), expert(+hdr,2), faqs(+hdr,6), cta |
+| how-it-works | hero, workflow-header, steps(6), guardrails(+hdr,3), cta |
+| features | hero, items(8), cta |
+| infosec | hero, isolation(+hdr,4), promise(2), collab(+hdr,3), certifications, cta |
+| federal-rd-101 | hero, what(3), eligibility(+hdr,5), capture, cta |
+| customers (Track Record) | hero, outcomes(4), agencies, testimonials-header, empty, cta |
+| resources | hero, programs(+hdr,6), insights-header, portals(+hdr,2), cta |
+| about | hero, pillars(4), founder |
+| team | hero, empty, cta |
+| site-chrome (header/footer) | chrome (banner / nav / footer in the block's metadata) |
+
+Articles (newcomer primer, ROI story, eligibility check) + any blog/resource/guide/testimonial/team item are editable in `/admin/site` → **Documents**.
+
+**How each field is edited:** title / body / excerpt / image are first-class inputs per block. Structured bits live in the block's **metadata JSON** box (intentionally — CTA label+href pairs, pricing tier price/period/features[], stat values, expert bullets, agency list, the comparison row's "ours"/note, and the chrome nav/footer link lists).
+
+**Intentionally NOT CMS-editable (by design):** the drawn SVG diagram labels (Model Venn, Flywheel — they're brand graphics), the legal pages (code-versioned for compliance/acceptance tracking), and the redirect stubs.
+
+**One-source rule:** the cost-comparison figures are edited only on **`/value`** (its `comparison-row` blocks); `/pricing` reads the same blocks, so the numbers can't drift between the two pages.

@@ -20,6 +20,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   const stats = many(lookup['stats']);
   const valueBand = single(lookup['value-band']);
   const stagesHeader = single(lookup['stages-header']);
+  const how = many(lookup['how']);
   const pricingHero = single(lookup['pricing-hero']);
   const pricingCards = many(lookup['pricing']);
   const expertGate = single(lookup['expert-gate']);
@@ -48,6 +49,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   ];
 
   const resolvedStats = stats.length > 0 ? stats.map((s: ContentRow) => ({ title: s.title, body: s.body })) : DEFAULT_STATS;
+  const resolvedHow = how.length > 0 ? how.map((h: ContentRow) => ({ title: h.title, body: h.body })) : HOME_HOW;
   const resolvedPricing = pricingCards.length > 0 ? pricingCards.map((p: ContentRow) => ({ excerpt: p.excerpt, title: p.title, body: p.body, metadata: p.metadata })) : DEFAULT_PRICING;
 
   return (
@@ -134,7 +136,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             <Link href="/how-it-works" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors shrink-0">See the full 6-stage workflow &rarr;</Link>
           </div>
           <div className="grid md:grid-cols-3 gap-px bg-navy-100 border border-navy-100 rounded-xl overflow-hidden">
-            {HOME_HOW.map((step, i) => (
+            {resolvedHow.map((step, i) => (
               <div key={i} className="bg-cream-50 p-8">
                 <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">{String(i + 1).padStart(2, '0')} — {step.title}</p>
                 <p className="mt-1 text-sm text-navy-600 leading-relaxed">{step.body}</p>
