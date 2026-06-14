@@ -142,11 +142,19 @@ export const solicitationPushTool = defineTool<Input, Output>({
         );
       }
 
-      // 4. Flip the opportunity visible — customers see it after this.
+      // 4. Flip the FULL activation set visible — customers see it after
+      // this. Contract C1.a: the activation set is the landing opportunity
+      // (cs.opportunity_id) PLUS every topic of the solicitation
+      // (opportunities.solicitation_id = sol.id). A single-topic
+      // solicitation has no child topics, so only the landing opportunity
+      // matches and exactly one row flips — identical to prior behavior.
+      // A multi-topic solicitation flips landing + all children, atomically
+      // in this same txn.
       await tx`
         UPDATE opportunities
         SET is_active = true, updated_at = now()
-        WHERE id = ${r.opportunityId}::uuid
+        WHERE solicitation_id = ${solicitationId}::uuid
+           OR id = ${r.opportunityId}::uuid
       `;
 
       // 5. Audit + event.
@@ -192,13 +200,17 @@ export const solicitationPushTool = defineTool<Input, Output>({
       // Non-fatal — continue
     }
 
-    // Count topics (opportunities) linked to this solicitation for
-    // downstream workflow matching (on_solicitation_pushed expects it).
+    // Count the actually-activated set for downstream workflow matching
+    // (on_solicitation_pushed expects it). Contract C1.a/C1.c: this MUST
+    // match the activation WHERE clause above (landing opportunity PLUS
+    // every topic of the solicitation) so topicCount reflects all topics
+    // that were just set is_active=true — not just child topics.
     let topicCount: number;
     try {
       const [topicRow] = await sql<{ count: string }[]>`
         SELECT count(*)::text AS count FROM opportunities
         WHERE solicitation_id = ${solicitationId}::uuid
+           OR id = ${r.opportunityId}::uuid
       `;
       topicCount = parseInt(topicRow?.count ?? '0', 10);
     } catch (err) {
