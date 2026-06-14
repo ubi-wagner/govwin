@@ -1,31 +1,49 @@
 import type { SeedPage } from './types';
 
-/** /customers — page chrome (hero / empty-state / CTA). The testimonial grid is
- *  sourced from testimonial documents (content_pages docs), not these blocks. */
+/** /customers — "Track Record": hero + outcomes + agencies + customer-stories
+ *  header/empty-state + CTA. The story grid is sourced from testimonial documents
+ *  (content_pages docs) when they exist; until then the expert's record is the proof. */
 export const customers: SeedPage = {
   pageKey: 'customers',
-  title: 'Customers',
+  title: 'Track Record',
   blocks: [
     {
       section: 'hero',
       displayOrder: 0,
-      excerpt: 'Customers',
-      title: 'Trusted by *federal innovators*.',
-      body: 'Hear from the small businesses building their federal R&D pipeline with us.',
-      metadata: { accent: 'brand-500' },
+      excerpt: 'Track Record',
+      title: 'A 25-year record of *funded* outcomes.',
+      body: "We're a new platform — but the expertise behind it isn't. Eric Wagner has spent 25 years turning innovative small businesses into federally funded ones. That playbook is what RFP Pipeline delivers as software.",
+      metadata: { accent: 'award' },
     },
+
+    { section: 'outcomes', displayOrder: 1, title: 'Hundreds of $M', body: 'in SBIR, STTR, BAA & OTA funding secured', metadata: {} },
+    { section: 'outcomes', displayOrder: 2, title: '$270M', body: 'annual revenue at the A&D company Eric led', metadata: {} },
+    { section: 'outcomes', displayOrder: 3, title: '22+', body: 'startups launched through OSU commercialization', metadata: {} },
+    { section: 'outcomes', displayOrder: 4, title: 'Phase I–III', body: 'across DoD, NSF, DOE, DARPA & more', metadata: {} },
+
+    {
+      section: 'agencies',
+      displayOrder: 5,
+      excerpt: 'Funded across',
+      title: 'Agencies our expert has won with.',
+      metadata: { items: ['DoD', 'NSF', 'DOE', 'DARPA', 'DOT', 'AFWERX'] },
+    },
+
+    { section: 'testimonials-header', displayOrder: 6, title: 'From the founding cohort', metadata: {} },
+
     {
       section: 'empty',
-      displayOrder: 1,
-      title: 'Customer stories coming soon.',
-      body: 'We are onboarding our founding cohort. Check back for their stories.',
+      displayOrder: 7,
+      title: 'Founding-cohort stories are on the way.',
+      body: 'Our first customers are onboarding now. Their results will appear here as they win.',
       metadata: {},
     },
+
     {
       section: 'cta',
-      displayOrder: 2,
-      title: 'Join our founding cohort.',
-      body: 'Be among the first small businesses to build a federal R&D pipeline powered by AI.',
+      displayOrder: 8,
+      title: 'Put that track record to work for you.',
+      body: 'Apply to the founding cohort and get the same expertise behind your next proposal.',
       metadata: { ctaLabel: 'Apply Now', ctaHref: '/apply' },
     },
   ],

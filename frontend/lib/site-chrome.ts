@@ -52,8 +52,8 @@ export const DEFAULT_CHROME: SiteChrome = {
       {
         label: 'Platform',
         items: [
+          { label: 'Why RFP Pipeline', href: '/value' },
           { label: 'Features', href: '/features' },
-          { label: 'Engine', href: '/engine' },
           { label: 'How It Works', href: '/how-it-works' },
           { label: 'The Expert', href: '/the-expert' },
           { label: 'Pricing', href: '/pricing' },
@@ -75,8 +75,8 @@ export const DEFAULT_CHROME: SiteChrome = {
       {
         title: 'Platform',
         links: [
+          { label: 'Why RFP Pipeline', href: '/value' },
           { label: 'Features', href: '/features' },
-          { label: 'Engine', href: '/engine' },
           { label: 'How It Works', href: '/how-it-works' },
           { label: 'The Expert', href: '/the-expert' },
           { label: 'Pricing', href: '/pricing' },
@@ -87,13 +87,14 @@ export const DEFAULT_CHROME: SiteChrome = {
         links: [
           { label: 'About', href: '/about' },
           { label: 'Team', href: '/team' },
-          { label: 'Customers', href: '/customers' },
-          { label: 'Value', href: '/value' },
+          { label: 'Track Record', href: '/customers' },
+          { label: 'Why RFP Pipeline', href: '/value' },
         ],
       },
       {
         title: 'Resources',
         links: [
+          { label: 'Federal R&D 101', href: '/federal-rd-101' },
           { label: 'Resources', href: '/resources' },
           { label: 'Security & Data', href: '/infosec' },
         ],

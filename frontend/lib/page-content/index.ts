@@ -10,7 +10,6 @@ import { homepage } from './homepage';
 import { value } from './value';
 import { theExpert } from './theExpert';
 import { apply } from './apply';
-import { engine } from './engine';
 import { features } from './features';
 import { howItWorks } from './howItWorks';
 import { infosec } from './infosec';
@@ -18,6 +17,7 @@ import { pricing } from './pricing';
 import { team } from './team';
 import { customers } from './customers';
 import { resources } from './resources';
+import { federalRd101 } from './federal-rd-101';
 import { siteChrome } from './site-chrome';
 
 export const PAGE_SEEDS: Record<string, SeedPage> = {
@@ -26,7 +26,6 @@ export const PAGE_SEEDS: Record<string, SeedPage> = {
   [value.pageKey]: value,
   [theExpert.pageKey]: theExpert,
   [apply.pageKey]: apply,
-  [engine.pageKey]: engine,
   [features.pageKey]: features,
   [howItWorks.pageKey]: howItWorks,
   [infosec.pageKey]: infosec,
@@ -34,6 +33,7 @@ export const PAGE_SEEDS: Record<string, SeedPage> = {
   [team.pageKey]: team,
   [customers.pageKey]: customers,
   [resources.pageKey]: resources,
+  [federalRd101.pageKey]: federalRd101,
   [siteChrome.pageKey]: siteChrome,
 };
 

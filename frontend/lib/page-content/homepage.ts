@@ -19,10 +19,10 @@ export const homepage: SeedPage = {
       displayOrder: 0,
       excerpt: 'AI + Expert · From Application to Submission',
       title: 'A proposal\nengine, *not* a\nproposal\ngamble.',
-      body: 'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.',
+      body: 'Win non-dilutive federal R&D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. (SBIR, STTR, BAA, OTA.)',
       metadata: {
         primary_cta: { label: 'Apply for Founding Cohort', href: '/apply' },
-        secondary_cta: { label: 'See How It Works', href: '/value' },
+        secondary_cta: { label: 'See why it works', href: '/value' },
         note: 'Platform launches July 2026. 20 founding-cohort seats. Applications reviewed weekly.',
       },
     },
@@ -33,21 +33,25 @@ export const homepage: SeedPage = {
     { section: 'stats', displayOrder: 3, title: '20', body: 'Founding Cohort Cap' },
     { section: 'stats', displayOrder: 4, title: '25+', body: 'Years of Fed R&D Expertise' },
 
-    // Six-stages header. Title accents: brand-500 ("applicant", "submission").
+    // Value band — newcomer hook + ROI anchor.
     {
-      section: 'stages-header',
+      section: 'value-band',
       displayOrder: 5,
-      title: 'Six stages from curious *applicant* to compliant proposal *submission*.',
-      excerpt: 'Value from Day One —\nNot Six Months From Now',
+      excerpt: 'New to federal R&D?',
+      body: 'There are billions a year in non-dilutive federal R&D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply. We make it accessible.',
+      metadata: {
+        roiLabel: 'The math',
+        roi: 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $299/mo and a flat $999 / $1,999 per proposal. No success fee.',
+      },
     },
 
-    // Six stages (6). metadata.num is the step number.
-    { section: 'stages', displayOrder: 6, title: 'Apply', excerpt: 'Short application.', body: 'Company info, SAM.gov status, prior awards, tech summary. Filters tire-kickers. Nothing paid yet.', metadata: { num: '01' } },
-    { section: 'stages', displayOrder: 7, title: 'Accepted', excerpt: 'Expert reviews every one.', body: 'Personal review within 72 hours. Brief onboarding call. If you\'re a fit for the cohort, you get an invite link.', metadata: { num: '02' } },
-    { section: 'stages', displayOrder: 8, title: 'Onboard', excerpt: 'Your library goes live.', body: 'Upload capability statement, past performance, key personnel. Activate subscription. Your AI agents provisioned.', metadata: { num: '03' } },
-    { section: 'stages', displayOrder: 9, title: 'Spotlight', excerpt: 'Daily curated pipeline.', body: 'SAM.gov, SBIR.gov, Grants.gov, and agency portals ingested every day. Expert-curated matches ranked to your technology innovation areas.', metadata: { num: '04' } },
-    { section: 'stages', displayOrder: 10, title: 'Purchase Portal', excerpt: 'Pay per build.', body: 'Purchase individual Proposal Portal when you find a fit. Expert builds the compliance matrix in 72 hours. AI drafts against your library. Your team revises.', metadata: { num: '05' } },
-    { section: 'stages', displayOrder: 11, title: 'Submit & Learn', excerpt: 'The system gets smarter.', body: 'Every submission, every verified value, every debrief feeds future cycles. The AI gets more accurate — and intelligent — enabling proposal development at scale.', metadata: { num: '06' } },
+    // How-it-works teaser header (the full 6-stage journey lives on /how-it-works).
+    {
+      section: 'stages-header',
+      displayOrder: 6,
+      excerpt: 'How it works',
+      title: 'From application to submitted *proposal* — one workflow.',
+    },
 
     // Pricing hero. Title accent: citrus ("portals").
     {
@@ -105,6 +109,7 @@ export const homepage: SeedPage = {
       title: 'Apply today. Draft your *first*\nproposal on launch day.',
       metadata: {
         cta: { label: 'Apply Now', href: '/apply' },
+        secondary: { label: 'New to federal R&D? Start here', href: '/federal-rd-101' },
         footer: { role: 'Founder & Architect', name: 'Eric Wagner', email: 'eric@rfppipeline.com' },
       },
     },

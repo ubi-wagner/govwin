@@ -8,7 +8,7 @@ export const revalidate = 60;
 export const metadata = {
   title: 'RFP Pipeline — A Proposal Engine, Not a Proposal Gamble',
   description:
-    'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.',
+    'Win non-dilutive federal R&D funding without burning a month of payroll on every submission. 25 years of hands-on expertise plus isolated, company-specific AI — replacing a $5,000/mo monitoring service and a 10%-of-award consultant for $299/mo and flat per-proposal fees.',
 };
 
 export default async function LandingPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -18,8 +18,8 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   const lookup = buildLookup(blocks, 'homepage');
   const hero = single(lookup['hero']);
   const stats = many(lookup['stats']);
+  const valueBand = single(lookup['value-band']);
   const stagesHeader = single(lookup['stages-header']);
-  const stages = many(lookup['stages']);
   const pricingHero = single(lookup['pricing-hero']);
   const pricingCards = many(lookup['pricing']);
   const expertGate = single(lookup['expert-gate']);
@@ -34,13 +34,11 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
     { title: '25+', body: 'Years of Fed R&D Expertise' },
   ];
 
-  const DEFAULT_STAGES = [
-    { num: '01', title: 'Apply', subtitle: 'Short application.', body: 'Company info, SAM.gov status, prior awards, tech summary. Filters tire-kickers. Nothing paid yet.' },
-    { num: '02', title: 'Accepted', subtitle: 'Expert reviews every one.', body: 'Personal review within 72 hours. Brief onboarding call. If you\'re a fit for the cohort, you get an invite link.' },
-    { num: '03', title: 'Onboard', subtitle: 'Your library goes live.', body: 'Upload capability statement, past performance, key personnel. Activate subscription. Your AI agents provisioned.' },
-    { num: '04', title: 'Spotlight', subtitle: 'Daily curated pipeline.', body: 'SAM.gov, SBIR.gov, Grants.gov, and agency portals ingested every day. Expert-curated matches ranked to your technology innovation areas.' },
-    { num: '05', title: 'Purchase Portal', subtitle: 'Pay per build.', body: 'Purchase individual Proposal Portal when you find a fit. Expert builds the compliance matrix in 72 hours. AI drafts against your library. Your team revises.' },
-    { num: '06', title: 'Submit & Learn', subtitle: 'The system gets smarter.', body: 'Every submission, every verified value, every debrief feeds future cycles. The AI gets more accurate — and intelligent — enabling proposal development at scale.' },
+  // Condensed 3-beat teaser of the journey (the full 6 stages live on /how-it-works).
+  const HOME_HOW = [
+    { title: 'Find', body: 'Daily, expert-curated ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — ranked to your tech areas.' },
+    { title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; your team revises in a stage-gated workspace.' },
+    { title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle makes the next cheaper, faster, and more accurate.' },
   ];
 
   const DEFAULT_PRICING = [
@@ -50,7 +48,6 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   ];
 
   const resolvedStats = stats.length > 0 ? stats.map((s: ContentRow) => ({ title: s.title, body: s.body })) : DEFAULT_STATS;
-  const resolvedStages = stages.length > 0 ? stages.map((s: ContentRow) => ({ num: (s.metadata as { num?: string })?.num ?? '', title: s.title, subtitle: s.excerpt ?? '', body: s.body })) : DEFAULT_STAGES;
   const resolvedPricing = pricingCards.length > 0 ? pricingCards.map((p: ContentRow) => ({ excerpt: p.excerpt, title: p.title, body: p.body, metadata: p.metadata })) : DEFAULT_PRICING;
 
   return (
@@ -65,7 +62,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             <RichText text={hero?.title ?? 'A proposal\nengine, *not* a\nproposal\ngamble.'} accent="brand-500" />
           </h1>
           <p className="mt-8 text-xl md:text-2xl text-navy-600 font-prose italic leading-relaxed max-w-2xl">
-            {hero?.body ?? 'RFP Pipeline pairs isolated, company-specific AI with 25 years of hands-on federal R&D expertise — so small businesses can pursue SBIR, STTR, BAA, and OTA funding without burning a month of payroll on every submission.'}
+            {hero?.body ?? 'Win non-dilutive federal R&D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. (SBIR, STTR, BAA, OTA.)'}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <Link
@@ -104,26 +101,43 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
         </div>
       </section>
 
-      {/* Six stages */}
+      {/* Value band — newcomer hook + ROI anchor */}
+      <section className="bg-cream-100 border-b border-cream-200">
+        <div className="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-2 gap-8 md:gap-12 md:divide-x md:divide-cream-300">
+          <div className="md:pr-6">
+            <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-2">{valueBand?.excerpt ?? 'New to federal R&D?'}</p>
+            <p className="text-lg text-navy-700 leading-relaxed">
+              {valueBand?.body ?? 'There are billions a year in non-dilutive federal R&D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply. We make it accessible.'}
+            </p>
+            <Link href="/federal-rd-101" className="inline-flex mt-3 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">Start here &rarr;</Link>
+          </div>
+          <div className="md:pl-6">
+            <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-2">{(valueBand?.metadata as { roiLabel?: string })?.roiLabel ?? 'The math'}</p>
+            <p className="text-lg text-navy-700 leading-relaxed">
+              {(valueBand?.metadata as { roi?: string })?.roi ?? 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $299/mo and a flat $999 / $1,999 per proposal. No success fee.'}
+            </p>
+            <Link href="/pricing" className="inline-flex mt-3 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">See pricing &rarr;</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* How it works — condensed teaser (full 6-stage journey on /how-it-works) */}
       <section className="bg-white">
         <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
-          <div className="flex flex-col md:flex-row items-baseline gap-6 mb-16">
-            <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
-              <RichText text={stagesHeader?.title ?? 'Six stages from curious *applicant* to compliant proposal *submission*.'} accent="brand-500" />
-            </h2>
-            <p className="text-sm uppercase tracking-widest text-navy-400 shrink-0">
-              <RichText text={stagesHeader?.excerpt ?? 'Value from Day One —\nNot Six Months From Now'} accent="brand-500" />
-            </p>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
+            <div>
+              <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-3">{stagesHeader?.excerpt ?? 'How it works'}</p>
+              <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900">
+                <RichText text={stagesHeader?.title ?? 'From application to submitted *proposal* — one workflow.'} accent="brand-500" />
+              </h2>
+            </div>
+            <Link href="/how-it-works" className="text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors shrink-0">See the full 6-stage workflow &rarr;</Link>
           </div>
-
           <div className="grid md:grid-cols-3 gap-px bg-navy-100 border border-navy-100 rounded-xl overflow-hidden">
-            {resolvedStages.map((step) => (
-              <div key={step.num} className="bg-cream-50 p-8">
-                <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">
-                  {step.num} — {step.title}
-                </p>
-                <h3 className="font-display text-lg font-bold text-navy-900">{step.subtitle}</h3>
-                <p className="mt-3 text-sm text-navy-600 leading-relaxed">{step.body}</p>
+            {HOME_HOW.map((step, i) => (
+              <div key={i} className="bg-cream-50 p-8">
+                <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-2">{String(i + 1).padStart(2, '0')} — {step.title}</p>
+                <p className="mt-1 text-sm text-navy-600 leading-relaxed">{step.body}</p>
               </div>
             ))}
           </div>
@@ -281,12 +295,18 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
           <h2 className="font-display text-3xl md:text-5xl font-black text-white leading-tight">
             <RichText text={cta?.title ?? 'Apply today. Draft your *first*\nproposal on launch day.'} accent="citrus" />
           </h2>
-          <div className="mt-10">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href={(cta?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'}
               className="inline-flex items-center justify-center px-10 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg shadow-lg transition-all hover:shadow-xl"
             >
               {(cta?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Apply Now'}
+            </Link>
+            <Link
+              href={(cta?.metadata as { secondary?: { href?: string } })?.secondary?.href ?? '/federal-rd-101'}
+              className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-600 hover:border-brand-400 text-navy-200 hover:text-white text-lg font-semibold rounded-lg transition-colors"
+            >
+              {(cta?.metadata as { secondary?: { label?: string } })?.secondary?.label ?? 'New to federal R&D? Start here'}
             </Link>
           </div>
           <div className="mt-8 flex items-center justify-center gap-6 text-sm text-navy-400">

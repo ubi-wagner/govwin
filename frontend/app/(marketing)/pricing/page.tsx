@@ -9,6 +9,7 @@ import {
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
+import { ValueComparison } from '@/components/marketing/value-comparison';
 
 export const revalidate = 60;
 
@@ -60,7 +61,7 @@ const proposalTiers: PricingTierProps[] = [
     name: 'Proposal Portal — Phase II',
     price: '$1,999',
     period: 'per proposal',
-    description: 'Phase II-equivalent effort. SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
+    description: 'An exponentially bigger proposal for only $1,000 more — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
     features: [
       'Everything in Phase I tier',
       'Extended compliance matrix for longer-form proposals',
@@ -177,11 +178,18 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         note={(hero?.metadata as { note?: string })?.note ?? "$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
       />
 
+      <ValueComparison
+        eyebrow="Before you compare our tiers"
+        title="What this replaces — and what it really costs."
+        subtitle="The status quo for chasing federal R&D: a monitoring service, a consultant who takes a cut of your award, a BD hire, or your own nights. Here's the same job, re-priced."
+        cta={null}
+      />
+
       <Section variant="white">
         <SectionHeader
-          eyebrow={subscriptionHeader?.excerpt ?? "Required Subscription"}
+          eyebrow={subscriptionHeader?.excerpt ?? "Start with Spotlight"}
           title={subscriptionHeader?.title ?? "Spotlight: the foundation of everything"}
-          subtitle={(subscriptionHeader?.metadata as { subtitle?: string })?.subtitle ?? "Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers."}
+          subtitle={(subscriptionHeader?.metadata as { subtitle?: string })?.subtitle ?? "Spotlight is your daily federal R&D intelligence feed. Proposal Portals build on it — so they're available to active Spotlight subscribers."}
         />
         <div className="mt-12 max-w-md mx-auto">
           <PricingTier {...subscription} />
@@ -205,7 +213,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         <SectionHeader
           eyebrow={expertHeader?.excerpt ?? "Expert Access"}
           title={expertHeader?.title ?? "Eric is available when you need him"}
-          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "Monthly minutes included. Additional time on demand."}
+          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {resolvedExpertTiers.map((tier) => (
@@ -256,8 +264,8 @@ const faqs = [
     a: 'Phase I is for shorter-form proposals (typically 10-20 pages technical volume, <$250K funding). Phase II is for longer-form proposals (20-50+ pages, $1M+ funding, commercialization plans). If you\'re unsure which tier fits your opportunity, use your monthly Ask-the-Expert time to check.',
   },
   {
-    q: 'Can I upgrade a Phase I portal to Phase II?',
-    a: 'Yes. If a purchased Phase I portal becomes a Phase II effort, the $1,000 difference is credited toward the upgrade. No work is lost.',
+    q: 'Phase II costs only $1,000 more than Phase I — what makes it worth it?',
+    a: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal (there is no upgrade credit between them) — so you get a large step up in scope for a small step up in price, and never a success fee taking a cut of your win.',
   },
   {
     q: 'What happens to my data if I cancel?',

@@ -37,9 +37,9 @@ export const pricing: SeedPage = {
     {
       section: 'subscription-header',
       displayOrder: 1,
-      excerpt: 'Required Subscription',
+      excerpt: 'Start with Spotlight',
       title: 'Spotlight: the foundation of everything',
-      metadata: { subtitle: 'Every customer subscribes. Proposal Portals are only available to active Spotlight subscribers.' },
+      metadata: { subtitle: 'Spotlight is your daily federal R&D intelligence feed. Proposal Portals build on it — so they\'re available to active Spotlight subscribers.' },
     },
 
     // Spotlight subscription tier.
@@ -102,7 +102,7 @@ export const pricing: SeedPage = {
       section: 'proposals',
       displayOrder: 5,
       title: 'Proposal Portal — Phase II',
-      body: 'Phase II-equivalent effort. SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
+      body: 'An exponentially bigger proposal for only $1,000 more — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
       metadata: {
         price: '$1,999',
         period: 'per proposal',
@@ -127,7 +127,7 @@ export const pricing: SeedPage = {
       displayOrder: 6,
       excerpt: 'Expert Access',
       title: 'Eric is available when you need him',
-      metadata: { subtitle: 'Monthly minutes included. Additional time on demand.' },
+      metadata: { subtitle: 'The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand.' },
     },
 
     // Expert-access tiers (2): Ask the Expert + Expert Consulting.
@@ -205,8 +205,8 @@ export const pricing: SeedPage = {
     {
       section: 'faqs',
       displayOrder: 13,
-      title: 'Can I upgrade a Phase I portal to Phase II?',
-      body: 'Yes. If a purchased Phase I portal becomes a Phase II effort, the $1,000 difference is credited toward the upgrade. No work is lost.',
+      title: 'Phase II costs only $1,000 more than Phase I — what makes it worth it?',
+      body: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal (there is no upgrade credit between them) — so you get a large step up in scope for a small step up in price, and never a success fee taking a cut of your win.',
     },
     {
       section: 'faqs',
