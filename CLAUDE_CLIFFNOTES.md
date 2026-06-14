@@ -709,6 +709,23 @@ migration number each time** (`063` → `064` → …). For ordinary content cha
 editor's per-page **Publish** (`publishPage` in `lib/content-admin.ts`), which versions
 content in the DB and needs no migration.
 
+### Mistake 24: Push/scoring operated on the primary opp only (topics never reached customers)
+`solicitation.push` flipped `is_active` on **only** `cs.opportunity_id`, and
+`score_tenants.match_tenants` scored only that one opportunity. So a multi-topic DoD
+BAA (e.g. 65 DSIP topics, each its own `opportunities` row with `solicitation_id`)
+got pushed once and **zero topics reached customers' Spotlight**. Fixed (M1): push
+activates, and scoring scores, the whole **topic SET** = `opportunities WHERE
+solicitation_id = cs.id OR id = cs.opportunity_id` (scoring additionally filters
+`is_active AND close_date future`); one `tenant_pipeline_items` upsert per
+(tenant, opportunity).
+
+**Rule:** anything that "acts on a solicitation's opportunities" (activation,
+scoring, spotlight reads, counts) must operate on the topic SET, never just
+`cs.opportunity_id`. Also: `finder:topic.updated` has two emitters with different
+payloads (`app/api/admin/topics/[id]/route.ts` → `topicId`/`changes`;
+`opportunity.update_topic` → `opportunityId`/`changedFields`) — reconcile to one
+canonical shape.
+
 ---
 
 ## 5. Project Architecture Quick Reference

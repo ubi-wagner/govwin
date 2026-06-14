@@ -89,7 +89,15 @@ file) → **D. Test** (integration / end-to-end on local pg + stub) → **E. Ref
 
 ---
 
-# MILESTONE 1 — Multi-topic output hop (KEYSTONE)  ⬜
+# MILESTONE 1 — Multi-topic output hop (KEYSTONE)  ✅ DONE (2026-06-14)
+
+> **Status:** T1.1 push (`42b7087`), T1.2 scoring (`f41526d`), T1.3 update_topic
+> (`8651aa0`) committed + pushed. T1.4 = per-topic cards already render (confirmed);
+> grouping-under-parent deferred (needs `components/portal/spotlight-feed.tsx`, out of
+> the task's write-set). SQL e2e on local pg: activate=4, scoring-set=3 (closed topic
+> excluded), single-topic=1 (no regression); tsc clean; pipeline syntax/import OK.
+> Deferred to HITL/refine: Spotlight grouping; reconcile the `finder:topic.updated`
+> payload (`topicId`+`changes` vs `opportunityId`+`changedFields`).
 
 **Why first:** until this lands, a perfectly ingested 65-topic BAA reaches **zero**
 customers — `solicitation.push` activates only the primary opportunity and
