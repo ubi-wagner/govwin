@@ -45,6 +45,7 @@ import { ingestGetRunDetailTool } from './ingest-get-run-detail';
 // Phase 1 §E extension: topics under a solicitation (post-migration 013)
 import { opportunityAddTopicTool } from './opportunity-add-topic';
 import { opportunityBulkAddTopicsTool } from './opportunity-bulk-add-topics';
+import { opportunityUpdateTopicTool } from './opportunity-update-topic';
 // Phase 1 §E extension: volumes + required items (post-migration 012/014)
 import { volumeAddTool } from './volume-add';
 import { volumeDeleteTool } from './volume-delete';
@@ -85,6 +86,7 @@ register(ingestListRecentRunsTool);
 register(ingestGetRunDetailTool);
 register(opportunityAddTopicTool);
 register(opportunityBulkAddTopicsTool);
+register(opportunityUpdateTopicTool);
 register(volumeAddTool);
 register(volumeDeleteTool);
 register(volumeAddRequiredItemTool);
