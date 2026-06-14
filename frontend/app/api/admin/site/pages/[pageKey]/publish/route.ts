@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin-auth';
 import { publishPage } from '@/lib/content-admin';
+import { SEED_PAGE_KEYS } from '@/lib/page-content';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
-// page_key → public path for ISR revalidation.
+// page_key → public path for ISR revalidation (most are /{pageKey}).
 const PAGE_PATHS: Record<string, string> = {
   homepage: '/',
   about: '/about',
@@ -13,21 +14,22 @@ const PAGE_PATHS: Record<string, string> = {
   value: '/value',
   pricing: '/pricing',
   'how-it-works': '/how-it-works',
-  engine: '/engine',
   'the-expert': '/the-expert',
-  security: '/infosec',
   infosec: '/infosec',
   apply: '/apply',
-  'get-started': '/pricing',
   resources: '/resources',
   team: '/team',
   customers: '/customers',
+  'federal-rd-101': '/federal-rd-101',
 };
 
 export async function POST(req: Request, { params }: { params: Promise<{ pageKey: string }> }) {
   const a = await requireAdmin();
   if (!a.ok) return a.res;
   const { pageKey } = await params;
+  if (!SEED_PAGE_KEYS.includes(pageKey)) {
+    return NextResponse.json({ error: 'Unknown page', code: 'NOT_FOUND' }, { status: 404 });
+  }
 
   let note = '';
   try {

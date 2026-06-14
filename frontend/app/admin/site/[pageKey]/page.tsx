@@ -1,11 +1,15 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ensurePageSeeded, getPage, type PageVersion } from '@/lib/content-admin';
+import { SEED_PAGE_KEYS } from '@/lib/page-content';
 import EditorClient from './editor-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PageEditorPage({ params }: { params: Promise<{ pageKey: string }> }) {
   const { pageKey } = await params;
+  // Only registry pages are editable; bounce junk/deprecated keys back to the list.
+  if (!SEED_PAGE_KEYS.includes(pageKey)) redirect('/admin/site');
   let active: PageVersion | null = null;
   let draft: PageVersion | null = null;
   try {
