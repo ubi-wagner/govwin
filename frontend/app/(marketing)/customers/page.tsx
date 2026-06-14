@@ -48,12 +48,12 @@ export default async function TrackRecordPage() {
       </section>
 
       {/* Outcomes */}
-      <section className="bg-navy-900 border-y border-navy-800">
+      <section className="bg-cream-100 border-y border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 gap-8">
           {resolvedOutcomes.map((o, i) => (
             <div key={i}>
-              <div className="font-display text-3xl md:text-4xl font-black text-white">{o.title}</div>
-              <div className="mt-2 text-xs text-navy-400 uppercase tracking-widest leading-relaxed">{o.body}</div>
+              <div className="font-display text-3xl md:text-4xl font-black text-brand-600">{o.title}</div>
+              <div className="mt-2 text-xs text-navy-500 uppercase tracking-widest leading-relaxed">{o.body}</div>
             </div>
           ))}
         </div>
@@ -117,10 +117,10 @@ export default async function TrackRecordPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-navy-900">
+      <section className="bg-cream-100 border-t border-cream-200">
         <div className="max-w-4xl mx-auto px-6 py-16 text-center">
-          <h2 className="font-display text-2xl md:text-3xl font-bold text-white">{cta?.title ?? 'Put that track record to work for you.'}</h2>
-          <p className="mt-3 text-navy-300 max-w-xl mx-auto">{cta?.body ?? 'Apply to the founding cohort and get the same expertise behind your next proposal.'}</p>
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-navy-900">{cta?.title ?? 'Put that track record to work for you.'}</h2>
+          <p className="mt-3 text-navy-600 max-w-xl mx-auto">{cta?.body ?? 'Apply to the founding cohort and get the same expertise behind your next proposal.'}</p>
           <Link href={ctaMeta.ctaHref ?? '/apply'} className="inline-flex mt-6 px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-lg transition-colors">
             {ctaMeta.ctaLabel ?? 'Apply Now'}
           </Link>

@@ -129,22 +129,22 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
       </section>
 
       {/* The flywheel — compounding gain */}
-      <section className="bg-navy-900 border-t border-navy-800">
+      <section className="bg-cream-50 border-t border-cream-200">
         <div className="max-w-6xl mx-auto px-6 py-20 md:py-28">
           <div className="grid md:grid-cols-[auto_1fr] gap-12 items-center">
             <div className="flex justify-center">
               <FlywheelRing className="w-64 md:w-72" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">{flywheelHeader?.excerpt ?? 'The compounding advantage'}</p>
-              <h2 className="font-display text-3xl md:text-4xl font-black text-white leading-tight">
-                <RichText text={flywheelHeader?.title ?? 'Every cycle gets *cheaper*, faster, and better.'} accent={(flywheelHeader?.metadata as { accent?: string })?.accent ?? 'citrus'} />
+              <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-4">{flywheelHeader?.excerpt ?? 'The compounding advantage'}</p>
+              <h2 className="font-display text-3xl md:text-4xl font-black text-navy-900 leading-tight">
+                <RichText text={flywheelHeader?.title ?? 'Every cycle gets *cheaper*, faster, and better.'} accent={(flywheelHeader?.metadata as { accent?: string })?.accent ?? 'brand-500'} />
               </h2>
               <div className="mt-8 grid sm:grid-cols-3 gap-6">
                 {resolvedFlywheel.map((f, i) => (
                   <div key={i}>
-                    <h3 className="font-display text-base font-bold text-cream">{f.title}</h3>
-                    <p className="mt-1.5 text-sm text-navy-300 leading-relaxed">{f.body}</p>
+                    <h3 className="font-display text-base font-bold text-navy-900">{f.title}</h3>
+                    <p className="mt-1.5 text-sm text-navy-600 leading-relaxed">{f.body}</p>
                   </div>
                 ))}
               </div>
@@ -194,20 +194,20 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
       </section>
 
       {/* CTA */}
-      <section className="bg-navy-900">
+      <section className="bg-cream-100 border-t border-cream-200">
         <div className="max-w-4xl mx-auto px-6 py-24 text-center">
-          <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">{cta?.excerpt ?? 'Applications open · Founding cohort'}</p>
-          <h2 className="font-display text-3xl md:text-5xl font-black text-white leading-tight">
+          <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-4">{cta?.excerpt ?? 'Applications open · Founding cohort'}</p>
+          <h2 className="font-display text-3xl md:text-5xl font-black text-navy-900 leading-tight">
             {cta?.title ?? 'Make federal R&D your next non-dilutive raise.'}
           </h2>
-          <p className="mt-4 text-lg text-navy-300 max-w-2xl mx-auto">
+          <p className="mt-4 text-lg text-navy-600 max-w-2xl mx-auto">
             {cta?.body ?? 'Apply to the founding cohort. Eric reviews every application within 72 hours.'}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link href={(cta?.metadata as { cta?: { href?: string } })?.cta?.href ?? '/apply'} className="inline-flex items-center justify-center px-10 py-4 bg-brand-500 hover:bg-brand-600 text-white text-lg font-bold rounded-lg shadow-lg transition-all hover:shadow-xl">
               {(cta?.metadata as { cta?: { label?: string } })?.cta?.label ?? 'Apply to the Founding Cohort'}
             </Link>
-            <Link href={(cta?.metadata as { secondary?: { href?: string } })?.secondary?.href ?? '/how-it-works'} className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-600 hover:border-brand-400 text-navy-200 hover:text-white text-lg font-semibold rounded-lg transition-colors">
+            <Link href={(cta?.metadata as { secondary?: { href?: string } })?.secondary?.href ?? '/how-it-works'} className="inline-flex items-center justify-center px-8 py-4 border-2 border-navy-200 hover:border-brand-400 text-navy-700 hover:text-brand-700 text-lg font-semibold rounded-lg transition-colors">
               {(cta?.metadata as { secondary?: { label?: string } })?.secondary?.label ?? 'See how it works'}
             </Link>
           </div>
