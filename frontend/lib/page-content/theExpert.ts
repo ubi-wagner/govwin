@@ -18,7 +18,7 @@ export const theExpert: SeedPage = {
       displayOrder: 0,
       excerpt: 'Your Expert',
       title: 'Eric Wagner',
-      body: 'Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $300M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups.',
+      body: 'Founder and CEO of RFP Pipeline. 25+ years in technology commercialization. Hundreds of millions in SBIR, STTR, BAA, and OTA funding secured. Former president of a $270M aerospace & defense company. Ohio State commercialization veteran who launched 22+ startups.',
       metadata: {},
     },
     {
