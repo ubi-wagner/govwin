@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { PageVersion, PageBlock } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { MarketingIcon, ICON_CATALOG } from '@/components/marketing/icons';
 
 function shortActor(s: string | null): string {
   return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
@@ -11,6 +12,28 @@ function fmtWhen(d: Date | string | null): string {
   if (!d) return '—';
   const dt = new Date(d);
   return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Read/write the line-art icon name from a block's metadata JSON, leaving any
+// other metadata keys untouched.
+function metaIcon(metaText: string): string {
+  try {
+    const m = JSON.parse(metaText || '{}') as { icon?: unknown };
+    return typeof m.icon === 'string' ? m.icon : '';
+  } catch {
+    return '';
+  }
+}
+function withIcon(metaText: string, icon: string): string {
+  let m: Record<string, unknown> = {};
+  try {
+    m = metaText.trim() ? JSON.parse(metaText) : {};
+  } catch {
+    m = {};
+  }
+  if (icon) m.icon = icon;
+  else delete m.icon;
+  return JSON.stringify(m, null, 2);
 }
 
 interface EditBlock {
@@ -221,6 +244,26 @@ export default function EditorClient({
               onChange={(url) => update(i, { featuredImage: url })}
               placeholder="Image URL (optional), or upload →"
             />
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-gray-200 bg-gray-50 text-brand-600">
+                <MarketingIcon name={metaIcon(b.metaText)} className="h-6 w-6" />
+              </span>
+              <select
+                className="flex-1 border rounded px-2 py-1.5 text-sm bg-white"
+                value={metaIcon(b.metaText)}
+                onChange={(e) => update(i, { metaText: withIcon(b.metaText, e.target.value) })}
+                title="Line-art icon for this card / bucket"
+              >
+                <option value="">— no icon —</option>
+                {ICON_CATALOG.map((g) => (
+                  <optgroup key={g.category} label={g.category}>
+                    {g.names.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
             <textarea
               className="w-full border rounded px-2 py-1 text-xs font-mono"
               rows={3}
