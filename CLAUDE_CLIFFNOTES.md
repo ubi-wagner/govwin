@@ -693,6 +693,22 @@ Jobs signal failure by raising, never by returning a success envelope with an er
 field. RLS is ENABLED with ZERO policies — tenant isolation rests entirely on explicit
 `WHERE tenant_id = $1` in every query (NOT on RLS, despite CLAUDE.md's claim).
 
+### Mistake 23: Re-editing an applied migration won't re-run (prod icons missing, Jun 2026)
+`db/migrations/migrate.mjs` keys applied migrations by **filename** in `_migration_history`
+and runs each **once** — it records a checksum but never re-runs on change. Migration `063`
+(publish the `content_pages` baseline from the in-code registry) ran on the PR #172 deploy
+with the pre-icon registry. Re-editing `063` to add `metadata.icon` (PR #173) was then
+**silently skipped** on the next deploy, so the live `content_pages` rows kept the old
+content and the new icons never appeared — the deployed code renders registry icons only on
+pages with NO db row. Fixed by adding migration `064` (fresh filename) to re-publish the
+current registry.
+
+**Rule:** Never edit a migration that may already be applied — the runner skips it by
+filename. Any **bulk content baseline** that must auto-apply on deploy needs a **NEW
+migration number each time** (`063` → `064` → …). For ordinary content changes use the admin
+editor's per-page **Publish** (`publishPage` in `lib/content-admin.ts`), which versions
+content in the DB and needs no migration.
+
 ---
 
 ## 5. Project Architecture Quick Reference
