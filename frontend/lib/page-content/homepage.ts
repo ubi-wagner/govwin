@@ -53,6 +53,11 @@ export const homepage: SeedPage = {
       title: 'From application to submitted *proposal* — one workflow.',
     },
 
+    // Condensed 3-beat how-teaser (editable; the full 6 stages live on /how-it-works).
+    { section: 'how', displayOrder: 0, title: 'Find', body: 'Daily, expert-curated ingestion across SAM.gov, SBIR.gov, Grants.gov, and agency portals — ranked to your tech areas.', metadata: {} },
+    { section: 'how', displayOrder: 1, title: 'Build', body: 'Buy a portal when you find a fit. Your isolated AI drafts against your library; your team revises in a stage-gated workspace.', metadata: {} },
+    { section: 'how', displayOrder: 2, title: 'Submit & improve', body: 'Export a compliant, submission-ready package. Every cycle makes the next cheaper, faster, and more accurate.', metadata: {} },
+
     // Pricing hero. Title accent: citrus ("portals").
     {
       section: 'pricing-hero',

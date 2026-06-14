@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
-import { ValueComparison } from '@/components/marketing/value-comparison';
+import { ValueComparison, rowsFromBlocks } from '@/components/marketing/value-comparison';
 import { ModelDiagram, FlywheelRing } from '@/components/marketing/diagrams';
 
 export const revalidate = 60;
@@ -95,6 +95,7 @@ export default async function WhyPage({ searchParams }: { searchParams: Promise<
         eyebrow={comparison?.excerpt ?? cmeta.eyebrow ?? 'The cost of the old way'}
         title={comparison?.title ?? 'What you pay today vs. what you pay us.'}
         subtitle={comparison?.body ?? 'Small businesses chase federal R&D the expensive way: a monitoring service, a consultant who takes a cut, a BD hire, or the founder’s own nights. Here’s the same job, re-priced.'}
+        rows={rowsFromBlocks(blocks)}
         cta={{ label: 'See full pricing', href: '/pricing' }}
       />
 

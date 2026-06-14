@@ -9,7 +9,7 @@ import {
 import { getPageBlocks, buildLookup, single, many, type ContentRow } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
-import { ValueComparison } from '@/components/marketing/value-comparison';
+import { ValueComparison, rowsFromBlocks } from '@/components/marketing/value-comparison';
 
 export const revalidate = 60;
 
@@ -143,6 +143,8 @@ export default async function Page(props: { searchParams: Promise<Record<string,
   const isPreview = searchParams?._preview === '1';
   const blocks = await getPageBlocks('pricing', isPreview);
   const lookup = buildLookup(blocks, 'pricing');
+  // Cost-comparison rows are edited in one place (/value) and shared here.
+  const comparisonRows = rowsFromBlocks(await getPageBlocks('value'));
   const hero = single(lookup['hero']);
   const subscriptionHeader = single(lookup['subscription-header']);
   const subscriptionBlock = single(lookup['subscription']);
@@ -182,6 +184,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         eyebrow="Before you compare our tiers"
         title="What this replaces — and what it really costs."
         subtitle="The status quo for chasing federal R&D: a monitoring service, a consultant who takes a cut of your award, a BD hire, or your own nights. Here's the same job, re-priced."
+        rows={comparisonRows}
         cta={null}
       />
 
