@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
           </p>
           <div className="mt-6 p-4 bg-navy-800/50 border border-navy-600 rounded-lg">
             <p className="text-sm text-gray-300">
-              <strong className="text-white">{(hero?.metadata as { before_you_apply_label?: string })?.before_you_apply_label ?? 'Before you apply:'}</strong>{(hero?.metadata as { before_you_apply?: string })?.before_you_apply ?? ' This is a paid service ($299/month after acceptance). There is no free trial. If accepted, you’ll be invited to onboard, register your admin, upload foundational company documents, and activate your subscription via Stripe.'}
+              <strong className="text-white">{(hero?.metadata as { before_you_apply_label?: string })?.before_you_apply_label ?? 'Before you apply:'}</strong>{(hero?.metadata as { before_you_apply?: string })?.before_you_apply ?? ' This is a paid service ($299/month after acceptance). There is no free trial. If accepted, you’ll be invited to onboard, register your admin, upload foundational company documents, and activate your subscription via Stripe.'}
             </p>
           </div>
         </div>
