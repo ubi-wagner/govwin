@@ -65,6 +65,17 @@ One row per page **version**:
 
 `cms_content` is retained **read-only** during transition, then retired; `cms_posts` content usage is deprecated.
 
+**Getting content to prod (two paths):**
+- **Per-page edits** → the admin editor's Save/Publish (below). The normal path; it versions
+  each page in the DB and needs no deploy.
+- **Bulk baseline** (seed/replace the live rows from the in-code registry `frontend/lib/page-content`)
+  → a SQL migration that archives all `active`+`draft` `page` rows and re-inserts the registry
+  as fresh `active` versions (e.g. `063_publish_launch_baseline.sql`, then
+  `064_republish_launch_baseline.sql`). The runner (`db/migrations/migrate.mjs`) is
+  **filename-keyed and applies each migration once** — re-editing an already-applied baseline
+  migration is **silently skipped** on the next deploy, so every baseline refresh needs a
+  **NEW migration number**. (See CLAUDE_CLIFFNOTES "Mistake 23".)
+
 ---
 
 ## 3. Editor (Frontend, isolated)

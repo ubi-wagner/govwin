@@ -37,6 +37,11 @@ class IngestResult:
     skipped: int = 0
     failed: int = 0
     pages_fetched: int = 0
+    # Detection rollup (C2.a): NEW triage rows actually created this run, the
+    # subset that are topics (topic_number present), and up to 5 sample titles.
+    new_solicitations: int = 0
+    new_topics: int = 0
+    sample_titles: list[str] = field(default_factory=list)
     last_cursor: Optional[str] = None
     errors: list[str] = field(default_factory=list)
     started_at: Optional[datetime] = None
@@ -115,12 +120,16 @@ class BaseIngester(ABC):
         conn: asyncpg.Connection,
         opp_id: Any,
         row: dict[str, Any],
-    ) -> None:
+    ) -> bool:
         """Auto-create a curated_solicitations row for the admin triage queue.
 
         Every newly-ingested opportunity gets a triage row at status='new'
         so admins see it immediately in /admin/rfp-curation. Namespace is
         computed from the opportunity's agency/office/program_type.
+
+        Returns True only when a NEW triage row was actually inserted (the
+        WHERE NOT EXISTS guard / a failure both yield False) so the caller
+        can count detected solicitations for the rollup event (C2.a).
         """
         from shredder.namespace import compute_namespace_key
 
@@ -133,7 +142,7 @@ class BaseIngester(ABC):
         description = (row.get("description") or "")[:50000]
 
         try:
-            await conn.execute(
+            status = await conn.execute(
                 """
                 INSERT INTO curated_solicitations
                   (opportunity_id, namespace, status, full_text)
@@ -146,12 +155,16 @@ class BaseIngester(ABC):
                 namespace,
                 description or None,
             )
+            # asyncpg returns a command tag like "INSERT 0 1"; the trailing
+            # number is the affected row count (0 when WHERE NOT EXISTS skipped).
+            return bool(status) and status.rsplit(" ", 1)[-1] != "0"
         except Exception as e:
             # Don't fail the ingest if the triage row fails — just log.
             # The UNIQUE on (opportunity_id) means this is safe on re-runs.
             self.log.warning(
                 "failed to create triage row for opp %s: %s", opp_id, e
             )
+            return False
 
     async def _emit_event(
         self,
@@ -293,9 +306,18 @@ class BaseIngester(ABC):
                                 # Auto-create curated_solicitations
                                 # row so the opportunity appears in
                                 # the admin triage queue immediately.
-                                await self._create_triage_row(
+                                created_triage = await self._create_triage_row(
                                     conn, opp_id, row
                                 )
+                                # Detection rollup bookkeeping (C2.a): only
+                                # count rows that produced a NEW triage entry.
+                                if created_triage:
+                                    result.new_solicitations += 1
+                                    if row.get("topic_number"):
+                                        result.new_topics += 1
+                                    title = row.get("title")
+                                    if title and len(result.sample_titles) < 5:
+                                        result.sample_titles.append(title)
                                 await self._emit_event(
                                     conn,
                                     "finder",
@@ -351,6 +373,26 @@ class BaseIngester(ABC):
         }
         if result.errors:
             end_payload["errors"] = result.errors[:5]
+
+        # Detection rollup (C2.a): exactly ONE finder:opportunities.detected
+        # :single event per run that created >=1 NEW triage row, so the
+        # alerting workflow can fire once. No new triage rows → no event.
+        if result.new_solicitations > 0:
+            await self._emit_event(
+                conn,
+                "finder",
+                "opportunities.detected",
+                {
+                    "source": self.source,
+                    "runId": start_event_id,
+                    "newSolicitations": result.new_solicitations,
+                    "newTopics": result.new_topics,
+                    "sampleTitles": result.sample_titles[:5],
+                },
+                phase="single",
+                parent_event_id=start_event_id,
+            )
+
         await self._emit_event(
             conn,
             "finder",

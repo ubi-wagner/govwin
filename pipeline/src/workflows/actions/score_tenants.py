@@ -18,13 +18,28 @@ INPUTS:
         - solicitation_id: str — curated_solicitations.id (UUID string)
         - topic_count: Optional[int] — number of topics (informational only)
 
+SCORING SET (C1.b):
+        Scores EVERY active opportunity belonging to the solicitation, not
+        just the landing opportunity. The set is all opportunities where
+        (o.solicitation_id = cs.id OR o.id = cs.opportunity_id) that are
+        active and not past close. For a single-topic solicitation this is
+        exactly one opportunity (the landing opp == its own topic), so the
+        behavior is identical to before. For a multi-topic solicitation
+        every open topic is scored. One tenant_pipeline_items row is
+        upserted per (tenant, opportunity) clearing the threshold.
+
 OUTPUTS:
-        - tenantIds: list[str] — tenant UUIDs scoring >= 50 (notification
-          threshold)
-        - tenantsScored: int — total tenants that passed min_surface_score
-        - tenantsNotified: int — count of tenantIds (above notification
-          threshold)
-        - avgScore: float — average score across all scored tenants
+        - tenantIds: list[str] — distinct tenant UUIDs scoring >= 50 on at
+          least one opportunity in the set (notification threshold)
+        - opportunitiesScored: int — number of opportunities in the scoring
+          set that were processed
+        - tenantsScored: int — total (tenant, opportunity) pairs that passed
+          min_surface_score (aggregated across the set)
+        - tenantsNotified: int — count of distinct tenantIds above the
+          notification threshold
+        - upserts: int — number of tenant_pipeline_items rows written
+          (one per qualifying (tenant, opportunity) pair)
+        - avgScore: float — average score across all scored pairs
 
 ERROR HANDLING:
     - Solicitation not found: Returns status="skipped" immediately
@@ -79,14 +94,16 @@ async def match_tenants(
     solicitation_id: str,
     topic_count: Optional[int] = None,
 ) -> dict[str, Any]:
-    """Score a solicitation against all eligible tenants.
+    """Score every active opportunity under a solicitation against all tenants.
 
-    For each tenant with an active finder subscription:
+    Builds the scoring set (all active, not-past-close opportunities for the
+    solicitation) and, for each opportunity × each tenant with an active
+    finder subscription:
       1. Load tenant profile (naics_codes, tech_focus_areas, agency_preferences)
-      2. Load solicitation metadata (naics_codes, tech_focus_areas, agency)
+      2. Load opportunity metadata (naics_codes, tech_focus_areas, agency)
       3. Compute multi-factor match score (NAICS overlap, tech focus overlap,
          agency preference, close date proximity)
-      4. Write/update tenant_pipeline_items row with score
+      4. Write/update the tenant_pipeline_items row for (tenant, opportunity)
       5. Collect tenant IDs above threshold for notification
 
     Args:
@@ -96,9 +113,11 @@ async def match_tenants(
 
     Returns:
         {
-            "tenantIds": ["uuid1", "uuid2", ...],  # tenants above notification threshold
-            "tenantsScored": 5,
-            "tenantsNotified": 2,
+            "tenantIds": ["uuid1", "uuid2", ...],  # distinct tenants above threshold
+            "opportunitiesScored": 3,              # opps in the scoring set
+            "tenantsScored": 6,                    # (tenant, opp) pairs scored
+            "tenantsNotified": 2,                  # distinct tenants notified
+            "upserts": 6,                          # pipeline rows written
             "avgScore": 0.73,
         }
     """
@@ -118,22 +137,32 @@ async def match_tenants(
     except Exception as exc:
         log.error("match_tenants: failed to emit start event: %s", exc)
 
-    # 1. Fetch the solicitation + opportunity metadata
+    # 1. Fetch the SCORING SET (C1.b): every opportunity belonging to the
+    #    solicitation that is active and not past close. The set is the
+    #    solicitation's topics (o.solicitation_id = cs.id) PLUS the landing
+    #    opportunity (o.id = cs.opportunity_id), which may itself be a real
+    #    opp. For a single-topic solicitation this resolves to exactly one
+    #    opportunity, preserving the prior behavior.
     #    Note: opportunities table has no 'keywords' column; use
     #    tech_focus_areas (added in migration 013) instead.
     try:
-        sol = await conn.fetchrow(
-            """SELECT cs.id, cs.opportunity_id, o.naics_codes, o.agency,
-                      o.program_type, o.set_aside_type, o.close_date,
-                      o.title, o.tech_focus_areas, o.description
+        scoring_set = await conn.fetch(
+            """SELECT DISTINCT ON (o.id)
+                      cs.id AS solicitation_id, o.id AS opportunity_id,
+                      o.naics_codes, o.agency, o.program_type,
+                      o.set_aside_type, o.close_date, o.title,
+                      o.tech_focus_areas, o.description
                FROM curated_solicitations cs
-               JOIN opportunities o ON o.id = cs.opportunity_id
+               JOIN opportunities o
+                 ON (o.solicitation_id = cs.id OR o.id = cs.opportunity_id)
                WHERE cs.id = $1
-                 AND (o.close_date IS NULL OR o.close_date > now())""",
+                 AND o.is_active = true
+                 AND (o.close_date IS NULL OR o.close_date > now())
+               ORDER BY o.id""",
             sol_uuid,
         )
     except Exception as exc:
-        log.error("match_tenants: failed to fetch solicitation %s: %s", solicitation_id, exc)
+        log.error("match_tenants: failed to fetch scoring set for %s: %s", solicitation_id, exc)
         duration_ms = int((time.monotonic() - start_ms) * 1000)
         try:
             await emit_event(conn, namespace="finder", type="scoring.completed", phase="end",
@@ -145,10 +174,10 @@ async def match_tenants(
             pass
         return {"status": "error", "reason": f"db_error: {exc}"}
 
-    if sol is None:
+    if not scoring_set:
+        # No active, not-past-close opportunity in the set (e.g. unknown
+        # solicitation, or every topic closed/inactive). Nothing to score.
         return {"status": "skipped", "reason": "solicitation_not_found"}
-
-    opportunity_id = sol["opportunity_id"]
 
     # 2. Fetch all eligible tenants with profiles
     try:
@@ -178,91 +207,110 @@ async def match_tenants(
     if not profiles:
         return {
             "tenantIds": [],
+            "opportunitiesScored": len(scoring_set),
             "tenantsScored": 0,
             "tenantsNotified": 0,
+            "upserts": 0,
             "avgScore": 0,
         }
 
-    # 3. Score each tenant and upsert pipeline items
+    # 3. Score each (opportunity, tenant) pair and upsert pipeline items.
+    #    Outer loop = the scoring set (every active topic / landing opp);
+    #    inner loop = eligible tenants. Counts aggregate across the set.
     notification_threshold = 50
-    tenant_ids_above_threshold: list[str] = []
+    tenant_ids_above_threshold: set[str] = set()
     total_score_sum = 0
-    tenants_scored = 0
-    tenants_errored = 0
+    tenants_scored = 0          # (tenant, opportunity) pairs above min surface
+    upserts = 0                 # pipeline rows written
+    pairs_errored = 0
 
-    for profile in profiles:
-        try:
-            scores = _calculate_match_scores(sol, profile)
-            total_score = scores["total_score"]
+    for opp in scoring_set:
+        opportunity_id = opp["opportunity_id"]
+        for profile in profiles:
+            try:
+                # _calculate_match_scores reads opportunity columns (naics,
+                # agency, tech_focus_areas, ...) which the scoring-set rows
+                # carry, so the scoring math is unchanged per opportunity.
+                scores = _calculate_match_scores(opp, profile)
+                total_score = scores["total_score"]
 
-            # Skip tenants below their configured minimum surface score
-            min_score = profile["min_surface_score"] or 40
-            if total_score < min_score:
+                # Skip tenants below their configured minimum surface score
+                min_score = profile["min_surface_score"] or 40
+                if total_score < min_score:
+                    continue
+
+                tenants_scored += 1
+                total_score_sum += total_score
+
+                # Upsert into tenant_pipeline_items per (tenant, opportunity)
+                await conn.execute(
+                    """INSERT INTO tenant_pipeline_items
+                         (tenant_id, opportunity_id, total_score,
+                          naics_score, keyword_score, agency_score,
+                          set_aside_score, type_score, timeline_score,
+                          matched_keywords, pursuit_status)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unreviewed')
+                       ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
+                         total_score = $3,
+                         naics_score = $4,
+                         keyword_score = $5,
+                         agency_score = $6,
+                         set_aside_score = $7,
+                         type_score = $8,
+                         timeline_score = $9,
+                         matched_keywords = $10,
+                         updated_at = now()""",
+                    profile["tenant_id"],
+                    opportunity_id,
+                    scores["total_score"],
+                    scores["naics_score"],
+                    scores["keyword_score"],
+                    scores["agency_score"],
+                    scores["set_aside_score"],
+                    scores["type_score"],
+                    scores["timeline_score"],
+                    scores["matched_keywords"],
+                )
+                upserts += 1
+
+                if total_score >= notification_threshold:
+                    tenant_ids_above_threshold.add(str(profile["tenant_id"]))
+
+            except Exception as exc:
+                pairs_errored += 1
+                log.error(
+                    "match_tenants: failed to score tenant %s on opportunity %s: %s",
+                    profile["tenant_id"],
+                    opportunity_id,
+                    exc,
+                )
+                # Continue with next pair — one failure must not block others
                 continue
 
-            tenants_scored += 1
-            total_score_sum += total_score
-
-            # Upsert into tenant_pipeline_items
-            await conn.execute(
-                """INSERT INTO tenant_pipeline_items
-                     (tenant_id, opportunity_id, total_score,
-                      naics_score, keyword_score, agency_score,
-                      set_aside_score, type_score, timeline_score,
-                      matched_keywords, pursuit_status)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unreviewed')
-                   ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
-                     total_score = $3,
-                     naics_score = $4,
-                     keyword_score = $5,
-                     agency_score = $6,
-                     set_aside_score = $7,
-                     type_score = $8,
-                     timeline_score = $9,
-                     matched_keywords = $10,
-                     updated_at = now()""",
-                profile["tenant_id"],
-                opportunity_id,
-                scores["total_score"],
-                scores["naics_score"],
-                scores["keyword_score"],
-                scores["agency_score"],
-                scores["set_aside_score"],
-                scores["type_score"],
-                scores["timeline_score"],
-                scores["matched_keywords"],
-            )
-
-            if total_score >= notification_threshold:
-                tenant_ids_above_threshold.append(str(profile["tenant_id"]))
-
-        except Exception as exc:
-            tenants_errored += 1
-            log.error(
-                "match_tenants: failed to score tenant %s: %s",
-                profile["tenant_id"],
-                exc,
-            )
-            # Continue with next tenant — one failure should not block others
-            continue
-
-    if tenants_errored > 0:
+    if pairs_errored > 0:
         log.warning(
-            "match_tenants: %d tenant(s) failed scoring (out of %d total)",
-            tenants_errored,
+            "match_tenants: %d (tenant, opportunity) pair(s) failed scoring "
+            "(out of %d opportunities x %d tenants)",
+            pairs_errored,
+            len(scoring_set),
             len(profiles),
         )
 
     avg_score = round(total_score_sum / tenants_scored, 2) if tenants_scored else 0
     duration_ms = int((time.monotonic() - start_ms) * 1000)
 
+    tenant_ids_list = sorted(tenant_ids_above_threshold)
+    opportunities_scored = len(scoring_set)
+
     # Emit end event
     try:
         await emit_event(conn, namespace="finder", type="scoring.completed", phase="end",
             parent_event_id=start_event_id, payload={
                 "solicitationId": str(sol_uuid),
+                "opportunitiesScored": opportunities_scored,
                 "tenantsScored": tenants_scored,
-                "tenantsNotified": len(tenant_ids_above_threshold),
+                "tenantsNotified": len(tenant_ids_list),
+                "upserts": upserts,
                 "avgScore": avg_score,
                 "durationMs": duration_ms,
             })
@@ -270,9 +318,11 @@ async def match_tenants(
         log.error("match_tenants: failed to emit end event: %s", exc)
 
     return {
-        "tenantIds": tenant_ids_above_threshold,
+        "tenantIds": tenant_ids_list,
+        "opportunitiesScored": opportunities_scored,
         "tenantsScored": tenants_scored,
-        "tenantsNotified": len(tenant_ids_above_threshold),
+        "tenantsNotified": len(tenant_ids_list),
+        "upserts": upserts,
         "avgScore": avg_score,
     }
 

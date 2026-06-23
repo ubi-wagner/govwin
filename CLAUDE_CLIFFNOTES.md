@@ -693,6 +693,39 @@ Jobs signal failure by raising, never by returning a success envelope with an er
 field. RLS is ENABLED with ZERO policies — tenant isolation rests entirely on explicit
 `WHERE tenant_id = $1` in every query (NOT on RLS, despite CLAUDE.md's claim).
 
+### Mistake 23: Re-editing an applied migration won't re-run (prod icons missing, Jun 2026)
+`db/migrations/migrate.mjs` keys applied migrations by **filename** in `_migration_history`
+and runs each **once** — it records a checksum but never re-runs on change. Migration `063`
+(publish the `content_pages` baseline from the in-code registry) ran on the PR #172 deploy
+with the pre-icon registry. Re-editing `063` to add `metadata.icon` (PR #173) was then
+**silently skipped** on the next deploy, so the live `content_pages` rows kept the old
+content and the new icons never appeared — the deployed code renders registry icons only on
+pages with NO db row. Fixed by adding migration `064` (fresh filename) to re-publish the
+current registry.
+
+**Rule:** Never edit a migration that may already be applied — the runner skips it by
+filename. Any **bulk content baseline** that must auto-apply on deploy needs a **NEW
+migration number each time** (`063` → `064` → …). For ordinary content changes use the admin
+editor's per-page **Publish** (`publishPage` in `lib/content-admin.ts`), which versions
+content in the DB and needs no migration.
+
+### Mistake 24: Push/scoring operated on the primary opp only (topics never reached customers)
+`solicitation.push` flipped `is_active` on **only** `cs.opportunity_id`, and
+`score_tenants.match_tenants` scored only that one opportunity. So a multi-topic DoD
+BAA (e.g. 65 DSIP topics, each its own `opportunities` row with `solicitation_id`)
+got pushed once and **zero topics reached customers' Spotlight**. Fixed (M1): push
+activates, and scoring scores, the whole **topic SET** = `opportunities WHERE
+solicitation_id = cs.id OR id = cs.opportunity_id` (scoring additionally filters
+`is_active AND close_date future`); one `tenant_pipeline_items` upsert per
+(tenant, opportunity).
+
+**Rule:** anything that "acts on a solicitation's opportunities" (activation,
+scoring, spotlight reads, counts) must operate on the topic SET, never just
+`cs.opportunity_id`. Also: `finder:topic.updated` has two emitters with different
+payloads (`app/api/admin/topics/[id]/route.ts` → `topicId`/`changes`;
+`opportunity.update_topic` → `opportunityId`/`changedFields`) — reconcile to one
+canonical shape.
+
 ---
 
 ## 5. Project Architecture Quick Reference

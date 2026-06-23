@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { TriageQueue } from '@/components/rfp-curation/triage-queue';
+import TriageTodos from './triage-todos';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,6 +80,7 @@ export default async function RFPCurationPage() {
 
   return (
     <div>
+      <TriageTodos />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">RFP Triage Queue</h1>
