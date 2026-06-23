@@ -53,6 +53,28 @@ export async function listOpenTasksForActor(opts: {
   if (isAdmin) {
     // Admins see admin-scoped tasks (tenant_id IS NULL), plus a specific
     // tenant's when one is in context.
+    try {
+      return await sql<TaskRow[]>`
+        SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
+               description, entity_type, entity_id, process_instance_id, step_name,
+               status, due_at, nudge_schedule, params, created_at
+        FROM tasks
+        WHERE status IN ('open', 'in_progress')
+          AND (assignee_role = ${role} OR assignee_user_id = ${userId}::uuid)
+          AND (tenant_id IS NULL
+               OR ${tenantId}::uuid IS NULL
+               OR tenant_id = ${tenantId}::uuid)
+        ORDER BY due_at ASC NULLS LAST, created_at ASC
+        LIMIT 200
+      `;
+    } catch (e) {
+      console.error('[tasks] listOpenTasksForActor admin query failed:', e);
+      throw new Error('Failed to load tasks');
+    }
+  }
+
+  // Tenant users are pinned to their own tenant.
+  try {
     return await sql<TaskRow[]>`
       SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
              description, entity_type, entity_id, process_instance_id, step_name,
@@ -60,26 +82,14 @@ export async function listOpenTasksForActor(opts: {
       FROM tasks
       WHERE status IN ('open', 'in_progress')
         AND (assignee_role = ${role} OR assignee_user_id = ${userId}::uuid)
-        AND (tenant_id IS NULL
-             OR ${tenantId}::uuid IS NULL
-             OR tenant_id = ${tenantId}::uuid)
+        AND tenant_id = ${tenantId}::uuid
       ORDER BY due_at ASC NULLS LAST, created_at ASC
       LIMIT 200
     `;
+  } catch (e) {
+    console.error('[tasks] listOpenTasksForActor tenant query failed:', e);
+    throw new Error('Failed to load tasks');
   }
-
-  // Tenant users are pinned to their own tenant.
-  return await sql<TaskRow[]>`
-    SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
-           description, entity_type, entity_id, process_instance_id, step_name,
-           status, due_at, nudge_schedule, params, created_at
-    FROM tasks
-    WHERE status IN ('open', 'in_progress')
-      AND (assignee_role = ${role} OR assignee_user_id = ${userId}::uuid)
-      AND tenant_id = ${tenantId}::uuid
-    ORDER BY due_at ASC NULLS LAST, created_at ASC
-    LIMIT 200
-  `;
 }
 
 /**
@@ -126,17 +136,30 @@ export async function completeTask(opts: {
 }): Promise<CompleteTaskResult> {
   const { taskId, result, actor } = opts;
 
-  const rows = await sql<{
+  let rows: {
     id: string;
     status: string;
     tenantId: string | null;
     assigneeRole: string | null;
     assigneeUserId: string | null;
     processInstanceId: string | null;
-  }[]>`
-    SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id
-    FROM tasks WHERE id = ${taskId}::uuid
-  `;
+  }[];
+  try {
+    rows = await sql<{
+      id: string;
+      status: string;
+      tenantId: string | null;
+      assigneeRole: string | null;
+      assigneeUserId: string | null;
+      processInstanceId: string | null;
+    }[]>`
+      SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id
+      FROM tasks WHERE id = ${taskId}::uuid
+    `;
+  } catch (e) {
+    console.error('[tasks] completeTask lookup failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
   if (rows.length === 0) {
     return { ok: false, status: 404, error: 'Task not found', code: 'NOT_FOUND' };
   }
@@ -154,16 +177,22 @@ export async function completeTask(opts: {
   }
 
   // Close the task (guarded against a lost race).
-  const closed = await sql<{ id: string }[]>`
-    UPDATE tasks
-    SET status = 'completed',
-        result = ${JSON.stringify(result ?? {})}::jsonb,
-        completed_by = ${actor.id}::uuid,
-        completed_at = now(),
-        updated_at = now()
-    WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
-    RETURNING id
-  `;
+  let closed: { id: string }[];
+  try {
+    closed = await sql<{ id: string }[]>`
+      UPDATE tasks
+      SET status = 'completed',
+          result = ${JSON.stringify(result ?? {})}::jsonb,
+          completed_by = ${actor.id}::uuid,
+          completed_at = now(),
+          updated_at = now()
+      WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
+      RETURNING id
+    `;
+  } catch (e) {
+    console.error('[tasks] completeTask update failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
   if (closed.length === 0) {
     return { ok: false, status: 409, error: 'Task is already closed', code: 'TASK_CLOSED' };
   }

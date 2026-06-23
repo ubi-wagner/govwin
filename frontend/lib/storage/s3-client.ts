@@ -200,7 +200,14 @@ export async function listObjects(prefix: string, delimiter = '/'): Promise<{
     Prefix: prefix,
     Delimiter: delimiter,
   });
-  const res = await s3.send(cmd);
+  let res;
+  try {
+    res = await s3.send(cmd);
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error('[s3.listObjects] failed', { prefix, bucket: BUCKET, err: detail });
+    throw new Error(`S3 list failed: ${detail}`);
+  }
   const objects = (res.Contents ?? [])
     .filter(o => o.Key && o.Key !== prefix)
     .map(o => ({

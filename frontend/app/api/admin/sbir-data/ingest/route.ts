@@ -363,7 +363,8 @@ async function insertAwardBatch(rows: RawRow[]): Promise<void> {
         contact_phone, contact_email,
         pi_name, pi_title, pi_phone, pi_email,
         ri_name, ri_poc_name, ri_poc_phone
-      ) VALUES ${placeholders.join(', ')}`,
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT DO NOTHING`,
       params,
     );
   } catch (err) {
@@ -561,10 +562,9 @@ export async function POST(request: Request) {
       data: { fileType, rowCount, filename },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error('[api/admin/sbir-data/ingest] POST error:', msg);
+    console.error('[api/admin/sbir-data/ingest] POST error:', e);
     return NextResponse.json(
-      { error: `Ingest failed: ${msg.slice(0, 500)}`, code: 'DB_ERROR' },
+      { error: 'Ingest failed', code: 'INGEST_ERROR' },
       { status: 500 },
     );
   }

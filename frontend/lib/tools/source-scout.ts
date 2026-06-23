@@ -232,7 +232,8 @@ Only include extracted_opportunities if you identify specific, actionable opport
       tokensUsed,
     };
   } catch (err) {
-    // Claude analysis is best-effort — don't fail the whole scout
+    // Claude analysis is best-effort — log and return null so the scout continues
+    console.error('[source-scout] analyzeRegionWithClaude error:', err);
     return null;
   }
 }

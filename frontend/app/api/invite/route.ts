@@ -144,36 +144,34 @@ export async function POST(request: Request) {
     // Set the password on the user and mark temp_password as false
     const passwordHash = await bcrypt.hash(password, 12);
 
-    if (collaborator.userId) {
-      try {
-        await sql`
-          UPDATE users
-          SET password_hash = ${passwordHash},
-              temp_password = false
-          WHERE id = ${collaborator.userId}
-        `;
-      } catch (e) {
-        console.error('[api/invite] user password update failed:', e);
-        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
-      }
-    }
-
-    // Mark collaborator as accepted
+    // Wrap user update + collaborator accept in a single atomic transaction
     try {
-      await sql`
-        UPDATE proposal_collaborators
-        SET accepted_at = now()
-        WHERE id = ${token}
-      `;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await sql.begin(async (txSql: any) => {
+        if (collaborator!.userId) {
+          await txSql`
+            UPDATE users
+            SET password_hash = ${passwordHash},
+                temp_password = false
+            WHERE id = ${collaborator!.userId}
+          `;
+        }
+
+        await txSql`
+          UPDATE proposal_collaborators
+          SET accepted_at = now()
+          WHERE id = ${token}
+        `;
+      });
     } catch (e) {
-      console.error('[api/invite] collaborator accept update failed:', e);
+      console.error('[api/invite] transaction failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
     try {
       await emitEventSingle({
         namespace: 'identity',
-        type: 'identity.invite_accepted',
+        type: 'invite.accepted',
         actor: systemActor(),
         payload: {
           correlationId: randomUUID(),
