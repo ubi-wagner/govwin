@@ -6,6 +6,20 @@
 
 ---
 
+## Status after fix pass (2026-06-23)
+
+All 15 P0 gaps are closed. Two were false positives requiring no code change:
+- **FE-01 / P0-01** (pdf-reader named import): pdf-parse v2.4.5 exports `PDFParse` as a named export; the import was always correct.
+- **FE-07 / P0-07** (ILIKE escaping): `memory-search.ts` and `library-search-atoms.ts` already had `.replace(/[%_\\]/g, '\\$&')` in place.
+
+Most P1 gaps listed above are also closed (see LAUNCH_TODO.md for per-item status). The following tiers remain deferred:
+- **Deferred to V2:** TEST-10, TEST-12–14, TEST-17–23; DATA-01–03; FE-14–20; PIPE-10–17; CMS-04–11; AGENT-02–04; CI-02, CI-04; DOC-06–12.
+- **Note on DATA-02 (RLS):** reality is already documented accurately in ARCHITECTURE_V9; adding real RLS policies requires an app-set tenant GUC — deferred to V2.
+
+New test counts after fix pass: pipeline 383 passed / 29 skipped (was 239/24); frontend 404 passed / 24 files (was 273/17); CMS 100 passed / 2 skipped (was 54/2).
+
+---
+
 ## Executive Summary — Gap Counts by Tier
 
 | Tier | Label | Gap count |

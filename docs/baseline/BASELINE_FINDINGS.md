@@ -49,17 +49,17 @@ The file-by-file pass corrects it:
 
 | Sev | Bug | Location | Source |
 |-----|-----|----------|--------|
-| 🔴 | **Double-emit** of `finder:topics.expanded` (both the expander and the dispatcher emit for one job) — introduced in M3 | `pipeline/src/ingest/topic_expander.py` `_emit_topics_expanded` + `dispatcher.py` `_run_expand_topics_job` | P2 |
-| 🔴 | `lib/import/pdf-reader.ts` imports `{ PDFParse }` but `pdf-parse` only has a **default export** → likely runtime error on first call | `frontend/lib/import/pdf-reader.ts` | F3 |
-| 🔴 | `lifecycle_scheduler` reconnect loop is **recursive** → stack-overflow under sustained DB outage | `pipeline/src/lifecycle_scheduler.py` | P2 |
-| 🟡 | `shredder/extractor.py` calls **synchronous boto3 inside async** → blocks the event loop per PDF | `pipeline/src/shredder/extractor.py` | P2 |
-| 🟡 | `agents/learning/__init__.py` has **broken absolute imports** (`pipeline.src.agents.learning.*`) → ImportError; masked because the scheduler imports modules directly | `pipeline/src/agents/learning/__init__.py` | P1 |
-| 🟡 | `invite` POST emits **double-prefixed type** `identity.identity.invite_accepted` (should be `invite.accepted`) and does multi-table writes with **no transaction** | `frontend/app/api/invite/route.ts` | F1 |
-| 🟡 | `consent` POST: multi-table writes with **no transaction** | `frontend/app/api/consent/route.ts` | F1 |
-| 🟡 | `portal/[tenantSlug]/profile` GET has **no role floor** → a `partner_user` can read `billing_email` + company profile | `frontend/app/api/portal/[tenantSlug]/profile/route.ts` | F1 |
-| 🟡 | `admin/sbir-data/ingest` **leaks internal error text** to client; `sql.unsafe` batch with no `ON CONFLICT` | `frontend/app/api/admin/sbir-data/ingest/route.ts` | F1 |
-| 🟡 | `document/converter.py` `convert_format()` has **no subprocess timeout** (hung LibreOffice blocks loop) | `pipeline/src/document/converter.py` | P2 |
-| 🟡 | `tools/source-scout.ts` **silently swallows** Claude errors (`catch { return null }`) | `frontend/lib/tools/source-scout.ts` | F3 |
+| ✅ FIXED | **Double-emit** of `finder:topics.expanded` (both the expander and the dispatcher emit for one job) — introduced in M3 | `pipeline/src/ingest/topic_expander.py` `_emit_topics_expanded` + `dispatcher.py` `_run_expand_topics_job` | P2 |
+| ~~🔴~~ FALSE POSITIVE | ~~`lib/import/pdf-reader.ts` imports `{ PDFParse }` but `pdf-parse` only has a default export → likely runtime error on first call~~ — pdf-parse is v2.4.5 and exports `PDFParse` as a NAMED export; the named import is CORRECT. Not a bug. | `frontend/lib/import/pdf-reader.ts` | F3 |
+| ✅ FIXED | `lifecycle_scheduler` reconnect loop is **recursive** → stack-overflow under sustained DB outage | `pipeline/src/lifecycle_scheduler.py` | P2 |
+| ✅ FIXED | `shredder/extractor.py` calls **synchronous boto3 inside async** → blocks the event loop per PDF | `pipeline/src/shredder/extractor.py` | P2 |
+| ✅ FIXED | `agents/learning/__init__.py` has **broken absolute imports** (`pipeline.src.agents.learning.*`) → ImportError; masked because the scheduler imports modules directly | `pipeline/src/agents/learning/__init__.py` | P1 |
+| ✅ FIXED | `invite` POST emits **double-prefixed type** `identity.identity.invite_accepted` (should be `invite.accepted`) and does multi-table writes with **no transaction** | `frontend/app/api/invite/route.ts` | F1 |
+| ✅ FIXED | `consent` POST: multi-table writes with **no transaction** | `frontend/app/api/consent/route.ts` | F1 |
+| ✅ FIXED | `portal/[tenantSlug]/profile` GET has **no role floor** → a `partner_user` can read `billing_email` + company profile | `frontend/app/api/portal/[tenantSlug]/profile/route.ts` | F1 |
+| ✅ FIXED | `admin/sbir-data/ingest` **leaks internal error text** to client; `sql.unsafe` batch with no `ON CONFLICT` | `frontend/app/api/admin/sbir-data/ingest/route.ts` | F1 |
+| ✅ FIXED | `document/converter.py` `convert_format()` has **no subprocess timeout** (hung LibreOffice blocks loop) | `pipeline/src/document/converter.py` | P2 |
+| ✅ FIXED | `tools/source-scout.ts` **silently swallows** Claude errors (`catch { return null }`) | `frontend/lib/tools/source-scout.ts` | F3 |
 
 ---
 
@@ -68,11 +68,11 @@ The file-by-file pass corrects it:
 CLAUDE.md mandates "EVERY `await sql` inside try/catch" and consistent `{error,code}`. The floor is good
 (all 138 routes authenticate + return `{error,code}`), but hygiene is uneven:
 
-- **20+ API routes** run `await sql` with **no inner try/catch** (a DB error collapses to a generic outer-handler log) — incl. `admin/analytics`, `admin/pipeline`, `admin/tenants`, `admin/workflows/*`, `portal/dashboard`, `portal/proposals/[id]/{sections,compliance,dropbox,collaborators}`.
-- **7 routes** emit events **outside** try/catch → event failure returns false 500 after the business op succeeded.
-- **4 routes** call `auth()`/`requireAdmin()` outside the outer try/catch.
-- **Lib layer**: `lib/process/force-advance.ts` (4 sequential `await sql`, no handling), `lib/tasks/tasks.ts` (no try/catch), `lib/storage/s3-client.ts::listObjects` (bare `s3.send`).
-- **Unescaped ILIKE** on user input in `lib/tools/memory-search.ts` + `lib/tools/library-search-atoms.ts` — CLAUDE.md requires `.replace(/[%_\\]/g, '\\$&')`; wildcard-DoS / match-bypass risk.
+- ✅ FIXED: **~4 API routes** (16 of the originally listed 20 were already compliant) ran `await sql` with **no inner try/catch** (a DB error collapses to a generic outer-handler log) — incl. `admin/analytics`, `admin/pipeline`, `admin/tenants`, `admin/workflows/*`, `portal/dashboard`, `portal/proposals/[id]/{sections,compliance,dropbox,collaborators}`. The 4 genuinely non-compliant routes were fixed.
+- ✅ FIXED: **7 routes** emit events **outside** try/catch → event failure returns false 500 after the business op succeeded.
+- ✅ FIXED: **4 routes** call `auth()`/`requireAdmin()` outside the outer try/catch.
+- ✅ FIXED: **Lib layer**: `lib/process/force-advance.ts` (4 sequential `await sql`, no handling), `lib/tasks/tasks.ts` (no try/catch), `lib/storage/s3-client.ts::listObjects` (bare `s3.send`).
+- ~~**Unescaped ILIKE**~~ FALSE POSITIVE: `lib/tools/memory-search.ts` + `lib/tools/library-search-atoms.ts` already escape ILIKE via `.replace(/[%_\\]/g, '\\$&')`. Nothing to fix.
 - **Doc conflict**: `API_CONVENTIONS.md` mandates `withHandler()`; `CLIFFNOTES §2` shows raw `NextResponse.json`. The codebase uses **both** patterns → standardize in P4.
 - ✅ **No `console.log`** violations found anywhere.
 
