@@ -1,35 +1,20 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+// Re-exported from the shared NavLink component (FE-17 consolidation).
+// Import sites that use '@/components/admin/admin-nav-link' continue to work.
+import { NavLink, type NavLinkVariant } from '@/components/nav-link'
+import type { ReactNode } from 'react'
 
-export function AdminNavLink({ href, children, external }: { href: string; children: React.ReactNode; external?: boolean }) {
-  const pathname = usePathname()
-  const isActive = pathname === href || (href !== '/admin' && pathname.startsWith(href))
-
-  if (external) {
-    return (
-      <a
-        href={href}
-        className="block px-3 py-1.5 rounded text-sm transition-colors text-slate-300 hover:text-white hover:bg-slate-700"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {children} &rarr;
-      </a>
-    )
-  }
-
-  return (
-    <Link
-      href={href}
-      className={`block px-3 py-1.5 rounded text-sm transition-colors ${
-        isActive
-          ? 'bg-blue-600 text-white font-medium'
-          : 'text-slate-300 hover:text-white hover:bg-slate-700'
-      }`}
-    >
-      {children}
-    </Link>
-  )
+export function AdminNavLink({
+  href,
+  children,
+  external,
+}: {
+  href: string
+  children: ReactNode
+  external?: boolean
+}) {
+  return <NavLink href={href} variant="admin" external={external}>{children}</NavLink>
 }
+
+export type { NavLinkVariant }
