@@ -2,6 +2,8 @@
 
 Consolidated reference for all code quality rules, security standards, testing requirements, event naming conventions, database rules, and error handling protocols. Sourced from CLAUDE.md, ERROR_HANDLING.md, API_CONVENTIONS.md, TOOL_CONVENTIONS.md, DEFINITION_OF_DONE.md, and TESTING_STRATEGY.md.
 
+**Architecture reference:** `ARCHITECTURE_V9.md` (root) is the authoritative as-built system design (supersedes V5–V8). All service topology, storage, and CMS facts in this document should be read in light of V9.
+
 ---
 
 ## 1. Code Quality Rules
@@ -118,7 +120,10 @@ const safeInput = input.replace(/[%_\\]/g, '\\$&');
 
 ### Agent Security
 
-- Row-Level Security on all tenant-scoped agent memory tables.
+- RLS is ENABLED on 4 memory tables (`episodic_memories`, `semantic_memories`,
+  `procedural_memories`, `agent_task_log`) but **zero policies exist** in any migration.
+  In practice RLS is bypassed because both services connect as the DB owner. Tenant
+  isolation relies exclusively on explicit `WHERE tenant_id = $1` in every query.
 - Agent tools enforce `tenant_id` -- agents never construct SQL directly.
 - User content clearly delimited in agent prompts (prompt injection defense).
 
@@ -204,6 +209,13 @@ const safeInput = input.replace(/[%_\\]/g, '\\$&');
 | `console.log` ban | Every commit | Grep step |
 
 Note: As of Phase 0.5b, CI is not fully wired -- developers must run checks locally before pushing.
+Note: **No DB migration check runs in CI** -- migrations are applied manually via `db/migrations/migrate.mjs`
+(or the GitHub Actions `migrate.yml` workflow). The CI pipeline does NOT validate that a new migration
+applies cleanly against production state.
+
+For the full test-run command reference, CI job inventory, and per-subsystem coverage gaps, see:
+- `docs/baseline/TESTING_PROCESS.md` — how to run tests for frontend, pipeline, and CMS
+- `docs/baseline/TEST_COVERAGE_MATRIX.md` — what is and is not covered, highest-risk untested paths
 
 ---
 

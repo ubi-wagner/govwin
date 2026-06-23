@@ -2,15 +2,19 @@
 
 ## Project Overview
 Multi-tenant SaaS platform for government contractors to discover, score, and build
-proposals for federal opportunities (SBIR, STTR, BAA, OTA). AI agent workforce assists
-at every lifecycle stage. See ARCHITECTURE_V5.md for full system design.
+proposals for federal opportunities (SBIR, STTR, BAA, OTA). Product AI (drafting / compliance /
+review) is live via the frontend; an autonomous pipeline agent workforce is built but not yet
+wired. See ARCHITECTURE_V9.md for the full as-built system design (supersedes V5–V8).
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
 2. **Pipeline** (Python 3.12): Ingestion, scoring, workers, agents → `pipeline/`
-3. **CMS/CRM** (FastAPI): Dormant V1, placeholder → `services/cms/`
+3. **CMS/CRM** (FastAPI): Live — email automation, content pipeline, social, page-block editor; own `govtech_cms` DB → `services/cms/`
 
-All services share one PostgreSQL database (govtech_intel) and one storage volume (/data).
+Frontend + Pipeline share one PostgreSQL database (govtech_intel); CMS/CRM has its own (govtech_cms)
+and bridges via the shared `system_events` table. Object storage is S3-compatible (Cloudflare R2) —
+there is no `/data` business-data volume (the `STORAGE_ROOT=/data` constant in pipeline config is dead;
+the only local volume is CMS media).
 
 ## Roles
 - `master_admin`: Full system access, migrations, Railway management

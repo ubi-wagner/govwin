@@ -12,7 +12,7 @@ See also: [CLAUDE.md](../CLAUDE.md), [NAMESPACES.md](./NAMESPACES.md), [API_CONV
 govwin/
   frontend/          # Next.js 15 app (UI + API routes)
   pipeline/          # Python worker (ingest, scoring, agents)
-  services/cms/      # Dormant V1 placeholder (FastAPI)
+  services/cms/      # Live FastAPI CRM/CMS (87 endpoints, 7 worker loops, Vite SPA; email/content/social + page-block editor; own govtech_cms DB)
   db/migrations/     # Numbered SQL migrations (applied in order)
   scripts/           # Dev helpers + one-off tasks
   docs/              # Architecture + binding convention docs

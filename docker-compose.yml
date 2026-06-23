@@ -1,7 +1,7 @@
 # Local dev stack for RFP Pipeline.
 #
 # Default command: `docker compose up -d` starts db, pipeline, frontend.
-# To also run the (currently dormant, V1-deferred) CMS service:
+# To also run the CMS service (FastAPI + Vite SPA; requires CMS_* env vars):
 #   docker compose --profile cms up -d
 #
 # All environment variables have dev-safe defaults so the stack works
@@ -79,7 +79,8 @@ services:
       - "3000:3000"
 
   # ---------------------------------------------------------------------
-  # CMS service — V1 dormant, only starts with `--profile cms`
+  # CMS service — live FastAPI (87 endpoints, 7 workers, Vite SPA)
+  # Only starts with `--profile cms`; requires CMS_* env vars
   # ---------------------------------------------------------------------
   cms-db:
     image: pgvector/pgvector:pg16
