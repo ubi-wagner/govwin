@@ -10,9 +10,8 @@ Covers:
      dispatches to the right ingester (with a fake conn).
   3. consume_one_job: when the DB returns no pending job, returns False.
   4. tick_schedules routing: DB error path returns 0.
-  5. Double-emit characterization: exactly ONE finder:topics.expanded event
-     is emitted per expand job — currently FAILS because topic_expander and
-     dispatcher BOTH emit the event (BASELINE_FINDINGS §3 double-emit bug).
+  5. Double-emit regression: exactly ONE finder:topics.expanded event is
+     emitted per expand job — PIPE-03/PIPE-06 fix verified here.
 """
 from __future__ import annotations
 
@@ -254,32 +253,22 @@ class TestTickSchedulesErrorPath:
 
 
 # ---------------------------------------------------------------------------
-# 5. Double-emit characterisation — known M3 bug (BASELINE_FINDINGS §3)
+# 5. Double-emit regression test (PIPE-03 / PIPE-06 fix)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason="known M3 double-emit bug — BASELINE_FINDINGS §3: "
-           "both topic_expander._emit_topics_expanded and "
-           "dispatcher._run_expand_topics_job emit finder:topics.expanded; "
-           "the suite expects exactly 1 but currently gets 2.",
-    strict=False,
-)
 @pytest.mark.asyncio
 async def test_expand_topics_job_emits_exactly_one_topics_expanded_event():
-    """Characterisation: exactly ONE finder:topics.expanded event per expand job.
+    """Regression: exactly ONE finder:topics.expanded event per expand job.
 
-    Currently FAILS (xfail) because two events are emitted:
-      1. topic_expander._emit_topics_expanded (the rollup event, emitted by
-         expand_solicitation_topics itself)
-      2. dispatcher._run_expand_topics_job (a second 'job-lifecycle' event
-         using the same namespace/type)
-    Both use namespace='finder', type='topics.expanded'.
+    After the PIPE-03/PIPE-06 fix, the duplicate emit in
+    dispatcher._run_expand_topics_job was removed.  The only emit is the
+    rollup from topic_expander._emit_topics_expanded.
 
     Strategy: we patch ``ingest.topic_expander.expand_solicitation_topics``
-    (the lazy import target) on the module itself, and also inject our fake
-    into the dispatcher's lazy-import namespace via sys.modules so the
-    ``from ingest.topic_expander import expand_solicitation_topics`` inside
-    _run_expand_topics_job resolves to our fake.
+    on the module itself so the ``from ingest.topic_expander import
+    expand_solicitation_topics`` inside _run_expand_topics_job resolves to
+    our fake, which emits exactly one finder:topics.expanded event just like
+    the real expander does.
     """
     import sys
     import ingest.topic_expander as _te_module
@@ -344,9 +333,7 @@ async def test_expand_topics_job_emits_exactly_one_topics_expanded_event():
         if e["namespace"] == "finder" and e["type"] == "topics.expanded"
     ]
 
-    # The correct behaviour is exactly 1 event.
-    # Currently 2 are emitted (bug): one from _fake_expand (real expander simulation)
-    # and one from _run_expand_topics_job's own INSERT, so this assertion FAILS → xfail.
+    # After PIPE-03/PIPE-06: exactly 1 event (from the expander only).
     assert len(topics_expanded_events) == 1, (
         f"Expected 1 finder:topics.expanded event, got {len(topics_expanded_events)}. "
         f"Events: {topics_expanded_events}"

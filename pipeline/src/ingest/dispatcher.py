@@ -369,32 +369,8 @@ async def _run_expand_topics_job(
         json.dumps(result),
     )
     log.info("expand_topics job %s completed: %s", job_id, result.get("status"))
-
-    # Emit a job-level finder lifecycle event. The expander already emits
-    # the finder:topics.expanded rollup; this records job completion so
-    # downstream systems can correlate the work to its pipeline_job.
-    import uuid as _uuid
-    try:
-        await conn.execute(
-            """
-            INSERT INTO system_events
-              (id, namespace, type, phase, actor_type, actor_id,
-               payload, created_at)
-            VALUES ($1, 'finder', 'topics.expanded', 'single',
-                    'pipeline', 'dispatcher',
-                    $2::jsonb, now())
-            """,
-            _uuid.uuid4(),
-            json.dumps({
-                "solicitation_id": solicitation_id,
-                "job_id": str(job_id),
-                "status": result.get("status"),
-                "topics_upserted": result.get("topics_upserted"),
-                "topics_skipped": result.get("topics_skipped"),
-            }),
-        )
-    except Exception as e:
-        log.error("failed to emit topics.expanded event for job %s: %s", job_id, e)
+    # The finder:topics.expanded rollup event is emitted by topic_expander
+    # itself (_emit_topics_expanded). No duplicate emit here.
 
 
 async def _run_scout_job(

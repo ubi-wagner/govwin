@@ -79,78 +79,82 @@ async def run_lifecycle_scheduler(
     last_weekly_run: date | None = None
     last_monthly_run: date | None = None
 
-    try:
-        conn = await asyncpg.connect(database_url)
-        logger.info("lifecycle scheduler connected to database")
-
-        while not shutdown_event.is_set():
-            now = datetime.now(timezone.utc)
-            today = now.date()
-            hour = now.hour
-            weekday = now.weekday()  # 0 = Monday
-            day_of_month = now.day
-
-            # Daily jobs (3 AM UTC) — once per calendar day
-            if hour >= 3 and last_daily_run != today:
-                await _run_daily_jobs(conn)
-                last_daily_run = today
-
-            # Weekly jobs (Monday 4 AM UTC) — once per calendar week
-            if hour >= 4 and weekday == 0 and last_weekly_run != today:
-                await _run_weekly_jobs(conn)
-                last_weekly_run = today
-
-            # Monthly jobs (1st Monday 5 AM UTC) — once per month
-            if hour >= 5 and weekday == 0 and day_of_month <= 7 and last_monthly_run != today:
-                await _run_monthly_jobs(conn)
-                last_monthly_run = today
-
-            # Sleep until next hour boundary to prevent timing drift
-            sleep_seconds = _seconds_until_next_hour()
-            try:
-                await asyncio.wait_for(
-                    shutdown_event.wait(),
-                    timeout=sleep_seconds,
-                )
-                break  # shutdown_event was set
-            except asyncio.TimeoutError:
-                pass  # Normal — hour boundary reached, loop again
-
-    except asyncio.CancelledError:
-        logger.info("lifecycle scheduler cancelled")
-    except (asyncpg.PostgresConnectionError, OSError) as conn_err:
-        logger.error("lifecycle scheduler connection lost: %s, reconnecting...", conn_err)
-        try:
-            if conn:
-                await conn.close()
-        except Exception:
-            pass
+    # Outer supervise loop: connect, then run the scheduling loop. On a dropped
+    # connection, back off and let this outer loop RECONNECT and RESUME
+    # scheduling. Iterative (never recursive), so repeated outages cannot
+    # overflow the stack (PIPE-01). last_*_run live outside the loop, so the
+    # de-dup state survives reconnects.
+    backoff = 30
+    while not shutdown_event.is_set():
         conn = None
-        # Reconnect loop with exponential backoff (non-recursive)
-        backoff = 30
-        while not shutdown_event.is_set() and backoff <= 480:
-            logger.info("lifecycle scheduler reconnecting in %ds...", backoff)
+        try:
+            conn = await asyncpg.connect(database_url)
+            backoff = 30  # reset after a healthy connect
+            logger.info("lifecycle scheduler connected to database")
+
+            while not shutdown_event.is_set():
+                now = datetime.now(timezone.utc)
+                today = now.date()
+                hour = now.hour
+                weekday = now.weekday()  # 0 = Monday
+                day_of_month = now.day
+
+                # Daily jobs (3 AM UTC) — once per calendar day
+                if hour >= 3 and last_daily_run != today:
+                    await _run_daily_jobs(conn)
+                    last_daily_run = today
+
+                # Weekly jobs (Monday 4 AM UTC) — once per calendar week
+                if hour >= 4 and weekday == 0 and last_weekly_run != today:
+                    await _run_weekly_jobs(conn)
+                    last_weekly_run = today
+
+                # Monthly jobs (1st Monday 5 AM UTC) — once per month
+                if hour >= 5 and weekday == 0 and day_of_month <= 7 and last_monthly_run != today:
+                    await _run_monthly_jobs(conn)
+                    last_monthly_run = today
+
+                # Sleep until next hour boundary to prevent timing drift
+                sleep_seconds = _seconds_until_next_hour()
+                try:
+                    await asyncio.wait_for(
+                        shutdown_event.wait(),
+                        timeout=sleep_seconds,
+                    )
+                    break  # shutdown_event was set
+                except asyncio.TimeoutError:
+                    pass  # Normal — hour boundary reached, loop again
+
+            break  # inner loop exited → shutdown requested
+
+        except asyncio.CancelledError:
+            logger.info("lifecycle scheduler cancelled")
+            break
+        except (asyncpg.PostgresConnectionError, OSError) as conn_err:
+            # Connection dropped. Back off (bounded), then the OUTER loop
+            # reconnects and resumes scheduling — no recursion, retries until
+            # the DB returns or shutdown is requested.
+            logger.error(
+                "lifecycle scheduler connection lost: %s; reconnecting in %ds",
+                conn_err, backoff,
+            )
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=backoff)
-                break  # shutdown was requested
+                break  # shutdown requested during backoff
             except asyncio.TimeoutError:
                 pass
-            try:
-                conn = await asyncpg.connect(database_url)
-                logger.info("lifecycle scheduler reconnected")
-                # Re-enter the main scheduling loop
-                return await run_lifecycle_scheduler(
-                    database_url=database_url, shutdown_event=shutdown_event
-                )
-            except Exception as re_err:
-                logger.error("lifecycle scheduler reconnect failed: %s", re_err)
-                backoff = min(backoff * 2, 480)
-    except Exception as e:
-        logger.error("lifecycle scheduler fatal: %s", e)
-    finally:
-        if conn:
-            await conn.close()
-        logger.info("lifecycle scheduler stopped")
+            backoff = min(backoff * 2, 480)
+        except Exception as e:
+            logger.error("lifecycle scheduler fatal: %s", e)
+            break
+        finally:
+            if conn:
+                try:
+                    await conn.close()
+                except Exception:
+                    pass
+
+    logger.info("lifecycle scheduler stopped")
 
 
 async def _run_daily_jobs(conn: asyncpg.Connection) -> None:
