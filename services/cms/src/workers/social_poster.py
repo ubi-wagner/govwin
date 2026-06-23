@@ -191,14 +191,20 @@ async def process_scheduled_posts() -> int:
             logger.info(f'Posted {post_id} to {platform}')
 
         except NotImplementedError as e:
-            # Platform not yet implemented — don't retry, mark as failed
+            # Platform adapter not yet implemented (OAuth pending).
+            # Mark as failed with a clear reason and CONTINUE the loop —
+            # a stub post must never crash the worker or block sibling posts.
+            reason = 'oauth_not_configured'
             await cms_pool.execute(
                 '''UPDATE social_posts
                    SET status = 'failed', error_message = $1, updated_at = $2
                    WHERE id = $3''',
-                str(e)[:500], now, post_id,
+                reason, now, post_id,
             )
-            logger.warning(f'Post {post_id} failed (not implemented): {e}')
+            logger.warning(
+                '[social_poster] Post %s failed — adapter not implemented (%s): %s',
+                post_id, reason, e,
+            )
 
         except Exception as e:
             logger.error(f'[social_poster] Error posting {post_id}: {e}')
