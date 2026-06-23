@@ -644,7 +644,7 @@ Step types: ACTION | AI_INVOKE | NOTIFY | HITL_WAIT | TODO | CONDITION | API_CAL
 | `OnApplicationAccepted` | `capture:application.accepted:end` | ACTION (create_library_defaults) → HITL_WAIT (TODO) | ✅ Live |
 | `OnCmsContentRequested` | `library:content.requested:single` | ACTION (draft) → TODO (rfp_admin, 72h) → ACTION (publish) → NOTIFY | ✅ Live |
 | `OnOpportunitiesDetected` | `finder:opportunities.detected:single` | NOTIFY → TODO (rfp_admin, 72h) | ✅ Live |
-| `OnProposalAdvancedToReview` | `proposal:proposal.advanced:end` (targetStage==review) | AI_INVOKE (skipped) → NOTIFY → TODO (tenant_admin, 72h) | 🟦 Partially dormant (AI_INVOKE always skipped) |
+| `OnProposalAdvancedToReview` | `proposal:proposal.advanced:end` (targetStage==review) | AI_INVOKE (routes via fabric, activates on deploy) → NOTIFY → TODO (tenant_admin, 72h) | ✅ wired (PIPE-12–13); real Claude activates on-deploy |
 | `OnProposalAdvancedToFinal` | `proposal:proposal.advanced:end` (targetStage==final) | ACTION (generate_preview) → NOTIFY | ✅ Live |
 | `OnProposalCreated` | `proposal:proposal.created:end` | NOTIFY only | ✅ Live (docstring mismatch — claims AI_INVOKE, code is NOTIFY-only) |
 | `OnRfpUploaded` | `finder:rfp.uploaded:end` | ACTION (shred, 3 retries) → ACTION (extract_compliance) → NOTIFY | ✅ Live |
@@ -684,19 +684,26 @@ The frontend makes direct calls to the Anthropic API (`api.anthropic.com`), allo
 | Pipeline `shredder/runner.py` | ANTHROPIC_API_KEY (env) / model configurable | Extract structure from RFP PDFs |
 | Pipeline `source_scout.py` | ANTHROPIC_API_KEY (env) | Analyze web page diffs |
 
-**System B — Pipeline Agent Workforce — 🟦 BUILT-BUT-DORMANT**
+**System B — Pipeline Agent Workforce — ✅ wired + context-bound + injection-hardened + tenant-isolated (PIPE-12–16); advisory output; real Claude + embeddings activate on-deploy**
 
-The pipeline has a complete agent infrastructure that has never been connected to the execution path:
+The pipeline agent infrastructure is now connected to the execution path (PIPE-12–16):
 
 ```
-main.py:72  → fabric = AgentFabric()     ← instantiated; local var; goes out of scope
+main.py     → fabric = AgentFabric()     ← instantiated and passed to run_workflow_processor()
                10 archetypes register successfully
-               but fabric never passed to run_workflow_processor()
-               and process_task_queue() never called
-processor.py → _execute_ai_invoke() → _execute_action() → importlib import
-               ImportError on "tool.proposal.check_compliance" → return {skipped: True}
-               AgentFabric.invoke_agent() is NEVER called at runtime
+               fabric passed to workflow processor (PIPE-12)
+               process_task_queue() scheduled as 5th asyncio task (PIPE-14)
+processor.py → _execute_ai_invoke() → fabric.invoke_agent(archetype_role, event_payload) (PIPE-13)
+               AI_INVOKE now routes via fabric (no importlib fallback)
+               ContextAssembler pre-loads proposal/RFP/atoms before each call
+               User content delimited by <untrusted_data> (injection hardened)
+               All agent tools enforce tenant_id (tenant isolated)
+               Output is advisory only — surfaced via NOTIFY, never auto-applied
+OnProposalSectionEdited  → DiffAnalyzer.analyze()     (PIPE-15; wired)
+OnProposalOutcomeRecorded → OutcomeAttributor.attribute() (PIPE-16; wired)
 ```
+
+AI_INVOKE now routes via fabric; `process_task_queue` scheduled; vectorization scaffolded (default-off). Activate on deploy: ANTHROPIC_API_KEY for real Claude; EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY + backfill for vector search.
 
 ### 9.2 10 Agent Archetypes (All Dormant)
 
@@ -727,16 +734,17 @@ Memory embedding column: `vector(1536)` with HNSW index (`m=16 ef_construction=1
 
 Memory lifecycle: decay → preference extraction (daily) → pattern promotion → GC (weekly) → compaction → calibration (monthly). All wired via `lifecycle_scheduler.py`.
 
-### 9.4 What Is Missing for Agent Workforce to Go Live
+### 9.4 Agent Workforce Wiring Status (PIPE-12–16 complete)
 
-To activate the pipeline agent workforce, the following wiring is needed:
+All code wiring is complete. Remaining items are deploy-time activation:
 
-1. Pass `fabric` object to `run_workflow_processor()` (or a shared singleton) — currently a dead local var.
-2. Wire `_execute_ai_invoke()` in `processor.py` to call `fabric.invoke_agent(archetype_role, event_payload)` instead of the importlib-import fallback.
-3. Wire `fabric.process_task_queue()` as a fifth asyncio task in `main.py` or as a scheduled loop.
-4. Implement the `OnProposalSectionEdited` workflow to call `DiffAnalyzer` (currently no caller exists).
-5. Implement the `OnProposalOutcomeRecorded` workflow to call `OutcomeAttributor` (currently no caller exists).
-6. Add real pgvector embeddings (requires embedding service or Anthropic text embeddings API).
+1. ✅ `fabric` passed to `run_workflow_processor()` (PIPE-12)
+2. ✅ `_execute_ai_invoke()` calls `fabric.invoke_agent(archetype_role, event_payload)` (PIPE-13)
+3. ✅ `fabric.process_task_queue()` scheduled as 5th asyncio task (PIPE-14)
+4. ✅ `OnProposalSectionEdited` → `DiffAnalyzer` workflow wired (PIPE-15); needs section-save event to emit `originalContent`/`agentRole` to fully activate (follow-up)
+5. ✅ `OnProposalOutcomeRecorded` → `OutcomeAttributor` workflow wired (PIPE-16)
+6. 🔲 Deploy-time: set `ANTHROPIC_API_KEY` to activate real Claude invocations
+7. 🔲 Deploy-time: set `EMBEDDINGS_PROVIDER=openai` + `OPENAI_API_KEY` and run `MemoryStore.backfill_embeddings` per table for vector search (Voyage needs vector(1536)→1024 migration first)
 
 ---
 
@@ -980,11 +988,11 @@ These are deviations from CLAUDE.md confirmed by the file-by-file audit:
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Pipeline agent workforce | 🟦 Built | `AgentFabric` instantiated but not connected; see §9.4 for wiring needed |
-| `AI_INVOKE` workflow steps | 🟦 Skip | `_execute_ai_invoke()` always returns `{skipped: True}` — no fabric call |
-| `agent_task_queue` consumer | 🟦 Never called | `process_task_queue()` implemented but not scheduled |
-| `DiffAnalyzer` | 💀 No caller | No `OnProposalSectionEdited` workflow exists |
-| `OutcomeAttributor` | 💀 No caller | No `OnProposalOutcomeRecorded` workflow exists |
+| Pipeline agent workforce | ✅ wired + context-bound + injection-hardened + tenant-isolated (PIPE-12–16); advisory output; real Claude + embeddings activate on-deploy | fabric→processor wired; AI_INVOKE routes via fabric; process_task_queue scheduled; vectorization scaffolded (default-off) |
+| `AI_INVOKE` workflow steps | ✅ routes via fabric (PIPE-13) | `_execute_ai_invoke()` now calls `fabric.invoke_agent()`; context-assembled + injection-hardened + tenant-isolated; real Claude activates on deploy |
+| `agent_task_queue` consumer | ✅ scheduled (PIPE-14) | `process_task_queue()` now a 5th asyncio task in main.py |
+| `DiffAnalyzer` | ✅ wired (PIPE-15) | `OnProposalSectionEdited` workflow wired; needs section-save event to emit originalContent/agentRole to fully activate |
+| `OutcomeAttributor` | ✅ wired (PIPE-16) | `OnProposalOutcomeRecorded` workflow wired; triggers on `proposal:outcome.recorded` |
 | `scoring/engine.py::ScoringEngine` | 💀 No caller | Standalone class, grep-confirmed zero callers; live path is `OnSolicitationPushed` → `match_tenants` |
 | `pptx-exporter.ts` | 💀 No callers | Frontend PPTX export unwired; only DOCX export is wired |
 | `xlsx-exporter.ts` | 💀 No callers | Frontend XLSX export unwired |

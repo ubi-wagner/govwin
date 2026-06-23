@@ -481,6 +481,8 @@ The following must be **manually signed off** before launch. None of these are v
 
 - [ ] **VH-16** — Confirm AI features come from the frontend, not the pipeline agents. Query `SELECT * FROM agent_task_log ORDER BY created_at DESC LIMIT 10;` — the table should be empty or have no recent entries corresponding to proposal drafting. All AI draft and compliance calls come from the frontend's direct Anthropic calls, not from the dormant agent workforce. See Appendix A.
 
+**Note:** as of PIPE-12–16 the agent pipeline is now wired. VH-16 remains valid for confirming the pre-deploy state (no ANTHROPIC_API_KEY = no agent invocations). Once deploy-time vars are set, agent_task_log will populate — see §9.9 below.
+
 ### 9.7 Social Posting — Confirm Graceful Failure (CMS social_poster stub)
 
 - [ ] **VH-17** — If a `distribute_social` automation rule fires, confirm the CMS `social_poster` worker marks the post as `failed` with `reason=oauth_not_configured` rather than crashing the worker loop. Query `SELECT status, error FROM cms.social_posts ORDER BY created_at DESC LIMIT 5;`. See Appendix A.
@@ -490,6 +492,16 @@ The following must be **manually signed off** before launch. None of these are v
 - [ ] **VH-18** — After RFP upload and shredding, confirm the S3 key scheme: `rfp-pipeline/[opp_id]/source.pdf`, `text.md`, `metadata.json`, and `shredded/*.md` files all exist in R2.
 - [ ] **VH-19** — Confirm `assertKeyBelongsToTenant()` blocks a portal route from accessing another tenant's S3 prefix. Attempt a signed URL request for a key outside the requesting tenant's `customers/[other-slug]/` prefix; confirm 403.
 
+### 9.9 Deploy-Time Agent Activation (verify after ANTHROPIC_API_KEY + embeddings vars set)
+
+- [ ] **VH-20** — Real agent invocation on deploy: with `ANTHROPIC_API_KEY` set, trigger an `OnProposalAdvancedToReview` event (advance a proposal to `review` stage) and submit an `agent_task_queue` task directly; confirm `agent_task_log` rows are written with a real Claude response (not `{skipped: True}`). Confirm budget/rate guardrails fire on overrun (check `rate_limit_state`). Confirm output is advisory — surfaced via NOTIFY/agent_task_log, never auto-applied to proposal sections.
+
+- [ ] **VH-21** — Activate embeddings (optional): set `EMBEDDINGS_PROVIDER=openai` + `OPENAI_API_KEY`; run `MemoryStore.backfill_embeddings` per memory table (`episodic_memories`, `semantic_memories`, `procedural_memories`); confirm cosine retrieval via `memory.search` tool returns semantically relevant atoms/memories (not just ILIKE keyword matches). Note: Voyage provider needs a `vector(1536)→1024` migration first before switching.
+
+- [ ] **VH-22** — PIPE-15 follow-up: enrich the section-save event (`proposal:section.saved`) to emit `originalContent` and `agentRole` in the payload; confirm `OnProposalSectionEdited` → `DiffAnalyzer.analyze()` fires and writes an `agent_task_log` row with a non-empty diff result.
+
+- [ ] **VH-23** — Confirm context-binding: trigger an agent on a real proposal; inspect the assembled prompt in `agent_task_log.input` and confirm it includes: (a) that proposal's section content, (b) RFP compliance requirements for that solicitation, (c) the tenant's library atoms, all wrapped inside `<untrusted_data>` delimiters (prompt injection defense).
+
 ---
 
 ## 10. Appendix A — Known-Dormant / V2 Items
@@ -498,10 +510,10 @@ Do not expect these features to work. The tester should confirm they are dormant
 
 | Item | Status | Why dormant |
 |------|--------|------------|
-| Pipeline agent workforce (10 archetypes) | 🟦 Built-but-dormant | `AgentFabric` is instantiated in `main.py:72` as a local variable but never passed to the workflow processor; `invoke_agent()` is never called at runtime. Wiring is P3. |
-| `AI_INVOKE` workflow steps | 🟦 Always skipped | `_execute_ai_invoke()` in `processor.py` always returns `{skipped: True}`. `OnProposalAdvancedToReview` AI compliance check never runs. |
-| `agent_task_queue` consumer | 🟦 Never scheduled | `AgentFabric.process_task_queue()` is implemented but not added to the asyncio gather loop. |
-| `DiffAnalyzer` / `OutcomeAttributor` | 💀 No caller | No `OnProposalSectionEdited` or `OnProposalOutcomeRecorded` workflow exists yet. Learning flywheel is wired but not triggered. |
+| Pipeline agent workforce (10 archetypes) | ✅ wired (PIPE-12–16) | `AgentFabric` passed to `run_workflow_processor()`; `invoke_agent()` called via AI_INVOKE steps; context-assembled, injection-hardened, tenant-isolated, advisory-only. Real Claude activates on-deploy (ANTHROPIC_API_KEY). |
+| `AI_INVOKE` workflow steps | ✅ routes via fabric (PIPE-13) | `_execute_ai_invoke()` calls `fabric.invoke_agent()`; `OnProposalAdvancedToReview` AI step activates on deploy. |
+| `agent_task_queue` consumer | ✅ scheduled (PIPE-14) | `AgentFabric.process_task_queue()` now a 5th asyncio task in main.py. |
+| `DiffAnalyzer` / `OutcomeAttributor` | ✅ wired (PIPE-15/16) | `OnProposalSectionEdited` → DiffAnalyzer and `OnProposalOutcomeRecorded` → OutcomeAttributor workflows wired. PIPE-15 needs section-save event to emit originalContent/agentRole to fully activate. |
 | Social posting — LinkedIn/Twitter | 🔴 Stub | `social_poster.py` adapters raise `NotImplementedError`. Posts are queued in the DB but never sent. CMS-01 fix wraps this gracefully; the tester should confirm `failed` status rather than a crashed worker. |
 | Recurring CMS campaigns | 🟡 Partial | `campaign_executor.py:342` defers recurring campaigns to V2. One-time campaigns work; recurring does not. |
 | PPTX/XLSX export | 🟦 Unwired | `pptx-exporter.ts` and `xlsx-exporter.ts` exist but are not connected to any export route. Only DOCX export is live. |

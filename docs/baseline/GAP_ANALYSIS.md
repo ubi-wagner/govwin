@@ -13,10 +13,12 @@ All 15 P0 gaps are closed. Two were false positives requiring no code change:
 - **FE-07 / P0-07** (ILIKE escaping): `memory-search.ts` and `library-search-atoms.ts` already had `.replace(/[%_\\]/g, '\\$&')` in place.
 
 Most P1 gaps listed above are also closed (see LAUNCH_TODO.md for per-item status). The following tiers remain deferred:
-- **Deferred to V2:** TEST-10, TEST-12–14, TEST-17–23; DATA-01–03; FE-14–20; PIPE-10–17; CMS-04–11; AGENT-02–04; CI-02, CI-04; DOC-06–12.
+- **Deferred to V2:** TEST-10, TEST-12–14, TEST-17–23; DATA-02; CMS-04–11; AGENT-04; CI-02, CI-04.
 - **Note on DATA-02 (RLS):** reality is already documented accurately in ARCHITECTURE_V9; adding real RLS policies requires an app-set tenant GUC — deferred to V2.
 
-New test counts after fix pass: pipeline 383 passed / 29 skipped (was 239/24); frontend 404 passed / 24 files (was 273/17); CMS 100 passed / 2 skipped (was 54/2).
+**Agent pipeline wired + hardened:** PIPE-12–16 complete — fabric→processor, AI_INVOKE via fabric, task-queue consumer scheduled, OnProposalSectionEdited and OnProposalOutcomeRecorded workflows wired; agents are context-bound (ContextAssembler), injection-delimited (`<untrusted_data>`), and tenant-isolated (all tools). Three deploy-time activation items remain: (1) ANTHROPIC_API_KEY for real Claude invocations; (2) EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY + backfill for vector search; (3) section-save event enrichment (originalContent/agentRole) to fully activate PIPE-15/DiffAnalyzer. AGENT-02 (tenant isolation tests) done. AGENT-03 vectorization scaffolded default-off.
+
+New test counts after fix pass: pipeline 511 passed / 29 skipped (was 383/29 pre-agent-wiring); frontend 404 passed / 24 files (was 273/17); CMS 100 passed / 2 skipped (was 54/2).
 
 ---
 

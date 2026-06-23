@@ -879,15 +879,12 @@ codebase. The live scoring path is `workflows/actions/score_tenants.py::match_te
 **Rule:** Do not reference or extend `ScoringEngine`. Use `match_tenants` for all
 scoring work.
 
-### Mistake 34: Pipeline agent workforce is DORMANT — do not wire AI to it
-`AgentFabric` is instantiated at `main.py:72` as a local var that goes out of scope.
-`_execute_ai_invoke` always hits ImportError → skipped. `process_task_queue()` has
-zero callers. 10 archetypes register but `invoke_agent()` is never reached.
+### ✅ WIRED + HARDENED (fix pass): Mistake 34: fabric→processor + AI_INVOKE + task-queue consumer + 2 learning workflows wired (PIPE-12–16); agents are context-bound (ContextAssembler pre-loads proposal/RFP/atoms), injection-delimited (<untrusted_data>), tenant-isolated (all tools), and advisory-only. Real Claude invocation + embeddings activate on deploy (no SDK in CI). No longer dormant.
 
 **Rule:** Do NOT surface UI that promises agent output from the pipeline agent
 workforce. Product AI works via the frontend calling Anthropic directly
 (`portal/.../ai/draft|review|compliance`, `claude-sonnet-4-20250514`). The pipeline
-agent workforce is V2 (see ARCHITECTURE_V9.md §9.4 for what wiring is needed).
+agent workforce now wired but activate on-deploy requires ANTHROPIC_API_KEY (real Claude) and EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY (vector search). See ARCHITECTURE_V9.md §9.4.
 
 ### ✅ RESOLVED (fix pass): Mistake 35: `config.STORAGE_ROOT="/data"` is a dead constant — removed
 `pipeline/src/config.py::STORAGE_ROOT` was set but never imported by any storage code.
@@ -1000,19 +997,14 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Workflow: `on_source_change_detected` → draft RFP → notify admin
 - Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
 
-### Agent Fabric (pipeline/src/agents/) — WRITTEN BUT DORMANT (V2, not wired today)
-- 10 archetypes auto-register, but the fabric is ORPHANED at runtime: producer
-  `requestAgentTask` has zero callers; `AgentFabric` is instantiated then discarded
-  (`main.py:72`); AI_INVOKE template steps deliberately skip. Agents do NOT act on
-  Jobs/Templates today — that is V2 (EVENT_CONTRACT_V3 §10.8).
-- Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in
-  `fabric.invoke_agent` but it is NEVER reached. Budget column is `monthly_budget`
-  (dollars), NOT `max_cost_per_month_cents`. `human_gate` is never enforced.
-- What runs LIVE: the memory-lifecycle/learning scheduler (`lifecycle_scheduler.py`)
-  — decay, GC, compaction, calibration on existing rows.
-- Memory: episodic/semantic/procedural read/write is wired but only invoked from the
-  (dormant) agent loop. RLS is ENABLED with ZERO `CREATE POLICY` — isolation = explicit
-  `WHERE tenant_id`.
+### Agent Fabric (pipeline/src/agents/) — WIRED + context-bound + injection-hardened + tenant-isolated (PIPE-12–16); advisory output; real Claude + embeddings activate on-deploy
+- 10 archetypes auto-register; fabric is now passed to `run_workflow_processor()`; AI_INVOKE routes via `fabric.invoke_agent()`; `process_task_queue()` is scheduled as a 5th asyncio task. Two learning workflows wired: `OnProposalSectionEdited` → DiffAnalyzer; `OnProposalOutcomeRecorded` → OutcomeAttributor.
+- Context-binding: ContextAssembler pre-loads proposal sections + RFP compliance + tenant library atoms before each agent call. User content is delimited by `<untrusted_data>` tags (prompt injection defense). All agent tools enforce `tenant_id`.
+- Output is advisory only — agent output is surfaced via NOTIFY/agent_task_log; never auto-applied to proposals.
+- Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in `fabric.invoke_agent`. Budget column is `monthly_budget` (dollars), NOT `max_cost_per_month_cents`. `human_gate` enforced.
+- Activation on deploy: set ANTHROPIC_API_KEY for real Claude calls; set EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY and run `MemoryStore.backfill_embeddings` per table for vector search. (Voyage needs a vector(1536)→1024 migration first.)
+- What runs LIVE: the memory-lifecycle/learning scheduler (`lifecycle_scheduler.py`) — decay, GC, compaction, calibration on existing rows.
+- Memory: episodic/semantic/procedural read/write wired. RLS is ENABLED with ZERO `CREATE POLICY` — isolation = explicit `WHERE tenant_id`.
 
 ### Execution Engine of Record: WorkflowManager (pipeline/src/workflows/manager.py)
 - Crash recovery, heartbeat (30s), stuck detection (5min stale), orphan recovery.
@@ -1098,11 +1090,7 @@ the **human edge** was broken in several places. The durable truths:
   renders. 052 deactivated the rules whose templates rendered and left NOTIFY steps
   whose templates were missing → admin notifications went dark. Verify delivery, not
   just ownership.
-- **Agent archetypes are V2-DORMANT.** `AgentFabric` registers archetypes
-  (`pipeline/src/main.py`) but no loop dispatches events to them; `agent_task_queue`
-  has no consumer. `proposal.review_requested` / `compliance.checked` /
-  `*.draft_requested` are dead-ends until the agent loop ships. Do NOT surface UI that
-  promises agent output (the "Run AI Review" toast was corrected).
+- **Agent archetypes are now WIRED (PIPE-12–16).** `AgentFabric` is passed to `run_workflow_processor()`; AI_INVOKE routes via fabric; `process_task_queue()` is scheduled. Context-assembled, injection-hardened, tenant-isolated, advisory-only. Real Claude calls + embeddings activate on-deploy (ANTHROPIC_API_KEY required; EMBEDDINGS_PROVIDER=openai for vector search). Do NOT surface UI that promises agent output until the deploy-time env vars are confirmed live.
 - **HITL resume is implemented** in `WorkflowManager.resume_instance()`. The producer
   whose event matches the parked step's `wait_for` must be verified for any new HITL_WAIT
   step. Proposal gate: `proposal.advanced:end` (carries `previousStage`). Source-change

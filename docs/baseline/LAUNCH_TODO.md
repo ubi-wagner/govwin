@@ -57,21 +57,21 @@ All items in this section are **must-fix before production traffic**. They are a
 
 - [x] **[PIPE-09]** Remove dead `STORAGE_ROOT="/data"` constant from `pipeline/src/config.py` · `pipeline/src/config.py` · P2 · S · acceptance: `grep -rn STORAGE_ROOT` shows no callers after removal; storage code continues to use S3/R2 · source: DEPRECATION_CANDIDATES §A
 
-- [ ] **[PIPE-10]** Remove dead code blocks in `topic_expander.py` — dead `setParts` builder in `opportunity-update-topic.ts` and `volume-update-required-item.ts`; dead `updateFields` in `rfp-curation/[solId]/triage/route.ts` · `frontend/lib/tools/opportunity-update-topic.ts`, `frontend/lib/tools/volume-update-required-item.ts`, `frontend/app/api/admin/rfp-curation/[solId]/triage/route.ts` · P2 · S · acceptance: dead blocks removed; static SQL path continues to work; `tsc --noEmit` passes · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[PIPE-10]** Remove dead code blocks in `topic_expander.py` — dead `setParts` builder in `opportunity-update-topic.ts` and `volume-update-required-item.ts`; dead `updateFields` in `rfp-curation/[solId]/triage/route.ts` · `frontend/lib/tools/opportunity-update-topic.ts`, `frontend/lib/tools/volume-update-required-item.ts`, `frontend/app/api/admin/rfp-curation/[solId]/triage/route.ts` · P2 · S · acceptance: dead blocks removed; static SQL path continues to work; `tsc --noEmit` passes · source: DEPRECATION_CANDIDATES §A
 
 - [ ] **[PIPE-11]** Clarify / decide fate of `draft_section` + `review_section` job kinds: these are in `pipeline_jobs.kind` CHECK constraint but have no dispatch handler in `dispatcher.py`; either add handlers or remove from CHECK · `pipeline/src/ingest/dispatcher.py`, relevant migration · P2 · M · acceptance: CHECK enum matches dispatcher's handled cases; no undispatchable job kinds remain · source: ARCHITECTURE_V9 §5.2 — DEFERRED (in-house/V2)
 
 ### P3
 
-- [ ] **[PIPE-12]** Wire pipeline agent workforce (Step 1 of 6 per ARCHITECTURE_V9 §9.4): pass `fabric` object from `main.py` into `run_workflow_processor()` — currently a dead local var at `main.py:72` · `pipeline/src/main.py`, `pipeline/src/workflows/processor.py` · P3 · M · acceptance: `fabric` is accessible inside `run_workflow_processor`; no change in behavior yet but wiring is in place · source: ARCHITECTURE_V9 §9.4 — DEFERRED (in-house/V2)
+- [x] **[PIPE-12]** Wire pipeline agent workforce (Step 1 of 6 per ARCHITECTURE_V9 §9.4): pass `fabric` object from `main.py` into `run_workflow_processor()` — currently a dead local var at `main.py:72` · `pipeline/src/main.py`, `pipeline/src/workflows/processor.py` · P3 · M · acceptance: `fabric` is accessible inside `run_workflow_processor`; no change in behavior yet but wiring is in place · source: ARCHITECTURE_V9 §9.4
 
-- [ ] **[PIPE-13]** Wire pipeline agent workforce (Step 2): replace importlib fallback in `_execute_ai_invoke()` with `fabric.invoke_agent(archetype_role, event_payload)` · `pipeline/src/workflows/processor.py` · P3 · M · acceptance: AI_INVOKE step calls fabric; test with mock fabric confirms no ImportError path · source: ARCHITECTURE_V9 §9.4 — DEFERRED (in-house/V2)
+- [x] **[PIPE-13]** Wire pipeline agent workforce (Step 2): replace importlib fallback in `_execute_ai_invoke()` with `fabric.invoke_agent(archetype_role, event_payload)` · `pipeline/src/workflows/processor.py` · P3 · M · acceptance: AI_INVOKE step calls fabric; test with mock fabric confirms no ImportError path · source: ARCHITECTURE_V9 §9.4
 
-- [ ] **[PIPE-14]** Wire pipeline agent workforce (Step 3): schedule `fabric.process_task_queue()` as a 5th asyncio task in `main.py::asyncio.gather(...)` · `pipeline/src/main.py` · P3 · S · acceptance: `process_task_queue()` runs as concurrent task; task log shows processing activity · source: ARCHITECTURE_V9 §9.4 — DEFERRED (in-house/V2)
+- [x] **[PIPE-14]** Wire pipeline agent workforce (Step 3): schedule `fabric.process_task_queue()` as a 5th asyncio task in `main.py::asyncio.gather(...)` · `pipeline/src/main.py` · P3 · S · acceptance: `process_task_queue()` runs as concurrent task; task log shows processing activity · source: ARCHITECTURE_V9 §9.4
 
-- [ ] **[PIPE-15]** Wire pipeline agent workforce (Step 4a): implement `OnProposalSectionEdited` workflow template → calls `DiffAnalyzer.analyze()` · `pipeline/src/workflows/`, `pipeline/src/agents/learning/diff_analyzer.py` · P3 · M · acceptance: new workflow template registered; `proposal:section.saved` event triggers diff analysis; `agent_task_log` records result · source: ARCHITECTURE_V9 §9.4 — DEFERRED (in-house/V2)
+- [x] **[PIPE-15]** Wire pipeline agent workforce (Step 4a): implement `OnProposalSectionEdited` workflow template → calls `DiffAnalyzer.analyze()` · `pipeline/src/workflows/`, `pipeline/src/agents/learning/diff_analyzer.py` · P3 · M · acceptance: new workflow template registered; `proposal:section.saved` event triggers diff analysis; `agent_task_log` records result · source: ARCHITECTURE_V9 §9.4 — wired; needs the section-save event to emit originalContent/agentRole to fully activate (follow-up)
 
-- [ ] **[PIPE-16]** Wire pipeline agent workforce (Step 4b): implement `OnProposalOutcomeRecorded` workflow template → calls `OutcomeAttributor.attribute()` · `pipeline/src/workflows/`, `pipeline/src/agents/learning/outcome_attributor.py` · P3 · M · acceptance: new workflow; `proposal:outcome.recorded` event triggers attribution; `agent_performance` rows updated · source: ARCHITECTURE_V9 §9.4 — DEFERRED (in-house/V2)
+- [x] **[PIPE-16]** Wire pipeline agent workforce (Step 4b): implement `OnProposalOutcomeRecorded` workflow template → calls `OutcomeAttributor.attribute()` · `pipeline/src/workflows/`, `pipeline/src/agents/learning/outcome_attributor.py` · P3 · M · acceptance: new workflow; `proposal:outcome.recorded` event triggers attribution; `agent_performance` rows updated · source: ARCHITECTURE_V9 §9.4
 
 - [ ] **[PIPE-17]** Archive or remove `diff_analyzer.py` + `outcome_attributor.py` if PIPE-15/PIPE-16 are deferred past V2 · `pipeline/src/agents/learning/diff_analyzer.py`, `pipeline/src/agents/learning/outcome_attributor.py` · P3 · S · acceptance: decision documented; files archived or wired · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
 
@@ -111,19 +111,19 @@ All items in this section are **must-fix before production traffic**. They are a
 
 ### P2
 
-- [ ] **[FE-14]** Remove `GET /api/system` 501 stub — confirm no client fetches it (grep), then delete the route file · `frontend/app/api/system/route.ts` · P2 · S · acceptance: `grep -rn "/api/system"` shows no fetch callers; route file deleted; `next build` passes · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[FE-14]** Remove `GET /api/system` 501 stub — confirm no client fetches it (grep), then delete the route file · `frontend/app/api/system/route.ts` · P2 · S · acceptance: `grep -rn "/api/system"` shows no fetch callers; route file deleted; `next build` passes · source: DEPRECATION_CANDIDATES §A
 
 - [ ] **[FE-15]** Decide and action PPTX/XLSX exporter fate — either wire `pptx-exporter.ts` + `xlsx-exporter.ts` into the export routes, or delete them and document as V2 · `frontend/lib/export/pptx-exporter.ts`, `frontend/lib/export/xlsx-exporter.ts` · P2 · M · acceptance: either exporters are reachable via an export route, or files are deleted with a V2 note in the gap tracker · source: DEPRECATION_CANDIDATES §A / ARCHITECTURE_V9 §14.3 — DEFERRED (in-house/V2)
 
-- [ ] **[FE-16]** Remove dead `POST /api/portal/[tenantSlug]/proposals` immediately-400 endpoint — confirm no callers, remove · `frontend/app/api/portal/[tenantSlug]/proposals/route.ts` · P2 · S · acceptance: grep confirms no client calls the endpoint; route removed; `next build` passes · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[FE-16]** Remove dead `POST /api/portal/[tenantSlug]/proposals` immediately-400 endpoint — confirm no callers, remove · `frontend/app/api/portal/[tenantSlug]/proposals/route.ts` · P2 · S · acceptance: grep confirms no client calls the endpoint; route removed; `next build` passes · source: DEPRECATION_CANDIDATES §A
 
-- [ ] **[FE-17]** Consolidate `portal-nav-link.tsx` + `admin-nav-link.tsx` into one themed component · `frontend/components/portal/portal-nav-link.tsx`, `frontend/components/admin/admin-nav-link.tsx` · P2 · S · acceptance: single component with a `variant` or `colorScheme` prop; both admin and portal nav render identically to before · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[FE-17]** Consolidate `portal-nav-link.tsx` + `admin-nav-link.tsx` into one themed component · `frontend/components/portal/portal-nav-link.tsx`, `frontend/components/admin/admin-nav-link.tsx` · P2 · S · acceptance: single component with a `variant` or `colorScheme` prop; both admin and portal nav render identically to before · source: DEPRECATION_CANDIDATES §A
 
-- [ ] **[FE-18]** Remove dead `setParts` dynamic SQL builder blocks in `opportunity-update-topic.ts` and `volume-update-required-item.ts`; remove dead `updateFields` object in `rfp-curation/[solId]/triage/route.ts` · relevant files · P2 · S · acceptance: dead code removed; routes continue to use static SQL path; `tsc --noEmit` passes · source: DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[FE-18]** Remove dead `setParts` dynamic SQL builder blocks in `opportunity-update-topic.ts` and `volume-update-required-item.ts`; remove dead `updateFields` object in `rfp-curation/[solId]/triage/route.ts` · relevant files · P2 · S · acceptance: dead code removed; routes continue to use static SQL path; `tsc --noEmit` passes · source: DEPRECATION_CANDIDATES §A
 
-- [ ] **[FE-19]** Implement or remove `GET,PATCH /api/portal/[tenantSlug]/agents/config` 501 stubs — if implementing, add basic agent preference persistence; if deferring, remove stub and hide UI · `frontend/app/api/portal/[tenantSlug]/agents/config/route.ts` · P2 · M · acceptance: either route returns data or route and its UI entry point are removed · source: ARCHITECTURE_V9 §14.2 / DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
+- [x] **[FE-19]** Implement or remove `GET,PATCH /api/portal/[tenantSlug]/agents/config` 501 stubs — if implementing, add basic agent preference persistence; if deferring, remove stub and hide UI · `frontend/app/api/portal/[tenantSlug]/agents/config/route.ts` · P2 · M · acceptance: either route returns data or route and its UI entry point are removed · source: ARCHITECTURE_V9 §14.2 / DEPRECATION_CANDIDATES §A
 
-- [ ] **[FE-20]** Add migration to change `proposal_sections.content` column type from TEXT to JSONB for explicit semantics (currently written with `::jsonb` cast; works but non-explicit) · `db/migrations/` · P2 · S · acceptance: new migration applies cleanly; existing rows round-trip; shredder + section save + canvas load verified · source: AUDIT_PRELAUNCH_20260428 §Audit4-Break4 — DEFERRED (in-house/V2)
+- [x] **[FE-20]** Add migration to change `proposal_sections.content` column type from TEXT to JSONB for explicit semantics (currently written with `::jsonb` cast; works but non-explicit) · `db/migrations/` · P2 · S · acceptance: new migration applies cleanly; existing rows round-trip; shredder + section save + canvas load verified · source: AUDIT_PRELAUNCH_20260428 §Audit4-Break4
 
 ---
 
@@ -131,11 +131,11 @@ All items in this section are **must-fix before production traffic**. They are a
 
 ### P2
 
-- [ ] **[DATA-01]** Deprecate `trigger_bus`/`trigger_events` columns from `automation_rules` — add migration to DROP the two legacy columns after confirming zero writes (grep across all 3 services) · `db/migrations/` · P2 · M · acceptance: `grep -rn trigger_bus\|trigger_events` shows no active writes; migration applied; CMS `event_listener.py` introspection path confirmed to work with `trigger_namespace`/`trigger_type` only · source: ARCHITECTURE_V9 §7.5 / DEPRECATION_CANDIDATES §B — DEFERRED (in-house/V2)
+- [x] **[DATA-01]** Deprecate `trigger_bus`/`trigger_events` columns from `automation_rules` — add migration to DROP the two legacy columns after confirming zero writes (grep across all 3 services) · `db/migrations/` · P2 · M · acceptance: `grep -rn trigger_bus\|trigger_events` shows no active writes; migration applied; CMS `event_listener.py` introspection path confirmed to work with `trigger_namespace`/`trigger_type` only · source: ARCHITECTURE_V9 §7.5 / DEPRECATION_CANDIDATES §B
 
 - [ ] **[DATA-02]** Add RLS policies to 4 memory tables (`episodic_memories`, `semantic_memories`, `procedural_memories`, `agent_task_log`) or document the isolation model and remove the RLS-enabled-but-no-policies footgun · `db/migrations/` (new migration) · P2 · M · acceptance: either: (a) at least one `CREATE POLICY` per table with tenant_id scoping, or (b) a migration that `ALTER TABLE … DISABLE ROW LEVEL SECURITY` with a comment explaining app-layer isolation; CLAUDE.md updated to reflect reality · source: ARCHITECTURE_V9 §7.4 / BASELINE_FINDINGS §2.8 — DEFERRED (in-house/V2); note: RLS reality is already documented accurately; adding real policies needs an app-set tenant GUC = V2.
 
-- [ ] **[DATA-03]** Remove dead `agent` namespace from `system_events.namespace` column CHECK constraint and comment — add migration to update CHECK to the 7 canonical namespaces · `db/migrations/` · P2 · S · acceptance: `system_events.namespace` CHECK does not include `agent`; ARCHITECTURE_V9 §8.2 is the reference; zero runtime emissions of `agent` namespace confirmed · source: ARCHITECTURE_V9 §8.2 / BASELINE_FINDINGS §6.2 — DEFERRED (in-house/V2)
+- [x] **[DATA-03]** Remove dead `agent` namespace from `system_events.namespace` column CHECK constraint and comment — add migration to update CHECK to the 7 canonical namespaces · `db/migrations/` · P2 · S · acceptance: `system_events.namespace` CHECK does not include `agent`; ARCHITECTURE_V9 §8.2 is the reference; zero runtime emissions of `agent` namespace confirmed · source: ARCHITECTURE_V9 §8.2 / BASELINE_FINDINGS §6.2
 
 ### P3
 
@@ -183,11 +183,11 @@ All items in this section are **must-fix before production traffic**. They are a
 
 - [x] **[AGENT-01]** Add `AgentFabric` + archetype registration smoke test — confirm all 10 archetypes register without error on startup; confirm `AgentFabric()` instantiates cleanly · `pipeline/src/agents/fabric.py`, `pipeline/tests/` · P2 · M · acceptance: `test_agents.py` (replacing placeholder) tests `AgentFabric()` init, confirms `len(fabric.archetypes) == 10`; runs in CI · source: TEST_MATRIX §Pipeline Agents / DEPRECATION_CANDIDATES §A (PIPE-11 placeholder)
 
-- [ ] **[AGENT-02]** Add `agents/tools.py` ToolRegistry tenant isolation tests — 9 SQL handlers; confirm each enforces `tenant_id` filter · `pipeline/src/agents/tools.py`, `pipeline/tests/` · P2 · M · acceptance: pytest with fake conn confirms each tool handler adds `WHERE tenant_id = $tenant_id` to its query; cross-tenant queries are rejected · source: TEST_MATRIX rank-11 — DEFERRED (in-house/V2)
+- [x] **[AGENT-02]** Add `agents/tools.py` ToolRegistry tenant isolation tests — 9 SQL handlers; confirm each enforces `tenant_id` filter · `pipeline/src/agents/tools.py`, `pipeline/tests/` · P2 · M · acceptance: pytest with fake conn confirms each tool handler adds `WHERE tenant_id = $tenant_id` to its query; cross-tenant queries are rejected · source: TEST_MATRIX rank-11
 
 ### P3
 
-- [ ] **[AGENT-03]** Add pgvector embeddings to memory store — implement embedding generation (Anthropic text-embeddings API or equivalent) and replace zero-vector placeholders · `pipeline/src/agents/memory.py`, `pipeline/src/agents/lifecycle/` · P3 · L · acceptance: `MemoryStore.store()` generates a real embedding vector; `recall()` uses cosine similarity (not ILIKE); HNSW index is used in query plan · source: ARCHITECTURE_V9 §9.3 — DEFERRED (in-house/V2)
+- [x] **[AGENT-03]** Add pgvector embeddings to memory store — implement embedding generation (Anthropic text-embeddings API or equivalent) and replace zero-vector placeholders · `pipeline/src/agents/memory.py`, `pipeline/src/agents/lifecycle/` · P3 · L · acceptance: `MemoryStore.store()` generates a real embedding vector; `recall()` uses cosine similarity (not ILIKE); HNSW index is used in query plan · source: ARCHITECTURE_V9 §9.3 — SCAFFOLDED (pluggable, default-off); activate on deploy with EMBEDDINGS_PROVIDER=openai + OPENAI_API_KEY + backfill
 
 - [ ] **[AGENT-04]** Add memory lifecycle module tests: `MemoryStore.store()` + `recall()`, `decay.py`, `gc.py` retention guards · `pipeline/tests/`, `pipeline/src/agents/` · P3 · L · acceptance: `test_memory.py` (replacing placeholder) covers store/recall round-trip, decay factor update, GC retention guard (importance ≥ 0.9 threshold) · source: TEST_MATRIX §Pipeline Lifecycle / DEPRECATION_CANDIDATES §A — DEFERRED (in-house/V2)
 
@@ -281,19 +281,19 @@ All items in this section are **must-fix before production traffic**. They are a
 
 ### P3
 
-- [ ] **[DOC-06]** Archive superseded architecture docs — move `ARCHITECTURE_V5.md` and `docs/ARCHITECTURE_V6.md` to `docs/archive/` · `ARCHITECTURE_V5.md`, `docs/ARCHITECTURE_V6.md` · P3 · S · acceptance: files in `docs/archive/`; no links to them from active docs · source: DEPRECATION_CANDIDATES §C — DEFERRED (in-house/V2)
+- [x] **[DOC-06]** Archive superseded architecture docs — move `ARCHITECTURE_V5.md` and `docs/ARCHITECTURE_V6.md` to `docs/archive/` · `ARCHITECTURE_V5.md`, `docs/ARCHITECTURE_V6.md` · P3 · S · acceptance: files in `docs/archive/`; no links to them from active docs · source: DEPRECATION_CANDIDATES §C
 
-- [ ] **[DOC-07]** Archive stale event docs — move `docs/EVENT_CONTRACT.md` and `docs/NAMESPACES.md` to `docs/archive/` after confirming ARCHITECTURE_V9 §8 is the authoritative namespace reference · `docs/EVENT_CONTRACT.md`, `docs/NAMESPACES.md` · P3 · S · acceptance: files archived; ARCHITECTURE_V9 §8.2 is the single namespace reference · source: DEPRECATION_CANDIDATES §C — DEFERRED (in-house/V2)
+- [x] **[DOC-07]** Archive stale event docs — move `docs/EVENT_CONTRACT.md` and `docs/NAMESPACES.md` to `docs/archive/` after confirming ARCHITECTURE_V9 §8 is the authoritative namespace reference · `docs/EVENT_CONTRACT.md`, `docs/NAMESPACES.md` · P3 · S · acceptance: files archived; ARCHITECTURE_V9 §8.2 is the single namespace reference · source: DEPRECATION_CANDIDATES §C
 
-- [ ] **[DOC-08]** Archive completed phase docs — move `docs/phase-1/*` (10 files), `docs/PHASE_1_PLAN.md`, `docs/PHASE_0_5_CHECKLIST.md`, `docs/PHASE_0_5_VERIFICATION.md`, `docs/IMPLEMENTATION_PLAN_V2.md` to `docs/archive/` · `docs/` · P3 · S · acceptance: `docs/` root cleaned of completed-phase files · source: DEPRECATION_CANDIDATES §C — DEFERRED (in-house/V2)
+- [x] **[DOC-08]** Archive completed phase docs — move `docs/phase-1/*` (10 files), `docs/PHASE_1_PLAN.md`, `docs/PHASE_0_5_CHECKLIST.md`, `docs/PHASE_0_5_VERIFICATION.md`, `docs/IMPLEMENTATION_PLAN_V2.md` to `docs/archive/` · `docs/` · P3 · S · acceptance: `docs/` root cleaned of completed-phase files · source: DEPRECATION_CANDIDATES §C
 
-- [ ] **[DOC-09]** Archive superseded workflow + testing docs — move `docs/HITL_TEST_PLAN.md`, `docs/AUTOMATION_WORKFLOWS.md` to `docs/archive/` after confirming `docs/WORKFLOW_REFERENCE.md` supersedes them · `docs/HITL_TEST_PLAN.md`, `docs/AUTOMATION_WORKFLOWS.md` · P3 · S · acceptance: files archived; WORKFLOW_REFERENCE.md is the single workflow reference · source: DEPRECATION_CANDIDATES §C — DEFERRED (in-house/V2)
+- [x] **[DOC-09]** Archive superseded workflow + testing docs — move `docs/HITL_TEST_PLAN.md`, `docs/AUTOMATION_WORKFLOWS.md` to `docs/archive/` after confirming `docs/WORKFLOW_REFERENCE.md` supersedes them · `docs/HITL_TEST_PLAN.md`, `docs/AUTOMATION_WORKFLOWS.md` · P3 · S · acceptance: files archived; WORKFLOW_REFERENCE.md is the single workflow reference · source: DEPRECATION_CANDIDATES §C
 
 - [ ] **[DOC-10]** Consolidate and standardize API convention docs — `docs/API_CONVENTIONS.md` mandates `withHandler()`; `CLAUDE_CLIFFNOTES.md §2` shows raw `NextResponse.json`; resolve which pattern is canonical and update both docs · `docs/API_CONVENTIONS.md`, `CLAUDE_CLIFFNOTES.md` · P3 · M · acceptance: one canonical API pattern documented; all new route authoring follows it · source: BASELINE_FINDINGS §4 / ARCHITECTURE_V9 §13.5 — DEFERRED (in-house/V2)
 
-- [ ] **[DOC-11]** Remove `agent` namespace from `system_events.namespace` column comment and any doc references — ARCHITECTURE_V9 §8.2 confirms zero runtime emissions · docs and DB migration · P3 · S · acceptance: `agent` namespace appears nowhere in active docs or schema comments; DATA-03 migration handles the DB side · source: ARCHITECTURE_V9 §8.2 / BASELINE_FINDINGS §6.2 — DEFERRED (in-house/V2)
+- [x] **[DOC-11]** Remove `agent` namespace from `system_events.namespace` column comment and any doc references — ARCHITECTURE_V9 §8.2 confirms zero runtime emissions · docs and DB migration · P3 · S · acceptance: `agent` namespace appears nowhere in active docs or schema comments; DATA-03 migration handles the DB side · source: ARCHITECTURE_V9 §8.2 / BASELINE_FINDINGS §6.2
 
-- [ ] **[DOC-12]** Update `docs/EVENT_CONTRACT_V3.md` stale content — document marks the HITL resume as broken (bug); ARCHITECTURE_V9 §14 confirms HITL resume is implemented; update to reflect current state · `docs/EVENT_CONTRACT_V3.md` · P3 · S · acceptance: V3 doc accurately describes implemented HITL resume path · source: BASELINE_FINDINGS §2.4 — DEFERRED (in-house/V2)
+- [x] **[DOC-12]** Update `docs/EVENT_CONTRACT_V3.md` stale content — document marks the HITL resume as broken (bug); ARCHITECTURE_V9 §14 confirms HITL resume is implemented; update to reflect current state · `docs/EVENT_CONTRACT_V3.md` · P3 · S · acceptance: V3 doc accurately describes implemented HITL resume path · source: BASELINE_FINDINGS §2.4
 
 ---
 
@@ -312,3 +312,5 @@ All items in this section are **must-fix before production traffic**. They are a
 | **Total** | **15** | **25** | **40** | **19** | **99** |
 
 **Status as of fix pass (2026-06-23):** P0 15/15 done (2 were false positives: FE-01, FE-07); P1 done where listed above (FE-09–FE-13, CMS-01–CMS-03, TEST-05–TEST-09, TEST-11, TEST-15); P2 5 done (PIPE-07–PIPE-09, AGENT-01, TEST-16, CI-03, DOC-01–DOC-05); remainder deferred (in-house/V2). New test counts: pipeline 383 passed / 29 skipped (was 239/24); frontend 404 passed / 24 files (was 273/17); CMS 100 passed / 2 skipped (was 54/2).
+
+**Agent pipeline now WIRED + context-bound + injection-hardened + tenant-isolated; vectorization scaffolded default-off.**
