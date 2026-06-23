@@ -39,18 +39,31 @@ export async function forceAdvanceProcess(opts: {
   const { instanceId, actor, note } = opts;
 
   // ── Load the target instance ───────────────────────────────────────
-  const rows = await sql<{
+  let rows: {
     id: string;
     status: string;
     currentStep: string | null;
     stepStatus: Record<string, string> | null;
     stepResults: Record<string, unknown> | null;
     tenantId: string | null;
-  }[]>`
-    SELECT id, status, current_step, step_status, step_results, tenant_id
-    FROM process_instances
-    WHERE id = ${instanceId}::uuid
-  `;
+  }[];
+  try {
+    rows = await sql<{
+      id: string;
+      status: string;
+      currentStep: string | null;
+      stepStatus: Record<string, string> | null;
+      stepResults: Record<string, unknown> | null;
+      tenantId: string | null;
+    }[]>`
+      SELECT id, status, current_step, step_status, step_results, tenant_id
+      FROM process_instances
+      WHERE id = ${instanceId}::uuid
+    `;
+  } catch (e) {
+    console.error('[force-advance] instance query failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
   if (rows.length === 0) {
     return { ok: false, status: 404, error: 'Process instance not found', code: 'NOT_FOUND' };
   }
@@ -86,16 +99,22 @@ export async function forceAdvanceProcess(opts: {
   }
 
   // ── Transition paused → retrying (guarded against a lost race) ──────
-  const updated = await sql<{ id: string }[]>`
-    UPDATE process_instances
-    SET status = 'retrying',
-        step_status = ${JSON.stringify(stepStatus)}::jsonb,
-        step_results = ${JSON.stringify(stepResults)}::jsonb,
-        last_heartbeat_at = now(),
-        updated_at = now()
-    WHERE id = ${instanceId}::uuid AND status = 'paused'
-    RETURNING id
-  `;
+  let updated: { id: string }[];
+  try {
+    updated = await sql<{ id: string }[]>`
+      UPDATE process_instances
+      SET status = 'retrying',
+          step_status = ${JSON.stringify(stepStatus)}::jsonb,
+          step_results = ${JSON.stringify(stepResults)}::jsonb,
+          last_heartbeat_at = now(),
+          updated_at = now()
+      WHERE id = ${instanceId}::uuid AND status = 'paused'
+      RETURNING id
+    `;
+  } catch (e) {
+    console.error('[force-advance] instance update failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
   if (updated.length === 0) {
     return { ok: false, status: 409, error: 'Process is no longer paused', code: 'NOT_PAUSED' };
   }
@@ -107,24 +126,34 @@ export async function forceAdvanceProcess(opts: {
   // the task-completion path the actor's own row is already 'completed', so this
   // WHERE skips it and only closes the siblings (Bob's). Mirrors pipeline
   // resume_instance's reconcile so both engines behave identically.
-  await sql`
-    UPDATE tasks
-    SET status = 'completed',
-        completed_by = ${actor.id}::uuid,
-        completed_at = now(),
-        updated_at = now()
-    WHERE process_instance_id = ${instanceId}::uuid
-      AND status IN ('open', 'in_progress')
-  `;
+  try {
+    await sql`
+      UPDATE tasks
+      SET status = 'completed',
+          completed_by = ${actor.id}::uuid,
+          completed_at = now(),
+          updated_at = now()
+      WHERE process_instance_id = ${instanceId}::uuid
+        AND status IN ('open', 'in_progress')
+    `;
+  } catch (e) {
+    console.error('[force-advance] tasks reconcile failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
 
   // ── Durable audit: who forced it ───────────────────────────────────
-  await sql`
-    INSERT INTO process_instance_transitions
-      (instance_id, from_status, to_status, step_name, actor, reason, metadata)
-    VALUES (${instanceId}::uuid, 'paused', 'retrying', ${currentStep},
-            ${actor.email ?? actor.id}, 'hitl_forced',
-            ${JSON.stringify({ forcedByRole: actor.role, forcedById: actor.id, note: note ?? null })}::jsonb)
-  `;
+  try {
+    await sql`
+      INSERT INTO process_instance_transitions
+        (instance_id, from_status, to_status, step_name, actor, reason, metadata)
+      VALUES (${instanceId}::uuid, 'paused', 'retrying', ${currentStep},
+              ${actor.email ?? actor.id}, 'hitl_forced',
+              ${JSON.stringify({ forcedByRole: actor.role, forcedById: actor.id, note: note ?? null })}::jsonb)
+    `;
+  } catch (e) {
+    console.error('[force-advance] audit insert failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
 
   // ── Observable event — namespace reflects who acted (admin vs customer) ──
   const namespace = hasRoleAtLeast(actor.role, 'rfp_admin') ? 'finder' : 'capture';

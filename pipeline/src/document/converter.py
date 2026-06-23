@@ -144,9 +144,16 @@ async def convert_format(
             env={**os.environ, "HOME": str(work_dir)},
         )
 
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=CONVERT_TIMEOUT
-        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=CONVERT_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise RuntimeError(
+                f"LibreOffice timed out after {CONVERT_TIMEOUT}s converting "
+                f"{source_format} → {target_format}"
+            )
 
         if proc.returncode != 0:
             raise RuntimeError(

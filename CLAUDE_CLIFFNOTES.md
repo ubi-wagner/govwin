@@ -813,25 +813,26 @@ payloads (`app/api/admin/topics/[id]/route.ts` → `topicId`/`changes`;
 `opportunity.update_topic` → `opportunityId`/`changedFields`) — reconcile to one
 canonical shape.
 
-### Mistake 25: Double-emit of `finder:topics.expanded`
+### ✅ RESOLVED (fix pass): Mistake 25: Double-emit of `finder:topics.expanded`
 Both `topic_expander._emit_topics_expanded` AND `dispatcher._run_expand_topics_job`
 emit `finder:topics.expanded` for one job — two events are written per expansion.
 
 **Rule:** Emit once, from one owner. Pick the expander (close to the work) and remove
 the dispatcher's redundant emit.
 
-### Mistake 26: Unescaped ILIKE on user input (confirmed in two files)
-`lib/tools/memory-search.ts` and `lib/tools/library-search-atoms.ts` pass user input
-directly into ILIKE patterns without escaping — wildcard-DoS / match-bypass risk.
+### ⚠️ FALSE POSITIVE — not a real bug: Mistake 26: Unescaped ILIKE on user input (confirmed in two files)
+`lib/tools/memory-search.ts` and `lib/tools/library-search-atoms.ts` — these files ALREADY escape ILIKE via `.replace(/[%_\\]/g, '\\$&')`. The baseline incorrectly flagged them as violators; code inspection confirmed escaping was already present.
 
 **Rule:** Always apply `.replace(/[%_\\]/g, '\\$&')` before building ILIKE patterns
 (already in Mistake 4 — these two files were confirmed violators as of the baseline).
 
-### Mistake 27: `await sql` with no inner try/catch (20+ routes)
-20+ routes run `await sql` inside the outer handler try/catch but with no per-query
-try/catch — a DB error produces a generic 500 and exposes no diagnostics. Confirmed
-in: `admin/analytics`, `admin/pipeline`, `admin/tenants`, `admin/workflows/*`,
-`portal/dashboard`, `portal/proposals/[id]/{sections,compliance,dropbox,collaborators}`.
+### ✅ RESOLVED (fix pass): Mistake 27: `await sql` with no inner try/catch (~4 routes needed it; 16 of the listed 20 were already compliant — fixed the 4)
+~4 routes ran `await sql` inside the outer handler try/catch but with no per-query
+try/catch — a DB error produced a generic 500 and exposed no diagnostics. 16 of the
+originally listed 20 routes were already compliant on inspection; the 4 that genuinely
+needed fixes were corrected. Confirmed in: `admin/analytics`, `admin/pipeline`,
+`admin/tenants`, `admin/workflows/*`, `portal/dashboard`,
+`portal/proposals/[id]/{sections,compliance,dropbox,collaborators}`.
 
 **Rule:** EVERY `await sql` call must be inside its own try/catch returning a clean
 error response. The outer catch is a last resort, not a substitute.
@@ -844,41 +845,39 @@ business operation succeeded — the client retries and the op double-executes.
 **Rule:** Wrap every event emit in its own try/catch. Log the emit failure; do NOT
 propagate it as a 500. The business operation already committed.
 
-### Mistake 29: `invite` route double-prefixed event type + no transaction
+### ✅ RESOLVED (fix pass): Mistake 29: `invite` route double-prefixed event type + no transaction
 `POST /api/invite/route.ts` emits type `identity.identity.invite_accepted` (should be
 `invite.accepted`) and writes to multiple tables with no `sql.begin()` transaction.
 
 **Rule:** Event type = `entity.action_past_tense` with no namespace prefix in the
 `type` field. Multi-table writes that must be atomic require `sql.begin()`.
 
-### Mistake 30: `pdf-reader.ts` named import from default-export package
-`frontend/lib/import/pdf-reader.ts` does `import { PDFParse } from 'pdf-parse'` but
-`pdf-parse` only has a default export — runtime error on first PDF import call.
+### ⚠️ FALSE POSITIVE — not a real bug: Mistake 30: `pdf-reader.ts` named import from default-export package
+`frontend/lib/import/pdf-reader.ts` does `import { PDFParse } from 'pdf-parse'` — pdf-parse is v2.4.5 which exports `PDFParse` as a NAMED export (class); `tsc` resolves the named import correctly. The baseline assumed v1.x default-only export behavior. The named import is CORRECT and no change is needed.
 
-**Rule:** Check the export style of third-party packages before importing. Use
-`import PDFParse from 'pdf-parse'` (default import).
+**Rule:** Check the export style of third-party packages before importing. Verify against the installed version, not assumed defaults.
 
-### Mistake 31: `portal/[tenantSlug]/profile` GET has no role floor
+### ✅ RESOLVED (fix pass): Mistake 31: `portal/[tenantSlug]/profile` GET has no role floor
 A `partner_user` can call `GET /api/portal/[tenantSlug]/profile` and read
 `billing_email` plus full company profile — no role minimum is enforced.
 
 **Rule:** Add `hasRoleAtLeast('tenant_user')` check before returning billing fields;
 or strip `billing_email` from the response for `partner_user` callers.
 
-### Mistake 32: `admin/sbir-data/ingest` leaks internal error text to client
+### ✅ RESOLVED (fix pass): Mistake 32: `admin/sbir-data/ingest` leaks internal error text to client
 The route returns raw error details (including SQL error messages) in the response
 body, and uses `sql.unsafe` batch inserts with no `ON CONFLICT` clause.
 
 **Rule:** Never expose internal error details to clients. Use a generic message for
 500s. Use explicit `ON CONFLICT (column)` on all upserts.
 
-### Mistake 33: `scoring/engine.py::ScoringEngine` is dead code
+### ✅ RESOLVED (fix pass): Mistake 33: `scoring/engine.py::ScoringEngine` is dead code — removed
 `pipeline/src/scoring/engine.py::ScoringEngine` has no caller anywhere in the
 codebase. The live scoring path is `workflows/actions/score_tenants.py::match_tenants`
-(invoked by `OnSolicitationPushed`). `ScoringEngine` is a vestige.
+(invoked by `OnSolicitationPushed`). `ScoringEngine` was a vestige and has been removed.
 
 **Rule:** Do not reference or extend `ScoringEngine`. Use `match_tenants` for all
-scoring work. `ScoringEngine` is a deprecation candidate.
+scoring work.
 
 ### Mistake 34: Pipeline agent workforce is DORMANT — do not wire AI to it
 `AgentFabric` is instantiated at `main.py:72` as a local var that goes out of scope.
@@ -890,10 +889,11 @@ workforce. Product AI works via the frontend calling Anthropic directly
 (`portal/.../ai/draft|review|compliance`, `claude-sonnet-4-20250514`). The pipeline
 agent workforce is V2 (see ARCHITECTURE_V9.md §9.4 for what wiring is needed).
 
-### Mistake 35: `config.STORAGE_ROOT="/data"` is a dead constant — do not use it
-`pipeline/src/config.py::STORAGE_ROOT` is set but never imported by any storage code.
+### ✅ RESOLVED (fix pass): Mistake 35: `config.STORAGE_ROOT="/data"` is a dead constant — removed
+`pipeline/src/config.py::STORAGE_ROOT` was set but never imported by any storage code.
 All pipeline storage goes through `storage/s3_client.py` (boto3 / Cloudflare R2).
 The `/data` Railway volume is used ONLY by the CMS service for its own media files.
+The constant has been removed from `config.py`.
 
 **Rule:** Never use `config.STORAGE_ROOT` for pipeline file paths. Use the S3 key
 scheme (see ARCHITECTURE_V9.md §11).

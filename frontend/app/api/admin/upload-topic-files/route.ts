@@ -155,18 +155,22 @@ export async function POST(request: Request) {
   }
 
   if (uploaded.length > 0) {
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'topic_file.uploaded',
-      actor: { type: 'user', id: userId ?? 'unknown' },
-      tenantId: null,
-      payload: {
-        correlationId: randomUUID(),
-        solicitationId,
-        fileCount: uploaded.length,
-        documentIds: uploaded.map(u => u.documentId),
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'topic_file.uploaded',
+        actor: { type: 'user', id: userId ?? 'unknown' },
+        tenantId: null,
+        payload: {
+          correlationId: randomUUID(),
+          solicitationId,
+          fileCount: uploaded.length,
+          documentIds: uploaded.map(u => u.documentId),
+        },
+      });
+    } catch (evtErr) {
+      console.error('[upload-topic-files] event emission failed', evtErr);
+    }
   }
 
   return NextResponse.json({ data: { uploaded, totalFiles: files.length } }, { status: 201 });

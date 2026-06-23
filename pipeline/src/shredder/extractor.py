@@ -11,6 +11,7 @@ ship bytes to the LLM.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 from typing import Optional
@@ -130,12 +131,14 @@ async def extract_text_from_s3_key(
         bucket = bucket or default_bucket
 
     try:
-        # boto3's get_object is synchronous; we run it directly because
-        # the rest of the shredder pipeline is async but IO-bound and
-        # the per-document fetch is a single round-trip. If we ever
-        # batch this, swap to aioboto3.
-        response = s3_client.get_object(Bucket=bucket, Key=s3_key)  # type: ignore[attr-defined]
-        pdf_bytes = response["Body"].read()
+        # boto3's get_object is synchronous — run it in a thread pool
+        # executor so the async event loop is not blocked during the S3
+        # round-trip (fixes PIPE-04).
+        def _s3_fetch():
+            resp = s3_client.get_object(Bucket=bucket, Key=s3_key)  # type: ignore[attr-defined]
+            return resp["Body"].read()
+
+        pdf_bytes = await asyncio.to_thread(_s3_fetch)
     except Exception as e:
         raise ExtractionError(
             f"S3 fetch failed for key={s3_key!r} bucket={bucket!r}: {e}"

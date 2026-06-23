@@ -964,17 +964,17 @@ These are deviations from CLAUDE.md confirmed by the file-by-file audit:
 
 | Sev | Bug | Location |
 |-----|-----|---------|
-| 🔴 | **Double-emit** of `finder:topics.expanded` — both `topic_expander.py::_emit_topics_expanded` and `dispatcher.py::_run_expand_topics_job` emit for one job (M3 regression) | `pipeline/src/ingest/topic_expander.py`, `dispatcher.py` |
-| 🔴 | `pdf-reader.ts` uses `{ PDFParse }` named import but `pdf-parse` only has a default export — likely runtime error on first PDF import | `frontend/lib/import/pdf-reader.ts` |
-| 🔴 | `lifecycle_scheduler` reconnect loop is **recursive** → stack overflow under sustained DB outage | `pipeline/src/lifecycle_scheduler.py` |
-| 🟡 | `shredder/extractor.py` calls **synchronous boto3 inside async** — blocks event loop per PDF | `pipeline/src/shredder/extractor.py` |
-| 🟡 | `agents/learning/__init__.py` has broken absolute imports (`pipeline.src.agents.learning.*`) → ImportError (masked because scheduler imports directly) | `pipeline/src/agents/learning/__init__.py` |
-| 🟡 | `invite` POST emits double-prefixed type `identity.identity.invite_accepted` (should be `invite.accepted`) and does multi-table writes with no transaction | `frontend/app/api/invite/route.ts` |
-| 🟡 | `consent` POST: multi-table writes with no transaction | `frontend/app/api/consent/route.ts` |
-| 🟡 | `portal/[tenantSlug]/profile` GET has no role floor — `partner_user` can read `billing_email` + company profile | `frontend/app/api/portal/[tenantSlug]/profile/route.ts` |
-| 🟡 | `admin/sbir-data/ingest` leaks internal error text to client; `sql.unsafe` batch with no `ON CONFLICT` | `frontend/app/api/admin/sbir-data/ingest/route.ts` |
-| 🟡 | `document/converter.py::convert_format()` has no subprocess timeout — hung LibreOffice blocks loop | `pipeline/src/document/converter.py` |
-| 🟡 | `tools/source-scout.ts` silently swallows Claude errors (`catch { return null }`) | `frontend/lib/tools/source-scout.ts` |
+| ✅ fixed (fix pass) | **Double-emit** of `finder:topics.expanded` — both `topic_expander.py::_emit_topics_expanded` and `dispatcher.py::_run_expand_topics_job` emit for one job (M3 regression) | `pipeline/src/ingest/topic_expander.py`, `dispatcher.py` |
+| not a bug — pdf-parse v2.4.5 named export (false positive) | ~~`pdf-reader.ts` uses `{ PDFParse }` named import but `pdf-parse` only has a default export~~ — pdf-parse v2.4.5 exports `PDFParse` as a named export; `tsc` resolves it correctly. Named import is CORRECT. | `frontend/lib/import/pdf-reader.ts` |
+| ✅ fixed (fix pass) | `lifecycle_scheduler` reconnect loop is **recursive** → stack overflow under sustained DB outage | `pipeline/src/lifecycle_scheduler.py` |
+| ✅ fixed (fix pass) | `shredder/extractor.py` calls **synchronous boto3 inside async** — blocks event loop per PDF | `pipeline/src/shredder/extractor.py` |
+| ✅ fixed (fix pass) | `agents/learning/__init__.py` has broken absolute imports (`pipeline.src.agents.learning.*`) → ImportError (masked because scheduler imports directly) | `pipeline/src/agents/learning/__init__.py` |
+| ✅ fixed (fix pass) | `invite` POST emits double-prefixed type `identity.identity.invite_accepted` (should be `invite.accepted`) and does multi-table writes with no transaction | `frontend/app/api/invite/route.ts` |
+| ✅ fixed (fix pass) | `consent` POST: multi-table writes with no transaction | `frontend/app/api/consent/route.ts` |
+| ✅ fixed (fix pass) | `portal/[tenantSlug]/profile` GET has no role floor — `partner_user` can read `billing_email` + company profile | `frontend/app/api/portal/[tenantSlug]/profile/route.ts` |
+| ✅ fixed (fix pass) | `admin/sbir-data/ingest` leaks internal error text to client; `sql.unsafe` batch with no `ON CONFLICT` | `frontend/app/api/admin/sbir-data/ingest/route.ts` |
+| ✅ fixed (fix pass) | `document/converter.py::convert_format()` has no subprocess timeout — hung LibreOffice blocks loop | `pipeline/src/document/converter.py` |
+| ✅ fixed (fix pass) | `tools/source-scout.ts` silently swallows Claude errors (`catch { return null }`) | `frontend/lib/tools/source-scout.ts` |
 
 ### 14.2 Dormant Items
 

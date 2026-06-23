@@ -297,22 +297,26 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Emit event ───────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'section.saved',
-      actor: userActor(sessionUser.id, sessionUser.email),
-      tenantId,
-      payload: {
-        correlationId: randomUUID(),
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'section.saved',
+        actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        tenantSlug,
-        proposalId,
-        sectionId,
-        sectionTitle: section.title,
-        version: nextVersion,
-        status: newStatus ?? undefined,
-      },
-    });
+        payload: {
+          correlationId: randomUUID(),
+          tenantId,
+          tenantSlug,
+          proposalId,
+          sectionId,
+          sectionTitle: section.title,
+          version: nextVersion,
+          status: newStatus ?? undefined,
+        },
+      });
+    } catch (evtErr) {
+      console.error('[api/portal/proposals/sections/save] event emission failed:', evtErr);
+    }
 
     // ── Activity log ────────────────────────────────────────────────
     try {

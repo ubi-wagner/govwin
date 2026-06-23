@@ -122,32 +122,3 @@ async def emit_end(
         )
     except Exception as e:
         log.error("emit_end failed for start=%s: %s", start_event_id, e)
-
-
-# ─── Legacy compatibility (deprecated — use emit_event directly) ────
-
-
-async def emit_opportunity_event(
-    conn, event_type: str, opportunity_id: str | None = None,
-    source: str | None = None, metadata: dict | None = None,
-) -> None:
-    await emit_event(
-        conn,
-        namespace="finder",
-        type=event_type,
-        payload={"opportunityId": opportunity_id, "source": source, **(metadata or {})},
-    )
-
-
-async def emit_customer_event(
-    conn, event_type: str, tenant_id: str | None = None,
-    user_id: str | None = None, metadata: dict | None = None,
-) -> None:
-    await emit_event(
-        conn,
-        namespace="capture",
-        type=event_type,
-        tenant_id=tenant_id,
-        actor_id=user_id or "system",
-        payload=metadata or {},
-    )

@@ -86,37 +86,29 @@ export async function POST(request: Request) {
     const forwarded = request.headers.get('x-forwarded-for');
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : null;
 
-    // ── Insert consent record ────────────────────────────────────
+    // ── Insert consent record + update user in one transaction ──────────
+    let recordId: string;
+    let recordAcceptedAt: string;
     try {
-      const [record] = await sql<{ id: string; acceptedAt: string }[]>`
-        INSERT INTO consent_records (user_id, document_type, document_version, ip_address)
-        VALUES (${sessionUser.id}::uuid, ${body.document_type}, ${body.document_version}, ${ipAddress})
-        RETURNING id, accepted_at
-      `;
-
-      // Also update user's terms_accepted_at if this is a TOS acceptance
-      if (body.document_type === 'terms_of_service') {
-        await sql`
-          UPDATE users SET terms_accepted_at = now() WHERE id = ${sessionUser.id}::uuid
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await sql.begin(async (txSql: any) => {
+        const [record] = await txSql<{ id: string; acceptedAt: string }[]>`
+          INSERT INTO consent_records (user_id, document_type, document_version, ip_address)
+          VALUES (${sessionUser.id}::uuid, ${body.document_type}, ${body.document_version}, ${ipAddress})
+          RETURNING id, accepted_at
         `;
-      }
 
-      try {
-        await emitEventSingle({
-          namespace: 'identity',
-          type: 'consent.recorded',
-          actor: userActor(sessionUser.id),
-          tenantId: null,
-          payload: { userId: sessionUser.id, documentType: body.document_type },
-        });
-      } catch (e) {
-        console.error('[consent] event emission failed:', e);
-      }
+        // Also update user's terms_accepted_at if this is a TOS acceptance
+        if (body.document_type === 'terms_of_service') {
+          await txSql`
+            UPDATE users SET terms_accepted_at = now() WHERE id = ${sessionUser.id}::uuid
+          `;
+        }
 
-      return NextResponse.json(
-        { data: { id: record.id, accepted_at: record.acceptedAt } },
-        { status: 201 },
-      );
+        return record;
+      });
+      recordId = result.id;
+      recordAcceptedAt = result.acceptedAt;
     } catch (dbErr) {
       console.error('[consent] DB error:', dbErr);
       return NextResponse.json(
@@ -124,6 +116,23 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
+    try {
+      await emitEventSingle({
+        namespace: 'identity',
+        type: 'consent.recorded',
+        actor: userActor(sessionUser.id),
+        tenantId: null,
+        payload: { userId: sessionUser.id, documentType: body.document_type },
+      });
+    } catch (e) {
+      console.error('[consent] event emission failed:', e);
+    }
+
+    return NextResponse.json(
+      { data: { id: recordId, accepted_at: recordAcceptedAt } },
+      { status: 201 },
+    );
   } catch (err) {
     console.error('[consent] error:', err);
     return NextResponse.json(

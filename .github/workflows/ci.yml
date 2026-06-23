@@ -111,3 +111,45 @@ jobs:
           echo "All CRM tables verified"
         env:
           CMS_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_db
+
+  # CI-01: main-DB migration smoke check. Runs the full migration chain
+  # (db/migrations/migrate.mjs) against a fresh pgvector Postgres so a broken
+  # migration fails CI before merge instead of at Railway deploy time.
+  migrate-main:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: intel
+          POSTGRES_PASSWORD: intel
+          POSTGRES_DB: govtech_intel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U intel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      # migrate.mjs imports the `postgres` driver via a bare specifier; install
+      # it at the repo root so Node's node_modules walk-up resolves it.
+      - name: Install migration driver (postgres.js)
+        run: npm install --no-save postgres@3.4.3
+      - name: Run main-DB migrations
+        run: node db/migrations/migrate.mjs
+        env:
+          DATABASE_URL: postgresql://intel:intel@localhost:5432/govtech_intel
+      - name: Verify critical tables exist
+        run: |
+          psql "$DATABASE_URL" -c "\dt" | grep -q proposals
+          psql "$DATABASE_URL" -c "\dt" | grep -q system_events
+          psql "$DATABASE_URL" -c "\dt" | grep -q pipeline_jobs
+          psql "$DATABASE_URL" -c "\dt" | grep -q curated_solicitations
+          echo "Main-DB migration smoke check passed"
+        env:
+          DATABASE_URL: postgresql://intel:intel@localhost:5432/govtech_intel

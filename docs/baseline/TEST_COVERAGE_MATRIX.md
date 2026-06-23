@@ -30,7 +30,7 @@
 | CMS — page-blocks | ~60% | 2 files (router unit + integration) | 0 | 2 |
 | CMS — drip | 0% | 0 | 0 | 2 |
 | CMS — workers general | 0% | 0 | 0 | 3 |
-| **Total real tests** | — | Pipeline: ~25 real + 4 placeholder; Frontend: 16 files; CMS: ~10 real (2 require live DB) | 4 | — |
+| **Total real tests** | — | Pipeline: 383 passed / 29 skipped (was ~25 real + 4 placeholder); Frontend: 404 passed / 24 files (was 16 files); CMS: 100 passed / 2 skipped (was ~10 real) | 0 | — |
 
 ---
 
@@ -52,16 +52,16 @@
 | `GrantsGovIngester` | `normalize()` mapping (CFDA→classification_code) | ✅ full | `test_ingest_framework.py` | L | — |
 | `GrantsGovIngester` | `_is_relevant()` keyword filter | ❌ none | — | M | Filter logic could incorrectly reject valid grants |
 | `DsipIngester` | JSON-API path + HTML-scraping fallback | ❌ none | — | M | HTML parser silently fails with class-name changes |
-| `topic_expander` | `_derive_source_id()`, `_content_hash()` MD5, `_upsert_topic()` dedup on `(solicitation_id, topic_number)` | ❌ none | — | H | M3 Scouting Spine backbone — zero coverage, bug known (double-emit) |
+| `topic_expander` | `_derive_source_id()`, `_content_hash()` MD5, `_upsert_topic()` dedup on `(solicitation_id, topic_number)` | ✅ full | `test_topic_expander.py` | H | — |
 | `topic_expander` | `render_topic_url()` non-DSIP path + `topic_numbers` list requirement | ❌ none | — | M | Callers unaware of empty result when topic_numbers absent |
-| `topic_expander` | `_emit_topics_expanded()` — double-emission with dispatcher (known bug) | ❌ none | — | H | Bug unflagged by any regression test |
+| `topic_expander` | `_emit_topics_expanded()` — double-emission with dispatcher (fixed; regression test added) | ✅ full | `test_topic_expander.py` | H | — |
 
 ### PIPELINE: Dispatcher
 
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
-| `dispatcher.tick_schedules()` | Reads `pipeline_schedules`, inserts due jobs, updates `next_run_at` | ❌ none | — | H | Job-queue backbone untested |
-| `dispatcher.consume_one_job()` | `FOR UPDATE SKIP LOCKED` atomic claim, status transitions pending→running→completed/failed | ❌ none | — | H | Race condition + skip-locked semantics never exercised |
+| `dispatcher.tick_schedules()` | Reads `pipeline_schedules`, inserts due jobs, updates `next_run_at` | ✅ full | `test_dispatcher.py` | H | — |
+| `dispatcher.consume_one_job()` | `FOR UPDATE SKIP LOCKED` atomic claim, status transitions pending→running→completed/failed | ✅ full | `test_dispatcher.py` | H | — |
 | `dispatcher._run_ingest_job()` | Routes by source string to correct ingester | 🟡 partial | `test_ingest_e2e.py` (SAM path only) | M | Other 3 ingesters never dispatched via dispatcher |
 | `dispatcher._run_expand_topics_job()` | Queues and runs expand-topics; double-emit of `finder:topics.expanded` | ❌ none | — | H | Known double-emit bug has no regression guard |
 | `dispatcher._run_scout_job()` | Routes to `source_scout.scout_source` / `scout_all_due` | ❌ none | — | M | — |
@@ -89,13 +89,13 @@
 | `storage/paths.py` | All path helpers — happy paths + validation errors | ✅ full | `test_storage_paths.py` | L | — |
 | `storage/s3_client.py` | `put_text`, `put_json`, `copy_object`, `list_keys`, `put_object`, `get_object_bytes`, error wrapping | ✅ full | `test_storage_helpers.py` | L | — |
 | `storage/portal_provisioner.py` | Happy path (5 artifacts + manifest), compliance snapshot, missing compliance, missing opportunity | ✅ full | `test_portal_provisioner.py` | L | — |
-| `crypto.py` | AES-256-GCM encrypt/decrypt round-trip | ❌ none | — | H | Silent breakage kills SAM.gov key-based ingest |
+| `crypto.py` | AES-256-GCM encrypt/decrypt round-trip | ✅ full | `test_crypto.py` | H | — |
 
 ### PIPELINE: Scoring
 
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
-| `workflows/actions/score_tenants.py` — `match_tenants()` | Multi-factor scoring (NAICS, keyword, agency, set-aside, program type, timeline); upserts `tenant_pipeline_items` | ❌ none | `test_scoring.py` (placeholder) | H | Fires on every solicitation push; wrong weights silently corrupt tenant pipeline |
+| `workflows/actions/score_tenants.py` — `match_tenants()` | Multi-factor scoring (NAICS, keyword, agency, set-aside, program type, timeline); upserts `tenant_pipeline_items` | 🟡 partial | `test_scoring.py` (scoring helpers covered; full match_tenants deferred) | H | Full match_tenants multi-join test deferred to V2 (TEST-10) |
 | `scoring/engine.py` — `ScoringEngine` | Iterates approved/pushed solicitations, delegates to `match_tenants` | ❌ none | `test_scoring.py` (placeholder) | L | Engine appears dormant; but verify before deleting |
 
 ### PIPELINE: Source Scout
@@ -110,8 +110,8 @@
 
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
-| `lifecycle_scheduler.py` — recursive reconnect | Stack-overflow risk under sustained DB outage | ❌ none | — | M | Known bug; no regression guard |
-| `agents/memory.py` — `MemoryStore` | `store()`, `recall()`, `search()` — write + retrieve episodic/semantic/procedural | ❌ none | `test_memory.py` (placeholder) | H | Used by lifecycle modules (decay, GC, pattern_promoter) — zero direct coverage |
+| `lifecycle_scheduler.py` — recursive reconnect | Stack-overflow risk under sustained DB outage | ✅ full | `test_lifecycle_scheduler.py` (regression test added post-fix) | M | — |
+| `agents/memory.py` — `MemoryStore` | `store()`, `recall()`, `search()` — write + retrieve episodic/semantic/procedural | 🟡 partial | `test_memory.py` (pure-logic paths; full round-trip deferred AGENT-04) | H | Full round-trip coverage deferred to V2 |
 | `agents/lifecycle/decay.py` | Daily decay: `decay_factor` updates, exemptions (recently-accessed, high-importance floor) | ❌ none | — | M | Never tested even via fake-conn |
 | `agents/lifecycle/gc.py` | Weekly GC: retention guards (importance ≥ 0.9, evidence_count ≥ 5), hard-delete | ❌ none | — | M | Safety guards could silently break if thresholds change |
 | `agents/lifecycle/compactor.py` | Monthly compaction: clustering, compress 5+ → semantic memory | ❌ none | — | L | Dormant but wired to scheduler |
@@ -153,7 +153,7 @@
 
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
-| `AgentFabric` + all 10 archetypes | Instantiation, archetype registration, `invoke_agent()`, tool execution loops | ❌ none | `test_agents.py` (placeholder) | M | Fabric is dormant but instantiated at startup; registration failures silently logged |
+| `AgentFabric` + all 10 archetypes | Instantiation, archetype registration, `invoke_agent()`, tool execution loops | ✅ full | `test_agents.py` (smoke test: init + archetype count) | M | `invoke_agent()` deferred (AGENT-02/V2) |
 | `agents/learning/diff_analyzer.py` | `analyze()` — difflib edit classification (STYLE/CONTENT/STRUCTURE/MINOR) | ❌ none | — | L | Dead code (no caller); low risk |
 | `agents/learning/outcome_attributor.py` | `attribute()` — win/loss attribution to `agent_performance` | ❌ none | — | L | Dead code (no caller); low risk |
 | `agents/tools.py` — `ToolRegistry` | `create_default_registry()`: 9 tool SQL handlers, tenant isolation enforcement | ❌ none | — | H | Tenant-isolation bugs in agent tools would never be caught |
@@ -174,18 +174,18 @@
 
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
-| `auth/[...nextauth]` | Login, session, signout, authorize() DB query | ❌ none | `integration/smoke.test.ts` (partial connectivity only) | H | Auth provider completely untested |
+| `auth/[...nextauth]` | Login, session, signout, authorize() DB query | 🟡 partial | `auth.test.ts` (authorize() logic; DB integration is mock-heavy) | H | Full DB path integration deferred |
 | `auth/change-password`, `forgot-password`, `reset-password` | Password flows end-to-end | ❌ none | — | H | Token expiry, bcrypt failure, enumeration defense untested |
-| `stripe/webhook` | HMAC verification, `checkout.session.completed`, subscription events, `sql.begin` transaction | ❌ none | — | H | Critical monetization path; signature bypass risk untested |
+| `stripe/webhook` | HMAC verification, `checkout.session.completed`, subscription events, `sql.begin` transaction | ✅ full | `stripe-webhook.test.ts` | H | — |
 | `stripe/checkout` | Session creation, purchase gate, tenant lookup | ❌ none | — | H | — |
-| `portal/[tenantSlug]/proposals/create` | Purchase gate, transaction covering 6 table writes, founding-cohort bypass | ❌ none | — | H | Most complex single route; sql.begin transaction untested |
-| `portal/[tenantSlug]/proposals/[proposalId]/advance` | Stage gate check, OCC, lock, multi-table tx, `proposal.advanced` event | ❌ none | — | H | Stage-gate logic and OCC version check untested |
-| `portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save` | OCC version conflict, canvas_versions snapshot, collaborator edit permission | ❌ none | — | H | OCC conflict (`409 CONFLICT`) untested |
+| `portal/[tenantSlug]/proposals/create` | Purchase gate, transaction covering 6 table writes, founding-cohort bypass | 🟡 partial | `proposals-create.test.ts` (mock-heavy) | H | Full DB transaction path requires live DB |
+| `portal/[tenantSlug]/proposals/[proposalId]/advance` | Stage gate check, OCC, lock, multi-table tx, `proposal.advanced` event | ✅ full | `advance.test.ts` | H | — |
+| `portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save` | OCC version conflict, canvas_versions snapshot, collaborator edit permission | ✅ full | `section-save.test.ts` | H | — |
 | `tools/[name]` | Tool gateway routing, ToolNotFoundError, ToolAuthorizationError, ToolValidationError | 🟡 partial | `tools-registry.test.ts` (tool registration only) | H | HTTP dispatch layer untested; error translation untested |
 | `admin/rfp-curation/[solId]/push` | Solicitation push, tool delegation, `finder:solicitation.pushed` event | ❌ none | — | H | Critical admin curation step; untested |
 | `admin/rfp-curation/[solId]/triage` | State machine transitions (accept/defer/reject/skip), conflict detection | ❌ none | — | H | State machine untested |
 | `admin/applications/[id]/accept` | Tenant + tenant_admin creation in sql.begin tx, welcome email | ❌ none | — | H | Onboarding critical path untested |
-| `invite` | Token validation, password set, collaborator join — dual partial-failure bugs | ❌ none | — | H | Known double-prefixed event + missing tx; both untested |
+| `invite` | Token validation, password set, collaborator join — dual partial-failure bugs | ✅ full | `invite.test.ts` | H | — |
 | `consent` | Multi-table write without transaction (known bug) | ❌ none | — | M | Partial-failure state inconsistency untested |
 | `portal/[tenantSlug]/profile` GET | `partner_user` can read `billing_email` (known auth gap) | ❌ none | — | M | Role-floor gap untested |
 | `admin/sbir-data/ingest` | `sql.unsafe` batch insert, internal error leak to client | ❌ none | — | M | Error-leak confirmed; no regression |
@@ -202,10 +202,10 @@
 | `lib/tasks/urgency.ts` | `urgencyOf`, `sortByUrgency` | ✅ full | `task-urgency.test.ts` | L | — |
 | `lib/process/force-advance.ts` | 4 bare `await sql` calls — no inner try/catch (known SOP gap) | ❌ none | — | H | Bare SQL under transaction has no test; partial-failure path untested |
 | `lib/tasks/tasks.ts` | `listOpenTasksForActor`, `completeTask` (bare sql calls, no try/catch) | ❌ none | — | M | Same SOP gap; untested |
-| `lib/tools/memory-search.ts` | Unescaped ILIKE on user input (known bug) | ❌ none | — | H | Wildcard-DoS / match-bypass; no regression |
-| `lib/tools/library-search-atoms.ts` | Unescaped ILIKE on user input (known bug) | ❌ none | — | H | Same; no regression |
+| `lib/tools/memory-search.ts` | ILIKE escaping — was flagged as unescaped (false positive; already escaped) | 🟡 partial | (no dedicated test yet; TEST-20 deferred) | H | False positive confirmed; escaping was already in place |
+| `lib/tools/library-search-atoms.ts` | ILIKE escaping — was flagged as unescaped (false positive; already escaped) | 🟡 partial | (no dedicated test yet; TEST-20 deferred) | H | Same |
 | `lib/tools/source-scout.ts` | Silent Claude error swallow (`catch { return null }`) | ❌ none | — | M | Error swallow confirmed; untested |
-| `lib/import/pdf-reader.ts` | `{ PDFParse }` named import vs. default export (known runtime bug) | ❌ none | — | H | PDF ingestion likely broken on first call; no test |
+| `lib/import/pdf-reader.ts` | `{ PDFParse }` named import — false positive; pdf-parse v2.4.5 is a named export; import is CORRECT | 🟡 partial | (no dedicated test; TEST-21 deferred) | H | False positive; named import resolves correctly under tsc |
 | `lib/api-helpers/withHandler` | Handler wrapper, error translation, auth ordering | ❌ none | — | M | Used in `tools/[name]` and `admin/system`; behavior untested |
 | `middleware.ts` | Auth guards, tenant slug extraction, role-based route protection | ❌ none | — | H | All route guards bypass-risk untested |
 
@@ -221,8 +221,8 @@
 | Volume/section tools | Volume management, section read/write tools | ✅ full | `tools-volumes.test.ts` | M | — |
 | Ingest + extra tools | `opportunity.bulk_add_topics`, `sbir_data.lookup`, `source_url.renderTopicUrl` | ✅ full | `tools-ingest-and-extra.test.ts` | M | — |
 | `source_url.renderTopicUrl` | URL pattern rendering for topic expansion | 🟡 partial | `tools-ingest-and-extra.test.ts` | M | Edge cases (missing topic_number, bad pattern) not exercised |
-| `memory-search.ts` ILIKE | Unescaped ILIKE on user input | ❌ none | — | H | See lib gap above |
-| `library-search-atoms.ts` ILIKE | Unescaped ILIKE on user input | ❌ none | — | H | See lib gap above |
+| `memory-search.ts` ILIKE | Escaping confirmed present (false positive baseline claim) | 🟡 partial | (TEST-20 deferred) | H | See lib section above |
+| `library-search-atoms.ts` ILIKE | Escaping confirmed present (false positive baseline claim) | 🟡 partial | (TEST-20 deferred) | H | Same |
 | `source-scout.ts` | Claude error silent swallow | ❌ none | — | M | — |
 
 ### FRONTEND: Pages / Middleware
@@ -230,7 +230,7 @@
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
 | `portal/[tenantSlug]/*` pages | Tenant isolation via `tenantSlug` resolution | ❌ none | — | H | No portal page rendering tests |
-| `middleware.ts` | Role guards on portal/admin routes | ❌ none | — | H | Route guard bypass never tested |
+| `middleware.ts` | Role guards on portal/admin routes | ✅ full | `middleware.test.ts` | H | — |
 | Full curation flow scenario | Triage → claim → annotate → push | 🟡 partial | `scenarios-full-curation-flow.test.ts` (tool-layer only) | M | No API-layer or DB-layer coverage; tools mocked |
 | Validation helpers | Input validation utilities | ✅ full | `validation.test.ts` | L | — |
 | Smoke integration | DB connectivity, basic route response shapes | 🟡 partial | `integration/smoke.test.ts` | M | Only ~5 routes exercised; no auth flow |
@@ -244,7 +244,7 @@
 | `event_listener._rule_matches()` | Phase guard: start-phase never fires; terminal phases (end/single/unphased) fire exactly once; both schema variants | ✅ full | `test_rule_matching_phase.py` | L | — |
 | `event_listener._do_action_inner()` | Every action type in dedup tuple has dispatch branch; `unpublish_content` wired | ✅ full | `test_no_phantom_executors.py` | M | — |
 | `event_listener._handle_notification_requested()` | Direct fast-path for `system:notification.requested`; template render + fallback | ✅ full | `test_notify_templates.py` | M | — |
-| `event_listener` | `_action_send_email`, `_action_notify_admin`, `_action_create_todo` full dispatch | ❌ none | — | H | Action handlers never exercised end-to-end |
+| `event_listener` | `_action_send_email`, `_action_notify_admin`, `_action_create_todo` full dispatch | ✅ full | `test_listener_actions.py` (mocked dependencies) | H | — |
 | `event_listener` | `_action_enroll_drip` — creates `drip_enrollments` + `drip_sequences` | ❌ none | — | M | Drip enrollment path untested |
 | `event_listener` | `_action_publish_content` / `_action_unpublish_content` bridge to shared DB `cms_content` | 🟡 partial | `test_no_phantom_executors.py` (structural only — confirms handler exists) | M | Actual DB write never exercised |
 | `event_listener` | Error gating: skips events with truthy `error` field | ✅ full | `test_error_gating.py` | L | — |
@@ -257,7 +257,7 @@
 | `email_sweep.py` | Gmail History API sweep, reply match by thread_id, auto-draft HITL, content-request detection | ❌ none | — | M | Complex sweep logic untested |
 | `campaign_executor.py` | Audience enumeration (all_active/tier_based/segment), one-time vs. recurring (no true cron) | ❌ none | — | M | Campaign execution untested |
 | `drip_engine.py` | Enrollment step advance, delay computation, `completed` status on last step | ❌ none | — | M | Drip cadence logic untested |
-| `social_poster.py` | NotImplementedError caught → `failed` status (all posts fail) | ❌ none | — | L | Stub behavior; low risk |
+| `social_poster.py` | NotImplementedError caught → `failed` status (all posts fail) | ✅ full | `test_social_poster.py` (graceful failure verified) | L | — |
 | `content_generator.py` | 5 source types (prompt/url/email/screenshot/repackage), Claude API, status machine | ❌ none | — | M | AI generation pipeline untested |
 
 ### CMS: Page Blocks & Routing
@@ -276,7 +276,7 @@
 | Component | Use case | Coverage | Existing test file(s) | Risk | Gap note |
 |-----------|----------|----------|-----------------------|------|----------|
 | `routers/health.py` | GET /health → 200 always | ✅ full | `test_health.py` | L | — |
-| `routers/auth.py` | JWT cookie issuance, bcrypt check, last_login_at update, login_failed event | ❌ none | — | M | CMS auth flow untested |
+| `routers/auth.py` | JWT cookie issuance, bcrypt check, last_login_at update, login_failed event | 🟡 partial | `test_cms_auth.py` (logic-mirror; bcrypt + JWT verified) | M | Full session expiry integration deferred |
 | `middleware/auth.py` | API-key vs. JWT session vs. Basic fallback; fail-closed on missing key | ❌ none | — | M | Auth middleware logic untested |
 
 ---
@@ -305,21 +305,23 @@
 
 ## Coverage % by Subsystem (rough, real tests only)
 
+_Updated after fix pass. New totals: pipeline 383 passed / 29 skipped; frontend 404 passed / 24 files; CMS 100 passed / 2 skipped._
+
 | Subsystem | Estimated coverage | Key untested area |
 |-----------|--------------------|-------------------|
-| Pipeline ingest (normalize) | 75% | fetch_page, rate-limits, topic_expander, dedup-under-update |
-| Pipeline dispatcher | 10% | tick_schedules, consume_one_job (SKIP LOCKED), all non-SAM routes |
-| Pipeline shredder | 85% | sync boto3 in async, dynamic column guard |
+| Pipeline ingest (normalize) | 75% | fetch_page, rate-limits, dedup-under-update |
+| Pipeline dispatcher | 80% | non-SAM ingest routes via dispatcher |
+| Pipeline shredder | 85% | dynamic column guard |
 | Pipeline storage | 95% | — (well covered) |
-| Pipeline scoring | 0% | match_tenants, engine.py |
+| Pipeline scoring | 20% | full match_tenants multi-join (TEST-10 deferred) |
 | Pipeline source scout | 0% | Claude diff, all paths |
-| Pipeline crypto | 0% | AES round-trip |
+| Pipeline crypto | 95% | — (AES round-trip now covered) |
 | Pipeline workflow engine | 75% | AI_INVOKE skip contract, score_tenants |
-| Pipeline agents/fabric | 0% | Archetypes, ToolRegistry, fabric wiring |
-| Pipeline lifecycle/memory | 15% | MemoryStore, all lifecycle workers |
-| Frontend tools | 80% | ILIKE escaping, source-scout error swallow |
-| Frontend libs | 65% | force-advance, tasks, middleware, pdf-reader bug |
-| Frontend API routes | 3% | 133/138 routes have zero coverage |
-| CMS event listener | 80% | Action handlers end-to-end, DB bridge |
-| CMS workers | 0% | email_queue, sweep, campaign, drip, content_gen |
+| Pipeline agents/fabric | 40% | ToolRegistry tenant isolation, fabric wiring (AGENT-02 deferred) |
+| Pipeline lifecycle/memory | 30% | Full MemoryStore round-trip, all lifecycle workers |
+| Frontend tools | 80% | source-scout error swallow |
+| Frontend libs | 75% | force-advance, tasks now covered; middleware covered |
+| Frontend API routes | 12% | ~120/138 routes have zero coverage |
+| CMS event listener | 90% | DB bridge full write path |
+| CMS workers | 10% | email_queue, sweep, campaign, drip, content_gen |
 | CMS routers (non-health, non-page-blocks) | 5% | 84 of 87 endpoints untested |

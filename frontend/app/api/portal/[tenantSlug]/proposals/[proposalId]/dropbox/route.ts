@@ -158,11 +158,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant and is not locked
-    const [proposal] = await sql<{ id: string; isLocked: boolean; stage: string }[]>`
-      SELECT id, is_locked, stage FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; isLocked: boolean; stage: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string; isLocked: boolean; stage: string }[]>`
+        SELECT id, is_locked, stage FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/dropbox] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }

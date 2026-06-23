@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { hasRoleAtLeast, isRole } from '@/lib/rbac';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -14,8 +15,14 @@ export async function GET(_request: Request, ctx: RouteContext) {
   }
 
   const { tenantSlug } = await ctx.params;
-  const role = (session.user as { role?: string }).role ?? '';
+  const rawRole = (session.user as { role?: string }).role ?? '';
+  const role = isRole(rawRole) ? rawRole : null;
   const userId = (session.user as { id?: string }).id ?? '';
+
+  // partner_user must NOT read billing_email / company profile
+  if (!role || !hasRoleAtLeast(role, 'tenant_user')) {
+    return NextResponse.json({ error: 'Insufficient role', code: 'FORBIDDEN' }, { status: 403 });
+  }
 
   try {
     const tenant = await getTenantBySlug(tenantSlug);

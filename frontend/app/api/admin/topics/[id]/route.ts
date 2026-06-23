@@ -76,17 +76,21 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     const userId = (session.user as { id?: string; email?: string }).id;
     const userEmail = (session.user as { email?: string }).email;
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'topic.updated',
-      actor: { type: 'user', id: userId ?? 'unknown', email: userEmail ?? undefined },
-      payload: {
-        correlationId: randomUUID(),
-        topicId: id,
-        solicitationId: rows[0].solicitationId,
-        changes: Object.keys(input),
-      },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'topic.updated',
+        actor: { type: 'user', id: userId ?? 'unknown', email: userEmail ?? undefined },
+        payload: {
+          correlationId: randomUUID(),
+          topicId: id,
+          solicitationId: rows[0].solicitationId,
+          changes: Object.keys(input),
+        },
+      });
+    } catch (evtErr) {
+      console.error('[topics PATCH] event emission failed', evtErr);
+    }
 
     return NextResponse.json({ data: { id, updated: true } });
   } catch (err) {
