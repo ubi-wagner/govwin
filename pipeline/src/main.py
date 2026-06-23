@@ -40,6 +40,92 @@ from config import DATABASE_URL
 shutdown_event = asyncio.Event()
 
 
+# ---------------------------------------------------------------------------
+# PIPE-14: Agent task queue consumer
+# ---------------------------------------------------------------------------
+
+async def run_agent_task_consumer(
+    database_url: str,
+    fabric,  # AgentFabric | None
+    shutdown_event: asyncio.Event,
+    poll_interval: int = 20,
+) -> None:
+    """Poll agent_task_queue for pending tasks and process them via fabric.
+
+    Mirrors the lifecycle_scheduler's outer-supervise reconnect loop:
+    on a dropped DB connection, backs off and reconnects. Respects
+    shutdown_event.
+
+    If fabric is None (AgentFabric failed to initialise), logs a warning
+    and exits immediately — tasks remain pending for the next deploy.
+    """
+    import asyncpg as _asyncpg
+
+    if fabric is None:
+        log.warning(
+            "run_agent_task_consumer: fabric is None — task queue consumer disabled"
+        )
+        await shutdown_event.wait()
+        return
+
+    log.info("agent task queue consumer started (poll_interval=%ds)", poll_interval)
+    backoff = 30
+
+    while not shutdown_event.is_set():
+        conn = None
+        try:
+            conn = await _asyncpg.connect(database_url)
+            backoff = 30  # reset after a healthy connect
+            log.info("agent task queue consumer connected to database")
+
+            while not shutdown_event.is_set():
+                try:
+                    results = await fabric.process_task_queue(conn)
+                    if results:
+                        log.info(
+                            "agent task queue: processed %d task(s)", len(results)
+                        )
+                except Exception as exc:
+                    log.error("agent task queue processing error: %s", exc)
+
+                # Sleep poll_interval seconds (or until shutdown)
+                try:
+                    await asyncio.wait_for(
+                        shutdown_event.wait(), timeout=poll_interval
+                    )
+                    break  # shutdown_event was set
+                except asyncio.TimeoutError:
+                    pass  # Normal — poll interval elapsed
+
+            break  # inner loop exited → shutdown requested
+
+        except asyncio.CancelledError:
+            log.info("agent task queue consumer cancelled")
+            break
+        except (_asyncpg.PostgresConnectionError, OSError) as conn_err:
+            log.error(
+                "agent task queue consumer lost DB connection: %s; reconnecting in %ds",
+                conn_err, backoff,
+            )
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=backoff)
+                break  # shutdown requested during backoff
+            except asyncio.TimeoutError:
+                pass
+            backoff = min(backoff * 2, 480)
+        except Exception as exc:
+            log.error("agent task queue consumer fatal: %s", exc)
+            break
+        finally:
+            if conn:
+                try:
+                    await conn.close()
+                except Exception:
+                    pass
+
+    log.info("agent task queue consumer stopped")
+
+
 def handle_signal(sig: signal.Signals) -> None:
     log.info("Received %s, shutting down...", sig.name)
     shutdown_event.set()
@@ -67,6 +153,7 @@ async def main() -> None:
     # Instantiate the AgentFabric so all 10 archetypes are registered
     # and ready for invocation by the workflow processor (AI_INVOKE
     # steps) and the agent_task_queue consumer.
+    fabric = None
     try:
         from agents import AgentFabric
         fabric = AgentFabric()
@@ -78,8 +165,8 @@ async def main() -> None:
         log.error("AgentFabric initialisation failed (non-fatal): %s", exc)
 
     # Run the ingester consumer loop, workflow processor, health
-    # server, and lifecycle scheduler concurrently. All manage their
-    # own resources and respect shutdown_event.
+    # server, lifecycle scheduler, and agent task queue consumer
+    # concurrently. All manage their own resources and respect shutdown_event.
     await asyncio.gather(
         run_consumer_loop(
             database_url=DATABASE_URL,
@@ -90,12 +177,18 @@ async def main() -> None:
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,
             poll_interval=10,
+            fabric=fabric,
         ),
         run_health_server(
             shutdown_event=shutdown_event,
         ),
         run_lifecycle_scheduler(
             database_url=DATABASE_URL,
+            shutdown_event=shutdown_event,
+        ),
+        run_agent_task_consumer(
+            database_url=DATABASE_URL,
+            fabric=fabric,
             shutdown_event=shutdown_event,
         ),
     )
