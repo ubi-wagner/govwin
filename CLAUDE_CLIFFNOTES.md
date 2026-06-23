@@ -1,6 +1,7 @@
 # CLAUDE_CLIFFNOTES.md — Engineering Reference for All Future Sessions
 
-**Last updated:** 2026-05-31 (unified automation architecture — five-track engine audit; see docs/EVENT_CONTRACT_V3.md)
+**Last updated:** 2026-06-23 (Phase 4 reconcile — as-built baseline from ARCHITECTURE_V9.md)
+**Architecture reference:** `ARCHITECTURE_V9.md` is the authoritative as-built master (supersedes V5–V8).
 **Purpose:** Prevent recurring errors. Every future Claude session MUST read
 this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
@@ -10,9 +11,11 @@ that have been caught and fixed.
 
 ## 1. Database Schema Quick Reference
 
-The schema is defined across **53 migration files (000-051, plus the
-interleaved `030a_ensure_full_schema.sql`)** — highest number is `051`.
-(Prior docs said "51 (000-050)" or "40 (000-039)" — both stale/wrong.)
+The schema is defined across **69 migrations (000–067, plus the interleaved
+`030a_ensure_full_schema.sql`)** — highest numbered file is `067`. This
+produces **72 live tables across 14 domains**. Full per-table detail:
+`docs/baseline/inventory/DB_SCHEMA_CURRENT.md`.
+(Prior docs said "53 / 051" or "40 / 039" — both stale/wrong.)
 These are the tables most frequently queried and the exact column names.
 **Do NOT guess column names. Look them up here.**
 
@@ -287,23 +290,95 @@ SELECT * FROM opportunities WHERE solicitation_id = ${solId}::uuid
 ```
 
 NOT: `SELECT * FROM opportunity_topics` (does not exist)
-NOT: `SELECT * FROM solicitation_topics` (dropped in 030a)
+NOT: `SELECT * FROM solicitation_topics` (dropped in migration 035/030a)
+
+### pipeline_jobs.kind (migration 067 — current CHECK set)
+
+```
+'ingest', 'shred_solicitation', 'scout_source',
+'draft_section', 'review_section', 'expand_topics'
+```
+
+`expand_topics` was added in migration 067. `draft_section` and `review_section`
+are in the CHECK enum but have no dispatcher handler — do NOT insert them (see Mistake 15).
+
+### automation_rules — Dual-Schema Warning
+
+The table has TWO parallel trigger-column sets due to migration history:
+
+| Era | Columns | Status |
+|-----|---------|--------|
+| Legacy (001) | `trigger_bus TEXT`, `trigger_events TEXT[]` | Nullable, no active callers |
+| Current (019/028/030a) | `trigger_namespace TEXT`, `trigger_type TEXT` | **USE THESE** |
+
+Always use `trigger_namespace` + `trigger_type` when reading or writing `automation_rules`.
+The CMS event listener introspects `information_schema.columns` to handle both; all seeded
+rules use the current columns. Do NOT use `trigger_bus` or `trigger_events` in new code.
 
 ---
 
 ## 2. API Route Pattern (The Canonical Template)
 
-Every API route MUST follow this exact structure. No exceptions.
+### Pattern A — `withHandler()` (CANONICAL — use for all new routes)
+
+`API_CONVENTIONS.md` mandates `withHandler()` from `lib/api-helpers.ts` as the
+standard going forward. It handles auth resolution, error mapping, and response
+wrapping automatically. Throw typed errors from `lib/errors.ts`; return `data`
+directly (wrapper wraps in `{ data: ... }`).
+
+```typescript
+import { withHandler } from '@/lib/api-helpers';
+import { requireAdmin } from '@/lib/api-helpers';
+import { sql } from '@/lib/db';
+import { emitEventSingle } from '@/lib/events';
+import { ForbiddenError, NotFoundError } from '@/lib/errors';
+
+export const POST = withHandler(async (ctx) => {
+  requireAdmin(ctx);  // throws ForbiddenError if not rfp_admin+
+  // ctx.actor has { id, role, tenantId, tenantSlug }
+
+  const { id } = await ctx.params;
+  const body = ctx.body;  // pre-parsed by withHandler
+
+  // Every await sql must be inside try/catch
+  try {
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO ... RETURNING id
+    `;
+
+    // Event emission — wrap in try/catch; event failure must not 500 the op
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'entity.action_done',
+        actor: { type: 'user', id: ctx.actor.id },
+        tenantId: null,
+        payload: { entityId: rows[0].id },
+      });
+    } catch (emitErr) {
+      console.error('[route-name] event emit failed', emitErr);
+    }
+
+    return { id: rows[0].id };  // withHandler wraps in { data: ... }
+  } catch (err) {
+    console.error('[route-name] operation failed', err);
+    throw new InternalError('Operation failed');
+  }
+});
+```
+
+### Pattern B — Raw `NextResponse.json` (LEGACY — present in many existing routes)
+
+Many existing routes use raw `NextResponse.json` with manual try/catch. Both
+patterns are valid in the codebase today. BOTH must return `{ data }` on success
+and `{ error, code }` on failure. EVERY `await sql` must be inside try/catch
+regardless of which pattern is used.
 
 ```typescript
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventSingle } from '@/lib/events';
-
-interface RouteContext {
-  params: Promise<{ id: string }>;
-}
 
 export async function POST(request: Request, ctx: RouteContext) {
   // 1. AUTH CHECK — always first
@@ -315,7 +390,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     );
   }
 
-  // 2. ROLE CHECK — admin routes need rfp_admin OR master_admin
+  // 2. ROLE CHECK
   const role = (session.user as { role?: string }).role;
   if (role !== 'rfp_admin' && role !== 'master_admin') {
     return NextResponse.json(
@@ -351,14 +426,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       INSERT INTO ... RETURNING id
     `;
 
-    // 6. EVENT EMISSION — after successful mutation
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'entity.action_done',
-      actor: { type: 'user', id: userId ?? 'unknown' },
-      tenantId: null,
-      payload: { entityId: rows[0].id },
-    });
+    // 6. EVENT EMISSION — inside its own try/catch (event failure ≠ op failure)
+    try {
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'entity.action_done',
+        actor: { type: 'user', id: userId ?? 'unknown' },
+        tenantId: null,
+        payload: { entityId: rows[0].id },
+      });
+    } catch (emitErr) {
+      console.error('[route-name] event emit failed', emitErr);
+    }
 
     // 7. SUCCESS RESPONSE — always { data: ... }
     return NextResponse.json({ data: { id: rows[0].id } }, { status: 201 });
@@ -415,6 +494,12 @@ NEVER use: `admin.*`, `cms.*`, `spotlight.*`, `pipeline.*` as event namespaces.
 (NOTE: `solicitation`/`volume`/`compliance`/`opportunity`/`memory`/`ingest` are
 TOOL names, not event namespaces — never emit events under them.)
 
+`agent` namespace: appears in `system_events.namespace` column comment and older
+docs (EVENT_CONTRACT.md, NAMESPACES.md) but is **never emitted at runtime**
+(confirmed by grep across all 3 services). It is a stale schema/doc artifact.
+Agent/tool activity emits under `tool` (e.g. `tool:tool.invoked`). The canonical
+set is the 7 listed above — do NOT emit `agent.*` events.
+
 Event type format: `entity.verb_past_tense` (snake_case)
 Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
 
@@ -449,19 +534,20 @@ Process Templates (`pipeline/src/workflows/on_*.py`):
 - `proposal:proposal.advanced:end` → OnProposalAdvanced (AI review → notify → HITL wait)
 - `finder:source.change_detected:single` → OnSourceChangeDetected (draft → notify → HITL)
 
-⚠️ **HITL is currently BROKEN** (cannot resume + force-killed at +1h via a hardcoded
-deadline). AI_INVOKE / API_CALL are stubbed skips. Agents are written but dormant
-(V2). See EVENT_CONTRACT_V3.md §10–§11 for the full verified gap matrix.
+**HITL resume is implemented** in `WorkflowManager.resume_instance()` (`manager.py:1000+`);
+the old fire-and-forget path that skipped `HITL_WAIT` is the legacy path (now dead).
+AI_INVOKE / API_CALL are stubbed skips. Agents are written but dormant (V2).
+`EVENT_CONTRACT_V3.md` documents the OLD pre-baseline state and is now STALE — use
+`ARCHITECTURE_V9.md §8` for the current engine truth.
 
 ### CMS Event Listener — a SECOND, PARALLEL engine (services/cms/src/event_listener.py)
 The CMS listener is NOT the Jobs/Templates engine — it is a separate polling engine
 matching `automation_rules` and running a flat action ladder (send_email, notify_admin,
 create_todo, enroll_drip, distribute_social, publish_content). It is **fire-and-forget:
 no per-action timeout, no retry, no heartbeat, not auto-restarted.**
-- `system:content_pipeline.post.published` → `_action_publish_content` → upserts cms_content (LIVE)
-- `unpublish_content`: rule live but **handler missing → silent no-op**
-- `distribute_social`: rows created but poster always `raise NotImplementedError` → always fails
-- ⚠️ It ignores event `phase`, so any rule on a start/end-paired event **double-fires**.
+- `publish_content` and `unpublish_content`: both handlers are LIVE (unpublish was a no-op before the baseline; now fixed with regression tests).
+- `distribute_social`: rows created but `social_poster` always `raise NotImplementedError` → all posts fail.
+- ⚠️ Phase guard fixed: `_rule_matches` now fires only on terminal phases (`end`, `single`) — double-fire on `start` is no longer an issue (regression tested).
 
 ### CMS SPA Event Types (emitted by page_blocks.py)
 All use namespace `system`, phase `single`:
@@ -634,24 +720,25 @@ authoritative score when available. It falls back to lightweight estimation
 Use `tenant_pipeline_items.total_score` when present. Only the pipeline
 scoring engine should compute full scores.
 
-### Mistake 17: Hardcoded instance deadline kills HITL (LIVE BUG)
-`manager.create_instance` sets `deadline = now + 1h` (`manager.py:148`) and never
-reads the step's `timeout_minutes`. The paused-deadline sweep then force-fails any
-parked instance past deadline — so a 72h HITL review dies ~60 min after parking.
+### Mistake 17: Hardcoded instance deadline kills HITL (RESOLVED as of baseline)
+This was a live bug: `manager.create_instance` had a hardcoded 1h deadline. As of the
+Phase 1 baseline, `WorkflowManager.resume_instance()` is implemented (`manager.py:1000+`)
+and `HITL_WAIT` resume is functional. The old fire-and-forget path that skipped `HITL_WAIT`
+is now the legacy dead path.
 
-**Rule:** A park-and-wait's `wait_deadline` MUST be derived from the binding's
-declared `timeout_minutes`, never a global default. Parked instances are exempt
-from the running-heartbeat sweep but subject to a deadline sweep that routes to
-`on_timeout` (escalate), not to silent failure.
+**Rule (still applies):** A park-and-wait's `wait_deadline` MUST be derived from the
+binding's declared `timeout_minutes`, never a global default. Parked instances are exempt
+from the running-heartbeat sweep but subject to a deadline sweep that routes to `on_timeout`
+(escalate), not to silent failure. Always verify the deadline derivation when adding new
+HITL_WAIT steps.
 
-### Mistake 18: HITL can pause but cannot resume (LIVE BUG)
-`resume_instance` (`manager.py:670`) has ZERO callers, there is no resume route, and
-`Step.wait_for` is never matched against incoming events. Every HITL_WAIT is a dead
-end. `on_timeout`/`on_failure` are declared on `Step` but read nowhere.
+### Mistake 18: HITL resume had no callers (RESOLVED as of baseline)
+This was a live bug: `resume_instance` had zero callers. As of the Phase 1 baseline, the
+resume path is wired. `EVENT_CONTRACT_V3.md`'s description of this as a current bug is STALE.
 
-**Rule:** A park-and-wait requires a resume path — the awaited event, matched against
-`wait_for`, must transition the instance `paused → running`. Wire `on_timeout`/
-`on_failure` to real escalation Jobs.
+**Rule (still applies):** Any new HITL_WAIT step must have a documented resume trigger —
+the awaited event, matched against `wait_for`, must transition the instance `paused → running`.
+Wire `on_timeout`/`on_failure` to real escalation Jobs before shipping the step.
 
 ### Mistake 19: Matching on namespace+type without PHASE → double-fire (LIVE BUG)
 The CMS `event_listener._rule_matches` ignores `phase`, so a rule on `rfp.uploaded`
@@ -726,6 +813,91 @@ payloads (`app/api/admin/topics/[id]/route.ts` → `topicId`/`changes`;
 `opportunity.update_topic` → `opportunityId`/`changedFields`) — reconcile to one
 canonical shape.
 
+### Mistake 25: Double-emit of `finder:topics.expanded`
+Both `topic_expander._emit_topics_expanded` AND `dispatcher._run_expand_topics_job`
+emit `finder:topics.expanded` for one job — two events are written per expansion.
+
+**Rule:** Emit once, from one owner. Pick the expander (close to the work) and remove
+the dispatcher's redundant emit.
+
+### Mistake 26: Unescaped ILIKE on user input (confirmed in two files)
+`lib/tools/memory-search.ts` and `lib/tools/library-search-atoms.ts` pass user input
+directly into ILIKE patterns without escaping — wildcard-DoS / match-bypass risk.
+
+**Rule:** Always apply `.replace(/[%_\\]/g, '\\$&')` before building ILIKE patterns
+(already in Mistake 4 — these two files were confirmed violators as of the baseline).
+
+### Mistake 27: `await sql` with no inner try/catch (20+ routes)
+20+ routes run `await sql` inside the outer handler try/catch but with no per-query
+try/catch — a DB error produces a generic 500 and exposes no diagnostics. Confirmed
+in: `admin/analytics`, `admin/pipeline`, `admin/tenants`, `admin/workflows/*`,
+`portal/dashboard`, `portal/proposals/[id]/{sections,compliance,dropbox,collaborators}`.
+
+**Rule:** EVERY `await sql` call must be inside its own try/catch returning a clean
+error response. The outer catch is a last resort, not a substitute.
+
+### Mistake 28: Event emits outside try/catch (7 routes)
+7 routes call `emitEventSingle` / `emitEventStart` / `emitEventEnd` outside a
+try/catch. If the event write fails, the route returns a false 500 even though the
+business operation succeeded — the client retries and the op double-executes.
+
+**Rule:** Wrap every event emit in its own try/catch. Log the emit failure; do NOT
+propagate it as a 500. The business operation already committed.
+
+### Mistake 29: `invite` route double-prefixed event type + no transaction
+`POST /api/invite/route.ts` emits type `identity.identity.invite_accepted` (should be
+`invite.accepted`) and writes to multiple tables with no `sql.begin()` transaction.
+
+**Rule:** Event type = `entity.action_past_tense` with no namespace prefix in the
+`type` field. Multi-table writes that must be atomic require `sql.begin()`.
+
+### Mistake 30: `pdf-reader.ts` named import from default-export package
+`frontend/lib/import/pdf-reader.ts` does `import { PDFParse } from 'pdf-parse'` but
+`pdf-parse` only has a default export — runtime error on first PDF import call.
+
+**Rule:** Check the export style of third-party packages before importing. Use
+`import PDFParse from 'pdf-parse'` (default import).
+
+### Mistake 31: `portal/[tenantSlug]/profile` GET has no role floor
+A `partner_user` can call `GET /api/portal/[tenantSlug]/profile` and read
+`billing_email` plus full company profile — no role minimum is enforced.
+
+**Rule:** Add `hasRoleAtLeast('tenant_user')` check before returning billing fields;
+or strip `billing_email` from the response for `partner_user` callers.
+
+### Mistake 32: `admin/sbir-data/ingest` leaks internal error text to client
+The route returns raw error details (including SQL error messages) in the response
+body, and uses `sql.unsafe` batch inserts with no `ON CONFLICT` clause.
+
+**Rule:** Never expose internal error details to clients. Use a generic message for
+500s. Use explicit `ON CONFLICT (column)` on all upserts.
+
+### Mistake 33: `scoring/engine.py::ScoringEngine` is dead code
+`pipeline/src/scoring/engine.py::ScoringEngine` has no caller anywhere in the
+codebase. The live scoring path is `workflows/actions/score_tenants.py::match_tenants`
+(invoked by `OnSolicitationPushed`). `ScoringEngine` is a vestige.
+
+**Rule:** Do not reference or extend `ScoringEngine`. Use `match_tenants` for all
+scoring work. `ScoringEngine` is a deprecation candidate.
+
+### Mistake 34: Pipeline agent workforce is DORMANT — do not wire AI to it
+`AgentFabric` is instantiated at `main.py:72` as a local var that goes out of scope.
+`_execute_ai_invoke` always hits ImportError → skipped. `process_task_queue()` has
+zero callers. 10 archetypes register but `invoke_agent()` is never reached.
+
+**Rule:** Do NOT surface UI that promises agent output from the pipeline agent
+workforce. Product AI works via the frontend calling Anthropic directly
+(`portal/.../ai/draft|review|compliance`, `claude-sonnet-4-20250514`). The pipeline
+agent workforce is V2 (see ARCHITECTURE_V9.md §9.4 for what wiring is needed).
+
+### Mistake 35: `config.STORAGE_ROOT="/data"` is a dead constant — do not use it
+`pipeline/src/config.py::STORAGE_ROOT` is set but never imported by any storage code.
+All pipeline storage goes through `storage/s3_client.py` (boto3 / Cloudflare R2).
+The `/data` Railway volume is used ONLY by the CMS service for its own media files.
+
+**Rule:** Never use `config.STORAGE_ROOT` for pipeline file paths. Use the S3 key
+scheme (see ARCHITECTURE_V9.md §11).
+
 ---
 
 ## 5. Project Architecture Quick Reference
@@ -736,9 +908,14 @@ canonical shape.
 - **CMS** (FastAPI): `services/cms/` — email automation, CMS SPA (Vite/React/TipTap), event listener
 
 ### Storage
-- Single Railway S3 bucket: `rfp-pipeline-prod-r8t7tr6`
+- **S3-compatible object storage: Cloudflare R2** (`forcePathStyle: true`)
+- Single bucket (name from `AWS_S3_BUCKET_NAME` env — `rfp-pipeline-prod-r8t7tr6` in prod)
 - Three head folders: `rfp-admin/`, `rfp-pipeline/`, `customers/`
 - AWS SDK auto-reads `AWS_*` env vars — zero config needed
+- **`config.STORAGE_ROOT="/data"` is a DEAD constant** in `pipeline/src/config.py`.
+  No storage code imports it. Do NOT use it. The live store is S3/R2 accessed via
+  `pipeline/src/storage/s3_client.py` (boto3) and `frontend/lib/storage/s3-client.ts`.
+  (The CMS service uses `/data/cms` Railway volume only for its own media uploads.)
 
 ### Auth
 - NextAuth v5 with Credentials provider + JWT
@@ -826,7 +1003,7 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 ### Agent Fabric (pipeline/src/agents/) — WRITTEN BUT DORMANT (V2, not wired today)
 - 10 archetypes auto-register, but the fabric is ORPHANED at runtime: producer
   `requestAgentTask` has zero callers; `AgentFabric` is instantiated then discarded
-  (`main.py:70`); AI_INVOKE template steps deliberately skip. Agents do NOT act on
+  (`main.py:72`); AI_INVOKE template steps deliberately skip. Agents do NOT act on
   Jobs/Templates today — that is V2 (EVENT_CONTRACT_V3 §10.8).
 - Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in
   `fabric.invoke_agent` but it is NEVER reached. Budget column is `monthly_budget`
@@ -841,8 +1018,9 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Crash recovery, heartbeat (30s), stuck detection (5min stale), orphan recovery.
 - Driven by the `processor.py` poll loop (every 10s, `main.py:87`). Transport is
   POLLING — there is no pg_notify/add_listener anywhere despite schema triggers.
-- ⚠️ HITL is broken here (Mistakes 17–18). ACTION/NOTIFY enforce timeout+retry;
-  AI_INVOKE/API_CALL are stubbed skips; CONDITION works but no template uses it.
+- HITL resume is implemented (Mistakes 17–18 are resolved). ACTION/NOTIFY enforce
+  timeout+retry; AI_INVOKE/API_CALL are stubbed skips; CONDITION works but no template
+  uses it.
 
 ---
 
@@ -876,7 +1054,7 @@ CMS SPA:        services/cms/frontend/src/
 3. Use explicit ON CONFLICT (column) targets — never bare ON CONFLICT DO NOTHING
 4. UUID columns need UUIDs or NULL — never insert strings
 5. Verify FK target rows exist before inserting references
-6. Test migrations on fresh DB (all 51 in sequence), not just incremental
+6. Test migrations on fresh DB (all 69, 000–067 + 030a, in sequence), not just incremental
 7. The production runner (migrate.mjs) wraps each migration in a transaction
    — partial failures roll back cleanly
 ```
@@ -925,11 +1103,10 @@ the **human edge** was broken in several places. The durable truths:
   has no consumer. `proposal.review_requested` / `compliance.checked` /
   `*.draft_requested` are dead-ends until the agent loop ships. Do NOT surface UI that
   promises agent output (the "Run AI Review" toast was corrected).
-- **HITL resume needs a real producer** whose event matches the parked step's
-  `wait_for`. Proposal gate: fixed to `proposal.advanced:end` (its `end` event carries
-  `previousStage`). Source-change gate: fixed to `source_diff.reviewed:end` (the diffs
-  route PATCH emits it). That event is per-diff and not yet correlated to the instance's
-  sourceId, so the **process ledger force-advance** is the precise per-instance override.
+- **HITL resume is implemented** in `WorkflowManager.resume_instance()`. The producer
+  whose event matches the parked step's `wait_for` must be verified for any new HITL_WAIT
+  step. Proposal gate: `proposal.advanced:end` (carries `previousStage`). Source-change
+  gate: `source_diff.reviewed:end` (the diffs route PATCH emits it).
 - **Ops:** the CMS automation listener silently disables ALL CMS automation if
   `SHARED_DATABASE_URL` is unset. Source Scout has no scheduler (manual-only).
 - **Verify against the actual file, not a truncated read or a subagent summary.** A
