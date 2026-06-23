@@ -107,10 +107,19 @@ export async function POST(
     const actorId = user.id!;
 
     // ── Fetch current state ─────────────────────────────────────────
-    const existing = await sql<{ status: string }[]>`
-      SELECT status FROM curated_solicitations
-      WHERE id = ${solId}::uuid
-    `;
+    let existing: { status: string }[];
+    try {
+      existing = await sql<{ status: string }[]>`
+        SELECT status FROM curated_solicitations
+        WHERE id = ${solId}::uuid
+      `;
+    } catch (dbErr) {
+      console.error('[rfp-curation] POST triage DB fetch failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     if (existing.length === 0) {
       return NextResponse.json(
@@ -132,17 +141,26 @@ export async function POST(
     const toState = mapping.to;
 
     // ── Start event ────────────────────────────────────────────────
-    const startId = await emitEventStart({
-      namespace: 'finder',
-      type: 'solicitation.triaged',
-      actor: userActor(actorId, user.email),
-      payload: {
-        solicitationId: solId,
-        action,
-        fromState,
-        toState,
-      },
-    });
+    let startId: string;
+    try {
+      startId = await emitEventStart({
+        namespace: 'finder',
+        type: 'solicitation.triaged',
+        actor: userActor(actorId, user.email),
+        payload: {
+          solicitationId: solId,
+          action,
+          fromState,
+          toState,
+        },
+      });
+    } catch (evtErr) {
+      console.error('[rfp-curation] POST triage emitEventStart failed:', evtErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     const updateFields: Record<string, string | null> = {};
     if (action === 'claim' || action === 'reclaim') {
@@ -153,21 +171,30 @@ export async function POST(
     }
 
     // Use a conditional UPDATE that also acts as a race guard
-    const updated = await sql<{ id: string }[]>`
-      UPDATE curated_solicitations
-      SET status = ${toState},
-          claimed_by = CASE WHEN ${action} IN ('claim', 'reclaim') THEN ${actorId}::uuid ELSE claimed_by END,
-          claimed_at = CASE WHEN ${action} IN ('claim', 'reclaim') THEN now() ELSE claimed_at END,
-          dismissed_reason = CASE WHEN ${action} = 'dismiss' THEN ${typeof notes === 'string' ? notes : null} ELSE dismissed_reason END,
-          curated_by = CASE WHEN ${action} = 'request_review' THEN ${actorId}::uuid ELSE curated_by END,
-          updated_at = now()
-      WHERE id = ${solId}::uuid
-        AND status = ${fromState}
-      RETURNING id
-    `;
+    let updated: { id: string }[];
+    try {
+      updated = await sql<{ id: string }[]>`
+        UPDATE curated_solicitations
+        SET status = ${toState},
+            claimed_by = CASE WHEN ${action} IN ('claim', 'reclaim') THEN ${actorId}::uuid ELSE claimed_by END,
+            claimed_at = CASE WHEN ${action} IN ('claim', 'reclaim') THEN now() ELSE claimed_at END,
+            dismissed_reason = CASE WHEN ${action} = 'dismiss' THEN ${typeof notes === 'string' ? notes : null} ELSE dismissed_reason END,
+            curated_by = CASE WHEN ${action} = 'request_review' THEN ${actorId}::uuid ELSE curated_by END,
+            updated_at = now()
+        WHERE id = ${solId}::uuid
+          AND status = ${fromState}
+        RETURNING id
+      `;
+    } catch (dbErr) {
+      console.error('[rfp-curation] POST triage update failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     if (updated.length === 0) {
-      await emitEventEnd(startId, { error: { message: 'Status changed concurrently', code: 'CONFLICT' } });
+      try { await emitEventEnd(startId, { error: { message: 'Status changed concurrently', code: 'CONFLICT' } }); } catch { /* non-fatal */ }
       return NextResponse.json(
         { error: 'Status changed concurrently, please retry', code: 'CONFLICT' },
         { status: 409 },
@@ -175,24 +202,37 @@ export async function POST(
     }
 
     // ── Insert triage audit row ─────────────────────────────────────
-    const [triageRow] = await sql<{ id: string }[]>`
-      INSERT INTO triage_actions
-        (solicitation_id, actor_id, action, from_state, to_state, notes)
-      VALUES
-        (${solId}::uuid, ${actorId}::uuid, ${action}, ${fromState}, ${toState}, ${typeof notes === 'string' ? notes : null})
-      RETURNING id
-    `;
+    let triageRow: { id: string };
+    try {
+      [triageRow] = await sql<{ id: string }[]>`
+        INSERT INTO triage_actions
+          (solicitation_id, actor_id, action, from_state, to_state, notes)
+        VALUES
+          (${solId}::uuid, ${actorId}::uuid, ${action}, ${fromState}, ${toState}, ${typeof notes === 'string' ? notes : null})
+        RETURNING id
+      `;
+    } catch (dbErr) {
+      console.error('[rfp-curation] POST triage_actions insert failed:', dbErr);
+      return NextResponse.json(
+        { error: 'Internal error', code: 'DB_ERROR' },
+        { status: 500 },
+      );
+    }
 
     // ── End event ──────────────────────────────────────────────────
-    await emitEventEnd(startId, {
-      result: {
-        triageActionId: triageRow.id,
-        solicitationId: solId,
-        action,
-        fromState,
-        toState,
-      },
-    });
+    try {
+      await emitEventEnd(startId, {
+        result: {
+          triageActionId: triageRow.id,
+          solicitationId: solId,
+          action,
+          fromState,
+          toState,
+        },
+      });
+    } catch (evtErr) {
+      console.error('[rfp-curation] POST triage emitEventEnd failed:', evtErr);
+    }
 
     return NextResponse.json({
       data: {

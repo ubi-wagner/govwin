@@ -232,21 +232,33 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string; title: string; stage: string; gateConfig: string[] }[]>`
-      SELECT id, title, stage, gate_config FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string; title: string; stage: string; gateConfig: string[] } | undefined;
+    try {
+      [proposal] = await sql<{ id: string; title: string; stage: string; gateConfig: string[] }[]>`
+        SELECT id, title, stage, gate_config FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] proposal lookup failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     // Check if collaborator already exists
-    const [existing] = await sql<{ id: string }[]>`
-      SELECT id FROM proposal_collaborators
-      WHERE proposal_id = ${proposalId} AND email = ${email}
-      LIMIT 1
-    `;
+    let existing: { id: string } | undefined;
+    try {
+      [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM proposal_collaborators
+        WHERE proposal_id = ${proposalId} AND email = ${email}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/collaborators] duplicate check failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (existing) {
       return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
     }

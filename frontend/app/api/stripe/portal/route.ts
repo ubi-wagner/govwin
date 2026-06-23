@@ -60,13 +60,17 @@ export async function POST() {
       returnUrl,
     );
 
-    await emitEventSingle({
-      namespace: 'capture',
-      type: 'billing.portal_opened',
-      actor: { type: 'user', id: user.id! },
-      tenantId: user.tenantId,
-      payload: { correlationId: randomUUID(), tenantId: user.tenantId },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'billing.portal_opened',
+        actor: { type: 'user', id: user.id! },
+        tenantId: user.tenantId,
+        payload: { correlationId: randomUUID(), tenantId: user.tenantId },
+      });
+    } catch (evtErr) {
+      console.error('[stripe/portal] event emission failed:', evtErr);
+    }
 
     return NextResponse.json({ data: { url: portalSession.url } });
   } catch (err) {

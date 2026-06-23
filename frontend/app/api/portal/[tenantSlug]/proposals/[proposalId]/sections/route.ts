@@ -46,11 +46,17 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }
 
     // Verify proposal belongs to tenant
-    const [proposal] = await sql<{ id: string }[]>`
-      SELECT id FROM proposals
-      WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-      LIMIT 1
-    `;
+    let proposal: { id: string } | undefined;
+    try {
+      [proposal] = await sql<{ id: string }[]>`
+        SELECT id FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections] proposal query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
@@ -59,7 +65,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
 
     // Load all sections
-    const allSections = await sql<{
+    let allSections: {
       id: string;
       sectionNumber: string;
       title: string;
@@ -67,14 +73,28 @@ export async function GET(_request: Request, ctx: RouteContext) {
       pageAllocation: number | null;
       version: number;
       assignedTo: string | null;
-    }[]>`
-      SELECT
-        id, section_number, title, status,
-        page_allocation, version, assigned_to
-      FROM proposal_sections
-      WHERE proposal_id = ${proposalId}
-      ORDER BY section_number ASC
-    `;
+    }[];
+    try {
+      allSections = await sql<{
+        id: string;
+        sectionNumber: string;
+        title: string;
+        status: string;
+        pageAllocation: number | null;
+        version: number;
+        assignedTo: string | null;
+      }[]>`
+        SELECT
+          id, section_number, title, status,
+          page_allocation, version, assigned_to
+        FROM proposal_sections
+        WHERE proposal_id = ${proposalId}
+        ORDER BY section_number ASC
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/sections] sections query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
 
     // Map sections with per-user permission
     const sections = allSections.map((section) => {

@@ -82,6 +82,7 @@ function slugSafeName(name: string): string {
 }
 
 export async function POST(request: Request) {
+  try {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json(
@@ -492,5 +493,12 @@ export async function POST(request: Request) {
     },
     { status: 201 },
   );
+  } catch (err) {
+    console.error('[rfp-upload] unhandled error:', err);
+    return NextResponse.json(
+      { error: 'Upload failed', code: 'DB_ERROR' },
+      { status: 500 },
+    );
+  }
 }
 

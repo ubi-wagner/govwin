@@ -17,30 +17,30 @@ interface RouteContext {
 }
 
 export async function GET(_req: Request, ctx: RouteContext) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json(
-      { error: 'Authentication required', code: 'UNAUTHENTICATED' },
-      { status: 401 },
-    );
-  }
-  const role = (session.user as { role?: string }).role;
-  if (role !== 'rfp_admin' && role !== 'master_admin') {
-    return NextResponse.json(
-      { error: 'rfp_admin role required', code: 'FORBIDDEN' },
-      { status: 403 },
-    );
-  }
-
-  const { id } = await ctx.params;
-  if (!isValidUUID(id)) {
-    return NextResponse.json(
-      { error: 'Invalid document ID format', code: 'VALIDATION_ERROR' },
-      { status: 400 },
-    );
-  }
-
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Authentication required', code: 'UNAUTHENTICATED' },
+        { status: 401 },
+      );
+    }
+    const role = (session.user as { role?: string }).role;
+    if (role !== 'rfp_admin' && role !== 'master_admin') {
+      return NextResponse.json(
+        { error: 'rfp_admin role required', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    const { id } = await ctx.params;
+    if (!isValidUUID(id)) {
+      return NextResponse.json(
+        { error: 'Invalid document ID format', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     const rows = await sql<{ storageKey: string; originalFilename: string }[]>`
       SELECT storage_key, original_filename
       FROM solicitation_documents

@@ -179,13 +179,17 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── Emit event ──────────────────────────────────────────────────
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'section.exported',
-      actor: userActor(sessionUser.id, sessionUser.email ?? undefined),
-      tenantId,
-      payload: { proposalId, sectionId, format, title },
-    });
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'section.exported',
+        actor: userActor(sessionUser.id, sessionUser.email ?? undefined),
+        tenantId,
+        payload: { proposalId, sectionId, format, title },
+      });
+    } catch (evtErr) {
+      console.error('[api/portal/proposals/sections/export] event emission failed:', evtErr);
+    }
 
     const contentTypes: Record<string, string> = {
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

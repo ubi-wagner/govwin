@@ -192,13 +192,17 @@ export async function POST(
     }
   }
 
-  await emitEventSingle({
-    namespace: 'library',
-    type: 'file.uploaded',
-    actor: { type: 'user', id: sessionUser.id },
-    tenantId,
-    payload: { correlationId: randomUUID(), fileCount: uploaded.length, files: uploaded.map(f => ({ id: f.id, filename: f.filename })) },
-  });
+  try {
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'file.uploaded',
+      actor: { type: 'user', id: sessionUser.id },
+      tenantId,
+      payload: { correlationId: randomUUID(), fileCount: uploaded.length, files: uploaded.map(f => ({ id: f.id, filename: f.filename })) },
+    });
+  } catch (evtErr) {
+    console.error('[library/upload] event emission failed', evtErr);
+  }
 
   return NextResponse.json(
     { data: { uploaded } },
