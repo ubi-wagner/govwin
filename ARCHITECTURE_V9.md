@@ -1095,12 +1095,12 @@ Highest-risk untested paths:
 
 | File | Problem |
 |------|---------|
-| `CLAUDE.md` (root) | Points to `ARCHITECTURE_V5.md`; says "one Postgres + one /data volume"; says "CMS dormant V1" |
+| `CLAUDE.md` (root) | ~~Points to `ARCHITECTURE_V5.md`~~ — fixed (now points to V9); says "one Postgres + one /data volume"; says "CMS dormant V1" |
 | `docs/CLAUDE_CLIFFNOTES.md` (in docs/) | OLDER version (2026-04-27) of the root CLIFFNOTES; navigation hazard — delete or rename |
 | `scripts/migrate.sh` | No tracking — marked "NEVER USE" in CLIFFNOTES; delete or rename to `_DANGEROUS_NO_TRACKING.sh` |
 | `docker-compose.yml` | CMS section comment says "V1 dormant" — stale |
 | `.env.example` | CMS section says "V1 dormant, deferred to V2+" — stale |
-| `docs/AUTOMATION_WORKFLOWS.md` | Superseded by `WORKFLOW_REFERENCE.md`; archive |
+| `docs/AUTOMATION_WORKFLOWS.md` | Superseded by `WORKFLOW_REFERENCE.md`; archived → `docs/archive/AUTOMATION_WORKFLOWS.md` |
 
 ---
 

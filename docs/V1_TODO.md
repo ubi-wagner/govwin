@@ -1,7 +1,7 @@
 # V1 Launch — Comprehensive TODO Plan
 
 **Generated:** 2026-05-20
-**Source:** ARCHITECTURE_V6.md Section 10 (Gap Analysis) + TODO.md audit
+**Source:** ARCHITECTURE_V6.md Section 10 (Gap Analysis) + TODO.md audit (V6 now archived at docs/archive/ARCHITECTURE_V6.md)
 **Status:** Active — tracks all remaining work for V1 launch
 
 ---

@@ -72,7 +72,7 @@ Event bridge coordinates via `system_events` table in Main Postgres.
 | Media router defined but never registered | `/api/media/*` endpoints unreachable | `app.include_router(media.router, ...)` in `main.py` |
 | Zero auth on CMS API endpoints | Any caller can hit CMS service | API key middleware (`X-CMS-API-Key`) |
 | `anthropic` not in `requirements.txt` | Content generation worker will crash | Add `anthropic>=0.40.0` |
-| Event namespace uses `cms` (forbidden) | Violates EVENT_CONTRACT.md Section 2 | Change to `system` with `cms_content.*` types |
+| Event namespace uses `cms` (forbidden) | Violates EVENT_CONTRACT_V3.md §2 / ARCHITECTURE_V9.md §8 | Change to `system` with `cms_content.*` types |
 | Campaign execution engine missing | Campaigns created but never sent | Build `campaign_executor.py` |
 | `social_post` content type orphaned | Exists in validation but no pipeline | Wire to social posting system |
 

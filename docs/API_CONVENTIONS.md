@@ -2,7 +2,7 @@
 
 Binding contract every `frontend/app/api/**/route.ts` handler must satisfy. Non-compliance fails PR review.
 
-See also: [ERROR_HANDLING.md](./ERROR_HANDLING.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [NAMESPACES.md](./NAMESPACES.md).
+See also: [ERROR_HANDLING.md](./ERROR_HANDLING.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md). Namespace registry: ARCHITECTURE_V9.md §8.
 
 ---
 
@@ -12,7 +12,7 @@ See also: [ERROR_HANDLING.md](./ERROR_HANDLING.md), [TOOL_CONVENTIONS.md](./TOOL
 2. **Every handler** uses `withHandler` from `lib/api-helpers.ts` — no bespoke try/catch, no raw `NextResponse.json`.
 3. **Input validation** is zod. Never `typeof` checks. Shared primitives live in `lib/validation.ts`.
 4. **Auth-first ordering**: `(1) resolve session → (2) validate input → (3) verify tenant access → (4) business logic → (5) return`.
-5. **Logging** via `lib/logger.ts` with a scope from [NAMESPACES.md §"Log scope names"](./NAMESPACES.md). No raw `console.*`.
+5. **Logging** via `lib/logger.ts` with a scope from ARCHITECTURE_V9.md §8. No raw `console.*`.
 6. **Errors** are typed `AppError` subclasses thrown from the handler; the wrapper translates them to HTTP via `httpStatus` + `code`.
 7. **Events** — significant handlers emit `emitEventStart` + `emitEventEnd` (or `emitEventSingle` for instantaneous events) to `system_events`.
 
@@ -109,7 +109,7 @@ const InputSchema = z.object({
 });
 
 export const POST = withHandler({
-  scope: 'auth',              // log scope, from NAMESPACES.md
+  scope: 'auth',              // log scope, from ARCHITECTURE_V9.md §8
   inputSchema: InputSchema,   // zod or null for no-input routes
   requireAuth: true,          // default true; public routes opt out
   requiredRole: 'rfp_admin',  // optional — enforced via hasRoleAtLeast
@@ -232,7 +232,7 @@ async handler(input, ctx) {
 }
 ```
 
-Scope values must come from [NAMESPACES.md §"Log scope names"](./NAMESPACES.md). Adding a new scope requires updating the registry doc in the same PR.
+Scope values must come from ARCHITECTURE_V9.md §8 "Log scope names". Adding a new scope requires updating the registry doc in the same PR.
 
 ---
 
@@ -461,7 +461,7 @@ export const POST = withHandler({
 
 Notes:
 - The tenant check happens BEFORE any write. This is non-negotiable.
-- The event emission uses the correct namespace from `NAMESPACES.md` (`proposal.section.drafted`).
+- The event emission uses the correct namespace from ARCHITECTURE_V9.md §8 (`proposal.section.drafted`).
 - If the event emission fails, it is logged but does not fail the request — events are write-ahead audit, not a transaction anchor.
 
 ---

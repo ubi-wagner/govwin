@@ -2,7 +2,7 @@
 
 Binding specification for the dual-use Tool framework.
 
-See also: [API_CONVENTIONS.md](./API_CONVENTIONS.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [NAMESPACES.md](./NAMESPACES.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), and the authoring guide at `frontend/lib/tools/README.md`.
+See also: [API_CONVENTIONS.md](./API_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), and the authoring guide at `frontend/lib/tools/README.md`. Namespace registry: ARCHITECTURE_V9.md §8.
 
 ---
 
@@ -27,7 +27,7 @@ Full TypeScript (from `frontend/lib/tools/base.ts`):
 ```ts
 export interface Tool<I = unknown, O = unknown> {
   name: string;              // unique, dotted — e.g. 'memory.search'
-  namespace: string;         // top-level bucket from NAMESPACES.md
+  namespace: string;         // top-level bucket from ARCHITECTURE_V9.md §8
   description: string;       // for agent catalog + admin UI
   inputSchema: ZodSchema<I>; // parsed by the registry before handler runs
   requiredRole?: Role;       // minimum role — undefined means any authenticated actor
@@ -247,7 +247,7 @@ Skeleton exists in Phase 0.5b; full implementation lands in Phase 4 alongside th
 
 ## Authoring a new tool
 
-1. **Check [NAMESPACES.md §"Tool namespaces"](./NAMESPACES.md)** — the top-level bucket you're using must be registered. Adding a new namespace requires a PR touching that doc.
+1. **Check ARCHITECTURE_V9.md §8** — the top-level bucket you're using must be registered. Adding a new namespace requires a PR touching that doc.
 2. **Create `frontend/lib/tools/<kebab-name>.ts`** exporting `defineTool({...})`.
 3. **Write the zod schema** for input. Use primitives from `lib/validation.ts` where possible.
 4. **Implement the handler**. Throw `ToolError` subclasses on failure; return the success value directly.
@@ -966,7 +966,7 @@ import { defineTool } from './base';
 import { sql } from '@/lib/db';
 import { ToolValidationError } from './errors';
 
-// {agency}:{program_office}:{type}:{phase} per NAMESPACES.md §"Memory namespaces"
+// {agency}:{program_office}:{type}:{phase} per ARCHITECTURE_V9.md §8 "Memory namespaces"
 const NAMESPACE_KEY_RE = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
 
 const InputSchema = z.object({

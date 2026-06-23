@@ -495,7 +495,7 @@ NEVER use: `admin.*`, `cms.*`, `spotlight.*`, `pipeline.*` as event namespaces.
 TOOL names, not event namespaces — never emit events under them.)
 
 `agent` namespace: appears in `system_events.namespace` column comment and older
-docs (EVENT_CONTRACT.md, NAMESPACES.md) but is **never emitted at runtime**
+docs (now archived) but is **never emitted at runtime**
 (confirmed by grep across all 3 services). It is a stale schema/doc artifact.
 Agent/tool activity emits under `tool` (e.g. `tool:tool.invoked`). The canonical
 set is the 7 listed above — do NOT emit `agent.*` events.

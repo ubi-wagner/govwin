@@ -17,7 +17,7 @@
 | **Semantic** | `semantic_memories` | Confirmed facts and preferences: "what I know" | `confidence DESC, evidence_count DESC` | pgvector cosine similarity |
 | **Procedural** | `procedural_memories` | Learned step-by-step procedures: "how to do things" | `success_rate DESC, execution_count DESC` | pgvector cosine similarity |
 
-### Four Memory Layers (from ARCHITECTURE_V5.md)
+### Four Memory Layers (originally from ARCHITECTURE_V5.md — now archived; see ARCHITECTURE_V9.md)
 
 | Layer | Scope | Mutability | Description |
 |-------|-------|-----------|-------------|
