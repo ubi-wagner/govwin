@@ -53,6 +53,12 @@ from typing import Any, Callable, Coroutine
 logger = logging.getLogger("pipeline.agents")
 
 
+def _get_embedding_provider():
+    """Lazy import to avoid circular dependency at module load time."""
+    from agents.embeddings import get_embedding_provider  # lazy
+    return get_embedding_provider()
+
+
 # ---------------------------------------------------------------------------
 # Tool definition
 # ---------------------------------------------------------------------------
@@ -220,7 +226,9 @@ async def _memory_search(
 ) -> dict:
     """Search episodic, semantic, or procedural memories by content match.
 
-    Uses ILIKE for text search (V1). Vector similarity in V2.
+    When EMBEDDINGS_PROVIDER is active, embeds the query and uses cosine
+    ORDER BY embedding <=> $vec (tenant-scoped). Falls back to recency/ILIKE
+    path when provider returns None (DEFAULT-OFF: behavior unchanged).
     """
     if limit < 1:
         limit = 1
@@ -228,24 +236,51 @@ async def _memory_search(
         limit = 25
 
     tenant_uuid = uuid.UUID(tenant_id)
+
+    # ── Try to get a query embedding (DEFAULT-OFF: returns None when inactive) ──
+    query_vec: list[float] | None = None
+    if query:
+        try:
+            provider = _get_embedding_provider()
+            if provider._active:
+                query_vec = await provider.embed(query)
+        except Exception as _emb_exc:
+            logger.error("[memory.search] embed failed, using ILIKE: %s", _emb_exc)
+
+    # ── ILIKE fallback setup (only needed when no vector) ─────────────────
     escaped_query = _escape_ilike(query) if query else ""
     pattern = f"%{escaped_query}%" if escaped_query else "%"
 
     try:
         if memory_type == "semantic":
-            rows = await conn.fetch(
-                """
-                SELECT id, content, category, subcategory, confidence,
-                       evidence_count, updated_at
-                FROM semantic_memories
-                WHERE tenant_id = $1
-                  AND is_active = true
-                  AND content ILIKE $2
-                ORDER BY confidence DESC, updated_at DESC
-                LIMIT $3
-                """,
-                tenant_uuid, pattern, limit,
-            )
+            if query_vec is not None:
+                vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, confidence,
+                           evidence_count, updated_at
+                    FROM semantic_memories
+                    WHERE tenant_id = $1
+                      AND is_active = true
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $3
+                    """,
+                    tenant_uuid, vec_str, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, confidence,
+                           evidence_count, updated_at
+                    FROM semantic_memories
+                    WHERE tenant_id = $1
+                      AND is_active = true
+                      AND content ILIKE $2
+                    ORDER BY confidence DESC, updated_at DESC
+                    LIMIT $3
+                    """,
+                    tenant_uuid, pattern, limit,
+                )
             return {
                 "memories": [
                     {
@@ -261,19 +296,34 @@ async def _memory_search(
             }
 
         elif memory_type == "procedural":
-            rows = await conn.fetch(
-                """
-                SELECT id, name, description, steps, success_rate,
-                       execution_count
-                FROM procedural_memories
-                WHERE tenant_id = $1
-                  AND is_active = true
-                  AND (name ILIKE $2 OR description ILIKE $2)
-                ORDER BY success_rate DESC, execution_count DESC
-                LIMIT $3
-                """,
-                tenant_uuid, pattern, limit,
-            )
+            if query_vec is not None:
+                vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
+                rows = await conn.fetch(
+                    """
+                    SELECT id, name, description, steps, success_rate,
+                           execution_count
+                    FROM procedural_memories
+                    WHERE tenant_id = $1
+                      AND is_active = true
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $3
+                    """,
+                    tenant_uuid, vec_str, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, name, description, steps, success_rate,
+                           execution_count
+                    FROM procedural_memories
+                    WHERE tenant_id = $1
+                      AND is_active = true
+                      AND (name ILIKE $2 OR description ILIKE $2)
+                    ORDER BY success_rate DESC, execution_count DESC
+                    LIMIT $3
+                    """,
+                    tenant_uuid, pattern, limit,
+                )
             results = []
             for r in rows:
                 steps = r["steps"]
@@ -293,19 +343,34 @@ async def _memory_search(
 
         else:
             # Default: episodic
-            rows = await conn.fetch(
-                """
-                SELECT id, content, memory_type, importance, metadata,
-                       occurred_at
-                FROM episodic_memories
-                WHERE tenant_id = $1
-                  AND is_archived = false
-                  AND content ILIKE $2
-                ORDER BY (importance * decay_factor) DESC, occurred_at DESC
-                LIMIT $3
-                """,
-                tenant_uuid, pattern, limit,
-            )
+            if query_vec is not None:
+                vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, memory_type, importance, metadata,
+                           occurred_at
+                    FROM episodic_memories
+                    WHERE tenant_id = $1
+                      AND is_archived = false
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $3
+                    """,
+                    tenant_uuid, vec_str, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, memory_type, importance, metadata,
+                           occurred_at
+                    FROM episodic_memories
+                    WHERE tenant_id = $1
+                      AND is_archived = false
+                      AND content ILIKE $2
+                    ORDER BY (importance * decay_factor) DESC, occurred_at DESC
+                    LIMIT $3
+                    """,
+                    tenant_uuid, pattern, limit,
+                )
             return {
                 "memories": [
                     {
@@ -332,9 +397,23 @@ async def _memory_write(
     memory_type: str = "observation",
     agent_role: str = "unknown",
 ) -> dict:
-    """Write a new episodic memory entry."""
+    """Write a new episodic memory entry.
+
+    Embeds content when provider is active; else stores zero-vector (DEFAULT-OFF).
+    """
     # Zero vector placeholder (1536 dims for text-embedding-3-small compat)
     zero_vector = "[" + ",".join(["0.0"] * 1536) + "]"
+    embedding_str = zero_vector
+
+    # Embed if provider is active (DEFAULT-OFF: provider inactive → zero-vector)
+    try:
+        provider = _get_embedding_provider()
+        if provider._active:
+            vec = await provider.embed(content)
+            if vec is not None:
+                embedding_str = "[" + ",".join(str(v) for v in vec) + "]"
+    except Exception as _emb_exc:
+        logger.error("[memory.write] embedding failed: %s", _emb_exc)
 
     memory_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
@@ -352,7 +431,7 @@ async def _memory_write(
             memory_id,
             uuid.UUID(tenant_id),
             agent_role,
-            zero_vector,
+            embedding_str,
             content,
             memory_type,
             now,
@@ -370,18 +449,66 @@ async def _library_search(
     category: str = "",
     limit: int = 10,
 ) -> dict:
-    """Search library_units by keyword and/or category."""
+    """Search library_units by keyword and/or category.
+
+    When EMBEDDINGS_PROVIDER is active AND a query is provided, uses cosine
+    ORDER BY embedding <=> $vec (tenant-scoped). Category filter is still
+    applied as a WHERE clause when cosine path is taken (if category given).
+    Falls back to recency/ILIKE when provider returns None (DEFAULT-OFF).
+    """
     if limit < 1:
         limit = 1
     elif limit > 25:
         limit = 25
 
     tenant_uuid = uuid.UUID(tenant_id)
+
+    # ── Try to get a query embedding ──────────────────────────────────────
+    query_vec: list[float] | None = None
+    if query:
+        try:
+            provider = _get_embedding_provider()
+            if provider._active:
+                query_vec = await provider.embed(query)
+        except Exception as _emb_exc:
+            logger.error("[library.search] embed failed, using ILIKE: %s", _emb_exc)
+
     escaped_query = _escape_ilike(query) if query else ""
     escaped_category = _escape_ilike(category) if category else ""
 
     try:
-        if query and category:
+        if query_vec is not None:
+            # Cosine path — category still applied as WHERE filter if given
+            vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
+            if category:
+                cat_pattern = f"%{escaped_category}%"
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, tags,
+                           confidence, status, usage_count
+                    FROM library_units
+                    WHERE tenant_id = $1
+                      AND status != 'archived'
+                      AND category ILIKE $3
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $4
+                    """,
+                    tenant_uuid, vec_str, cat_pattern, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, tags,
+                           confidence, status, usage_count
+                    FROM library_units
+                    WHERE tenant_id = $1
+                      AND status != 'archived'
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $3
+                    """,
+                    tenant_uuid, vec_str, limit,
+                )
+        elif query and category:
             query_pattern = f"%{escaped_query}%"
             cat_pattern = f"%{escaped_category}%"
             rows = await conn.fetch(

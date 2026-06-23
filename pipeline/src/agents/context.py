@@ -42,6 +42,36 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger("pipeline.agents")
 
+
+def _get_provider():
+    """Lazy import to avoid circular dependency at module load time."""
+    from agents.embeddings import get_embedding_provider  # lazy
+    return get_embedding_provider()
+
+
+def _build_task_text(task_data: dict) -> str:
+    """Extract a representative text from task_data for embedding-based ranking.
+
+    Tries common keys in priority order; truncates to 512 chars to keep the
+    embedding call cheap. Returns empty string when nothing useful is found.
+    """
+    if not isinstance(task_data, dict):
+        return ""
+    candidates = []
+    for key in ("task", "description", "content", "title", "query", "prompt"):
+        val = task_data.get(key)
+        if isinstance(val, str) and val.strip():
+            candidates.append(val.strip())
+    # Also check nested context dict
+    ctx = task_data.get("context")
+    if isinstance(ctx, dict):
+        for key in ("task", "description", "title"):
+            val = ctx.get(key)
+            if isinstance(val, str) and val.strip():
+                candidates.append(val.strip())
+    text = " ".join(candidates)
+    return text[:512] if text else ""
+
 # ---------------------------------------------------------------------------
 # Token budget constants (rough estimates — 1 token ~ 4 chars)
 # ---------------------------------------------------------------------------
@@ -157,7 +187,7 @@ class ContextAssembler:
                 )
 
             library_atoms_text = await self._load_library_atoms(
-                conn, tenant_id,
+                conn, tenant_id, task_data=task_data if isinstance(task_data, dict) else {},
             )
 
         # Format the system prompt
@@ -444,27 +474,60 @@ class ContextAssembler:
         return "\n\n".join(parts)
 
     async def _load_library_atoms(
-        self, conn, tenant_id: str,
+        self, conn, tenant_id: str, *, task_data: dict | None = None,
     ) -> str:
         """Load top-N relevant library_units atoms for the tenant.
 
-        Ordered by usage_count DESC, updated_at DESC (recency fallback).
+        When EMBEDDINGS_PROVIDER is active, ranks atoms by cosine similarity
+        to the task/proposal context text extracted from task_data.
+        Falls back to recency ordering (usage_count DESC, updated_at DESC)
+        when no provider is configured (DEFAULT-OFF: no behavior change).
+
         Tenant-isolated via WHERE tenant_id = $1.
         Capped at MAX_LIBRARY_ATOMS_TOKENS.
         """
+        # ── Attempt cosine ranking if provider is active ──────────────────
+        query_vec: list[float] | None = None
+        if task_data:
+            task_text = _build_task_text(task_data)
+            if task_text:
+                try:
+                    provider = _get_provider()
+                    if provider._active:
+                        query_vec = await provider.embed(task_text)
+                except Exception as _emb_exc:
+                    logger.error("[_load_library_atoms] embed failed: %s", _emb_exc)
+
         try:
-            rows = await conn.fetch(
-                """
-                SELECT id, content, category, subcategory, usage_count, updated_at
-                FROM library_units
-                WHERE tenant_id = $1
-                  AND status != 'archived'
-                ORDER BY usage_count DESC, updated_at DESC
-                LIMIT $2
-                """,
-                uuid.UUID(tenant_id),
-                LIBRARY_ATOMS_LIMIT,
-            )
+            if query_vec is not None:
+                vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, usage_count, updated_at
+                    FROM library_units
+                    WHERE tenant_id = $1
+                      AND status != 'archived'
+                    ORDER BY embedding <=> $2::vector
+                    LIMIT $3
+                    """,
+                    uuid.UUID(tenant_id),
+                    vec_str,
+                    LIBRARY_ATOMS_LIMIT,
+                )
+            else:
+                # DEFAULT-OFF: recency path (unchanged from original)
+                rows = await conn.fetch(
+                    """
+                    SELECT id, content, category, subcategory, usage_count, updated_at
+                    FROM library_units
+                    WHERE tenant_id = $1
+                      AND status != 'archived'
+                    ORDER BY usage_count DESC, updated_at DESC
+                    LIMIT $2
+                    """,
+                    uuid.UUID(tenant_id),
+                    LIBRARY_ATOMS_LIMIT,
+                )
         except Exception as exc:
             logger.error("[_load_library_atoms] query failed: %s", exc)
             return ""
