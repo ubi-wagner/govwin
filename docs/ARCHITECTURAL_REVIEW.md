@@ -109,7 +109,7 @@ Add OCC to `proposals` (stage field), `library_units` (content), and `curated_so
 
 **Phase 3 (multi-user scaling):**
 
-Real-time collaboration via WebSocket (already planned in ARCHITECTURE_V5.md for V2+). OCC is the bridge until then.
+Real-time collaboration via WebSocket (planned for V2+; see docs/archive/ARCHITECTURE_V5.md). OCC is the bridge until then.
 
 ### Effort
 

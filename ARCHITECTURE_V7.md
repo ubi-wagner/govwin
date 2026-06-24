@@ -178,8 +178,8 @@ All reference documents live in `/docs/`. This section is the master index — u
 | Document | Purpose | Last Updated | Status |
 |----------|---------|-------------|--------|
 | [ARCHITECTURE_V7.md](./ARCHITECTURE_V7.md) | **This file.** Master index and system overview | 2026-05-21 | Current |
-| [ARCHITECTURE_V6.md](docs/ARCHITECTURE_V6.md) | V1 launch baseline architecture | 2026-05-20 | Superseded by V7 |
-| [ARCHITECTURE_V5.md](ARCHITECTURE_V5.md) | Original 5-service vision architecture | 2026-04-05 | Historical |
+| [ARCHITECTURE_V6.md](docs/archive/ARCHITECTURE_V6.md) | V1 launch baseline architecture | 2026-05-20 | Superseded by V7 |
+| [ARCHITECTURE_V5.md](docs/archive/ARCHITECTURE_V5.md) | Original 5-service vision architecture | 2026-04-05 | Historical |
 | [ARCHITECTURE_DAY365.md](docs/ARCHITECTURE_DAY365.md) | Day-365 vision document | 2026-04 | Vision |
 | [AGENT_FABRIC_DESIGN.md](docs/AGENT_FABRIC_DESIGN.md) | Agent system architecture | 2026-04 | Design spec |
 | [CANVAS_DOCUMENT_ARCHITECTURE.md](docs/CANVAS_DOCUMENT_ARCHITECTURE.md) | Proposal canvas editor architecture | 2026-05 | Current |
@@ -196,8 +196,8 @@ All reference documents live in `/docs/`. This section is the master index — u
 | Document | Purpose | Last Updated |
 |----------|---------|-------------|
 | [EVENT_CONTRACT_V2.md](docs/EVENT_CONTRACT_V2.md) | Namespace dictionary, event type catalog, processor reference, state machine | 2026-05-21 |
-| [EVENT_CONTRACT.md](docs/EVENT_CONTRACT.md) | Original event contract (V5 era) | 2026-04 |
-| [NAMESPACES.md](docs/NAMESPACES.md) | Original namespace definitions | 2026-04 |
+| [EVENT_CONTRACT.md](docs/archive/EVENT_CONTRACT.md) | Original event contract (V5 era) | 2026-04 |
+| [NAMESPACES.md](docs/archive/NAMESPACES.md) | Original namespace definitions | 2026-04 |
 | [WORKFLOW_REFERENCE.md](docs/WORKFLOW_REFERENCE.md) | Pipeline workflows, email automation flows, how to build new workflows | 2026-05-21 |
 
 ### API & Integration
@@ -231,7 +231,7 @@ All reference documents live in `/docs/`. This section is the master index — u
 
 | Document | Purpose | Last Updated |
 |----------|---------|-------------|
-| [IMPLEMENTATION_PLAN_V2.md](docs/IMPLEMENTATION_PLAN_V2.md) | Clean build implementation plan | 2026-04-07 |
+| [IMPLEMENTATION_PLAN_V2.md](docs/archive/IMPLEMENTATION_PLAN_V2.md) | Clean build implementation plan | 2026-04-07 |
 | [CRM_CMS_PHASE1.md](docs/CRM_CMS_PHASE1.md) | CRM/CMS Phase 1 design | 2026-05 |
 | [V1_AUDIT_TODO.md](docs/V1_AUDIT_TODO.md) | V1 pre-merge audit findings (all resolved) | 2026-05-21 |
 | [SYSTEM_STATUS_20260507.md](docs/SYSTEM_STATUS_20260507.md) | System status snapshot | 2026-05-07 |

@@ -1,5 +1,7 @@
 # EVENT_CONTRACT_V3.md — Unified Automation Architecture: Jobs, Process Templates & the Event Ledger
 
+> ⚠️ The HITL-resume-broken description below is STALE — resume is implemented (WorkflowManager.resume_instance); see ARCHITECTURE_V9.md §8/§14.
+
 **Date:** 2026-05-31
 **Status:** Authoritative target architecture for automation. Supersedes the *design*
 sections of EVENT_CONTRACT.md. Does **not** supersede EVENT_CONTRACT_V2.md — that remains
@@ -9,7 +11,7 @@ the authoritative **as-built event catalog** (which events fire, from where). V3
 five-track codebase audit on 2026-05-31. Every as-built claim carries a `file:line` cite.
 
 **Companion docs:** CLAUDE.md (binding standards), CLAUDE_CLIFFNOTES.md §3/§9 (event +
-automation rules), ARCHITECTURE_V6.md §4 (note: V6 §4.4/§10.1 are STALE — see §10.0 below),
+automation rules), ARCHITECTURE_V9.md §8 (canonical namespace registry; V6 archived at docs/archive/ARCHITECTURE_V6.md — note V6 §4.4/§10.1 are STALE, see §10.0 below),
 EVENT_CONTRACT_V2.md (as-built event catalog).
 
 ---

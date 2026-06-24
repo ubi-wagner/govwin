@@ -149,7 +149,7 @@ Because `ToolExecutionError extends AppError`, a route that invokes a tool and l
      return <ErrorBoundaryFallback />;
    }
    ```
-3. **Log via `createLogger('page')`** (or the matching scope from `docs/NAMESPACES.md`), not `console.error`.
+3. **Log via `createLogger('page')`** (or the matching scope from ARCHITECTURE_V9.md §8), not `console.error`.
 4. **Render friendly error UI** on unexpected catches. Never dump the raw error object to the user.
 5. **Never swallow.** If you catch something, either re-throw, log+render-fallback, or translate to a typed error. A bare `catch {}` fails code review.
 
@@ -260,7 +260,7 @@ Rules:
 - **Never raw `console.error`.** The only exception is `lib/logger.ts` itself, which uses `console.error` as a fallback when pino fails to initialize (breaks the circular dependency of logging a logging failure).
 - **Never `console.log` anywhere.** Enforced by a grep in CI.
 - **Log `err` as a field** (`log.error({ err }, 'msg')`), not interpolated into the message — pino serializes the former with the stack, the latter loses it.
-- **Use the scope from `docs/NAMESPACES.md`** Log scope names section. Adding a new scope requires updating the registry in the same PR.
+- **Use the scope from ARCHITECTURE_V9.md §8** Log scope names section. Adding a new scope requires updating the registry in the same PR.
 - **Log before re-throwing.** If the wrapper above you also logs, you will see two lines — that's fine, the correlation id ties them together.
 
 ## Redaction

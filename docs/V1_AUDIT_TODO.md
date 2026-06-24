@@ -112,7 +112,7 @@ Status: **ALL ITEMS RESOLVED** — deployment ready for testing
 - [ ] Move CMS SPA build to .gitignore (Docker builds it now)
 
 ### Documentation
-- [ ] Update ARCHITECTURE_V5.md with CMS service details
+- [x] Update architecture docs with CMS service details (captured in ARCHITECTURE_V9.md; V5 archived)
 - [ ] Document email trigger flag system
 - [ ] Document content bridge flow
 - [ ] Update CLAUDE_CLIFFNOTES.md with CMS schema

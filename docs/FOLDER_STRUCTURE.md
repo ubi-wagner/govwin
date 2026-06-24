@@ -2,7 +2,7 @@
 
 **Status: BINDING.** Moving a file to a different directory requires updating this document. If you find yourself wanting to put a file in a location not covered here, update this doc in the same PR.
 
-See also: [CLAUDE.md](../CLAUDE.md), [NAMESPACES.md](./NAMESPACES.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md).
+See also: [CLAUDE.md](../CLAUDE.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md). Namespace registry: ARCHITECTURE_V9.md §8.
 
 ---
 

@@ -493,7 +493,7 @@ class OnMyEvent(Workflow):
 
     trigger = EventTrigger(
         namespace="finder",           # one of the 7 namespaces
-        type="entity.verb_past_tense", # from EVENT_CONTRACT.md
+        type="entity.verb_past_tense", # from EVENT_CONTRACT_V3.md
         phase="single",               # or "end" for paired events
         condition=lambda p: p.get("someField") is not None,  # optional
     )
@@ -566,13 +566,13 @@ The CMS `event_listener.py` polls `system_events` and matches against active aut
 
 ### Adding a New Event Type
 
-1. Verify the namespace exists in `docs/EVENT_CONTRACT.md` section 2 (7 total: finder, capture, identity, proposal, library, system, tool)
+1. Verify the namespace exists in ARCHITECTURE_V9.md §8 (7 total: finder, capture, identity, proposal, library, system, tool)
 2. Follow the naming convention: `entity.verb_past_tense` (snake_case, past tense, max two segments)
 3. Emit from service code:
    - Frontend: `emitEventSingle(conn, namespace, type, payload)` or `emitEventStart`/`emitEventEnd` pair
    - Pipeline: `emit_event(conn, namespace, type, payload)` or `BaseIngester._emit_event()`
    - CMS: `emit_event(event_type, entity_type, ...)` from `models/events.py`
-4. Update `docs/NAMESPACES.md` if adding a new event type
+4. See ARCHITECTURE_V9.md §8 for the canonical namespace registry
 5. If a workflow should react to this event, create a workflow definition with matching trigger
 
 ### Retry/Timeout/Failure Patterns

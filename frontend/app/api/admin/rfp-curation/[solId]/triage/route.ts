@@ -162,14 +162,6 @@ export async function POST(
       );
     }
 
-    const updateFields: Record<string, string | null> = {};
-    if (action === 'claim' || action === 'reclaim') {
-      updateFields.claimedBy = actorId;
-    }
-    if (action === 'dismiss') {
-      updateFields.dismissedReason = typeof notes === 'string' ? notes : null;
-    }
-
     // Use a conditional UPDATE that also acts as a race guard
     let updated: { id: string }[];
     try {

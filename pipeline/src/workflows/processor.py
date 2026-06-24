@@ -212,29 +212,91 @@ async def _execute_action(
     return {"result": result}
 
 
+
+# PIPE-13: Maps every AI_INVOKE action string to the archetype that handles it.
+# Adding new actions here is the ONLY change needed when new AI_INVOKE steps
+# are introduced. If an action is not listed → safe skip (no fabric call).
+TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
+    # on_proposal_advanced.py — pink-team compliance review
+    "tool.proposal.check_compliance": "compliance_reviewer",
+    # on_proposal_created.py — initial section drafting
+    "tool.proposal.draft_all_sections": "section_drafter",
+    # on_rfp_uploaded.py / on_opportunities_detected.py — opportunity analysis
+    "tool.opportunity.analyze": "opportunity_analyst",
+    "tool.opportunity.score": "scoring_strategist",
+    # on_solicitation_pushed.py — capture strategy generation
+    "tool.capture.generate_strategy": "capture_strategist",
+    # generic content drafting invocations
+    "tool.proposal.draft_section": "section_drafter",
+    "tool.proposal.review_color_team": "color_team_reviewer",
+    "tool.proposal.package": "packaging_specialist",
+    "tool.library.curate": "librarian",
+    "tool.partner.coordinate": "partner_coordinator",
+    "tool.proposal.architect": "proposal_architect",
+}
+
+
 async def _execute_ai_invoke(
     conn: asyncpg.Connection,
     action: str,
     inputs: dict[str, Any],
+    fabric: Any = None,
+    trigger_event: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Invoke an AI tool action.
+    """Invoke an AI tool action via AgentFabric (PIPE-13).
 
-    For V1, we log the invocation. The actual AI tool call infrastructure
-    (POST to frontend tool API or direct Anthropic SDK call) will be
-    wired in V2. For now we attempt to resolve the action as a Python
-    callable, same as ACTION, so any tool functions that exist locally
-    can still be called.
+    If fabric is None or the action is not in TOOL_ACTION_TO_ARCHETYPE,
+    falls back to the safe V1 skip behaviour (no crash, no DB write).
+    Never writes to business tables — all output is advisory.
     """
-    log.info("AI_INVOKE: %s with inputs %s", action, list(inputs.keys()))
-    try:
-        return await _execute_action(conn, action, inputs)
-    except (ImportError, AttributeError) as exc:
+    log.info("AI_INVOKE: %s with inputs %s (fabric=%s)", action, list(inputs.keys()), fabric is not None)
+
+    archetype = TOOL_ACTION_TO_ARCHETYPE.get(action)
+
+    if fabric is None or archetype is None:
+        # Safe skip — no fabric or action not mapped
         log.warning(
-            "AI_INVOKE action '%s' not resolvable locally (V1), skipping: %s",
+            "AI_INVOKE action '%s' skipped (fabric=%s, mapped=%s)",
             action,
-            exc,
+            fabric is not None,
+            archetype is not None,
         )
-        return {"result": None, "skipped": True, "reason": str(exc)}
+        return {"result": None, "skipped": True, "reason": f"no_fabric_or_mapping:{action}"}
+
+    # Build context from inputs + trigger event metadata
+    context: dict[str, Any] = dict(inputs)
+    context["type"] = action
+    if trigger_event:
+        context.setdefault("tenant_id", trigger_event.get("tenant_id"))
+        context.setdefault("proposal_id",
+            trigger_event.get("payload", {}).get("proposalId")
+            or trigger_event.get("payload", {}).get("proposal_id")
+        )
+        context["trigger_event_id"] = trigger_event.get("id")
+        context["trigger_event_type"] = trigger_event.get("type")
+        context["trigger_event_namespace"] = trigger_event.get("namespace")
+
+    tenant_id: Optional[str] = context.get("tenant_id")
+
+    try:
+        result = await fabric.invoke_agent(
+            conn,
+            archetype,
+            context,
+            tenant_id=tenant_id,
+        )
+        # invoke_agent returns advisory result — never auto-applied
+        log.info(
+            "AI_INVOKE %s via archetype=%s status=%s",
+            action, archetype, result.get("status"),
+        )
+        return {"result": result}
+    except Exception as exc:
+        log.error(
+            "AI_INVOKE %s (archetype=%s) raised: %s",
+            action, archetype, exc,
+        )
+        return {"result": None, "skipped": True, "reason": str(exc)[:300]}
 
 
 async def _execute_notify(
@@ -327,13 +389,18 @@ async def _execute_step(
     step: Any,
     inputs: dict[str, Any],
     trigger_event: dict[str, Any] | None = None,
+    fabric: Any = None,
 ) -> dict[str, Any]:
     """Dispatch a single workflow step by its type."""
     if step.step_type == StepType.ACTION:
         return await _execute_action(conn, step.action, inputs)
 
     if step.step_type == StepType.AI_INVOKE:
-        return await _execute_ai_invoke(conn, step.action, inputs)
+        return await _execute_ai_invoke(
+            conn, step.action, inputs,
+            fabric=fabric,
+            trigger_event=trigger_event,
+        )
 
     if step.step_type == StepType.NOTIFY:
         return await _execute_notify(conn, step.action, inputs, trigger_event=trigger_event)
@@ -365,6 +432,7 @@ async def _execute_step_with_retry(
     step: Any,
     inputs: dict[str, Any],
     trigger_event: dict[str, Any] | None = None,
+    fabric: Any = None,
 ) -> dict[str, Any]:
     """Execute a step with retry logic and timeout enforcement.
 
@@ -379,7 +447,7 @@ async def _execute_step_with_retry(
             # Enforce timeout
             timeout_seconds = step.timeout_minutes * 60
             result = await asyncio.wait_for(
-                _execute_step(conn, step, inputs, trigger_event=trigger_event),
+                _execute_step(conn, step, inputs, trigger_event=trigger_event, fabric=fabric),
                 timeout=timeout_seconds,
             )
             return result
@@ -425,6 +493,7 @@ async def _run_workflow(
     conn: asyncpg.Connection,
     workflow_cls: type[Workflow],
     event: dict[str, Any],
+    fabric: Any = None,
 ) -> None:
     """Execute all steps of a matched workflow in dependency order."""
     workflow_name = workflow_cls.__name__
@@ -498,7 +567,7 @@ async def _run_workflow(
 
         try:
             result = await _execute_step_with_retry(
-                conn, step, inputs, trigger_event=event
+                conn, step, inputs, trigger_event=event, fabric=fabric
             )
             step_results[step.name] = result
             step_duration_ms = int((time.monotonic() - step_start_time) * 1000)
@@ -688,6 +757,7 @@ async def run_workflow_processor(
     database_url: str,
     shutdown_event: asyncio.Event,
     poll_interval: int = 10,
+    fabric: Any = None,
 ) -> None:
     """Poll system_events for new events and execute matching workflows.
 
@@ -697,6 +767,9 @@ async def run_workflow_processor(
     If the process_instances table exists (migration 043), uses the
     persistent WorkflowManager for crash recovery and audit trail.
     Otherwise falls back to fire-and-forget execution.
+
+    fabric: optional AgentFabric instance; when provided, AI_INVOKE steps
+    are routed to the mapped archetype instead of being skipped (PIPE-12).
     """
     conn: Optional[asyncpg.Connection] = None
     manager: Optional[Any] = None
@@ -799,7 +872,7 @@ async def run_workflow_processor(
                                     conn, manager, workflow_cls, event_dict
                                 )
                             else:
-                                await _run_workflow(conn, workflow_cls, event_dict)
+                                await _run_workflow(conn, workflow_cls, event_dict, fabric=fabric)
                         except Exception as exc:
                             log.error(
                                 "workflow execution failed for event %s: %s",

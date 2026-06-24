@@ -160,7 +160,7 @@ working storage, and working health checks — nothing more.
 2. Auth scaffold: login page, NextAuth config, master_admin seed
 3. Middleware enforces the 5-role hierarchy
 4. `/api/health` reports DB connectivity AND S3 connectivity
-5. Documentation: DECISIONS.md (this file), STORAGE_LAYOUT.md, PHASE_0_5_CHECKLIST.md
+5. Documentation: DECISIONS.md (this file), STORAGE_LAYOUT.md
 
 **Out of scope (deferred to Phase 1+):**
 - RFP ingestion logic
@@ -211,7 +211,7 @@ The following decisions are made up-front for Phase 1 (RFP Ingestion & Expert Cu
 ## D-Phase1-04: Memory namespace key format
 
 **Status:** accepted
-**Decision:** Cross-cycle memory keys use the format `{agency}:{program_office}:{type}:{phase}` (4 parts), with a 3-part variant `{agency}:{type}:{phase}` allowed for sources that don't expose a program office (NSF, NIH). Documented canonically in `docs/NAMESPACES.md` §"Memory namespace keys".
+**Decision:** Cross-cycle memory keys use the format `{agency}:{program_office}:{type}:{phase}` (4 parts), with a 3-part variant `{agency}:{type}:{phase}` allowed for sources that don't expose a program office (NSF, NIH). Documented canonically in ARCHITECTURE_V9.md §8 (NAMESPACES.md archived at docs/archive/NAMESPACES.md).
 **Rationale:** The `(agency, program_office, type, phase)` tuple is the natural primary key for "this kind of solicitation" in the federal contracting world. Two AFWERX SBIR Phase I solicitations from different fiscal years are 90%+ similar in compliance requirements; using this as the namespace lets cross-cycle pre-fill work without ML.
 **Consequences:** the key MUST be computed identically in Python (`pipeline/src/shredder/namespace.py compute_namespace_key`) and TypeScript (`frontend/lib/memory/agency-key.ts computeAgencyKey`). Cross-language drift is verified by `frontend/__tests__/lib/memory/cross-lang-agency-key.test.ts`.
 

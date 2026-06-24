@@ -36,67 +36,11 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
   requiredRole: 'rfp_admin',
   tenantScoped: false,
   async handler(input, ctx) {
-    // Build a dynamic UPDATE using COALESCE to only touch fields the
-    // caller supplied. Other fields stay unchanged.
-    const setParts: string[] = [];
-    const values: unknown[] = [input.itemId];
-    let idx = 2;
-
-    function add(col: string, value: unknown, cast?: string) {
-      setParts.push(`${col} = $${idx}${cast ? '::' + cast : ''}`);
-      values.push(value);
-      idx++;
-    }
-
-    if (input.itemName !== undefined) add('item_name', input.itemName);
-    if (input.required !== undefined) add('required', input.required);
-    if (input.pageLimit !== undefined) add('page_limit', input.pageLimit);
-    if (input.slideLimit !== undefined) add('slide_limit', input.slideLimit);
-    if (input.fontFamily !== undefined) add('font_family', input.fontFamily);
-    if (input.fontSize !== undefined) add('font_size', input.fontSize);
-    if (input.margins !== undefined) add('margins', input.margins);
-    if (input.lineSpacing !== undefined) add('line_spacing', input.lineSpacing);
-    if (input.headerFormat !== undefined) add('header_format', input.headerFormat);
-    if (input.footerFormat !== undefined) add('footer_format', input.footerFormat);
-    if (input.customFields !== undefined) {
-      add('custom_fields', JSON.stringify(input.customFields), 'jsonb');
-    }
-    if (input.appliesToPhase !== undefined) {
-      add('applies_to_phase', input.appliesToPhase, 'text[]');
-    }
-
-    add('verified_by', ctx.actor.id, 'uuid');
-    add('verified_at', 'now()');
-    // "verified_at" above is handled by now() expression — the setParts
-    // won't work generically. Do it separately below with sql`NOW()`.
-    // Reset the last entry.
-    setParts.pop(); values.pop(); idx--;
-    const verifiedAtIdx = idx;
-    setParts.push('verified_at = now()');
-
-    if (setParts.length === 2) {
-      // Only verified_by + verified_at — nothing to actually update
-      throw new NotFoundError('no fields provided to update');
-    }
-
-    const updateSql = `
-      UPDATE volume_required_items
-      SET ${setParts.join(', ')}
-      WHERE id = $1::uuid
-      RETURNING id, volume_id
-    `;
-    // Use sql.unsafe-like pattern via template — but postgres.js doesn't
-    // expose unsafe cleanly, so fall back to a manual loop construction.
-    // Simpler: run a cascade of fixed templates covering the common subset.
-    // To keep this file focused, build as a tagged-template with only the
-    // critical fields + customFields. Any field not listed here can use
-    // a dedicated narrow tool later.
-
     let rows: { id: string; volumeId: string }[];
     try {
       rows = await sql<{ id: string; volumeId: string }[]>`
         UPDATE volume_required_items
-      SET
+        SET
         item_name = COALESCE(${input.itemName ?? null}, item_name),
         required = COALESCE(${input.required ?? null}, required),
         page_limit = CASE WHEN ${input.pageLimit !== undefined ? 't' : 'f'}::bool

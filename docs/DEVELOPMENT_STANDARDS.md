@@ -429,7 +429,7 @@ All errors that cross a layer boundary inherit from `AppError` (`frontend/lib/er
 
 ### Logging Standards
 
-- Frontend: `createLogger(scope)` from `lib/logger.ts` with scope from `NAMESPACES.md`. Pino-based, structured JSON.
+- Frontend: `createLogger(scope)` from `lib/logger.ts` with scope from ARCHITECTURE_V9.md §8. Pino-based, structured JSON.
 - Pipeline: Standard library `logging` with format `%(asctime)s [%(levelname)s] %(name)s: %(message)s`.
 - CMS: Standard library `logging` with named loggers per module.
 - Never `console.log` (frontend) or `print` (pipeline, except for startup messages via reconfigured stdout).

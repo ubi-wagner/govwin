@@ -2,7 +2,7 @@
 
 Binding pre-commit / pre-PR / pre-phase checklist. Every item is actionable — if you can't tick a box, the change isn't ready.
 
-See also: [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [EVENT_CONTRACT.md](./EVENT_CONTRACT.md), [TESTING_STRATEGY.md](./TESTING_STRATEGY.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md), [NAMESPACES.md](./NAMESPACES.md).
+See also: [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md), [TESTING_STRATEGY.md](./TESTING_STRATEGY.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md). Namespace registry: ARCHITECTURE_V9.md §8.
 
 ---
 
@@ -34,8 +34,8 @@ Every single commit must pass all of these. No exceptions for "fix later" commit
 
 - [ ] API routes use `withHandler` from `lib/api-helpers.ts` (or document the opt-out, e.g. `/api/health`).
 - [ ] Response shapes match [API_CONVENTIONS.md §"Response shape"](./API_CONVENTIONS.md) — `{ data: T }` on success, `{ error, code, details? }` on failure.
-- [ ] Scoped logging via `lib/logger.ts` `createLogger(scope)` with a scope from [NAMESPACES.md §"Log scope names"](./NAMESPACES.md).
-- [ ] Significant actions emit start + end events (or a single event) per [EVENT_CONTRACT.md](./EVENT_CONTRACT.md).
+- [ ] Scoped logging via `lib/logger.ts` `createLogger(scope)` with a scope from ARCHITECTURE_V9.md §8.
+- [ ] Significant actions emit start + end events (or a single event) per [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md).
 - [ ] Input validation uses zod, never `typeof` checks. Shared primitives from `lib/validation.ts`.
 - [ ] Errors thrown are `AppError` subclasses from `lib/errors.ts` or `ToolError` subclasses from `lib/tools/errors.ts`. No `throw new Error('...')`.
 - [ ] Tenant-scoped queries include `WHERE tenant_id = ${ctx.actor.tenantId}` (or `ctx.tenantId` inside tools).
@@ -56,7 +56,7 @@ In addition to every commit in the PR passing the per-commit checks:
 
 ### Docs
 
-- [ ] If the PR adds a new namespace (event, tool, or log scope), [NAMESPACES.md](./NAMESPACES.md) is updated in the same PR.
+- [ ] If the PR adds a new namespace (event, tool, or log scope), ARCHITECTURE_V9.md §8 is the reference; update CLAUDE_CLIFFNOTES.md accordingly.
 - [ ] If the PR introduces a new architectural decision, `docs/DECISIONS.md` has a new entry.
 - [ ] If the PR changes a binding convention doc, the change includes a link to the motivating discussion or ticket.
 
@@ -96,7 +96,7 @@ Questions a reviewer should ask for every PR. If the answer to any is unclear, r
 2. **Does every API route throw typed errors**, not `return NextResponse.json({ error })`?
 3. **Does every handler emit start + end events** (or document why a single event is sufficient)?
 4. **Is there a test for the error path**, not just the happy path?
-5. **Does the PR body cross-reference `docs/NAMESPACES.md`** for any new namespace?
+5. **Does the PR body cross-reference ARCHITECTURE_V9.md §8** for any new namespace?
 6. **Does the PR body link to the issue, plan section, or ticket** it's closing? ("Closes #42", "Implements Phase 1 item 1.4", etc.)
 7. **Does the PR add any `console.*`, `any`, or raw `NextResponse.json({ error })`?** If yes, reject.
 8. **Can the reviewer explain what happens when `ctx.actor` is null**, or when the input fails validation, or when the DB is unreachable? If not, the tests aren't covering enough.

@@ -68,4 +68,4 @@ See CLAUDE_CLIFFNOTES.md for:
 - User content clearly delimited in agent prompts (prompt injection defense)
 
 ## Project Structure
-See docs/IMPLEMENTATION_PLAN_V2.md for complete file tree.
+See ARCHITECTURE_V9.md for the full as-built system design and file tree.
