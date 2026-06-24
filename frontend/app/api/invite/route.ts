@@ -146,7 +146,6 @@ export async function POST(request: Request) {
 
     // Wrap user update + collaborator accept in a single atomic transaction
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await sql.begin(async (txSql: any) => {
         if (collaborator!.userId) {
           await txSql`

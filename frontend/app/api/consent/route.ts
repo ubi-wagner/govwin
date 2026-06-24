@@ -90,7 +90,6 @@ export async function POST(request: Request) {
     let recordId: string;
     let recordAcceptedAt: string;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await sql.begin(async (txSql: any) => {
         const [record] = await txSql<{ id: string; acceptedAt: string }[]>`
           INSERT INTO consent_records (user_id, document_type, document_version, ip_address)
