@@ -93,8 +93,10 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Route: `GET /api/admin/tenants`; table: `tenants`.
 
 - [ ] **MA-05** — Click a tenant → `/admin/tenants/[tenantId]`.
-  - Expected: subscription status, user list, proposal list, purchase history all render.
-  - Route: `GET /api/admin/tenants/[tenantId]`; tables: `tenants`, `users`, `proposals`, `purchases`.
+  - Expected: subscription status, user list, proposal list, purchase history, and the
+    **"AI Budget & Limits"** card all render. The card shows the per-tenant budget,
+    rate limit, and per-call ceiling, each with an "Inheriting default (…)" hint when blank.
+  - Route: `GET /api/admin/tenants/[tenantId]`; tables: `tenants`, `users`, `proposals`, `purchases`, `tenant_agent_config`, `platform_agent_config`.
 
 - [ ] **MA-06** — Patch a tenant (e.g. toggle status).
   - Expected: `200` response; `finder:tenant.updated:single` event written; table: `tenants`.
@@ -122,7 +124,27 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `200`; `process_instance_transitions` row written; instance moves to next step.
   - Route: `POST /api/admin/workflows/[instanceId]/advance`.
 
-**master_admin total: 11 steps**
+### 3.5 AI Budget & Limits (settable)
+
+- [ ] **MA-12** — On a tenant profile (`/admin/tenants/[tenantId]`), use the **AI Budget & Limits**
+  card: set monthly budget = `75`, rate limit = `25`, per-call ceiling = `0.30`; Save.
+  - Expected: "Saved." `200`; `finder:agent_config.updated` event; `tenant_agent_config` row
+    has the three values. Reload the page → values persist (read back via SSR).
+  - Then blank the rate-limit field and Save → the hint shows "Inheriting default", and the
+    `tenant_agent_config.rate_limit_per_hour` column is `NULL`.
+  - Then set monthly budget = `0` and Save → the hint shows "AI disabled for this account".
+    (Enforcement is verified live in **VH-20**.)
+  - Route: `PATCH /api/admin/tenants/[tenantId]/agent-config` (also `GET`).
+
+- [ ] **MA-13** — On `/admin/agents`, use the **Pipeline AI Controls** card (master_admin only):
+  change a default (e.g. default budget = `60`), enable the platform monthly cap = `1500`,
+  toggle the AI master switch off then on; Save.
+  - Expected: "Saved." `200`; `system:platform_agent_config.updated` event; the singleton
+    `platform_agent_config` row reflects each change. With AI toggled off, every agent
+    invocation is blocked platform-wide (verify live in **VH-20**); toggle back on before finishing.
+  - Route: `PATCH /api/admin/agents/platform-config` (also `GET`).
+
+**master_admin total: 13 steps**
 
 ---
 
@@ -238,7 +260,16 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: task status → `completed`; workflow instance advances past the `HITL_WAIT` step.
   - Route: `POST /api/admin/tasks` (with `taskId`); table: `tasks`.
 
-**rfp_admin total: 24 steps**
+### 4.9 AI Budget Scope (positive + negative)
+
+- [ ] **RA-25** — Confirm the AI-config scope boundary for rfp_admin:
+  - **Positive:** on a tenant profile, the **AI Budget & Limits** card is usable — set a
+    budget and Save → `200` (`PATCH /api/admin/tenants/[tenantId]/agent-config` is rfp_admin+).
+  - **Negative:** on `/admin/agents`, the **Pipeline AI Controls** card is **NOT** rendered
+    (master_admin-only). A direct `PATCH /api/admin/agents/platform-config` returns `403`
+    (`FORBIDDEN`).
+
+**rfp_admin total: 25 steps**
 
 ---
 
@@ -494,7 +525,7 @@ The following must be **manually signed off** before launch. None of these are v
 
 ### 9.9 Deploy-Time Agent Activation (verify after ANTHROPIC_API_KEY + embeddings vars set)
 
-- [ ] **VH-20** — Real agent invocation on deploy: with `ANTHROPIC_API_KEY` set, trigger an `OnProposalAdvancedToReview` event (advance a proposal to `review` stage) and submit an `agent_task_queue` task directly; confirm `agent_task_log` rows are written with a real Claude response (not `{skipped: True}`). Confirm budget/rate guardrails fire on overrun (check `rate_limit_state`). Confirm output is advisory — surfaced via NOTIFY/agent_task_log, never auto-applied to proposal sections.
+- [ ] **VH-20** — Real agent invocation on deploy: with `ANTHROPIC_API_KEY` set, trigger an `OnProposalAdvancedToReview` event (advance a proposal to `review` stage) and submit an `agent_task_queue` task directly; confirm `agent_task_log` rows are written with a real Claude response (not `{skipped: True}`). Confirm budget/rate guardrails fire on overrun: set a low per-tenant budget via the **AI Budget & Limits** card (MA-12) — e.g. `$0.01` or `0` — then re-invoke and confirm the call is **rejected** (status `rejected`, no Claude spend). Repeat for the rate limit (set rate = `1`) and the AI master switch (MA-13: toggle off → all invocations blocked). The cap/limits are read from `tenant_agent_config` / `platform_agent_config`; spend is summed from `agent_task_log` (there is no `rate_limit_state` table). Confirm output is advisory — surfaced via NOTIFY/agent_task_log, never auto-applied to proposal sections.
 
 - [ ] **VH-21** — Activate embeddings (optional): set `EMBEDDINGS_PROVIDER=openai` + `OPENAI_API_KEY`; run `MemoryStore.backfill_embeddings` per memory table (`episodic_memories`, `semantic_memories`, `procedural_memories`); confirm cosine retrieval via `memory.search` tool returns semantically relevant atoms/memories (not just ILIKE keyword matches). Note: Voyage provider needs a `vector(1536)→1024` migration first before switching.
 
