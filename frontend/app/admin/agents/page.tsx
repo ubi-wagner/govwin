@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import { list as listTools } from '@/lib/tools';
 import type { Tool } from '@/lib/tools';
 import { AgentUsageSummary } from '@/components/admin/agent-usage-summary';
+import { PlatformAiConfigCard } from '@/components/admin/platform-ai-config-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +85,14 @@ export default async function AgentsPage() {
         <h2 className="text-lg font-semibold mb-4">Usage Summary (30 days)</h2>
         <AgentUsageSummary />
       </section>
+
+      {/* Pipeline-wide AI controls (master_admin only) */}
+      {role === 'master_admin' && (
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold mb-4">Pipeline AI Controls</h2>
+          <PlatformAiConfigCard />
+        </section>
+      )}
 
       {/* Tool Registry */}
       <section className="mb-10">
