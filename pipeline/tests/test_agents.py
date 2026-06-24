@@ -31,6 +31,7 @@ from agents.fabric import (  # noqa: E402
     MODEL_PRICING,
     RATE_LIMIT_PER_HOUR,
     DEFAULT_MONTHLY_BUDGET_USD,
+    PER_CALL_CEILING_USD,
 )
 
 
@@ -273,4 +274,5 @@ class TestSettableLimits:
         assert cfg["ai_enabled"] is True
         assert cfg["default_rate_limit"] == RATE_LIMIT_PER_HOUR
         assert cfg["default_monthly_budget"] == DEFAULT_MONTHLY_BUDGET_USD
+        assert cfg["default_per_call_ceiling"] == PER_CALL_CEILING_USD
         assert cfg["platform_monthly_cap"] is None

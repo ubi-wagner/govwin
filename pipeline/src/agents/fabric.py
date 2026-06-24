@@ -97,6 +97,7 @@ logger = logging.getLogger("pipeline.agents")
 MAX_TOOL_ROUNDS = 20
 RATE_LIMIT_PER_HOUR = 50
 DEFAULT_MONTHLY_BUDGET_USD = 50.00
+PER_CALL_CEILING_USD = 0.50  # mid-loop cost ceiling for a single invocation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
@@ -328,6 +329,26 @@ class AgentFabric:
                         f"Tenant {tenant_id} exceeded the monthly AI budget or platform cap"
                     )
 
+            # Resolve the effective per-call ceiling (tenant override ->
+            # platform default -> constant) used by the mid-loop cost check.
+            effective_ceiling = PER_CALL_CEILING_USD
+            try:
+                pcfg = platform_cfg if tenant_id else await self._load_platform_config(conn)
+                effective_ceiling = pcfg["default_per_call_ceiling"]
+                if tenant_id:
+                    tcfg = await conn.fetchrow(
+                        "SELECT per_call_ceiling FROM tenant_agent_config WHERE tenant_id = $1",
+                        uuid.UUID(tenant_id),
+                    )
+                    if tcfg and tcfg["per_call_ceiling"] is not None:
+                        effective_ceiling = float(tcfg["per_call_ceiling"])
+            except Exception as exc:
+                logger.warning(
+                    "[per_call_ceiling] resolve failed, using $%.2f: %s",
+                    PER_CALL_CEILING_USD, exc,
+                )
+                effective_ceiling = PER_CALL_CEILING_USD
+
             # 4. Assemble context
             assembled = await self.context_assembler.assemble(
                 conn, archetype, tenant_id, context,
@@ -460,8 +481,11 @@ class AgentFabric:
 
                     # Mid-loop budget check: stop if per-call cost ceiling reached
                     accumulated_cost = _cost_for(model, total_input_tokens, total_output_tokens)
-                    if accumulated_cost > 0.50:  # $0.50 per-call ceiling
-                        logger.warning("[invoke_agent] per-call cost ceiling reached: $%.4f", accumulated_cost)
+                    if accumulated_cost > effective_ceiling:
+                        logger.warning(
+                            "[invoke_agent] per-call cost ceiling reached: $%.4f (limit $%.4f)",
+                            accumulated_cost, effective_ceiling,
+                        )
                         break
                 else:
                     # Unexpected stop reason (e.g. max_tokens) — stop looping
@@ -811,13 +835,14 @@ class AgentFabric:
             "ai_enabled": True,
             "default_monthly_budget": DEFAULT_MONTHLY_BUDGET_USD,
             "default_rate_limit": RATE_LIMIT_PER_HOUR,
+            "default_per_call_ceiling": PER_CALL_CEILING_USD,
             "platform_monthly_cap": None,
         }
         try:
             row = await conn.fetchrow(
                 """
                 SELECT default_monthly_budget, default_rate_limit_per_hour,
-                       platform_monthly_cap, ai_enabled
+                       default_per_call_ceiling, platform_monthly_cap, ai_enabled
                 FROM platform_agent_config
                 WHERE id = TRUE
                 """
@@ -829,6 +854,7 @@ class AgentFabric:
                 "ai_enabled": bool(row["ai_enabled"]),
                 "default_monthly_budget": float(row["default_monthly_budget"]),
                 "default_rate_limit": int(row["default_rate_limit_per_hour"]),
+                "default_per_call_ceiling": float(row["default_per_call_ceiling"]),
                 "platform_monthly_cap": float(cap) if cap is not None else None,
             }
         except Exception as exc:

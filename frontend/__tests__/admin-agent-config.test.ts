@@ -101,6 +101,28 @@ describe('PATCH /api/admin/tenants/[tenantId]/agent-config', () => {
     expect(emitStartMock).toHaveBeenCalled();
   });
 
+  it('422 for a per-call ceiling of 0', async () => {
+    authMock.mockResolvedValue(session('rfp_admin'));
+    const res = await tenantPATCH(patchReq({ perCallCeiling: 0 }), tenantCtx);
+    expect(res.status).toBe(422);
+  });
+
+  it('sets a per-call ceiling override and returns it', async () => {
+    authMock.mockResolvedValue(session('rfp_admin'));
+    sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('FROM tenants')) return Promise.resolve([{ id: TENANT }]);
+      if (q.includes('UPDATE tenant_agent_config')) {
+        return Promise.resolve([{ monthlyBudget: null, rateLimitPerHour: null, perCallCeiling: '0.2500' }]);
+      }
+      return Promise.resolve([]);
+    });
+    const res = await tenantPATCH(patchReq({ perCallCeiling: 0.25 }), tenantCtx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.perCallCeiling).toBe(0.25);
+  });
+
   it('404 when the tenant does not exist', async () => {
     authMock.mockResolvedValue(session('rfp_admin'));
     sqlMock.mockImplementation((strings: TemplateStringsArray) => {
@@ -166,6 +188,29 @@ describe('PATCH /api/admin/agents/platform-config', () => {
     const json = await res.json();
     expect(json.data.aiEnabled).toBe(false);
     expect(json.data.defaultMonthlyBudget).toBe(80);
+  });
+
+  it('422 for a default per-call ceiling of 0', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    const res = await platformPATCH(patchReq({ defaultPerCallCeiling: 0 }));
+    expect(res.status).toBe(422);
+  });
+
+  it('sets the default per-call ceiling and serializes it', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('UPDATE platform_agent_config')) {
+        return Promise.resolve([
+          { defaultMonthlyBudget: '50.00', defaultRateLimitPerHour: 50, defaultPerCallCeiling: '0.1000', platformMonthlyCap: null, aiEnabled: true },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    const res = await platformPATCH(patchReq({ defaultPerCallCeiling: 0.1 }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.defaultPerCallCeiling).toBe(0.1);
   });
 
   it('accepts a platform cap and serializes it', async () => {

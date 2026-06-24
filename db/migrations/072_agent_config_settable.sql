@@ -11,10 +11,12 @@
 -- defaults match the existing constants (50 calls/hour, $50/month), the cap is
 -- NULL (off), and AI is enabled.
 
--- ── 1. Per-tenant: settable hourly rate limit ───────────────────────────────
+-- ── 1. Per-tenant: settable hourly rate limit + per-call ceiling ─────────────
 -- NULL = inherit the platform default (keeps existing rows behaving as before).
 ALTER TABLE tenant_agent_config
   ADD COLUMN IF NOT EXISTS rate_limit_per_hour INT;
+ALTER TABLE tenant_agent_config
+  ADD COLUMN IF NOT EXISTS per_call_ceiling NUMERIC(10,4);
 
 -- ── 2. Pipeline-wide singleton config ───────────────────────────────────────
 -- The single-row guard (id is always TRUE) keeps exactly one platform config.
@@ -23,6 +25,9 @@ CREATE TABLE IF NOT EXISTS platform_agent_config (
     -- Defaults applied to any tenant without an explicit override.
     default_monthly_budget      NUMERIC(10,2) NOT NULL DEFAULT 50.00,
     default_rate_limit_per_hour INT           NOT NULL DEFAULT 50,
+    -- Per-call cost ceiling: a single agent invocation's tool-use loop halts
+    -- once accumulated cost exceeds this. Bounds runaway multi-round loops.
+    default_per_call_ceiling    NUMERIC(10,4) NOT NULL DEFAULT 0.50,
     -- Hard ceiling on TOTAL AI spend across ALL tenants + admin/system for the
     -- calendar month. NULL = no platform cap (off). Closes the otherwise
     -- uncapped admin (tenant_id = NULL) path.
@@ -36,7 +41,8 @@ CREATE TABLE IF NOT EXISTS platform_agent_config (
 -- Seed the single row with the current hardcoded defaults so behavior is
 -- byte-identical until an admin changes something.
 INSERT INTO platform_agent_config
-    (id, default_monthly_budget, default_rate_limit_per_hour, platform_monthly_cap, ai_enabled)
+    (id, default_monthly_budget, default_rate_limit_per_hour, default_per_call_ceiling,
+     platform_monthly_cap, ai_enabled)
 VALUES
-    (TRUE, 50.00, 50, NULL, TRUE)
+    (TRUE, 50.00, 50, 0.50, NULL, TRUE)
 ON CONFLICT (id) DO NOTHING;

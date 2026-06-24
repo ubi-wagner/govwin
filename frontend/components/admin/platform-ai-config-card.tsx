@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 interface PlatformConfig {
   defaultMonthlyBudget: number;
   defaultRateLimitPerHour: number;
+  defaultPerCallCeiling: number;
   platformMonthlyCap: number | null;
   aiEnabled: boolean;
 }
@@ -22,6 +23,7 @@ export function PlatformAiConfigCard() {
 
   const [budget, setBudget] = useState('');
   const [rate, setRate] = useState('');
+  const [ceiling, setCeiling] = useState('');
   const [capEnabled, setCapEnabled] = useState(false);
   const [cap, setCap] = useState('');
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -29,6 +31,7 @@ export function PlatformAiConfigCard() {
   function applyConfig(c: PlatformConfig) {
     setBudget(String(c.defaultMonthlyBudget));
     setRate(String(c.defaultRateLimitPerHour));
+    setCeiling(String(c.defaultPerCallCeiling));
     setCapEnabled(c.platformMonthlyCap != null);
     setCap(c.platformMonthlyCap != null ? String(c.platformMonthlyCap) : '');
     setAiEnabled(c.aiEnabled);
@@ -61,6 +64,7 @@ export function PlatformAiConfigCard() {
 
     const budgetNum = Number(budget);
     const rateNum = Number(rate);
+    const ceilingNum = Number(ceiling);
     const capNum = Number(cap);
     if (!Number.isFinite(budgetNum) || budgetNum < 0) {
       setError('Default monthly budget must be a non-negative number.');
@@ -68,6 +72,10 @@ export function PlatformAiConfigCard() {
     }
     if (!Number.isInteger(rateNum) || rateNum < 1) {
       setError('Default rate limit must be a whole number ≥ 1.');
+      return;
+    }
+    if (!Number.isFinite(ceilingNum) || ceilingNum <= 0) {
+      setError('Default per-call ceiling must be greater than 0.');
       return;
     }
     if (capEnabled && (!Number.isFinite(capNum) || capNum < 0)) {
@@ -83,6 +91,7 @@ export function PlatformAiConfigCard() {
         body: JSON.stringify({
           defaultMonthlyBudget: budgetNum,
           defaultRateLimitPerHour: rateNum,
+          defaultPerCallCeiling: ceilingNum,
           platformMonthlyCap: capEnabled ? capNum : null,
           aiEnabled,
         }),
@@ -142,6 +151,17 @@ export function PlatformAiConfigCard() {
             onChange={(e) => setRate(e.target.value)}
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
           />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Default per-call ceiling ($)</span>
+          <input
+            type="number" min="0" step="0.01" value={ceiling}
+            onChange={(e) => setCeiling(e.target.value)}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <span className="text-[11px] text-gray-400 mt-0.5 block">
+            Halts one agent&apos;s tool-loop once its cost exceeds this.
+          </span>
         </label>
       </div>
 

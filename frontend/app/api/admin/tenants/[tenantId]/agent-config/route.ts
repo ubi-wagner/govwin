@@ -23,6 +23,7 @@ interface RouteContext {
 
 const MAX_BUDGET = 100_000; // sanity ceiling ($)
 const MAX_RATE = 100_000;   // sanity ceiling (calls/hour)
+const MAX_CEILING = 1_000;  // sanity ceiling for per-call cost ($)
 
 async function requireAdmin(): Promise<
   | { ok: true; userId: string; role: Role }
@@ -57,13 +58,13 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!adm.ok) return adm.res;
 
     try {
-      const [cfg] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null }[]>`
-        SELECT monthly_budget, rate_limit_per_hour
+      const [cfg] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null; perCallCeiling: string | null }[]>`
+        SELECT monthly_budget, rate_limit_per_hour, per_call_ceiling
         FROM tenant_agent_config
         WHERE tenant_id = ${tenantId}::uuid
       `;
-      const [platform] = await sql<{ defaultMonthlyBudget: string; defaultRateLimitPerHour: number }[]>`
-        SELECT default_monthly_budget, default_rate_limit_per_hour
+      const [platform] = await sql<{ defaultMonthlyBudget: string; defaultRateLimitPerHour: number; defaultPerCallCeiling: string }[]>`
+        SELECT default_monthly_budget, default_rate_limit_per_hour, default_per_call_ceiling
         FROM platform_agent_config
         WHERE id = TRUE
       `;
@@ -73,9 +74,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
           tenantId,
           monthlyBudget: cfg?.monthlyBudget != null ? parseFloat(cfg.monthlyBudget) : null,
           rateLimitPerHour: cfg?.rateLimitPerHour ?? null,
+          perCallCeiling: cfg?.perCallCeiling != null ? parseFloat(cfg.perCallCeiling) : null,
           platformDefaults: {
             monthlyBudget: platform?.defaultMonthlyBudget != null ? parseFloat(platform.defaultMonthlyBudget) : 50,
             rateLimitPerHour: platform?.defaultRateLimitPerHour ?? 50,
+            perCallCeiling: platform?.defaultPerCallCeiling != null ? parseFloat(platform.defaultPerCallCeiling) : 0.5,
           },
         },
       });
@@ -99,7 +102,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const adm = await requireAdmin();
     if (!adm.ok) return adm.res;
 
-    let body: { monthlyBudget?: number | null; rateLimitPerHour?: number | null };
+    let body: { monthlyBudget?: number | null; rateLimitPerHour?: number | null; perCallCeiling?: number | null };
     try {
       body = await request.json();
     } catch {
@@ -108,7 +111,8 @@ export async function PATCH(request: Request, ctx: RouteContext) {
 
     const budgetProvided = 'monthlyBudget' in body;
     const rateProvided = 'rateLimitPerHour' in body;
-    if (!budgetProvided && !rateProvided) {
+    const ceilingProvided = 'perCallCeiling' in body;
+    if (!budgetProvided && !rateProvided && !ceilingProvided) {
       return NextResponse.json({ error: 'No valid fields to update', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
@@ -139,6 +143,19 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         rateVal = r;
       }
     }
+    let ceilingVal: number | null = null;
+    if (ceilingProvided) {
+      const c = body.perCallCeiling;
+      if (c !== null) {
+        if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0 || c > MAX_CEILING) {
+          return NextResponse.json(
+            { error: `perCallCeiling must be a number between 0 (exclusive) and ${MAX_CEILING}, or null to inherit`, code: 'VALIDATION_ERROR' },
+            { status: 422 },
+          );
+        }
+        ceilingVal = Math.round(c * 10000) / 10000;
+      }
+    }
 
     try {
       // Verify tenant exists.
@@ -156,24 +173,25 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       });
 
       // Ensure a row exists (inherit-everything by default), then update only
-      // the provided fields so PATCH semantics don't clobber the other.
+      // the provided fields so PATCH semantics don't clobber the others.
       await sql`
-        INSERT INTO tenant_agent_config (tenant_id, monthly_budget, rate_limit_per_hour)
-        VALUES (${tenantId}::uuid, NULL, NULL)
+        INSERT INTO tenant_agent_config (tenant_id, monthly_budget, rate_limit_per_hour, per_call_ceiling)
+        VALUES (${tenantId}::uuid, NULL, NULL, NULL)
         ON CONFLICT (tenant_id) DO NOTHING
       `;
 
       const setClauses = [];
       if (budgetProvided) setClauses.push(sql`monthly_budget = ${budgetVal}`);
       if (rateProvided) setClauses.push(sql`rate_limit_per_hour = ${rateVal}`);
+      if (ceilingProvided) setClauses.push(sql`per_call_ceiling = ${ceilingVal}`);
       setClauses.push(sql`updated_at = now()`);
       const setFragment = setClauses.reduce((acc, frag, i) => (i === 0 ? frag : sql`${acc}, ${frag}`));
 
-      const [updated] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null }[]>`
+      const [updated] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null; perCallCeiling: string | null }[]>`
         UPDATE tenant_agent_config
         SET ${setFragment}
         WHERE tenant_id = ${tenantId}::uuid
-        RETURNING monthly_budget, rate_limit_per_hour
+        RETURNING monthly_budget, rate_limit_per_hour, per_call_ceiling
       `;
 
       await emitEventEnd(startId, { result: { tenantId, updatedFields: Object.keys(body) } });
@@ -183,6 +201,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           tenantId,
           monthlyBudget: updated?.monthlyBudget != null ? parseFloat(updated.monthlyBudget) : null,
           rateLimitPerHour: updated?.rateLimitPerHour ?? null,
+          perCallCeiling: updated?.perCallCeiling != null ? parseFloat(updated.perCallCeiling) : null,
         },
       });
     } catch (dbErr) {

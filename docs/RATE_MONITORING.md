@@ -129,7 +129,7 @@ the `RATE_LIMIT_PER_HOUR` constant.
 | Monthly budget (per tenant) | $50.00/month | **Yes** | tenant override `tenant_agent_config.monthly_budget` → platform default `platform_agent_config.default_monthly_budget` |
 | Platform monthly cap | off (NULL) | **Yes** | `platform_agent_config.platform_monthly_cap` — hard ceiling on TOTAL monthly spend across all tenants + admin/system |
 | AI master switch | on | **Yes** | `platform_agent_config.ai_enabled` — FALSE disables the whole agent workforce |
-| Per-call ceiling | $0.50 | No (hardcoded) | Mid-loop check in `invoke_agent()` |
+| Per-call ceiling | $0.50 (default) | **Yes** | tenant override `tenant_agent_config.per_call_ceiling` → platform default `platform_agent_config.default_per_call_ceiling` → `PER_CALL_CEILING_USD`. Halts one invocation's tool-loop once its cost exceeds this (pipeline-only — the live single-shot surfaces never reach it). |
 
 `monthly_budget = 0` disables AI for a single tenant. The platform cap closes the
 otherwise-uncapped admin (`tenant_id = NULL`) Spotlight path. Both the frontend

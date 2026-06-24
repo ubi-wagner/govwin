@@ -20,6 +20,7 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 const MAX_BUDGET = 100_000;
 const MAX_RATE = 100_000;
+const MAX_CEILING = 1_000;
 const MAX_CAP = 10_000_000;
 
 async function requireMasterAdmin(): Promise<
@@ -47,6 +48,7 @@ async function requireMasterAdmin(): Promise<
 interface PlatformRow {
   defaultMonthlyBudget: string | null;
   defaultRateLimitPerHour: number | null;
+  defaultPerCallCeiling: string | null;
   platformMonthlyCap: string | null;
   aiEnabled: boolean | null;
 }
@@ -55,6 +57,7 @@ function serialize(row: PlatformRow | undefined) {
   return {
     defaultMonthlyBudget: row?.defaultMonthlyBudget != null ? parseFloat(row.defaultMonthlyBudget) : 50,
     defaultRateLimitPerHour: row?.defaultRateLimitPerHour ?? 50,
+    defaultPerCallCeiling: row?.defaultPerCallCeiling != null ? parseFloat(row.defaultPerCallCeiling) : 0.5,
     platformMonthlyCap: row?.platformMonthlyCap != null ? parseFloat(row.platformMonthlyCap) : null,
     aiEnabled: row?.aiEnabled ?? true,
   };
@@ -68,7 +71,7 @@ export async function GET() {
     try {
       const [row] = await sql<PlatformRow[]>`
         SELECT default_monthly_budget, default_rate_limit_per_hour,
-               platform_monthly_cap, ai_enabled
+               default_per_call_ceiling, platform_monthly_cap, ai_enabled
         FROM platform_agent_config
         WHERE id = TRUE
       `;
@@ -91,6 +94,7 @@ export async function PATCH(request: Request) {
     let body: {
       defaultMonthlyBudget?: number;
       defaultRateLimitPerHour?: number;
+      defaultPerCallCeiling?: number;
       platformMonthlyCap?: number | null;
       aiEnabled?: boolean;
     };
@@ -121,6 +125,16 @@ export async function PATCH(request: Request) {
         );
       }
       setClauses.push(sql`default_rate_limit_per_hour = ${r}`);
+    }
+    if ('defaultPerCallCeiling' in body) {
+      const c = body.defaultPerCallCeiling;
+      if (typeof c !== 'number' || !Number.isFinite(c) || c <= 0 || c > MAX_CEILING) {
+        return NextResponse.json(
+          { error: `defaultPerCallCeiling must be a number between 0 (exclusive) and ${MAX_CEILING}`, code: 'VALIDATION_ERROR' },
+          { status: 422 },
+        );
+      }
+      setClauses.push(sql`default_per_call_ceiling = ${Math.round(c * 10000) / 10000}`);
     }
     if ('platformMonthlyCap' in body) {
       const c = body.platformMonthlyCap;
@@ -169,24 +183,28 @@ export async function PATCH(request: Request) {
         UPDATE platform_agent_config
         SET ${setFragment}
         WHERE id = TRUE
-        RETURNING default_monthly_budget, default_rate_limit_per_hour, platform_monthly_cap, ai_enabled
+        RETURNING default_monthly_budget, default_rate_limit_per_hour,
+                  default_per_call_ceiling, platform_monthly_cap, ai_enabled
       `;
       let row: PlatformRow | undefined = updatedRows[0];
 
       if (!row) {
         const insertedRows = await sql<PlatformRow[]>`
           INSERT INTO platform_agent_config
-            (id, default_monthly_budget, default_rate_limit_per_hour, platform_monthly_cap, ai_enabled, updated_by)
+            (id, default_monthly_budget, default_rate_limit_per_hour, default_per_call_ceiling,
+             platform_monthly_cap, ai_enabled, updated_by)
           VALUES (
             TRUE,
             ${body.defaultMonthlyBudget ?? 50},
             ${body.defaultRateLimitPerHour ?? 50},
+            ${body.defaultPerCallCeiling ?? 0.5},
             ${body.platformMonthlyCap ?? null},
             ${body.aiEnabled ?? true},
             ${adm.userId}::uuid
           )
           ON CONFLICT (id) DO NOTHING
-          RETURNING default_monthly_budget, default_rate_limit_per_hour, platform_monthly_cap, ai_enabled
+          RETURNING default_monthly_budget, default_rate_limit_per_hour,
+                    default_per_call_ceiling, platform_monthly_cap, ai_enabled
         `;
         row = insertedRows[0];
       }

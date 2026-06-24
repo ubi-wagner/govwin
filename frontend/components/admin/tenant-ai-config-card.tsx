@@ -6,8 +6,10 @@ interface Props {
   tenantId: string;
   initialMonthlyBudget: number | null;
   initialRateLimitPerHour: number | null;
+  initialPerCallCeiling: number | null;
   defaultMonthlyBudget: number;
   defaultRateLimitPerHour: number;
+  defaultPerCallCeiling: number;
 }
 
 /**
@@ -19,11 +21,14 @@ export function TenantAiConfigCard({
   tenantId,
   initialMonthlyBudget,
   initialRateLimitPerHour,
+  initialPerCallCeiling,
   defaultMonthlyBudget,
   defaultRateLimitPerHour,
+  defaultPerCallCeiling,
 }: Props) {
   const [budget, setBudget] = useState(initialMonthlyBudget != null ? String(initialMonthlyBudget) : '');
   const [rate, setRate] = useState(initialRateLimitPerHour != null ? String(initialRateLimitPerHour) : '');
+  const [ceiling, setCeiling] = useState(initialPerCallCeiling != null ? String(initialPerCallCeiling) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -48,13 +53,21 @@ export function TenantAiConfigCard({
         return;
       }
     }
+    let ceilingVal: number | null = null;
+    if (ceiling.trim() !== '') {
+      ceilingVal = Number(ceiling);
+      if (!Number.isFinite(ceilingVal) || ceilingVal <= 0) {
+        setError('Per-call ceiling must be greater than 0 (or blank to inherit).');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/agent-config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ monthlyBudget: budgetVal, rateLimitPerHour: rateVal }),
+        body: JSON.stringify({ monthlyBudget: budgetVal, rateLimitPerHour: rateVal, perCallCeiling: ceilingVal }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -108,6 +121,21 @@ export function TenantAiConfigCard({
           <span className="text-[11px] text-gray-400 mt-0.5 block">
             {rate.trim() === ''
               ? `Inheriting default (${defaultRateLimitPerHour}/hr)`
+              : 'Custom override'}
+          </span>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium text-gray-600">Per-call ceiling ($)</span>
+          <input
+            type="number" min="0" step="0.01" value={ceiling}
+            placeholder={`default ${defaultPerCallCeiling.toFixed(2)}`}
+            onChange={(e) => setCeiling(e.target.value)}
+            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+          />
+          <span className="text-[11px] text-gray-400 mt-0.5 block">
+            {ceiling.trim() === ''
+              ? `Inheriting default ($${defaultPerCallCeiling.toFixed(2)})`
               : 'Custom override'}
           </span>
         </label>
