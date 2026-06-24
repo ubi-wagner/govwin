@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
@@ -79,6 +80,21 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];
 
+  // ── Partner scoping ────────────────────────────────────────────────
+  // Tenant staff (tenant_user+) have tenant-wide proposal access by design.
+  // partner_user is collaborator-scoped: only sections granted on THIS
+  // proposal are viewable, and only 'edit'-granted sections are writable.
+  let partnerReadOnly = false;
+  if (role === 'partner_user') {
+    const access = await resolveUserAccess(userId, proposalId, tenantId);
+    const canView =
+      access.editableSections.includes(sectionId) ||
+      access.commentableSections.includes(sectionId) ||
+      access.viewableSections.includes(sectionId);
+    if (!canView) notFound();
+    partnerReadOnly = !access.editableSections.includes(sectionId);
+  }
+
   // If no canvas content yet, create an empty one with default preset
   let canvasDoc: CanvasDocument;
   if (section.content && typeof section.content === 'object' && 'version' in (section.content as object)) {
@@ -109,7 +125,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       proposalId={proposalId}
       actorId={userId}
       actorName={userName}
-      readOnly={proposal.isLocked}
+      readOnly={proposal.isLocked || partnerReadOnly}
       tenantSlug={tenantSlug}
     />
   );

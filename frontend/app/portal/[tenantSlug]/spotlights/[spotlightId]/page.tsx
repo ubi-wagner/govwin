@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import SpotlightDetailActions from '@/components/portal/spotlight-detail-actions';
 import { OpportunityDocuments } from '@/components/portal/opportunity-documents';
@@ -74,6 +74,11 @@ export default async function SpotlightDetailPage({ params }: Props) {
 
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) redirect('/login?error=session');
+
+  // PU-07: Spotlight is tenant-staff only. partner_user is stage-scoped to a
+  // proposal and must not browse the opportunity feed/detail by direct URL
+  // (matches the list page's role floor).
+  if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');

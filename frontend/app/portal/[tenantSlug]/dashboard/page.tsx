@@ -5,6 +5,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
 import { TaskQueue } from '@/components/tasks/task-queue';
+import { describeEvent } from '@/lib/event-labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -248,8 +249,7 @@ export default async function DashboardPage({
             {recentEvents.map((evt) => (
               <li key={evt.id} className="px-4 py-3 text-sm flex justify-between">
                 <span className="text-gray-700">
-                  {evt.namespace}.{evt.type}
-                  <span className="ml-2 text-xs text-gray-400">{evt.phase}</span>
+                  {describeEvent({ namespace: evt.namespace, type: evt.type, phase: evt.phase, payload: evt.payload })}
                 </span>
                 <span className="text-gray-400 text-xs">
                   {new Date(evt.createdAt).toLocaleString()}

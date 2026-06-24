@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
 
@@ -28,6 +29,13 @@ export default async function PortalAgentsPage({
   if (!hasRoleAtLeast(role, 'tenant_admin')) {
     redirect(`/portal/${tenantSlug}/dashboard`);
   }
+
+  // Defense-in-depth: verify tenant access at the page layer too (matches the
+  // sibling portal pages — don't rely solely on the layout's tenant check).
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) redirect('/portal');
+  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenant.id as string);
+  if (!hasAccess) redirect('/portal');
 
   return (
     <div className="max-w-5xl mx-auto">

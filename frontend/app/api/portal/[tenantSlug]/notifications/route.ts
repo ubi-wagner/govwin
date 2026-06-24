@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { describeEvent } from '@/lib/event-labels';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -79,14 +80,16 @@ export async function GET(request: Request, ctx: RouteContext) {
         id: string;
         type: string;
         namespace: string;
+        phase: string;
         payload: Record<string, unknown>;
         createdAt: string;
         actorType: string | null;
       }[]>`
-        SELECT id, type, namespace, payload, created_at, actor_type
+        SELECT id, type, namespace, phase, payload, created_at, actor_type
         FROM system_events
         WHERE tenant_id = ${tenantId}::uuid
           AND namespace IN ('proposal', 'capture', 'library', 'system')
+          AND phase IN ('single', 'end')
         ORDER BY created_at DESC
         LIMIT ${limit}
         OFFSET ${offset}
@@ -94,29 +97,17 @@ export async function GET(request: Request, ctx: RouteContext) {
 
       const items = notifications.map((n) => {
         const p = (n.payload ?? {}) as Record<string, unknown>;
-        let title: string = (p.title as string) ?? n.type;
-        let summary: string | null = (p.summary as string) ?? null;
-
-        // Human-readable titles for closed-loop completion events
-        if (n.type === 'email.delivery_completed' || n.type === 'email.invite_delivered' || n.type === 'email.team_invite_delivered') {
-          const status = p.status === 'sent' ? 'sent' : 'failed';
-          title = `Email ${status} to ${(p.recipientEmail as string) ?? 'recipient'}`;
-          summary = p.error ? `Error: ${p.error as string}` : null;
-        } else if (n.type === 'email.admin_alert_delivered') {
-          title = `Admin alert sent (${(p.adminsNotified as number) ?? 0} admins notified)`;
-        } else if (n.type === 'notification.delivered') {
-          title = `Notification delivered to ${(p.recipientEmail as string) ?? 'recipient'}`;
-        } else if (n.type === 'notification.delivery_failed') {
-          title = `Notification failed for ${(p.recipientEmail as string) ?? 'recipient'}`;
-          summary = p.error ? `Error: ${p.error as string}` : null;
-        } else if (n.type === 'content_pipeline.post.publish_completed') {
-          title = `Blog post "${(p.title as string) ?? (p.slug as string) ?? ''}" published`;
-        } else if (n.type === 'content_pipeline.post.unpublish_completed') {
-          title = `Blog post "${(p.slug as string) ?? ''}" unpublished`;
-        } else if (n.type.endsWith('.failed') && n.namespace === 'system') {
-          title = `Action failed: ${(p.actionType as string) ?? n.type}`;
-          summary = p.error ? `${p.error as string}` : null;
-        }
+        // Canonical, human-readable label (shared with the activity stream +
+        // proposal timeline; keyed on the real emitted type/phase/payload).
+        const title = describeEvent({
+          namespace: n.namespace,
+          type: n.type,
+          phase: n.phase,
+          payload: p,
+        });
+        const summary: string | null = p.error
+          ? `Error: ${String(p.error)}`
+          : ((p.summary as string) ?? null);
 
         return {
           id: n.id,
@@ -124,6 +115,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           namespace: n.namespace,
           title,
           summary,
+          payload: p, // returned so the bell can deep-link to the source entity
           created_at: n.createdAt,
           is_read: false, // V1: no per-user read tracking; all shown as unread
         };

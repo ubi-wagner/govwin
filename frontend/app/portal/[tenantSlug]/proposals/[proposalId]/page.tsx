@@ -111,6 +111,18 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   }
 
+  // Partner scoping: a partner_user with no grant on THIS proposal must not see
+  // the workspace shell (title, collaborator roster + emails, compliance,
+  // stage history). Tenant staff (tenant_user+) retain tenant-wide access.
+  if (
+    role === 'partner_user' &&
+    access.editableSections.length === 0 &&
+    access.commentableSections.length === 0 &&
+    access.viewableSections.length === 0
+  ) {
+    notFound();
+  }
+
   // ── Load sections (with completion markers) ────────────────────────
   let sections: {
     id: string;

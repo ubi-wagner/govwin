@@ -97,7 +97,9 @@ export default async function PortalLayout({
                 )}
               </>
             )}
-            <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+            {!isPartner && (
+              <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+            )}
           </nav>
         </div>
         <div className="mt-8">

@@ -33,6 +33,11 @@ export default async function ProfilePage({ params }: Props) {
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
 
+  // Company settings (profile, billing email) are tenant-staff only. A
+  // partner_user is an external collaborator and must not see tenant
+  // billing/company data (matches the profile API's role floor).
+  if (role === 'partner_user') redirect(`/portal/${tenantSlug}/proposals`);
+
   // ── Load full tenant info ─────────────────────────────────────────
   interface TenantInfo {
     id: string;

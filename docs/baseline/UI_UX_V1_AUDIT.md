@@ -6,6 +6,27 @@
 
 ---
 
+## ✅ Update — fixes applied on this branch (Tier 0 + both [once] fixes)
+
+Tier-0 and the two high-leverage [once] items are implemented. Two findings were **downgraded after verifying the actual code** (noted below). Tier-2/3 items are unchanged.
+
+**Implemented**
+- **Spotlight convert flow** *(was P0)* — `proposals/create` paywall is now off by default for the founding cohort; "Build Proposal" reaches the workspace. Set `FOUNDING_COHORT_BYPASS=false` to re-enable the 402.
+- **Dual "Spotlight" identity** *(was P0)* — the unwired saved-search API routes (`/api/portal/[slug]/spotlights[/[id]]`) were removed; `/spotlights/*` now unambiguously means the opportunity feed.
+- **Partner authorization cluster** *(was P1 ×5)* — `resolveUserAccess`/role-floor guards added at the **page + comments-API** layer: section editor, review page, spotlight detail, profile (page + hidden nav), workspace shell, processes, comments POST. `tenant_user` tenant-wide access preserved by design (only `partner_user` is scoped).
+- **Event-audit visualization** *(was the "not HITL-ready" verdict + P1 ×3)* — new `lib/event-labels.ts` (canonical label + deep-link map keyed on the **real emitted `type`**), wired into the activity stream, notification bell, notifications API, dashboard, and proposal timeline. Notifications now drop noisy `start` rows, return payload, and deep-link to the source entity. Unit-tested (`__tests__/event-labels.test.ts`).
+- **Route scaffolding** *(was P1)* — `loading.tsx` + `error.tsx` + `not-found.tsx` under `app/portal/[tenantSlug]` (render inside the shell).
+- **"Run AI Review" no-op** *(was P0)* — button disabled ("coming soon"); its color-team agent loop is built but unwired for V1.
+- **`agents/page.tsx`** — page-layer `getTenantBySlug`+`verifyTenantAccess` added (defense-in-depth).
+
+**Severity corrections (verified against the code)**
+- **Outcome "42P10 → 500" (was P0): FALSE POSITIVE.** The route uses bare `ON CONFLICT DO NOTHING` (no target) — that does NOT raise `42P10` and does NOT 500. The only real effect was non-idempotent re-recording (duplicate audit rows). Fixed as **P2**: migration `073` adds `UNIQUE(unit_id, proposal_id)` and the route now targets it.
+- **tenant_user AI (TU-07/08) "P0": reconciled to a spec note, not code.** AI section actions are admin-gated by the as-built design (proposals are created locked for admin co-draft). HITL TU-07/08 updated to reflect admin-driven AI. *If customer-facing section AI is desired, that's a deliberate product change — flagged for your decision.*
+
+**Not in this batch (Tier 2/3):** gate seeding + 400 status (TU-09), canvas autosave + 409 merge, `canvas_versions` snapshot metadata, package export format/persistence, version restore, reviews-table persistence, library atomize race, team-management actions, duplicate upload route. See the tiered list at the bottom.
+
+---
+
 ## 0. Can you even log in? (the "forgot my password" question)
 
 **Yes — your credential is seeded and known.** `db/migrations/051_reset_admin_launch.sql` upserts:

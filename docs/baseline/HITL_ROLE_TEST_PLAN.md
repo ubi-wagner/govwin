@@ -309,6 +309,10 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Route: Stripe checkout session creation.
   - **Verify in-house:** must use a Stripe test key (`sk_test_…`) and a real test card (`4242 4242 4242 4242`). Stripe webhook must be configured with `STRIPE_WEBHOOK_SECRET`. This path has zero automated coverage — see Section 6.
 
+- [ ] **TA-06b** — Founding-cohort convert (no Stripe): pin an opportunity, then click **"Build Proposal"** on the detail page.
+  - Expected: `POST …/proposals/create` returns `200` and the browser navigates to the new `/proposals/[id]` workspace (created `is_locked=true` for admin review). The paywall is **off by default** in V1 (`FOUNDING_COHORT_BYPASS` unset/≠`false`); set `FOUNDING_COHORT_BYPASS=false` to re-enable the 402 paywall.
+  - Event: `proposal:proposal.created:end`; tables: `proposals`, `proposal_sections`, `proposal_supporting_docs`.
+
 - [ ] **TA-07** — Complete Stripe checkout (test mode); confirm redirect back to portal.
   - Expected: `stripe/webhook` receives `checkout.session.completed`; 6-table `sql.begin` transaction runs: `purchases` row created, `proposals` row created, `proposal_sections` rows created, S3 `customers/[slug]/proposals/[id]/` prefix provisioned.
   - Event: `capture:purchase.completed:end`; tables: `purchases`, `proposals`, `proposal_sections`.
@@ -384,6 +388,7 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft` queues draft intent; client then calls `POST /api/tools/proposal.draft_section` which calls Claude Sonnet directly; draft content returned and inserted into canvas.
   - Event: `proposal:proposal.draft_requested:single`; tool event: `tool:tool.invoked:end`.
   - **Verify in-house:** confirm ANTHROPIC_API_KEY is set and a real Claude response is returned (not a mock). This is a live Anthropic call — the pipeline agent workforce does NOT handle drafting; it comes from the frontend directly.
+  - **V1 note (admin-driven AI):** the "Draft with AI" / "Compliance Check" buttons live in the **admin panel** and are gated on `isAdmin` (`proposal-ai-actions.tsx`), matching the as-built flow (proposals are created locked for admin co-draft, then unlocked to the customer). Perform TU-07/TU-08 as `tenant_admin`/`rfp_admin`; a plain `tenant_user` edits manually + per-node AI revise inside the canvas. **"Run AI Review" is intentionally disabled ("coming soon")** — its color-team agent loop is built but not wired for V1, so it no longer emits a request that nothing processes.
 
 ### 6.4 Compliance Check
 
@@ -451,16 +456,25 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
 - [ ] **PU-06** — Attempt to navigate to `/portal/[slug]/billing`.
   - Expected: redirect or 403. partner_user must NOT see billing data.
 
-- [ ] **PU-07** — Attempt to navigate to `/portal/[slug]/spotlights`.
-  - Expected: redirect or 403. partner_user is blocked from Spotlight by portal layout guard.
+- [ ] **PU-07** — Attempt to navigate to `/portal/[slug]/spotlights` **and** a deep `/portal/[slug]/spotlights/[opportunityId]` URL.
+  - Expected: both redirect to `/proposals`. The list AND the detail page now enforce the `hasRoleAtLeast(role,'tenant_user')` floor (nav-hiding alone is not access control).
 
-- [ ] **PU-08** — Attempt to call `GET /api/portal/[tenantSlug]/profile` as partner_user.
-  - Expected: 403 response after FE-04 fix. If the fix is not applied this will return 200 with `billing_email` — a known security gap (P0-05). Confirm the fix is live.
+- [ ] **PU-08** — Attempt `GET /api/portal/[tenantSlug]/profile` **and** navigate to `/portal/[slug]/profile` as partner_user.
+  - Expected: API returns `403`; the Settings **page** now also redirects partners to `/proposals` (and the Settings nav link is hidden for partners), so `billing_email` is never rendered. Confirm both layers.
 
-- [ ] **PU-09** — Attempt to access a proposal section NOT in partner's `collaborator_stage_access`.
-  - Expected: `lib/proposal-access.ts::resolveUserAccess()` returns `canView=false`; section content hidden or 403.
+- [ ] **PU-09** — Attempt to open a section editor URL (`…/sections/[sectionId]`) NOT in the partner's `collaborator_stage_access`.
+  - Expected: the **page** calls `resolveUserAccess` and `notFound()`s when the section isn't viewable; a view/comment-only grant opens the canvas **read-only** (`readOnly = isLocked || !partnerCanEdit`). Previously the page only checked tenant membership.
 
-**partner_user total: 9 steps**
+- [ ] **PU-10** — Attempt to open `/portal/[slug]/proposals/[proposalId]/review` and `/portal/[slug]/proposals/[proposalId]` (workspace) for a proposal the partner does NOT collaborate on.
+  - Expected: review page redirects to `/proposals`; the workspace `notFound()`s for a no-grant partner (no leak of title, collaborator roster/emails, compliance matrix, or stage history). Tenant staff (`tenant_user`+) retain tenant-wide access by design.
+
+- [ ] **PU-11** — Attempt `POST …/proposals/[proposalId]/comments` on a section outside the partner's grant.
+  - Expected: `403 FORBIDDEN`. The route resolves `resolveUserAccess` for partners and rejects comments on non-commentable/editable sections; it also 404s a `nodeId` that doesn't belong to the proposal.
+
+- [ ] **PU-12** — Attempt to navigate to `/portal/[slug]/processes` as partner_user.
+  - Expected: redirect to `/proposals` (the process ledger now enforces the `tenant_user`+ view floor).
+
+**partner_user total: 12 steps**
 
 ---
 

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { describeEvent as describeEventLabel } from '@/lib/event-labels';
 
 export type SerializedActivityEvent = {
   id: string;
@@ -74,83 +75,10 @@ function describeEvent(
   payload: Record<string, unknown> | null,
   durationMs: number | null,
 ): string {
-  const key = `${namespace}.${type}:${phase ?? ''}`;
-
-  // Proposal events
-  if (key === 'proposal.created:end') return 'Proposal created';
-  if (key === 'proposal.section_drafted:end') return 'Section drafted by AI';
-  if (key === 'proposal.advanced:single') {
-    const toStage = payload?.toStage ?? payload?.to_stage ?? 'next stage';
-    return `Proposal advanced to ${toStage}`;
-  }
-
-  // Capture events
-  if (key === 'capture.proposal.purchased:end') return 'Proposal portal purchased';
-
-  // Library events
-  if (key === 'library.unit_created:end') return 'Library unit created';
-
-  // Finder events
-  if (key === 'finder.topic_pushed:end') return 'Topic published to spotlight';
-
-  // Identity events
-  if (key === 'identity.user.signed_in:single') return 'User signed in';
-
-  // Tool events
-  if (namespace === 'tool' && phase === 'start') {
-    return `AI tool invoked: ${type}`;
-  }
-  if (namespace === 'tool' && phase === 'end') {
-    return `AI tool completed${durationMs != null ? ` (${durationMs}ms)` : ''}`;
-  }
-
-  // Closed-loop completion events (system namespace)
-  if (namespace === 'system') {
-    if (type === 'content_pipeline.post.publish_completed') {
-      const slug = payload?.slug ?? '';
-      const title = payload?.title ?? slug;
-      return `Blog post "${title}" published to website`;
-    }
-    if (type === 'content_pipeline.post.unpublish_completed') {
-      const slug = payload?.slug ?? '';
-      return `Blog post "${slug}" unpublished from website`;
-    }
-    if (type === 'email.delivery_completed' || type === 'email.admin_notification_completed') {
-      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
-      const status = payload?.status === 'sent' ? 'sent' : 'failed';
-      return `Email ${status} to ${recipient}`;
-    }
-    if (type === 'email.invite_delivered') {
-      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
-      const status = payload?.status === 'sent' ? 'sent' : 'failed';
-      return `Invite email ${status} to ${recipient}`;
-    }
-    if (type === 'email.team_invite_delivered') {
-      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
-      const status = payload?.status === 'sent' ? 'sent' : 'failed';
-      return `Team invite email ${status} to ${recipient}`;
-    }
-    if (type === 'email.admin_alert_delivered') {
-      const count = payload?.adminsNotified ?? 0;
-      return `Admin alert sent (${count} admin${count === 1 ? '' : 's'} notified)`;
-    }
-    if (type === 'notification.delivered') {
-      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
-      return `Notification delivered to ${recipient}`;
-    }
-    if (type === 'notification.delivery_failed') {
-      const recipient = (payload?.recipientEmail as string) ?? 'recipient';
-      return `Notification failed for ${recipient}`;
-    }
-    if (type.endsWith('.failed')) {
-      const error = (payload?.error as string) ?? 'unknown error';
-      const actionType = (payload?.actionType as string) ?? type;
-      return `Action failed: ${actionType} - ${error}`;
-    }
-  }
-
-  // Default
-  return `${namespace}.${type}`;
+  // Delegate to the canonical label map (keyed on the real emitted `type`,
+  // which already includes the entity — the old `${namespace}.${type}` keys
+  // never matched). The shared module also handles tool + system events.
+  return describeEventLabel({ namespace, type, phase, payload, durationMs });
 }
 
 /* ------------------------------------------------------------------ */

@@ -70,11 +70,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Stripe gate — founding cohort bypass
-    // When Stripe is live, check for a valid purchase or active subscription
-    // before allowing proposal creation. For now, all tenant_admins can create.
-    const FOUNDING_COHORT_BYPASS = process.env.FOUNDING_COHORT_BYPASS === 'true';
-    if (!FOUNDING_COHORT_BYPASS) {
+    // Stripe gate — founding cohort.
+    // V1: proposal creation is admin-granted (no Stripe). The paywall is OFF by
+    // default so the founding cohort can convert opportunities → workspaces;
+    // set FOUNDING_COHORT_BYPASS=false to require a purchase/subscription once
+    // billing is live. (When enforced, this is where the purchase/subscription
+    // check belongs.)
+    const paywallEnforced = process.env.FOUNDING_COHORT_BYPASS === 'false';
+    if (paywallEnforced) {
       return NextResponse.json(
         { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
         { status: 402 },

@@ -250,15 +250,18 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     expect(json.code).toBe('PAYMENT_REQUIRED');
   });
 
-  it('returns 402 when FOUNDING_COHORT_BYPASS is not set', async () => {
+  it('proceeds (no 402) when FOUNDING_COHORT_BYPASS is unset — V1 paywall is opt-in', async () => {
     delete process.env.FOUNDING_COHORT_BYPASS;
 
     authMock.mockResolvedValue(makeSession());
     getTenantBySlugMock.mockResolvedValue(makeTenant());
     verifyTenantAccessMock.mockResolvedValue(true);
+    // Topic lookup → not found, which proves we passed the (now off-by-default) gate.
+    sqlMock.mockResolvedValueOnce([]);
 
     const res = await POST(makeRequest({ topicId: TOPIC_ID }), makeCtx());
-    expect(res.status).toBe(402);
+    expect(res.status).not.toBe(402);
+    expect(res.status).toBe(404);
   });
 
   // ── Input validation ───────────────────────────────────────────────

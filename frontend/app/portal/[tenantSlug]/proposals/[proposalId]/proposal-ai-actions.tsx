@@ -20,7 +20,6 @@ export function ProposalAiActions({
 }: Props) {
   const router = useRouter();
   const [draftLoading, setDraftLoading] = useState(false);
-  const [reviewLoading, setReviewLoading] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -38,8 +37,6 @@ export function ProposalAiActions({
 
   // AI Draft: available for admin when not locked
   const canDraft = isAdmin && !isLocked;
-  // AI Review: available for admin when not locked
-  const canReview = isAdmin && !isLocked;
   // Outcome: available for admin when proposal is submitted or archived
   const canRecordOutcome =
     isAdmin && ['submitted', 'archived'].includes(stage);
@@ -81,44 +78,6 @@ export function ProposalAiActions({
       setDraftLoading(false);
     }
   }, [canDraft, draftLoading, tenantSlug, proposalId]);
-
-  const handleReview = useCallback(async () => {
-    if (!canReview || reviewLoading) return;
-    setReviewLoading(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/ai/review`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reviewType: 'both' }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Failed' }));
-        setMessage({ type: 'error', text: err.error || 'Review failed' });
-      } else {
-        const json = await res.json();
-        const count = json.data?.sections_queued ?? 0;
-        if (count === 0) {
-          setMessage({
-            type: 'success',
-            text: 'No sections with content to review.',
-          });
-        } else {
-          setMessage({
-            type: 'success',
-            text: `AI review requested for ${count} section${count > 1 ? 's' : ''}.`,
-          });
-        }
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Network error' });
-    } finally {
-      setReviewLoading(false);
-    }
-  }, [canReview, reviewLoading, tenantSlug, proposalId]);
 
   const handleOutcome = useCallback(async () => {
     if (!selectedOutcome || outcomeLoading) return;
@@ -212,17 +171,18 @@ export function ProposalAiActions({
             {draftLoading ? 'Drafting...' : 'Draft with AI'}
           </button>
 
+          {/* AI color-team review runs via the pipeline agent workforce, which
+              is built but not yet wired for V1. Disabled rather than emitting a
+              request that nothing processes (admins review sections manually
+              during the review stage). */}
           <button
-            onClick={handleReview}
-            disabled={!canReview || reviewLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-purple-200 rounded-lg bg-white text-purple-700 hover:bg-purple-50 hover:border-purple-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            type="button"
+            disabled
+            title="AI color-team review is coming soon. During the review stage an admin reviews sections."
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed"
           >
-            {reviewLoading ? (
-              <span className="w-4 h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
-            ) : (
-              <span className="text-purple-400">&#x2726;</span>
-            )}
-            {reviewLoading ? 'Reviewing...' : 'Run AI Review'}
+            <span className="text-gray-300">&#x2726;</span>
+            AI Review (coming soon)
           </button>
         </div>
       </div>

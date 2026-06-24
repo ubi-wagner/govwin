@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,17 @@ export default async function ReviewPage({ params }: Props) {
 
   if (!proposal) {
     redirect(`${basePath}/proposals`);
+  }
+
+  // Partner scoping: the full-proposal compliance view is collaborator-scoped
+  // for partners. Tenant staff (tenant_user+) keep tenant-wide access.
+  if (role === 'partner_user') {
+    const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+    const hasAny =
+      access.editableSections.length > 0 ||
+      access.commentableSections.length > 0 ||
+      access.viewableSections.length > 0;
+    if (!hasAny) redirect(`${basePath}/proposals`);
   }
 
   // ── Load sections with content stats ──────────────────────────────
