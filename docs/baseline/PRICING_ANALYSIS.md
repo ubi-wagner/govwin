@@ -112,12 +112,18 @@ a per-tenant best case; the blended, reprompt-inclusive number is higher.)
 The counter the customer asked about is **real** and lives in `agent_task_log`
 (the unified spend ledger). It enforces, **fail-closed**, per tenant:
 
-| Rail | Value | Where |
-|------|-------|-------|
-| Hourly rate limit | **50 calls / hour / tenant** | `fabric.py::_check_rate_limit` + `lib/ai/agent-guard.ts` |
-| Monthly budget | **$50 / tenant** (`tenant_agent_config.monthly_budget`, default) | `fabric.py::_check_budget` + `agent-guard.ts` |
-| AI kill-switch per tenant | `monthly_budget = 0` → AI disabled | both |
-| Per-call ceiling | **$0.50 / call** (mid-loop) | `fabric.py` |
+| Rail | Value | Settable | Where |
+|------|-------|:---:|-------|
+| Hourly rate limit | **50 calls / hour / tenant** (default) | **Yes** (per-tenant + platform default) | `fabric.py::_check_rate_limit` + `lib/ai/agent-guard.ts` |
+| Monthly budget | **$50 / tenant** (default) | **Yes** (per-tenant + platform default) | `fabric.py::_check_budget` + `agent-guard.ts` |
+| **Platform monthly cap** | **off (NULL)** | **Yes** | `platform_agent_config.platform_monthly_cap` — total spend across all tenants + admin/system |
+| AI kill-switch per tenant | `monthly_budget = 0` → AI disabled | **Yes** | both |
+| AI master switch | on | **Yes** | `platform_agent_config.ai_enabled` |
+| Per-call ceiling | **$0.50 / call** (mid-loop) | No | `fabric.py` |
+
+Limits resolve **tenant override → platform default → constant**, settable by
+admins: per-tenant on the account profile (AI Budget & Limits), pipeline-wide on
+`/admin/agents` (Pipeline AI Controls, master_admin). Migration `072`.
 
 **What changed this session ("wire it up the whole way"):** the two **live**
 product-AI surfaces — the **Draft tool** and the **Compliance route** — called
@@ -135,12 +141,12 @@ Expected build spend ($360) sits ~4× under the ceiling, leaving headroom for
 heavy users — and a single runaway customer is hard-capped at $50 (≈ 8 heavy
 proposals, then 402 until next month or an admin raises their budget).
 
-**The one gap that remains:** Spotlight "for all" runs as **admin**
-(`tenant_id = null`), which is **not** covered by the per-tenant budget. With
-gating it's only ~$20/mo, but it is structurally uncapped. **Recommendation:**
-add a **platform-level monthly cap** (a single env-configurable ceiling checked
-before admin/system invocations) as a kill-switch backstop. Small follow-up;
-not launch-blocking given the gated cost.
+**The admin-path gap is now closed:** Spotlight "for all" runs as **admin**
+(`tenant_id = null`), which the per-tenant budget doesn't cover. The new
+**platform monthly cap** (`platform_agent_config.platform_monthly_cap`) is a hard
+ceiling on *total* spend across all tenants + admin/system, enforced by both
+guards. It ships **off (NULL)** to preserve current behavior; set it from
+`/admin/agents` → Pipeline AI Controls (e.g. $1,500/mo) for a kill-switch backstop.
 
 ---
 
@@ -151,11 +157,11 @@ not launch-blocking given the gated cost.
    reflects real product-AI cost (it was previously blind to it).
 2. **Gate Spotlight LLM-scoring** behind the algorithmic pre-filter (§2): ~13×
    cheaper, no UX loss.
-3. **Add a platform-level cap** for admin/system (`tenant_id = null`) spend (§5)
-   so the one uncapped path has a backstop.
-4. **Tie budget to tier.** $50/mo is a sensible default; consider raising it for
-   higher subscription tiers via `tenant_agent_config.monthly_budget` (already
-   per-tenant, no code change needed).
+3. **Platform-level cap (done).** A settable platform monthly cap now backstops
+   the admin/system (`tenant_id = null`) path (§5); enable it from `/admin/agents`.
+4. **Tie budget to tier.** $50/mo is a sensible default; raise it for higher
+   subscription tiers from the admin account profile (AI Budget & Limits) — now a
+   UI control, no SQL or code change.
 5. **Re-baseline after launch.** The volume assumptions (opportunities scored,
    proposals/customer/month, reprompt factor) are the only soft inputs. The
    dashboard now captures the real numbers — revisit this doc once HITL testing

@@ -69,7 +69,11 @@ For horizontal scaling beyond a single Railway container:
 
 | Setting | Value | Configurable | Location |
 |---------|-------|:---:|----------|
-| Rate limit | 50 calls/hour/tenant | No (hardcoded) | `RATE_LIMIT_PER_HOUR` in `fabric.py` |
+| Rate limit | 50 calls/hour/tenant (default) | **Yes** | tenant override `tenant_agent_config.rate_limit_per_hour` → platform default `platform_agent_config.default_rate_limit_per_hour` → `RATE_LIMIT_PER_HOUR` constant |
+
+Effective limit resolves **tenant override → platform default → constant**. Set
+the per-tenant value from the admin account profile (AI Budget & Limits card) and
+the platform default from `/admin/agents` (Pipeline AI Controls, master_admin).
 
 ### Rate Check Implementation
 
@@ -103,12 +107,16 @@ This prevents runaway agent invocations if the database is unreachable.
 
 ### How to Adjust Per-Tenant
 
-The current rate limit is hardcoded at 50 calls/hour for all tenants. To make it
-configurable per-tenant:
+Settable from the UI (no SQL needed):
 
-1. Add a `rate_limit_per_hour` column to `tenant_agent_config`
-2. Query the config in `_check_rate_limit()` and use the tenant-specific value
-3. Fall back to `RATE_LIMIT_PER_HOUR` if no config exists
+- **Per-tenant:** admin account profile → "AI Budget & Limits" card (rfp_admin+),
+  which `PATCH`es `/api/admin/tenants/[tenantId]/agent-config`. Blank = inherit
+  the platform default.
+- **Platform default:** `/admin/agents` → "Pipeline AI Controls" card
+  (master_admin), which `PATCH`es `/api/admin/agents/platform-config`.
+
+`_check_rate_limit()` reads the tenant override, then the platform default, then
+the `RATE_LIMIT_PER_HOUR` constant.
 
 ---
 
@@ -118,8 +126,14 @@ configurable per-tenant:
 
 | Setting | Default | Configurable | Location |
 |---------|---------|:---:|----------|
-| Monthly budget | $50.00/month | Yes | `tenant_agent_config.monthly_budget` |
+| Monthly budget (per tenant) | $50.00/month | **Yes** | tenant override `tenant_agent_config.monthly_budget` → platform default `platform_agent_config.default_monthly_budget` |
+| Platform monthly cap | off (NULL) | **Yes** | `platform_agent_config.platform_monthly_cap` — hard ceiling on TOTAL monthly spend across all tenants + admin/system |
+| AI master switch | on | **Yes** | `platform_agent_config.ai_enabled` — FALSE disables the whole agent workforce |
 | Per-call ceiling | $0.50 | No (hardcoded) | Mid-loop check in `invoke_agent()` |
+
+`monthly_budget = 0` disables AI for a single tenant. The platform cap closes the
+otherwise-uncapped admin (`tenant_id = NULL`) Spotlight path. Both the frontend
+guard (`lib/ai/agent-guard.ts`) and the pipeline (`fabric.py`) enforce all four.
 
 ### Budget Check Implementation
 
@@ -197,18 +211,16 @@ source of truth.
 
 ### Pricing (Claude API)
 
-| Model | Input (per 1M tokens) | Output (per 1M tokens) | Cached Input (per 1M tokens) |
-|-------|----------------------|----------------------|------------------------------|
-| Claude Sonnet (`claude-sonnet-4-20250514`) | $3.00 | $15.00 | $0.30 |
-| Claude Haiku (`claude-haiku-4-5-20251001`) | $0.25 | $1.25 | $0.025 |
-| Claude Opus (`claude-opus-4-20250918`) | $15.00 | $75.00 | $1.50 |
+| Model | Input (per 1M tokens) | Output (per 1M tokens) |
+|-------|----------------------|----------------------|
+| Claude Sonnet (`claude-sonnet-4-20250514`) | $3.00 | $15.00 |
+| Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) | $1.00 | $5.00 |
 
-V1 uses Sonnet pricing for all agents. Cost constants in `fabric.py`:
-
-```python
-INPUT_COST_PER_TOKEN = 3.0 / 1_000_000   # $3/1M input
-OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000  # $15/1M output
-```
+Cost is computed **per-model** (`fabric.py::MODEL_PRICING` / `_cost_for`, mirrored
+in `lib/ai/agent-guard.ts::MODEL_PRICING` and the admin usage dashboard). Haiku
+archetypes are no longer billed at Sonnet rates. Unknown model ids fall back to
+Sonnet pricing so nothing is ever costed as free. (Per-archetype cost estimates
+below predate the per-model fix and are conservative for Haiku roles.)
 
 ### Per-Archetype Costs
 
@@ -471,3 +483,9 @@ The customer portal should display:
 | `frontend/app/api/portal/[tenantSlug]/agents/config/route.ts` | Tenant agent configuration |
 | `frontend/app/api/portal/[tenantSlug]/agents/performance/route.ts` | Tenant performance metrics |
 | `db/migrations/001_baseline.sql` | Schema: agent_task_log, tenant_agent_config, agent_performance |
+| `db/migrations/072_agent_config_settable.sql` | Adds `tenant_agent_config.rate_limit_per_hour`; creates `platform_agent_config` singleton (defaults + cap + master switch) |
+| `frontend/lib/ai/agent-guard.ts` | Unified guard + ledger for the live product-AI surfaces; resolves effective limits + platform cap |
+| `frontend/app/api/admin/tenants/[tenantId]/agent-config/route.ts` | GET/PATCH per-tenant budget + rate limit (rfp_admin+) |
+| `frontend/app/api/admin/agents/platform-config/route.ts` | GET/PATCH pipeline-wide defaults + cap + master switch (master_admin) |
+| `frontend/components/admin/tenant-ai-config-card.tsx` | Per-tenant AI limits editor on the admin account profile |
+| `frontend/components/admin/platform-ai-config-card.tsx` | Pipeline AI defaults + cap editor on `/admin/agents` |
