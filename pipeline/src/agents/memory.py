@@ -417,11 +417,11 @@ class MemoryStore:
                 """
                 INSERT INTO procedural_memories
                     (id, tenant_id, agent_role, embedding, name,
-                     description, steps, confidence,
-                     created_at, updated_at, last_accessed)
+                     description, steps, success_rate,
+                     created_at, updated_at)
                 VALUES ($1, $2, $3, $4::vector, $5,
                         $6, $7::jsonb, 0.5,
-                        $8, $8, $8)
+                        $8, $8)
                 """,
                 uuid.UUID(memory_id),
                 uuid.UUID(tenant_id),

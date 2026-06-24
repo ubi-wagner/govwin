@@ -22,6 +22,13 @@
 -- No existing CHECK constraint on this column exists in the schema; this ADD is a
 -- fresh constraint, not a drop-and-re-add. Constraint name: system_events_namespace_chk
 --
+-- NOT VALID: the constraint is added WITHOUT scanning pre-existing rows, so any
+-- historical/dev row with a non-canonical namespace cannot block the migration at
+-- ADD-CONSTRAINT time (which would fail the whole deploy). It is still enforced on
+-- every NEW insert/update. Belt-and-suspenders: the admin POST /api/events route
+-- validates namespace against this same allowlist (returns 422), so a caller gets
+-- a clean error instead of a raw CHECK violation.
+--
 -- Source: ARCHITECTURE_V9 §8.2 / BASELINE_FINDINGS §6.2 / LAUNCH_TODO DATA-03
 
 ALTER TABLE system_events
@@ -29,4 +36,5 @@ ALTER TABLE system_events
 
 ALTER TABLE system_events
   ADD CONSTRAINT system_events_namespace_chk
-  CHECK (namespace IN ('finder','capture','identity','proposal','library','system','tool'));
+  CHECK (namespace IN ('finder','capture','identity','proposal','library','system','tool'))
+  NOT VALID;
