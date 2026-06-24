@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 
@@ -64,6 +64,7 @@ export default async function PortalLayout({
 
   const basePath = `/portal/${tenantSlug}`;
   const isPartner = role === 'partner_user';
+  const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
 
   return (
     <div className="min-h-screen flex">
@@ -91,6 +92,9 @@ export default async function PortalLayout({
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
                 <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>
+                {isTenantAdmin && (
+                  <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
+                )}
               </>
             )}
             <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>

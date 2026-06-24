@@ -25,7 +25,7 @@ const VALID_PERIODS: Record<string, string> = {
 };
 
 const DEFAULT_MONTHLY_BUDGET = 50.0;
-const RATE_LIMIT_PER_HOUR = 50;
+const DEFAULT_RATE_LIMIT_PER_HOUR = 50;
 
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   opportunity_analyst: 'Opportunity Analyst',
@@ -116,25 +116,40 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    let budgetRows: { monthlyBudget: string | null }[];
+    // ── Resolve effective limits (tenant override → platform default) ──
+    // Keep this view in sync with the guard: a tenant with a custom rate
+    // limit or budget should see those numbers, not the hardcoded defaults.
+    let tenantCfgRows: { monthlyBudget: string | null; rateLimitPerHour: number | null }[] = [];
+    let platformRows: { defaultMonthlyBudget: string | null; defaultRateLimitPerHour: number | null; aiEnabled: boolean | null }[] = [];
     try {
-      budgetRows = await sql<typeof budgetRows>`
-        SELECT monthly_budget::text AS monthly_budget
+      tenantCfgRows = await sql<typeof tenantCfgRows>`
+        SELECT monthly_budget, rate_limit_per_hour
         FROM tenant_agent_config
         WHERE tenant_id = ${tenantId}::uuid
       `;
+      platformRows = await sql<typeof platformRows>`
+        SELECT default_monthly_budget, default_rate_limit_per_hour, ai_enabled
+        FROM platform_agent_config
+        WHERE id = TRUE
+      `;
     } catch (dbErr) {
-      console.error('[portal/agents/usage] budget query failed:', dbErr);
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      // Pre-migration / config absent: fall back to constants below.
+      console.error('[portal/agents/usage] config query failed (using defaults):', dbErr);
     }
 
-    const monthlyBudget = budgetRows[0]?.monthlyBudget
-      ? parseFloat(budgetRows[0].monthlyBudget)
-      : DEFAULT_MONTHLY_BUDGET;
+    const platformBudget = platformRows[0]?.defaultMonthlyBudget != null
+      ? parseFloat(platformRows[0].defaultMonthlyBudget) : DEFAULT_MONTHLY_BUDGET;
+    const platformRate = platformRows[0]?.defaultRateLimitPerHour ?? DEFAULT_RATE_LIMIT_PER_HOUR;
+    const aiEnabled = platformRows[0]?.aiEnabled ?? true;
+
+    const monthlyBudget = tenantCfgRows[0]?.monthlyBudget != null
+      ? parseFloat(tenantCfgRows[0].monthlyBudget) : platformBudget;
+    const effectiveRate = tenantCfgRows[0]?.rateLimitPerHour ?? platformRate;
+
     const totalCostThisMonth = parseFloat(totalCallsRows[0]?.totalCostUsd ?? '0');
     const budgetUsedPct = monthlyBudget > 0
       ? Math.round((totalCostThisMonth / monthlyBudget) * 10000) / 100
-      : 0;
+      : 100; // budget 0 = AI disabled for this tenant → show fully consumed
 
     // ── Calls remaining this hour ────────────────────────────────
     let hourlyRows: { callsThisHour: number }[];
@@ -150,12 +165,14 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
     const callsThisHour = hourlyRows[0]?.callsThisHour ?? 0;
-    const callsRemainingThisHour = Math.max(0, RATE_LIMIT_PER_HOUR - callsThisHour);
+    const callsRemainingThisHour = Math.max(0, effectiveRate - callsThisHour);
 
     const summary = {
       totalCalls: totalCallsRows[0]?.totalCalls ?? 0,
       budgetUsedPct,
       callsRemainingThisHour,
+      rateLimitPerHour: effectiveRate,
+      aiEnabled: aiEnabled && monthlyBudget > 0,
     };
 
     // ── By agent (within the requested period) ───────────────────
