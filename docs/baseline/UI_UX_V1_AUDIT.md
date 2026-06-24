@@ -53,9 +53,32 @@ No later migration (059/063/064/072) touches your row, so that password stands a
 
 ---
 
-## C. Proposals workspace
+## C. Proposals workspace — core editing is real and well-guarded; the review/AI/outcome edges break
 
-> _Pending the final analyst (largest scope — proposal drafting, AI tools, stage gates, review, collaborators, packaging). This section will be completed when that pass returns._
+**What works:** Section editing (Tiptap/Canvas) loads content and persists via `PUT .../sections/[sectionId]/save` with **genuine optimistic concurrency** (CAS on `version` → 409), a `canvas_versions` snapshot, lock/stage/edit-window enforcement, and partner edit-permission gating; emits `proposal:section.saved:single`. Stage advance is atomic (`sql.begin`): snapshots sections, writes `stage_completion_snapshots` + `proposal_stage_history` + `proposal_activity_log`, emits `proposal:proposal.advanced:end`. The **Compliance Check** tool genuinely calls Claude Haiku with budget/rate guardrails + prompt-injection delimiting; in-canvas **AI draft/revision** calls Sonnet. Tenant isolation is solid across every route (no IDOR found), `{error,code}` everywhere, `await sql` wrapped. DOCX + section-level PPTX/XLSX exporters are real.
+
+| Severity | File:line | Gap | Fix |
+|---|---|---|---|
+| **P0** | `proposals/[proposalId]/outcome/route.ts:251-254` | Recording Won/Lost does `INSERT INTO library_atom_outcomes … ON CONFLICT DO NOTHING` but the table has **no unique constraint** on `(unit_id, proposal_id)` → Postgres `42P10` aborts the `sql.begin` → **500 for any proposal with harvested atoms**. Outcome recording broken for the common case. | Add `UNIQUE(unit_id, proposal_id)` migration + target it (or drop `ON CONFLICT`). |
+| **P0** | `proposal-ai-actions.tsx:40-42,162` + `proposal-contributor-view.tsx` | TU-07/TU-08 want a **tenant_user** to run AI Draft + Compliance Check, but those controls are `if (!isAdmin) return null`. The contributor (tenant_user/partner) view has **no** AI-draft/compliance/review actions — only per-node revise. TU-07/TU-08 can't be performed as tenant_user. | Expose section AI/compliance in `ProposalContributorView` (gated by edit permission), or mark admin-only in the spec. |
+| **P0** | `ai/review/route.ts:148-167` + `proposal-ai-actions.tsx:225` | "Run AI Review" calls **no model and no tool** — it counts sections and emits `review_requested`; the consumer agent is dormant. UI shows "AI review requested for N sections" but **nothing reviews anything**. | Implement via a real Anthropic call (like `ai/compliance`), or hide the button + label not-yet-available. |
+| **P0** | `reviews/route.ts:10,219-240` | Self-described stub ("V1 TODO P2-14"): POST writes a `review→review` history note; `reviewerIds` accepted but **never persisted**; the real `proposal_reviews` table is unused. No reviewer assignment/scores. | Persist to `proposal_reviews` (row per reviewer/round), or remove from the flow. |
+| **P1** | `proposals/[proposalId]/review/page.tsx` (no inbound link) | The dedicated **Compliance Review page is unreachable** — nothing links to `…/proposals/[id]/review`; only typing the URL gets there. Also read-only (no run/advance). The HITL "review flow" is effectively hidden. | Add a "Compliance Review" link from the workspace (StageControl/admin panel), or fold into a workspace tab. |
+| **P1** | `advance/route.ts:187-206` (+ nothing seeds `stage_gate_requirements`) | TU-09 (advance blocked by unmet gates) is **never exercised**: gate rows are seeded only by a manual `gates` POST, so a fresh proposal advances with an empty `unmet` set. Gate-block is opt-in, not default. | Seed default gates (`all_sections_complete`, `compliance_check_passed`) at proposal creation, or document gates as opt-in. |
+| **P1** | `advance/route.ts:327` (+ `__tests__/advance.test.ts:367`) | TU-09 contract is **HTTP 400** + `GATE_REQUIREMENTS_NOT_MET`; route returns **422** (code + `details.unmet` correct). The unit test enshrines the wrong 422. | Change to 400; update the test. |
+| **P1** | `canvas-editor.tsx:353-371` (+ `save/route.ts` 409) | TU-06 says "auto-save," but the editor is **manual-save only** (no debounce; just `beforeunload`). Client sends no base version; on a 409 it shows the raw error with no reload/merge — two editors thrash. | Add debounced autosave; on 409 prompt to reload latest; add a presence indicator. |
+| **P1** | `save/route.ts:175-236` | The `canvas_versions` snapshot archives the **previous** content at the **old** version, hardcodes `source='human_edit'` (discarding AI `source`/`aiInstruction`/`aiModel`), never sets `parent_version_id`. AI revisions are mislabeled human; the 045 revision chain is dead. | Archive new content at `nextVersion` after the CAS, with the body's revision metadata + `parent_version_id`. |
+| **P1** | `proposal-draft-section.ts:374-381` + `ai-revision-panel.tsx:60-66` | When `ANTHROPIC_API_KEY` is unset the AI tool **returns a success envelope** `{nodes:[], error:'…not configured'}`; `registry.invoke` logs success, clients only check `nodes.length` → user sees a **silent no-op**, no reason. | Throw a typed error on missing key so invoke logs failure + clients surface it (or read `result.error`). |
+| **P1** | `comments/route.ts:194-197,243-250` | PU-05/TU-11: partner comments only within their grant. POST checks tenant membership only — **any tenant member (incl. partner) can comment on any section**, with no `nodeId`-belongs-to-proposal check. (API-layer twin of the §F disclosure cluster.) | `resolveUserAccess` for non-admins; reject `nodeId ∉ commentable/editable`; verify section↔proposal. |
+| **P1** | `supporting-docs/route.ts:347-364`; `dropbox/route.ts:126-222` | Supporting-docs upload needs only "any collaborator row" (ignores `accepted_at`/`dropbox_enabled`/stage/revocation); Dropbox POST isn't gated by `dropbox_enabled` at all. A view-only partner can upload. | Gate both on `resolveUserAccess().canUpload`. |
+| **P1** | `ai/compliance/route.ts:236-490,495` | ~8 early-return paths fire `emitEventStart` but never `emitEventEnd` (leaking open events); an un-guarded `recordAgentSpend` can 500 a successful check. | Emit `end` before each early return; wrap `recordAgentSpend` in try/catch. |
+| **P1** | `stage/route.ts:139-316` (PATCH) | A **second, gate-bypassing** stage-change path (no gate check, no snapshots/log, emits an unlistened `proposal.stage_advanced`). UI never calls it but it's reachable by direct API — a tenant_admin can skip gates. | Delete the PATCH handler (keep GET), or route through advance logic. |
+| **P2** | `package/route.ts:160,433-500` | Final **package** export is JSON+DOCX only (PPTX/XLSX wired only at section level) and DOCX is **streamed, not persisted** (the `proposal-export` S3 helper is dead; `download_count` increments with no artifact). Admin "Export" downloads a JSON blob. | Decide package format(s); render/stream DOCX from the admin panel; optionally persist to R2. |
+| **P2** | `proposal-timeline.tsx:36-37` | Timeline reads `payload.toStage ?? payload.stage`, but advance emits `previousStage`/`targetStage` → renders generic "next stage"; also start/end vs the `:single` matcher. (Same taxonomy drift as §E/G.) | Match `proposal.advanced:end`; read `targetStage`. |
+| **P2** | `versions/route.ts` (GET-only); `export/route.ts:24-153` | No version **restore** endpoint (no `section_reverted`); section export doesn't check per-section access and renders client-supplied bytes — any tenant member can export any section of a locked proposal. | Add audited `POST …/versions/[n]/restore` (OCC); gate export by `resolveUserAccess`, render from stored content for non-admins. |
+| **P2/P3** | `registry.ts:113-271`; `supporting-docs/route.ts:446-464`; `collaborators/route.ts:314`; `stage-control.tsx:252`; `outcome/route.ts:161` & `reviews/route.ts:226` | `invoke()` has **no timeout/retry** (a hung Anthropic call hangs indefinitely); supporting-doc row flips to `uploaded` on presign (before the object lands); `dropbox_enabled` hardcoded `true`; admin "Advance" sends no `{force}` so override 422s; event types `outcome.recorded`/`review.created` don't match wired `proposal.*` templates. | Add `AbortSignal.timeout`+retry; use `pending`→`uploaded`; derive `dropbox_enabled`; send `{force:true}` for admin; rename event types. |
+
+**Doc reconciliations (not code bugs):** `CLAUDE_CLIFFNOTES.md:128` says `canvas_versions.document` but code/migrations use `content` — **the doc is stale**. "Mistake 22" claims `ai/review` invokes a missing tool; it actually invokes nothing. The "DOCX-only" limit is true for the **package** export but not section-level export (PPTX/XLSX work there).
 
 ---
 
@@ -123,16 +146,50 @@ Hiding a nav link is not access control. Four partner-reachable pages verify **t
 
 ---
 
-## G. Systemic themes (root causes, not one-offs)
+## G. Systemic themes (root causes — each fix clears many findings)
 
-1. **Event taxonomy drift (touches B, D, E).** Emitted `type` strings already contain the entity (`proposal.created`, `topic.pinned`, `file.uploaded`), but consumers/label-maps/spec assume different names/phases (`proposal.advanced:single`, `opportunity.pinned`, `document.atomized:single`, namespace double-prefix). This single mismatch breaks the activity stream, notifications, dashboard recent-activity, automation-rule matching, and HITL event assertions. **Fix once, centrally:** a shared canonical event-label/key module used by the activity stream, notification panel, notifications route, and dashboard — derived from the *actually emitted* types.
-2. **"Nav-hiding ≠ access control" (F).** Tenant-wide nav pages gate correctly, but deep-linked pages (section editor, review, spotlight detail, settings, workspace shell) stop at `verifyTenantAccess`. Uniform fix: add `hasRoleAtLeast`/`resolveUserAccess` page guards.
-3. **Duplicate/divergent endpoints (B, D).** Two upload routes (`uploads` vs `library/upload`), two pin paths with different side-effects, an orphan dashboard route, a `spotlights` table whose CRUD nothing calls. Consolidate to one path per action.
-4. **False-empty on error (B, D, F).** Most pages swallow query errors into an empty list, so a DB failure looks like "no data." `processes` is the model to copy (distinct error state).
-5. **Missing route scaffolding (F).** No `loading.tsx`/`error.tsx`/`not-found.tsx` under `app/portal/**` → blank transitions and nav-less error screens.
+1. **Event taxonomy drift (B, D, E, C).** Emitted `type` strings already contain the entity (`proposal.created`, `proposal.advanced`, `topic.pinned`, `file.uploaded`), but consumers/label-maps/spec assume different names, phases, and payload fields (`proposal.advanced:single`+`toStage`, `opportunity.pinned`, `document.atomized:single`, namespace double-prefix). This one mismatch breaks the activity stream, notifications, dashboard recent-activity, the proposal timeline, automation-rule matching, and HITL event assertions. **Fix once:** a shared canonical event-label/key module (keyed on real `type`+`phase`, reading real payload fields), reused by the activity stream, notification panel + route, dashboard, and proposal timeline.
+2. **"Nav-hiding ≠ access control" (F, C).** Tenant-wide *nav* pages gate correctly, but deep-linked pages/endpoints (section editor, review page, spotlight detail, settings, workspace shell, comments POST) stop at `verifyTenantAccess`. Uniform fix: add the `hasRoleAtLeast`/`resolveUserAccess` guard the sibling surfaces already use.
+3. **AI features that report success but do nothing (C).** `ai/review` invokes no model; AI tools return a success envelope when `ANTHROPIC_API_KEY` is unset; both surface "success" toasts over no-ops. **Fix pattern:** throw typed errors on missing capability so `registry.invoke` logs failure and the UI shows it; hide buttons for unimplemented features.
+4. **Duplicate/divergent endpoints (B, D, C).** Two upload routes, two pin paths with different side-effects, a second gate-bypassing `PATCH /stage`, an orphan dashboard route, an unwired `spotlights` CRUD. Consolidate to one path per action.
+5. **False-empty on error (B, D, F, C).** Most pages/routes swallow query/storage errors into an empty list, so a DB/S3 failure looks like "no data." `processes` is the model (distinct error state).
+6. **Missing route scaffolding (F).** No `loading.tsx`/`error.tsx`/`not-found.tsx` under `app/portal/**` → blank transitions and nav-less error screens during HITL.
 
 ---
 
-## Prioritized fix list
+## Prioritized fix list (decision-ready)
 
-> _Finalized after the Proposals section lands._
+Tags: **[once]** = a single central fix that clears multiple findings · effort is rough (S<½d, M~1d, L>1d).
+
+### Tier 0 — fix before HITL even starts (core flows / would derail a walkthrough)
+| # | Fix | Why | Files | Effort |
+|---|---|---|---|---|
+| 1 | Unblock the **opportunity → proposal** convert flow | The headline V1 demo dead-ends on a 402 | set `FOUNDING_COHORT_BYPASS` in deploy **or** wire the CTA to Stripe checkout — `spotlight-detail-actions.tsx:56`, `proposals/create/route.ts:76` | S |
+| 2 | Add `UNIQUE(unit_id, proposal_id)` to `library_atom_outcomes` | Win/Lost recording 500s for any proposal with harvested atoms | new migration + `outcome/route.ts:251` | S |
+| 3 | Resolve the **dual "Spotlight" identity** | GET/PATCH/DELETE at the detail URL operate on the wrong table | `spotlights/[spotlightId]/route.ts` vs `page.tsx` | M |
+| 4 | Decide tenant_user AI access; hide or implement **"Run AI Review"** | TU-07/08 can't be done; a button claims success but no-ops | `proposal-ai-actions.tsx`, `proposal-contributor-view.tsx`, `ai/review/route.ts` | M |
+| 5 | Add `app/portal/[tenantSlug]/loading.tsx` (+ `error.tsx`, `not-found.tsx`) | Every navigation blanks during the SSR query fan-out; errors nuke the nav | new files under `app/portal/**` | S |
+
+### Tier 1 — close the security cluster (disclosure to partner/tenant_user) **[mostly one pattern]**
+| # | Fix | Why | Files | Effort |
+|---|---|---|---|---|
+| 6 | Add `resolveUserAccess`/`hasRoleAtLeast` guards to the deep-linked pages + comments POST | Partner/any tenant member can read any section, compliance matrix, opportunity detail, billing email, and comment anywhere by URL | `sections/[sectionId]/page.tsx`, `review/page.tsx`, `spotlights/[spotlightId]/page.tsx`, `profile/page.tsx`+`profile-editor.tsx`, `proposals/[proposalId]/page.tsx`, `processes/page.tsx`, `comments/route.ts` | M **[once]** |
+| 7 | Tighten upload/dropbox gating + delete the gate-bypassing `PATCH /stage` | View-only partners can upload; admins can skip gates via direct API | `supporting-docs/route.ts`, `dropbox/route.ts`, `stage/route.ts` | S |
+
+### Tier 2 — make the HITL walkthrough honest (events, gates, AI, audit trail)
+| # | Fix | Why | Files | Effort |
+|---|---|---|---|---|
+| 8 | **[once]** Shared canonical event label/key map (real `type`+`phase`+payload) | Activity stream, notifications, dashboard, proposal timeline all render raw strings; automation rules mis-match | `activity-stream-client.tsx`, `notification-panel.tsx`, `notifications/route.ts`, `dashboard/page.tsx`, `proposal-timeline.tsx` | M |
+| 9 | Persist notification read-state + deep-link rows to their source entity | Unread resets on reload; no click-through — the audit trail isn't trustworthy | `notification-panel.tsx`, `notifications/route.ts` (+ small read-cursor table) | M |
+| 10 | Seed default `stage_gate_requirements` at proposal creation; return **400** on unmet | TU-09 "blocked by gates" never triggers; wrong status code | `proposals/create`, `advance/route.ts:327` + its test | M |
+| 11 | Throw on missing `ANTHROPIC_API_KEY`; balance `ai/compliance` start/end events; guard `recordAgentSpend` | Silent AI no-ops; leaked open events; spend write can 500 a success | `proposal-draft-section.ts`, `ai/compliance/route.ts` | S |
+| 12 | Fix `canvas_versions` snapshot (archive new content at `nextVersion`, keep AI metadata, set parent) + add autosave + 409 reload affordance | TU-06 autosave missing; revision history mislabeled/dead | `save/route.ts`, `canvas-editor.tsx` | M |
+| 13 | Link the **Compliance Review** page from the workspace | The review flow is unreachable except by URL | `stage-control.tsx`/admin panel → `review/page.tsx` | S |
+| 14 | Persist real reviewer assignments (or drop the endpoint) | `reviews` is a stub; reviewerIds discarded | `reviews/route.ts`, `proposal_reviews` | M |
+
+### Tier 3 — consistency & polish (P2/P3, batch when convenient)
+Source scoring from `tenant_profiles` not `applications` (Spotlight); align pin event type + route + drop the `pursuit_status` clobber; surface distinct error vs empty states (copy `processes`); fix documents "Untitled"+links; retire the legacy `uploads` route + wrap its emit; package-export format decision + R2 persistence; version-restore endpoint; `registry.invoke` timeout/retry; team member-management actions + token-based invites; seed-email de-dup; stale `V1 TODO` comment sweep; client-side upload size/extension feedback; unify error-screen button palette + shared `<EmptyState>`. See per-section tables for file:line.
+
+### Cross-references
+- **§0/§A** auth is the only thing you strictly need to start: log in as `eric.c.wagner@gmail.com` / `GovWin2026!`. Configure `RESEND_API_KEY` (or Google Workspace) before testing forgot-password or team invites.
+- Items **6** and **8** are the highest-leverage: one auth-guard pattern and one event-label module each clear ~6 findings.
