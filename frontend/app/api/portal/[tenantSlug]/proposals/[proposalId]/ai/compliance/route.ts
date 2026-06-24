@@ -15,6 +15,8 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { isAppError } from '@/lib/errors';
+import { assertAgentBudget, recordAgentSpend } from '@/lib/ai/agent-guard';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -158,6 +160,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'AI service not configured', code: 'AI_ERROR' },
         { status: 503 },
+      );
+    }
+
+    // ── Enforce the unified per-tenant AI rate limit + monthly budget ──
+    // Same counter as the pipeline agents (agent_task_log). Block BEFORE
+    // any spend so a "crazy reprompt" customer is capped here too.
+    try {
+      await assertAgentBudget(tenantId);
+    } catch (guardErr) {
+      if (isAppError(guardErr)) {
+        return NextResponse.json(guardErr.toResponseBody(), { status: guardErr.httpStatus });
+      }
+      console.error('[portal/proposals/ai/compliance] budget guard error:', guardErr);
+      return NextResponse.json(
+        { error: 'AI budget check failed', code: 'AI_ERROR' },
+        { status: 500 },
       );
     }
 
@@ -420,6 +438,10 @@ For each variable, return:
 Return ONLY the JSON array. No markdown fences, no explanation.`;
 
     let checks: ComplianceCheck[];
+    let aiInputTokens = 0;
+    let aiOutputTokens = 0;
+    let aiModel = 'claude-haiku-4-5-20251001';
+    const aiStartedAt = Date.now();
     try {
       const response = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
@@ -427,6 +449,10 @@ Return ONLY the JSON array. No markdown fences, no explanation.`;
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       });
+
+      aiInputTokens = response.usage.input_tokens;
+      aiOutputTokens = response.usage.output_tokens;
+      aiModel = response.model ?? aiModel;
 
       const textBlock = response.content.find((b) => b.type === 'text');
       if (!textBlock || textBlock.type !== 'text') {
@@ -462,6 +488,21 @@ Return ONLY the JSON array. No markdown fences, no explanation.`;
         { status: 502 },
       );
     }
+
+    // ── Record AI spend in the unified ledger ────────────────────
+    // Reaching here means the Haiku call + parse succeeded. Bills cost
+    // to the monthly budget and counts toward the hourly rate limit.
+    await recordAgentSpend({
+      tenantId,
+      agentRole: 'compliance_reviewer',
+      taskType: 'proposal.compliance_check',
+      model: aiModel,
+      inputTokens: aiInputTokens,
+      outputTokens: aiOutputTokens,
+      durationMs: Date.now() - aiStartedAt,
+      proposalId,
+      sectionId: sectionId ?? null,
+    });
 
     // ── Build structured result ──────────────────────────────────
     const variableMap = new Map(complianceVariables.map(v => [v.id, v]));
