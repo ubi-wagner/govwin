@@ -24,7 +24,12 @@ import pytest
 if "anthropic" not in sys.modules:
     sys.modules["anthropic"] = unittest.mock.MagicMock()
 
-from agents.fabric import AgentFabric, _ARCHETYPE_CLASSES  # noqa: E402
+from agents.fabric import (  # noqa: E402
+    AgentFabric,
+    _ARCHETYPE_CLASSES,
+    _cost_for,
+    MODEL_PRICING,
+)
 
 
 EXPECTED_ARCHETYPES = {
@@ -153,3 +158,37 @@ class TestRegisterArchetype:
         self.fabric.register_archetype("capture_strategist", arch_a)
         self.fabric.register_archetype("capture_strategist", arch_b)
         assert self.fabric._archetypes["capture_strategist"] is arch_b
+
+
+# ---------------------------------------------------------------------------
+# Per-model cost
+# ---------------------------------------------------------------------------
+
+class TestCostFor:
+    """_cost_for prices each model from its own rate, not a flat Sonnet rate."""
+
+    def test_sonnet_priced_at_3_15_per_million(self):
+        # 1M input + 1M output = $3 + $15 = $18
+        assert _cost_for("claude-sonnet-4-20250514", 1_000_000, 1_000_000) == pytest.approx(18.0)
+
+    def test_haiku_priced_at_1_5_per_million(self):
+        # 1M input + 1M output = $1 + $5 = $6
+        assert _cost_for("claude-haiku-4-5-20251001", 1_000_000, 1_000_000) == pytest.approx(6.0)
+
+    def test_haiku_is_cheaper_than_sonnet_for_same_tokens(self):
+        haiku = _cost_for("claude-haiku-4-5-20251001", 500_000, 200_000)
+        sonnet = _cost_for("claude-sonnet-4-20250514", 500_000, 200_000)
+        assert haiku < sonnet
+
+    def test_unknown_model_falls_back_to_sonnet_pricing(self):
+        unknown = _cost_for("some-future-model", 1_000_000, 0)
+        sonnet = _cost_for("claude-sonnet-4-20250514", 1_000_000, 0)
+        assert unknown == pytest.approx(sonnet)
+        assert unknown == pytest.approx(3.0)
+
+    def test_zero_tokens_is_zero_cost(self):
+        assert _cost_for("claude-haiku-4-5-20251001", 0, 0) == 0.0
+
+    def test_pricing_table_has_both_live_models(self):
+        assert "claude-sonnet-4-20250514" in MODEL_PRICING
+        assert "claude-haiku-4-5-20251001" in MODEL_PRICING

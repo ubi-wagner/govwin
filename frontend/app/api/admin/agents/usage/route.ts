@@ -24,9 +24,11 @@ const DEFAULT_MONTHLY_BUDGET = 50.0;
 const RATE_LIMIT = 50;
 const PER_CALL_CEILING = 0.5;
 
+// Keep in sync with frontend/lib/ai/agent-guard.ts::MODEL_PRICING and
+// pipeline/src/agents/fabric.py::MODEL_PRICING.
 const MODEL_PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
   'claude-sonnet-4-20250514': { inputPer1M: 3.0, outputPer1M: 15.0 },
-  'claude-haiku-4-5-20251001': { inputPer1M: 0.25, outputPer1M: 1.25 },
+  'claude-haiku-4-5-20251001': { inputPer1M: 1.0, outputPer1M: 5.0 },
 };
 
 export async function GET(request: NextRequest) {

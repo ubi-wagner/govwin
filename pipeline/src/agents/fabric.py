@@ -100,9 +100,29 @@ DEFAULT_MONTHLY_BUDGET_USD = 50.00
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
-# Sonnet pricing: $3/M input, $15/M output
+# Sonnet pricing: $3/M input, $15/M output (kept for backwards-compat).
 INPUT_COST_PER_TOKEN = 3.0 / 1_000_000
 OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000
+
+# Per-model pricing in USD per 1M tokens (input, output). Keep in sync
+# with frontend/lib/ai/agent-guard.ts::MODEL_PRICING and the admin usage
+# dashboard (frontend/app/api/admin/agents/usage/route.ts). Costing per
+# model matters because Haiku archetypes are 3x cheaper than Sonnet —
+# billing them all at Sonnet rates overstates spend and trips the budget
+# guard too early.
+MODEL_PRICING = {
+    "claude-sonnet-4-20250514": (3.0, 15.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0),
+}
+# Fallback for an unknown model id — Sonnet (the fabric default), so an
+# unrecognised model is costed conservatively, never as free.
+_DEFAULT_PRICING = (3.0, 15.0)
+
+
+def _cost_for(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Return the USD cost of a call, priced per-model."""
+    in_rate, out_rate = MODEL_PRICING.get(model, _DEFAULT_PRICING)
+    return input_tokens * in_rate / 1_000_000 + output_tokens * out_rate / 1_000_000
 
 
 class AgentFabric:
@@ -283,6 +303,7 @@ class AgentFabric:
         total_input_tokens = 0
         total_output_tokens = 0
         tool_calls_count = 0
+        model = DEFAULT_MODEL  # resolved from archetype below; default for error paths
 
         try:
             # 2. Check rate limit
@@ -432,7 +453,7 @@ class AgentFabric:
                     rounds += 1
 
                     # Mid-loop budget check: stop if per-call cost ceiling reached
-                    accumulated_cost = total_input_tokens * INPUT_COST_PER_TOKEN + total_output_tokens * OUTPUT_COST_PER_TOKEN
+                    accumulated_cost = _cost_for(model, total_input_tokens, total_output_tokens)
                     if accumulated_cost > 0.50:  # $0.50 per-call ceiling
                         logger.warning("[invoke_agent] per-call cost ceiling reached: $%.4f", accumulated_cost)
                         break
@@ -445,11 +466,8 @@ class AgentFabric:
                     archetype_name, MAX_TOOL_ROUNDS,
                 )
 
-            # 6. Calculate cost
-            cost_usd = (
-                total_input_tokens * INPUT_COST_PER_TOKEN
-                + total_output_tokens * OUTPUT_COST_PER_TOKEN
-            )
+            # 6. Calculate cost (priced per-model)
+            cost_usd = _cost_for(model, total_input_tokens, total_output_tokens)
 
             duration_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -598,10 +616,7 @@ class AgentFabric:
                     output_tokens=total_output_tokens,
                     tool_calls_count=tool_calls_count,
                     duration_ms=duration_ms,
-                    cost_usd=(
-                        total_input_tokens * INPUT_COST_PER_TOKEN
-                        + total_output_tokens * OUTPUT_COST_PER_TOKEN
-                    ),
+                    cost_usd=_cost_for(model, total_input_tokens, total_output_tokens),
                     error=error_msg,
                 )
             except Exception as log_exc:
