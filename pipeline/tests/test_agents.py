@@ -29,6 +29,8 @@ from agents.fabric import (  # noqa: E402
     _ARCHETYPE_CLASSES,
     _cost_for,
     MODEL_PRICING,
+    RATE_LIMIT_PER_HOUR,
+    DEFAULT_MONTHLY_BUDGET_USD,
 )
 
 
@@ -192,3 +194,83 @@ class TestCostFor:
     def test_pricing_table_has_both_live_models(self):
         assert "claude-sonnet-4-20250514" in MODEL_PRICING
         assert "claude-haiku-4-5-20251001" in MODEL_PRICING
+
+
+# ---------------------------------------------------------------------------
+# Settable limits (tenant override -> platform default -> constant)
+# ---------------------------------------------------------------------------
+
+_TENANT = "11111111-1111-4111-8111-111111111111"
+_PLATFORM_DEFAULTS = {
+    "ai_enabled": True,
+    "default_monthly_budget": 50.0,
+    "default_rate_limit": 50,
+    "platform_monthly_cap": None,
+}
+
+
+class TestSettableLimits:
+    """_check_rate_limit / _check_budget resolve tenant -> platform -> constant."""
+
+    def setup_method(self):
+        self.fabric = AgentFabric()
+
+    async def test_rate_limit_honors_tenant_override(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = [
+            {"rate_limit_per_hour": 5},  # tenant override below the platform default
+            {"cnt": 5},                  # 5 calls this hour
+        ]
+        ok = await self.fabric._check_rate_limit(conn, _TENANT, dict(_PLATFORM_DEFAULTS))
+        assert ok is False  # 5 >= tenant override of 5
+
+    async def test_rate_limit_falls_back_to_platform_default(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = [
+            {"rate_limit_per_hour": None},  # no tenant override
+            {"cnt": 49},                    # under the platform default of 50
+        ]
+        ok = await self.fabric._check_rate_limit(conn, _TENANT, dict(_PLATFORM_DEFAULTS))
+        assert ok is True
+
+    async def test_budget_zero_disables_tenant(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = [{"monthly_budget": 0}]
+        ok = await self.fabric._check_budget(conn, _TENANT, dict(_PLATFORM_DEFAULTS))
+        assert ok is False
+
+    async def test_budget_uses_platform_default_when_no_tenant_row(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = [
+            None,                     # no tenant_agent_config row -> platform default $50
+            {"total_cost": 49.0},     # under $50
+        ]
+        ok = await self.fabric._check_budget(conn, _TENANT, dict(_PLATFORM_DEFAULTS))
+        assert ok is True
+
+    async def test_platform_cap_blocks_even_when_tenant_under_budget(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = [
+            {"monthly_budget": 50.0},  # tenant budget
+            {"total_cost": 10.0},      # tenant spend well under its budget
+            {"total_cost": 100.0},     # platform-wide spend hits the cap
+        ]
+        platform = dict(_PLATFORM_DEFAULTS, platform_monthly_cap=100.0)
+        ok = await self.fabric._check_budget(conn, _TENANT, platform)
+        assert ok is False
+
+    async def test_ai_disabled_platform_wide_blocks_budget(self):
+        conn = unittest.mock.AsyncMock()
+        platform = dict(_PLATFORM_DEFAULTS, ai_enabled=False)
+        ok = await self.fabric._check_budget(conn, _TENANT, platform)
+        assert ok is False
+        conn.fetchrow.assert_not_called()  # short-circuits before any query
+
+    async def test_load_platform_config_falls_back_on_error(self):
+        conn = unittest.mock.AsyncMock()
+        conn.fetchrow.side_effect = Exception("relation does not exist")
+        cfg = await self.fabric._load_platform_config(conn)
+        assert cfg["ai_enabled"] is True
+        assert cfg["default_rate_limit"] == RATE_LIMIT_PER_HOUR
+        assert cfg["default_monthly_budget"] == DEFAULT_MONTHLY_BUDGET_USD
+        assert cfg["platform_monthly_cap"] is None

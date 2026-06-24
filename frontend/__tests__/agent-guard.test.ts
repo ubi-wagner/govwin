@@ -63,57 +63,112 @@ describe('guard error types', () => {
   });
 });
 
+// Query order inside assertAgentBudget:
+//   1. platform_agent_config (best-effort)
+//   2. tenant_agent_config   (fail closed)
+//   3. hourly count          (fail closed)
+//   4. tenant month sum      (fail closed)
+//   5. platform cap sum      (only when a cap is set; fail closed)
+const platformRow = (over: Record<string, unknown> = {}) => [
+  { aiEnabled: true, defaultMonthlyBudget: '50.00', defaultRateLimitPerHour: 50, platformMonthlyCap: null, ...over },
+];
+const tenantRow = (over: Record<string, unknown> = {}) => [
+  { monthlyBudget: '50.00', rateLimitPerHour: null, ...over },
+];
+
 describe('assertAgentBudget', () => {
   it('resolves when under the hourly limit and the monthly budget', async () => {
     sqlMock
-      .mockResolvedValueOnce([{ cnt: '10' }]) // hourly count
-      .mockResolvedValueOnce([{ monthlyBudget: '50.00' }]) // config
-      .mockResolvedValueOnce([{ total: '5.00' }]); // month-to-date cost
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce(tenantRow())
+      .mockResolvedValueOnce([{ cnt: '10' }])
+      .mockResolvedValueOnce([{ total: '5.00' }]);
     await expect(assertAgentBudget(TENANT)).resolves.toBeUndefined();
-    expect(sqlMock).toHaveBeenCalledTimes(3);
+    expect(sqlMock).toHaveBeenCalledTimes(4);
   });
 
-  it('throws AiRateLimitError at the hourly limit (no budget query)', async () => {
-    sqlMock.mockResolvedValueOnce([{ cnt: String(RATE_LIMIT_PER_HOUR) }]);
+  it('throws AiRateLimitError at the platform-default hourly limit', async () => {
+    sqlMock
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce(tenantRow())
+      .mockResolvedValueOnce([{ cnt: String(RATE_LIMIT_PER_HOUR) }]);
     await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiRateLimitError);
-    expect(sqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors a per-tenant rate-limit override below the default', async () => {
+    sqlMock
+      .mockResolvedValueOnce(platformRow()) // default 50
+      .mockResolvedValueOnce(tenantRow({ rateLimitPerHour: 5 })) // tenant capped at 5
+      .mockResolvedValueOnce([{ cnt: '5' }]);
+    await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiRateLimitError);
   });
 
   it('throws AiBudgetExceededError when the tenant budget is 0 (AI disabled)', async () => {
     sqlMock
-      .mockResolvedValueOnce([{ cnt: '1' }])
-      .mockResolvedValueOnce([{ monthlyBudget: '0' }]);
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce(tenantRow({ monthlyBudget: '0' }));
     await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiBudgetExceededError);
-    // No month-to-date sum needed once we know AI is disabled.
+    // budget==0 short-circuits before any spend query.
     expect(sqlMock).toHaveBeenCalledTimes(2);
   });
 
   it('throws AiBudgetExceededError when month-to-date cost >= budget', async () => {
     sqlMock
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce(tenantRow())
       .mockResolvedValueOnce([{ cnt: '1' }])
-      .mockResolvedValueOnce([{ monthlyBudget: '50.00' }])
       .mockResolvedValueOnce([{ total: '60.00' }]);
     await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiBudgetExceededError);
   });
 
-  it('uses the default budget when the tenant has no config row', async () => {
+  it('falls back to the platform default budget when the tenant has no row', async () => {
     sqlMock
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce([]) // no tenant row → platform default ($50)
       .mockResolvedValueOnce([{ cnt: '1' }])
-      .mockResolvedValueOnce([]) // no config row → DEFAULT_MONTHLY_BUDGET_USD
       .mockResolvedValueOnce([{ total: String(DEFAULT_MONTHLY_BUDGET_USD - 1) }]);
     await expect(assertAgentBudget(TENANT)).resolves.toBeUndefined();
   });
 
-  it('FAILS CLOSED (denies) when the rate-limit query errors', async () => {
-    sqlMock.mockRejectedValueOnce(new Error('db down'));
-    await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiRateLimitError);
+  it('throws AiBudgetExceededError when AI is disabled platform-wide', async () => {
+    sqlMock.mockResolvedValueOnce(platformRow({ aiEnabled: false }));
+    await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiBudgetExceededError);
+    expect(sqlMock).toHaveBeenCalledTimes(1);
   });
 
-  it('FAILS CLOSED (denies) when the budget query errors', async () => {
+  it('throws AiBudgetExceededError when the platform monthly cap is reached', async () => {
     sqlMock
+      .mockResolvedValueOnce(platformRow({ platformMonthlyCap: '100.00' }))
+      .mockResolvedValueOnce(tenantRow())
       .mockResolvedValueOnce([{ cnt: '1' }])
+      .mockResolvedValueOnce([{ total: '10.00' }]) // tenant under its own budget
+      .mockResolvedValueOnce([{ total: '100.00' }]); // platform total hits the cap
+    await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiBudgetExceededError);
+    expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('does NOT deny when the platform config is absent (uses constants)', async () => {
+    sqlMock
+      .mockRejectedValueOnce(new Error('relation does not exist')) // pre-migration
+      .mockResolvedValueOnce(tenantRow())
+      .mockResolvedValueOnce([{ cnt: '1' }])
+      .mockResolvedValueOnce([{ total: '5.00' }]);
+    await expect(assertAgentBudget(TENANT)).resolves.toBeUndefined();
+  });
+
+  it('FAILS CLOSED (denies) when the tenant config query errors', async () => {
+    sqlMock
+      .mockResolvedValueOnce(platformRow())
       .mockRejectedValueOnce(new Error('db down'));
     await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiBudgetExceededError);
+  });
+
+  it('FAILS CLOSED (denies) when the rate-limit query errors', async () => {
+    sqlMock
+      .mockResolvedValueOnce(platformRow())
+      .mockResolvedValueOnce(tenantRow())
+      .mockRejectedValueOnce(new Error('db down'));
+    await expect(assertAgentBudget(TENANT)).rejects.toBeInstanceOf(AiRateLimitError);
   });
 });
 

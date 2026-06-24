@@ -78,18 +78,104 @@ export class AiBudgetExceededError extends AppError {
   }
 }
 
+// ─── Effective limits (tenant override → platform default → constant) ─
+
+interface PlatformConfig {
+  aiEnabled: boolean;
+  defaultMonthlyBudget: number;
+  defaultRateLimit: number;
+  platformMonthlyCap: number | null;
+}
+
+/**
+ * Read the pipeline-wide config singleton. BEST-EFFORT: a missing table or
+ * row (e.g. pre-migration) is treated as "use the hardcoded constants" — a
+ * config *absence*, not a spend-verification failure, so it must NOT deny AI.
+ * (Spend checks below still fail closed on DB error.)
+ */
+async function loadPlatformConfig(): Promise<PlatformConfig> {
+  try {
+    const [row] = await sql<{
+      defaultMonthlyBudget: string;
+      defaultRateLimitPerHour: number;
+      platformMonthlyCap: string | null;
+      aiEnabled: boolean;
+    }[]>`
+      SELECT default_monthly_budget, default_rate_limit_per_hour,
+             platform_monthly_cap, ai_enabled
+      FROM platform_agent_config
+      WHERE id = TRUE
+    `;
+    return {
+      aiEnabled: row?.aiEnabled ?? true,
+      defaultMonthlyBudget:
+        row?.defaultMonthlyBudget != null ? parseFloat(row.defaultMonthlyBudget) : DEFAULT_MONTHLY_BUDGET_USD,
+      defaultRateLimit:
+        row?.defaultRateLimitPerHour != null ? Number(row.defaultRateLimitPerHour) : RATE_LIMIT_PER_HOUR,
+      platformMonthlyCap:
+        row?.platformMonthlyCap != null ? parseFloat(row.platformMonthlyCap) : null,
+    };
+  } catch {
+    // Config absent → fall back to constants (do not deny on absence).
+    return {
+      aiEnabled: true,
+      defaultMonthlyBudget: DEFAULT_MONTHLY_BUDGET_USD,
+      defaultRateLimit: RATE_LIMIT_PER_HOUR,
+      platformMonthlyCap: null,
+    };
+  }
+}
+
 // ─── The guard ──────────────────────────────────────────────────────
 
 /**
- * Throw if the tenant has hit the hourly rate limit OR the monthly
- * budget. Call this BEFORE spending on Claude. Fails CLOSED: if either
- * check cannot be verified (DB error), the call is denied — identical
- * to fabric.py's _check_rate_limit / _check_budget contract.
+ * Throw if AI is disabled, the tenant hit its hourly rate limit or monthly
+ * budget, or the platform monthly cap is reached. Call this BEFORE spending.
+ *
+ * Effective limits resolve as: tenant override → platform default → constant.
+ * Fails CLOSED: if a spend check can't be verified (DB error), the call is
+ * denied — identical to fabric.py's contract.
  *
  * @throws AiRateLimitError      hourly limit reached / unverifiable
- * @throws AiBudgetExceededError monthly budget reached / AI disabled / unverifiable
+ * @throws AiBudgetExceededError budget/cap reached, AI disabled, or unverifiable
  */
 export async function assertAgentBudget(tenantId: string): Promise<void> {
+  const platform = await loadPlatformConfig();
+
+  // ── Master switch: AI disabled pipeline-wide ────────────────────
+  if (!platform.aiEnabled) {
+    throw new AiBudgetExceededError('AI is currently disabled.', { aiEnabled: false });
+  }
+
+  // ── Resolve tenant overrides (fail closed if unreadable) ────────
+  let tenantBudget: number | null = null;
+  let tenantRate: number | null = null;
+  let tenantRowExists = false;
+  try {
+    const [cfg] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null }[]>`
+      SELECT monthly_budget, rate_limit_per_hour
+      FROM tenant_agent_config
+      WHERE tenant_id = ${tenantId}::uuid
+    `;
+    if (cfg) {
+      tenantRowExists = true;
+      tenantBudget = cfg.monthlyBudget != null ? parseFloat(cfg.monthlyBudget) : null;
+      tenantRate = cfg.rateLimitPerHour != null ? Number(cfg.rateLimitPerHour) : null;
+    }
+  } catch (err) {
+    console.error('[agent-guard] tenant config read failed, denying call:', err);
+    throw new AiBudgetExceededError('AI config check unavailable; call denied');
+  }
+
+  const effectiveRate = tenantRate ?? platform.defaultRateLimit;
+  const effectiveBudget =
+    tenantRowExists && tenantBudget != null ? tenantBudget : platform.defaultMonthlyBudget;
+
+  // Explicit zero budget means AI is disabled for this tenant.
+  if (effectiveBudget === 0) {
+    throw new AiBudgetExceededError('AI is disabled for this account.', { monthlyBudget: 0 });
+  }
+
   // ── Rate limit: calls in the last rolling hour ──────────────────
   let hourCount: number;
   try {
@@ -101,38 +187,19 @@ export async function assertAgentBudget(tenantId: string): Promise<void> {
     `;
     hourCount = parseInt(row?.cnt ?? '0', 10);
   } catch (err) {
-    // FAIL CLOSED — same as fabric.py::_check_rate_limit.
     console.error('[agent-guard] rate-limit check failed, denying call:', err);
     throw new AiRateLimitError('AI rate-limit check unavailable; call denied');
   }
-  if (hourCount >= RATE_LIMIT_PER_HOUR) {
+  if (hourCount >= effectiveRate) {
     throw new AiRateLimitError(
-      `Hourly AI limit reached (${RATE_LIMIT_PER_HOUR}/hour). Please try again shortly.`,
-      { limit: RATE_LIMIT_PER_HOUR, used: hourCount },
+      `Hourly AI limit reached (${effectiveRate}/hour). Please try again shortly.`,
+      { limit: effectiveRate, used: hourCount },
     );
   }
 
-  // ── Budget: monthly_budget vs sum(cost_usd) this calendar month ──
-  let monthlyBudget: number;
+  // ── Per-tenant budget: sum(cost_usd) this calendar month ────────
   let monthCost: number;
   try {
-    const [cfg] = await sql<{ monthlyBudget: string | null }[]>`
-      SELECT monthly_budget::text AS "monthlyBudget"
-      FROM tenant_agent_config
-      WHERE tenant_id = ${tenantId}::uuid
-    `;
-    monthlyBudget =
-      cfg?.monthlyBudget != null
-        ? parseFloat(cfg.monthlyBudget)
-        : DEFAULT_MONTHLY_BUDGET_USD;
-
-    // Explicit zero budget means AI is disabled for this tenant.
-    if (monthlyBudget === 0) {
-      throw new AiBudgetExceededError('AI is disabled for this account.', {
-        monthlyBudget: 0,
-      });
-    }
-
     const [usage] = await sql<{ total: string }[]>`
       SELECT COALESCE(SUM(cost_usd), 0)::text AS total
       FROM agent_task_log
@@ -141,16 +208,36 @@ export async function assertAgentBudget(tenantId: string): Promise<void> {
     `;
     monthCost = parseFloat(usage?.total ?? '0');
   } catch (err) {
-    // Preserve the intentional "AI disabled" signal; fail closed on the rest.
-    if (err instanceof AppError) throw err;
     console.error('[agent-guard] budget check failed, denying call:', err);
     throw new AiBudgetExceededError('AI budget check unavailable; call denied');
   }
-  if (monthCost >= monthlyBudget) {
+  if (monthCost >= effectiveBudget) {
     throw new AiBudgetExceededError(
-      `Monthly AI budget of $${monthlyBudget.toFixed(2)} reached.`,
-      { monthlyBudget, used: monthCost },
+      `Monthly AI budget of $${effectiveBudget.toFixed(2)} reached.`,
+      { monthlyBudget: effectiveBudget, used: monthCost },
     );
+  }
+
+  // ── Platform-wide cap: total spend across ALL tenants + admin ───
+  if (platform.platformMonthlyCap != null) {
+    let platformCost: number;
+    try {
+      const [usage] = await sql<{ total: string }[]>`
+        SELECT COALESCE(SUM(cost_usd), 0)::text AS total
+        FROM agent_task_log
+        WHERE created_at >= date_trunc('month', now())
+      `;
+      platformCost = parseFloat(usage?.total ?? '0');
+    } catch (err) {
+      console.error('[agent-guard] platform-cap check failed, denying call:', err);
+      throw new AiBudgetExceededError('AI platform-cap check unavailable; call denied');
+    }
+    if (platformCost >= platform.platformMonthlyCap) {
+      throw new AiBudgetExceededError(
+        `Platform AI monthly cap of $${platform.platformMonthlyCap.toFixed(2)} reached.`,
+        { platformMonthlyCap: platform.platformMonthlyCap, used: platformCost },
+      );
+    }
   }
 }
 
