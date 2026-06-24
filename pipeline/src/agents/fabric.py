@@ -97,12 +97,33 @@ logger = logging.getLogger("pipeline.agents")
 MAX_TOOL_ROUNDS = 20
 RATE_LIMIT_PER_HOUR = 50
 DEFAULT_MONTHLY_BUDGET_USD = 50.00
+PER_CALL_CEILING_USD = 0.50  # mid-loop cost ceiling for a single invocation
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
-# Sonnet pricing: $3/M input, $15/M output
+# Sonnet pricing: $3/M input, $15/M output (kept for backwards-compat).
 INPUT_COST_PER_TOKEN = 3.0 / 1_000_000
 OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000
+
+# Per-model pricing in USD per 1M tokens (input, output). Keep in sync
+# with frontend/lib/ai/agent-guard.ts::MODEL_PRICING and the admin usage
+# dashboard (frontend/app/api/admin/agents/usage/route.ts). Costing per
+# model matters because Haiku archetypes are 3x cheaper than Sonnet —
+# billing them all at Sonnet rates overstates spend and trips the budget
+# guard too early.
+MODEL_PRICING = {
+    "claude-sonnet-4-20250514": (3.0, 15.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0),
+}
+# Fallback for an unknown model id — Sonnet (the fabric default), so an
+# unrecognised model is costed conservatively, never as free.
+_DEFAULT_PRICING = (3.0, 15.0)
+
+
+def _cost_for(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Return the USD cost of a call, priced per-model."""
+    in_rate, out_rate = MODEL_PRICING.get(model, _DEFAULT_PRICING)
+    return input_tokens * in_rate / 1_000_000 + output_tokens * out_rate / 1_000_000
 
 
 class AgentFabric:
@@ -283,23 +304,50 @@ class AgentFabric:
         total_input_tokens = 0
         total_output_tokens = 0
         tool_calls_count = 0
+        model = DEFAULT_MODEL  # resolved from archetype below; default for error paths
 
         try:
-            # 2. Check rate limit
+            # 2-3. Cost-control guard. Effective limits resolve as:
+            #   tenant override -> platform default -> hardcoded constant.
+            # Load the pipeline-wide config once and pass it to both checks.
             if tenant_id:
-                rate_ok = await self._check_rate_limit(conn, tenant_id)
+                platform_cfg = await self._load_platform_config(conn)
+
+                # Master switch: AI disabled pipeline-wide.
+                if not platform_cfg["ai_enabled"]:
+                    raise BudgetExceeded("AI is disabled platform-wide")
+
+                rate_ok = await self._check_rate_limit(conn, tenant_id, platform_cfg)
                 if not rate_ok:
                     raise RateLimitExceeded(
-                        f"Tenant {tenant_id} exceeded {RATE_LIMIT_PER_HOUR} calls/hour"
+                        f"Tenant {tenant_id} exceeded the hourly call limit"
                     )
 
-            # 3. Check budget
-            if tenant_id:
-                budget_ok = await self._check_budget(conn, tenant_id)
+                budget_ok = await self._check_budget(conn, tenant_id, platform_cfg)
                 if not budget_ok:
                     raise BudgetExceeded(
-                        f"Tenant {tenant_id} exceeded monthly AI budget"
+                        f"Tenant {tenant_id} exceeded the monthly AI budget or platform cap"
                     )
+
+            # Resolve the effective per-call ceiling (tenant override ->
+            # platform default -> constant) used by the mid-loop cost check.
+            effective_ceiling = PER_CALL_CEILING_USD
+            try:
+                pcfg = platform_cfg if tenant_id else await self._load_platform_config(conn)
+                effective_ceiling = pcfg["default_per_call_ceiling"]
+                if tenant_id:
+                    tcfg = await conn.fetchrow(
+                        "SELECT per_call_ceiling FROM tenant_agent_config WHERE tenant_id = $1",
+                        uuid.UUID(tenant_id),
+                    )
+                    if tcfg and tcfg["per_call_ceiling"] is not None:
+                        effective_ceiling = float(tcfg["per_call_ceiling"])
+            except Exception as exc:
+                logger.warning(
+                    "[per_call_ceiling] resolve failed, using $%.2f: %s",
+                    PER_CALL_CEILING_USD, exc,
+                )
+                effective_ceiling = PER_CALL_CEILING_USD
 
             # 4. Assemble context
             assembled = await self.context_assembler.assemble(
@@ -432,9 +480,12 @@ class AgentFabric:
                     rounds += 1
 
                     # Mid-loop budget check: stop if per-call cost ceiling reached
-                    accumulated_cost = total_input_tokens * INPUT_COST_PER_TOKEN + total_output_tokens * OUTPUT_COST_PER_TOKEN
-                    if accumulated_cost > 0.50:  # $0.50 per-call ceiling
-                        logger.warning("[invoke_agent] per-call cost ceiling reached: $%.4f", accumulated_cost)
+                    accumulated_cost = _cost_for(model, total_input_tokens, total_output_tokens)
+                    if accumulated_cost > effective_ceiling:
+                        logger.warning(
+                            "[invoke_agent] per-call cost ceiling reached: $%.4f (limit $%.4f)",
+                            accumulated_cost, effective_ceiling,
+                        )
                         break
                 else:
                     # Unexpected stop reason (e.g. max_tokens) — stop looping
@@ -445,11 +496,8 @@ class AgentFabric:
                     archetype_name, MAX_TOOL_ROUNDS,
                 )
 
-            # 6. Calculate cost
-            cost_usd = (
-                total_input_tokens * INPUT_COST_PER_TOKEN
-                + total_output_tokens * OUTPUT_COST_PER_TOKEN
-            )
+            # 6. Calculate cost (priced per-model)
+            cost_usd = _cost_for(model, total_input_tokens, total_output_tokens)
 
             duration_ms = int((time.monotonic() - start_time) * 1000)
 
@@ -598,10 +646,7 @@ class AgentFabric:
                     output_tokens=total_output_tokens,
                     tool_calls_count=tool_calls_count,
                     duration_ms=duration_ms,
-                    cost_usd=(
-                        total_input_tokens * INPUT_COST_PER_TOKEN
-                        + total_output_tokens * OUTPUT_COST_PER_TOKEN
-                    ),
+                    cost_usd=_cost_for(model, total_input_tokens, total_output_tokens),
                     error=error_msg,
                 )
             except Exception as log_exc:
@@ -776,15 +821,72 @@ class AgentFabric:
         return results
 
     # ------------------------------------------------------------------
+    # Platform-wide config (pipeline-level, settable by admin)
+    # ------------------------------------------------------------------
+
+    async def _load_platform_config(self, conn) -> dict:
+        """Read the pipeline-wide config singleton (platform_agent_config).
+
+        BEST-EFFORT: a missing table/row (e.g. pre-migration) falls back to the
+        hardcoded constants. Config absence is not a spend-verification failure,
+        so it must NOT disable AI — the spend checks below still fail closed.
+        """
+        fallback = {
+            "ai_enabled": True,
+            "default_monthly_budget": DEFAULT_MONTHLY_BUDGET_USD,
+            "default_rate_limit": RATE_LIMIT_PER_HOUR,
+            "default_per_call_ceiling": PER_CALL_CEILING_USD,
+            "platform_monthly_cap": None,
+        }
+        try:
+            row = await conn.fetchrow(
+                """
+                SELECT default_monthly_budget, default_rate_limit_per_hour,
+                       default_per_call_ceiling, platform_monthly_cap, ai_enabled
+                FROM platform_agent_config
+                WHERE id = TRUE
+                """
+            )
+            if not row:
+                return fallback
+            cap = row["platform_monthly_cap"]
+            return {
+                "ai_enabled": bool(row["ai_enabled"]),
+                "default_monthly_budget": float(row["default_monthly_budget"]),
+                "default_rate_limit": int(row["default_rate_limit_per_hour"]),
+                "default_per_call_ceiling": float(row["default_per_call_ceiling"]),
+                "platform_monthly_cap": float(cap) if cap is not None else None,
+            }
+        except Exception as exc:
+            logger.warning("[platform_config] read failed, using constants: %s", exc)
+            return fallback
+
+    # ------------------------------------------------------------------
     # Rate limit check
     # ------------------------------------------------------------------
 
-    async def _check_rate_limit(self, conn, tenant_id: str) -> bool:
+    async def _check_rate_limit(self, conn, tenant_id: str, platform: dict | None = None) -> bool:
         """Check if tenant has exceeded the hourly rate limit.
 
-        Returns True if within limit, False if exceeded.
+        Effective limit = tenant override (tenant_agent_config.rate_limit_per_hour)
+        -> platform default -> RATE_LIMIT_PER_HOUR. Returns True if within limit,
+        False if exceeded. Fails CLOSED.
         """
         try:
+            if platform is None:
+                platform = await self._load_platform_config(conn)
+
+            cfg = await conn.fetchrow(
+                """
+                SELECT rate_limit_per_hour
+                FROM tenant_agent_config
+                WHERE tenant_id = $1
+                """,
+                uuid.UUID(tenant_id),
+            )
+            tenant_rate = cfg["rate_limit_per_hour"] if cfg else None
+            effective = int(tenant_rate) if tenant_rate is not None else platform["default_rate_limit"]
+
             row = await conn.fetchrow(
                 """
                 SELECT COUNT(*) AS cnt
@@ -795,10 +897,10 @@ class AgentFabric:
                 uuid.UUID(tenant_id),
             )
             count = row["cnt"] if row else 0
-            if count >= RATE_LIMIT_PER_HOUR:
+            if count >= effective:
                 logger.error(
                     "[rate_limit] tenant %s has %d calls in the last hour (limit: %d)",
-                    tenant_id, count, RATE_LIMIT_PER_HOUR,
+                    tenant_id, count, effective,
                 )
                 return False
             return True
@@ -811,15 +913,24 @@ class AgentFabric:
     # Budget check
     # ------------------------------------------------------------------
 
-    async def _check_budget(self, conn, tenant_id: str) -> bool:
-        """Check if tenant has exceeded their monthly AI budget.
+    async def _check_budget(self, conn, tenant_id: str, platform: dict | None = None) -> bool:
+        """Check the tenant monthly budget AND the platform monthly cap.
 
-        Returns True if within budget, False if exceeded.
-        Reads monthly_budget from tenant_agent_config (default $50).
-        Sums cost_usd from agent_task_log for the current calendar month.
+        Effective budget = tenant override (tenant_agent_config.monthly_budget)
+        -> platform default -> DEFAULT_MONTHLY_BUDGET_USD. monthly_budget=0
+        disables AI for the tenant. If a platform_monthly_cap is set, total spend
+        across ALL tenants + admin/system is also checked. Returns True if within
+        all limits, False otherwise. Fails CLOSED.
         """
         try:
-            # Get the tenant's budget config
+            if platform is None:
+                platform = await self._load_platform_config(conn)
+
+            if not platform["ai_enabled"]:
+                logger.info("[budget] AI disabled platform-wide")
+                return False
+
+            # Tenant budget (override -> platform default)
             config_row = await conn.fetchrow(
                 """
                 SELECT monthly_budget
@@ -828,7 +939,10 @@ class AgentFabric:
                 """,
                 uuid.UUID(tenant_id),
             )
-            monthly_budget = float(config_row["monthly_budget"]) if config_row else DEFAULT_MONTHLY_BUDGET_USD
+            if config_row and config_row["monthly_budget"] is not None:
+                monthly_budget = float(config_row["monthly_budget"])
+            else:
+                monthly_budget = platform["default_monthly_budget"]
 
             # Explicit zero budget means AI is disabled for this tenant
             if monthly_budget == 0:
@@ -838,7 +952,7 @@ class AgentFabric:
                 )
                 return False
 
-            # Sum costs for the current calendar month
+            # Sum tenant costs for the current calendar month
             usage_row = await conn.fetchrow(
                 """
                 SELECT COALESCE(SUM(cost_usd), 0) AS total_cost
@@ -856,6 +970,25 @@ class AgentFabric:
                     tenant_id, total_cost, monthly_budget,
                 )
                 return False
+
+            # Platform-wide cap across ALL tenants + admin/system spend
+            cap = platform["platform_monthly_cap"]
+            if cap is not None:
+                platform_row = await conn.fetchrow(
+                    """
+                    SELECT COALESCE(SUM(cost_usd), 0) AS total_cost
+                    FROM agent_task_log
+                    WHERE created_at >= date_trunc('month', now())
+                    """
+                )
+                platform_cost = float(platform_row["total_cost"]) if platform_row else 0.0
+                if platform_cost >= cap:
+                    logger.error(
+                        "[budget] platform monthly cap reached: $%.4f of $%.2f",
+                        platform_cost, cap,
+                    )
+                    return False
+
             return True
         except Exception as exc:
             # Fail CLOSED — deny the call if we can't verify budget

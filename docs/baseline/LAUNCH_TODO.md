@@ -123,7 +123,7 @@ All items in this section are **must-fix before production traffic**. They are a
 
 - [x] **[FE-19]** Implement or remove `GET,PATCH /api/portal/[tenantSlug]/agents/config` 501 stubs — if implementing, add basic agent preference persistence; if deferring, remove stub and hide UI · `frontend/app/api/portal/[tenantSlug]/agents/config/route.ts` · P2 · M · acceptance: either route returns data or route and its UI entry point are removed · source: ARCHITECTURE_V9 §14.2 / DEPRECATION_CANDIDATES §A
 
-- [x] **[FE-20]** Add migration to change `proposal_sections.content` column type from TEXT to JSONB for explicit semantics (currently written with `::jsonb` cast; works but non-explicit) · `db/migrations/` · P2 · S · acceptance: new migration applies cleanly; existing rows round-trip; shredder + section save + canvas load verified · source: AUDIT_PRELAUNCH_20260428 §Audit4-Break4
+- [ ] **[FE-20]** ~~change `proposal_sections.content` TEXT→JSONB~~ — **REVERTED (alignment sweep):** migration 070 broke ~15 readers that read `content` as a JSON string (postgres.js/asyncpg return JSONB as a parsed object); migration 071 reverts to TEXT. Deferred until every reader (frontend save/compliance/package/review/advance/harvest + pipeline context/tools/generate_preview/compliance_reviewer/packaging_specialist) handles objects. · `db/migrations/` · P2 · source: ALIGNMENT_SWEEP.md
 
 ---
 

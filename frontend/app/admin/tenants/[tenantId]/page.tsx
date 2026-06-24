@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
+import { TenantAiConfigCard } from '@/components/admin/tenant-ai-config-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,6 +128,34 @@ export default async function TenantDetailPage({ params }: Props) {
     console.error('[admin/tenants/detail] purchase total failed', e);
   }
 
+  // ── AI budget + limits (per-tenant override vs platform default) ──
+  let aiBudget: number | null = null;
+  let aiRate: number | null = null;
+  let aiCeiling: number | null = null;
+  let defaultBudget = 50;
+  let defaultRate = 50;
+  let defaultCeiling = 0.5;
+  try {
+    const [cfg] = await sql<{ monthlyBudget: string | null; rateLimitPerHour: number | null; perCallCeiling: string | null }[]>`
+      SELECT monthly_budget, rate_limit_per_hour, per_call_ceiling
+      FROM tenant_agent_config
+      WHERE tenant_id = ${tenantId}
+    `;
+    aiBudget = cfg?.monthlyBudget != null ? parseFloat(cfg.monthlyBudget) : null;
+    aiRate = cfg?.rateLimitPerHour ?? null;
+    aiCeiling = cfg?.perCallCeiling != null ? parseFloat(cfg.perCallCeiling) : null;
+    const [platform] = await sql<{ defaultMonthlyBudget: string | null; defaultRateLimitPerHour: number | null; defaultPerCallCeiling: string | null }[]>`
+      SELECT default_monthly_budget, default_rate_limit_per_hour, default_per_call_ceiling
+      FROM platform_agent_config
+      WHERE id = TRUE
+    `;
+    if (platform?.defaultMonthlyBudget != null) defaultBudget = parseFloat(platform.defaultMonthlyBudget);
+    if (platform?.defaultRateLimitPerHour != null) defaultRate = platform.defaultRateLimitPerHour;
+    if (platform?.defaultPerCallCeiling != null) defaultCeiling = parseFloat(platform.defaultPerCallCeiling);
+  } catch (e) {
+    console.error('[admin/tenants/detail] agent config query failed', e);
+  }
+
   // ── Recent events ─────────────────────────────────────────────────
   interface EventRow {
     id: string;
@@ -238,6 +267,17 @@ export default async function TenantDetailPage({ params }: Props) {
           </div>
         </dl>
       </div>
+
+      {/* AI Budget & Limits */}
+      <TenantAiConfigCard
+        tenantId={tenant.id}
+        initialMonthlyBudget={aiBudget}
+        initialRateLimitPerHour={aiRate}
+        initialPerCallCeiling={aiCeiling}
+        defaultMonthlyBudget={defaultBudget}
+        defaultRateLimitPerHour={defaultRate}
+        defaultPerCallCeiling={defaultCeiling}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Users */}

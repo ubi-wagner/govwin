@@ -93,8 +93,10 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Route: `GET /api/admin/tenants`; table: `tenants`.
 
 - [ ] **MA-05** — Click a tenant → `/admin/tenants/[tenantId]`.
-  - Expected: subscription status, user list, proposal list, purchase history all render.
-  - Route: `GET /api/admin/tenants/[tenantId]`; tables: `tenants`, `users`, `proposals`, `purchases`.
+  - Expected: subscription status, user list, proposal list, purchase history, and the
+    **"AI Budget & Limits"** card all render. The card shows the per-tenant budget,
+    rate limit, and per-call ceiling, each with an "Inheriting default (…)" hint when blank.
+  - Route: `GET /api/admin/tenants/[tenantId]`; tables: `tenants`, `users`, `proposals`, `purchases`, `tenant_agent_config`, `platform_agent_config`.
 
 - [ ] **MA-06** — Patch a tenant (e.g. toggle status).
   - Expected: `200` response; `finder:tenant.updated:single` event written; table: `tenants`.
@@ -122,7 +124,27 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `200`; `process_instance_transitions` row written; instance moves to next step.
   - Route: `POST /api/admin/workflows/[instanceId]/advance`.
 
-**master_admin total: 11 steps**
+### 3.5 AI Budget & Limits (settable)
+
+- [ ] **MA-12** — On a tenant profile (`/admin/tenants/[tenantId]`), use the **AI Budget & Limits**
+  card: set monthly budget = `75`, rate limit = `25`, per-call ceiling = `0.30`; Save.
+  - Expected: "Saved." `200`; `finder:agent_config.updated` event; `tenant_agent_config` row
+    has the three values. Reload the page → values persist (read back via SSR).
+  - Then blank the rate-limit field and Save → the hint shows "Inheriting default", and the
+    `tenant_agent_config.rate_limit_per_hour` column is `NULL`.
+  - Then set monthly budget = `0` and Save → the hint shows "AI disabled for this account".
+    (Enforcement is verified live in **VH-20**.)
+  - Route: `PATCH /api/admin/tenants/[tenantId]/agent-config` (also `GET`).
+
+- [ ] **MA-13** — On `/admin/agents`, use the **Pipeline AI Controls** card (master_admin only):
+  change a default (e.g. default budget = `60`), enable the platform monthly cap = `1500`,
+  toggle the AI master switch off then on; Save.
+  - Expected: "Saved." `200`; `system:platform_agent_config.updated` event; the singleton
+    `platform_agent_config` row reflects each change. With AI toggled off, every agent
+    invocation is blocked platform-wide (verify live in **VH-20**); toggle back on before finishing.
+  - Route: `PATCH /api/admin/agents/platform-config` (also `GET`).
+
+**master_admin total: 13 steps**
 
 ---
 
@@ -238,7 +260,16 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: task status → `completed`; workflow instance advances past the `HITL_WAIT` step.
   - Route: `POST /api/admin/tasks` (with `taskId`); table: `tasks`.
 
-**rfp_admin total: 24 steps**
+### 4.9 AI Budget Scope (positive + negative)
+
+- [ ] **RA-25** — Confirm the AI-config scope boundary for rfp_admin:
+  - **Positive:** on a tenant profile, the **AI Budget & Limits** card is usable — set a
+    budget and Save → `200` (`PATCH /api/admin/tenants/[tenantId]/agent-config` is rfp_admin+).
+  - **Negative:** on `/admin/agents`, the **Pipeline AI Controls** card is **NOT** rendered
+    (master_admin-only). A direct `PATCH /api/admin/agents/platform-config` returns `403`
+    (`FORBIDDEN`).
+
+**rfp_admin total: 25 steps**
 
 ---
 
@@ -302,7 +333,19 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: purchase table shows product type, amount, status; `purchases` rows visible.
   - Route: `GET /api/portal/[tenantSlug]/billing` (requires tenant_admin role; partner_user must be blocked).
 
-**tenant_admin total: 11 steps**
+### 5.6 AI Usage (read-only)
+
+- [ ] **TA-12** — Click **AI Usage** in the portal nav (`/portal/[slug]/agents`).
+  - Expected: the page renders **no dollar figures** — total AI calls, "Allocation Used %"
+    bar, "Calls Remaining (this hour) / N", per-agent breakdown, and recent activity. The
+    period toggle (7d/30d/90d) re-queries. If an admin set this tenant's budget to `0`
+    (MA-12), an amber "AI is currently disabled" banner shows and the allocation reads 100%.
+    The "/ N" denominator reflects the tenant's effective rate limit (override or platform default).
+  - Negative: a `tenant_user` does not see the nav link and is redirected from the page;
+    `GET /api/portal/[tenantSlug]/agents/usage` returns `403` for below-tenant_admin.
+  - Route: `GET /api/portal/[tenantSlug]/agents/usage`; tables: `agent_task_log`, `tenant_agent_config`, `platform_agent_config`. No pricing data is ever returned (§7).
+
+**tenant_admin total: 12 steps**
 
 ---
 
@@ -494,7 +537,7 @@ The following must be **manually signed off** before launch. None of these are v
 
 ### 9.9 Deploy-Time Agent Activation (verify after ANTHROPIC_API_KEY + embeddings vars set)
 
-- [ ] **VH-20** — Real agent invocation on deploy: with `ANTHROPIC_API_KEY` set, trigger an `OnProposalAdvancedToReview` event (advance a proposal to `review` stage) and submit an `agent_task_queue` task directly; confirm `agent_task_log` rows are written with a real Claude response (not `{skipped: True}`). Confirm budget/rate guardrails fire on overrun (check `rate_limit_state`). Confirm output is advisory — surfaced via NOTIFY/agent_task_log, never auto-applied to proposal sections.
+- [ ] **VH-20** — Real agent invocation on deploy: with `ANTHROPIC_API_KEY` set, trigger an `OnProposalAdvancedToReview` event (advance a proposal to `review` stage) and submit an `agent_task_queue` task directly; confirm `agent_task_log` rows are written with a real Claude response (not `{skipped: True}`). Confirm budget/rate guardrails fire on overrun: set a low per-tenant budget via the **AI Budget & Limits** card (MA-12) — e.g. `$0.01` or `0` — then re-invoke and confirm the call is **rejected** (status `rejected`, no Claude spend). Repeat for the rate limit (set rate = `1`) and the AI master switch (MA-13: toggle off → all invocations blocked). The cap/limits are read from `tenant_agent_config` / `platform_agent_config`; spend is summed from `agent_task_log` (there is no `rate_limit_state` table). Confirm output is advisory — surfaced via NOTIFY/agent_task_log, never auto-applied to proposal sections.
 
 - [ ] **VH-21** — Activate embeddings (optional): set `EMBEDDINGS_PROVIDER=openai` + `OPENAI_API_KEY`; run `MemoryStore.backfill_embeddings` per memory table (`episodic_memories`, `semantic_memories`, `procedural_memories`); confirm cosine retrieval via `memory.search` tool returns semantically relevant atoms/memories (not just ILIKE keyword matches). Note: Voyage provider needs a `vector(1536)→1024` migration first before switching.
 
@@ -517,6 +560,6 @@ Do not expect these features to work. The tester should confirm they are dormant
 | Social posting — LinkedIn/Twitter | 🔴 Stub | `social_poster.py` adapters raise `NotImplementedError`. Posts are queued in the DB but never sent. CMS-01 fix wraps this gracefully; the tester should confirm `failed` status rather than a crashed worker. |
 | Recurring CMS campaigns | 🟡 Partial | `campaign_executor.py:342` defers recurring campaigns to V2. One-time campaigns work; recurring does not. |
 | PPTX/XLSX export | 🟦 Unwired | `pptx-exporter.ts` and `xlsx-exporter.ts` exist but are not connected to any export route. Only DOCX export is live. |
-| `/api/portal/[tenantSlug]/agents/config` | 🟦 501 stub | Returns 501. Agent configuration UI renders but the API is unimplemented (P2-18). |
+| `/portal/[tenantSlug]/agents` (AI Usage) | ✅ Live | Read-only usage view (tenant_admin+): total calls, allocation used %, calls-remaining-this-hour, per-agent breakdown, recent activity — no pricing/$ (§7). Effective rate/budget resolve tenant→platform. Customer-settable AI config is intentionally not offered; admins set per-tenant limits (MA-12). |
 | `pgvector` semantic search | 🟦 Zero-vector V1 | Memory tables have HNSW indexes but all stored embeddings are zero-vector placeholders. Similarity search is ILIKE text-only. Real embeddings are Phase 4. |
 | `ScoringEngine` class in `scoring/engine.py` | 💀 Dead code | Zero callers confirmed by grep. Live scoring is `match_tenants()` in `workflows/actions/score_tenants.py`. |

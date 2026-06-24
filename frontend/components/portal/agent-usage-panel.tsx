@@ -22,6 +22,8 @@ interface UsageData {
     totalCalls: number;
     budgetUsedPct: number;
     callsRemainingThisHour: number;
+    rateLimitPerHour?: number;
+    aiEnabled?: boolean;
   };
   byAgent: AgentBreakdown[];
   recentActivity: RecentActivity[];
@@ -115,6 +117,13 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
         </div>
       </div>
 
+      {/* AI-disabled banner (budget 0 for this tenant, or paused platform-wide) */}
+      {data.summary.aiEnabled === false && (
+        <div className="mb-4 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          AI is currently disabled for your account. Contact your administrator to enable it.
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="border border-gray-200 rounded-lg p-3">
@@ -122,14 +131,19 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
           <p className="text-xl font-bold mt-1">{data.summary.totalCalls}</p>
         </div>
         <div className="border border-gray-200 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Budget Used</p>
+          <p className="text-xs text-gray-500">Allocation Used</p>
           <p className={`text-xl font-bold mt-1 ${budgetColor}`}>
             {data.summary.budgetUsedPct}%
           </p>
         </div>
         <div className="border border-gray-200 rounded-lg p-3">
           <p className="text-xs text-gray-500">Calls Remaining (this hour)</p>
-          <p className="text-xl font-bold mt-1">{data.summary.callsRemainingThisHour}</p>
+          <p className="text-xl font-bold mt-1">
+            {data.summary.callsRemainingThisHour}
+            {data.summary.rateLimitPerHour != null && (
+              <span className="text-sm font-normal text-gray-400"> / {data.summary.rateLimitPerHour}</span>
+            )}
+          </p>
         </div>
       </div>
 

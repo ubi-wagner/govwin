@@ -104,7 +104,7 @@ Proposal workspace has three concurrent AI paths:
 │  │   Customer portal        │   │   Dispatcher / ingesters │                    │
 │  │   Marketing site         │   │   Shredder / scorer      │                    │
 │  │   138 API routes         │   │   Workflow processor     │                    │
-│  │   32-tool registry       │   │   Memory lifecycle       │                    │
+│  │   33-tool registry       │   │   Memory lifecycle       │                    │
 │  │   NextAuth v5 / RBAC     │   │   Source scout           │                    │
 │  │   Anthropic calls direct │   │   Health server :8080    │                    │
 │  └──────────┬───────────────┘   └──────────────┬───────────┘                    │
@@ -247,9 +247,10 @@ Tools by category:
 | Memory | `memory.search`, `memory.write` |
 | Opportunity | `opportunity.add_topic`, `opportunity.bulk_add_topics`, `opportunity.get_by_id`, `opportunity.update_topic` |
 | Proposal | `proposal.draft_section` (calls Anthropic Sonnet directly) |
-| Solicitation | `solicitation.approve`, `solicitation.claim`, `solicitation.delete_annotation`, `solicitation.dismiss`, `solicitation.push`, `solicitation.reject_review`, `solicitation.release`, `solicitation.request_review`, `solicitation.return_to_curation`, `solicitation.shred_sync`, `solicitation.skip_shredder` |
+| Solicitation | `solicitation.approve`, `solicitation.claim`, `solicitation.delete_annotation`, `solicitation.dismiss`, `solicitation.push`, `solicitation.reject_review`, `solicitation.release`, `solicitation.request_review` |
 | Ingest | `ingest.get_run_detail`, `ingest.list_recent_runs`, `ingest.trigger_manual` |
-| Source | `source-scout` (silently swallows Claude errors — 🟡 gap) |
+| Source | `finder.scout_source` |
+| Other | `solicitation.get_detail`, `solicitation.list_triage`, `solicitation.save_annotation`, `volume.*` (5), document import/analytics (see `lib/tools/index.ts` for the canonical 33) |
 | Other | Additional tools for document import, analytics |
 
 Required role for each tool is checked via `tool.requiredRole` before execution. Zod schemas validate all inputs.

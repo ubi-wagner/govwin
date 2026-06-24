@@ -16,7 +16,8 @@ import { z } from 'zod';
 import { defineTool } from './base';
 import { createNode } from '@/lib/types/canvas-document';
 import type { CanvasNode, HeadingContent, TextBlockContent, ListContent } from '@/lib/types/canvas-document';
-import { ToolExecutionError, ToolExternalError } from './errors';
+import { ToolAuthorizationError, ToolExecutionError, ToolExternalError } from './errors';
+import { assertAgentBudget, recordAgentSpend } from '@/lib/ai/agent-guard';
 
 // ─── Input schema ──────────────────────────────────────────────────
 
@@ -328,8 +329,46 @@ export const proposalDraftSectionTool = defineTool<Input, Output>({
     const actorName = ctx.actor.email ?? actorId;
 
     if (process.env.ANTHROPIC_API_KEY) {
+      // Tenant scope is guaranteed by the registry (tenantScoped: true);
+      // assert for type-narrowing + defense in depth.
+      const tenantId = ctx.tenantId;
+      if (!tenantId) {
+        throw new ToolAuthorizationError('proposal.draft_section requires tenant scope');
+      }
+
+      // Enforce the unified per-tenant AI rate limit + monthly budget
+      // BEFORE spending. Throws AiRateLimitError (429) / AiBudgetExceededError
+      // (402); the registry re-raises AppError subclasses as-is.
+      await assertAgentBudget(tenantId);
+
       ctx.log.info({ proposalId: input.proposalId, section: input.sectionTitle }, 'Drafting section with Claude');
-      return draftWithClaude(input, actorId, actorName);
+
+      const startedAt = Date.now();
+      let out: Output | undefined;
+      let draftErr: unknown;
+      try {
+        out = await draftWithClaude(input, actorId, actorName);
+        return out;
+      } catch (err) {
+        draftErr = err;
+        throw err;
+      } finally {
+        // Record the attempt in the unified ledger: bills cost_usd to the
+        // monthly budget and counts as one call toward the hourly limit.
+        await recordAgentSpend({
+          tenantId,
+          agentRole: 'section_drafter',
+          taskType: 'proposal.draft_section',
+          model: out?.model ?? 'claude-sonnet-4-20250514',
+          inputTokens: out?.inputTokens ?? 0,
+          outputTokens: out?.outputTokens ?? 0,
+          durationMs: Date.now() - startedAt,
+          proposalId: input.proposalId,
+          error: draftErr
+            ? (draftErr instanceof Error ? draftErr.message : String(draftErr)).slice(0, 500)
+            : null,
+        });
+      }
     }
 
     ctx.log.warn({ proposalId: input.proposalId, section: input.sectionTitle }, 'No ANTHROPIC_API_KEY — returning error');

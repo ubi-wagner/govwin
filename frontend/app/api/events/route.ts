@@ -148,6 +148,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // Namespace must be one of the 7 canonical values (enforced at the DB by the
+    // system_events_namespace_chk CHECK from migration 069). Validate here so a bad
+    // value returns a clean 422 instead of a raw CHECK violation surfacing as a 500.
+    const ALLOWED_NAMESPACES = ['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool'];
+    if (!ALLOWED_NAMESPACES.includes(body.namespace)) {
+      return NextResponse.json(
+        { error: 'Invalid namespace', code: 'VALIDATION_ERROR' },
+        { status: 422 },
+      );
+    }
+
     // ── Insert event ─────────────────────────────────────────────
     try {
       const [event] = await sql<{ id: string }[]>`

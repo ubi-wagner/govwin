@@ -194,8 +194,6 @@ class EmbeddingProvider:
 
     async def _embed_openai(self, text: str) -> list[float]:
         """Call the OpenAI embeddings endpoint (async via AsyncOpenAI)."""
-        import asyncio
-
         client = self._openai.AsyncOpenAI()
         response = await client.embeddings.create(
             model=self.OPENAI_MODEL,
