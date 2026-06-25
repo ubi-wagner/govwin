@@ -214,6 +214,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       itemName: string;
       itemType: string;
       pageLimit: number | null;
+      volumeName: string | null;
+      volumeNumber: number | null;
     }> = [];
 
     let globalItemIndex = 0;
@@ -225,6 +227,8 @@ export async function POST(request: Request, ctx: RouteContext) {
           itemName: item.itemName as string,
           itemType: item.itemType as string,
           pageLimit: (item.pageLimit as number) ?? null,
+          volumeName: (vol.volumeName as string) ?? null,
+          volumeNumber: (vol.volumeNumber as number) ?? null,
         });
       }
     }
@@ -266,14 +270,17 @@ export async function POST(request: Request, ctx: RouteContext) {
           // Insert the section row first to get its id
           const [section] = await tx<{ id: string }[]>`
             INSERT INTO proposal_sections (
-              proposal_id, section_number, title, content, status, page_allocation
+              proposal_id, section_number, title, content, status, page_allocation,
+              volume_name, volume_number
             ) VALUES (
               ${proposalRow.id},
               ${String(item.itemNumber)},
               ${item.itemName},
               ${null},
               'empty',
-              ${item.pageLimit}
+              ${item.pageLimit},
+              ${item.volumeName},
+              ${item.volumeNumber}
             )
             RETURNING id
           `;
@@ -311,13 +318,16 @@ export async function POST(request: Request, ctx: RouteContext) {
         // No required items defined — create a single default section
         await tx`
           INSERT INTO proposal_sections (
-            proposal_id, section_number, title, content, status
+            proposal_id, section_number, title, content, status,
+            volume_name, volume_number
           ) VALUES (
             ${proposalRow.id},
             '1',
             'Technical Volume',
             ${null},
-            'empty'
+            'empty',
+            'Technical Volume',
+            1
           )
         `;
         count = 1;

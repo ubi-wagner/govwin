@@ -20,6 +20,8 @@ describe('describeEvent', () => {
     expect(describeEvent({ namespace: 'capture', type: 'topic.pinned', phase: 'single' })).toBe('Opportunity pinned');
     const saved = describeEvent({ namespace: 'proposal', type: 'section.saved', phase: 'single', payload: { title: 'Technical Volume' } });
     expect(saved).toBe('Section saved: Technical Volume');
+    expect(describeEvent({ namespace: 'proposal', type: 'section.locked', phase: 'single', payload: { title: 'Cost Volume' } })).toBe('Section accepted & locked: Cost Volume');
+    expect(describeEvent({ namespace: 'proposal', type: 'section.unlocked', phase: 'single', payload: {} })).toBe('Section reopened');
   });
 
   it('never returns the broken ${namespace}.${type} double-prefix', () => {
@@ -45,6 +47,7 @@ describe('eventHref', () => {
   it('links proposal events to the workspace, section events to the section', () => {
     expect(eventHref(slug, { namespace: 'proposal', type: 'proposal.advanced', payload: { proposalId: 'p1' } })).toBe('/portal/acme/proposals/p1');
     expect(eventHref(slug, { namespace: 'proposal', type: 'section.saved', payload: { proposalId: 'p1', sectionId: 's1' } })).toBe('/portal/acme/proposals/p1/sections/s1');
+    expect(eventHref(slug, { namespace: 'proposal', type: 'section.locked', payload: { proposalId: 'p1', sectionId: 's1' } })).toBe('/portal/acme/proposals/p1/sections/s1');
   });
   it('links library + opportunity + profile events to their surfaces', () => {
     expect(eventHref(slug, { namespace: 'library', type: 'file.uploaded', payload: {} })).toBe('/portal/acme/library');

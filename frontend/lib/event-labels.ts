@@ -53,6 +53,8 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   // ── Sections / content ──────────────────────────────────────────────
   'section.saved': (p) => `Section saved${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.exported': 'Section exported',
+  'section.locked': (p) => `Section accepted & locked${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'section.unlocked': (p) => `Section reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
 
   // ── Collaboration ───────────────────────────────────────────────────
   'comment.created': 'Comment added',
@@ -158,7 +160,8 @@ export function eventHref(tenantSlug: string, ev: EventLike): string | null {
   const opportunityId = str(p.opportunityId) ?? str(p.opportunity_id) ?? str(p.topicId);
 
   if (proposalId) {
-    if (sectionId && (ev.type === 'section.saved' || ev.type === 'section.exported' || ev.type === 'comment.created')) {
+    const sectionEvents = ['section.saved', 'section.exported', 'section.locked', 'section.unlocked', 'comment.created'];
+    if (sectionId && sectionEvents.includes(ev.type)) {
       return `${base}/proposals/${proposalId}/sections/${sectionId}`;
     }
     return `${base}/proposals/${proposalId}`;
