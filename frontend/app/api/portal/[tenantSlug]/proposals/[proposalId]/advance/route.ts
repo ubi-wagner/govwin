@@ -177,12 +177,33 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Update proposal stage + record history (transactional) ──────
     // Gate check is inside the transaction to prevent TOCTOU races.
-    let sectionsSnapshot: { section_id: string; title: string; version: number; status: string; char_count: number }[] = [];
+    let sectionsSnapshot: { section_id: string; title: string; version: number; status: string; char_count: number; locked: boolean }[] = [];
     let completeSections = 0;
     let approvedSections = 0;
+    let lockedSections = 0;
+    let forcedOpenSections: { sectionId: string; title: string; volumeName: string | null }[] = [];
     try {
       await sql.begin(async (tx: any) => {
-        // ── Check gate requirements inside transaction ────────────
+        // ── Gate: every section must be accepted + locked (all documents
+        //    closed) before the proposal advances as one unit. force=true
+        //    overrides but records the still-open sections as the audit trail
+        //    ("forced to advance and marking open sections").
+        const openSections = await tx<{ id: string; title: string; volumeName: string | null }[]>`
+          SELECT id, title, volume_name
+          FROM proposal_sections
+          WHERE proposal_id = ${proposalId}::uuid AND is_locked = false
+          ORDER BY volume_number NULLS LAST, section_number
+        `;
+        if (openSections.length > 0 && !body.force) {
+          throw new Error('SECTIONS_NOT_LOCKED:' + JSON.stringify(
+            openSections.map((s: { id: string; title: string; volumeName: string | null }) =>
+              ({ sectionId: s.id, title: s.title, volumeName: s.volumeName })),
+          ));
+        }
+        forcedOpenSections = openSections.map((s: { id: string; title: string; volumeName: string | null }) =>
+          ({ sectionId: s.id, title: s.title, volumeName: s.volumeName }));
+
+        // ── Check legacy manual gate requirements inside transaction ──
         try {
           const unmetGates = await tx`
             SELECT label FROM stage_gate_requirements
@@ -212,22 +233,25 @@ export async function POST(request: Request, ctx: RouteContext) {
           version: number;
           status: string;
           content: string | null;
+          isLocked: boolean;
         }[]>`
-          SELECT id, title, version, status, content
+          SELECT id, title, version, status, content, is_locked
           FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid
           ORDER BY section_number
         `;
 
-        sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null }) => ({
+        sectionsSnapshot = sections.map((s: { id: string; title: string; version: number; status: string; content: string | null; isLocked: boolean }) => ({
           section_id: s.id,
           title: s.title,
           version: s.version,
           status: s.status,
           char_count: s.content ? s.content.length : 0,
+          locked: s.isLocked,
         }));
 
         completeSections = sections.filter((s: { status: string }) => s.status === 'complete' || s.status === 'approved').length;
         approvedSections = sections.filter((s: { status: string }) => s.status === 'approved').length;
+        lockedSections = sections.filter((s: { isLocked: boolean }) => s.isLocked).length;
 
         // ── 2. Insert stage completion snapshot ────────────────────
         await tx`
@@ -326,6 +350,15 @@ export async function POST(request: Request, ctx: RouteContext) {
           details: { unmet: unmetLabels }
         }, { status: 422 });
       }
+      if (e instanceof Error && e.message.startsWith('SECTIONS_NOT_LOCKED:')) {
+        const openSections = JSON.parse(e.message.replace('SECTIONS_NOT_LOCKED:', ''));
+        await emitEventEnd(startId, { error: { message: 'Sections not locked', code: 'SECTIONS_NOT_LOCKED' } });
+        return NextResponse.json({
+          error: 'Every section must be accepted & locked before advancing (use force to override)',
+          code: 'SECTIONS_NOT_LOCKED',
+          details: { openSections },
+        }, { status: 422 });
+      }
       console.error('[portal/proposals/advance] stage update failed:', e);
       await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
@@ -341,6 +374,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalTitle: proposal.title,
         previousStage,
         targetStage,
+        forced: !!body.force,
+        forcedOpenSections,
+        sectionsLocked: lockedSections,
         ...(shouldLock ? { effectiveStage: 'submitted' } : {}),
         locked: shouldLock,
         lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
@@ -364,6 +400,9 @@ export async function POST(request: Request, ctx: RouteContext) {
                   sections_accepted: sectionsSnapshot.length,
                   sections_complete: completeSections,
                   sections_approved: approvedSections,
+                  sections_locked: lockedSections,
+                  forced: !!body.force,
+                  forced_open: forcedOpenSections.length,
                 })}::jsonb)
       `;
     } catch (logErr) {
