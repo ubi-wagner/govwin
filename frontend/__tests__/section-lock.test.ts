@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveUserAccessMock, emitEventSingleMock } =
+const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveUserAccessMock, emitEventSingleMock, harvestMock } =
   vi.hoisted(() => ({
     authMock: vi.fn(),
     sqlMock: vi.fn(),
@@ -13,6 +13,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveU
     verifyTenantAccessMock: vi.fn(),
     resolveUserAccessMock: vi.fn(),
     emitEventSingleMock: vi.fn(),
+    harvestMock: vi.fn(),
   }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
@@ -22,6 +23,7 @@ vi.mock('@/lib/db', () => ({
   verifyTenantAccess: verifyTenantAccessMock,
 }));
 vi.mock('@/lib/proposal-access', () => ({ resolveUserAccess: resolveUserAccessMock }));
+vi.mock('@/lib/proposal-harvest', () => ({ harvestSectionToLibrary: harvestMock }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,
   userActor: (id: string, email?: string) => ({ type: 'user', id, email }),
@@ -50,10 +52,14 @@ function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFoun
     const q = Array.isArray(strings) ? strings.join('?') : String(strings);
     if (q.includes('FROM proposal_sections s')) {
       return Promise.resolve(
-        sectionFound ? [{ stage: 'draft', sectionId: SECTION, title: 'Technical Approach', volumeName: 'Technical Volume' }] : [],
+        sectionFound
+          ? [{ stage: 'draft', sectionId: SECTION, title: 'Technical Approach', volumeName: 'Technical Volume', volumeNumber: 1, content: null, version: 1 }]
+          : [],
       );
     }
-    return Promise.resolve([]); // UPDATE
+    // Document-close + proposal-ready counts: report all sections locked.
+    if (q.includes('count(*)')) return Promise.resolve([{ total: 1, locked: 1 }]);
+    return Promise.resolve([]); // UPDATE / INSERT
   });
 }
 
@@ -64,6 +70,7 @@ beforeEach(() => {
   verifyTenantAccessMock.mockReset();
   resolveUserAccessMock.mockReset();
   emitEventSingleMock.mockReset().mockResolvedValue(undefined);
+  harvestMock.mockReset().mockResolvedValue({ atomsHarvested: 0, atomsSkipped: 0 });
 });
 
 describe('POST section lock (accept + lock)', () => {
@@ -106,6 +113,17 @@ describe('POST section lock (accept + lock)', () => {
         tenantId: TENANT,
         payload: expect.objectContaining({ proposalId: PROPOSAL, sectionId: SECTION, stage: 'draft', volumeName: 'Technical Volume' }),
       }),
+    );
+
+    // Option 1 — the accepted section is harvested to the tenant library.
+    expect(harvestMock).toHaveBeenCalledWith(TENANT, PROPOSAL, SECTION, USER);
+
+    // With all sections locked, the document closes and the proposal signals ready.
+    expect(emitEventSingleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'document.locked', payload: expect.objectContaining({ volumeName: 'Technical Volume' }) }),
+    );
+    expect(emitEventSingleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'proposal.ready_to_advance' }),
     );
   });
 });

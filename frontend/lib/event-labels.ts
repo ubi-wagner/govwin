@@ -42,6 +42,9 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
     `Proposal advanced to ${str(p.targetStage) ?? str(p.toStage) ?? str(p.stage) ?? 'the next stage'}`,
   'proposal.stage_advanced': (p) =>
     `Proposal advanced to ${str(p.targetStage) ?? str(p.toStage) ?? str(p.stage) ?? 'the next stage'}`,
+  'proposal.ready_to_advance': 'All sections locked — ready to advance',
+  'document.locked': (p) =>
+    `Document complete & locked${str(p.volumeName) ? `: ${str(p.volumeName)}` : ''}`,
   'proposal.locked': 'Proposal locked for admin review',
   'proposal.unlocked': 'Proposal unlocked for editing',
   'proposal.ready_for_customer': 'Proposal ready for your input',
@@ -55,6 +58,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'section.exported': 'Section exported',
   'section.locked': (p) => `Section accepted & locked${str(p.title) ? `: ${str(p.title)}` : ''}`,
   'section.unlocked': (p) => `Section reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'section.harvested': 'Accepted content saved to library',
 
   // ── Collaboration ───────────────────────────────────────────────────
   'comment.created': 'Comment added',
