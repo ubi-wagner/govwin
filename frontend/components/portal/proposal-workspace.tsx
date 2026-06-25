@@ -25,6 +25,9 @@ interface SectionItem {
   completedAt?: string | null;
   acceptedByName?: string | null;
   isEditable?: boolean;
+  isLocked?: boolean;
+  volumeName?: string | null;
+  volumeNumber?: number | null;
 }
 
 interface StageHistoryEntry {
