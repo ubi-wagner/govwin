@@ -116,9 +116,15 @@ HITL §6.5 updated.*
   most used / most recent**. Falls back to the category-based `library.search_atoms` in admin
   context (no tenant/section). Tag/bucket-scoped now; embedding-ranked in Phase-4. Validated
   against a live Postgres (assembled scoped + fallback queries run).
-- 🔴 **C5 · P1 · [∥]** Spotlight bucket taxonomy + per-bucket scoring. `spotlights` is filter-only.
-  **Green:** classification (technology/innovation/service-offering, readiness, capabilities,
-  prior funding) + `spotlight_bucket_score` per opp×bucket; opp shows rank per active bucket.
+- 🟢 **C5 · P1 · [∥] · SHIPPED** Spotlight bucket taxonomy + per-bucket scoring. Fixed bucket
+  taxonomy (technology_innovation / service_offering / capabilities / readiness / prior_funding) +
+  `spotlight_bucket_scores` per (tenant × opp × bucket) (mig 081). The pipeline scorer
+  (`score_tenants.match_tenants`) computes each bucket via `_calculate_bucket_scores` — a
+  deterministic re-weighting of the existing match signals (naics/keyword/agency/set-aside/timeline)
+  into 0-100 per bucket — and upserts them (single unnest statement, best-effort). The spotlight
+  **detail page shows the opp's rank per active bucket** ("#2 of 12") via a read-time window query.
+  Validated against a live Postgres (mig + unnest upsert + rank window). Pipeline +7 bucket tests.
+  *Rank is read-time (always fresh); the bucket weights are a tunable v1 heuristic.*
 - 🔴 **C6 · P2 · [∥]** Opportunity lifecycle: archive-on-close + reconstitution / close-date change
   / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
 - 🟢 **C7 · P1 · [∥] · CLOSED** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —

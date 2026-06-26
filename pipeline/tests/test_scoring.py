@@ -23,7 +23,11 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from workflows.actions.score_tenants import _calculate_match_scores
+from workflows.actions.score_tenants import (
+    _calculate_match_scores,
+    _calculate_bucket_scores,
+    SPOTLIGHT_BUCKETS,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -394,3 +398,64 @@ class TestTotalScore:
 async def test_match_tenants_requires_live_db():
     from workflows.actions.score_tenants import match_tenants
     await match_tenants(conn=None, solicitation_id="00000000-0000-0000-0000-000000000000")
+
+
+# ---------------------------------------------------------------------------
+# Spotlight bucket scoring (C5) — _calculate_bucket_scores
+# ---------------------------------------------------------------------------
+
+class TestBucketScores:
+    """Per-bucket scores are deterministic, 0-100, and derived from the existing
+    match component scores."""
+
+    def _scores(self, **overrides) -> dict:
+        base = {
+            "total_score": 0, "naics_score": 0, "keyword_score": 0,
+            "agency_score": 0, "set_aside_score": 0, "type_score": 0,
+            "timeline_score": 0, "matched_keywords": [],
+        }
+        base.update(overrides)
+        return base
+
+    def test_returns_all_five_buckets(self):
+        out = _calculate_bucket_scores(self._scores())
+        assert set(out.keys()) == set(SPOTLIGHT_BUCKETS)
+
+    def test_zero_signals_zero_buckets(self):
+        out = _calculate_bucket_scores(self._scores())
+        assert all(v == 0 for v in out.values())
+
+    def test_all_scores_clamped_0_100(self):
+        # Max out every component; every bucket must stay within [0, 100].
+        out = _calculate_bucket_scores(self._scores(
+            naics_score=30, keyword_score=25, agency_score=20,
+            set_aside_score=10, timeline_score=5,
+        ))
+        assert all(0 <= v <= 100 for v in out.values())
+
+    def test_keyword_drives_technology_innovation(self):
+        out = _calculate_bucket_scores(self._scores(keyword_score=25))
+        assert out["technology_innovation"] == 100  # 25 * 4.0, clamped
+        # A bucket that doesn't weight keyword stays low.
+        assert out["prior_funding"] == 0
+
+    def test_agency_drives_prior_funding_and_capabilities(self):
+        out = _calculate_bucket_scores(self._scores(agency_score=20))
+        assert out["prior_funding"] == 80   # 20 * 4.0
+        assert out["capabilities"] == 40    # 20 * 2.0
+        assert out["technology_innovation"] == 0
+
+    def test_readiness_uses_timeline_and_set_aside(self):
+        out = _calculate_bucket_scores(self._scores(timeline_score=5, set_aside_score=10))
+        # 5*8 + 10*6 = 100, clamped
+        assert out["readiness"] == 100
+
+    def test_integration_with_match_scores_shape(self):
+        # The output of _calculate_match_scores feeds straight in.
+        scores = _calculate_match_scores(
+            _sol(naics_codes=["541715"], agency="DARPA"),
+            _profile(naics_codes=["541715"], target_agencies=["DARPA"]),
+        )
+        out = _calculate_bucket_scores(scores)
+        assert set(out.keys()) == set(SPOTLIGHT_BUCKETS)
+        assert all(isinstance(v, int) and 0 <= v <= 100 for v in out.values())

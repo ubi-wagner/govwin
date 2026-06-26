@@ -273,6 +273,28 @@ async def match_tenants(
                 )
                 upserts += 1
 
+                # Per-bucket scores (C5) — one statement via unnest. Best-effort:
+                # a failure here must not drop the tenant_pipeline_items upsert.
+                try:
+                    bucket_scores = _calculate_bucket_scores(scores)
+                    await conn.execute(
+                        """INSERT INTO spotlight_bucket_scores
+                             (tenant_id, opportunity_id, bucket, score)
+                           SELECT $1, $2, b.bucket, b.score
+                           FROM unnest($3::text[], $4::int[]) AS b(bucket, score)
+                           ON CONFLICT (tenant_id, opportunity_id, bucket) DO UPDATE SET
+                             score = EXCLUDED.score, updated_at = now()""",
+                        profile["tenant_id"],
+                        opportunity_id,
+                        list(bucket_scores.keys()),
+                        list(bucket_scores.values()),
+                    )
+                except Exception as bkt_exc:
+                    log.warning(
+                        "match_tenants: bucket scoring failed for tenant %s opp %s: %s",
+                        profile["tenant_id"], opportunity_id, bkt_exc,
+                    )
+
                 if total_score >= notification_threshold:
                     tenant_ids_above_threshold.add(str(profile["tenant_id"]))
 
@@ -421,3 +443,42 @@ def _calculate_match_scores(sol: Any, profile: Any) -> dict[str, Any]:
         "timeline_score": timeline_score,
         "matched_keywords": matched_kw[:20],  # cap array size
     }
+
+
+# ── Spotlight bucket scoring (C5) ─────────────────────────────────────
+# A v1 heuristic that re-weights the existing match component scores into the
+# fixed opportunity-classification buckets, normalized to 0-100. The component
+# maxima are naics 30 / keyword 25 / agency 20 / set_aside 10 / timeline 5, so
+# the multipliers below lift each bucket toward a 0-100 range. The exact weights
+# are tunable; the contract (a 0-100 score per bucket, derived deterministically
+# from real signals) is what spotlight_bucket_scores stores.
+SPOTLIGHT_BUCKETS = (
+    "technology_innovation",
+    "service_offering",
+    "capabilities",
+    "readiness",
+    "prior_funding",
+)
+
+_BUCKET_WEIGHTS: dict[str, dict[str, float]] = {
+    # Tech/keyword overlap is the innovation-fit signal.
+    "technology_innovation": {"keyword_score": 4.0},
+    # What the tenant offers — industry (NAICS) + keyword overlap.
+    "service_offering": {"naics_score": 1.7, "keyword_score": 1.7},
+    # Domain + customer fit — NAICS + agency alignment.
+    "capabilities": {"naics_score": 2.0, "agency_score": 2.0},
+    # Eligibility + timing — set-aside fit + how soon it closes.
+    "readiness": {"set_aside_score": 6.0, "timeline_score": 8.0},
+    # Agency relationship + set-aside as a prior-funding/incumbency proxy.
+    "prior_funding": {"agency_score": 4.0, "set_aside_score": 4.0},
+}
+
+
+def _calculate_bucket_scores(scores: dict) -> dict[str, int]:
+    """Map the match component scores into the fixed spotlight buckets (0-100
+    each). Pure + deterministic so it is unit-testable."""
+    out: dict[str, int] = {}
+    for bucket, weights in _BUCKET_WEIGHTS.items():
+        raw = sum(float(scores.get(comp, 0) or 0) * w for comp, w in weights.items())
+        out[bucket] = max(0, min(100, int(round(raw))))
+    return out
