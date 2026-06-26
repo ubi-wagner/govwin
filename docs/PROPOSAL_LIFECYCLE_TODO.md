@@ -112,8 +112,11 @@ HITL §6.5 updated.*
   prior funding) + `spotlight_bucket_score` per opp×bucket; opp shows rank per active bucket.
 - 🔴 **C6 · P2 · [∥]** Opportunity lifecycle: archive-on-close + reconstitution / close-date change
   / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
-- 🔴 **C7 · P1 · [∥]** Pipeline automation + **AI-agent review tasking** at the workflow
-  step-milestones. The pipeline is a workflow; hang automation off the existing step milestones +
+- 🟡 **C7 · P1 · [∥]** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —
+  customer automation setup (mig 076 `tenant_automation_preferences` + portal API + Automation
+  page). Increments 2 (AI review on advance → section context boxes) + 3 (notification/flow
+  enforcement) are designed + infra-ready in `PROPOSAL_LIFECYCLE_V1.md` §C3.* Remaining at the
+  workflow step-milestones: The pipeline is a workflow; hang automation off the existing step milestones +
   outcome hooks, **configured by the customer admin at portal purchase** (start there), then run
   the code through and fill gaps with the most common proposal-dev automations. Driven by
   already-emitted events: `document.locked`→collaborator "get-ready" emails;

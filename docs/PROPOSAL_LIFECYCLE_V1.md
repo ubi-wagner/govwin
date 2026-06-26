@@ -271,6 +271,50 @@ items are integration seams + UX completeness (§9) and roadmap (§10).
 
 ---
 
+## C3 — Automation & AI-Agent Review (design + status)
+
+Grounded in a full inventory of the automation, workflow, agent, purchase, and
+section-feedback subsystems. **Much of this is already built** — the work is wiring,
+tenant-scoping, and one cross-stack write-back.
+
+**Increment 1 — customer automation setup · 🟢 SHIPPED.** `tenant_automation_preferences`
+(mig 076) + `/api/portal/[slug]/automation-preferences` (GET/PATCH, tenant_admin) + the
+**Automation** portal page (grouped toggles). Conservative defaults; `configured_at` marks
+setup. This is the "set it up at portal purchase" surface (a dashboard "get started" nudge +
+post-purchase redirect is a small follow-on).
+
+**Increment 2 — AI review on (force-)advance → section context boxes · 🔴 designed, infra-ready.**
+The agent infra is production-ready: `agent_task_queue` + `fabric.process_task_queue` (running
+every 20s, cost-guarded by the settable limits) + the wired `ColorTeamReviewer`/`ComplianceReviewer`
+archetypes + `requestAgentTask()` enqueue. The only missing link is the trigger + the write-back:
+  1. **Trigger** — in the advance route, after a successful advance, if the tenant's
+     `ai_review_on_advance` pref is on, enqueue one `review_section` task per locked section via
+     `requestAgentTask({ agentRole:'color_team_reviewer', taskType:'review_section', proposalId,
+     sectionId, input:{ requestedBy, sectionTitle, sectionText } })`. (`forced` is already on the
+     `proposal.advanced` event, so "review on force-advance" is just a payload check.)
+     *Design point:* pass **extracted prose** (`getNodeText` over the canvas), not raw canvas JSON.
+  2. **Run** — the queue consumer already executes the archetype (cost-guarded; per-tenant budget).
+  3. **Write-back** — add `_post_section_recommendation()` to `fabric.process_task_queue`: on a
+     completed `review_section` task, `INSERT proposal_comments (recommendation_type='ai_review',
+     section_id, user_id=requestedBy, content=summary)`. Clean hook (the loop already holds
+     `proposal_id`/`section_id`/`result`).
+  4. **Display** — add `recommendation_type` + `category` to `proposal_comments` (migration), have
+     the comments GET + canvas sidebar carry it, and badge AI recommendations distinctly in the
+     existing `CommentThread` (the "context boxes"). Attribution = the admin who triggered the review.
+  *Tests:* advance enqueues-when-pref-on / skips-when-off (vitest) + the write-back inserts a comment (pytest).
+
+**Increment 3 — notification + flow enforcement · 🔴 designed.** Have the executors consult
+`tenant_automation_preferences`: the CMS `event_listener` (tenant-scope rule matching) for
+`document.locked`→team email and collaborator "get-ready" emails; auto-advance on
+`proposal.advance_ready` when `auto_advance_when_all_locked` is on. Plus the common-automation
+seed defaults.
+
+**Compliance:** every agent invocation already passes the budget/rate/per-call guard (§8) and
+fails closed; events stay in the `proposal`/`library`/`capture` namespaces; RBAC is tenant_admin+
+for setup, admin-triggered for review.
+
+---
+
 ## 12. File map (where the lifecycle lives)
 
 - Create/seed: `app/api/portal/[tenantSlug]/proposals/create/route.ts`, `lib/compliance-resolver.ts`
