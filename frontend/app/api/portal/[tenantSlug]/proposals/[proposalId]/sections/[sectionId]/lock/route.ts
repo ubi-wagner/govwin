@@ -221,7 +221,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (all && all.total > 0 && all.total === all.locked) {
       await emitEventSingle({
         namespace: 'proposal',
-        type: 'proposal.ready_to_advance',
+        type: 'proposal.advance_ready',
         actor: userActor(userId, email),
         tenantId,
         payload: { proposalId, stage: proposalStage, sectionCount: all.total },

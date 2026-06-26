@@ -397,14 +397,42 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Event: `proposal:compliance.checked:single`; tables read: `solicitation_compliance`, `compliance_variables`.
   - Model used: `claude-haiku-4-5-20251001` (hardcoded in route).
 
-### 6.5 Proposal Stage Advancement and Gate Check
+### 6.5 Section Accept/Lock → Lock-Gated Advancement
 
-- [ ] **TU-09** — Attempt to advance a proposal stage without meeting gate requirements.
-  - Expected: `400` response with `code: GATE_REQUIREMENTS_NOT_MET` and `details.unmet` listing missing items.
-  - Route: `POST /api/portal/[tenantSlug]/proposals/[proposalId]/advance`.
+*The proposal advances as one unit only when every section is accepted + locked
+(`PROPOSAL_LIFECYCLE_V1.md §7`). The legacy `stage_gate_requirements` checklist still applies if a
+tenant seeded it.*
 
-- [ ] **TU-10** — Satisfy gate requirements; attempt advance again.
-  - Expected: stage advances; `proposals.stage` updated; `proposal_stage_history` + `proposal_activity_log` rows written.
+- [ ] **TU-09a** — In the workspace (as tenant_admin), open a section, then **Accept & Lock** it.
+  - Expected: `is_locked=true`, `status='approved'`, `accepted_by`/`accepted_at` set; emits
+    `proposal:section.locked`; the accepted content is snapshotted (`canvas_versions`, reason
+    `section_accepted:<stage>`) and harvested to the library (`library:section.harvested`). The
+    contributor "My Sections" view shows "🔒 Accepted & Locked".
+  - Route: `POST …/sections/[sectionId]/lock`.
+
+- [ ] **TU-09b** — Lock every section of one document/volume.
+  - Expected: the last lock of a volume emits `proposal:document.locked` (volumeName, sectionCount);
+    when ALL sections are locked, emits `proposal:proposal.advance_ready`.
+
+- [ ] **TU-09** — Attempt to advance with one or more sections **unlocked**.
+  - Expected: **`422 SECTIONS_NOT_LOCKED`** with `details.openSections` (grouped by volume); the
+    Advance UI lists the blocking sections. (A seeded `stage_gate_requirements` additionally returns
+    `GATE_REQUIREMENTS_NOT_MET`.)
+  - Route: `POST …/advance`.
+
+- [ ] **TU-10** — Accept + lock all sections, then advance.
+  - Expected: stage advances; `proposals.stage` updated; `stage_completion_snapshots` (with each
+    section's `locked` flag), `proposal_stage_history`, `proposal_activity_log` rows written;
+    `proposal:proposal.advanced:end` carries `sectionsLocked`. Locks carry forward to the next stage.
+
+- [ ] **TU-10a** — Admin **force-advance** with sections still open.
+  - Expected: from the Advance UI's blocking panel, "Force advance anyway" (admin only) posts
+    `{force:true}` → advances; the open sections are recorded as `forcedOpenSections` on the
+    `proposal.advanced` event + activity log; those sections are **not** stamped `accepted_by`.
+
+- [ ] **TU-10b** — Visit the **Compliance Review** page.
+  - Expected: "Ready for Final" reflects **lock state** (all sections locked ⇒ ready), not the old
+    `status='complete'` count; the page agrees with the advance gate.
 
 ### 6.6 Comments
 
@@ -422,7 +450,7 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `library_units` rows updated with extracted atoms; event: `library:document.atomized:single`.
   - Route: `POST /api/portal/[tenantSlug]/library/atomize`.
 
-**tenant_user total: 13 steps**
+**tenant_user total: 17 steps**
 
 ---
 

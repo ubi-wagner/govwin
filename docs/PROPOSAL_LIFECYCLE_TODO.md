@@ -26,29 +26,34 @@ Anchor: **429 frontend tests · 524 pipeline tests · tsc clean.** Migrations 07
 
 ---
 
-## Track A — Lock↔status unification (Phase 2c) · the immediate Red
+## Track A — Lock↔status unification (Phase 2c) · 🟢 SHIPPED
+
+*Status: A1–A5 shipped & green (review-page readiness now lock-based; advance UI surfaces the
+gate + admin force with the blocking-section list; force-advance no longer mislabels open
+sections; GET-proposal `isEditable` is lock-aware; `status='approved'` is lock-only). Tests +
+HITL §6.5 updated.*
 
 *The new lock-state truth coexists with old `status` reads that now contradict it
 (`PROPOSAL_LIFECYCLE_V1.md §9`). Highest priority — these are user-visible.* A1–A4 are mostly
 **parallel** (different files); A5 is the **serial capstone** that removes the root cause.
 
-- 🔴 **A1 · P0 · [∥]** Fix "Ready for Final" inversion. `review/page.tsx` counts
+- 🟢 **A1 · P0 · [∥]** Fix "Ready for Final" inversion. `review/page.tsx` counts
   `status==='complete'`; locking sets `status='approved'`, so a fully-locked proposal reads
   "not ready." **Green:** readiness computed from `is_locked` (all sections locked ⇒ ready);
   page agrees with the advance gate; test asserts locked⇒ready.
-- 🔴 **A2 · P1 · [∥]** Surface the gate + force in the advance UI. `stage-control.tsx` posts `{}`
+- 🟢 **A2 · P1 · [∥]** Surface the gate + force in the advance UI. `stage-control.tsx` posts `{}`
   and hides the force path. **Green:** on `SECTIONS_NOT_LOCKED`, render `details.openSections`
   (grouped by document) inline; add an admin-only **Force advance** action (confirm dialog +
   required note) that posts `{force:true}`; button visibility keys on lock state, not the legacy
   checklist. Test: force path posts `force:true`; open-sections list renders.
-- 🔴 **A3 · P1 · [∥]** Stop mislabeling forced-open sections as accepted. `advance/route.ts`
+- 🟢 **A3 · P1 · [∥]** Stop mislabeling forced-open sections as accepted. `advance/route.ts`
   sets `accepted_by`/`accepted_at` on still-open sections. **Green:** on force, set
   `completed_stage` only for open sections (the "marked open" record); `accepted_by` reserved
   for genuine accept+lock. Test: forced-open section has no `accepted_by`.
-- 🔴 **A4 · P2 · [∥]** Align GET-proposal API `isEditable` with the lock. `route.ts:236` ignores
+- 🟢 **A4 · P2 · [∥]** Align GET-proposal API `isEditable` with the lock. `route.ts:236` ignores
   `is_locked`. **Green:** `isEditable = !isLocked && (completedStage === null || === stage)`;
   matches the page. Test updated.
-- 🔴 **A5 · P1 · [→ A1–A4]** Make lock authoritative, `status` derived. `save` route lets
+- 🟢 **A5 · P1 · [→ A1–A4]** Make lock authoritative, `status` derived. `save` route lets
   `status` diverge from lock. **Green:** lock/unlock is the only writer of "done"; `status` is
   computed/display-only; all readiness reads use `is_locked`; doc §9 closed.
 
@@ -58,19 +63,20 @@ Anchor: **429 frontend tests · 524 pipeline tests · tsc clean.** Migrations 07
 
 ## Track B — Audit & UX completeness · parallel with A
 
-- 🔴 **B1 · P2 · [∥]** Contributor lock visibility. `proposal-contributor-view.tsx` + `sections`
-  API don't expose `is_locked`/`accepted_by`. **Green:** "My Sections" shows a locked badge +
-  who accepted + when; API returns the fields.
-- 🔴 **B2 · P2 · [∥]** Lock-aware stage history. Stage-history + advance snapshot summaries are
-  `status`-based. **Green:** show `sectionsLocked`; (optional mig to add `sections_locked` to
-  `stage_completion_snapshots`).
-- 🔴 **B3 · P2 · [∥]** Event naming. `proposal.ready_to_advance` isn't past-tense (SOP
-  `entity.action_past_tense`). **Green:** rename to `proposal.advance_ready` (+ label + any
-  consumer); add to `event-labels.ts`.
-- 🔴 **B4 · P1 · [∥]** One-click whole-section "regenerate with prompt". Per-node revise exists;
-  no section-level affordance. **Green:** section toolbar action → prompt modal → regenerates the
-  section via `proposal.draft_section` (guarded); emits `proposal.draft_requested` with the
-  instruction + model; section returns to `in_progress` (unlocks if needed via explicit confirm).
+- 🟢 **B1 · P2** Contributor lock visibility. After A5, `status='approved'` ⟺ locked, so the
+  contributor "My Sections" badge now reads **"🔒 Accepted & Locked"**; the GET-proposal API also
+  returns `isLocked`/`lockedAt`/`acceptedByName`. *(Full "who/when" inline is a minor polish.)*
+- 🟡 **B2 · P2** Lock-aware stage history. Largely satisfied by A5: `stage_completion_snapshots
+  .sections_approved` now equals the locked count (status='approved' ⟺ locked), and the advance
+  event carries `sectionsLocked`. Remaining: relabel the workspace history display "approved"→
+  "locked" (cosmetic).
+- 🟢 **B3 · P2** Event naming. Renamed `proposal.ready_to_advance` → **`proposal.advance_ready`**
+  across the emitter, `event-labels.ts`, tests, and docs.
+- 🟡 **B4 · P1** Regenerate-with-prompt. **Capability already ships** — the per-node revision
+  panel (`ai-revision-panel.tsx`) has a "Regenerate" preset + a custom-instruction field invoking
+  `proposal.draft_section` (which accepts an `instruction` param, verified). Remaining enhancement:
+  a one-click *whole-section* regen button (replace all section nodes) wired through the workspace
+  `onSectionDrafted` path. Backend is ready (`ai/draft` accepts `{sectionId, instructions}`).
 
 ---
 
@@ -104,13 +110,15 @@ Anchor: **429 frontend tests · 524 pipeline tests · tsc clean.** Migrations 07
 
 - 🟡 **D1 · [∥]** Test coverage for the new lifecycle. **Green:** lock-gate (done), harvest
   (done), document-close/ready events (done); add unlock-path + carry-forward across-stage tests.
-- 🔴 **D2 · P2 · [→ A5]** Purge `status`-based assumptions from tests + assert `is_locked` gates.
+- 🟡 **D2 · P2** Test coverage for the unified model: added the lock-gate (`SECTIONS_NOT_LOCKED`)
+  + force-advance tests (Phase 2a) and the `status='approved'`-is-ignored test (A5). Remaining:
+  carry-forward-across-stage + unlock-path cases.
 - 🔴 **D3 · P2 · [∥]** Integrate the design docs: add a pointer to `PROPOSAL_LIFECYCLE_V1.md`
   from `ARCHITECTURE_V9.md` + `CLAUDE_CLIFFNOTES.md` (schema/route refs). **Green:** main docs
   link the lifecycle doc; CLIFFNOTES lists the new columns/events.
-- 🔴 **D4 · P1 · [∥]** HITL matrix for the open-to-close flow: V0 build → handoff → customer
-  draft/regen/accept/lock → document-close → gated advance → force-advance → final/harvest, with
-  the event assertions at each step. **Green:** steps added to `docs/baseline/HITL_ROLE_TEST_PLAN.md`.
+- 🟢 **D4 · P1** HITL matrix for the open-to-close flow — §6.5 expanded (TU-09a/09b/09/10/10a/10b):
+  accept/lock → document-close + harvest events → `SECTIONS_NOT_LOCKED` gate → advance →
+  admin force-advance → lock-based review readiness. tenant_user total updated.
 - 🟢 **D5** Deploy notes: migrations 072/073/074 run on deploy; set `RESEND_API_KEY` (or Google
   Workspace) before HITL for invite/reset/notification email. (Captured in `PROPOSAL_LIFECYCLE_V1.md`.)
 

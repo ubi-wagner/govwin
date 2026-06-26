@@ -268,13 +268,16 @@ export async function POST(request: Request, ctx: RouteContext) {
           )
         `;
 
-        // ── 3. Mark all sections as completed for this stage ──────
+        // ── 3. Mark all sections as having passed through this stage ──────
+        // Only stamp completed_stage/completed_at here. accepted_by/accepted_at
+        // are owned exclusively by the section lock route — a force-advanced
+        // (still-unlocked) section must NOT be recorded as "accepted", and a
+        // genuinely locked section keeps the accepter from its lock, not the
+        // advancing admin. Open sections are captured in forcedOpenSections.
         await tx`
           UPDATE proposal_sections
           SET completed_stage = ${previousStage},
-              completed_at = now(),
-              accepted_by = ${sessionUser.id}::uuid,
-              accepted_at = now()
+              completed_at = now()
           WHERE proposal_id = ${proposalId}::uuid
             AND (completed_stage IS NULL OR completed_stage = ${previousStage})
         `;

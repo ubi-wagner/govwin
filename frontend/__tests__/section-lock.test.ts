@@ -123,7 +123,7 @@ describe('POST section lock (accept + lock)', () => {
       expect.objectContaining({ type: 'document.locked', payload: expect.objectContaining({ volumeName: 'Technical Volume' }) }),
     );
     expect(emitEventSingleMock).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'proposal.ready_to_advance' }),
+      expect.objectContaining({ type: 'proposal.advance_ready' }),
     );
   });
 });

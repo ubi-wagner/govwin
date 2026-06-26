@@ -47,7 +47,7 @@ first two passes: V0 = our RFP admin's initial build; V1 = released to the custo
                                               tool.invoked)                                          manual edits)
                                                                                                           │
                                                                                                           ▼
- harvest ◀─ submit/final-lock ◀─ ADVANCE (gated) ◀─ proposal.ready_to_advance ◀─ document.locked ◀─ accept+lock section
+ harvest ◀─ submit/final-lock ◀─ ADVANCE (gated) ◀─ proposal.advance_ready ◀─ document.locked ◀─ accept+lock section
  (library     (proposal.advanced   (all sections      (emitted when ALL           (emitted when      (section.locked +
   atoms,        :end, harvest        locked, or         sections locked)            every section      snapshot + harvest
   approved)     completed)           force+marked)                                  of a volume         section.harvested)
@@ -62,7 +62,7 @@ with AI, tags sections, accepts + locks them, then **manually advances** to rele
 customer. (4) The customer's `tenant_admin` owns iteration: draft/regen/edit each major section,
 then **Accept & Lock** it. (5) When every section of a volume is locked, the **document closes**
 (`document.locked`); when **all** sections are locked, the proposal signals
-`proposal.ready_to_advance`. (6) **Advance is gated on lock state** — it proceeds only when all
+`proposal.advance_ready`. (6) **Advance is gated on lock state** — it proceeds only when all
 sections are locked, or an admin **force-advances** (which records the still-open sections as the
 audit trail). (7) Advancing to `final` auto-locks → `submitted`; first lock **harvests** the
 accepted content into the tenant's library as reusable, deduped atoms.
@@ -137,7 +137,7 @@ Namespaces (per `CLAUDE.md`): `finder` (admin), `capture` (customer), `identity`
 | `section.unlocked` | proposal | reopen | proposalId, sectionId |
 | `section.harvested` | library | per-section harvest on accept | proposalId, sectionId, atomsHarvested |
 | `document.locked` | proposal | all sections of a volume locked | volumeName, volumeNumber, sectionCount |
-| `proposal.ready_to_advance` | proposal | **all** sections locked | proposalId, stage, sectionCount |
+| `proposal.advance_ready` | proposal | **all** sections locked | proposalId, stage, sectionCount |
 | `proposal.advanced` (start/end) | proposal | stage advance | previousStage, targetStage, forced, forcedOpenSections, sectionsLocked |
 | `proposal.locked`/`unlocked` | proposal | whole-proposal lock | lockCount |
 | `harvest.completed` | library | whole-proposal harvest at final | atomsHarvested |
@@ -150,7 +150,7 @@ filter + deep-links), **dashboard recent-activity**, and the **proposal timeline
 lands everywhere. `eventHref()` deep-links each row to its source proposal/section/opportunity.
 
 These emitters are the **automation substrate**: `document.locked` → future collaborator
-"get-ready" emails; `proposal.ready_to_advance` → future auto-advance under an agent manager;
+"get-ready" emails; `proposal.advance_ready` → future auto-advance under an agent manager;
 new-priority-opp → customer notifications.
 
 ---
@@ -186,7 +186,7 @@ Every model call flows through the cost guard (§8) before spending tokens.
   next stage). Re-editing at a later stage requires an explicit **unlock** (admin). This makes
   "done = locked" and avoids re-doing finished work; advancing with no new edits is valid.
 - **Document close vs proposal advance:** `document.locked` fires per volume as it completes
-  (automation hook); `proposal.ready_to_advance` fires when all are locked. Advance is **manual
+  (automation hook); `proposal.advance_ready` fires when all are locked. Advance is **manual
   now** (RFP admin V0→V1) but gated on lock state, with the events in place to **auto-advance
   later**.
 - Advancing to `final` auto-locks the proposal → `submitted`, enabling export + triggering the
@@ -253,7 +253,7 @@ opportunity scoring, and "similar section" retrieval driving canvas selections. 
 | Section accept/lock backbone | mig 074, lock route, workspace UI | 🟢 shipped (1a/1b) |
 | Advance gated on lock state | `advance/route.ts` + tests | 🟢 shipped (2a) |
 | Document-close + per-section harvest | lock route, `proposal-harvest.ts` | 🟢 shipped (2b) |
-| Lock↔status seam fixes | review page, stage-control, API isEditable | 🔴 Phase 2c (ToDo Track A) |
+| Lock↔status unification (Phase 2c) | review page, stage-control (+force UI), advance route, API isEditable, save route | 🟢 shipped + tested |
 | Section meta-tagging + Phase 3 | — | 🔴 roadmap (ToDo Track C) |
 
 **Independently re-verified this review:** (a) `vol.volumeName`/`volumeNumber` resolve to real

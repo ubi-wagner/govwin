@@ -42,7 +42,7 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
     `Proposal advanced to ${str(p.targetStage) ?? str(p.toStage) ?? str(p.stage) ?? 'the next stage'}`,
   'proposal.stage_advanced': (p) =>
     `Proposal advanced to ${str(p.targetStage) ?? str(p.toStage) ?? str(p.stage) ?? 'the next stage'}`,
-  'proposal.ready_to_advance': 'All sections locked — ready to advance',
+  'proposal.advance_ready': 'All sections locked — ready to advance',
   'document.locked': (p) =>
     `Document complete & locked${str(p.volumeName) ? `: ${str(p.volumeName)}` : ''}`,
   'proposal.locked': 'Proposal locked for admin review',
