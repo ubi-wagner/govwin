@@ -331,13 +331,22 @@ export function ProposalAdminPanel({
       );
       if (res.ok) {
         setLockOverrides((prev) => ({ ...prev, [sectionId]: !currentlyLocked }));
+        // If this lock completed the document and the tenant opted into
+        // auto-advance, the proposal moved a stage — refresh so the stage badge
+        // and gate controls reflect the new state.
+        try {
+          const json = await res.json();
+          if (json?.data?.autoAdvancedTo) router.refresh();
+        } catch {
+          /* no/again non-JSON body — nothing to react to */
+        }
       }
     } catch {
       /* network error — leave UI state unchanged */
     } finally {
       setLockPending(null);
     }
-  }, [tenantSlug, proposalId]);
+  }, [tenantSlug, proposalId, router]);
 
   // Bulk "Accept & Lock All" — locks every unlocked, draftable section so the
   // whole document can advance in one click. Reuses the per-section lock route,

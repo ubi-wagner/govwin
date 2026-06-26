@@ -486,6 +486,23 @@ tenant seeded it.*
     WHERE proposal_id='[id]' AND recommendation_type='ai_review';` — confirm one row per reviewed
     section. Requires the pipeline worker running (`process_task_queue`) and `ANTHROPIC_API_KEY` set.
 
+- [ ] **TU-10d** — **Auto-advance on all locked** (C3 Increment 3b). Turn on
+    `auto_advance_when_all_locked` on the Automation page (TA-13), then lock the **last** open
+    section (or use "Accept & Lock All").
+  - Expected: locking the final section emits `proposal:proposal.advance_ready` and then the lock
+    route advances the proposal one gate via the shared `advanceProposalStage` core — same writes
+    as a manual advance (`stage_completion_snapshots`, `proposal_stage_history`,
+    `proposal:proposal.advanced` with `trigger:'auto'`, activity log). The lock response includes
+    `autoAdvancedTo`, and the admin panel refreshes so the stage badge shows the new stage. One
+    gate per trigger (not a cascade). If `ai_review_on_advance` is also on, the AI review (TU-10c)
+    fires as part of the same advance.
+  - Negative: with the toggle **off** (default), locking the last section emits `advance_ready`
+    but does **not** advance — the stage is unchanged and the admin advances manually (TU-10).
+  - Best-effort: an auto-advance that hits a gate/OCC conflict leaves the proposal at the
+    ready-to-advance state (the lock itself always succeeds).
+  - Routes/code: `POST …/sections/[sectionId]/lock` → `lib/proposal-advance.ts`; pref in
+    `tenant_automation_preferences.auto_advance_when_all_locked`.
+
 ### 6.6 Comments
 
 - [ ] **TU-11** — Leave a comment on a proposal.
@@ -502,7 +519,7 @@ tenant seeded it.*
   - Expected: `library_units` rows updated with extracted atoms; event: `library:document.atomized:single`.
   - Route: `POST /api/portal/[tenantSlug]/library/atomize`.
 
-**tenant_user total: 18 steps**
+**tenant_user total: 19 steps**
 
 ---
 

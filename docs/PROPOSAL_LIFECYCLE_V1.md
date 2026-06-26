@@ -319,9 +319,15 @@ archetypes + `requestAgentTask()` enqueue. The only missing link is the trigger 
     `document_locked_team_notify` + `collaborator_get_ready`. *V1 targets the tenant admin; a
     per-collaborator fan-out for the "get ready" email and a `notify_on_new_priority_opp` rule
     (the finder opportunity alert is workflow-only today) are follow-ons.*
-  - **3b — auto-advance · 🔴 designed.** Auto-advance on `proposal.advance_ready` when
-    `auto_advance_when_all_locked` is on (extract a shared advance-core; trigger from the lock
-    route's all-locked path).
+  - **3b — auto-advance · 🟢 SHIPPED.** The advance core was extracted into
+    `lib/proposal-advance.ts::advanceProposalStage()` (identical gate checks, snapshots,
+    stage-history, optimistic-locking, `proposal.advanced` events, activity log, and
+    AI-review-on-advance enqueue); the advance route is now a thin auth/validation wrapper over it.
+    The lock route's all-locked path consults `auto_advance_when_all_locked` and, when on, calls
+    the core (`trigger:'auto'`, non-forced — all sections are locked so the gate passes) one gate
+    per all-locked event. Best-effort: an auto-advance failure leaves the proposal ready for a
+    manual advance. The lock response carries `autoAdvancedTo` so the admin panel refreshes the
+    stage. *One gate per trigger (not a full cascade to submitted) — the safe V1 semantic.*
 
 **Compliance:** every agent invocation already passes the budget/rate/per-call guard (§8) and
 fails closed; events stay in the `proposal`/`library`/`capture` namespaces; RBAC is tenant_admin+

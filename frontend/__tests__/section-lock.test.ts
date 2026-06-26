@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveUserAccessMock, emitEventSingleMock, harvestMock } =
+const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveUserAccessMock, emitEventSingleMock, harvestMock, advanceProposalStageMock } =
   vi.hoisted(() => ({
     authMock: vi.fn(),
     sqlMock: vi.fn(),
@@ -14,6 +14,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, resolveU
     resolveUserAccessMock: vi.fn(),
     emitEventSingleMock: vi.fn(),
     harvestMock: vi.fn(),
+    advanceProposalStageMock: vi.fn(),
   }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
@@ -24,6 +25,7 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/proposal-access', () => ({ resolveUserAccess: resolveUserAccessMock }));
 vi.mock('@/lib/proposal-harvest', () => ({ harvestSectionToLibrary: harvestMock }));
+vi.mock('@/lib/proposal-advance', () => ({ advanceProposalStage: advanceProposalStageMock }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,
   userActor: (id: string, email?: string) => ({ type: 'user', id, email }),
@@ -43,7 +45,7 @@ function session(role = 'tenant_admin') {
   return { user: { id: USER, email: 'a@acme.com', role } };
 }
 
-function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFound = true) {
+function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFound = true, { autoAdvance = false } = {}) {
   authMock.mockResolvedValue(session());
   getTenantBySlugMock.mockResolvedValue({ id: TENANT, slug: 'acme' });
   verifyTenantAccessMock.mockResolvedValue(true);
@@ -57,6 +59,8 @@ function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFoun
           : [],
       );
     }
+    // Auto-advance opt-in lookup.
+    if (q.includes('auto_advance_when_all_locked')) return Promise.resolve([{ autoAdvance }]);
     // Document-close + proposal-ready counts: report all sections locked.
     if (q.includes('count(*)')) return Promise.resolve([{ total: 1, locked: 1 }]);
     return Promise.resolve([]); // UPDATE / INSERT
@@ -71,6 +75,7 @@ beforeEach(() => {
   resolveUserAccessMock.mockReset();
   emitEventSingleMock.mockReset().mockResolvedValue(undefined);
   harvestMock.mockReset().mockResolvedValue({ atomsHarvested: 0, atomsSkipped: 0 });
+  advanceProposalStageMock.mockReset().mockResolvedValue({ ok: true, data: { stage: 'review', previousStage: 'draft', locked: false, lockCount: 0 } });
 });
 
 describe('POST section lock (accept + lock)', () => {
@@ -125,6 +130,42 @@ describe('POST section lock (accept + lock)', () => {
     expect(emitEventSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'proposal.advance_ready' }),
     );
+  });
+});
+
+describe('POST section lock — auto-advance on all locked (C3 Increment 3b)', () => {
+  it('auto-advances via the shared core when the tenant opted in', async () => {
+    wireGuard('admin', true, { autoAdvance: true });
+    const res = await POST(req(), ctx);
+    expect(res.status).toBe(200);
+    // proposal.advance_ready still fires (all sections locked)
+    expect(emitEventSingleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'proposal.advance_ready' }),
+    );
+    // and the shared advance core is invoked as an automated advance
+    expect(advanceProposalStageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT,
+        proposalId: PROPOSAL,
+        actorId: USER,
+        force: false,
+        trigger: 'auto',
+      }),
+    );
+  });
+
+  it('does not auto-advance when the tenant did not opt in', async () => {
+    wireGuard('admin', true, { autoAdvance: false });
+    const res = await POST(req(), ctx);
+    expect(res.status).toBe(200);
+    expect(advanceProposalStageMock).not.toHaveBeenCalled();
+  });
+
+  it('lock still succeeds when auto-advance fails (best-effort)', async () => {
+    wireGuard('admin', true, { autoAdvance: true });
+    advanceProposalStageMock.mockResolvedValue({ ok: false, status: 409, code: 'CONFLICT', error: 'Stage already changed' });
+    const res = await POST(req(), ctx);
+    expect(res.status).toBe(200); // the lock itself is unaffected
   });
 });
 

@@ -122,9 +122,11 @@ HITL §6.5 updated.*
   consults `tenant_automation_preferences` (rules opt in via `action_config.tenant_pref`,
   allowlisted, default-on) and surfaces `system_events.tenant_id` into the payload for recipient
   resolution; seed rules for `document.locked`/`proposal.advance_ready` + `tenant_pref` on the
-  existing `proposal.advanced` rule (mig 078) + two email templates. Increment 3b (auto-advance on
-  `proposal.advance_ready` when `auto_advance_when_all_locked` is on) is designed in
-  `PROPOSAL_LIFECYCLE_V1.md` §C3.* Remaining at the
+  existing `proposal.advanced` rule (mig 078) + two email templates. Increment 3b SHIPPED —
+  auto-advance: the advance core was extracted to `lib/proposal-advance.ts` (route is now a thin
+  wrapper) and the lock route auto-advances one gate via that core when
+  `auto_advance_when_all_locked` is on (best-effort; `autoAdvancedTo` returned so the panel
+  refreshes).* Remaining at the
   workflow step-milestones: The pipeline is a workflow; hang automation off the existing step milestones +
   outcome hooks, **configured by the customer admin at portal purchase** (start there), then run
   the code through and fill gaps with the most common proposal-dev automations. Driven by

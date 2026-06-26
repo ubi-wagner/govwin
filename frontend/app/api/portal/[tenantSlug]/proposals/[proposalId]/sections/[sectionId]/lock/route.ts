@@ -22,6 +22,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { harvestSectionToLibrary } from '@/lib/proposal-harvest';
+import { advanceProposalStage } from '@/lib/proposal-advance';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -29,6 +30,8 @@ interface RouteContext {
 
 interface Resolved {
   tenantId: string;
+  tenantSlug: string;
+  role: Role;
   proposalId: string;
   userId: string;
   email: string | undefined;
@@ -100,6 +103,8 @@ async function guard(ctx: RouteContext): Promise<Resolved | NextResponse> {
 
   return {
     tenantId,
+    tenantSlug,
+    role,
     proposalId,
     userId: sessionUser.id,
     email: sessionUser.email,
@@ -122,7 +127,7 @@ function isErr(x: Resolved | NextResponse): x is NextResponse {
 export async function POST(_request: Request, ctx: RouteContext) {
   const g = await guard(ctx);
   if (isErr(g)) return g;
-  const { tenantId, proposalId, userId, email, proposalStage, section } = g;
+  const { tenantId, tenantSlug, role, proposalId, userId, email, proposalStage, section } = g;
 
   try {
     await sql`
@@ -188,6 +193,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
   // 3. Document-close + proposal-ready signals (future automation: notify team,
   //    "get ready" emails, auto-advance). A document closes when every section
   //    of its volume is locked; the proposal is ready when all are.
+  let autoAdvancedTo: string | null = null;
   try {
     const [doc] = await sql<{ total: number; locked: number }[]>`
       SELECT count(*)::int AS total,
@@ -226,13 +232,48 @@ export async function POST(_request: Request, ctx: RouteContext) {
         tenantId,
         payload: { proposalId, stage: proposalStage, sectionCount: all.total },
       });
+
+      // Auto-advance (customer opt-in, default off). When every section is
+      // locked and the tenant enabled auto_advance_when_all_locked, advance one
+      // gate via the shared core — same gates/snapshots/events as a manual
+      // advance. Best-effort: a failure leaves the proposal ready for a manual
+      // advance. The lock route already verified admin access (guard).
+      try {
+        const [autoPref] = await sql<{ autoAdvance: boolean }[]>`
+          SELECT auto_advance_when_all_locked FROM tenant_automation_preferences
+          WHERE tenant_id = ${tenantId}::uuid
+        `;
+        if (autoPref?.autoAdvance) {
+          const result = await advanceProposalStage({
+            tenantId,
+            tenantSlug,
+            proposalId,
+            actorId: userId,
+            actorEmail: email ?? null,
+            actorRole: role,
+            force: false,
+            notes: 'Auto-advanced: all sections locked',
+            trigger: 'auto',
+          });
+          if (result.ok) {
+            autoAdvancedTo = result.data.stage;
+          } else {
+            console.error('[sections/lock] auto-advance skipped:', result.code);
+          }
+        }
+      } catch (autoErr) {
+        console.error('[sections/lock] auto-advance failed (non-fatal):', autoErr);
+      }
     }
   } catch (e) {
     console.error('[sections/lock] close-state signals failed:', e);
   }
 
   return NextResponse.json({
-    data: { sectionId: section.id, isLocked: true, status: 'approved', acceptedStage: proposalStage },
+    data: {
+      sectionId: section.id, isLocked: true, status: 'approved', acceptedStage: proposalStage,
+      ...(autoAdvancedTo ? { autoAdvancedTo } : {}),
+    },
   });
 }
 
