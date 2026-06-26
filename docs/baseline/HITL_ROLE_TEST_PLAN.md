@@ -381,7 +381,30 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Tables/code: `automation_rules` (mig 078), `tenant_automation_preferences`,
     `services/cms/src/event_listener.py::_automation_pref_allows`.
 
-**tenant_admin total: 14 steps**
+- [ ] **TA-15** — **Collaborator get-ready fan-out** (C3 follow-on, mig 079). With
+    `notify_collaborators_get_ready` on and ≥1 **accepted** collaborator (TA-09 + accepted invite),
+    lock the last section so `proposal.advance_ready` fires.
+  - Expected: the get-ready email goes to **every accepted collaborator** on the proposal (not just
+    the tenant admin) — the rule sets `recipients:'collaborators'` and the send handler resolves
+    `proposal_collaborators` (`accepted_at IS NOT NULL`, prefers the user-account email). With zero
+    accepted collaborators it falls back to the tenant admin (`to_field`).
+  - **Verify in-house:** `SELECT pc.email FROM proposal_collaborators pc WHERE pc.proposal_id='[id]'
+    AND pc.accepted_at IS NOT NULL;` — confirm one send per address (logs: `collaborator fan-out
+    for "collaborator_get_ready": sent N of N`).
+
+- [ ] **TA-16** — **New-priority-opportunity alert** (C3 follow-on, `notify_on_new_priority_opp`).
+    With the toggle **on** (default), have an rfp_admin push a solicitation that matches this tenant
+    (RA-flow → `finder:solicitation.pushed` → `score_tenants` → `send_spotlight_digest`).
+  - Expected: the spotlight digest (`spotlight_new_topics`) is delivered to this tenant via
+    `_handle_multi_tenant_notification` — the NOTIFY step passes `tenant_ids` (plural) and the
+    handler fans out per tenant, gating each on `notify_on_new_priority_opp` and de-duping per
+    (event, tenant). (Previously the plural `tenant_ids` resolved no recipient and silently dropped
+    — this path now delivers.)
+  - Negative: toggle **off** → this tenant is skipped while other matched tenants still receive it.
+  - Tables/code: `services/cms/src/event_listener.py::_handle_multi_tenant_notification`;
+    `pipeline/src/workflows/on_solicitation_pushed.py` (`tenant_pref` on the digest step).
+
+**tenant_admin total: 16 steps**
 
 ---
 

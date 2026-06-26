@@ -316,9 +316,17 @@ archetypes + `requestAgentTask()` enqueue. The only missing link is the trigger 
     (mig 078): rules for `proposal:document.locked` → `notify_team_on_document_locked` and
     `proposal:proposal.advance_ready` → `notify_collaborators_get_ready`, plus a `tenant_pref`
     on the existing `proposal.advanced` rule → `notify_on_stage_advanced`. Templates
-    `document_locked_team_notify` + `collaborator_get_ready`. *V1 targets the tenant admin; a
-    per-collaborator fan-out for the "get ready" email and a `notify_on_new_priority_opp` rule
-    (the finder opportunity alert is workflow-only today) are follow-ons.*
+    `document_locked_team_notify` + `collaborator_get_ready`.
+  - **3a follow-ons · 🟢 SHIPPED.** (1) *Collaborator fan-out* (mig 079): the get-ready rule sets
+    `recipients:'collaborators'`; the send_email handler emails every accepted collaborator on the
+    proposal (`_resolve_collaborator_emails` — `accepted_at IS NOT NULL`, tenant-scoped, prefers
+    the user-account email), falling back to the tenant admin when there are none. (2)
+    *`notify_on_new_priority_opp`*: the spotlight digest (`spotlight_new_topics`) NOTIFY step
+    passes `tenant_ids` (plural), which the single-recipient handler never delivered;
+    `_handle_multi_tenant_notification` now fans it out per tenant, gating each on
+    `notify_on_new_priority_opp` and de-duplicating per (event, tenant). The digest step carries
+    `tenant_pref:'notify_on_new_priority_opp'`. This wires the 4th notify-* toggle **and** fixes the
+    latent multi-tenant delivery gap.
   - **3b — auto-advance · 🟢 SHIPPED.** The advance core was extracted into
     `lib/proposal-advance.ts::advanceProposalStage()` (identical gate checks, snapshots,
     stage-history, optimistic-locking, `proposal.advanced` events, activity log, and

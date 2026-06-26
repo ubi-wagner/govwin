@@ -112,7 +112,7 @@ HITL §6.5 updated.*
   prior funding) + `spotlight_bucket_score` per opp×bucket; opp shows rank per active bucket.
 - 🔴 **C6 · P2 · [∥]** Opportunity lifecycle: archive-on-close + reconstitution / close-date change
   / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
-- 🟡 **C7 · P1 · [∥]** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —
+- 🟢 **C7 · P1 · [∥] · CLOSED** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —
   customer automation setup (mig 076 `tenant_automation_preferences` + portal API + Automation
   page). Increment 2 SHIPPED — AI review on advance → section context boxes (mig 077
   `proposal_comments.recommendation_type/category`; advance route enqueues per-section
@@ -126,12 +126,14 @@ HITL §6.5 updated.*
   auto-advance: the advance core was extracted to `lib/proposal-advance.ts` (route is now a thin
   wrapper) and the lock route auto-advances one gate via that core when
   `auto_advance_when_all_locked` is on (best-effort; `autoAdvancedTo` returned so the panel
-  refreshes).* Remaining at the
-  workflow step-milestones: The pipeline is a workflow; hang automation off the existing step milestones +
-  outcome hooks, **configured by the customer admin at portal purchase** (start there), then run
-  the code through and fill gaps with the most common proposal-dev automations. Driven by
-  already-emitted events: `document.locked`→collaborator "get-ready" emails;
-  `proposal.advance_ready`→optional auto-advance; new-priority-opp→customer alerts.
+  refreshes). 3a follow-ons SHIPPED — collaborator fan-out for the "get-ready" email (mig 079;
+  `recipients:'collaborators'` → every accepted collaborator, tenant-admin fallback) + the 4th
+  toggle `notify_on_new_priority_opp` wired by fanning the spotlight digest out per tenant
+  (`_handle_multi_tenant_notification`, gated + de-duped), which also fixed the latent
+  `tenant_ids`-plural delivery gap.* **CLOSED:** the customer configures automation at portal
+  purchase (Automation page), all four notify-* toggles + AI-review-on-advance + auto-advance are
+  live off the already-emitted lifecycle events, and the built-but-dormant agent workforce
+  (`fabric.py`/archetypes) is now on-ramped into the customer loop via review-on-advance.
   **AI-agent tasking (key):** on an admin **force-advance to the next stage**, task our agents
   (grammar / flow / fluidity / compliance-matrix evaluation — skill-based) to review the completed
   work and surface **recommended changes inside each section's context boxes** — the same

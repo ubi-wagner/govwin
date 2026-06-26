@@ -493,6 +493,85 @@ async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) ->
     return None
 
 
+async def _resolve_collaborator_emails(proposal_id, tenant_id) -> list[str]:
+    """Resolve the email addresses of accepted collaborators on a proposal,
+    scoped to the tenant. Prefers the user account's email, falling back to the
+    invite email; de-duplicated. Empty list on any failure (best-effort)."""
+    pool = get_event_pool()
+    if not pool or not proposal_id or not tenant_id:
+        return []
+    try:
+        rows = await pool.fetch(
+            """
+            SELECT DISTINCT COALESCE(u.email, pc.email) AS email
+            FROM proposal_collaborators pc
+            JOIN proposals p ON p.id = pc.proposal_id
+            LEFT JOIN users u ON u.id = pc.user_id
+            WHERE pc.proposal_id = $1::uuid
+              AND p.tenant_id = $2::uuid
+              AND pc.accepted_at IS NOT NULL
+              AND COALESCE(u.email, pc.email) IS NOT NULL
+            """,
+            str(proposal_id), str(tenant_id),
+        )
+        return [r['email'] for r in rows if r['email']]
+    except Exception as e:
+        logger.warning('collaborator email resolution failed (proposal %s): %s', proposal_id, e)
+        return []
+
+
+async def _handle_multi_tenant_notification(event, payload: dict, template_name: str) -> None:
+    """Fan a digest notification.requested (tenant_ids plural) out to each tenant,
+    gating each on the named tenant_pref and de-duplicating per (event, tenant).
+    This is the delivery path for the spotlight "new priority opportunity" digest
+    (gated by notify_on_new_priority_opp)."""
+    pool = get_event_pool()
+    tenant_ids = payload.get('tenant_ids') or []
+    pref = payload.get('tenant_pref')
+
+    html = render_template(template_name, payload)
+    if not html:
+        logger.warning('multi-tenant notification: template "%s" rendered empty, skipping', template_name)
+        return
+    subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
+    trigger_event_id = payload.get('trigger_event_id') or (str(event.get('id')) if event.get('id') else None)
+    sender = resolve_sender(
+        identity=payload.get('fromIdentity'),
+        namespace=payload.get('senderNamespace'),
+        template=template_name,
+        default=_SEND_AS,
+    )
+
+    sent = 0
+    for tid in tenant_ids:
+        if not tid:
+            continue
+        # Per-tenant preference gate.
+        if pref and not await _automation_pref_allows({'tenant_pref': pref}, {'tenantId': tid}):
+            logger.info('multi-tenant notification "%s": tenant %s opted out (%s)', template_name, tid, pref)
+            continue
+        # Per-tenant dedup so a re-read event does not double-send to a tenant.
+        if trigger_event_id and pool and await _check_dedup(pool, trigger_event_id, f'send_email:{tid}'):
+            continue
+        to_email = await _resolve_recipient_email('payload.tenantId', {'tenantId': tid}, event)
+        if not to_email:
+            logger.info('multi-tenant notification "%s": no recipient for tenant %s', template_name, tid)
+            continue
+        result = await send_email(to=to_email, subject=subject, html=html, sender=sender)
+        sent += 1
+        logger.info('multi-tenant notification "%s": sent to tenant %s (%s): %s', template_name, tid, to_email, result)
+        if trigger_event_id and pool:
+            try:
+                await _log_rule_execution(
+                    pool, None, trigger_event_id, f'send_email:{tid}', 'success',
+                    result={'template': template_name, 'recipient': to_email, 'tenant_id': str(tid),
+                            'source': 'multi_tenant_notification'},
+                )
+            except Exception as e:
+                logger.error('multi-tenant notification log failed: %s', e)
+    logger.info('multi-tenant notification "%s": delivered %d of %d', template_name, sent, len(tenant_ids))
+
+
 async def _handle_notification_requested(event) -> None:
     """Handle a ``system:notification.requested`` event emitted by a workflow
     NOTIFY step.
@@ -523,6 +602,14 @@ async def _handle_notification_requested(event) -> None:
     template_name = payload.get('template', '')
     if not template_name:
         logger.warning('notification.requested event has no template, skipping')
+        return
+
+    # Multi-tenant digest fan-out (e.g. spotlight_new_topics → matched tenants).
+    # The NOTIFY step passes tenant_ids (plural); the single-recipient path below
+    # only handles one. Fan out here, gating each tenant on its tenant_pref.
+    tenant_ids = payload.get('tenant_ids')
+    if isinstance(tenant_ids, list) and tenant_ids:
+        await _handle_multi_tenant_notification(event, payload, template_name)
         return
 
     # Resolve recipient first (hoisted above the render so a render-miss can still
@@ -1025,6 +1112,33 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
         html = render_template(template_name, payload)
         if not html:
             logger.warning(f'No template rendered for "{template_name}", skipping send')
+            return
+
+        # Multi-recipient fan-out for collaborator "get ready" emails: when the
+        # rule sets recipients=collaborators, send to every accepted collaborator
+        # on the proposal, falling back to the configured to_field (tenant admin)
+        # when there are none. The preference gate (notify_collaborators_get_ready)
+        # already ran in _execute_rule before dispatch.
+        if config.get('recipients') == 'collaborators':
+            emails = await _resolve_collaborator_emails(
+                payload.get('proposalId') or payload.get('proposal_id'),
+                payload.get('tenantId') or payload.get('tenant_id'),
+            )
+            if not emails:
+                to_field = config.get('to_field')
+                fallback = await _resolve_recipient_email(to_field, payload, event) if to_field else None
+                if fallback:
+                    emails = [fallback]
+            if not emails:
+                logger.warning('collaborator fan-out: no recipients for "%s", skipping', template_name)
+                return
+            sent = 0
+            for addr in dict.fromkeys(emails):  # de-dupe, preserve order
+                result = await send_email(to=addr, subject=subject, html=html)
+                if not result.get('error'):
+                    sent += 1
+                logger.info('Sent "%s" to collaborator %s: %s', template_name, addr, result)
+            logger.info('collaborator fan-out for "%s": sent %d of %d', template_name, sent, len(set(emails)))
             return
 
         # Resolve recipient: use to_field from config, then fall back to payload fields

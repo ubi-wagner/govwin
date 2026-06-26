@@ -29,7 +29,9 @@ STEPS:
     2. send_spotlight_digest (NOTIFY)
        Action: system.notify
        Input: channel=email, template=spotlight_new_topics, tenant_ids
-              from step 1 result
+              from step 1 result, tenant_pref=notify_on_new_priority_opp
+              (the CMS event_listener fans the digest out per tenant, gating
+              each on that toggle)
        Output: notified=True/False
        Retry: 0
        Timeout: 30 minutes
@@ -109,6 +111,8 @@ class OnSolicitationPushed(Workflow):
                 "channel": '"email"',
                 "template": '"spotlight_new_topics"',
                 "tenant_ids": "step.find_matching_tenants.result.tenantIds",
+                # Gate each tenant's digest on their new-priority-opportunity toggle.
+                "tenant_pref": '"notify_on_new_priority_opp"',
             },
         ),
     ]
