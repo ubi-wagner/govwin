@@ -125,7 +125,7 @@ export interface HarvestResult {
 async function harvestSectionNodes(
   tenantId: string,
   proposalId: string,
-  section: { id: string; title: string; content: string | null; volumeName?: string | null; sectionType?: string | null },
+  section: { id: string; title: string; content: string | null; volumeName?: string | null; sectionType?: string | null; standardCategory?: string | null },
   provenanceTag: string,
 ): Promise<HarvestResult> {
   let atomsHarvested = 0;
@@ -145,6 +145,10 @@ async function harvestSectionNodes(
   }
 
   const category = sectionToCategory(section.title);
+  // The C1 standard bucket (technical / team / commercialization / readiness …),
+  // resolved from the section's section_type. Stored structured in subcategory so
+  // atoms are bucket-retrievable, not just title-bucketed.
+  const subcategory = section.standardCategory ?? null;
   const sectionSlug = slugify(section.title);
   const volumeSlug = section.volumeName ? slugify(section.volumeName) : null;
   // Inherit the section's standard classification (C1/C2) so atoms are
@@ -156,6 +160,17 @@ async function harvestSectionNodes(
     ...(volumeSlug ? [volumeSlug] : []),
     ...(section.sectionType ? [`type:${section.sectionType}`] : []),
   ];
+  // Classified-shred metadata (C2 — "JSON now, vector-ready"). Carried on each
+  // atom so Phase-4 retrieval can filter/rank by the standard taxonomy; the
+  // embedding column already exists (library_units.embedding) and stays NULL
+  // until Phase-4 populates real vectors.
+  const atomMeta = {
+    sectionType: section.sectionType ?? null,
+    standardCategory: subcategory,
+    provenance: provenanceTag,
+    proposalId,
+    sectionId: section.id,
+  };
 
   for (const node of canvasDoc.nodes) {
     if (!isHarvestable(node)) {
@@ -194,7 +209,7 @@ async function harvestSectionNodes(
 
       await sql`
         INSERT INTO library_units (
-          tenant_id, content, category, tags,
+          tenant_id, content, category, subcategory, tags, meta,
           confidence, status, source_type, source_id,
           original_proposal_id, original_node_id, atom_hash,
           outcome, outcome_score
@@ -202,7 +217,9 @@ async function harvestSectionNodes(
           ${tenantId}::uuid,
           ${text},
           ${category},
+          ${subcategory},
           ${tags}::text[],
+          ${JSON.stringify(atomMeta)}::jsonb,
           0.9,
           'approved',
           'harvest',
@@ -252,8 +269,10 @@ export async function harvestProposalToLibrary(
       content: string | null;
       volumeName: string | null;
       sectionType: string | null;
+      standardCategory: string | null;
     }>>`
-      SELECT id, title, content, volume_name, section_type
+      SELECT id, title, content, volume_name, section_type,
+             (SELECT ss.category FROM section_standards ss WHERE ss.key = section_type) AS standard_category
       FROM proposal_sections
       WHERE proposal_id = ${proposalId}
       ORDER BY section_number
@@ -305,8 +324,9 @@ export async function harvestSectionToLibrary(
 ): Promise<HarvestResult> {
   let section: { id: string; title: string; content: string | null; volumeName: string | null } | undefined;
   try {
-    [section] = await sql<Array<{ id: string; title: string; content: string | null; volumeName: string | null; sectionType: string | null }>>`
-      SELECT id, title, content, volume_name, section_type
+    [section] = await sql<Array<{ id: string; title: string; content: string | null; volumeName: string | null; sectionType: string | null; standardCategory: string | null }>>`
+      SELECT id, title, content, volume_name, section_type,
+             (SELECT ss.category FROM section_standards ss WHERE ss.key = section_type) AS standard_category
       FROM proposal_sections
       WHERE id = ${sectionId} AND proposal_id = ${proposalId}
       LIMIT 1

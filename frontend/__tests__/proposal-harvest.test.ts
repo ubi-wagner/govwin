@@ -39,7 +39,7 @@ beforeEach(() => {
 describe('harvestSectionToLibrary', () => {
   it('harvests a new node and emits section.harvested', async () => {
     sqlMock
-      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume' }])) // load section
+      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }])) // load section
       .mockImplementationOnce(() => Promise.resolve([]))  // existing-atom check → none
       .mockImplementationOnce(() => Promise.resolve([]))  // INSERT library_units
       .mockImplementationOnce(() => Promise.resolve([])); // INSERT library_harvest_log
@@ -54,6 +54,34 @@ describe('harvestSectionToLibrary', () => {
         payload: expect.objectContaining({ proposalId: PROPOSAL, sectionId: SECTION, atomsHarvested: 1 }),
       }),
     );
+  });
+
+  it('classifies the harvested atom with the C1 standard bucket (C2)', async () => {
+    sqlMock
+      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }]))
+      .mockImplementationOnce(() => Promise.resolve([]))  // existing-atom check
+      .mockImplementationOnce(() => Promise.resolve([]))  // INSERT library_units
+      .mockImplementationOnce(() => Promise.resolve([])); // INSERT harvest_log
+
+    await harvestSectionToLibrary(TENANT, PROPOSAL, SECTION, 'user-1');
+
+    // Find the library_units INSERT and assert it carries subcategory + meta + the type: tag.
+    const insertCall = sqlMock.mock.calls.find((c) => {
+      const q = Array.isArray(c[0]) ? c[0].join('?') : String(c[0]);
+      return q.includes('INSERT INTO library_units');
+    });
+    expect(insertCall).toBeDefined();
+    const values = (insertCall as unknown[]).slice(1);
+    // subcategory = the standard bucket
+    expect(values).toContain('technical');
+    // tags include the section_type tag
+    const tagsArg = values.find((v) => Array.isArray(v)) as string[] | undefined;
+    expect(tagsArg).toContain('type:technical.innovation');
+    // meta JSON carries the structured classification
+    const metaArg = values.find((v) => typeof v === 'string' && v.includes('standardCategory')) as string | undefined;
+    expect(metaArg).toBeDefined();
+    const meta = JSON.parse(metaArg as string);
+    expect(meta).toMatchObject({ sectionType: 'technical.innovation', standardCategory: 'technical' });
   });
 
   it('dedups when the atom hash already exists (usage bump, no insert)', async () => {

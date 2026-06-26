@@ -92,16 +92,19 @@ HITL §6.5 updated.*
   tags each section (`inferSectionType`) + stores matrix `meta`. RFP-admin **add/remove** via
   `/api/admin/section-standards` (GET/POST) + `[id]` DELETE (soft). *Follow-up: a small admin UI to
   manage the standards list (table + API are live).*
-- 🟡 **C2 · P1 · [→ C1]** Ingest shred-classification (**JSON now, vector-ready**). *Started:
-  harvested library atoms now inherit the section's `section_type` as a `type:<key>` tag.* Treat
-  meta-tags as classified **shreds of the uploaded docs** carrying `meta` JSONB + (later) an
-  embedding: buckets = tech highlights (primary ranking), readiness level, team, tech overviews,
-  commercialization, facilities & equipment, prior funding, past performance (the
-  `section_standards.category` set). The ingest sets the first matrix pass and auto-generates
-  solicitation-specific tagged section skeletons; RFP admin refines in V0; tenant_admin tags
-  documents they create in V1+. **Green:** new-opp ingest produces tagged skeletons; harvested
-  atoms inherit `section_type`/category in `meta`; embedding column added (zero-vector until Phase-4
-  embeddings).
+- 🟢 **C2 · P1 · [→ C1] · SHIPPED** Ingest shred-classification (**JSON now, vector-ready**).
+  Solicitation-specific tagged section skeletons are produced at proposal creation (the create
+  route builds sections from `solicitation_compliance` + tags each via `inferSectionType`, C1).
+  Harvested library atoms are now classified **shreds carrying `meta` JSONB** (mig 080:
+  `library_units.meta`): each atom inherits the section's `section_type` (as a `type:<key>` tag),
+  the standard **bucket category** in `subcategory` (resolved from `section_standards.category` —
+  tech_highlight / tech_overview / readiness / team / commercialization / facilities / funding /
+  past_performance …, indexed `idx_library_tenant_subcat`), and a `meta` blob
+  `{sectionType, standardCategory, provenance, proposalId, sectionId}`. The **embedding column
+  already exists** (`library_units.embedding vector(1536)` + HNSW, mig 001) and stays NULL until
+  Phase-4 populates real vectors (NULL is correctly excluded from cosine search until then).
+  Validated against a live Postgres 16 + pgvector (full chain + the real harvest INSERT).
+  *Follow-on: the shredder classifying raw uploaded-doc content into the same buckets is Phase-4.*
 - 🔴 **C3 · P1 · [→ C1]** Tenant library seeding. Seed foundational atoms (company, collaborators,
   technologies, nested bios) the tenant_admin tags/contexts at onboarding. **Green:** seeding flow
   + tagged `library_units`.
