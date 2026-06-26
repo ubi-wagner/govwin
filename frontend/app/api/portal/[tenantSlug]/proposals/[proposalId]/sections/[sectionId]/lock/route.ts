@@ -239,11 +239,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
       // advance. Best-effort: a failure leaves the proposal ready for a manual
       // advance. The lock route already verified admin access (guard).
       try {
-        const [autoPref] = await sql<{ autoAdvance: boolean }[]>`
+        // NB: the db client camelCases columns (postgres.toCamel), so
+        // auto_advance_when_all_locked → autoAdvanceWhenAllLocked.
+        const [autoPref] = await sql<{ autoAdvanceWhenAllLocked: boolean }[]>`
           SELECT auto_advance_when_all_locked FROM tenant_automation_preferences
           WHERE tenant_id = ${tenantId}::uuid
         `;
-        if (autoPref?.autoAdvance) {
+        if (autoPref?.autoAdvanceWhenAllLocked) {
           const result = await advanceProposalStage({
             tenantId,
             tenantSlug,

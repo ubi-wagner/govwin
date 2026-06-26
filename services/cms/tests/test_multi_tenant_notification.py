@@ -104,6 +104,30 @@ class TestMultiTenantNotification:
         )
         assert sends == ['t1@x.com', 't2@x.com']
 
+    async def test_failed_send_is_not_dedup_logged(self):
+        # A transient send failure must NOT write a dedup row, else the tenant is
+        # suppressed forever on the next poll. send_email returns {error}, not raises.
+        from src.event_listener import _handle_multi_tenant_notification
+        log_mock = AsyncMock()
+
+        async def failing_send(to, subject, html, sender=None):
+            return {'provider': 'gmail', 'error': 'rate limited'}
+
+        with patch('src.event_listener.get_event_pool', return_value=AsyncMock()), \
+             patch('src.event_listener.render_template', return_value='<html>digest</html>'), \
+             patch('src.event_listener.send_email', side_effect=failing_send), \
+             patch('src.event_listener.resolve_sender', return_value='sender@x'), \
+             patch('src.event_listener._automation_pref_allows', new=AsyncMock(return_value=True)), \
+             patch('src.event_listener._check_dedup', new=AsyncMock(return_value=False)), \
+             patch('src.event_listener._resolve_recipient_email', new=AsyncMock(return_value='t1@x.com')), \
+             patch('src.event_listener._log_rule_execution', new=log_mock):
+            await _handle_multi_tenant_notification(
+                _EVENT,
+                {'template': 'spotlight_new_topics', 'tenant_ids': ['t1'], 'trigger_event_id': _EVENT['id']},
+                'spotlight_new_topics',
+            )
+        log_mock.assert_not_called()  # no dedup row written → retried next poll
+
 
 class TestNotificationRequestedRouting:
     async def test_tenant_ids_list_routes_to_multi_tenant(self):

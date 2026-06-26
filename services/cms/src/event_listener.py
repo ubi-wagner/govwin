@@ -558,6 +558,12 @@ async def _handle_multi_tenant_notification(event, payload: dict, template_name:
             logger.info('multi-tenant notification "%s": no recipient for tenant %s', template_name, tid)
             continue
         result = await send_email(to=to_email, subject=subject, html=html, sender=sender)
+        if result.get('error'):
+            # Do NOT write a dedup row on a failed send — leave it un-logged so
+            # the next poll retries this tenant rather than suppressing it forever.
+            logger.warning('multi-tenant notification "%s": send failed for tenant %s: %s',
+                           template_name, tid, result.get('error'))
+            continue
         sent += 1
         logger.info('multi-tenant notification "%s": sent to tenant %s (%s): %s', template_name, tid, to_email, result)
         if trigger_event_id and pool:

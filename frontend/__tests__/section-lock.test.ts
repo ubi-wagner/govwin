@@ -59,8 +59,9 @@ function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFoun
           : [],
       );
     }
-    // Auto-advance opt-in lookup.
-    if (q.includes('auto_advance_when_all_locked')) return Promise.resolve([{ autoAdvance }]);
+    // Auto-advance opt-in lookup. The db client camelCases columns, so the
+    // row key is autoAdvanceWhenAllLocked (postgres.toCamel), matching prod.
+    if (q.includes('auto_advance_when_all_locked')) return Promise.resolve([{ autoAdvanceWhenAllLocked: autoAdvance }]);
     // Document-close + proposal-ready counts: report all sections locked.
     if (q.includes('count(*)')) return Promise.resolve([{ total: 1, locked: 1 }]);
     return Promise.resolve([]); // UPDATE / INSERT
