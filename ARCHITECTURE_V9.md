@@ -5,6 +5,13 @@
 **Verification method:** File-by-file analysis of all 908 tracked files.  
 **Evidence location:** `docs/baseline/inventory/` (8 subsystem inventories) + `docs/baseline/BASELINE_FINDINGS.md` (reconciled synthesis)
 
+**Lifecycle addendum (current push):** the proposal **open-to-close** process — AI draft/regen
+→ per-section accept/lock → document-close → lock-state advance gate (+ force-advance marking)
+→ submit → library harvest — and the **settable AI cost-control** substrate are specified in
+`docs/PROPOSAL_LIFECYCLE_V1.md`. Remaining Red→Green work: `docs/PROPOSAL_LIFECYCLE_TODO.md`.
+Schema since this baseline: migrations **072** (agent config), **073** (atom-outcome unique),
+**074** (`proposal_sections` lock columns).
+
 ## Status Legend
 
 | Symbol | Meaning |

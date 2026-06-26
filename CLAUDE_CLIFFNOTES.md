@@ -7,6 +7,17 @@ this file before writing any code. This is not aspirational — it documents
 the exact patterns that exist in the codebase TODAY and the exact mistakes
 that have been caught and fixed.
 
+**Proposal lifecycle + AI cost controls (current push):** `docs/PROPOSAL_LIFECYCLE_V1.md` is the
+authoritative design for the open-to-close proposal process (per-section accept/lock, lock-state
+advance gate, document-close, per-section library harvest) and settable AI limits;
+`docs/PROPOSAL_LIFECYCLE_TODO.md` tracks remaining Red→Green work. Schema since the 067 baseline:
+mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library_atom_outcomes`
+`UNIQUE(unit_id, proposal_id)`), **074** (`proposal_sections`: `is_locked`, `locked_at`,
+`locked_by`, `volume_name`, `volume_number`). New event types: `proposal:section.locked` /
+`section.unlocked`, `library:section.harvested`, `proposal:document.locked`,
+`proposal:proposal.ready_to_advance`. Human labels + deep-links are centralized in
+`lib/event-labels.ts` (key on the real `type`, never `${namespace}.${type}`).
+
 ---
 
 ## 1. Database Schema Quick Reference
