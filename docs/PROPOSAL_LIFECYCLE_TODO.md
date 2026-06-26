@@ -92,7 +92,8 @@ HITL §6.5 updated.*
   tags each section (`inferSectionType`) + stores matrix `meta`. RFP-admin **add/remove** via
   `/api/admin/section-standards` (GET/POST) + `[id]` DELETE (soft). *Follow-up: a small admin UI to
   manage the standards list (table + API are live).*
-- 🔴 **C2 · P1 · [→ C1]** Ingest shred-classification (**JSON now, vector-ready**). Treat
+- 🟡 **C2 · P1 · [→ C1]** Ingest shred-classification (**JSON now, vector-ready**). *Started:
+  harvested library atoms now inherit the section's `section_type` as a `type:<key>` tag.* Treat
   meta-tags as classified **shreds of the uploaded docs** carrying `meta` JSONB + (later) an
   embedding: buckets = tech highlights (primary ranking), readiness level, team, tech overviews,
   commercialization, facilities & equipment, prior funding, past performance (the

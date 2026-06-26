@@ -125,7 +125,7 @@ export interface HarvestResult {
 async function harvestSectionNodes(
   tenantId: string,
   proposalId: string,
-  section: { id: string; title: string; content: string | null; volumeName?: string | null },
+  section: { id: string; title: string; content: string | null; volumeName?: string | null; sectionType?: string | null },
   provenanceTag: string,
 ): Promise<HarvestResult> {
   let atomsHarvested = 0;
@@ -147,7 +147,15 @@ async function harvestSectionNodes(
   const category = sectionToCategory(section.title);
   const sectionSlug = slugify(section.title);
   const volumeSlug = section.volumeName ? slugify(section.volumeName) : null;
-  const tags = ['harvested', provenanceTag, sectionSlug, ...(volumeSlug ? [volumeSlug] : [])];
+  // Inherit the section's standard classification (C1/C2) so atoms are
+  // retrievable by section_type — the foundation for matrix-driven canvas selection.
+  const tags = [
+    'harvested',
+    provenanceTag,
+    sectionSlug,
+    ...(volumeSlug ? [volumeSlug] : []),
+    ...(section.sectionType ? [`type:${section.sectionType}`] : []),
+  ];
 
   for (const node of canvasDoc.nodes) {
     if (!isHarvestable(node)) {
@@ -243,8 +251,9 @@ export async function harvestProposalToLibrary(
       title: string;
       content: string | null;
       volumeName: string | null;
+      sectionType: string | null;
     }>>`
-      SELECT id, title, content, volume_name
+      SELECT id, title, content, volume_name, section_type
       FROM proposal_sections
       WHERE proposal_id = ${proposalId}
       ORDER BY section_number
@@ -296,8 +305,8 @@ export async function harvestSectionToLibrary(
 ): Promise<HarvestResult> {
   let section: { id: string; title: string; content: string | null; volumeName: string | null } | undefined;
   try {
-    [section] = await sql<Array<{ id: string; title: string; content: string | null; volumeName: string | null }>>`
-      SELECT id, title, content, volume_name
+    [section] = await sql<Array<{ id: string; title: string; content: string | null; volumeName: string | null; sectionType: string | null }>>`
+      SELECT id, title, content, volume_name, section_type
       FROM proposal_sections
       WHERE id = ${sectionId} AND proposal_id = ${proposalId}
       LIMIT 1
