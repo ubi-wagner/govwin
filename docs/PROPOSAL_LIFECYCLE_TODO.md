@@ -118,7 +118,12 @@ HITL §6.5 updated.*
   `proposal_comments.recommendation_type/category`; advance route enqueues per-section
   `review_section` tasks when `ai_review_on_advance` is on; `fabric._post_section_recommendation`
   writes the completed review back as an `ai_review` comment; canvas context box renders the
-  "🤖 AI Review" badge). Increment 3 (notification/flow enforcement) is designed + infra-ready in
+  "🤖 AI Review" badge). Increment 3a SHIPPED — notification gating: the CMS `event_listener`
+  consults `tenant_automation_preferences` (rules opt in via `action_config.tenant_pref`,
+  allowlisted, default-on) and surfaces `system_events.tenant_id` into the payload for recipient
+  resolution; seed rules for `document.locked`/`proposal.advance_ready` + `tenant_pref` on the
+  existing `proposal.advanced` rule (mig 078) + two email templates. Increment 3b (auto-advance on
+  `proposal.advance_ready` when `auto_advance_when_all_locked` is on) is designed in
   `PROPOSAL_LIFECYCLE_V1.md` §C3.* Remaining at the
   workflow step-milestones: The pipeline is a workflow; hang automation off the existing step milestones +
   outcome hooks, **configured by the customer admin at portal purchase** (start there), then run

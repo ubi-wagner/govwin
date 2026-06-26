@@ -303,11 +303,25 @@ archetypes + `requestAgentTask()` enqueue. The only missing link is the trigger 
      existing `CommentThread` (the "context boxes"). Attribution = the admin who triggered the review.
   *Tests:* advance enqueues-when-pref-on / skips-when-off (vitest) + the write-back inserts a comment (pytest).
 
-**Increment 3 — notification + flow enforcement · 🔴 designed.** Have the executors consult
-`tenant_automation_preferences`: the CMS `event_listener` (tenant-scope rule matching) for
-`document.locked`→team email and collaborator "get-ready" emails; auto-advance on
-`proposal.advance_ready` when `auto_advance_when_all_locked` is on. Plus the common-automation
-seed defaults.
+**Increment 3 — notification + flow enforcement.** Have the executors consult
+`tenant_automation_preferences`.
+  - **3a — notification gating · 🟢 SHIPPED.** The CMS `event_listener` now gates tenant-scoped
+    notification rules on the customer toggles. A rule opts in via `action_config.tenant_pref`
+    (an allowlisted column); `_automation_pref_allows()` reads `tenant_automation_preferences`
+    (shared DB, via the event pool) and skips the send when the toggle is off — default-on
+    (ungated rules, non-tenant events, unknown prefs, missing rows, and lookup errors all
+    proceed). The listener also surfaces the `system_events.tenant_id` column into the payload so
+    `to_field=payload.tenantId` recipient resolution works (this also repaired the pre-existing
+    `proposal.advanced` rule, which had the same to_field but no tenant in its payload). Seed
+    (mig 078): rules for `proposal:document.locked` → `notify_team_on_document_locked` and
+    `proposal:proposal.advance_ready` → `notify_collaborators_get_ready`, plus a `tenant_pref`
+    on the existing `proposal.advanced` rule → `notify_on_stage_advanced`. Templates
+    `document_locked_team_notify` + `collaborator_get_ready`. *V1 targets the tenant admin; a
+    per-collaborator fan-out for the "get ready" email and a `notify_on_new_priority_opp` rule
+    (the finder opportunity alert is workflow-only today) are follow-ons.*
+  - **3b — auto-advance · 🔴 designed.** Auto-advance on `proposal.advance_ready` when
+    `auto_advance_when_all_locked` is on (extract a shared advance-core; trigger from the lock
+    route's all-locked path).
 
 **Compliance:** every agent invocation already passes the budget/rate/per-call guard (§8) and
 fails closed; events stay in the `proposal`/`library`/`capture` namespaces; RBAC is tenant_admin+

@@ -235,6 +235,69 @@ def _rule_matches(
     return phase != 'start'
 
 
+# ── Tenant automation-preference gate (C3 Increment 3) ───────────────
+# A tenant-scoped rule opts into a customer toggle by naming a column in its
+# action_config.tenant_pref. The listener consults tenant_automation_preferences
+# (shared DB, reachable via the event pool) and skips the action when the tenant
+# has that toggle off. Default-on: a tenant with no preferences row uses the
+# column default. The pref name is allowlisted before it touches SQL.
+_GATED_PREFS: set[str] = {
+    'notify_team_on_document_locked',
+    'notify_collaborators_get_ready',
+    'notify_on_stage_advanced',
+    'notify_on_new_priority_opp',
+}
+_PREF_DEFAULTS: dict[str, bool] = {
+    'notify_team_on_document_locked': True,
+    'notify_collaborators_get_ready': True,
+    'notify_on_stage_advanced': True,
+    'notify_on_new_priority_opp': True,
+}
+
+
+def _extract_tenant_pref(config) -> str | None:
+    """Pull the tenant_pref column name from a rule's action_config (dict form,
+    or the first list item that declares one)."""
+    if isinstance(config, dict):
+        pref = config.get('tenant_pref')
+        return pref if isinstance(pref, str) else None
+    if isinstance(config, list):
+        for action in config:
+            if isinstance(action, dict) and isinstance(action.get('tenant_pref'), str):
+                return action['tenant_pref']
+    return None
+
+
+async def _automation_pref_allows(config, payload: dict) -> bool:
+    """Return False only when a tenant has explicitly turned off the customer
+    toggle this rule opts into. Ungated rules, non-tenant-scoped events, unknown
+    pref names, and lookup failures all return True (never silently suppress)."""
+    pref = _extract_tenant_pref(config)
+    if not pref:
+        return True  # rule is not preference-gated
+    if pref not in _GATED_PREFS:
+        logger.warning('automation rule names unknown tenant_pref %r — not gating', pref)
+        return True
+    tenant_id = payload.get('tenantId') or payload.get('tenant_id')
+    if not tenant_id:
+        return True  # not tenant-scoped; cannot (and must not) suppress
+    pool = get_event_pool()
+    if not pool:
+        return True
+    try:
+        # pref is allowlisted against _GATED_PREFS above, so this interpolation is safe.
+        row = await pool.fetchrow(
+            f'SELECT {pref} AS v FROM tenant_automation_preferences WHERE tenant_id = $1::uuid',
+            str(tenant_id),
+        )
+    except Exception as e:
+        logger.warning('tenant preference lookup failed for %s (tenant %s): %s — allowing', pref, tenant_id, e)
+        return True  # best-effort: a lookup error must not block notifications
+    if row is None:
+        return _PREF_DEFAULTS.get(pref, True)  # lazy row — use the documented default
+    return bool(row['v'])
+
+
 async def _execute_rule(rule, col_names: set, event):
     pool = get_event_pool()
     payload = event.get('payload')
@@ -245,6 +308,13 @@ async def _execute_rule(rule, col_names: set, event):
             payload = {}
     if not payload:
         payload = {}
+
+    # Surface the event's tenant_id column into the payload so tenant-scoped
+    # rules resolve consistently — recipient resolution (to_field=payload.tenantId)
+    # and the preference gate both read payload.tenantId, but emitters store the
+    # tenant on the system_events.tenant_id column rather than in the payload.
+    if 'tenantId' not in payload and event.get('tenant_id'):
+        payload = {**payload, 'tenantId': str(event.get('tenant_id'))}
 
     # Get action config — adapt to column names
     if 'action_config' in col_names:
@@ -264,6 +334,15 @@ async def _execute_rule(rule, col_names: set, event):
 
     rule_id = rule.get('id')
     event_id = event.get('id')
+
+    # Tenant automation-preference gate (C3 Increment 3): if this rule opts into
+    # a customer toggle, skip it when the tenant has that toggle off.
+    if not await _automation_pref_allows(config, payload):
+        logger.info(
+            'Skipping rule "%s" for event %s — tenant preference off',
+            rule.get('name') or rule_id, event_id,
+        )
+        return
 
     # If actions is a list of action objects, process each
     if isinstance(config, list):

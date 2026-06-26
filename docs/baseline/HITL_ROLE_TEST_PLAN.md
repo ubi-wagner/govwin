@@ -362,7 +362,26 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Route: `GET`/`PATCH /api/portal/[tenantSlug]/automation-preferences`; table:
     `tenant_automation_preferences` (mig 076). Drives TU-10c (AI review on advance).
 
-**tenant_admin total: 13 steps**
+- [ ] **TA-14** — **Notification gating** (C3 Increment 3a). Confirm the notify-* toggles actually
+    gate the lifecycle emails the CMS event_listener sends.
+  - Expected: with `notify_team_on_document_locked` **on** (default), locking the last section of a
+    volume (TU-09b emits `proposal:document.locked`) causes the CMS event_listener to fire the
+    "Proposal document locked — notify team" rule (mig 078) and send the `document_locked_team_notify`
+    email to the tenant admin. Likewise `proposal.advance_ready` → `collaborator_get_ready`
+    (gated by `notify_collaborators_get_ready`) and `proposal.advanced` → `stage_advanced`
+    (gated by `notify_on_stage_advanced`).
+  - Negative: turn a toggle **off** on the Automation page (TA-13); re-trigger the event → the
+    listener logs "Skipping rule … tenant preference off" and **no** email/`automation_log` row is
+    written for that rule. Rules with no `tenant_pref`, and events with no tenant scope, are
+    unaffected (default-on safety).
+  - **Verify in-house:** requires the CMS service running with `SHARED_DATABASE_URL` set (so the
+    listener can read `tenant_automation_preferences`) and Google Workspace creds for actual
+    delivery (absent creds it no-ops gracefully). Query `SELECT action_type, status FROM
+    automation_log WHERE trigger_event_id = '[event id]';` to confirm fire-vs-skip.
+  - Tables/code: `automation_rules` (mig 078), `tenant_automation_preferences`,
+    `services/cms/src/event_listener.py::_automation_pref_allows`.
+
+**tenant_admin total: 14 steps**
 
 ---
 

@@ -570,6 +570,26 @@ TEMPLATES.update({
         compliance-checked export package has been generated.</p>
         {_button('Open Workspace', p.get('workspaceUrl', '/portal'))}
     '''),
+    'document_locked_team_notify': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">A proposal document is locked</h2>
+        <p>Good news &mdash; a document on your proposal has been fully reviewed and locked.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            {f'<p style="margin:4px 0;"><strong>Document:</strong> {_e(p.get("volumeName"))}</p>' if p.get('volumeName') else ''}
+            <p style="margin:4px 0;"><strong>Sections locked:</strong> {_e(p.get('sectionCount', 'N/A'))}</p>
+            <p style="margin:4px 0;"><strong>Current stage:</strong> {_e(p.get('stage', 'N/A'))}</p>
+        </div>
+        <p>Locked sections are captured and snapshotted. When every document is locked, the proposal is ready to advance.</p>
+        {_button('Open Workspace', p.get('workspaceUrl', '/portal'))}
+    '''),
+    'collaborator_get_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Your proposal is ready to advance</h2>
+        <p>Every section of your proposal is now accepted and locked. It is ready to move to the next stage.</p>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:0;font-weight:600;color:#166534;">All {_e(p.get('sectionCount', ''))} sections locked &mdash; ready at the <strong>{_e(p.get('stage', 'current'))}</strong> gate.</p>
+        </div>
+        <p>Get your team ready: open the workspace to review the locked package and advance the proposal when you are set.</p>
+        {_button('Open Workspace', p.get('workspaceUrl', '/portal'))}
+    '''),
     'admin_proposal_review_required': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">New proposal &mdash; admin review required</h2>
         <p>A new proposal workspace was created and needs admin review.</p>
