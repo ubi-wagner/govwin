@@ -232,12 +232,18 @@ concern; all readiness reads switch to `is_locked`.
 ## 10. Section meta-tagging (Phase-3 keystone — design intent)
 
 The larger vision (library seeding, spotlight buckets, matrix-driven canvas selection) all hinge
-on **section meta-tags** that don't exist yet. Planned: add `section_type` + `tags[]` + `meta`
-(JSONB) to `proposal_sections`, set at **ingest** (auto-generated solicitation-specific
-documents/sections, meta-tagged Team/Bio, Technical/Overview/Technology-Name), carried into the
-V0 skeleton and onto harvested `library_units`. This unlocks: tenant library seeding (company /
-collaborator / technology foundational atoms), spotlight-bucket classification + per-bucket
-opportunity scoring, and "similar section" retrieval driving canvas selections. See ToDo Track C.
+on **section meta-tags**. **Shipped (C1, mig 075):** a discrete, hierarchical `section_standards`
+taxonomy (Team→Bio, Technical→Overview/Innovation/Readiness, Commercialization, Facilities &
+Equipment, Cost→Budget, … seeded for DOD/NSF/SBIR/STTR, **RFP-admin editable** via
+`/api/admin/section-standards`), plus `proposal_sections.section_type` (soft ref) + `tags[]` +
+`meta` (JSONB). The create-route tags each section (`lib/section-standards.ts::inferSectionType`)
+and stores matrix `meta`. **Next (C2, vector-ready):** carry the classification onto harvested
+`library_units` + an embedding column so meta-tags become classified, vector-searchable **shreds**
+(tech highlights w/ primary ranking, readiness, team, tech overviews, commercialization, facilities
+& equipment, prior funding); then tenant library seeding, spotlight-bucket scoring, and "similar
+section" retrieval. **C3 (automation):** pipeline step-milestone automations the customer admin
+configures at portal purchase, incl. **AI-agent review tasking** on force-advance (grammar / flow /
+compliance → recommendations in section context boxes). See ToDo Track C.
 
 ---
 
@@ -254,7 +260,8 @@ opportunity scoring, and "similar section" retrieval driving canvas selections. 
 | Advance gated on lock state | `advance/route.ts` + tests | 🟢 shipped (2a) |
 | Document-close + per-section harvest | lock route, `proposal-harvest.ts` | 🟢 shipped (2b) |
 | Lock↔status unification (Phase 2c) | review page, stage-control (+force UI), advance route, API isEditable, save route | 🟢 shipped + tested |
-| Section meta-tagging + Phase 3 | — | 🔴 roadmap (ToDo Track C) |
+| Section-standards taxonomy keystone (C1) | mig 075, `section_standards`, `section-standards` admin API, create-route tagging | 🟢 shipped + tested |
+| Phase 3 C2 (shred classification/vector) · C3 (automation + agent tasking) · C4–C6 | — | 🔴 roadmap (ToDo Track C) |
 
 **Independently re-verified this review:** (a) `vol.volumeName`/`volumeNumber` resolve to real
 NOT-NULL DB values; (b) `access.role==='admin'` admits exactly {tenant_admin-own-tenant,

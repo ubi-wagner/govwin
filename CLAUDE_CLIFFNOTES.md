@@ -13,7 +13,8 @@ advance gate, document-close, per-section library harvest) and settable AI limit
 `docs/PROPOSAL_LIFECYCLE_TODO.md` tracks remaining Red→Green work. Schema since the 067 baseline:
 mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library_atom_outcomes`
 `UNIQUE(unit_id, proposal_id)`), **074** (`proposal_sections`: `is_locked`, `locked_at`,
-`locked_by`, `volume_name`, `volume_number`). New event types: `proposal:section.locked` /
+`locked_by`, `volume_name`, `volume_number`), **075** (`section_standards` taxonomy +
+`proposal_sections.section_type`/`tags`/`meta`). New event types: `proposal:section.locked` /
 `section.unlocked`, `library:section.harvested`, `proposal:document.locked`,
 `proposal:proposal.advance_ready`. Human labels + deep-links are centralized in
 `lib/event-labels.ts` (key on the real `type`, never `${namespace}.${type}`).

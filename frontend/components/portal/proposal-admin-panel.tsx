@@ -169,6 +169,7 @@ export function ProposalAdminPanel({
   const [gatesLoaded, setGatesLoaded] = useState(false);
   const [lockOverrides, setLockOverrides] = useState<Record<string, boolean>>({});
   const [lockPending, setLockPending] = useState<string | null>(null);
+  const [lockingAll, setLockingAll] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
   const [newGateLabel, setNewGateLabel] = useState('');
   const [newGateStage, setNewGateStage] = useState('');
@@ -338,10 +339,38 @@ export function ProposalAdminPanel({
     }
   }, [tenantSlug, proposalId]);
 
+  // Bulk "Accept & Lock All" — locks every unlocked, draftable section so the
+  // whole document can advance in one click. Reuses the per-section lock route,
+  // so each lock emits section.locked + harvests + (on the last) document.locked
+  // and proposal.advance_ready. The advance gate then passes.
+  const handleLockAll = useCallback(async () => {
+    if (lockingAll) return;
+    const targets = sections.filter(
+      (s) => !(lockOverrides[s.id] ?? !!s.isLocked) && s.status !== 'empty' && s.nodeCount > 0,
+    );
+    if (targets.length === 0) return;
+    setLockingAll(true);
+    try {
+      for (const s of targets) {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${s.id}/lock`,
+          { method: 'POST' },
+        );
+        if (res.ok) setLockOverrides((prev) => ({ ...prev, [s.id]: true }));
+      }
+      router.refresh();
+    } finally {
+      setLockingAll(false);
+    }
+  }, [sections, lockOverrides, lockingAll, tenantSlug, proposalId, router]);
+
   const isSectionLocked = (s: SectionItem) => lockOverrides[s.id] ?? !!s.isLocked;
 
   // Group sections by document/volume (real matrix identity, prefix fallback).
   const volumes = groupSectionsByVolume(sections);
+  const unlockedLockable = sections.filter(
+    (s) => !isSectionLocked(s) && s.status !== 'empty' && s.nodeCount > 0,
+  );
 
   const complianceItems = compliance?.items || [];
 
@@ -375,6 +404,20 @@ export function ProposalAdminPanel({
       {/* ─── Artifacts Tab ────────────────────────────────────────── */}
       {activeTab === 'artifacts' && (
         <div>
+          {unlockedLockable.length > 0 && (
+            <div className="flex items-center justify-between mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <p className="text-xs text-indigo-800">
+                {unlockedLockable.length} section{unlockedLockable.length > 1 ? 's' : ''} drafted and ready to accept &amp; lock for this stage.
+              </p>
+              <button
+                onClick={handleLockAll}
+                disabled={lockingAll}
+                className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {lockingAll ? 'Locking…' : `Accept & Lock All (${unlockedLockable.length})`}
+              </button>
+            </div>
+          )}
           {volumes.map((volume) => (
             <div key={volume.label} className="mb-5">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg">

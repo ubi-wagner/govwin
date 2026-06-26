@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
+import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
@@ -246,6 +247,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       uei: '{uei}',
     };
 
+    // Load active section standards once to tag each section against the
+    // taxonomy (C1). Best-effort — pre-migration or empty just leaves sections
+    // untagged (section_type = null).
+    let sectionStandards: SectionStandard[] = [];
+    try {
+      sectionStandards = await sql<SectionStandard[]>`
+        SELECT key, label FROM section_standards WHERE is_active = true
+      `;
+    } catch (stdErr) {
+      console.error('[api/portal/proposals/create] section_standards load failed (non-fatal):', stdErr);
+    }
+
     const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
@@ -271,7 +284,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           const [section] = await tx<{ id: string }[]>`
             INSERT INTO proposal_sections (
               proposal_id, section_number, title, content, status, page_allocation,
-              volume_name, volume_number
+              volume_name, volume_number, section_type, meta
             ) VALUES (
               ${proposalRow.id},
               ${String(item.itemNumber)},
@@ -280,7 +293,9 @@ export async function POST(request: Request, ctx: RouteContext) {
               'empty',
               ${item.pageLimit},
               ${item.volumeName},
-              ${item.volumeNumber}
+              ${item.volumeNumber},
+              ${inferSectionType(item.itemName, sectionStandards)},
+              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null })}::jsonb
             )
             RETURNING id
           `;

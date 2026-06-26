@@ -72,11 +72,12 @@ HITL §6.5 updated.*
   "locked" (cosmetic).
 - 🟢 **B3 · P2** Event naming. Renamed `proposal.ready_to_advance` → **`proposal.advance_ready`**
   across the emitter, `event-labels.ts`, tests, and docs.
-- 🟡 **B4 · P1** Regenerate-with-prompt. **Capability already ships** — the per-node revision
-  panel (`ai-revision-panel.tsx`) has a "Regenerate" preset + a custom-instruction field invoking
-  `proposal.draft_section` (which accepts an `instruction` param, verified). Remaining enhancement:
-  a one-click *whole-section* regen button (replace all section nodes) wired through the workspace
-  `onSectionDrafted` path. Backend is ready (`ai/draft` accepts `{sectionId, instructions}`).
+- 🟢 **B4 · P1** Bulk **"Accept & Lock All"** — top-of-Artifacts button (admin) locks every
+  unlocked, drafted section in one click (loops the per-section lock route, so each emits
+  `section.locked` + harvests, and the last fires `document.locked` + `proposal.advance_ready`),
+  letting the whole document clear the advance gate. Per-node **regenerate-with-prompt** also
+  already ships (`ai-revision-panel.tsx` custom-instruction field + the `instruction` param on
+  `proposal.draft_section`). *(One-click whole-section regen remains a minor convenience.)*
 
 ---
 
@@ -84,12 +85,22 @@ HITL §6.5 updated.*
 
 *C1 is the keystone that unblocks C2/C3/C4. C5/C6/C7 are independent and can run in parallel with C1–C4.*
 
-- 🔴 **C1 · P1 · keystone** Section meta-tag schema. **Green:** mig adds
-  `proposal_sections.section_type`, `tags TEXT[]`, `meta JSONB`; create-route + harvest carry
-  them; backfill nulls safe.
-- 🔴 **C2 · P1 · [→ C1]** Ingest auto-tagging. Auto-generate solicitation-specific
-  documents/sections from the matrix, meta-tagged (Team/Bio, Technical/Overview/Technology-Name);
-  RFP admin refines in V0. **Green:** new opp ingest produces tagged section skeletons.
+- 🟢 **C1 · P1 · keystone** Section meta-tag schema — **shipped**. Migration **075**: a discrete,
+  hierarchical `section_standards` taxonomy (Team→Bio, Technical→Overview/Innovation/Readiness,
+  Commercialization, Facilities & Equipment, Cost→Budget, …) seeded for DOD/NSF/SBIR/STTR;
+  `proposal_sections` gains `section_type` (soft ref) + `tags TEXT[]` + `meta JSONB`. Create-route
+  tags each section (`inferSectionType`) + stores matrix `meta`. RFP-admin **add/remove** via
+  `/api/admin/section-standards` (GET/POST) + `[id]` DELETE (soft). *Follow-up: a small admin UI to
+  manage the standards list (table + API are live).*
+- 🔴 **C2 · P1 · [→ C1]** Ingest shred-classification (**JSON now, vector-ready**). Treat
+  meta-tags as classified **shreds of the uploaded docs** carrying `meta` JSONB + (later) an
+  embedding: buckets = tech highlights (primary ranking), readiness level, team, tech overviews,
+  commercialization, facilities & equipment, prior funding, past performance (the
+  `section_standards.category` set). The ingest sets the first matrix pass and auto-generates
+  solicitation-specific tagged section skeletons; RFP admin refines in V0; tenant_admin tags
+  documents they create in V1+. **Green:** new-opp ingest produces tagged skeletons; harvested
+  atoms inherit `section_type`/category in `meta`; embedding column added (zero-vector until Phase-4
+  embeddings).
 - 🔴 **C3 · P1 · [→ C1]** Tenant library seeding. Seed foundational atoms (company, collaborators,
   technologies, nested bios) the tenant_admin tags/contexts at onboarding. **Green:** seeding flow
   + tagged `library_units`.
@@ -100,9 +111,19 @@ HITL §6.5 updated.*
   prior funding) + `spotlight_bucket_score` per opp×bucket; opp shows rank per active bucket.
 - 🔴 **C6 · P2 · [∥]** Opportunity lifecycle: archive-on-close + reconstitution / close-date change
   / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
-- 🔴 **C7 · P2 · [→ C5]** Notification automation off emitters. New-priority-opp alerts;
-  `document.locked`→collaborator "get-ready" emails; `proposal.advance_ready`→auto-advance under
-  an agent manager. **Green:** automation rules consuming the (already-emitted) events.
+- 🔴 **C7 · P1 · [∥]** Pipeline automation + **AI-agent review tasking** at the workflow
+  step-milestones. The pipeline is a workflow; hang automation off the existing step milestones +
+  outcome hooks, **configured by the customer admin at portal purchase** (start there), then run
+  the code through and fill gaps with the most common proposal-dev automations. Driven by
+  already-emitted events: `document.locked`→collaborator "get-ready" emails;
+  `proposal.advance_ready`→optional auto-advance; new-priority-opp→customer alerts.
+  **AI-agent tasking (key):** on an admin **force-advance to the next stage**, task our agents
+  (grammar / flow / fluidity / compliance-matrix evaluation — skill-based) to review the completed
+  work and surface **recommended changes inside each section's context boxes** — the same
+  prompt→regen mechanism, but *we* prompt the agents by skill. **Green:** a customer-admin
+  automation-setup step at purchase + at least one agent-review task on force-advance writing
+  recommendations into section context. *(This is the on-ramp for the built-but-dormant agent
+  workforce — `fabric.py`/archetypes — into the customer loop.)*
 
 ---
 
