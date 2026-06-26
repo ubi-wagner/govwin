@@ -468,6 +468,9 @@ export function CanvasSidebar({
               <LibraryPicker
                 category={sectionCategory ?? selectedNode.type}
                 query={getNodeText(selectedNode).slice(0, 200) || undefined}
+                tenantSlug={tenantSlug}
+                sectionId={sectionId}
+                proposalId={proposalId}
                 onSelect={(atom) => {
                   onReplaceFromLibrary(selectedNode.id, atom);
                   setShowLibraryPicker(false);

@@ -108,8 +108,14 @@ HITL §6.5 updated.*
 - 🔴 **C3 · P1 · [→ C1]** Tenant library seeding. Seed foundational atoms (company, collaborators,
   technologies, nested bios) the tenant_admin tags/contexts at onboarding. **Green:** seeding flow
   + tagged `library_units`.
-- 🔴 **C4 · P2 · [→ C1,C3]** "Similar section" retrieval UI. Atoms have embeddings (HNSW) but no
-  retrieval UI. **Green:** sortable similar-atom picker in the canvas, scoped by section_type/tags.
+- 🟢 **C4 · P2 · [→ C1,C2] · SHIPPED** "Similar section" retrieval UI. The canvas `LibraryPicker`
+  now scopes candidates to the section's C1 `section_type` (the `type:<key>` tag) + standard bucket
+  (`subcategory`), not just the title-derived category, via a new
+  `GET /api/portal/[slug]/library/similar` route that resolves `section_type` server-side from
+  `sectionId`, excludes atoms harvested from the current proposal, and sorts by **best match /
+  most used / most recent**. Falls back to the category-based `library.search_atoms` in admin
+  context (no tenant/section). Tag/bucket-scoped now; embedding-ranked in Phase-4. Validated
+  against a live Postgres (assembled scoped + fallback queries run).
 - 🔴 **C5 · P1 · [∥]** Spotlight bucket taxonomy + per-bucket scoring. `spotlights` is filter-only.
   **Green:** classification (technology/innovation/service-offering, readiness, capabilities,
   prior funding) + `spotlight_bucket_score` per opp×bucket; opp shows rank per active bucket.
