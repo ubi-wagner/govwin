@@ -95,6 +95,9 @@ export default async function PortalLayout({
                 {isTenantAdmin && (
                   <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
                 )}
+                {isTenantAdmin && (
+                  <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>
+                )}
               </>
             )}
             {!isPartner && (
