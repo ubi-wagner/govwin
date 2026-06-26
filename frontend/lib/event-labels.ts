@@ -84,6 +84,10 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'topic.unpinned': 'Opportunity unpinned',
   'opportunity.pinned': 'Opportunity pinned',
   'opportunity.unpinned': 'Opportunity unpinned',
+  'opportunity.closed': (p) => `Opportunity closed${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'opportunity.reopened': (p) => `Opportunity reopened${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'opportunity.archived': (p) => `Opportunity archived${str(p.title) ? `: ${str(p.title)}` : ''}`,
+  'opportunity.close_date_changed': (p) => `Opportunity close date changed${str(p.newCloseDate) ? ` to ${str(p.newCloseDate)}` : ''}`,
   'profile.updated': 'Company profile updated',
   'process.force_advanced': 'Process advanced',
 

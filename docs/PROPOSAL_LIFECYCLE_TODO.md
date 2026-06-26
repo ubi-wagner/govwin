@@ -125,8 +125,16 @@ HITL §6.5 updated.*
   **detail page shows the opp's rank per active bucket** ("#2 of 12") via a read-time window query.
   Validated against a live Postgres (mig + unnest upsert + rank window). Pipeline +7 bucket tests.
   *Rank is read-time (always fresh); the bucket weights are a tunable v1 heuristic.*
-- 🔴 **C6 · P2 · [∥]** Opportunity lifecycle: archive-on-close + reconstitution / close-date change
-  / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
+- 🟢 **C6 · P2 · [∥] · SHIPPED** Opportunity lifecycle: archive / close / reopen / close-date change
+  (rfp admin). Soft-state (mig 082: `opportunities.lifecycle_status` open/closed/archived +
+  closed_at/reason/reopened_at/previous_close_date; `opportunity_lifecycle_actions` audit). New
+  `POST /api/admin/opportunities/[oppId]/lifecycle` (rfp_admin+) does a guarded conditional UPDATE
+  (invalid transition → 409) + audit insert in a tx, keeps `is_active` in sync with the status (so
+  the customer spotlight feed auto-hides closed/archived opps and reopening restores them), and
+  emits `finder:opportunity.{closed,reopened,archived,close_date_changed}` (labels +
+  `/spotlights/[id]` deep-link added). **All opps retained** — no deletes; proposals referencing a
+  closed opp keep working. Validated against a live Postgres (mig + close→reopen + audit). +9 tests.
+  *Follow-on: an auto-close-on-expiry job + an admin UI button (the route is the control today).*
 - 🟢 **C7 · P1 · [∥] · CLOSED** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —
   customer automation setup (mig 076 `tenant_automation_preferences` + portal API + Automation
   page). Increment 2 SHIPPED — AI review on advance → section context boxes (mig 077
