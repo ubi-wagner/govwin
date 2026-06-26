@@ -349,7 +349,20 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
     `GET /api/portal/[tenantSlug]/agents/usage` returns `403` for below-tenant_admin.
   - Route: `GET /api/portal/[tenantSlug]/agents/usage`; tables: `agent_task_log`, `tenant_agent_config`, `platform_agent_config`. No pricing data is ever returned (§7).
 
-**tenant_admin total: 12 steps**
+### 5.7 Automation Setup (C3 Increment 1)
+
+- [ ] **TA-13** — Visit `/portal/[slug]/automation`; review the automation preference toggles.
+  - Expected: the page renders the tenant's preferences (notify-team-on-document-locked,
+    collaborator "get-ready" emails, notify-on-stage-advanced, new-priority-opp alerts,
+    **AI review on advance** [default on], **auto-advance when all locked** [default off]). Toggling
+    a switch persists via an allowlisted upsert; reloading shows the saved state. First save writes
+    a `tenant_automation_preferences` row (`configured_at` set).
+  - Negative: a `tenant_user` does not see the nav link and is redirected; `PATCH …` is rejected for
+    below-tenant_admin.
+  - Route: `GET`/`PATCH /api/portal/[tenantSlug]/automation-preferences`; table:
+    `tenant_automation_preferences` (mig 076). Drives TU-10c (AI review on advance).
+
+**tenant_admin total: 13 steps**
 
 ---
 
@@ -434,6 +447,26 @@ tenant seeded it.*
   - Expected: "Ready for Final" reflects **lock state** (all sections locked ⇒ ready), not the old
     `status='complete'` count; the page agrees with the advance gate.
 
+- [ ] **TU-10c** — **AI review on advance → section context boxes** (C3 Increment 2). With the
+    tenant's **Automation** setting `ai_review_on_advance` left **on** (default), advance the proposal
+    (TU-10 or force-advance TU-10a).
+  - Expected: the advance succeeds normally (the review is best-effort and never blocks). For each
+    locked section with content, a `review_section` task is enqueued for `color_team_reviewer`
+    (`agent_task_queue`, `proposal_id`/`section_id` set, `input.requestedBy` = the advancing user).
+    Within one fabric poll cycle (~20s) the worker completes it and writes the review back as a
+    comment with `recommendation_type='ai_review'`. Reopen the section's context box in the canvas
+    sidebar: the recommendation renders with the **"🤖 AI Review"** badge, the section-type category,
+    and a **Dismiss** (not Resolve) action.
+  - Negative: turn `ai_review_on_advance` **off** on the Automation page (TA-13), advance again →
+    **no** `review_section` task is enqueued.
+  - Routes: `POST …/advance` (enqueue, gated on `tenant_automation_preferences.ai_review_on_advance`);
+    pipeline `fabric.process_task_queue` → `_post_section_recommendation`; surfaced via
+    `GET …/comments`. Tables: `agent_task_queue`, `agent_task_results`, `proposal_comments`
+    (`recommendation_type`, `category` — mig 077).
+  - **Verify in-house:** `SELECT recommendation_type, category, left(content,60) FROM proposal_comments
+    WHERE proposal_id='[id]' AND recommendation_type='ai_review';` — confirm one row per reviewed
+    section. Requires the pipeline worker running (`process_task_queue`) and `ANTHROPIC_API_KEY` set.
+
 ### 6.6 Comments
 
 - [ ] **TU-11** — Leave a comment on a proposal.
@@ -450,7 +483,7 @@ tenant seeded it.*
   - Expected: `library_units` rows updated with extracted atoms; event: `library:document.atomized:single`.
   - Route: `POST /api/portal/[tenantSlug]/library/atomize`.
 
-**tenant_user total: 17 steps**
+**tenant_user total: 18 steps**
 
 ---
 

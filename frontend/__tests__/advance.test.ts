@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccessMock,
-  emitEventStartMock, emitEventEndMock, isValidUUIDMock } = vi.hoisted(() => {
+  emitEventStartMock, emitEventEndMock, isValidUUIDMock, requestAgentTaskMock, getNodeTextMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
   const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock });
   return {
@@ -33,6 +33,8 @@ const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccess
     emitEventStartMock: vi.fn(),
     emitEventEndMock: vi.fn(),
     isValidUUIDMock: vi.fn(),
+    requestAgentTaskMock: vi.fn(),
+    getNodeTextMock: vi.fn(),
   };
 });
 
@@ -55,6 +57,13 @@ vi.mock('@/lib/events', () => ({
 vi.mock('@/lib/validation', () => ({
   isValidUUID: isValidUUIDMock,
 }));
+
+vi.mock('@/lib/agent-client', () => ({ requestAgentTask: requestAgentTaskMock }));
+
+vi.mock('@/lib/types/canvas-document', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/types/canvas-document')>();
+  return { ...actual, getNodeText: getNodeTextMock };
+});
 
 // ─── Import after mocks ────────────────────────────────────────────────────
 import { POST } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route';
@@ -562,5 +571,68 @@ describe('POST advance — success path', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.stage).toBe('review'); // next after 'draft'
+  });
+});
+
+describe('POST advance — AI review on advance (Phase 3, C3)', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    sqlMock.mockReset();
+    sqlBeginMock.mockReset();
+    getTenantBySlugMock.mockReset();
+    verifyTenantAccessMock.mockReset();
+    emitEventStartMock.mockReset();
+    emitEventEndMock.mockReset();
+    isValidUUIDMock.mockReset();
+    requestAgentTaskMock.mockReset().mockResolvedValue('task-1');
+    getNodeTextMock.mockReset().mockReturnValue('Reviewable section prose.');
+    emitEventStartMock.mockResolvedValue('evt-start-id');
+    emitEventEndMock.mockResolvedValue(undefined);
+  });
+
+  function wireAdvanceSql({ aiReviewOnAdvance = true, reviewSections = [] as Array<Record<string, unknown>> } = {}) {
+    authMock.mockResolvedValue(makeSession());
+    getTenantBySlugMock.mockResolvedValue(makeTenant());
+    verifyTenantAccessMock.mockResolvedValue(true);
+    isValidUUIDMock.mockReturnValue(true);
+    sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('gate_config')) return Promise.resolve([makeProposal()]);
+      if (q.includes('count(*)::text')) return Promise.resolve([{ count: '1' }]);
+      if (q.includes('ai_review_on_advance')) return Promise.resolve([{ aiReviewOnAdvance }]);
+      if (q.includes('is_locked = true')) return Promise.resolve(reviewSections);
+      return Promise.resolve([]); // activity log + anything else
+    });
+    wireTx();
+  }
+
+  it('enqueues a per-section review_section task when the tenant opted in', async () => {
+    wireAdvanceSql({
+      aiReviewOnAdvance: true,
+      reviewSections: [{ id: 'sec-1', title: 'Technical Approach', content: JSON.stringify({ nodes: [{}] }), sectionType: 'technical.approach' }],
+    });
+
+    const res = await POST(makeRequest(), makeCtx());
+    expect(res.status).toBe(200);
+    expect(requestAgentTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRole: 'color_team_reviewer',
+        taskType: 'review_section',
+        proposalId: PROPOSAL_ID,
+        sectionId: 'sec-1',
+        input: expect.objectContaining({ requestedBy: USER_ID, sectionTitle: 'Technical Approach', category: 'technical.approach' }),
+      }),
+    );
+  });
+
+  it('does not enqueue review when the tenant opted out', async () => {
+    wireAdvanceSql({
+      aiReviewOnAdvance: false,
+      reviewSections: [{ id: 'sec-1', title: 'X', content: JSON.stringify({ nodes: [{}] }), sectionType: null }],
+    });
+
+    const res = await POST(makeRequest(), makeCtx());
+    expect(res.status).toBe(200);
+    expect(requestAgentTaskMock).not.toHaveBeenCalled();
   });
 });

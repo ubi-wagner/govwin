@@ -114,8 +114,12 @@ HITL §6.5 updated.*
   / reopen (rfp admin). **Green:** lifecycle transitions + admin controls; all opps retained.
 - 🟡 **C7 · P1 · [∥]** Pipeline automation + **AI-agent review tasking**. *Increment 1 SHIPPED —
   customer automation setup (mig 076 `tenant_automation_preferences` + portal API + Automation
-  page). Increments 2 (AI review on advance → section context boxes) + 3 (notification/flow
-  enforcement) are designed + infra-ready in `PROPOSAL_LIFECYCLE_V1.md` §C3.* Remaining at the
+  page). Increment 2 SHIPPED — AI review on advance → section context boxes (mig 077
+  `proposal_comments.recommendation_type/category`; advance route enqueues per-section
+  `review_section` tasks when `ai_review_on_advance` is on; `fabric._post_section_recommendation`
+  writes the completed review back as an `ai_review` comment; canvas context box renders the
+  "🤖 AI Review" badge). Increment 3 (notification/flow enforcement) is designed + infra-ready in
+  `PROPOSAL_LIFECYCLE_V1.md` §C3.* Remaining at the
   workflow step-milestones: The pipeline is a workflow; hang automation off the existing step milestones +
   outcome hooks, **configured by the customer admin at portal purchase** (start there), then run
   the code through and fill gaps with the most common proposal-dev automations. Driven by

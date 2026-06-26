@@ -78,6 +78,9 @@ export interface NodeComment {
   timestamp: string;
   resolved?: boolean;
   resolved_by?: string;
+  /** 'human' (default) | 'ai_review' | 'ai_suggestion' — AI recommendations render distinctly. */
+  recommendation_type?: string;
+  category?: string | null;
 }
 
 interface CommentThreadProps {
@@ -96,19 +99,28 @@ export function CommentThread({ comments, onAddComment, onResolve }: CommentThre
   return (
     <div className="space-y-2">
       {active.map((c) => {
+        const isAi = !!c.recommendation_type && c.recommendation_type !== 'human';
         const color = getActorColor(c.actor_id);
         return (
-          <div key={c.id} className={`p-2 rounded border ${color.bg} ${color.border}`}>
+          <div
+            key={c.id}
+            className={`p-2 rounded border ${isAi ? 'bg-indigo-50 border-indigo-200' : `${color.bg} ${color.border}`}`}
+          >
             <div className="flex items-center justify-between">
-              <span className={`text-xs font-medium ${color.text}`}>{c.actor_name}</span>
+              <span className={`text-xs font-medium ${isAi ? 'text-indigo-700' : color.text}`}>
+                {isAi ? '🤖 AI Review' : c.actor_name}
+                {isAi && c.category ? (
+                  <span className="ml-1 text-[10px] font-normal text-indigo-400">· {c.category}</span>
+                ) : null}
+              </span>
               <span className="text-[10px] text-gray-400">{new Date(c.timestamp).toLocaleString()}</span>
             </div>
-            <p className="text-xs text-gray-700 mt-1">{c.text}</p>
+            <p className="text-xs text-gray-700 mt-1 whitespace-pre-wrap">{c.text}</p>
             <button
               onClick={() => onResolve(c.id)}
               className="text-[10px] text-gray-400 hover:text-green-600 mt-1"
             >
-              Resolve
+              {isAi ? 'Dismiss' : 'Resolve'}
             </button>
           </div>
         );

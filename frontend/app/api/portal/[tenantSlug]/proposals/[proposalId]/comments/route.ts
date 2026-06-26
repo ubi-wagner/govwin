@@ -85,6 +85,8 @@ export async function GET(request: Request, ctx: RouteContext) {
       content: string;
       resolved: boolean;
       createdAt: Date;
+      recommendationType: string;
+      category: string | null;
       userName: string | null;
       userEmail: string | null;
     }[];
@@ -100,6 +102,8 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.content,
           pc.resolved,
           pc.created_at,
+          pc.recommendation_type,
+          pc.category,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -119,6 +123,8 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.content,
           pc.resolved,
           pc.created_at,
+          pc.recommendation_type,
+          pc.category,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -142,6 +148,8 @@ export async function GET(request: Request, ctx: RouteContext) {
         text: c.content,
         resolved: c.resolved,
         createdAt: c.createdAt,
+        recommendationType: c.recommendationType,
+        category: c.category,
         userName: c.userName,
         userEmail: c.userEmail,
       })),

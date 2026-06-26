@@ -5,6 +5,24 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
+import { requestAgentTask } from '@/lib/agent-client';
+import { getNodeText, type CanvasNode } from '@/lib/types/canvas-document';
+
+/** Extract plain prose from a section's canvas JSON for AI review (not raw JSON). */
+function extractCanvasText(content: string | null): string {
+  if (!content) return '';
+  try {
+    const doc = JSON.parse(content) as { nodes?: unknown[] };
+    if (!Array.isArray(doc.nodes)) return '';
+    return doc.nodes
+      .map((n) => getNodeText(n as CanvasNode))
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+  } catch {
+    return '';
+  }
+}
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -410,6 +428,47 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/advance] activity log failed', logErr);
+    }
+
+    // ── AI review on advance (customer opt-in) ───────────────────────
+    // If the tenant enabled ai_review_on_advance, enqueue a per-section review
+    // of the accepted (locked) content. The agent workforce reviews grammar /
+    // flow / compliance and posts recommendations into each section's context
+    // box (proposal_comments, recommendation_type='ai_review'). Best-effort +
+    // cost-guarded downstream — never blocks the advance.
+    try {
+      const [pref] = await sql<{ aiReviewOnAdvance: boolean }[]>`
+        SELECT ai_review_on_advance FROM tenant_automation_preferences
+        WHERE tenant_id = ${tenantId}::uuid
+      `;
+      const aiReviewEnabled = pref ? pref.aiReviewOnAdvance : true; // default on
+      if (aiReviewEnabled) {
+        const reviewSections = await sql<{ id: string; title: string | null; content: string | null; sectionType: string | null }[]>`
+          SELECT id, title, content, section_type
+          FROM proposal_sections
+          WHERE proposal_id = ${proposalId}::uuid AND is_locked = true AND content IS NOT NULL
+        `;
+        for (const s of reviewSections) {
+          const sectionText = extractCanvasText(s.content);
+          if (!sectionText) continue;
+          await requestAgentTask({
+            tenantId,
+            agentRole: 'color_team_reviewer',
+            taskType: 'review_section',
+            proposalId,
+            sectionId: s.id,
+            input: {
+              requestedBy: sessionUser.id,
+              sectionTitle: s.title ?? '',
+              sectionText: sectionText.slice(0, 20000),
+              category: s.sectionType ?? 'review',
+              reviewType: 'red_team',
+            },
+          });
+        }
+      }
+    } catch (reviewErr) {
+      console.error('[api/portal/proposals/advance] AI review enqueue failed (non-fatal):', reviewErr);
     }
 
     return NextResponse.json({

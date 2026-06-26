@@ -51,13 +51,15 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
-          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean }) => ({
+          setComments(json.data.map((c: { id: string; userId: string; userName?: string; text: string; createdAt: string; resolved?: boolean; recommendationType?: string; category?: string | null }) => ({
             id: c.id,
             actor_id: c.userId,
             actor_name: c.userName ?? 'Unknown',
             text: c.text,
             timestamp: c.createdAt,
             resolved: c.resolved ?? false,
+            recommendation_type: c.recommendationType,
+            category: c.category ?? null,
           })));
         }
       }

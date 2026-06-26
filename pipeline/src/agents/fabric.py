@@ -789,6 +789,11 @@ class AgentFabric:
                         task_id, upd_exc,
                     )
 
+                # AI review write-back: surface a completed section review as a
+                # recommendation in that section's context-box thread.
+                if status == "completed" and task_type == "review_section":
+                    await self._post_section_recommendation(conn, row, task_input, result)
+
                 results.append({"task_id": str(task_id), **result})
 
             except Exception as exc:
@@ -819,6 +824,47 @@ class AgentFabric:
                 })
 
         return results
+
+    async def _post_section_recommendation(self, conn, row, task_input: dict, result: dict) -> None:
+        """Write a completed AI section review into proposal_comments
+        (recommendation_type='ai_review') so it surfaces in the section's
+        context-box thread, attributed to the admin who requested the review.
+        Best-effort — a failure here must never fail the agent task."""
+        try:
+            proposal_id = row["proposal_id"]
+            section_id = row["section_id"]
+            if not proposal_id or not section_id:
+                return
+            requested_by = task_input.get("requested_by") or task_input.get("requestedBy")
+            if not requested_by:
+                return  # proposal_comments.user_id is NOT NULL — need an author
+
+            res = result.get("result") if isinstance(result, dict) else None
+            text = ""
+            if isinstance(res, dict):
+                text = (res.get("summary") or res.get("text") or "").strip()
+            if not text:
+                return
+
+            await conn.execute(
+                """
+                INSERT INTO proposal_comments
+                    (proposal_id, section_id, user_id, content, recommendation_type, category)
+                VALUES ($1, $2, $3, $4, 'ai_review', $5)
+                """,
+                proposal_id,
+                section_id,
+                uuid.UUID(str(requested_by)),
+                text[:10000],
+                task_input.get("category"),
+            )
+            logger.info(
+                "[process_task_queue] posted AI recommendation for section %s", section_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[process_task_queue] recommendation write-back failed: %s", exc,
+            )
 
     # ------------------------------------------------------------------
     # Platform-wide config (pipeline-level, settable by admin)
