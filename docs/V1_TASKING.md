@@ -877,3 +877,26 @@ live PG 16 (`govtech_intel`, chain 001→latest).
   sites: source_scout, cms_content.)*
 - **Validated:** 7 platform_guard pytest + 127 existing fabric tests (test_agents +
   test_pipe12_16_wiring); live-PG nullable + null-tenant INSERT.
+
+### Bug sweep ✅ 3-factor adversarial review of E1/E2/G1 (commit cd77a1f)
+- 3 independent reviewers (correctness · data/migrations/isolation · regressions). Verdict: **0 P0,
+  3 P1, 3 P2** — all fixed + validated. Suites green before & after (vitest 517, pytest 547).
+- **P1:** `min_font_size` silently dropped (postgres.js returns NUMERIC as **string**; freeze used a
+  typeof-number check → now `parseFontPt`); cost volume froze the *technical* page limit (now uses
+  `pageLimitCost`); one item-level required-section dropped all matrix-level ones (now a union).
+- **P2:** admin usage by-tenant `INNER JOIN` dropped NULL-tenant platform rows (LEFT JOIN +
+  "Platform / System"); artifact lock roll-up made atomic (`UPDATE … WHERE NOT EXISTS unlocked`);
+  shred costed against the shredder's own model; mig 083 backfill idempotent under partial orphaning;
+  spec limits gated by format.
+
+### E3 (Template Studio) — backend ⏳ in progress
+- **E3a ✅** (mig 086, commit 1eb415e): DB-backed templates — `document_templates.canvas_document`
+  (full starter body) + `storage_key` nullable; `volume_required_items.template_id` + `expert_notes`;
+  `solicitation_volumes.expert_notes`. create-route resolves templates **DB-first** (per-item
+  `template_id`) with the in-code registry as fallback; expert notes flow into section meta.
+  *Validated:* tsc, 517 vitest, live-PG columns.
+- **E3b ✅** (commit a17715d): `document_templates` CRUD — `admin/templates` (list + create /
+  save-as-new) + `admin/templates/[templateId]` (get + PATCH; system templates read-only). *Validated:*
+  tsc, 7 vitest, live INSERT/UPDATE/DELETE round-trip.
+- **E3c ⏳ remaining:** volume/required-item CRUD routes (create/edit/delete volumes + items, set
+  `template_id`/`expert_notes`/specs) + the structured editor UI (E3.2).
