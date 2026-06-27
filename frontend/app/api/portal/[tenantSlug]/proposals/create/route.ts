@@ -218,6 +218,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       pageLimit: number | null;
       volumeName: string | null;
       volumeNumber: number | null;
+      templateId: string | null;
+      expertNotes: string | null;
     }> = [];
 
     let globalItemIndex = 0;
@@ -231,6 +233,8 @@ export async function POST(request: Request, ctx: RouteContext) {
           pageLimit: (item.pageLimit as number) ?? null,
           volumeName: (vol.volumeName as string) ?? null,
           volumeNumber: (vol.volumeNumber as number) ?? null,
+          templateId: (item.templateId as string) ?? null,
+          expertNotes: (item.expertNotes as string) ?? null,
         });
       }
     }
@@ -325,36 +329,47 @@ export async function POST(request: Request, ctx: RouteContext) {
               ${item.volumeName},
               ${item.volumeNumber},
               ${inferSectionType(item.itemName, sectionStandards)},
-              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null })}::jsonb
+              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}::jsonb
             )
             RETURNING id
           `;
 
-          // Attempt to resolve and apply a template for this section
-          const templateKey = resolveTemplateKey(programType, item.itemType);
-          if (templateKey) {
-            const templateDoc: CanvasDocument | null = getTemplate(templateKey);
-            if (templateDoc) {
-              // Set metadata IDs linking this document to the proposal structure
-              templateDoc.metadata.proposal_id = proposalRow.id;
-              templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-              templateDoc.metadata.created_at = new Date().toISOString();
-              templateDoc.metadata.last_modified_at = new Date().toISOString();
-              templateDoc.metadata.last_modified_by = userId;
-              templateDoc.document_id = section.id;
-
-              // Interpolate merge fields with available data
-              const interpolated = interpolateTemplate(templateDoc, templateVariables);
-
-              // Store the canvas document JSON and update status to reflect template content
-              const contentJson = JSON.stringify(interpolated);
-              await tx`
-                UPDATE proposal_sections
-                SET content = ${contentJson},
-                    status = 'ai_drafted'
-                WHERE id = ${section.id}
-              `;
+          // E3: resolve the starter template — DB-backed first (expert-authored
+          // via the Template Studio, linked per required-item via template_id),
+          // then the in-code registry as fallback.
+          let templateDoc: CanvasDocument | null = null;
+          if (item.templateId) {
+            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`
+              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1
+            `;
+            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
+              templateDoc = tpl.canvasDocument;
             }
+          }
+          if (!templateDoc) {
+            const templateKey = resolveTemplateKey(programType, item.itemType);
+            if (templateKey) templateDoc = getTemplate(templateKey);
+          }
+          if (templateDoc) {
+            // Set metadata IDs linking this document to the proposal structure
+            templateDoc.metadata.proposal_id = proposalRow.id;
+            templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
+            templateDoc.metadata.created_at = new Date().toISOString();
+            templateDoc.metadata.last_modified_at = new Date().toISOString();
+            templateDoc.metadata.last_modified_by = userId;
+            templateDoc.document_id = section.id;
+
+            // Interpolate merge fields with available data
+            const interpolated = interpolateTemplate(templateDoc, templateVariables);
+
+            // Store the canvas document JSON and update status to reflect template content
+            const contentJson = JSON.stringify(interpolated);
+            await tx`
+              UPDATE proposal_sections
+              SET content = ${contentJson},
+                  status = 'ai_drafted'
+              WHERE id = ${section.id}
+            `;
           }
 
           count++;
