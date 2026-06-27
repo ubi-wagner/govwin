@@ -1114,3 +1114,25 @@ the **human edge** was broken in several places. The durable truths:
   actually has a PATCH that emits `source_diff.reviewed`. Read the whole target before
   acting — and re-run a test before committing it (a batched commit shipped a red test
   and 6 broken templates once this session before being corrected).
+
+---
+
+## V1 build — schema deltas (2026-06-27, migrations 083–085)
+
+New tables/columns from the V1 build (chain validated 001→085 on live PG). Verify column names here
+before writing SQL against them. Full journal: `docs/V1_TASKING.md` §11.
+
+- **`proposal_artifacts`** (mig 083): `id, proposal_id (FK CASCADE), volume_id, volume_number,
+  volume_name, artifact_type (narrative|cost|form|matrix|other), format_spec JSONB, compliance_spec
+  JSONB, is_required, status (draft|in_progress|locked), is_locked, locked_at, locked_by, created_at,
+  updated_at`. The lockable/downloadable document unit; a proposal owns N.
+- **`proposal_sections.artifact_id`** (mig 083): FK → `proposal_artifacts(id)` ON DELETE SET NULL.
+  Every section belongs to one artifact.
+- **`solicitation_compliance.min_font_size`** (NUMERIC, mig 084).
+- **`volume_required_items.min_font_size`** (NUMERIC) + **`canvas_preset`** / **`compliance_preset`**
+  (JSONB, mig 084). Legacy TEXT `font_size`/`margins`/`line_spacing` remain the authored source.
+- **`agent_task_log.tenant_id`** is now **NULLABLE** (mig 085): NULL = platform/system AI spend.
+  Budget SUMs: tenant budget = `WHERE tenant_id = $1`; platform cap = SUM over ALL rows (incl. NULL).
+- Events added: `proposal.v0_provisioned` (create-route copy), `artifact.locked` (section lock route).
+- Modules: `frontend/lib/artifact-spec.ts` (`buildArtifactSpecs`), `pipeline/src/agents/platform_guard.py`
+  (`platform_ai_allowed` / `log_platform_call`).

@@ -3,16 +3,22 @@
 **Built from a 4-way consensus** (3 independent competitive analyses + a source-verified column)
 over 18 load-bearing questions. Every task below is anchored to a consensus verdict (the `Qn`
 refs). Companion docs: `V1_LAUNCH_READINESS.md` (analysis), `V1_ARTIFACT_PIPELINE_DESIGN.md` (E2E#1
-design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, then Red→Green.**
+design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **Build underway — foundation shipped (E1/E2/G1); see Status + §11 as-built log.**
 
-> **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
-> memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
-> **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 16 items (E1–E9 narrative + E10–E12 non-narrative
-> artifact classes + E13 doc-level access + E14 library↔canvas round-trip + E15 V0.5 provisioning +
-> E16 expert role) · F = 8 · G = 6 · H = 5. **§9 = V0.5 milestone** (admin-provisioned portals);
-> **§10 = Expert role** (global shadow identity + customer-controlled grants; realizes E15.4) +
-> recorded BYOC economics roadmap.
+> **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7). **BUILD IN PROGRESS.** The
+> foundation is shipped, validated on a live PG 16 (migration chain **001→085 applies clean**), and
+> pushed:
+> - **E1 ✅ BUILT** — `proposal_artifacts` container (mig 083): per-volume artifacts, section
+>   linkage, `proposal.v0_provisioned`, artifact-scoped advance/lock gate, idempotent backfill.
+> - **E2 ✅ BUILT** — structured specs (mig 084): `CanvasRules`+`ComplianceSpec`, `min_font_size`
+>   source, tested TEXT→spec builder, frozen `format_spec`/`compliance_spec` at purchase.
+> - **G1 ✅ BUILT** — platform AI cap (mig 085): nullable `agent_task_log.tenant_id`, `platform_guard`,
+>   fabric logs/caps the null-tenant path, shredder wired.
+>
+> **Next: E3 → E5** (finish the E2E#1 critical path), then E4/E6–E16, Track F, G2–G6, H. Counts:
+> Track E = 16 (E1–E9 narrative + E10–E12 non-narrative + E13 doc access + E14 library↔canvas +
+> E15 V0.5 + E16 expert) · F = 8 · G = 6 · H = 5. **§9 = V0.5 milestone**; **§10 = Expert role**;
+> **§11 = as-built log** (live build journal).
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -829,3 +835,45 @@ platform-expert access** — "the same as taking an email off their access list.
   all that expert's grants everywhere at once. → E16.3.
 
 **§10 fully locked — both flags resolved.**
+
+---
+
+## 11. As-built log (live build journal)
+
+Each entry = one shipped + validated + pushed increment on `claude/nice-hamilton-kBqtD`. Validation
+bar: `npx tsc --noEmit` clean, relevant vitest/pytest green, and the migration chain applied on a
+live PG 16 (`govtech_intel`, chain 001→latest).
+
+### E1 ✅ `proposal_artifacts` container — mig 083 (commit 28ff157)
+- **Schema:** `proposal_artifacts(id, proposal_id FK CASCADE, volume_id?, volume_number, volume_name,
+  artifact_type CHECK(narrative|cost|form|matrix|other), format_spec JSONB, compliance_spec JSONB,
+  is_required, status CHECK(draft|in_progress|locked), is_locked, locked_at, locked_by, timestamps)`
+  + `proposal_sections.artifact_id` FK **ON DELETE SET NULL** + indexes + idempotent backfill
+  (groups existing sections by `(volume_number, volume_name)`; cost/budget volumes auto-typed `cost`).
+- **Code:** create-route creates one artifact per resolved volume (+ default-artifact fallback),
+  links each section's `artifact_id`, emits **`proposal.v0_provisioned`** (compliance copy event).
+  Advance gate (`proposal-advance.ts`) now LEFT JOINs artifacts and treats **optional** artifacts
+  (`is_required=false`) as non-blocking. Section lock/unlock route rolls the artifact up:
+  all-sections-locked ⇒ artifact `is_locked` + `artifact.locked` event; unlock reopens it.
+- **Validated:** 50 vitest (proposals-create incl. new E1 test + section-lock + advance); live-PG
+  backfill grouping, cost auto-typing, zero unassigned sections, lock roll-up.
+
+### E2 ✅ structured + enforceable specs — mig 084 (commit 2d07ea9)
+- **Types:** `CanvasRules` += `min_font_size?`/`images_allowed?`/`image_max_width|height?`; new
+  `ComplianceSpec`.
+- **Schema:** `solicitation_compliance.min_font_size` + `volume_required_items.min_font_size`
+  + `canvas_preset`/`compliance_preset` JSONB.
+- **Code:** `lib/artifact-spec.ts` — pure tested TEXT parsers (`parseFontPt`/`parseMarginsToPt`/
+  `parseLineSpacing`) + `buildArtifactSpecs` (item-over-matrix precedence). `compliance-resolver`
+  threads `min_font_size`. Create-route freezes `format_spec`+`compliance_spec` onto each artifact.
+- **Validated:** 27 vitest (new artifact-spec suite + proposals-create); live-PG columns present.
+
+### G1 ✅ platform AI cap + null-tenant logging — mig 085 (commit c13d4bd)
+- **Schema:** `agent_task_log.tenant_id` **DROP NOT NULL** (NULL = platform/system spend).
+- **Code:** `pipeline/src/agents/platform_guard.py` (`platform_ai_allowed` fail-closed +
+  `log_platform_call`). fabric: `_log_task` logs null-tenant rows, new `_check_platform_cap`, no-tenant
+  invoke path gated on master switch + platform cap. shred action gates on `platform_ai_allowed` +
+  logs spend (`agent_role='shredder'`). *(Shared primitive ready for the remaining platform call
+  sites: source_scout, cms_content.)*
+- **Validated:** 7 platform_guard pytest + 127 existing fabric tests (test_agents +
+  test_pipe12_16_wiring); live-PG nullable + null-tenant INSERT.
