@@ -771,10 +771,12 @@ platform-expert access** — "the same as taking an email off their access list.
   expert_user_id, email, level[view_only|edit|edit_accept_advance], granted_by, granted_at,
   accepted_at, revoked_at)` (UNIQUE per proposal×email). Both **owned by the customer tenant**
   (RLS-ready). *Files:* mig.
-- **E16.3 — invite/confirm.** Customer-admin "add expert by email" at any time → reuse-or-create
-  shadow user (`role='expert'` if new + standalone) → expert-invite email (new template) →
-  `/api/invite`-style confirm → portfolio. Notify on add. *Files:* new expert-grant route,
-  `lib/email-templates.ts`, reuse `/api/invite`.
+- **E16.3 — invite/confirm (no pre-approval gate).** Customer-admin "add expert by email" at any time
+  → reuse-or-create shadow user (`role='expert'` if new + standalone) → expert-invite email (new
+  template) → `/api/invite`-style confirm → portfolio. Notify on add. **No platform pre-approval** —
+  the invite activates; **our admin holds a global suspend/blocklist** (reuse `users.is_active` or add
+  an expert blocklist) enforced in the grant path so one suspend cuts all grants at once. *Files:* new
+  expert-grant route, `lib/email-templates.ts`, reuse `/api/invite`, `/admin` expert-suspend toggle.
 - **E16.4 — `verifyTenantAccess` (async) two-way change.** (a) For a user with an **active grant** to
   the tenant (bucket or proposal), return true; (b) for `rfp_admin`, return true **only if** the
   tenant has **not** restricted platform access; `master_admin` = **break-glass** (always allowed, but
@@ -821,7 +823,9 @@ platform-expert access** — "the same as taking an email off their access list.
   restrict `rfp_admin` access entirely; `master_admin` retains a **break-glass** path that writes
   `audit_log` **and notifies the customer on every entry** — no silent master access, and ops/support
   can still recover. → E16.4 / E16.9.
-- **Flag 2 (still open) — expert vetting:** is a customer invite **alone** enough to activate an
-  expert (max frictionless — owner's lean), or does **our admin** optionally **suspend/blocklist** bad
-  actors after the fact? *(Recommended default pending confirm: customer-invite activates + our admin
-  holds a global suspend — no pre-approval gate.)*
+- **Resolved (owner 2026-06-27) — expert vetting: NO PRE-APPROVAL GATE.** A **customer invite alone
+  activates** an expert (max frictionless); **our admin holds a global suspend/blocklist** (by
+  email/user) to cut bad actors after the fact — enforced in the grant path so one suspend revokes
+  all that expert's grants everywhere at once. → E16.3.
+
+**§10 fully locked — both flags resolved.**
