@@ -77,18 +77,28 @@ operate at artifact scope; package export iterates artifacts.
   items` + `solicitation_compliance` (page/slide/min-font/images/required-sections).
 - **E2.4** tests: type round-trip; mig + backfill on live PG.
 
-### E3 · P0 · [→E1,E2] · Expert authoring UI  *(Q2, Q3)*
-**Green:** RFP-expert can create/edit volumes + per-item format/compliance specs + required/optional
-in the curation workspace (not just apply-preset).
-- **E3.1** routes `admin/rfp-curation/[solId]/volumes` (GET/POST/PATCH/DELETE) + `.../volumes/
-  [volumeId]/items` (GET/POST/PATCH/DELETE) writing `solicitation_volumes`/`volume_required_items`
-  with structured specs + `required` flag. Auth rfp_admin+; SOP `{data}`/`{error,code}`.
-- **E3.2** UI: structured editor (volume list → items → per-item spec form + required toggle),
-  replacing the read-only display in the rfp-curation workspace.
-- **E3.3** *(fast-follow sub-task)* shredder *proposes* a volume/artifact structure (a Claude pass)
-  writing draft `volume_required_items` for expert acceptance — closes Q3's auto-populate gap.
-  *Files:* `pipeline/src/shredder/`.
-- **E3.4** tests: route auth/validation/write (vitest) + live-PG INSERT.
+### E3 · P0 · [→E1,E2] · Curation + Template Studio (expert authoring)  *(Q2, Q3; decisions #2, #4)*
+**Green:** the RFP-expert reads the RFP and builds the full **V0 upfront** in shared RFP space —
+the compliance matrix, each volume + base artifacts + all metadata — composing each artifact from
+**reusable templates** (pick existing / edit + save-as-new / create new from scratch / one-off cert
+or LOS), with the matrix referencing the template per artifact. This is the amortized upfront cost;
+the per-purchase agent fill (E5) consumes it.
+- **E3.1** volume/item routes `admin/rfp-curation/[solId]/volumes` + `.../volumes/[volumeId]/items`
+  (GET/POST/PATCH/DELETE) writing `solicitation_volumes`/`volume_required_items` with structured
+  specs + `required` flag + the chosen `template_id`. Auth rfp_admin+; SOP shapes.
+- **E3.2** UI: structured volume→items editor (replaces the read-only display).
+- **E3.3** **Template library (DB-backed, editable):** make `document_templates` CRUD —
+  choose existing, **edit + save-as-new**, **create new from scratch**, and **one-off templates**
+  (cert docs, simple LOS) usable in the V1 push; each carries a `canvas_preset` + `compliance_spec`
+  + metadata. Routes `admin/templates` (GET/POST/PATCH) + a picker in the volume editor.
+  *(Note: today templates are an in-code registry + a `document_templates` table; this makes them
+  expert-editable + reusable.)*
+- **E3.4** expert **notes/metadata** per volume/section (e.g. commercialization-plan guidance) →
+  stored on the artifact/section `meta` and surfaced to the agent fill as refinements (feeds E5.2).
+- **E3.5** *(fast-follow)* AI "scarecrow" pre-shred: a Claude pass proposes a volume/artifact +
+  template structure seeded from prior curations of the same `namespace` (agency/office/program_type,
+  e.g. "USAF Phase I SBIR") for the expert to accept/extend — closes Q3's auto-populate gap.
+- **E3.6** tests: route auth/validation/write + template save-as-new/create + live-PG INSERT.
 
 ### E4 · P1 · [→E2] · Compliance enforcement  *(Q6 — unanimous; decision #3)*
 **Green:** warn at each stage; final lock blocks when out of compliance **unless an admin forces
@@ -109,18 +119,23 @@ spotlight-bucket + customer profile + RFP/library; results write back; cost-guar
 G1** (platform cost cap) since this runs on every sale.
 - **E5.1** `proposal-draft-section.ts`: extend `InputSchema` (`spotlightAtoms`, `customerProfile`);
   embed `<spotlight_capabilities>` + `<customer_profile>` (delimited) in the prompt.
-- **E5.2** caller context assembly (tenant-scoped only): spotlight-bucket atoms
-  (`spotlight_bucket_scores` → library/spotlight atoms) + `tenant_profiles`
-  (company_summary/naics/keywords) + RFP/library.
+- **E5.2** caller context assembly (tenant-scoped only): the expert-built **compliance matrix +
+  chosen templates + expert notes** (from E3) as the development requirements, plus spotlight-bucket
+  atoms (`spotlight_bucket_scores` → the bucket the opp was bought from) + `tenant_profiles`
+  (company_summary/naics/keywords) + RFP/library. This is what makes the per-purchase fill bounded +
+  well-grounded.
 - **E5.3** wire `ProposalArchitectArchetype.handles_event('proposal.v0_requested')` → fan to
   per-section draft tasks (3-source context) → reuse Increment-2 write-back. *Files:* `pipeline/
   src/agents/archetypes/proposal_architect.py`, `fabric.py`.
 - **E5.4** **on-purchase trigger:** create-route enqueues `proposal.v0_requested` after artifact
   creation (E1); retain a manual "Generate V0 / Re-gen" button on the proposal admin panel
   (future: AI presses it). V0-lock gate requires agent-seed-complete + expert collaboration.
-- **E5.5** **agent-isolation guard/test:** assert every agent tool + `context.py` query is
-  tenant-scoped (no cross-tenant read path); add a unit/lint that fails if a tenant-data query
-  omits the tenant filter. (Verified solid today — this locks it in.)
+- **E5.5** **per-(customer, proposal) agent isolation (MVP bar):** every agent run is scoped to
+  `(tenant_id, proposal_id)`; **add `proposal_id` scope to agent memory** (episodic/semantic/
+  procedural are tenant-only today) + `context.py` so an agent recalls only that customer + that
+  proposal. Pair with **real RLS (F8)**. Add a guard/test that fails if any agent tool / context /
+  memory query omits the tenant (and, in-proposal, proposal) filter. (Cross-tenant reads verified
+  impossible today; this adds proposal-level isolation + the DB backstop.)
 - **E5.6** tests: context-assembly unit (spotlight+profile present, tenant-scoped) + archetype
   handles event + on-purchase enqueue (pytest + vitest).
 
@@ -271,10 +286,12 @@ health + rollup). Confirm the four open product decisions in each design doc (`�
 
 1. **Artifact boundary — LOCKED: one `proposal_artifacts` per volume/artifact (the whole DOCX/
    PPT/etc.).** The canvas + `meta` + JSON sections are the segments *within* that artifact. → E1.
-2. **Spec authoring — LOCKED: easy UI spec authoring first (E3.1/E3.2); AI "scarecrow" pre-shred
-   as fast-follow (E3.3), seeded from prior curations of similar solicitations via the existing
-   shredder `namespace` (agency/office/program_type, e.g. "USAF Phase I SBIR"), for expert
-   review/extend.**
+2. **Spec authoring — LOCKED: a reusable Template Studio (expert-driven, upfront).** The expert
+   reads the RFP and builds the full V0 in shared RFP space — compliance matrix + each volume + base
+   artifacts + metadata — composing each artifact from templates: **pick existing / edit + save-as-
+   new / create new from scratch / one-off (cert docs, simple LOS)**, all referenced by the
+   compliance matrix and saved for reuse. AI "scarecrow" pre-shred is the fast-follow (E3.5), seeded
+   from prior curations of the same `namespace` (e.g. "USAF Phase I SBIR"). → E3 (Template Studio).
 3. **Enforcement — LOCKED: warn at each stage; at final lock, block + enforce, BUT an admin
    (customer admin or RFP-admin) may force the approval-lock, recorded as an auditable approval
    event. No hard stops — stern warning + explicit admin acceptance on the final.** → E4 (reuses
@@ -290,11 +307,17 @@ health + rollup). Confirm the four open product decisions in each design doc (`�
      copied uploads/artifacts), with a **compliance event emitted on copy**. (Resolves the prior
      A/B question: **shared master for spotlight discovery + per-tenant copy at purchase**.) →
      E1 (copy artifact skeleton + event), E5 (on-purchase trigger).
-   - **Per-tenant agent isolation (verified, hard requirement):** every agent run is bound to one
-     tenant; tools strip `tenant_id` from input and source it from context (`WHERE tenant_id=$1`);
-     `context.py` only assembles that tenant's data (+ the shared RFP master they purchased) into
-     the prompt — Claude never sees another tenant's data. *App-enforced today; #5 adds the DB
-     backstop.* → add a guard/test that every agent tool + context query is tenant-scoped (E5/F8).
+   - **Cost shape:** the expensive structural work (matrix + templates) is **upfront, human, and
+     amortized across every buyer of the opp**; the per-purchase agent fill is a **bounded** draft
+     grounded by that pre-built context (matrix + templates + expert notes + company + the spotlight
+     bucket the opp was bought from). First draft within **72h of purchase**; expert regen/re-prompt
+     with new library data; **admin literal button-push to V1**.
+   - **Agent isolation (MVP bar — LOCKED):** real **RLS** + **agent-instance separation per
+     (customer, proposal)** with memory + context scoped to only that customer and that proposal.
+     Verified today: every run is tenant-bound, tools strip `tenant_id` from input and source it
+     from context (`WHERE tenant_id=$1`), `context.py` assembles only that tenant's data (+ the
+     shared RFP they purchased) — Claude never sees another tenant's data. **Refinement for MVP:**
+     add `proposal_id` scope to agent memory (tenant-only today) so memory is per-proposal. → E5.5 + F8.
 5. **RLS — LOCKED: do real RLS (same strict-isolation bar as #4)** — tenant policies +
    `FORCE ROW LEVEL SECURITY` + run the app as a **non-owner** DB role (migration runner stays
    owner). App-level scoping already works, so this is the DB-level backstop; stage carefully so
@@ -302,7 +325,8 @@ health + rollup). Confirm the four open product decisions in each design doc (`�
 6. **Health — LOCKED: heartbeat probes + updates, interval settable** (default ~30–60s, settable
    up to X) with a **hard minimum floor of 5–10s** (cannot be set faster). → F2.
 
-**Cost dependency (eval):** because #4 auto-runs the multi-section strawman on *every* purchase,
-the platform + per-tenant AI cost guards are load-bearing on day one — **G1 (platform cost cap +
-`agent_task_log` logging) is a hard prerequisite for the on-purchase V0 trigger (E5)**, not just
-alpha hardening.
+**Cost dependency (eval):** the Template Studio (#2) keeps per-purchase cost low — the structural
+"thinking" is upfront/human/amortized and the per-sale agent fill is *bounded* (well-grounded by
+matrix + templates + notes). But the fill is still real Claude spend on every purchase, so **G1
+(platform cost cap + `agent_task_log` logging) remains a hard prerequisite for the on-purchase V0
+trigger (E5)** — a guardrail, not a blocker on the economics.
