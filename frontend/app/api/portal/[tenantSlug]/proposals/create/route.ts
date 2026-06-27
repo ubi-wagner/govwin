@@ -9,6 +9,7 @@ import { inferSectionType, type SectionStandard } from '@/lib/section-standards'
 import { putObject, copyObject } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -290,9 +291,16 @@ export async function POST(request: Request, ctx: RouteContext) {
           const volName = (vol.volumeName as string) ?? null;
           const volNum = (vol.volumeNumber as number) ?? null;
           const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost' : 'narrative';
+          // E2: freeze the format + compliance spec onto the artifact at purchase.
+          const { formatSpec, complianceSpec } = buildArtifactSpecs({
+            artifactType,
+            items: (vol.items as Array<Record<string, unknown>>) ?? [],
+            compliance: resolved.compliance,
+          });
           const [art] = await tx<{ id: string }[]>`
-            INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
-            VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType})
+            INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
+            VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType},
+                    ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
@@ -353,9 +361,13 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
       } else {
         // No required items defined — create a single default artifact + section
+        const { formatSpec: defFormat, complianceSpec: defCompliance } = buildArtifactSpecs({
+          artifactType: 'narrative', items: [], compliance: resolved.compliance,
+        });
         const [defArt] = await tx<{ id: string }[]>`
-          INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
-          VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative')
+          INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
+          VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative',
+                  ${JSON.stringify(defFormat)}::jsonb, ${JSON.stringify(defCompliance)}::jsonb)
           RETURNING id
         `;
         artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
