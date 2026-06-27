@@ -777,8 +777,9 @@ platform-expert access** — "the same as taking an email off their access list.
   `lib/email-templates.ts`, reuse `/api/invite`.
 - **E16.4 — `verifyTenantAccess` (async) two-way change.** (a) For a user with an **active grant** to
   the tenant (bucket or proposal), return true; (b) for `rfp_admin`, return true **only if** the
-  tenant has **not** restricted platform access; `master_admin` = break-glass (audited). *Files:*
-  `lib/db.ts` (+ the restriction read).
+  tenant has **not** restricted platform access; `master_admin` = **break-glass** (always allowed, but
+  the access is `audit_log`'d **and** the customer is notified — owner-confirmed). *Files:* `lib/db.ts`
+  (+ the restriction read).
 - **E16.5 — `resolveUserAccess` from grants.** Resolve per-proposal access from
   `proposal_expert_grants.level`: `view_only`→view+comment; `edit`→edit; `edit_accept_advance`→
   admin-equivalent on that proposal **incl. accept + advance** (shadow company-admin for that one
@@ -794,9 +795,12 @@ platform-expert access** — "the same as taking an email off their access list.
   proposals across all customers; per-company scoped entry; expert-scoped portal nav (no
   dashboard/pipeline/library unless granted). Driven by **grants**, not role. *Files:* expert
   portfolio page, `[tenantSlug]/layout.tsx` nav, `getLandingPath`.
-- **E16.9 — customer controls platform access.** Customer-admin toggle/list to **restrict
-  `rfp_admin`** access (the "take us off the list"); `master_admin` break-glass writes `audit_log` +
-  notifies the customer. *Files:* tenant settings route/UI, `verifyTenantAccess`, `audit_log`.
+- **E16.9 — customer controls platform access (break-glass + audit — owner-confirmed).**
+  Customer-admin toggle/list to **restrict `rfp_admin`** access (the "take us off the list"); a
+  `master_admin` **break-glass** entry past a restriction **writes `audit_log` and notifies the
+  customer** every time (no silent access). Add a `tenants` platform-access-restriction flag/list +
+  the customer-notification. *Files:* tenant settings route/UI, `verifyTenantAccess`, `audit_log`,
+  notification path.
 - **E16.10 — audit + revocation.** Every expert action in a customer portal → `audit_log`; revoking
   a grant (bucket or proposal) cuts access **immediately** (per-request resolution, not session-baked).
 - **E16.11 — tests:** 1:N same-email across customers; existing-user-as-expert keeps home role;
@@ -808,15 +812,16 @@ platform-expert access** — "the same as taking an email off their access list.
   email serves many customers; an `edit_accept_advance` expert can accept + advance its proposal; a
   customer can lock out our `rfp_admin`; every grant/action is audited; nothing is expert-controlled.
 
-### 10.4 Decisions (most owner-confirmed; two flagged)
+### 10.4 Decisions
 - **Confirmed:** single `expert` role; access = **projection of customer grants** in
   customer-segmented tables; levels **view_only / edit / edit_accept_advance**; `edit_accept_advance`
   **may accept + advance**; **no TABA tracking** (out of scope — lives in the customer's cost volume);
   1:N one-email identity; existing users can be experts elsewhere.
-- **Flag 1 — platform lockout depth:** `rfp_admin` is restrictable by the customer; should
-  `master_admin` be **hard-locked too**, or **break-glass with audit + customer notice**?
-  *(Recommend break-glass + audit so support/ops can recover; the customer sees every entry.)*
-- **Flag 2 — expert vetting:** is a customer invite **alone** enough to activate an expert (max
-  frictionless — owner's lean), or does **our admin** optionally **suspend/blocklist** bad actors
-  after the fact? *(Recommend: customer-invite activates; our admin holds a global suspend — no
-  pre-approval gate.)*
+- **Resolved (owner 2026-06-27) — platform lockout depth: BREAK-GLASS + AUDIT.** A customer can
+  restrict `rfp_admin` access entirely; `master_admin` retains a **break-glass** path that writes
+  `audit_log` **and notifies the customer on every entry** — no silent master access, and ops/support
+  can still recover. → E16.4 / E16.9.
+- **Flag 2 (still open) — expert vetting:** is a customer invite **alone** enough to activate an
+  expert (max frictionless — owner's lean), or does **our admin** optionally **suspend/blocklist** bad
+  actors after the fact? *(Recommended default pending confirm: customer-invite activates + our admin
+  holds a global suspend — no pre-approval gate.)*
