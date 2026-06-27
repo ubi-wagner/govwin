@@ -8,8 +8,9 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
 > memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
 > **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 12 items (E1–E9 narrative + E10–E12 non-narrative
-> artifact classes from the reverse trace) · F = 8 · G = 6 · H = 5.
+> (F1/F2/F3) in parallel. Counts: Track E = 13 items (E1–E9 narrative + E10–E12 non-narrative
+> artifact classes from the reverse trace + E13 document-level access control) · F = 8 · G = 6 ·
+> H = 5.
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -281,6 +282,8 @@ ALPHA GATE (controlled cohort):   G1 → G2 → H2 → H3 → H4            (~1�
 E2E #1 (V1 feature):
    E1 ─▶ E2 ─▶ E3 (Template Studio; +E3.5 AI scarecrow) ─▶ E4
    (E1 + E3 + G1 + H1) ─▶ E5 ─▶ E6 ─▶ E8       ;  E7 ∥ ,  E9 after E3
+   §8 additions:  E13 (per-doc access) after E1  ;  E11 (cost volume) ∥  ;  E10 (form templates)
+                  in E3  ;  E10/E11/E12 bundled by E8 (package)
 
 E2E #2 (V1 feature):
    F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5        (independent; F1 surfaces F2)  ;  F6 / F7 fast-follow
@@ -424,11 +427,11 @@ The forward plan models every artifact as a **narrative canvas** (DOCX/PPT/sheet
 backwards from a complete federal submission exposes **non-narrative artifact classes the plan
 never covered** (all verified absent). These are **NEW scope**, added to Track E:
 
-- **E10 · P1 · Fillable forms (SF-424, SBIR/STTR certs, reps & certs, LOS).** `volume_required_
-  items.item_type` already enumerates `form_sf424`/`form_sbir_certs`/`form_other`, but there is **no
-  fill engine** — the prose strawman/canvas cannot produce a filled form. Need: a structured
-  field-map (tenant profile + proposal data → form fields), a fill/render path (PDF AcroForm or
-  templated form artifact), and signature/cert collection. **Distinct from E5 prose drafting.**
+- **E10 · P2 · Fillable form *templates* (SF-424, SBIR/STTR certs, reps & certs, LOS).** Owner
+  framing: a **simple, powerful fillable-template class** inside the Template Studio (E3), not a
+  heavy engine. A form template declares a field-map (tenant profile + proposal data → fields);
+  fill = data-merge into the template; collect signatures/certs as needed. `item_type` already
+  enumerates `form_sf424`/`form_sbir_certs`/`form_other`. Lower priority than E11/E12.
 - **E11 · P1 · Cost / budget volume.** No budget computation exists — the cost volume is a generic
   artifact and the matrix only *stores* rules (`indirectRateCap`, TABA, cost-share, partner-max-%).
   Need: a budget model (direct/indirect/fringe/TABA lines, indirect-rate application, cost-share +
@@ -450,3 +453,73 @@ never covered** (all verified absent). These are **NEW scope**, added to Track E
 **Minor:** `proposals` records `opportunity_id` but not the specific spotlight **bucket** the opp
 was bought from — E5.2 derives bucket context via `opportunity_id → spotlight_bucket_scores`, so
 workable; add a source-bucket column only if you want explicit provenance.
+
+### Access-control requirement (2026-06-27 — owner)
+
+A launch requirement surfaced reviewing the artifact model: **"the docs and the sections have to be
+access controlled in the launch product."** Walking the current resolver confirms the grain is
+**stage × section**, not per-document — so this is net scope on top of E1, added to Track E.
+
+- **E13 · P1 · [→E1] · Document-level (per-artifact) access control.** Owner framing, verbatim
+  intent: *"whole artifact access and control for now..but by document...even in the same company,
+  there may be a finance team and tech team and different access and edit on each...internal team
+  members (employees) can have admin level access to proposal reviews but not acceptance...the
+  collaborators can have their file upload portals and the admin can choose to give them up to edit
+  access just like their employees...let's not get carried away...admin sees all and so does our
+  admin."*
+
+  **Access unit = the document/artifact** (the E1 `proposal_artifacts` container) — **not**
+  per-section ("let's not get carried away..whole artifact access..but by document"). A grant is
+  per **(user × artifact)** within a tenant, so the finance team can hold edit on the **cost
+  volume** while the tech team holds edit on the **tech volume**, in the same company.
+
+  **Permission ladder (per document):** `view` → `review` (comment) → `edit`. **Acceptance (lock)
+  is a separate, non-grantable capability** held only by `tenant_admin` (and, all-tenant,
+  `rfp_admin`/`master_admin`) — it sits *above* the ladder and can never be delegated to an
+  employee or a collaborator.
+
+  **Role ceilings:**
+  - **`tenant_admin`** — sees and controls **all** documents in the tenant; the **only** role that
+    can accept/lock. Grants per-document access to everyone below.
+  - **`tenant_user` (employee)** — grantable **up to admin-level *review*** (view + comment across
+    all documents) and **edit** on specifically granted documents; **never** acceptance.
+  - **`partner_user` (collaborator)** — **default = their file-upload portal** (the existing
+    supporting-docs dropbox); admin **may** grant up to **edit** on specific documents, *"just like
+    their employees."* Never acceptance.
+  - **`rfp_admin` / `master_admin`** — *"our admin"* — see and control **all documents across all
+    tenants** (already true via `verifyTenantAccess`/`resolveUserAccess`).
+
+  **What's built (verified):** `resolveUserAccess` already (a) treats `master_admin`/`rfp_admin`/
+  own-tenant `tenant_admin` as full `admin`, (b) returns `canAdvance:true` **only** for admin
+  (acceptance is already admin-only), and (c) reads collaborator grants from
+  `collaborator_stage_access` (which already carries `artifact_types TEXT[]` + a
+  `permission CHECK(view|comment|edit)`) joined to `proposal_collaborators.assigned_sections`. The
+  **bones of artifact-typed, three-rung permissions exist.**
+
+  **What changes (the refactor):**
+  - **E13.1** Make the **grant grain per-artifact**: key collaborator/employee access on
+    `artifact_id` (the E1 container), not `stage` + `assigned_sections`. Either repurpose
+    `collaborator_stage_access.artifact_types` into an explicit `proposal_artifact_access(user_id,
+    artifact_id, permission)` table (cleaner) or carry `artifact_id` on the existing grant row.
+    *Files:* `db/migrations/`, `lib/proposal-access.ts`.
+  - **E13.2** Extend `resolveUserAccess` to return a **per-artifact permission map**
+    (`{artifactId → view|review|edit}`) and derive the section lists from each section's
+    `artifact_id` (E1) ∩ the artifact grant — preserving the existing `editableSections`/
+    `commentableSections`/`viewableSections` API so callers/canvas keep working. Keep
+    `canAdvance`/acceptance **admin-only** (unchanged).
+  - **E13.3** **Employee (tenant_user) path:** today a tenant_user with no collaborator row gets
+    `NO_ACCESS`; add an employee grant path so an admin can give an employee **review-all** (admin
+    -level review) and/or per-document edit — capped below acceptance.
+  - **E13.4** Gate the section/artifact **edit + comment + export** API routes and the canvas editor
+    by the per-artifact permission (not just stage); collaborator **upload** stays the
+    supporting-docs portal by default.
+  - **E13.5** Team/collaborator admin UI: grant **per-document** view/review/edit to employees and
+    collaborators; show the per-document matrix (finance vs tech). *Files:* `portal/[tenantSlug]/
+    team`, collaborator management.
+  - **E13.6** tests: per-(user × artifact) grant resolution; employee review-all-but-not-accept;
+    collaborator upload-default + edit-on-grant; acceptance remains admin-only; cross-document
+    isolation (tech-team user cannot edit the cost volume); live-PG INSERT.
+  - **Accept:** access is enforced per document; employees reach admin-level review but never
+    acceptance; collaborators default to upload and can be raised to edit per document; tenant_admin
+    sees/controls all in-tenant; rfp_admin/master_admin see all tenants; acceptance/lock is
+    tenant_admin-only and non-grantable.
