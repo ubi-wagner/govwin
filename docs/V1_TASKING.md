@@ -131,11 +131,17 @@ G1** (platform cost cap) since this runs on every sale.
   creation (E1); retain a manual "Generate V0 / Re-gen" button on the proposal admin panel
   (future: AI presses it). V0-lock gate requires agent-seed-complete + expert collaboration.
 - **E5.5** **per-(customer, proposal) agent isolation (MVP bar):** every agent run is scoped to
-  `(tenant_id, proposal_id)`; **add `proposal_id` scope to agent memory** (episodic/semantic/
-  procedural are tenant-only today) + `context.py` so an agent recalls only that customer + that
-  proposal. Pair with **real RLS (F8)**. Add a guard/test that fails if any agent tool / context /
-  memory query omits the tenant (and, in-proposal, proposal) filter. (Cross-tenant reads verified
-  impossible today; this adds proposal-level isolation + the DB backstop.)
+  `(tenant_id, proposal_id)`; **add `proposal_id` scope to agent _working memory_** (episodic/
+  semantic/procedural — tenant-only today) + the per-proposal `context.py` reads so an agent
+  recalls only that customer + that proposal. Pair with **real RLS (F8)**. Add a guard/test that
+  fails if any agent tool / context / memory query omits the tenant (and, in-proposal, proposal)
+  filter. (Cross-tenant reads verified impossible today; this adds proposal-level isolation + the
+  DB backstop.)
+  - **Carve-out (do NOT over-scope):** the tenant **library** (`library_units` — approved,
+    harvested, reusable content) stays **tenant-scoped and cross-proposal by design** — it is the
+    deliberate reuse surface (C4 picker / regen-from-library), pulled in **explicitly**, never
+    auto-bled and never cross-tenant. Proposal-scoping applies to *working memory/context*, not to
+    the library, or it breaks C2/C4 reuse.
 - **E5.6** tests: context-assembly unit (spotlight+profile present, tenant-scoped) + archetype
   handles event + on-purchase enqueue (pytest + vitest).
 
@@ -317,7 +323,9 @@ health + rollup). Confirm the four open product decisions in each design doc (`�
      Verified today: every run is tenant-bound, tools strip `tenant_id` from input and source it
      from context (`WHERE tenant_id=$1`), `context.py` assembles only that tenant's data (+ the
      shared RFP they purchased) — Claude never sees another tenant's data. **Refinement for MVP:**
-     add `proposal_id` scope to agent memory (tenant-only today) so memory is per-proposal. → E5.5 + F8.
+     add `proposal_id` scope to agent *working memory* (tenant-only today) so memory is per-proposal
+     — **but the tenant library stays tenant-scoped/cross-proposal by design** (deliberate, explicit
+     reuse via C4; never auto-bled, never cross-tenant). → E5.5 + F8.
 5. **RLS — LOCKED: do real RLS (same strict-isolation bar as #4)** — tenant policies +
    `FORCE ROW LEVEL SECURITY` + run the app as a **non-owner** DB role (migration runner stays
    owner). App-level scoping already works, so this is the DB-level backstop; stage carefully so
