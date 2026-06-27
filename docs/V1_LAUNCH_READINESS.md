@@ -23,6 +23,12 @@ Two multi-agent sweeps were run, then a **consolidated source-verification pass*
 (several agent "P0"s were downgraded once app-level mitigations were confirmed; a couple were
 upgraded).
 
+4. **Consensus check** — three *additional* independent analyses then re-verified the 18
+   load-bearing questions; they converged (unanimous on 11/18, 3/3-substantive on the rest after
+   resolving framing-only splits). The consensus matrix and the **detailed, consensus-locked
+   tasking live in `docs/V1_TASKING.md`** — that is the authoritative ToDo. Part 4 below is the
+   high-level index.
+
 ---
 
 ## Part 2 — Readiness verdict by surface
