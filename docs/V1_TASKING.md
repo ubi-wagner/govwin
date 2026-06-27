@@ -8,9 +8,10 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
 > memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
 > **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 14 items (E1–E9 narrative + E10–E12 non-narrative
-> artifact classes + E13 document-level access control + E14 library↔canvas round-trip) · F = 8 ·
-> G = 6 · H = 5.
+> (F1/F2/F3) in parallel. Counts: Track E = 15 items (E1–E9 narrative + E10–E12 non-narrative
+> artifact classes + E13 document-level access control + E14 library↔canvas round-trip + E15 V0.5
+> admin-provisioning) · F = 8 · G = 6 · H = 5. **§9 holds the V0.5 milestone** (admin-provisioned
+> portals + expert-access basis + recorded BYOC/TABA roadmap).
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -285,6 +286,8 @@ E2E #1 (V1 feature):
    §8 additions:  E13 (per-doc access) after E1  ;  E14 (library↔canvas round-trip) after E1, with
                   E5/E13  ;  E11 (cost volume) ∥  ;  E10 (form templates) in E3  ;  E10/E11/E12
                   bundled by E8 (package)
+   §9 V0.5:       E15 (admin-provisioned portal) = E1 + E5 run in an admin space + prospect-tenant
+                  + consent (F7) ; after E1/E5, with E13/F7/F8
 
 E2E #2 (V1 feature):
    F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5        (independent; F1 surfaces F2)  ;  F6 / F7 fast-follow
@@ -594,3 +597,71 @@ use/reuse/regen/edit/lock.
     new opportunity context; section/artifact-level units exist alongside atoms; both ingestion paths
     yield one unit shape; library integration is admin-only; AI drafts carry lineage. The lineage
     chain (USAF Phase I unit → Army Phase I accepted section → new unit) is queryable end-to-end.
+
+---
+
+## 9. V0.5 milestone — admin-provisioned portals + expert-access basis (2026-06-27 — owner)
+
+**Concept.** A **V0.5** stage that runs the *same copy+create a V1 purchase does* but
+**admin-triggered** (no buyer / no Stripe), so an RFP-expert stands up a real portal-dataspace and
+**drafts V0/V0.5 in it using that portal's customer-AI only** — pre-sale, "by me at first,"
+generalizing to associated experts later. It is the operational space + agency for the expert to
+seed/draft inside an isolated customer dataspace before V1.
+
+**Already true today (verified — the lift is small):**
+- `proposals/create` is **already admin-granted, no Stripe** (route comment: *"Admin-granted for the
+  founding cohort — no Stripe required"*), gated `tenant_admin`+ (so rfp_admin/master_admin can run
+  it) → it already copies the skeleton + RFP docs and creates sections for a tenant against an opp.
+- **"Customer AI only in their portal-dataspace"** = **already the design** — E5.5
+  per-(customer,proposal) isolation + F8 RLS; Claude never sees another tenant's data.
+- **"Experts access customers' portals"** = **already true** — `verifyTenantAccess` returns true for
+  rfp_admin/master_admin (`db.ts:52`).
+- So V0.5 ≈ **run the E1/E5 copy+strawman in that admin-created space** + the small net-new pieces
+  below (prospect-tenant, consent, audit). Not a new pipeline.
+
+### E15 · P1 · [→E1, E5, E13, F7] · V0.5 provisioning + expert-access basis
+- **E15.1 — prospect tenant shell + claim.** `create` requires an existing tenant; add a way to
+  stand up a **prospect tenant** (`status='provisioned'`) so a portal can be built *before* the
+  customer signs up, plus a **claim** flow that hands it to the customer on signup. *(The main
+  net-new provisioning piece.)*
+- **E15.2 — versioned T&C / consent capture.** Record the customer's acceptance of updated terms
+  acknowledging **platform (and future associated) experts may access their portal** — consent
+  version + actor + timestamp; gate expert drafting on a recorded consent. Net-new (no consent
+  capture today).
+- **E15.3 — expert-access audit trail.** Every expert action inside a customer portal writes
+  `audit_log` (rides F7 + the existing unused `auditLog()` helper) — defensible who/what/when. Makes
+  the assumed-access contractually clean.
+- **E15.4 — forward-safe access shape.** Keep blanket all-tenant for **our** admin now, but model the
+  access surface so a future **expert↔customer association** (an expert sees only *their* customers)
+  drops in **without rework** — do **not** hardcode "all-tenant" as the only expert tier. (Seed of
+  the BYOC model below; pairs with F8 RLS.)
+- **E15.5 — run E1/E5 in V0.5.** The admin "Build V0.5" action provisions artifacts (E1) + fires the
+  3-source strawman (E5) in the (prospect) portal; the existing manual/regen button drives it (future
+  AI presses it).
+- **E15.6 — tests:** prospect provision + claim; consent gate blocks drafting until accepted; access
+  audit writes; isolation holds in V0.5 (customer AI scoped to the portal); live-PG.
+- **Accept:** an admin can stand up a portal pre-sale, draft V0.5 in it with portal-scoped AI under a
+  recorded consent + full access audit; the customer later claims it; the access shape leaves room for
+  scoped third-party experts without rework.
+
+### Recorded future model (roadmap context — NOT V1 build; informs the access design)
+- **Bring-your-own-customers experts** with a **50% portal-fee rev-share, paid only on customer
+  satisfaction** → experts become a self-driven marcom/BD channel; more experts = more cross-platform
+  success.
+- **TABA-funded assistance:** SBIR/STTR cost proposals carry a **TABA allowance** that can fund
+  external technical/business assistance → the platform's expert help can be **paid from the
+  customer's own TABA line**, and an expert can **bid in as the named TABA consultant** if the SBE
+  wins (built-in payment rail + post-award recurring revenue).
+- **Services → SBE referral** funnel feeding the top of the pipeline.
+
+### Considerations (flagged — not blocking)
+- **TABA independence / OCI:** an expert who both writes the proposal *and* is the funded post-award
+  TABA consultant should be **disclosed + arms-length** — position as a TABA *marketplace*, not
+  steering, to stay clear of organizational-conflict-of-interest scrutiny.
+- **Consent + Chinese wall:** expert cross-access to customer (potentially CUI/ITAR-adjacent) data
+  must be **consent-backed + audited**, and in the BYOC future expert A must never see expert B's
+  customers → this is what makes **F8 RLS a business enabler**, not just hardening.
+
+**Decisions defaulted (correct me):** V0.5 = near-term build (E15 — small, mostly E1/E5 run in an
+admin space); **blanket-admin access now + scoped-expert association as a forward extension**;
+BYOC / TABA / rev-share = **recorded roadmap, not V1 build**.
