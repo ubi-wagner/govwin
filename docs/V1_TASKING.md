@@ -8,10 +8,11 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
 > memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
 > **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 15 items (E1–E9 narrative + E10–E12 non-narrative
-> artifact classes + E13 document-level access control + E14 library↔canvas round-trip + E15 V0.5
-> admin-provisioning) · F = 8 · G = 6 · H = 5. **§9 holds the V0.5 milestone** (admin-provisioned
-> portals + expert-access basis + recorded BYOC/TABA roadmap).
+> (F1/F2/F3) in parallel. Counts: Track E = 16 items (E1–E9 narrative + E10–E12 non-narrative
+> artifact classes + E13 doc-level access + E14 library↔canvas round-trip + E15 V0.5 provisioning +
+> E16 expert role) · F = 8 · G = 6 · H = 5. **§9 = V0.5 milestone** (admin-provisioned portals);
+> **§10 = Expert role** (3rd-party / TABA / EDEV scoped access; realizes E15.4) + recorded
+> BYOC/TABA economics roadmap.
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -288,6 +289,8 @@ E2E #1 (V1 feature):
                   bundled by E8 (package)
    §9 V0.5:       E15 (admin-provisioned portal) = E1 + E5 run in an admin space + prospect-tenant
                   + consent (F7) ; after E1/E5, with E13/F7/F8
+   §10 Expert:    E16 (expert role + affiliations) after E13/E15 ; realizes E15.4 scoped access ;
+                  pairs with F8 (RLS) + C3 notify
 
 E2E #2 (V1 feature):
    F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5        (independent; F1 surfaces F2)  ;  F6 / F7 fast-follow
@@ -631,10 +634,10 @@ seed/draft inside an isolated customer dataspace before V1.
 - **E15.3 — expert-access audit trail.** Every expert action inside a customer portal writes
   `audit_log` (rides F7 + the existing unused `auditLog()` helper) — defensible who/what/when. Makes
   the assumed-access contractually clean.
-- **E15.4 — forward-safe access shape.** Keep blanket all-tenant for **our** admin now, but model the
-  access surface so a future **expert↔customer association** (an expert sees only *their* customers)
-  drops in **without rework** — do **not** hardcode "all-tenant" as the only expert tier. (Seed of
-  the BYOC model below; pairs with F8 RLS.)
+- **E15.4 — forward-safe access shape → now specified as E16 (§10).** Keep blanket all-tenant for
+  **our** admin now, but the scoped **expert↔customer association** (an expert sees only *their*
+  customers) is now a concrete tier — see §10/E16. Do **not** hardcode "all-tenant" as the only
+  expert tier. (Pairs with F8 RLS.)
 - **E15.5 — run E1/E5 in V0.5.** The admin "Build V0.5" action provisions artifacts (E1) + fires the
   3-source strawman (E5) in the (prospect) portal; the existing manual/regen button drives it (future
   AI presses it).
@@ -663,5 +666,98 @@ seed/draft inside an isolated customer dataspace before V1.
   customers → this is what makes **F8 RLS a business enabler**, not just hardening.
 
 **Decisions defaulted (correct me):** V0.5 = near-term build (E15 — small, mostly E1/E5 run in an
-admin space); **blanket-admin access now + scoped-expert association as a forward extension**;
-BYOC / TABA / rev-share = **recorded roadmap, not V1 build**.
+admin space); **blanket-admin access now + scoped-expert association** (now specified in §10/E16);
+BYOC / TABA / rev-share **economics** = **recorded roadmap, not V1 build**.
+
+---
+
+## 10. Expert role — 3rd-party / TABA / EDEV professionals + scoped access (2026-06-27 — owner)
+
+**New role `expert`** — an **approved-by-us, granted-by-the-customer** 3rd-party who is **not** an
+RFP-Pipeline affiliate (distinct from `rfp_admin`). Covers economic-development (EDEV) pros who refer
+their portfolio of SBEs onto the platform, 3rd-party proposal managers, and **TABA advisors** (who
+*advise, don't support*). This **realizes E15.4** (the "forward-safe scoped-expert" stub) as a
+concrete tier.
+
+**Identity + org.** Expert identity **key = email** (the value the customer selects); plus standard
+User info and **org info** (for cost-share / rev-share). **Approved by our admins** before they can
+be selected by a customer.
+
+**Access is association-based, not rank-based.** An expert belongs to no customer tenant; their
+access comes entirely from explicit **affiliations** the customer (or our admin) grants:
+- **Company scope** (the "base" expert identified at onboarding): acts **as an admin in that
+  company** — sees all that customer's proposals + company + spotlight data.
+- **Proposal scope** (the "Expert POC for THIS proposal", selected at portal staging, or added later
+  on the customer's Users UI): admin-level **on that proposal only**.
+- **Grant level** per affiliation: `advisory` (view + review/comment — the **TABA-advisor**
+  default), `contributor` (edit), `manager` (admin-equivalent **incl. acceptance** — the
+  **EDEV / 3rd-party-manager** default).
+- An **EDEV org's 5 pros** each hold their own affiliations to their own assigned SBEs → different
+  proposal access per expert; the org is a grouping (+ cost-share), access is individual.
+
+**2-part access (both set by the customer admin):**
+1. **Onboarding:** customer admin (or our admin) identifies the expert **by email** → **company-scope**
+   affiliation (base expert = company admin-equivalent; all company + spotlight).
+2. **Portal staging:** at proposal creation, customer admin selects the **Expert POC for that
+   proposal** (+ TABA POC if applicable) → **proposal-scope** affiliation; can add more per proposal
+   anytime via the Users UI.
+- Same expert onboarded **and** portal-selected ⇒ full company + spotlight visibility; portal-only /
+  added-later ⇒ proposal-scoped.
+
+**TABA POC.** A per-proposal designation (`is_taba_poc`) — the proposal records whether it has a TABA
+POC (or **none**, if no TABA allowed/requested). TABA advisors default to `advisory` (advise, not
+support). Surfaces at win time ("who is the TABA POC").
+
+**Consent.** Because the **customer explicitly grants** each affiliation (selecting the expert by
+email at onboarding + portal staging), the grant **is** the consent record — **stronger than a
+generic T&C** (per-relationship, auditable). Keep a baseline T&C for our internal `rfp_admin` access;
+**expert access = consent-by-grant.**
+
+### E16 · P1 · [→E13, E15] · Expert role + expert↔customer/proposal affiliations
+- **E16.1** RBAC: add `expert` to `ROLES`/`ROLE_RANK` (rank governs `/portal` path-gating only —
+  real authority comes from affiliations) + the `users.role` CHECK. *Files:* `lib/rbac.ts`, mig
+  (alter constraint).
+- **E16.2** schema: `expert_profiles(user_id, org_name/org_id?, taba_eligible, approval_status,
+  approved_by/at, …)` + `expert_affiliations(expert_user_id, tenant_id, scope[company|proposal],
+  proposal_id?, level[advisory|contributor|manager], is_poc, is_taba_poc, granted_by, granted_at,
+  status, revoked_at)` (UNIQUE per expert×tenant×proposal) + indexes. Optional
+  `proposals.taba_poc_user_id` convenience. *Files:* mig.
+- **E16.3** `verifyTenantAccess` (already async): for `expert`, return true iff an **active affiliation**
+  to `tenantId` exists (company scope, or any proposal scope in that tenant). *Files:* `lib/db.ts`.
+- **E16.4** `resolveUserAccess`: resolve expert access from affiliations — company-`manager` ⇒
+  tenant-admin-equivalent across the tenant's proposals (incl. acceptance; all company + spotlight);
+  proposal affiliation ⇒ access for THIS proposal per `level` (manager incl. acceptance; contributor
+  = edit; advisory = view + comment); else `NO_ACCESS`. *Files:* `lib/proposal-access.ts`.
+- **E16.5** **acceptance exception (E13 interaction):** acceptance/lock stays **non-grantable to
+  employees/collaborators**, **but** an expert with `level=manager` (explicit customer grant) is an
+  admin-delegate that **may** accept/lock its scoped proposal(s). *Decision — recommend yes; flag to
+  confirm.* (Update E13 to name this single exception.)
+- **E16.6** 2-part grant UI/routes: (a) onboarding expert selection by email (company affiliation),
+  (b) portal-staging Expert POC + TABA POC selection at create, (c) customer **Users UI** to
+  add/revoke per-proposal experts. Auth = customer `tenant_admin` (or our admin). *Files:* team/Users
+  UI, `proposals/create`, new grant routes.
+- **E16.7** approval: `/admin` experts page + route to **approve pending experts** before they're
+  selectable; email is the selection key. *Files:* admin experts page/route.
+- **E16.8** notifications: on client purchase / portal creation, **notify the affiliated expert(s)**
+  by email (ride the CMS `event_listener` + a `notify_expert_on_client_purchase` automation rule).
+  *Files:* CMS listener / `automation_rules` seed.
+- **E16.9** expert **portfolio login**: experts log in to a cross-tenant portfolio of their affiliated
+  customers/proposals (scoped to affiliations) + a spotlight-like **referral** surface to bring new
+  customers in ("access 1 like spotlight"). *Files:* expert dashboard + landing path in `rbac.ts`.
+- **E16.10** audit: every expert action inside a customer portal writes `audit_log` (ride F7); the
+  grant act is the consent record.
+- **E16.11** tests: affiliation resolution (company vs proposal vs none); level gates
+  (advisory/contributor/manager); **manager-accept allowed, advisory-accept denied**; cross-tenant
+  isolation (expert sees only affiliated customers); EDEV-5-pros different-proposal access;
+  notify-on-purchase; live-PG.
+- **Accept:** an approved expert, selected by a customer (by email) at onboarding and/or portal
+  staging, gets company- or proposal-scoped admin-equivalent access accordingly; TABA advisors get
+  advisory-only + are recorded as the proposal's TABA POC; experts see only their affiliated
+  customers; acceptance follows the manager-grant rule; every grant + action is audited.
+
+**Decisions defaulted (correct me):** `expert` is a **single new role** with access carried by
+**affiliations** (company/proposal scope × advisory/contributor/manager level); **manager-level
+experts may accept/lock** (the one acceptance exception, by explicit customer grant);
+rev-share/cost-share **billing stays roadmap** (org info captured now). The **role + access mechanics
+are buildable scope** (this elevates E15.4 from forward-note to E16); the BYOC **economics** remain
+§9 roadmap.
