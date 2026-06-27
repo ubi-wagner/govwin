@@ -184,11 +184,17 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       //    closed) before the proposal advances as one unit. force=true
       //    overrides but records the still-open sections as the audit trail
       //    ("forced to advance and marking open sections").
+      // Gate operates at artifact scope (E1.3): sections in an OPTIONAL artifact
+      // (is_required = false) do not block advance. Sections with no artifact
+      // (legacy / pre-backfill) are treated as required (COALESCE true).
       const openSections = await tx<{ id: string; title: string; volumeName: string | null }[]>`
-        SELECT id, title, volume_name
-        FROM proposal_sections
-        WHERE proposal_id = ${proposalId}::uuid AND is_locked = false
-        ORDER BY volume_number NULLS LAST, section_number
+        SELECT s.id, s.title, s.volume_name
+        FROM proposal_sections s
+        LEFT JOIN proposal_artifacts a ON a.id = s.artifact_id
+        WHERE s.proposal_id = ${proposalId}::uuid
+          AND s.is_locked = false
+          AND COALESCE(a.is_required, true) = true
+        ORDER BY s.volume_number NULLS LAST, s.section_number
       `;
       if (openSections.length > 0 && !force) {
         throw new Error('SECTIONS_NOT_LOCKED:' + JSON.stringify(

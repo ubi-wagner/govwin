@@ -41,6 +41,7 @@ interface Resolved {
     title: string | null;
     volumeName: string | null;
     volumeNumber: number | null;
+    artifactId: string | null;
     content: string | null;
     version: number;
   };
@@ -82,10 +83,10 @@ async function guard(ctx: RouteContext): Promise<Resolved | NextResponse> {
     );
   }
 
-  let row: { stage: string; sectionId: string; title: string | null; volumeName: string | null; volumeNumber: number | null; content: string | null; version: number } | undefined;
+  let row: { stage: string; sectionId: string; title: string | null; volumeName: string | null; volumeNumber: number | null; artifactId: string | null; content: string | null; version: number } | undefined;
   try {
-    [row] = await sql<{ stage: string; sectionId: string; title: string | null; volumeName: string | null; volumeNumber: number | null; content: string | null; version: number }[]>`
-      SELECT p.stage, s.id AS section_id, s.title, s.volume_name, s.volume_number, s.content, s.version
+    [row] = await sql<{ stage: string; sectionId: string; title: string | null; volumeName: string | null; volumeNumber: number | null; artifactId: string | null; content: string | null; version: number }[]>`
+      SELECT p.stage, s.id AS section_id, s.title, s.volume_name, s.volume_number, s.artifact_id, s.content, s.version
       FROM proposal_sections s
       JOIN proposals p ON p.id = s.proposal_id
       WHERE s.id = ${sectionId}::uuid
@@ -114,6 +115,7 @@ async function guard(ctx: RouteContext): Promise<Resolved | NextResponse> {
       title: row.title,
       volumeName: row.volumeName,
       volumeNumber: row.volumeNumber,
+      artifactId: row.artifactId,
       content: row.content,
       version: row.version,
     },
@@ -188,6 +190,41 @@ export async function POST(_request: Request, ctx: RouteContext) {
     await harvestSectionToLibrary(tenantId, proposalId, section.id, userId);
   } catch (e) {
     console.error('[sections/lock] section harvest failed:', e);
+  }
+
+  // 2b. Artifact roll-up (E1): when every section of this section's artifact is
+  //     locked, mark the artifact locked + emit artifact.locked. The artifact is
+  //     the lockable document unit (supersedes the volume_name grouping).
+  if (section.artifactId) {
+    try {
+      const [art] = await sql<{ total: number; locked: number }[]>`
+        SELECT count(*)::int AS total,
+               count(*) FILTER (WHERE is_locked)::int AS locked
+        FROM proposal_sections
+        WHERE artifact_id = ${section.artifactId}::uuid
+      `;
+      if (art && art.total > 0 && art.total === art.locked) {
+        await sql`
+          UPDATE proposal_artifacts
+          SET is_locked = true, status = 'locked', locked_at = now(), locked_by = ${userId}::uuid
+          WHERE id = ${section.artifactId}::uuid AND is_locked = false
+        `;
+        await emitEventSingle({
+          namespace: 'proposal',
+          type: 'artifact.locked',
+          actor: userActor(userId, email),
+          tenantId,
+          payload: {
+            proposalId,
+            artifactId: section.artifactId,
+            stage: proposalStage,
+            sectionCount: art.total,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[sections/lock] artifact roll-up failed (non-fatal):', e);
+    }
   }
 
   // 3. Document-close + proposal-ready signals (future automation: notify team,
@@ -302,6 +339,20 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
   } catch (dbErr) {
     console.error('[sections/unlock] update failed:', dbErr);
     return NextResponse.json({ error: 'Failed to unlock section', code: 'DB_ERROR' }, { status: 500 });
+  }
+
+  // Artifact roll-up (E1): unlocking a section reopens its (previously locked)
+  // artifact — the document is no longer fully accepted.
+  if (section.artifactId) {
+    try {
+      await sql`
+        UPDATE proposal_artifacts
+        SET is_locked = false, status = 'in_progress', locked_at = NULL, locked_by = NULL
+        WHERE id = ${section.artifactId}::uuid AND is_locked = true
+      `;
+    } catch (e) {
+      console.error('[sections/unlock] artifact reopen failed (non-fatal):', e);
+    }
   }
 
   try {

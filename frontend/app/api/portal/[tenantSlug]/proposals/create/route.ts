@@ -259,7 +259,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/create] section_standards load failed (non-fatal):', stdErr);
     }
 
-    const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
+    const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
         VALUES (
@@ -276,17 +276,39 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       let count = 0;
 
+      // ── E1: create one artifact (the lockable/downloadable document unit) per
+      //    volume, then link each section to its artifact. format_spec /
+      //    compliance_spec are frozen here ('{}' until E2 populates them).
+      const artifactByVolKey = new Map<string, string>();
+      const createdArtifacts: { id: string; volumeName: string | null; artifactType: string }[] = [];
+      const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
+
       if (requiredItems.length > 0) {
         const programType = topic.programType ?? '';
 
+        for (const vol of resolved.volumes) {
+          const volName = (vol.volumeName as string) ?? null;
+          const volNum = (vol.volumeNumber as number) ?? null;
+          const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost' : 'narrative';
+          const [art] = await tx<{ id: string }[]>`
+            INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
+            VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType})
+            RETURNING id
+          `;
+          artifactByVolKey.set(volKey(volNum, volName), art.id);
+          createdArtifacts.push({ id: art.id, volumeName: volName, artifactType });
+        }
+
         for (const item of requiredItems) {
+          const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           // Insert the section row first to get its id
           const [section] = await tx<{ id: string }[]>`
             INSERT INTO proposal_sections (
-              proposal_id, section_number, title, content, status, page_allocation,
+              proposal_id, artifact_id, section_number, title, content, status, page_allocation,
               volume_name, volume_number, section_type, meta
             ) VALUES (
               ${proposalRow.id},
+              ${artifactId},
               ${String(item.itemNumber)},
               ${item.itemName},
               ${null},
@@ -330,13 +352,21 @@ export async function POST(request: Request, ctx: RouteContext) {
           count++;
         }
       } else {
-        // No required items defined — create a single default section
+        // No required items defined — create a single default artifact + section
+        const [defArt] = await tx<{ id: string }[]>`
+          INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
+          VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative')
+          RETURNING id
+        `;
+        artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
+        createdArtifacts.push({ id: defArt.id, volumeName: 'Technical Volume', artifactType: 'narrative' });
         await tx`
           INSERT INTO proposal_sections (
-            proposal_id, section_number, title, content, status,
+            proposal_id, artifact_id, section_number, title, content, status,
             volume_name, volume_number
           ) VALUES (
             ${proposalRow.id},
+            ${defArt.id},
             '1',
             'Technical Volume',
             ${null},
@@ -388,7 +418,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         console.error('[api/portal/proposals/create] supporting docs seed failed (non-fatal):', seedErr);
       }
 
-      return { proposal: proposalRow, sectionCount: count };
+      return { proposal: proposalRow, sectionCount: count, artifacts: createdArtifacts };
     });
 
     // ── Link matching purchase to the new proposal ─────────────────
@@ -494,6 +524,28 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       },
     });
+
+    // ── E1: V0 provisioning (copy) event — the compliance event emitted on copy
+    //    of the skeleton + RFP docs into the customer portal. Carries the created
+    //    artifacts + copied-doc refs for the control plane / automation (E5/F1).
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.v0_provisioned',
+        actor: userActor(userId, sessionUser.email),
+        tenantId,
+        payload: {
+          proposalId: proposal.id,
+          tenantSlug,
+          artifacts: artifacts.map((a) => ({ id: a.id, volumeName: a.volumeName, artifactType: a.artifactType })),
+          rfpDocumentsCopied: docsCopied,
+          complianceCopied: true,
+          volumesCopied: true,
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
+    }
 
     // ── Activity log ─────────────────────────────────────────────────
     try {
