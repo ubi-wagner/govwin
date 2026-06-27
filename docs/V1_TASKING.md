@@ -6,9 +6,15 @@ refs). Companion docs: `V1_LAUNCH_READINESS.md` (analysis), `V1_ARTIFACT_PIPELIN
 design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, then Red→Green.**
 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
-> memory refinement. Current state verified against source (4-way consensus). **Decision-complete —
-> ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F (F1/F2/F3) in parallel.
-> Counts: Track E = 9 items (3 keystones: E1/E3/E5) · F = 8 · G = 6 · H = 5.
+> memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
+> **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
+> (F1/F2/F3) in parallel. Counts: Track E = 9 items (3 keystones: E1/E3/E5) · F = 8 · G = 6 · H = 5.
+>
+> **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
+> below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
+> `agent_task_log`) and adds prerequisites (e.g. a `min_font_size` source, the template registry→DB
+> switch). The code shipped this push was audited and is **sound** (two alleged regressions were
+> verified false-positives).
 
 ---
 
@@ -345,3 +351,68 @@ E2/E4/E6/E8 and the polish/ops tracks.
 matrix + templates + notes). But the fill is still real Claude spend on every purchase, so **G1
 (platform cost cap + `agent_task_log` logging) remains a hard prerequisite for the on-purchase V0
 trigger (E5)** — a guardrail, not a blocker on the economics.
+
+---
+
+## 8. Audit refinements (2026-06-27 — 5-way code audit, source-verified)
+
+**Audit result:** the code shipped this push is **sound** — `_post_section_recommendation`, the
+extracted `advanceProposalStage` core, the **lock-route auto-advance (which *does* call the shared
+core** — an audit "divergence" claim was a verified false-positive), `event_listener` gating +
+fan-out, C2/C4/C5/C6, and migs 076–082 all confirmed; the tests shipped this push exist (two
+"missing tests" claims were false-negatives). The plan's current-state claims **hold**. The audit
+surfaced these refinements (integration seams + data gaps the plan under-specified). None invalidate
+the plan; read each track item **with** its delta here.
+
+### E-track
+- **E1/E2/E8 — runtime spec source.** `CanvasRules` are authored *inline* in each section's
+  `content` JSON and exporters read them there. Freezing a per-artifact spec also requires
+  **redirecting the canvas editor + exporters to read the frozen `proposal_artifacts` spec**, not
+  inline section content.
+- **E1.3 — mandatory vs optional artifacts.** The advance gate must treat **optional** artifacts
+  (`required=false`) as non-blocking; move the document-closed grouping from `volume_number` →
+  `artifact_id`.
+- **E2/E4 — NEW prerequisite: `min_font_size` has no data source** (only `font_size` TEXT exists,
+  verified absent everywhere). Add `min_font_size` to `solicitation_compliance` + `volume_required_
+  items` + shredder extraction; otherwise E4 min-font enforcement has nothing to enforce.
+- **E3.1 — partly built.** `volume-add.ts` / `volume-add-required-item.ts` tools already write
+  volumes/items → E3 = expose/extend via the editor UI + **add a `template_id` column** on
+  `volume_required_items` + PATCH/DELETE. (Per-volume/section expert notes, E3.4, are net-new schema.)
+- **E3.3 — key integration (verified).** `document_templates` exists but is **never queried**;
+  create-route resolves templates from the **in-code registry** (`resolveTemplateKey`/`TEMPLATE_MAP`).
+  The Template Studio must **switch create-route to read `document_templates` (DB)** + link via the
+  new `template_id`.
+- **E5.3/E5.4 — CORRECTED dispatch + write-back.** The queue dispatches by **`agent_role`** (not
+  `handles_event`/`task_type`), so the on-purchase trigger enqueues `agent_role='proposal_architect'`
+  (task_type is context only). Drafting needs a **new section-content write-back tool**
+  (`publish_section_draft` → `proposal_sections.content`) + an architect→per-section fan-out — the
+  Increment-2 write-back targets `proposal_comments` (reviews), **not** section content. (Today
+  `ProposalArchitect` only designs the outline; `SectionDrafter` returns text with no persist tool.)
+- **E5.5 — memory scope.** The 3 memory tables have **no `proposal_id`**; add the column + index +
+  scope retrieval `(proposal_id = $X OR proposal_id IS NULL)` so tenant-level memories still surface
+  (library stays cross-proposal).
+- **E7 — smaller than written + a bug.** `applies_to_phase` + `custom_fields` columns exist and are
+  populated; `resolveVolumes()` simply doesn't apply them (wire the phase filter + the merge);
+  `solicitation_annotations` exists but isn't flowed into V0; and **`apply-preset` drops
+  `applies_to_phase` on item insert** (fix).
+
+### F-track
+- **F2 — partly built.** `manager.py` already heartbeats (hardcoded 30s) → make it settable via the
+  **existing `system_config` (key/value) table** (5–10s floor). The **CMS listener has no heartbeat**
+  and there is no worker-liveness signal distinct from per-workflow heartbeats (net-new).
+- **F3 — CONFIRMED missing** (conflict resolved): `/admin/proposals` is a flat per-proposal list
+  (`SELECT … p.stage`, no `GROUP BY`), so the cross-portal by-stage aggregate is genuinely net-new.
+- **F5 — confirmed.** `event_listener.py` `SELECT * FROM automation_rules` has no tenant filter.
+- **F7 — wire, not build.** An `auditLog()` helper exists in `lib/db.ts` but is **never called** →
+  F7 = invoke it on the settings PATCH paths.
+- **F8 — confirmed.** 0 policies; `migrate.mjs`/`lib/db.ts` connect with the default (owner) role →
+  needs policies + a non-owner role + connection switch.
+
+### G / H
+- **G1 — CORRECTED: `agent_task_log.tenant_id` is `NOT NULL`** (verified), so platform (non-tenant)
+  AI calls can't be logged as-is — and `fabric` already *skips* null-tenant logging. G1 must make
+  `tenant_id` nullable (or add a platform sentinel) + log the 3 platform calls + update `fabric`, so
+  the platform cap covers platform spend.
+- **G6 — confirmed.** The dead `content.published` rule is still seeded → remove it.
+- **H1 — partly built.** `create_library_defaults.py` seeds default **categories**, not content →
+  H1 = seed the actual **company/collaborator/tech/bio atoms** (feeds E5).
