@@ -52,9 +52,12 @@ operate at artifact scope; package export iterates artifacts.
   volume_id FK?, volume_number, volume_name, artifact_type, format_spec JSONB, compliance_spec
   JSONB, status, is_locked, locked_at, locked_by, created_at, updated_at)` + `proposal_sections.
   artifact_id UUID FK CASCADE` + idx `(proposal_id, volume_number)`. *Files:* `db/migrations/`.
-- **E1.2** create-route: during V0 copy, create one `proposal_artifacts` row per volume/required-
-  item group; set `sections.artifact_id`; freeze `format_spec`/`compliance_spec` (E2). *Files:*
-  `proposals/create/route.ts`.
+- **E1.2** create-route: during V0 copy (purchase), create one `proposal_artifacts` row per
+  volume/artifact; set `sections.artifact_id`; freeze `format_spec`/`compliance_spec` (E2). This is
+  the **skeleton copy** from shared RFP space → the tenant portal (alongside the existing
+  `compliance.json`/`volumes.json`/RFP-doc S3 copy to `customerProposalPath`); **emit a compliance
+  event on copy** (`proposal.v0_provisioned`, namespace `proposal`, carries artifacts + copied
+  doc refs). *Files:* `proposals/create/route.ts`.
 - **E1.3** advance/lock: extend gate to "all sections of artifact locked ⇒ artifact locked; all
   artifacts locked ⇒ proposal advance-ready"; artifact-level lock state. *Files:*
   `lib/proposal-advance.ts`, `sections/[sectionId]/lock/route.ts`.
@@ -87,27 +90,39 @@ in the curation workspace (not just apply-preset).
   *Files:* `pipeline/src/shredder/`.
 - **E3.4** tests: route auth/validation/write (vitest) + live-PG INSERT.
 
-### E4 · P1 · [→E2] · Compliance enforcement  *(Q6 — unanimous)*
-**Green:** violations warned at save, blocked at final-lock/export.
+### E4 · P1 · [→E2] · Compliance enforcement  *(Q6 — unanimous; decision #3)*
+**Green:** warn at each stage; final lock blocks when out of compliance **unless an admin forces
+it**, and the force is an audited approval event. No hard stops.
 - **E4.1** `lib/validators/canvas-compliance.ts::validateCanvasAgainstSpec(doc, ComplianceSpec)` →
   violations (page/slide estimate, min-font scan, images_allowed, required-sections present).
-- **E4.2** section save route: run validator → return violations (non-blocking warn).
-- **E4.3** final-lock + `package` export: run validator → 422 with violations unless explicit override.
-- **E4.4** canvas sidebar: live compliance indicator.
-- **E4.5** tests: validator unit (each rule) + save-warn/export-block (vitest).
+- **E4.2** section save + each stage advance: run validator → return violations (non-blocking warn).
+- **E4.3** final lock + `package` export: block on violations **unless** an admin (customer admin
+  or rfp_admin) passes `forceApprove:true` → proceed + emit an auditable approval event
+  (`proposal.compliance_override` / activity-log row capturing actor + violations). Reuse the shipped
+  force-advance+audit pattern.
+- **E4.4** canvas sidebar: live compliance indicator (per-artifact page/font/violations).
+- **E4.5** tests: validator unit (each rule) + warn-on-save + block-at-final + force-with-audit (vitest).
 
-### E5 · P0 · [→E1, +H1] · 3-source strawman + wire ProposalArchitect  *(Q4, Q5)*
-**Green:** a `proposal.v0_requested` task drafts each section from spotlight-bucket + customer
-profile + RFP/library; results write back.
+### E5 · P0 · [→E1, G1, +H1] · 3-source strawman + wire ProposalArchitect  *(Q4, Q5; decision #4)*
+**Green:** **purchase auto-triggers** a `proposal.v0_requested` task that drafts each section from
+spotlight-bucket + customer profile + RFP/library; results write back; cost-guarded. **Depends on
+G1** (platform cost cap) since this runs on every sale.
 - **E5.1** `proposal-draft-section.ts`: extend `InputSchema` (`spotlightAtoms`, `customerProfile`);
   embed `<spotlight_capabilities>` + `<customer_profile>` (delimited) in the prompt.
-- **E5.2** caller context assembly: query spotlight-bucket atoms (`spotlight_bucket_scores` →
-  library/spotlight atoms) + `tenant_profiles` (company_summary/naics/keywords) + RFP/library.
+- **E5.2** caller context assembly (tenant-scoped only): spotlight-bucket atoms
+  (`spotlight_bucket_scores` → library/spotlight atoms) + `tenant_profiles`
+  (company_summary/naics/keywords) + RFP/library.
 - **E5.3** wire `ProposalArchitectArchetype.handles_event('proposal.v0_requested')` → fan to
   per-section draft tasks (3-source context) → reuse Increment-2 write-back. *Files:* `pipeline/
   src/agents/archetypes/proposal_architect.py`, `fabric.py`.
-- **E5.4** "Generate V0" expert-triggered, cost-guarded action on the proposal admin panel.
-- **E5.5** tests: context-assembly unit (spotlight+profile present) + archetype handles event (pytest).
+- **E5.4** **on-purchase trigger:** create-route enqueues `proposal.v0_requested` after artifact
+  creation (E1); retain a manual "Generate V0 / Re-gen" button on the proposal admin panel
+  (future: AI presses it). V0-lock gate requires agent-seed-complete + expert collaboration.
+- **E5.5** **agent-isolation guard/test:** assert every agent tool + `context.py` query is
+  tenant-scoped (no cross-tenant read path); add a unit/lint that fails if a tenant-data query
+  omits the tenant filter. (Verified solid today — this locks it in.)
+- **E5.6** tests: context-assembly unit (spotlight+profile present, tenant-scoped) + archetype
+  handles event + on-purchase enqueue (pytest + vitest).
 
 ### E6 · P1 · [→E1,E5] · Artifact/proposal-scope agent tasks  *(Q5)*
 **Green:** agents can draft/review a whole artifact or the whole proposal.
@@ -147,13 +162,16 @@ profile + RFP/library; results write back.
 - **F1.2** drill-down: `process_instances.step_results` + correlated `system_events` tree + retry/force-advance.
 - **F1.3** tests (query shape).
 
-### F2 · P1 · [∥] · Service/worker health  *(Q15 — unanimous)*
-**Green:** live health + worker heartbeats surfaced.
+### F2 · P1 · [∥] · Service/worker health  *(Q15 — unanimous; decision #6)*
+**Green:** live health + worker heartbeats surfaced; heartbeat/probe interval **settable** with a
+hard **min floor of 5–10s**.
 - **F2.1** writers: pipeline loop + CMS listener write a heartbeat (`worker_heartbeats` table or
-  reuse `system_health_snapshots`) ~60s.
+  reuse `system_health_snapshots`) on a **configurable interval** (default ~30–60s; settable up to
+  X; clamped to a **5–10s minimum** — reject/clamp anything faster). Store the setting in
+  `platform_agent_config` (or a small `platform_settings`) so it's admin-settable.
 - **F2.2** `GET /api/admin/health`: DB `SELECT 1`, S3 HEAD, heartbeat read, listener lag.
-- **F2.3** surface in F1.
-- **F2.4** tests.
+- **F2.3** surface in F1; expose the interval setting in the admin UI.
+- **F2.4** tests (incl. the min-floor clamp).
 
 ### F3 · P1 · [∥] · Cross-portal project rollup  *(Q14 — resolved MISSING)*
 **Green:** proposals aggregated by stage across all tenants (incl. abandoned).
@@ -182,10 +200,18 @@ profile + RFP/library; results write back.
 ### F7 · P2 · [∥] · Settings-change audit
 **Green:** every platform/tenant config + automation-pref PATCH writes `audit_log`; `/admin/audit-log` view. tests.
 
-### F8 · P1 · [∥] · RLS decision  *(Q18 — resolved)*
-**Green (V1):** document app-level isolation as the enforcement + a test asserting every tenant-
-scoped query carries `tenant_id`; update CLAUDE.md. **OR (GA):** add tenant policies + `FORCE ROW
-LEVEL SECURITY` + run app as a non-owner role.
+### F8 · P1 · DB-enforced RLS  *(Q18 — resolved; decision #5 — real RLS)*
+**Green:** genuine DB-level tenant isolation as the backstop to app-level scoping (which already
+works). Strict-isolation bar = same as the agent-isolation requirement (#4).
+- **F8.1** add tenant-isolation `CREATE POLICY` on every tenant-private table (proposals,
+  proposal_sections via proposal, library_units, tenant_pipeline_items, spotlight_bucket_scores,
+  agent_task_*, memories, etc.) + `FORCE ROW LEVEL SECURITY`.
+- **F8.2** run the **app as a non-owner DB role** with `SET app.tenant_id` (or session GUC) per
+  request/agent-run; migration runner stays owner. Audit every query passes under RLS.
+- **F8.3** keep the app-level `WHERE tenant_id` (defense-in-depth) + the E5.5 guard/test.
+- **F8.4** stage carefully behind a flag; validate the full suite under RLS on the live-PG harness.
+- **Note:** heavier than the rest of Track F; sequence after the alpha gate but before multi-tenant
+  GA. Functional isolation is already in place via app scoping, so this is hardening, not a blocker.
 
 ---
 
@@ -241,11 +267,42 @@ health + rollup). Confirm the four open product decisions in each design doc (`�
 
 ---
 
-## 7. Open product decisions (must answer before coding the keystones)
-1. **Artifact boundary** — one `proposal_artifacts` row per volume, or per required-item? *(Rec:
-   per volume; required-items become sections under it.)*  → gates E1.
-2. **Spec authoring seed** — preset + manual (V1) vs shredder-proposed structure (E3.3 fast-follow)?
-3. **Enforcement hardness** — warn-on-save / block-on-final-lock (Rec) vs block-on-save.
-4. **Strawman trigger** — expert-clicked "Generate V0" (Rec, cost-control) vs auto-at-purchase.
-5. **RLS** — document+test for alpha (Rec) vs full policies+FORCE for GA.
-6. **Health depth** — live probe + heartbeats (Rec) vs probe-only.
+## 7. Locked product decisions (owner-confirmed 2026-06-27)
+
+1. **Artifact boundary — LOCKED: one `proposal_artifacts` per volume/artifact (the whole DOCX/
+   PPT/etc.).** The canvas + `meta` + JSON sections are the segments *within* that artifact. → E1.
+2. **Spec authoring — LOCKED: easy UI spec authoring first (E3.1/E3.2); AI "scarecrow" pre-shred
+   as fast-follow (E3.3), seeded from prior curations of similar solicitations via the existing
+   shredder `namespace` (agency/office/program_type, e.g. "USAF Phase I SBIR"), for expert
+   review/extend.**
+3. **Enforcement — LOCKED: warn at each stage; at final lock, block + enforce, BUT an admin
+   (customer admin or RFP-admin) may force the approval-lock, recorded as an auditable approval
+   event. No hard stops — stern warning + explicit admin acceptance on the final.** → E4 (reuses
+   the shipped force-advance + audit pattern).
+4. **V0 trigger + data model — LOCKED:**
+   - **Purchase auto-triggers the V0 build** — create the volumes/artifacts + generate the strawman
+     artifacts from the curated compliance matrix (the "launch button" is auto-pressed on purchase;
+     retained for re-gen / future AI press). Cost-guarded.
+   - **Agents seed → expert-admin collaborates → only then can V1 lock** (V0-lock gate).
+   - **Data flow:** V0 is built in **shared RFP memory/operational space**; on purchase the
+     **skeleton + the RFP documents surfaced via the spotlight buckets are COPIED into the
+     customer's portal** (their S3 bucket + their DB rows holding UUIDs + relational refs to the
+     copied uploads/artifacts), with a **compliance event emitted on copy**. (Resolves the prior
+     A/B question: **shared master for spotlight discovery + per-tenant copy at purchase**.) →
+     E1 (copy artifact skeleton + event), E5 (on-purchase trigger).
+   - **Per-tenant agent isolation (verified, hard requirement):** every agent run is bound to one
+     tenant; tools strip `tenant_id` from input and source it from context (`WHERE tenant_id=$1`);
+     `context.py` only assembles that tenant's data (+ the shared RFP master they purchased) into
+     the prompt — Claude never sees another tenant's data. *App-enforced today; #5 adds the DB
+     backstop.* → add a guard/test that every agent tool + context query is tenant-scoped (E5/F8).
+5. **RLS — LOCKED: do real RLS (same strict-isolation bar as #4)** — tenant policies +
+   `FORCE ROW LEVEL SECURITY` + run the app as a **non-owner** DB role (migration runner stays
+   owner). App-level scoping already works, so this is the DB-level backstop; stage carefully so
+   every query passes under RLS. → F8 (upgraded from document+test).
+6. **Health — LOCKED: heartbeat probes + updates, interval settable** (default ~30–60s, settable
+   up to X) with a **hard minimum floor of 5–10s** (cannot be set faster). → F2.
+
+**Cost dependency (eval):** because #4 auto-runs the multi-section strawman on *every* purchase,
+the platform + per-tenant AI cost guards are load-bearing on day one — **G1 (platform cost cap +
+`agent_task_log` logging) is a hard prerequisite for the on-purchase V0 trigger (E5)**, not just
+alpha hardening.
