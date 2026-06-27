@@ -657,28 +657,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    // ── Create process_instance for 72hr Admin SLA tracking ─────────
-    try {
-      await sql`
-        INSERT INTO process_instances
-          (workflow_name, status, source, tenant_id, deadline, payload)
-        VALUES (
-          'AdminProposalSetup',
-          'running',
-          'pipeline',
-          ${tenantId}::uuid,
-          NOW() + INTERVAL '72 hours',
-          ${JSON.stringify({
-            proposalId: proposal.id,
-            opportunityTitle: proposalTitle,
-            tenantName,
-            adminEmailsSent: adminsNotifiedCount,
-          })}::jsonb
-        )
-      `;
-    } catch (piErr) {
-      console.error('[proposals/create] process_instance creation failed (non-fatal)', piErr);
-    }
+    // ── 72h admin-review SLA ────────────────────────────────────────
+    // The admin is notified now via the inline emails above + the OnProposalCreated
+    // workflow (proposal.created → admin review). A previously-inserted
+    // `AdminProposalSetup` process_instance was a PHANTOM — no such Workflow class
+    // exists, so the manager's stuck-detection sweep force-failed it ~5 min later
+    // (status='running' with no heartbeat), polluting the admin monitor on every
+    // proposal and double-counting against OnProposalCreated. Removed (gap-sweep C1).
+    // A real deadline-tracked HITL gate (pause + nudge + escalation at 72h) belongs
+    // to the structured workflow-template-overlay roadmap item (D) and must be a
+    // registered Workflow with a HITL/TODO step, not a bare row.
 
     return NextResponse.json({
       data: {
