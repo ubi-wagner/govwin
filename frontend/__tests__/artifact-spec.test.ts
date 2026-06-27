@@ -119,4 +119,60 @@ describe('buildArtifactSpecs', () => {
     // object {name} and string forms both normalized
     expect(complianceSpec.required_sections).toEqual(['Cover Page', 'Abstract']);
   });
+
+  // ── Bug-sweep regressions (postgres.js NUMERIC-as-string + spec precedence) ──
+
+  it('preserves min_font_size when it arrives as a STRING (NUMERIC from postgres.js)', () => {
+    // postgres.js returns NUMERIC columns as strings; the freeze must not drop it.
+    const { formatSpec, complianceSpec } = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [{ itemType: 'word_doc', minFontSize: '10' }],
+      compliance: { minFontSize: '11' },
+    });
+    expect(complianceSpec.min_font_size).toBe(10); // item wins, parsed from string
+    expect(formatSpec.min_font_size).toBe(10);
+
+    const matrixOnly = buildArtifactSpecs({
+      artifactType: 'narrative', items: [{ itemType: 'word_doc' }], compliance: { minFontSize: '11.5' },
+    });
+    expect(matrixOnly.complianceSpec.min_font_size).toBe(11.5);
+  });
+
+  it('freezes the COST page limit (not the technical one) for a cost artifact', () => {
+    const { complianceSpec } = buildArtifactSpecs({
+      artifactType: 'cost',
+      items: [{ itemType: 'spreadsheet' }], // no per-item page limit (the normal case)
+      compliance: { pageLimitTechnical: 20, pageLimitCost: 5 },
+    });
+    expect(complianceSpec.max_pages).toBe(5);
+  });
+
+  it('UNIONs item-level and matrix-level required sections (no silent drop)', () => {
+    const { complianceSpec } = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [{ itemType: 'word_doc', requiredSections: ['Item Subsection'] }],
+      compliance: { requiredSections: ['Cover', 'Abstract', 'Technical Approach'] },
+    });
+    expect(complianceSpec.required_sections).toEqual([
+      'Item Subsection', 'Cover', 'Abstract', 'Technical Approach',
+    ]);
+  });
+
+  it('gates limits by format: slide deck has no page cap; doc has no slide cap', () => {
+    const slide = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [{ itemType: 'slide_deck', slideLimit: 25 }],
+      compliance: { pageLimitTechnical: 30, slideLimit: 25 },
+    });
+    expect(slide.complianceSpec.max_pages).toBeNull();
+    expect(slide.complianceSpec.max_slides).toBe(25);
+
+    const doc = buildArtifactSpecs({
+      artifactType: 'narrative',
+      items: [{ itemType: 'word_doc', pageLimit: 15 }],
+      compliance: { pageLimitTechnical: 15, slideLimit: 25 },
+    });
+    expect(doc.complianceSpec.max_slides).toBeNull();
+    expect(doc.complianceSpec.max_pages).toBe(15);
+  });
 });

@@ -197,18 +197,22 @@ export async function POST(_request: Request, ctx: RouteContext) {
   //     the lockable document unit (supersedes the volume_name grouping).
   if (section.artifactId) {
     try {
-      const [art] = await sql<{ total: number; locked: number }[]>`
-        SELECT count(*)::int AS total,
-               count(*) FILTER (WHERE is_locked)::int AS locked
-        FROM proposal_sections
-        WHERE artifact_id = ${section.artifactId}::uuid
+      // Atomic roll-up: lock the artifact iff it has sections and none remain
+      // unlocked — in ONE statement, so two concurrent final-section locks can't
+      // both observe "not all locked" and neither flip the artifact.
+      const locked = await sql<{ id: string; sectionCount: number }[]>`
+        UPDATE proposal_artifacts a
+        SET is_locked = true, status = 'locked', locked_at = now(), locked_by = ${userId}::uuid
+        WHERE a.id = ${section.artifactId}::uuid
+          AND a.is_locked = false
+          AND EXISTS (SELECT 1 FROM proposal_sections s WHERE s.artifact_id = a.id)
+          AND NOT EXISTS (
+            SELECT 1 FROM proposal_sections s WHERE s.artifact_id = a.id AND s.is_locked = false
+          )
+        RETURNING a.id,
+          (SELECT count(*)::int FROM proposal_sections s WHERE s.artifact_id = a.id) AS section_count
       `;
-      if (art && art.total > 0 && art.total === art.locked) {
-        await sql`
-          UPDATE proposal_artifacts
-          SET is_locked = true, status = 'locked', locked_at = now(), locked_by = ${userId}::uuid
-          WHERE id = ${section.artifactId}::uuid AND is_locked = false
-        `;
+      if (locked.length > 0) {
         await emitEventSingle({
           namespace: 'proposal',
           type: 'artifact.locked',
@@ -218,7 +222,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
             proposalId,
             artifactId: section.artifactId,
             stage: proposalStage,
-            sectionCount: art.total,
+            sectionCount: locked[0].sectionCount,
           },
         });
       }

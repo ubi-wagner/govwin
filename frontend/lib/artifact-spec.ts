@@ -100,11 +100,20 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   else if (types.some((t) => t === 'spreadsheet') || artifactType === 'cost') presetKey = 'spreadsheet';
   const base: CanvasRules = JSON.parse(JSON.stringify(CANVAS_PRESETS[presetKey]));
 
-  // Page / slide limits: prefer the (max) volume-item limit, fall back to the matrix.
+  // Page / slide limits: prefer the (max) volume-item limit, fall back to the
+  // matrix. Cost artifacts take the COST page limit (not the technical one), and
+  // each limit is gated by format so a slide deck carries no page cap and a
+  // page-based doc carries no slide cap.
+  const isSlide = presetKey === 'slide_cso';
   const itemPages = items.map((i) => i.pageLimit).filter((v): v is number => typeof v === 'number');
   const itemSlides = items.map((i) => i.slideLimit).filter((v): v is number => typeof v === 'number');
-  const maxPages = itemPages.length ? Math.max(...itemPages) : firstNum(compliance.pageLimitTechnical);
-  const maxSlides = itemSlides.length ? Math.max(...itemSlides) : firstNum(compliance.slideLimit);
+  const matrixPages = artifactType === 'cost'
+    ? firstNum(compliance.pageLimitCost, compliance.pageLimitTechnical)
+    : firstNum(compliance.pageLimitTechnical);
+  const maxPages = isSlide ? null : (itemPages.length ? Math.max(...itemPages) : matrixPages);
+  const maxSlides = isSlide
+    ? (itemSlides.length ? Math.max(...itemSlides) : firstNum(compliance.slideLimit))
+    : null;
 
   // Fonts / margins / spacing: first item that specifies, else the matrix.
   const fontItem = items.find((i) => i.fontSize != null);
@@ -115,17 +124,19 @@ export function buildArtifactSpecs(input: ArtifactSpecInput): FrozenSpecs {
   const spacingItem = items.find((i) => i.lineSpacing != null);
   const lineSpacing = parseLineSpacing(spacingItem?.lineSpacing ?? compliance.lineSpacing);
 
-  // Min-font enforcement floor.
+  // Min-font enforcement floor. NUMERIC columns arrive from postgres.js as
+  // STRINGS, so parse them (a typeof-number check silently drops the floor).
   const minFontItem = items.find((i) => i.minFontSize != null);
-  const minFontSize = firstNum(minFontItem?.minFontSize, compliance.minFontSize);
+  const minFontSize = parseFontPt(minFontItem?.minFontSize ?? compliance.minFontSize);
 
   const imagesAllowed = compliance.imagesTablesAllowed !== false;
 
-  // Required sections: union of item-level, else matrix-level.
-  const itemSections = items.flatMap((i) => toSectionList(i.requiredSections));
-  const requiredSections = itemSections.length
-    ? Array.from(new Set(itemSections))
-    : toSectionList(compliance.requiredSections);
+  // Required sections: UNION of item-level + matrix-level (a single item-level
+  // hint must not drop the matrix's document-level mandatory sections).
+  const requiredSections = Array.from(new Set([
+    ...items.flatMap((i) => toSectionList(i.requiredSections)),
+    ...toSectionList(compliance.requiredSections),
+  ]));
 
   const headerRequired = items.some((i) => i.headerFormat != null) || compliance.headerRequired === true || !!base.header;
   const footerRequired = items.some((i) => i.footerFormat != null) || compliance.footerRequired === true || !!base.footer;

@@ -61,14 +61,26 @@ BEGIN
         WHERE artifact_id IS NULL
         GROUP BY proposal_id, volume_number, COALESCE(volume_name, 'Volume')
     LOOP
-        INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
-        VALUES (
-            grp.proposal_id,
-            grp.volume_number,
-            grp.volume_name,
-            CASE WHEN grp.volume_name ~* '(cost|budget|price)' THEN 'cost' ELSE 'narrative' END
-        )
-        RETURNING id INTO new_artifact_id;
+        -- Reuse an existing artifact for this (proposal, volume) if one already
+        -- exists (e.g. some sections were re-orphaned by ON DELETE SET NULL), so
+        -- re-running never splits a volume across two artifacts.
+        SELECT id INTO new_artifact_id
+        FROM proposal_artifacts
+        WHERE proposal_id = grp.proposal_id
+          AND volume_number IS NOT DISTINCT FROM grp.volume_number
+          AND COALESCE(volume_name, 'Volume') = grp.volume_name
+        LIMIT 1;
+
+        IF new_artifact_id IS NULL THEN
+            INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type)
+            VALUES (
+                grp.proposal_id,
+                grp.volume_number,
+                grp.volume_name,
+                CASE WHEN grp.volume_name ~* '(cost|budget|price)' THEN 'cost' ELSE 'narrative' END
+            )
+            RETURNING id INTO new_artifact_id;
+        END IF;
 
         UPDATE proposal_sections
         SET artifact_id = new_artifact_id

@@ -189,13 +189,16 @@ async def shred(
 
         # Log the platform (non-tenant) AI spend so the cap + admin usage see it.
         try:
-            from agents.fabric import _cost_for, DEFAULT_MODEL
+            from agents.fabric import _cost_for
+            # Cost against the SHREDDER's model (not fabric's default) so spend is
+            # priced correctly when SHREDDER_MODEL differs.
+            shred_model = getattr(shredder_runner, "DEFAULT_MODEL", None) or "claude-sonnet-4-20250514"
             in_tok = int(result.get("total_input_tokens", 0) or 0)
             out_tok = int(result.get("total_output_tokens", 0) or 0)
             await log_platform_call(
                 conn, agent_role="shredder", task_type="shred",
                 input_tokens=in_tok, output_tokens=out_tok,
-                cost_usd=_cost_for(DEFAULT_MODEL, in_tok, out_tok),
+                cost_usd=_cost_for(shred_model, in_tok, out_tok),
                 duration_ms=int((time.monotonic() - start_ms) * 1000),
             )
         except Exception as exc:
