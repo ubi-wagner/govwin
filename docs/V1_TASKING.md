@@ -5,6 +5,11 @@ over 18 load-bearing questions. Every task below is anchored to a consensus verd
 refs). Companion docs: `V1_LAUNCH_READINESS.md` (analysis), `V1_ARTIFACT_PIPELINE_DESIGN.md` (E2E#1
 design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, then Red→Green.**
 
+> **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
+> memory refinement. Current state verified against source (4-way consensus). **Decision-complete —
+> ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F (F1/F2/F3) in parallel.
+> Counts: Track E = 9 items (3 keystones: E1/E3/E5) · F = 8 · G = 6 · H = 5.
+
 ---
 
 ## 1. Consensus matrix (3 analyses + verified)
@@ -113,7 +118,7 @@ it**, and the force is an audited approval event. No hard stops.
 - **E4.4** canvas sidebar: live compliance indicator (per-artifact page/font/violations).
 - **E4.5** tests: validator unit (each rule) + warn-on-save + block-at-final + force-with-audit (vitest).
 
-### E5 · P0 · [→E1, G1, +H1] · 3-source strawman + wire ProposalArchitect  *(Q4, Q5; decision #4)*
+### E5 · P0 · [→E1, E3, G1, +H1] · 3-source strawman + wire ProposalArchitect  *(Q4, Q5; decision #4)*
 **Green:** **purchase auto-triggers** a `proposal.v0_requested` task that drafts each section from
 spotlight-bucket + customer profile + RFP/library; results write back; cost-guarded. **Depends on
 G1** (platform cost cap) since this runs on every sale.
@@ -267,24 +272,26 @@ works). Strict-isolation bar = same as the agent-isolation requirement (#4).
 ALPHA GATE (controlled cohort):   G1 → G2 → H2 → H3 → H4            (~1–2 days code + staging pass)
 
 E2E #1 (V1 feature):
-   E1 ─┬─▶ E2 ─▶ E3(+E3.3) ─▶ E4
-       └─▶ E5(+H1) ─▶ E6 ─▶ E8        ;  E7 ∥ ,  E9 after E3
+   E1 ─▶ E2 ─▶ E3 (Template Studio; +E3.5 AI scarecrow) ─▶ E4
+   (E1 + E3 + G1 + H1) ─▶ E5 ─▶ E6 ─▶ E8       ;  E7 ∥ ,  E9 after E3
 
 E2E #2 (V1 feature):
-   F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5 ∥ F8        (independent)  ;  F6 / F7 fast-follow
-   (F1 consumes F2's health output)
+   F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5        (independent; F1 surfaces F2)  ;  F6 / F7 fast-follow
+   F8 (real RLS) — heavier; sequence after the alpha gate, before multi-tenant GA
 
 POLISH (continuous):  G3 ∥ G4 ∥ G5 ∥ G6 ∥ H5
 ```
 
 - **Critical path to alpha:** G1, G2, H2–H4.
-- **Critical path to V1 E2E#1:** E1 → E3 → E5 (container → authoring → 3-source strawman). E5
-  needs H1 (library seed) to have "company meat" for the bones.
-- **E2E#2** is highly parallel; F2 (health) should land before/with F1 (it surfaces F2).
+- **Critical path to V1 E2E#1:** **E1 → E3 → E5** (container → Template Studio → 3-source strawman).
+  E5 also needs **G1** (cost cap, since it fires on every purchase) and **H1** (library seed, for
+  "company meat" on the bones).
+- **E2E#2** is highly parallel; F2 (health) should land before/with F1 (it surfaces F2). F8 (real
+  RLS) is the one heavier item — stage it behind a flag after the alpha gate.
 
-**Suggested review order (before any code):** E1 (schema + artifact-boundary decision) → E3 (the
-big net-new UI) → E5/H1 (the strawman + seed) → E2/E4 (specs + enforcement) → F1/F2/F3 (tower +
-health + rollup). Confirm the four open product decisions in each design doc (`§5`) at the same time.
+**All six product decisions are LOCKED (§7)** — no open decisions remain. **Recommended build
+order:** `G1 → E1 → E3 → E5 (+H1)` for E2E#1, with `F1/F2/F3` running in parallel for E2E#2; then
+E2/E4/E6/E8 and the polish/ops tracks.
 
 ---
 
