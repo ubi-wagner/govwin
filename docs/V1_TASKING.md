@@ -8,7 +8,8 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
 > memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
 > **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 9 items (3 keystones: E1/E3/E5) · F = 8 · G = 6 · H = 5.
+> (F1/F2/F3) in parallel. Counts: Track E = 12 items (E1–E9 narrative + E10–E12 non-narrative
+> artifact classes from the reverse trace) · F = 8 · G = 6 · H = 5.
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -416,3 +417,36 @@ the plan; read each track item **with** its delta here.
 - **G6 — confirmed.** The dead `content.published` rule is still seeded → remove it.
 - **H1 — partly built.** `create_library_defaults.py` seeds default **categories**, not content →
   H1 = seed the actual **company/collaborator/tech/bio atoms** (feeds E5).
+
+### Reverse-trace findings (2026-06-27 — backwards from "submit the full package")
+
+The forward plan models every artifact as a **narrative canvas** (DOCX/PPT/sheet). Walking
+backwards from a complete federal submission exposes **non-narrative artifact classes the plan
+never covered** (all verified absent). These are **NEW scope**, added to Track E:
+
+- **E10 · P1 · Fillable forms (SF-424, SBIR/STTR certs, reps & certs, LOS).** `volume_required_
+  items.item_type` already enumerates `form_sf424`/`form_sbir_certs`/`form_other`, but there is **no
+  fill engine** — the prose strawman/canvas cannot produce a filled form. Need: a structured
+  field-map (tenant profile + proposal data → form fields), a fill/render path (PDF AcroForm or
+  templated form artifact), and signature/cert collection. **Distinct from E5 prose drafting.**
+- **E11 · P1 · Cost / budget volume.** No budget computation exists — the cost volume is a generic
+  artifact and the matrix only *stores* rules (`indirectRateCap`, TABA, cost-share, partner-max-%).
+  Need: a budget model (direct/indirect/fringe/TABA lines, indirect-rate application, cost-share +
+  partner-% validation against the matrix), a cost-volume representation/editor, and export to the
+  required cost workbook. **Distinct from the narrative canvas.**
+- **E12 · P2 · Compliance matrix as a deliverable.** Compliance is *validated* (E4) + *reviewed*
+  (agent) but the **requirement→section traceability crosswalk** (a commonly-required submission
+  deliverable) is never generated. Need: produce it (every matrix requirement → artifact/section/
+  page that addresses it) as a package artifact.
+- **E8 extension:** the `package` route assembles **only narrative sections** today → it must also
+  bundle forms (E10), the cost volume (E11), and the compliance-matrix deliverable (E12), named per
+  the RFP's submission instructions (file naming / order / page numbering).
+
+**Corrected (already built — NOT missing):** outcome/win-loss → library-learning loop
+(`outcome/route.ts` + `outcome_attributor.py` + `on_proposal_outcome_recorded.py` →
+`library_atom_outcomes`); the V0 review SLA (`create` writes a `process_instances` deadline +
+`OnProposalCreated` notify).
+
+**Minor:** `proposals` records `opportunity_id` but not the specific spotlight **bucket** the opp
+was bought from — E5.2 derives bucket context via `opportunity_id → spotlight_bucket_scores`, so
+workable; add a source-bucket column only if you want explicit provenance.
