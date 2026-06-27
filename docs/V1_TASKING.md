@@ -8,9 +8,9 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > **Status (2026-06-27):** All 6 product decisions **LOCKED** (§7) + the per-(customer,proposal)
 > memory refinement. Current state verified against source (4-way consensus + a 5-way code audit).
 > **Decision-complete — ready to build.** Recommended start: **G1 → E1 → E3 → E5 (+H1)**, Track F
-> (F1/F2/F3) in parallel. Counts: Track E = 13 items (E1–E9 narrative + E10–E12 non-narrative
-> artifact classes from the reverse trace + E13 document-level access control) · F = 8 · G = 6 ·
-> H = 5.
+> (F1/F2/F3) in parallel. Counts: Track E = 14 items (E1–E9 narrative + E10–E12 non-narrative
+> artifact classes + E13 document-level access control + E14 library↔canvas round-trip) · F = 8 ·
+> G = 6 · H = 5.
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -282,8 +282,9 @@ ALPHA GATE (controlled cohort):   G1 → G2 → H2 → H3 → H4            (~1�
 E2E #1 (V1 feature):
    E1 ─▶ E2 ─▶ E3 (Template Studio; +E3.5 AI scarecrow) ─▶ E4
    (E1 + E3 + G1 + H1) ─▶ E5 ─▶ E6 ─▶ E8       ;  E7 ∥ ,  E9 after E3
-   §8 additions:  E13 (per-doc access) after E1  ;  E11 (cost volume) ∥  ;  E10 (form templates)
-                  in E3  ;  E10/E11/E12 bundled by E8 (package)
+   §8 additions:  E13 (per-doc access) after E1  ;  E14 (library↔canvas round-trip) after E1, with
+                  E5/E13  ;  E11 (cost volume) ∥  ;  E10 (form templates) in E3  ;  E10/E11/E12
+                  bundled by E8 (package)
 
 E2E #2 (V1 feature):
    F1 ∥ F2 ∥ F3 ∥ F4 ∥ F5        (independent; F1 surfaces F2)  ;  F6 / F7 fast-follow
@@ -523,3 +524,73 @@ access controlled in the launch product."** Walking the current resolver confirm
     acceptance; collaborators default to upload and can be raised to edit per document; tenant_admin
     sees/controls all in-tenant; rfp_admin/master_admin see all tenants; acceptance/lock is
     tenant_admin-only and non-grantable.
+
+### Library ↔ canvas round-trip alignment (2026-06-27 — owner)
+
+A second launch requirement: the **library and the canvas must align *both ways*** so a unit
+round-trips cleanly — **library unit → section** (admin pulls a unit in as a baseline to redraft/
+rewrite) and **section → library** (an *accepted* section flows back out as a new reusable unit
+carrying **new context + lineage**). Owner's worked example: *"a section accepted by admin for an
+Army Phase I SBIR, which happened to use the library artifacts from a Phase I USAF proposal —
+selected by the customer admin on review and realignment of the V1 artifacts in a new portal."* So
+the USAF Phase I unit seeds the Army Phase I section, which is redrafted, accepted, and harvested
+back as a **new** unit that **records it was derived from the USAF unit** and is **tagged with the
+Army Phase I SBIR context**. This is **not** an access-logic change (reuse E13's admin tier) — it is
+**data-model + lifecycle alignment** across ingestion/atomization, library management, and portal
+use/reuse/regen/edit/lock.
+
+- **E14 · P1 · [→E1, E5, E13] · Library↔canvas round-trip alignment + lineage.** Make the library
+  unit and the canvas section/artifact line up in both directions so reuse, regen, and harvest-back
+  are lossless and traceable.
+
+  **Current state (verified):**
+  - **Inbound** `handleReplaceFromLibrary` (`canvas-editor.tsx:281`) replaces a node with an atom
+    and **stamps `provenance.source='library'` + `provenance.library_unit_id`** — lineage-*in* is
+    already captured on the node; sidebar shows "From library: …".
+  - **Outbound** `harvestSectionToLibrary` (on accept) + `harvestProposalToLibrary` (final lock) in
+    `lib/proposal-harvest.ts` walk canvas nodes, dedupe by `atom_hash`, and write `library_units`
+    with category/subcategory/tags/`meta` + `original_proposal_id`/`original_node_id` — but **never
+    read `node.provenance.library_unit_id`**, so the **derived-from link is dropped**.
+  - **Schema is ready:** `library_units` already has `parent_unit_id` (upload seminal→child),
+    `original_proposal_id/_node_id`, `canvas_nodes` JSONB (structured multi-node storage),
+    `source_type CHECK(manual|upload|harvest|ai)`, `embedding`, `meta`.
+  - **Two ingestion paths diverge in shape:** harvest classifies into the C1/C2 taxonomy
+    (`section_type`/`standardCategory`, `type:` tags, structured `meta`, `atom_hash` dedupe); the
+    upload→`atomize` route uses the reader's `suggestedCategory`/`suggestedTags` + `canvas_nodes`
+    but **omits** section_type/standardCategory/hash.
+
+  **Gaps + sub-tasks:**
+  - **E14.1 — preserve derived-from lineage at harvest (the core gap).** Harvest must read each
+    node's `provenance.library_unit_id` and record a **derived-from link** on the new unit. Add a
+    dedicated `derived_from_unit_id UUID[]` (ancestry; don't overload `parent_unit_id`, which means
+    upload-seminal→child) + index; populate it from the seeding atoms. *Files:* mig,
+    `lib/proposal-harvest.ts`.
+  - **E14.2 — re-stamp NEW context on harvest-back.** Enrich the harvested unit's `meta`/tags with
+    the proposal's **opportunity/solicitation context** (agency, `program_type`, phase — e.g. "Army
+    Phase I SBIR") + artifact type, so the unit is retrievable/rankable by the context it was
+    *accepted under*, not just its old category. (Mirrors E5.2's bucket-context derivation via
+    `opportunity_id`.) *Files:* `lib/proposal-harvest.ts`.
+  - **E14.3 — section/artifact-grain units, not only node atoms.** Today harvest emits per-node
+    atoms only. Add a **unit `level` (atom | section | artifact)** so an accepted *section* (and,
+    with E1, an *artifact*) is harvested as a reusable baseline unit (its `canvas_nodes` stored
+    structured, as `atomize` already does) — *"a similar unit artifact."* Fine-grained atoms stay;
+    the section/artifact unit is additive. *Files:* mig (`level` col), `lib/proposal-harvest.ts`.
+  - **E14.4 — converge the two ingestion shapes.** Make harvest store structured `canvas_nodes`
+    (like `atomize`) and make `atomize` classify into the C1/C2 taxonomy (`section_type`/
+    `standardCategory`/hash, like harvest) so a unit from **either** path drops into a canvas node
+    and round-trips identically. One unit shape, one dedupe. *Files:* `library/atomize/route.ts`,
+    `lib/proposal-harvest.ts`, shared helper.
+  - **E14.5 — admin-only integration + AI-draft lineage (no new access logic).** Keep "**only admins
+    grab + integrate** library units into a section as a baseline" — gate the library-pull/replace
+    action to the E13 admin tier (do **not** build new access machinery). And make the **E5 AI
+    draft/regen tool stamp `provenance.library_unit_id`** on nodes it seeds from library content
+    (today only the manual replace does), so AI-seeded baselines also carry lineage E14.1 captures.
+    *Files:* `canvas-editor.tsx` (gate), `lib/tools/proposal-draft-section.ts` (stamp).
+  - **E14.6 — tests:** USAF→Army round-trip (pull unit → redraft → accept → harvested unit carries
+    `derived_from_unit_id` + Army-Phase-I context); section/artifact-level unit harvested; harvest
+    and atomize produce the same unit shape; admin-only integration gate; AI-draft stamps lineage;
+    live-PG INSERT/round-trip.
+  - **Accept:** an accepted section harvests back as a unit that records its source unit(s) +
+    new opportunity context; section/artifact-level units exist alongside atoms; both ingestion paths
+    yield one unit shape; library integration is admin-only; AI drafts carry lineage. The lineage
+    chain (USAF Phase I unit → Army Phase I accepted section → new unit) is queryable end-to-end.
