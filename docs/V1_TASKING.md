@@ -11,8 +11,8 @@ design), `V1_CONTROL_PLANE_DESIGN.md` (E2E#2 design). **No code yet — review, 
 > (F1/F2/F3) in parallel. Counts: Track E = 16 items (E1–E9 narrative + E10–E12 non-narrative
 > artifact classes + E13 doc-level access + E14 library↔canvas round-trip + E15 V0.5 provisioning +
 > E16 expert role) · F = 8 · G = 6 · H = 5. **§9 = V0.5 milestone** (admin-provisioned portals);
-> **§10 = Expert role** (3rd-party / TABA / EDEV scoped access; realizes E15.4) + recorded
-> BYOC/TABA economics roadmap.
+> **§10 = Expert role** (global shadow identity + customer-controlled grants; realizes E15.4) +
+> recorded BYOC economics roadmap.
 >
 > **§8 holds the audit refinements** (integration seams + data gaps the audit surfaced). Tracks E–H
 > below must be read **together with §8** — it corrects two items (E5 dispatch/write-back, G1
@@ -654,7 +654,9 @@ seed/draft inside an isolated customer dataspace before V1.
 - **TABA-funded assistance:** SBIR/STTR cost proposals carry a **TABA allowance** that can fund
   external technical/business assistance → the platform's expert help can be **paid from the
   customer's own TABA line**, and an expert can **bid in as the named TABA consultant** if the SBE
-  wins (built-in payment rail + post-award recurring revenue).
+  wins (built-in payment rail + post-award recurring revenue). *(Scope note: TABA mechanics live in
+  the customer's cost-volume build — out of product scope; we do **not** track a TABA POC in-product.
+  This is a business/payment note only.)*
 - **Services → SBE referral** funnel feeding the top of the pipeline.
 
 ### Considerations (flagged — not blocking)
@@ -671,93 +673,150 @@ BYOC / TABA / rev-share **economics** = **recorded roadmap, not V1 build**.
 
 ---
 
-## 10. Expert role — 3rd-party / TABA / EDEV professionals + scoped access (2026-06-27 — owner)
+## 10. Expert role — global shadow identity + customer-controlled access (2026-06-27 — owner)
 
-**New role `expert`** — an **approved-by-us, granted-by-the-customer** 3rd-party who is **not** an
-RFP-Pipeline affiliate (distinct from `rfp_admin`). Covers economic-development (EDEV) pros who refer
-their portfolio of SBEs onto the platform, 3rd-party proposal managers, and **TABA advisors** (who
-*advise, don't support*). This **realizes E15.4** (the "forward-safe scoped-expert" stub) as a
-concrete tier.
+> **The architecture in one line:** an expert is a **single global identity (one email = one shadow
+> user)** that **controls nothing** — every access they have is a **projection of grants the customer
+> admin made**, stored in **customer-segmented** tables. The expert login is a frictionless **control
+> point** that surfaces *only* the spotlight buckets and proposals each customer added. Great for BD
+> (frictionless, customer-owned); **risk concentrates at the 1:N access page**, so that surface must
+> be airtight.
 
-**Identity + org.** Expert identity **key = email** (the value the customer selects); plus standard
-User info and **org info** (for cost-share / rev-share). **Approved by our admins** before they can
-be selected by a customer.
+**Supersedes the earlier E16 draft.** Owner corrections: **TABA is out of scope** (it lives in the
+customer's cost-volume build — we do **not** track a TABA POC); access levels are exactly
+**view-only / edit / edit+accept+advance**; the expert is a **single role**, created by a **customer
+admin invite at any time** (not a platform-gated approval); access is a **pure projection** of
+customer grants, never controlled by the expert.
 
-**Access is association-based, not rank-based.** An expert belongs to no customer tenant; their
-access comes entirely from explicit **affiliations** the customer (or our admin) grants:
-- **Company scope** (the "base" expert identified at onboarding): acts **as an admin in that
-  company** — sees all that customer's proposals + company + spotlight data.
-- **Proposal scope** (the "Expert POC for THIS proposal", selected at portal staging, or added later
-  on the customer's Users UI): admin-level **on that proposal only**.
-- **Grant level** per affiliation: `advisory` (view + review/comment — the **TABA-advisor**
-  default), `contributor` (edit), `manager` (admin-equivalent **incl. acceptance** — the
-  **EDEV / 3rd-party-manager** default).
-- An **EDEV org's 5 pros** each hold their own affiliations to their own assigned SBEs → different
-  proposal access per expert; the org is a grouping (+ cost-share), access is individual.
+### 10.1 The model (verified-feasible on today's schema)
 
-**2-part access (both set by the customer admin):**
-1. **Onboarding:** customer admin (or our admin) identifies the expert **by email** → **company-scope**
-   affiliation (base expert = company admin-equivalent; all company + spotlight).
-2. **Portal staging:** at proposal creation, customer admin selects the **Expert POC for that
-   proposal** (+ TABA POC if applicable) → **proposal-scope** affiliation; can add more per proposal
-   anytime via the Users UI.
-- Same expert onboarded **and** portal-selected ⇒ full company + spotlight visibility; portal-only /
-  added-later ⇒ proposal-scoped.
+**One email = one global shadow user.** `users.email` is **UNIQUE** and `tenant_id` is **nullable**,
+and the live invite flow already **reuses an existing user by email** across tenants — so the "one
+email, many customers (1:N)" identity is **already how the system behaves**. A pure expert is
+`role='expert', tenant_id=NULL`; an **existing** user (e.g. a `tenant_user` at their own company)
+**keeps their home role** and simply gains expert *grants* elsewhere — exactly the owner's "employees
+from one company can also be experts on other customers' sandboxes."
 
-**TABA POC.** A per-proposal designation (`is_taba_poc`) — the proposal records whether it has a TABA
-POC (or **none**, if no TABA allowed/requested). TABA advisors default to `advisory` (advise, not
-support). Surfaces at win time ("who is the TABA POC").
+> **Key correction:** `users.role` is a **single global value**, so expert capability **cannot** be
+> the role — it must be the **grants**. `role='expert'` is only the *home* role for a standalone
+> shadow identity; **expert ACCESS = the grant rows**, resolved for *any* logged-in user. The
+> landing/portfolio is driven by "does this user have grants?", not by `role==expert`.
 
-**Consent.** Because the **customer explicitly grants** each affiliation (selecting the expert by
-email at onboarding + portal staging), the grant **is** the consent record — **stronger than a
-generic T&C** (per-relationship, auditable). Keep a baseline T&C for our internal `rfp_admin` access;
-**expert access = consent-by-grant.**
+**Two customer-controlled grant surfaces (both live in the customer's segmented space):**
+1. **Company-level spotlight-bucket access — `0:N`, review-only.** The customer admin grants the
+   expert **view-only** access to all or specific spotlight buckets so they can review opps for their
+   supported SBEs. (Buckets are a fixed 5-string taxonomy, tenant-scoped via `spotlight_bucket_scores`
+   — **no per-user bucket access exists today**.)
+2. **Proposal-level access — addable any time after portal creation.** The customer admin adds any
+   number of experts to a proposal at **one of three levels: `view_only` / `edit` /
+   `edit_accept_advance`.** At `edit_accept_advance` the expert holds a **shadow company-admin role
+   for that one authorized proposal** (incl. accept + advance).
 
-### E16 · P1 · [→E13, E15] · Expert role + expert↔customer/proposal affiliations
-- **E16.1** RBAC: add `expert` to `ROLES`/`ROLE_RANK` (rank governs `/portal` path-gating only —
-  real authority comes from affiliations) + the `users.role` CHECK. *Files:* `lib/rbac.ts`, mig
-  (alter constraint).
-- **E16.2** schema: `expert_profiles(user_id, org_name/org_id?, taba_eligible, approval_status,
-  approved_by/at, …)` + `expert_affiliations(expert_user_id, tenant_id, scope[company|proposal],
-  proposal_id?, level[advisory|contributor|manager], is_poc, is_taba_poc, granted_by, granted_at,
-  status, revoked_at)` (UNIQUE per expert×tenant×proposal) + indexes. Optional
-  `proposals.taba_poc_user_id` convenience. *Files:* mig.
-- **E16.3** `verifyTenantAccess` (already async): for `expert`, return true iff an **active affiliation**
-  to `tenantId` exists (company scope, or any proposal scope in that tenant). *Files:* `lib/db.ts`.
-- **E16.4** `resolveUserAccess`: resolve expert access from affiliations — company-`manager` ⇒
-  tenant-admin-equivalent across the tenant's proposals (incl. acceptance; all company + spotlight);
-  proposal affiliation ⇒ access for THIS proposal per `level` (manager incl. acceptance; contributor
-  = edit; advisory = view + comment); else `NO_ACCESS`. *Files:* `lib/proposal-access.ts`.
-- **E16.5** **acceptance exception (E13 interaction):** acceptance/lock stays **non-grantable to
-  employees/collaborators**, **but** an expert with `level=manager` (explicit customer grant) is an
-  admin-delegate that **may** accept/lock its scoped proposal(s). *Decision — recommend yes; flag to
-  confirm.* (Update E13 to name this single exception.)
-- **E16.6** 2-part grant UI/routes: (a) onboarding expert selection by email (company affiliation),
-  (b) portal-staging Expert POC + TABA POC selection at create, (c) customer **Users UI** to
-  add/revoke per-proposal experts. Auth = customer `tenant_admin` (or our admin). *Files:* team/Users
-  UI, `proposals/create`, new grant routes.
-- **E16.7** approval: `/admin` experts page + route to **approve pending experts** before they're
-  selectable; email is the selection key. *Files:* admin experts page/route.
-- **E16.8** notifications: on client purchase / portal creation, **notify the affiliated expert(s)**
-  by email (ride the CMS `event_listener` + a `notify_expert_on_client_purchase` automation rule).
-  *Files:* CMS listener / `automation_rules` seed.
-- **E16.9** expert **portfolio login**: experts log in to a cross-tenant portfolio of their affiliated
-  customers/proposals (scoped to affiliations) + a spotlight-like **referral** surface to bring new
-  customers in ("access 1 like spotlight"). *Files:* expert dashboard + landing path in `rbac.ts`.
-- **E16.10** audit: every expert action inside a customer portal writes `audit_log` (ride F7); the
-  grant act is the consent record.
-- **E16.11** tests: affiliation resolution (company vs proposal vs none); level gates
-  (advisory/contributor/manager); **manager-accept allowed, advisory-accept denied**; cross-tenant
-  isolation (expert sees only affiliated customers); EDEV-5-pros different-proposal access;
-  notify-on-purchase; live-PG.
-- **Accept:** an approved expert, selected by a customer (by email) at onboarding and/or portal
-  staging, gets company- or proposal-scoped admin-equivalent access accordingly; TABA advisors get
-  advisory-only + are recorded as the proposal's TABA POC; experts see only their affiliated
-  customers; acceptance follows the manager-grant rule; every grant + action is audited.
+**Creation / invite / confirm (mirrors the working collaborator flow):** customer admin enters an
+**email** at any time → if no user exists, create a **shadow user** (`temp_password=true`, random
+hash, `role='expert'`, `tenant_id=NULL`); if the email exists, **reuse it** (they may already be an
+expert elsewhere). Expert gets an email with a confirm link → sets a password (`/api/invite`-style)
+→ lands on their **portfolio**. Until a customer adds them, the portfolio is the existing
+**"no workspace assigned"** page (already built) — the **blank landing** the owner described.
 
-**Decisions defaulted (correct me):** `expert` is a **single new role** with access carried by
-**affiliations** (company/proposal scope × advisory/contributor/manager level); **manager-level
-experts may accept/lock** (the one acceptance exception, by explicit customer grant);
-rev-share/cost-share **billing stays roadmap** (org info captured now). The **role + access mechanics
-are buildable scope** (this elevates E15.4 from forward-note to E16); the BYOC **economics** remain
-§9 roadmap.
+**Expert login = single intermediary control point (the portfolio).** One frictionless login lists,
+on one side, **all spotlight buckets** the customer(s) granted (view-only) and, on the other, **all
+proposals** they've been added to — across every customer. Selecting one drops them into **that one
+company's segmented space**, scoped to exactly what was granted. The expert **cannot navigate to
+anything not granted** — the page only *surfaces* projections. *(Owner: "beef this up later"; V1 =
+the secure minimal switchboard.)*
+
+**Customers can lock out *our* admins, too.** Today `verifyTenantAccess` returns `true`
+unconditionally for `rfp_admin`/`master_admin`. The owner wants a customer to be able to **prohibit
+platform-expert access** — "the same as taking an email off their access list." So a customer-set
+**platform-access restriction** blocks `rfp_admin` from that tenant's data; `master_admin` retains a
+**break-glass with audit + customer-visible notice** *(recommended; flag)*. Strong BD/trust story:
+*your data is yours; you can lock us out.*
+
+### 10.2 Current state (verified — what we build on)
+- **Identity/invite:** `users.email` UNIQUE + nullable `tenant_id`; the shadow-user pattern
+  (`temp_password`, random hash) and email-reuse-across-tenants already exist (`proposals/[id]/
+  collaborators`, `team` routes; accept via `/api/invite`). The dormant **`invitations`** table
+  (mig 001) can be adopted, or mirror the collaborator-token pattern.
+- **Email:** `lib/email.ts` (Gmail API → Resend fallback) + `collaboratorInviteEmail` template — an
+  expert-invite template is a small add.
+- **Landing:** `getLandingPath`→`null` → `/portal/page.tsx` "no workspace assigned" page = the blank
+  start state.
+- **Buckets:** fixed taxonomy + `spotlight_bucket_scores(tenant_id, opportunity_id, bucket)`,
+  tenant-scoped; spotlight portal at `/portal/[tenantSlug]/spotlights` (tenant_user+).
+- **Access chokepoint:** `verifyTenantAccess` (`db.ts:50`, **async**) is the *single* function
+  (~75 call sites, unchanged) where expert-grant + customer-lockout logic lands; the portal layout
+  (`[tenantSlug]/layout.tsx`) already calls it and redirects on no-access.
+- **Per-proposal grant pattern:** `proposal_collaborators` + `collaborator_stage_access` (view/
+  comment/edit) is the shape to extend toward the 3 expert levels.
+
+### 10.3 Gaps (all verified absent)
+- **G-X1** No `expert` role; `users.role` CHECK is the 5 roles only.
+- **G-X2** No expert-grant tables (company-bucket grants; proposal-level expert grants).
+- **G-X3** No per-user/-expert **bucket access** — spotlight is all-or-nothing per tenant.
+- **G-X4** `verifyTenantAccess` has **no affiliation path** and **no customer-lockout** path.
+- **G-X5** No expert **portfolio** (cross-customer switchboard) or expert-scoped portal nav.
+- **G-X6** No expert **invite/confirm** entry point (only proposal/team invites) or notify-on-add.
+- **G-X7** No **customer control** to restrict platform-admin access; no break-glass/audit for it.
+
+### E16 · P1 · [→E13, E15] · Expert role — global shadow identity + customer-controlled grants
+*(replaces the prior E16 draft; TABA tracking removed)*
+- **E16.1 — role + identity.** Add `expert` to `ROLES`/`ROLE_RANK` (rank only clears `/portal`
+  middleware; **authority = grants, not rank**) + the `users.role` CHECK. Expert **access is resolved
+  from grants for any user**, so an existing `tenant_user` can hold expert grants elsewhere without
+  changing their home role. *Files:* `lib/rbac.ts`, mig (alter constraint).
+- **E16.2 — grant schema, customer-segmented.**
+  `expert_bucket_grants(tenant_id, bucket, expert_user_id, granted_by, granted_at, revoked_at)`
+  (review-only; UNIQUE per tenant×bucket×expert) + `proposal_expert_grants(proposal_id, tenant_id,
+  expert_user_id, email, level[view_only|edit|edit_accept_advance], granted_by, granted_at,
+  accepted_at, revoked_at)` (UNIQUE per proposal×email). Both **owned by the customer tenant**
+  (RLS-ready). *Files:* mig.
+- **E16.3 — invite/confirm.** Customer-admin "add expert by email" at any time → reuse-or-create
+  shadow user (`role='expert'` if new + standalone) → expert-invite email (new template) →
+  `/api/invite`-style confirm → portfolio. Notify on add. *Files:* new expert-grant route,
+  `lib/email-templates.ts`, reuse `/api/invite`.
+- **E16.4 — `verifyTenantAccess` (async) two-way change.** (a) For a user with an **active grant** to
+  the tenant (bucket or proposal), return true; (b) for `rfp_admin`, return true **only if** the
+  tenant has **not** restricted platform access; `master_admin` = break-glass (audited). *Files:*
+  `lib/db.ts` (+ the restriction read).
+- **E16.5 — `resolveUserAccess` from grants.** Resolve per-proposal access from
+  `proposal_expert_grants.level`: `view_only`→view+comment; `edit`→edit; `edit_accept_advance`→
+  admin-equivalent on that proposal **incl. accept + advance** (shadow company-admin for that one
+  proposal). No grant ⇒ `NO_ACCESS`. *Files:* `lib/proposal-access.ts`.
+- **E16.6 — acceptance exception (E13).** Acceptance/lock stays non-grantable to employees/
+  collaborators, **but** an `edit_accept_advance` expert (explicit customer grant) **may** accept +
+  advance its granted proposal(s). **Owner-confirmed** (the level name says so). Update E13 to name
+  this exception.
+- **E16.7 — review-only bucket view.** A spotlight view scoped to `expert_bucket_grants` (WHERE the
+  granted buckets) — read-only; reuse the spotlight feed with a grant filter. *Files:* expert
+  spotlight route/view.
+- **E16.8 — expert portfolio (control point).** One login → switchboard of granted buckets +
+  proposals across all customers; per-company scoped entry; expert-scoped portal nav (no
+  dashboard/pipeline/library unless granted). Driven by **grants**, not role. *Files:* expert
+  portfolio page, `[tenantSlug]/layout.tsx` nav, `getLandingPath`.
+- **E16.9 — customer controls platform access.** Customer-admin toggle/list to **restrict
+  `rfp_admin`** access (the "take us off the list"); `master_admin` break-glass writes `audit_log` +
+  notifies the customer. *Files:* tenant settings route/UI, `verifyTenantAccess`, `audit_log`.
+- **E16.10 — audit + revocation.** Every expert action in a customer portal → `audit_log`; revoking
+  a grant (bucket or proposal) cuts access **immediately** (per-request resolution, not session-baked).
+- **E16.11 — tests:** 1:N same-email across customers; existing-user-as-expert keeps home role;
+  grant-projection (sees only granted buckets/proposals); `view_only`/`edit`/`edit_accept_advance`
+  gates with **accept allowed only at edit_accept_advance**; bucket review-only; **rfp_admin lockout**
+  + master break-glass audit; revoke-cuts-access; live-PG.
+- **Accept:** a customer adds an expert by email at any time; the expert confirms and sees a portfolio
+  that **projects only** granted buckets (view-only) + proposals (at the granted level); the same
+  email serves many customers; an `edit_accept_advance` expert can accept + advance its proposal; a
+  customer can lock out our `rfp_admin`; every grant/action is audited; nothing is expert-controlled.
+
+### 10.4 Decisions (most owner-confirmed; two flagged)
+- **Confirmed:** single `expert` role; access = **projection of customer grants** in
+  customer-segmented tables; levels **view_only / edit / edit_accept_advance**; `edit_accept_advance`
+  **may accept + advance**; **no TABA tracking** (out of scope — lives in the customer's cost volume);
+  1:N one-email identity; existing users can be experts elsewhere.
+- **Flag 1 — platform lockout depth:** `rfp_admin` is restrictable by the customer; should
+  `master_admin` be **hard-locked too**, or **break-glass with audit + customer notice**?
+  *(Recommend break-glass + audit so support/ops can recover; the customer sees every entry.)*
+- **Flag 2 — expert vetting:** is a customer invite **alone** enough to activate an expert (max
+  frictionless — owner's lean), or does **our admin** optionally **suspend/blocklist** bad actors
+  after the fact? *(Recommend: customer-invite activates; our admin holds a global suspend — no
+  pre-approval gate.)*
