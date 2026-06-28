@@ -139,3 +139,27 @@ foundation is built; 3 bounded extensions remain — not a substantive rebuild.*
 
 **Owner framing confirmed:** these are small, well-scoped extensions on a solid ledger — not a
 workflow rebuild. Recommended order: J1 (delegation) → J2 (date generator) → J3 (typed completers).
+
+---
+
+## K. Findings surfaced during the R-track refactor (2026-06-28)
+
+- **K1 · P2 · postgres.js jsonb text-cast reads back as a STRING.** Verified (3 probes, single
+  result-set): a jsonb value written `${JSON.stringify(x)}::jsonb` reads back as a **string**, while
+  `${sql.json(x)}` or a DDL `DEFAULT` reads back as a parsed **object** — within the *same* column
+  descriptor. The whole codebase writes jsonb via `JSON.stringify(...)::jsonb`. Concretely this means
+  a **custom** `gate_config` (written that way in `proposals/create`) reads back as a string in
+  `lib/proposal-advance.ts:116` (`(proposal.gateConfig || [...])`), so `gates.indexOf(stage)` /
+  `gates[idx+1]` would operate on a string. The **default** gate (`["draft","final"]`, from the column
+  DDL default) reads back as an array and works — which is why this is latent (almost all proposals
+  use default gates). **R0.3 fix pattern (canonical going forward):** write jsonb via `sql.json()` so
+  it round-trips as an object, and have read-models normalize defensively (`coerceOriginCard`).
+  **TODO (own task, NOT on the untouched advance path this pass):** audit every `JSON.stringify(...)::jsonb`
+  write whose column is later read as an object; either migrate writes to `sql.json()` or normalize on
+  read. Highest-priority real consumer: custom `gate_config` in advance.
+- **K2 · P3 · No DB uniqueness backs the duplicate-proposal guard.** `proposals` has no
+  `UNIQUE(tenant_id, opportunity_id)` (the 001 UNIQUE is on the tenant-scoring table; the opportunity
+  index is non-unique). Two concurrent `proposals/create` POSTs can both pass the app-level duplicate
+  check (route.ts) and create two proposals — each freezing its own origin card. Pre-existing; does not
+  violate single-card immutability. A `UNIQUE` index would need a dedupe pass first (could fail on
+  existing dupes). Track with the create-path hardening.

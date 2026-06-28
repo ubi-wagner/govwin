@@ -264,9 +264,44 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/create] section_standards load failed (non-fatal):', stdErr);
     }
 
+    // ── R0.3: resolve the source spotlight bucket for the IMMUTABLE origin card ─
+    // Best-effort — an admin-granted opportunity that was never spotlighted simply
+    // has no bucket (source_bucket stays null). Read before the txn so the freeze
+    // is atomic in the INSERT (no post-insert UPDATE window).
+    let topBucket: { bucket: string; score: number } | null = null;
+    try {
+      const [b] = await sql<{ bucket: string; score: number }[]>`
+        SELECT bucket, score FROM spotlight_bucket_scores
+        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${topicId}::uuid
+        ORDER BY score DESC NULLS LAST
+        LIMIT 1
+      `;
+      topBucket = b ?? null;
+    } catch (bucketErr) {
+      console.error('[api/portal/proposals/create] source bucket lookup failed (non-fatal):', bucketErr);
+    }
+
+    // The IMMUTABLE origin layer of the card: the L0 opportunity summary + the L1
+    // source bucket, frozen at purchase so a later master edit / close / amendment
+    // never rewrites the project's audit. Compliance is deliberately NOT frozen
+    // here — it renders LIVE from the matrix (an amendment must raise the live
+    // burden; freezing it would understate it — mig 089 / 3-factor review flaw #7).
+    const originCard = {
+      opportunity: {
+        id: topicId,
+        title: topic.title,
+        agency: topic.agency,
+        programType: topic.programType,
+        topicNumber: topic.topicNumber,
+        solicitationNumber: topic.solicitationNumber,
+      },
+      bucket: topBucket ? { key: topBucket.bucket, score: topBucket.score } : null,
+      frozenAt: new Date().toISOString(),
+    };
+
     const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
-        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (
           ${tenantId},
           ${topicId},
@@ -274,7 +309,9 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${proposalTitle},
           'draft',
           ${JSON.stringify(gateConfig)}::jsonb,
-          true
+          true,
+          ${sql.json(originCard)},
+          ${topBucket?.bucket ?? null}
         )
         RETURNING id
       `;
