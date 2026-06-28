@@ -5,6 +5,13 @@
 **Verification method:** File-by-file analysis of all 908 tracked files.  
 **Evidence location:** `docs/baseline/inventory/` (8 subsystem inventories) + `docs/baseline/BASELINE_FINDINGS.md` (reconciled synthesis)
 
+**Lifecycle addendum (current push):** the proposal **open-to-close** process — AI draft/regen
+→ per-section accept/lock → document-close → lock-state advance gate (+ force-advance marking)
+→ submit → library harvest — and the **settable AI cost-control** substrate are specified in
+`docs/PROPOSAL_LIFECYCLE_V1.md`. Remaining Red→Green work: `docs/PROPOSAL_LIFECYCLE_TODO.md`.
+Schema since this baseline: migrations **072** (agent config), **073** (atom-outcome unique),
+**074** (`proposal_sections` lock columns).
+
 ## Status Legend
 
 | Symbol | Meaning |
@@ -1114,3 +1121,35 @@ Highest-risk untested paths:
 ---
 
 *This document was generated 2026-06-23 as part of the Phase 2 baseline exercise. Source of truth for all facts is `docs/baseline/BASELINE_FINDINGS.md` and the 8 inventory files in `docs/baseline/inventory/`. When facts conflict between this document and the inventories, the inventories win.*
+
+---
+
+## As-built deltas since V9 (V1 build — 2026-06-27)
+
+The V1 feature build is underway on `claude/nice-hamilton-kBqtD`. Schema/runtime changes shipped so
+far (migration chain validated 001→085 on live PG 16). Authoritative live journal:
+`docs/V1_TASKING.md` §11.
+
+### New / changed schema
+- **`proposal_artifacts`** (mig 083) — NEW. The lockable/downloadable **document unit**; a proposal
+  owns N. Cols: `id, proposal_id (FK CASCADE), volume_id?, volume_number, volume_name, artifact_type
+  CHECK(narrative|cost|form|matrix|other), format_spec JSONB, compliance_spec JSONB, is_required,
+  status CHECK(draft|in_progress|locked), is_locked, locked_at, locked_by, timestamps`.
+- **`proposal_sections.artifact_id`** (mig 083) — NEW FK → `proposal_artifacts(id)` **ON DELETE SET
+  NULL**. Every section belongs to one artifact (backfilled by `(volume_number, volume_name)`).
+- **`solicitation_compliance.min_font_size`** + **`volume_required_items.min_font_size` /
+  `canvas_preset` / `compliance_preset`** (mig 084) — min-font enforcement source + a structured spec
+  home (legacy TEXT `font_size`/`margins`/`line_spacing` remain the authored source).
+- **`agent_task_log.tenant_id`** (mig 085) — now **NULLABLE**. NULL = platform/system AI spend
+  (shredder, discovery, CMS content); the platform monthly cap now accounts for it.
+
+### New / changed runtime
+- **`frontend/lib/artifact-spec.ts`** — `buildArtifactSpecs()` freezes a typed `CanvasRules` +
+  `ComplianceSpec` onto each artifact at purchase, parsing the authored TEXT specs.
+- **`CanvasRules`** gained `min_font_size?/images_allowed?/image_max_width|height?`; new
+  **`ComplianceSpec`** (`lib/types/canvas-document.ts`).
+- **Advance/lock at artifact scope** — `lib/proposal-advance.ts` treats optional artifacts as
+  non-blocking; the section lock route rolls sections up to artifact lock state (`artifact.locked`).
+- **`proposal.v0_provisioned`** — emitted by the create-route on V0 copy (artifacts + copied-doc refs).
+- **`pipeline/src/agents/platform_guard.py`** — NEW. `platform_ai_allowed(conn)` (fail-closed) +
+  `log_platform_call(conn, …)`. fabric caps + logs the null-tenant invoke path; shred action wired.

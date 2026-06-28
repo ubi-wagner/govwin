@@ -161,6 +161,23 @@ async def shred(
                     "reason": "anthropic_sdk_not_installed",
                 }
 
+        # G1: platform spend guard — the shredder runs per-ingest with no tenant,
+        # so gate it on the platform monthly cap before spending and log the spend
+        # after, so platform_agent_config.platform_monthly_cap accounts for it.
+        from agents.platform_guard import platform_ai_allowed, log_platform_call
+        if not await platform_ai_allowed(conn):
+            duration_ms = int((time.monotonic() - start_ms) * 1000)
+            try:
+                await emit_event(
+                    conn, namespace="finder", type="shred.executed", phase="end",
+                    parent_event_id=start_event_id,
+                    payload={"solicitationId": solicitation_id,
+                             "error": "platform_ai_cap_reached", "durationMs": duration_ms},
+                )
+            except Exception:
+                pass
+            return {"status": "shredder_blocked", "reason": "platform_ai_cap_reached"}
+
         # Delegate to the runner. ShredderBudgetError is intentionally not
         # caught here -- it propagates so the workflow processor records the
         # step as failed.
@@ -169,6 +186,23 @@ async def shred(
             solicitation_id=solicitation_id,
             anthropic_client=client,
         )
+
+        # Log the platform (non-tenant) AI spend so the cap + admin usage see it.
+        try:
+            from agents.fabric import _cost_for
+            # Cost against the SHREDDER's model (not fabric's default) so spend is
+            # priced correctly when SHREDDER_MODEL differs.
+            shred_model = getattr(shredder_runner, "DEFAULT_MODEL", None) or "claude-sonnet-4-20250514"
+            in_tok = int(result.get("total_input_tokens", 0) or 0)
+            out_tok = int(result.get("total_output_tokens", 0) or 0)
+            await log_platform_call(
+                conn, agent_role="shredder", task_type="shred",
+                input_tokens=in_tok, output_tokens=out_tok,
+                cost_usd=_cost_for(shred_model, in_tok, out_tok),
+                duration_ms=int((time.monotonic() - start_ms) * 1000),
+            )
+        except Exception as exc:
+            log.error("shred: platform spend log failed: %s", exc)
 
         duration_ms = int((time.monotonic() - start_ms) * 1000)
         try:

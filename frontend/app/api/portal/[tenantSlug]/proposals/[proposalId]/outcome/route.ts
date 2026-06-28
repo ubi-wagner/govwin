@@ -250,7 +250,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         await tx`
           INSERT INTO library_atom_outcomes (unit_id, proposal_id, outcome)
           VALUES (${unit.id}, ${proposalId}::uuid, ${atomOutcomeValue})
-          ON CONFLICT DO NOTHING
+          ON CONFLICT (unit_id, proposal_id) DO NOTHING
         `;
       }
 

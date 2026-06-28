@@ -328,12 +328,21 @@ class AgentFabric:
                     raise BudgetExceeded(
                         f"Tenant {tenant_id} exceeded the monthly AI budget or platform cap"
                     )
+            else:
+                # Platform/system invoke (tenant_id IS NULL): gate on the master
+                # switch + the platform monthly cap (G1 — platform spend is now
+                # logged and capped, not invisible).
+                platform_cfg = await self._load_platform_config(conn)
+                if not platform_cfg["ai_enabled"]:
+                    raise BudgetExceeded("AI is disabled platform-wide")
+                if not await self._check_platform_cap(conn, platform_cfg):
+                    raise BudgetExceeded("Platform monthly AI cap reached")
 
             # Resolve the effective per-call ceiling (tenant override ->
             # platform default -> constant) used by the mid-loop cost check.
             effective_ceiling = PER_CALL_CEILING_USD
             try:
-                pcfg = platform_cfg if tenant_id else await self._load_platform_config(conn)
+                pcfg = platform_cfg  # set in both branches above
                 effective_ceiling = pcfg["default_per_call_ceiling"]
                 if tenant_id:
                     tcfg = await conn.fetchrow(
@@ -789,6 +798,11 @@ class AgentFabric:
                         task_id, upd_exc,
                     )
 
+                # AI review write-back: surface a completed section review as a
+                # recommendation in that section's context-box thread.
+                if status == "completed" and task_type == "review_section":
+                    await self._post_section_recommendation(conn, row, task_input, result)
+
                 results.append({"task_id": str(task_id), **result})
 
             except Exception as exc:
@@ -819,6 +833,47 @@ class AgentFabric:
                 })
 
         return results
+
+    async def _post_section_recommendation(self, conn, row, task_input: dict, result: dict) -> None:
+        """Write a completed AI section review into proposal_comments
+        (recommendation_type='ai_review') so it surfaces in the section's
+        context-box thread, attributed to the admin who requested the review.
+        Best-effort — a failure here must never fail the agent task."""
+        try:
+            proposal_id = row["proposal_id"]
+            section_id = row["section_id"]
+            if not proposal_id or not section_id:
+                return
+            requested_by = task_input.get("requested_by") or task_input.get("requestedBy")
+            if not requested_by:
+                return  # proposal_comments.user_id is NOT NULL — need an author
+
+            res = result.get("result") if isinstance(result, dict) else None
+            text = ""
+            if isinstance(res, dict):
+                text = (res.get("summary") or res.get("text") or "").strip()
+            if not text:
+                return
+
+            await conn.execute(
+                """
+                INSERT INTO proposal_comments
+                    (proposal_id, section_id, user_id, content, recommendation_type, category)
+                VALUES ($1, $2, $3, $4, 'ai_review', $5)
+                """,
+                proposal_id,
+                section_id,
+                uuid.UUID(str(requested_by)),
+                text[:10000],
+                task_input.get("category"),
+            )
+            logger.info(
+                "[process_task_queue] posted AI recommendation for section %s", section_id,
+            )
+        except Exception as exc:
+            logger.error(
+                "[process_task_queue] recommendation write-back failed: %s", exc,
+            )
 
     # ------------------------------------------------------------------
     # Platform-wide config (pipeline-level, settable by admin)
@@ -995,6 +1050,37 @@ class AgentFabric:
             logger.error("[budget] check failed, denying call: %s", exc)
             return False
 
+    async def _check_platform_cap(self, conn, platform: dict | None = None) -> bool:
+        """Platform-wide monthly cap check across ALL spend (tenant + platform/
+        system). Used for tenant_id IS NULL (platform/system) invokes, where
+        there is no tenant budget to check. Returns True if within the cap (or no
+        cap is set). Fails CLOSED.
+        """
+        try:
+            if platform is None:
+                platform = await self._load_platform_config(conn)
+            cap = platform.get("platform_monthly_cap")
+            if cap is None:
+                return True
+            row = await conn.fetchrow(
+                """
+                SELECT COALESCE(SUM(cost_usd), 0) AS total_cost
+                FROM agent_task_log
+                WHERE created_at >= date_trunc('month', now())
+                """
+            )
+            total = float(row["total_cost"]) if row else 0.0
+            if total >= float(cap):
+                logger.error(
+                    "[budget] platform monthly cap reached: $%.4f of $%.2f",
+                    total, float(cap),
+                )
+                return False
+            return True
+        except Exception as exc:
+            logger.error("[budget] platform cap check failed, denying call: %s", exc)
+            return False
+
     # ------------------------------------------------------------------
     # Task logging
     # ------------------------------------------------------------------
@@ -1017,10 +1103,12 @@ class AgentFabric:
         memories_written: int = 0,
         error: str | None = None,
     ) -> None:
-        """Insert a row into agent_task_log for audit and billing."""
-        if not tenant_id:
-            return  # Admin/system invocations don't require logging
+        """Insert a row into agent_task_log for audit and billing.
 
+        G1: platform/system invocations (tenant_id is None) ARE logged now —
+        with a NULL tenant_id — so platform_monthly_cap and the admin usage views
+        account for their spend (previously they were silently skipped).
+        """
         try:
             await conn.execute(
                 """
@@ -1036,7 +1124,7 @@ class AgentFabric:
                      $13, $14, now())
                 """,
                 uuid.uuid4(),
-                uuid.UUID(tenant_id),
+                uuid.UUID(tenant_id) if tenant_id else None,
                 agent_role,
                 task_type,
                 trigger_event,

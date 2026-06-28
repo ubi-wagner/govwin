@@ -588,6 +588,16 @@ describe('PUT section/save — success path', () => {
     expect(json.data.status).toBe('in_progress');
   });
 
+  it("ignores status='approved' — lock is the sole writer of 'approved' (A5)", async () => {
+    setupFullHappyPath({ section: makeSection({ status: 'in_progress' }) });
+
+    // 'approved' is no longer client-settable via save; only the lock route sets it.
+    const res = await PUT(makeRequest({ content: VALID_CONTENT, status: 'approved' }), makeCtx());
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.status).toBe('in_progress'); // unchanged, not 'approved'
+  });
+
   it('strips __revisionMeta from content before persisting', async () => {
     setupFullHappyPath();
 

@@ -22,6 +22,9 @@ interface SectionItem {
   completedAt?: string | null;
   acceptedByName?: string | null;
   isEditable?: boolean;
+  isLocked?: boolean;
+  volumeName?: string | null;
+  volumeNumber?: number | null;
 }
 
 interface Collaborator {
@@ -164,6 +167,9 @@ export function ProposalAdminPanel({
   }>>([]);
   const [gatesLoading, setGatesLoading] = useState(false);
   const [gatesLoaded, setGatesLoaded] = useState(false);
+  const [lockOverrides, setLockOverrides] = useState<Record<string, boolean>>({});
+  const [lockPending, setLockPending] = useState<string | null>(null);
+  const [lockingAll, setLockingAll] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
   const [newGateLabel, setNewGateLabel] = useState('');
   const [newGateStage, setNewGateStage] = useState('');
@@ -315,8 +321,65 @@ export function ProposalAdminPanel({
     }
   }, [tenantSlug, proposalId, newGateLabel, newGateStage]);
 
-  // Group sections by volume (using section number prefix)
+  // Accept + lock / unlock a section (admin action; server-enforced + audited).
+  const handleToggleLock = useCallback(async (sectionId: string, currentlyLocked: boolean) => {
+    setLockPending(sectionId);
+    try {
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/lock`,
+        { method: currentlyLocked ? 'DELETE' : 'POST' },
+      );
+      if (res.ok) {
+        setLockOverrides((prev) => ({ ...prev, [sectionId]: !currentlyLocked }));
+        // If this lock completed the document and the tenant opted into
+        // auto-advance, the proposal moved a stage — refresh so the stage badge
+        // and gate controls reflect the new state.
+        try {
+          const json = await res.json();
+          if (json?.data?.autoAdvancedTo) router.refresh();
+        } catch {
+          /* no/again non-JSON body — nothing to react to */
+        }
+      }
+    } catch {
+      /* network error — leave UI state unchanged */
+    } finally {
+      setLockPending(null);
+    }
+  }, [tenantSlug, proposalId, router]);
+
+  // Bulk "Accept & Lock All" — locks every unlocked, draftable section so the
+  // whole document can advance in one click. Reuses the per-section lock route,
+  // so each lock emits section.locked + harvests + (on the last) document.locked
+  // and proposal.advance_ready. The advance gate then passes.
+  const handleLockAll = useCallback(async () => {
+    if (lockingAll) return;
+    const targets = sections.filter(
+      (s) => !(lockOverrides[s.id] ?? !!s.isLocked) && s.status !== 'empty' && s.nodeCount > 0,
+    );
+    if (targets.length === 0) return;
+    setLockingAll(true);
+    try {
+      for (const s of targets) {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${s.id}/lock`,
+          { method: 'POST' },
+        );
+        if (res.ok) setLockOverrides((prev) => ({ ...prev, [s.id]: true }));
+      }
+      router.refresh();
+    } finally {
+      setLockingAll(false);
+    }
+  }, [sections, lockOverrides, lockingAll, tenantSlug, proposalId, router]);
+
+  const isSectionLocked = (s: SectionItem) => lockOverrides[s.id] ?? !!s.isLocked;
+
+  // Group sections by document/volume (real matrix identity, prefix fallback).
   const volumes = groupSectionsByVolume(sections);
+  const unlockedLockable = sections.filter(
+    (s) => !isSectionLocked(s) && s.status !== 'empty' && s.nodeCount > 0,
+  );
 
   const complianceItems = compliance?.items || [];
 
@@ -350,13 +413,27 @@ export function ProposalAdminPanel({
       {/* ─── Artifacts Tab ────────────────────────────────────────── */}
       {activeTab === 'artifacts' && (
         <div>
+          {unlockedLockable.length > 0 && (
+            <div className="flex items-center justify-between mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <p className="text-xs text-indigo-800">
+                {unlockedLockable.length} section{unlockedLockable.length > 1 ? 's' : ''} drafted and ready to accept &amp; lock for this stage.
+              </p>
+              <button
+                onClick={handleLockAll}
+                disabled={lockingAll}
+                className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {lockingAll ? 'Locking…' : `Accept & Lock All (${unlockedLockable.length})`}
+              </button>
+            </div>
+          )}
           {volumes.map((volume) => (
             <div key={volume.label} className="mb-5">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg">
                 <h3 className="text-sm font-semibold text-gray-700">{volume.label}</h3>
                 <span className="text-xs text-gray-500">
-                  {volume.sections.filter((s) => s.status === 'complete' || s.status === 'approved').length} of{' '}
-                  {volume.sections.length} complete
+                  {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
+                  {volume.sections.length} locked
                   {volume.totalPages > 0 && ` • ${volume.usedPages}/${volume.totalPages} pages`}
                 </span>
               </div>
@@ -370,6 +447,9 @@ export function ProposalAdminPanel({
                     ? Math.round((section.nodeCount / (section.pageAllocation * 3)) * 100)
                     : 0;
                   const pageColor = pagePercent > 100 ? 'bg-red-500' : pagePercent > 90 ? 'bg-amber-500' : 'bg-emerald-500';
+                  const locked = isSectionLocked(section);
+                  const lockBusy = lockPending === section.id;
+                  const lockable = section.status !== 'empty' && section.nodeCount > 0;
 
                   return (
                     <div
@@ -425,6 +505,27 @@ export function ProposalAdminPanel({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                           </svg>
                         </span>
+                      )}
+
+                      {/* Accept & Lock / Unlock — the unit of "approved content" */}
+                      {locked ? (
+                        <button
+                          onClick={() => handleToggleLock(section.id, true)}
+                          disabled={lockBusy}
+                          title="Accepted & locked for this stage. Unlock to edit or regenerate."
+                          className="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 disabled:opacity-50 flex-shrink-0 transition-colors"
+                        >
+                          {lockBusy ? '…' : '🔒 Unlock'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleLock(section.id, false)}
+                          disabled={lockBusy || !lockable}
+                          title={lockable ? 'Accept this section and lock it for this stage' : 'Draft content before accepting'}
+                          className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 transition-colors"
+                        >
+                          {lockBusy ? '…' : 'Accept & Lock'}
+                        </button>
                       )}
 
                       {/* Action */}
@@ -723,12 +824,15 @@ interface VolumeGroup {
 }
 
 function groupSectionsByVolume(sections: SectionItem[]): VolumeGroup[] {
-  // Group by section number prefix (e.g., "1.1" and "1.2" go into volume 1)
+  // Prefer the real document/volume identity carried from the compliance matrix
+  // (proposal_sections.volume_name/number, set at create time). Fall back to the
+  // section-number prefix for legacy proposals created before migration 074.
   const groups = new Map<string, VolumeGroup>();
 
   for (const section of sections) {
+    const hasVolume = section.volumeNumber != null || !!section.volumeName;
     const prefix = section.sectionNumber.split('.')[0] || '1';
-    const key = prefix;
+    const key = hasVolume ? `v${section.volumeNumber ?? section.volumeName}` : prefix;
 
     if (!groups.has(key)) {
       const volumeNames: Record<string, string> = {
@@ -736,8 +840,13 @@ function groupSectionsByVolume(sections: SectionItem[]): VolumeGroup[] {
         '2': 'Volume 2: Cost Volume',
         '3': 'Volume 3: Supporting Documents',
       };
+      const label = hasVolume
+        ? (section.volumeNumber != null
+            ? `Volume ${section.volumeNumber}: ${section.volumeName ?? 'Document'}`
+            : (section.volumeName as string))
+        : (volumeNames[prefix] || `Volume ${prefix}`);
       groups.set(key, {
-        label: volumeNames[prefix] || `Volume ${prefix}`,
+        label,
         sections: [],
         totalPages: 0,
         usedPages: 0,

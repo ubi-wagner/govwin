@@ -37,7 +37,9 @@ const STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
   ai_drafted:  { label: 'AI Draft',    badge: 'bg-amber-100 text-amber-600' },
   in_progress: { label: 'In Progress', badge: 'bg-blue-100 text-blue-600' },
   complete:    { label: 'Complete',     badge: 'bg-emerald-100 text-emerald-600' },
-  approved:    { label: 'Approved',     badge: 'bg-emerald-100 text-emerald-600' },
+  // After A5, status='approved' is written ONLY by the lock route, so it is a
+  // faithful "accepted & locked" indicator for contributors.
+  approved:    { label: '🔒 Accepted & Locked', badge: 'bg-indigo-100 text-indigo-700' },
   review:      { label: 'Review',       badge: 'bg-amber-100 text-amber-600' },
   hidden:      { label: 'Hidden',       badge: 'bg-gray-100 text-gray-300' },
 };

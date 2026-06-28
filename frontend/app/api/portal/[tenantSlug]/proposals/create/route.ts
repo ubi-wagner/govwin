@@ -5,9 +5,11 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
+import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { putObject, copyObject } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -70,11 +72,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Stripe gate — founding cohort bypass
-    // When Stripe is live, check for a valid purchase or active subscription
-    // before allowing proposal creation. For now, all tenant_admins can create.
-    const FOUNDING_COHORT_BYPASS = process.env.FOUNDING_COHORT_BYPASS === 'true';
-    if (!FOUNDING_COHORT_BYPASS) {
+    // Stripe gate — founding cohort.
+    // V1: proposal creation is admin-granted (no Stripe). The paywall is OFF by
+    // default so the founding cohort can convert opportunities → workspaces;
+    // set FOUNDING_COHORT_BYPASS=false to require a purchase/subscription once
+    // billing is live. (When enforced, this is where the purchase/subscription
+    // check belongs.)
+    const paywallEnforced = process.env.FOUNDING_COHORT_BYPASS === 'false';
+    if (paywallEnforced) {
       return NextResponse.json(
         { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
         { status: 402 },
@@ -211,6 +216,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       itemName: string;
       itemType: string;
       pageLimit: number | null;
+      volumeName: string | null;
+      volumeNumber: number | null;
+      templateId: string | null;
+      expertNotes: string | null;
     }> = [];
 
     let globalItemIndex = 0;
@@ -222,6 +231,10 @@ export async function POST(request: Request, ctx: RouteContext) {
           itemName: item.itemName as string,
           itemType: item.itemType as string,
           pageLimit: (item.pageLimit as number) ?? null,
+          volumeName: (vol.volumeName as string) ?? null,
+          volumeNumber: (vol.volumeNumber as number) ?? null,
+          templateId: (item.templateId as string) ?? null,
+          expertNotes: (item.expertNotes as string) ?? null,
         });
       }
     }
@@ -239,7 +252,19 @@ export async function POST(request: Request, ctx: RouteContext) {
       uei: '{uei}',
     };
 
-    const { proposal, sectionCount } = await sql.begin(async (tx: any) => {
+    // Load active section standards once to tag each section against the
+    // taxonomy (C1). Best-effort — pre-migration or empty just leaves sections
+    // untagged (section_type = null).
+    let sectionStandards: SectionStandard[] = [];
+    try {
+      sectionStandards = await sql<SectionStandard[]>`
+        SELECT key, label FROM section_standards WHERE is_active = true
+      `;
+    } catch (stdErr) {
+      console.error('[api/portal/proposals/create] section_standards load failed (non-fatal):', stdErr);
+    }
+
+    const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
         VALUES (
@@ -256,65 +281,125 @@ export async function POST(request: Request, ctx: RouteContext) {
 
       let count = 0;
 
+      // ── E1: create one artifact (the lockable/downloadable document unit) per
+      //    volume, then link each section to its artifact. format_spec /
+      //    compliance_spec are frozen here ('{}' until E2 populates them).
+      const artifactByVolKey = new Map<string, string>();
+      const createdArtifacts: { id: string; volumeName: string | null; artifactType: string }[] = [];
+      const volKey = (num: number | null, name: string | null) => `${num ?? ''}|${name ?? ''}`;
+
       if (requiredItems.length > 0) {
         const programType = topic.programType ?? '';
 
+        for (const vol of resolved.volumes) {
+          const volName = (vol.volumeName as string) ?? null;
+          const volNum = (vol.volumeNumber as number) ?? null;
+          const artifactType = /cost|budget|price/i.test(volName ?? '') ? 'cost' : 'narrative';
+          // E2: freeze the format + compliance spec onto the artifact at purchase.
+          const { formatSpec, complianceSpec } = buildArtifactSpecs({
+            artifactType,
+            items: (vol.items as Array<Record<string, unknown>>) ?? [],
+            compliance: resolved.compliance,
+          });
+          const [art] = await tx<{ id: string }[]>`
+            INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
+            VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType},
+                    ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+            RETURNING id
+          `;
+          artifactByVolKey.set(volKey(volNum, volName), art.id);
+          createdArtifacts.push({ id: art.id, volumeName: volName, artifactType });
+        }
+
         for (const item of requiredItems) {
+          const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           // Insert the section row first to get its id
           const [section] = await tx<{ id: string }[]>`
             INSERT INTO proposal_sections (
-              proposal_id, section_number, title, content, status, page_allocation
+              proposal_id, artifact_id, section_number, title, content, status, page_allocation,
+              volume_name, volume_number, section_type, meta
             ) VALUES (
               ${proposalRow.id},
+              ${artifactId},
               ${String(item.itemNumber)},
               ${item.itemName},
               ${null},
               'empty',
-              ${item.pageLimit}
+              ${item.pageLimit},
+              ${item.volumeName},
+              ${item.volumeNumber},
+              ${inferSectionType(item.itemName, sectionStandards)},
+              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}::jsonb
             )
             RETURNING id
           `;
 
-          // Attempt to resolve and apply a template for this section
-          const templateKey = resolveTemplateKey(programType, item.itemType);
-          if (templateKey) {
-            const templateDoc: CanvasDocument | null = getTemplate(templateKey);
-            if (templateDoc) {
-              // Set metadata IDs linking this document to the proposal structure
-              templateDoc.metadata.proposal_id = proposalRow.id;
-              templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
-              templateDoc.metadata.created_at = new Date().toISOString();
-              templateDoc.metadata.last_modified_at = new Date().toISOString();
-              templateDoc.metadata.last_modified_by = userId;
-              templateDoc.document_id = section.id;
-
-              // Interpolate merge fields with available data
-              const interpolated = interpolateTemplate(templateDoc, templateVariables);
-
-              // Store the canvas document JSON and update status to reflect template content
-              const contentJson = JSON.stringify(interpolated);
-              await tx`
-                UPDATE proposal_sections
-                SET content = ${contentJson},
-                    status = 'ai_drafted'
-                WHERE id = ${section.id}
-              `;
+          // E3: resolve the starter template — DB-backed first (expert-authored
+          // via the Template Studio, linked per required-item via template_id),
+          // then the in-code registry as fallback.
+          let templateDoc: CanvasDocument | null = null;
+          if (item.templateId) {
+            const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`
+              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1
+            `;
+            if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
+              templateDoc = tpl.canvasDocument;
             }
+          }
+          if (!templateDoc) {
+            const templateKey = resolveTemplateKey(programType, item.itemType);
+            if (templateKey) templateDoc = getTemplate(templateKey);
+          }
+          if (templateDoc) {
+            // Set metadata IDs linking this document to the proposal structure
+            templateDoc.metadata.proposal_id = proposalRow.id;
+            templateDoc.metadata.solicitation_id = topic.solicitationId ?? '';
+            templateDoc.metadata.created_at = new Date().toISOString();
+            templateDoc.metadata.last_modified_at = new Date().toISOString();
+            templateDoc.metadata.last_modified_by = userId;
+            templateDoc.document_id = section.id;
+
+            // Interpolate merge fields with available data
+            const interpolated = interpolateTemplate(templateDoc, templateVariables);
+
+            // Store the canvas document JSON and update status to reflect template content
+            const contentJson = JSON.stringify(interpolated);
+            await tx`
+              UPDATE proposal_sections
+              SET content = ${contentJson},
+                  status = 'ai_drafted'
+              WHERE id = ${section.id}
+            `;
           }
 
           count++;
         }
       } else {
-        // No required items defined — create a single default section
+        // No required items defined — create a single default artifact + section
+        const { formatSpec: defFormat, complianceSpec: defCompliance } = buildArtifactSpecs({
+          artifactType: 'narrative', items: [], compliance: resolved.compliance,
+        });
+        const [defArt] = await tx<{ id: string }[]>`
+          INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
+          VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative',
+                  ${JSON.stringify(defFormat)}::jsonb, ${JSON.stringify(defCompliance)}::jsonb)
+          RETURNING id
+        `;
+        artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
+        createdArtifacts.push({ id: defArt.id, volumeName: 'Technical Volume', artifactType: 'narrative' });
         await tx`
           INSERT INTO proposal_sections (
-            proposal_id, section_number, title, content, status
+            proposal_id, artifact_id, section_number, title, content, status,
+            volume_name, volume_number
           ) VALUES (
             ${proposalRow.id},
+            ${defArt.id},
             '1',
             'Technical Volume',
             ${null},
-            'empty'
+            'empty',
+            'Technical Volume',
+            1
           )
         `;
         count = 1;
@@ -360,7 +445,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         console.error('[api/portal/proposals/create] supporting docs seed failed (non-fatal):', seedErr);
       }
 
-      return { proposal: proposalRow, sectionCount: count };
+      return { proposal: proposalRow, sectionCount: count, artifacts: createdArtifacts };
     });
 
     // ── Link matching purchase to the new proposal ─────────────────
@@ -467,6 +552,28 @@ export async function POST(request: Request, ctx: RouteContext) {
       },
     });
 
+    // ── E1: V0 provisioning (copy) event — the compliance event emitted on copy
+    //    of the skeleton + RFP docs into the customer portal. Carries the created
+    //    artifacts + copied-doc refs for the control plane / automation (E5/F1).
+    try {
+      await emitEventSingle({
+        namespace: 'proposal',
+        type: 'proposal.v0_provisioned',
+        actor: userActor(userId, sessionUser.email),
+        tenantId,
+        payload: {
+          proposalId: proposal.id,
+          tenantSlug,
+          artifacts: artifacts.map((a) => ({ id: a.id, volumeName: a.volumeName, artifactType: a.artifactType })),
+          rfpDocumentsCopied: docsCopied,
+          complianceCopied: true,
+          volumesCopied: true,
+        },
+      });
+    } catch {
+      // Best-effort — never break the main flow
+    }
+
     // ── Activity log ─────────────────────────────────────────────────
     try {
       await sql`
@@ -550,28 +657,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    // ── Create process_instance for 72hr Admin SLA tracking ─────────
-    try {
-      await sql`
-        INSERT INTO process_instances
-          (workflow_name, status, source, tenant_id, deadline, payload)
-        VALUES (
-          'AdminProposalSetup',
-          'running',
-          'pipeline',
-          ${tenantId}::uuid,
-          NOW() + INTERVAL '72 hours',
-          ${JSON.stringify({
-            proposalId: proposal.id,
-            opportunityTitle: proposalTitle,
-            tenantName,
-            adminEmailsSent: adminsNotifiedCount,
-          })}::jsonb
-        )
-      `;
-    } catch (piErr) {
-      console.error('[proposals/create] process_instance creation failed (non-fatal)', piErr);
-    }
+    // ── 72h admin-review SLA ────────────────────────────────────────
+    // The admin is notified now via the inline emails above + the OnProposalCreated
+    // workflow (proposal.created → admin review). A previously-inserted
+    // `AdminProposalSetup` process_instance was a PHANTOM — no such Workflow class
+    // exists, so the manager's stuck-detection sweep force-failed it ~5 min later
+    // (status='running' with no heartbeat), polluting the admin monitor on every
+    // proposal and double-counting against OnProposalCreated. Removed (gap-sweep C1).
+    // A real deadline-tracked HITL gate (pause + nudge + escalation at 72h) belongs
+    // to the structured workflow-template-overlay roadmap item (D) and must be a
+    // registered Workflow with a HITL/TODO step, not a bare row.
 
     return NextResponse.json({
       data: {

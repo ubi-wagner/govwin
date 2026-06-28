@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -84,6 +85,8 @@ export async function GET(request: Request, ctx: RouteContext) {
       content: string;
       resolved: boolean;
       createdAt: Date;
+      recommendationType: string;
+      category: string | null;
       userName: string | null;
       userEmail: string | null;
     }[];
@@ -99,6 +102,8 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.content,
           pc.resolved,
           pc.created_at,
+          pc.recommendation_type,
+          pc.category,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -118,6 +123,8 @@ export async function GET(request: Request, ctx: RouteContext) {
           pc.content,
           pc.resolved,
           pc.created_at,
+          pc.recommendation_type,
+          pc.category,
           u.name AS user_name,
           u.email AS user_email
         FROM proposal_comments pc
@@ -141,6 +148,8 @@ export async function GET(request: Request, ctx: RouteContext) {
         text: c.content,
         resolved: c.resolved,
         createdAt: c.createdAt,
+        recommendationType: c.recommendationType,
+        category: c.category,
         userName: c.userName,
         userEmail: c.userEmail,
       })),
@@ -238,6 +247,34 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     if (!proposal2) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Section must belong to this proposal ─────────────────────────
+    let sectionOk: { id: string } | undefined;
+    try {
+      [sectionOk] = await sql<{ id: string }[]>`
+        SELECT id FROM proposal_sections
+        WHERE id = ${nodeId} AND proposal_id = ${proposalId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments] POST section check failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (!sectionOk) {
+      return NextResponse.json({ error: 'Section not found for this proposal', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Partner scoping: partners may only comment on granted sections ─
+    // Tenant staff (tenant_user+) keep tenant-wide access.
+    if (role === 'partner_user') {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      const canComment =
+        access.commentableSections.includes(nodeId) ||
+        access.editableSections.includes(nodeId);
+      if (!canComment) {
+        return NextResponse.json({ error: 'No comment access to this section', code: 'FORBIDDEN' }, { status: 403 });
+      }
     }
 
     // ── Insert comment ───────────────────────────────────────────────

@@ -252,3 +252,15 @@ export function assertKeyBelongsToTenant(key: string, tenantSlug: string): void 
     throw new Error(`[storage/paths] key ${JSON.stringify(key)} does not belong to tenant ${tenantSlug}`);
   }
 }
+
+/**
+ * Per-tenant image upload key (canvas image nodes in proposal sections).
+ * Lives under the tenant's isolated `customers/<slug>/` prefix.
+ */
+export function customerImagePath(tenantSlug: string, filename: string): string {
+  assertTenantSlug(tenantSlug);
+  if (!filename || filename.includes('..') || filename.includes('/')) {
+    throw new Error(`[storage/paths] invalid image filename: ${JSON.stringify(filename)}`);
+  }
+  return `customers/${tenantSlug}/images/${filename}`;
+}

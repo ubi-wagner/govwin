@@ -309,6 +309,10 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Route: Stripe checkout session creation.
   - **Verify in-house:** must use a Stripe test key (`sk_test_…`) and a real test card (`4242 4242 4242 4242`). Stripe webhook must be configured with `STRIPE_WEBHOOK_SECRET`. This path has zero automated coverage — see Section 6.
 
+- [ ] **TA-06b** — Founding-cohort convert (no Stripe): pin an opportunity, then click **"Build Proposal"** on the detail page.
+  - Expected: `POST …/proposals/create` returns `200` and the browser navigates to the new `/proposals/[id]` workspace (created `is_locked=true` for admin review). The paywall is **off by default** in V1 (`FOUNDING_COHORT_BYPASS` unset/≠`false`); set `FOUNDING_COHORT_BYPASS=false` to re-enable the 402 paywall.
+  - Event: `proposal:proposal.created:end`; tables: `proposals`, `proposal_sections`, `proposal_supporting_docs`.
+
 - [ ] **TA-07** — Complete Stripe checkout (test mode); confirm redirect back to portal.
   - Expected: `stripe/webhook` receives `checkout.session.completed`; 6-table `sql.begin` transaction runs: `purchases` row created, `proposals` row created, `proposal_sections` rows created, S3 `customers/[slug]/proposals/[id]/` prefix provisioned.
   - Event: `capture:purchase.completed:end`; tables: `purchases`, `proposals`, `proposal_sections`.
@@ -345,7 +349,62 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
     `GET /api/portal/[tenantSlug]/agents/usage` returns `403` for below-tenant_admin.
   - Route: `GET /api/portal/[tenantSlug]/agents/usage`; tables: `agent_task_log`, `tenant_agent_config`, `platform_agent_config`. No pricing data is ever returned (§7).
 
-**tenant_admin total: 12 steps**
+### 5.7 Automation Setup (C3 Increment 1)
+
+- [ ] **TA-13** — Visit `/portal/[slug]/automation`; review the automation preference toggles.
+  - Expected: the page renders the tenant's preferences (notify-team-on-document-locked,
+    collaborator "get-ready" emails, notify-on-stage-advanced, new-priority-opp alerts,
+    **AI review on advance** [default on], **auto-advance when all locked** [default off]). Toggling
+    a switch persists via an allowlisted upsert; reloading shows the saved state. First save writes
+    a `tenant_automation_preferences` row (`configured_at` set).
+  - Negative: a `tenant_user` does not see the nav link and is redirected; `PATCH …` is rejected for
+    below-tenant_admin.
+  - Route: `GET`/`PATCH /api/portal/[tenantSlug]/automation-preferences`; table:
+    `tenant_automation_preferences` (mig 076). Drives TU-10c (AI review on advance).
+
+- [ ] **TA-14** — **Notification gating** (C3 Increment 3a). Confirm the notify-* toggles actually
+    gate the lifecycle emails the CMS event_listener sends.
+  - Expected: with `notify_team_on_document_locked` **on** (default), locking the last section of a
+    volume (TU-09b emits `proposal:document.locked`) causes the CMS event_listener to fire the
+    "Proposal document locked — notify team" rule (mig 078) and send the `document_locked_team_notify`
+    email to the tenant admin. Likewise `proposal.advance_ready` → `collaborator_get_ready`
+    (gated by `notify_collaborators_get_ready`) and `proposal.advanced` → `stage_advanced`
+    (gated by `notify_on_stage_advanced`).
+  - Negative: turn a toggle **off** on the Automation page (TA-13); re-trigger the event → the
+    listener logs "Skipping rule … tenant preference off" and **no** email/`automation_log` row is
+    written for that rule. Rules with no `tenant_pref`, and events with no tenant scope, are
+    unaffected (default-on safety).
+  - **Verify in-house:** requires the CMS service running with `SHARED_DATABASE_URL` set (so the
+    listener can read `tenant_automation_preferences`) and Google Workspace creds for actual
+    delivery (absent creds it no-ops gracefully). Query `SELECT action_type, status FROM
+    automation_log WHERE trigger_event_id = '[event id]';` to confirm fire-vs-skip.
+  - Tables/code: `automation_rules` (mig 078), `tenant_automation_preferences`,
+    `services/cms/src/event_listener.py::_automation_pref_allows`.
+
+- [ ] **TA-15** — **Collaborator get-ready fan-out** (C3 follow-on, mig 079). With
+    `notify_collaborators_get_ready` on and ≥1 **accepted** collaborator (TA-09 + accepted invite),
+    lock the last section so `proposal.advance_ready` fires.
+  - Expected: the get-ready email goes to **every accepted collaborator** on the proposal (not just
+    the tenant admin) — the rule sets `recipients:'collaborators'` and the send handler resolves
+    `proposal_collaborators` (`accepted_at IS NOT NULL`, prefers the user-account email). With zero
+    accepted collaborators it falls back to the tenant admin (`to_field`).
+  - **Verify in-house:** `SELECT pc.email FROM proposal_collaborators pc WHERE pc.proposal_id='[id]'
+    AND pc.accepted_at IS NOT NULL;` — confirm one send per address (logs: `collaborator fan-out
+    for "collaborator_get_ready": sent N of N`).
+
+- [ ] **TA-16** — **New-priority-opportunity alert** (C3 follow-on, `notify_on_new_priority_opp`).
+    With the toggle **on** (default), have an rfp_admin push a solicitation that matches this tenant
+    (RA-flow → `finder:solicitation.pushed` → `score_tenants` → `send_spotlight_digest`).
+  - Expected: the spotlight digest (`spotlight_new_topics`) is delivered to this tenant via
+    `_handle_multi_tenant_notification` — the NOTIFY step passes `tenant_ids` (plural) and the
+    handler fans out per tenant, gating each on `notify_on_new_priority_opp` and de-duping per
+    (event, tenant). (Previously the plural `tenant_ids` resolved no recipient and silently dropped
+    — this path now delivers.)
+  - Negative: toggle **off** → this tenant is skipped while other matched tenants still receive it.
+  - Tables/code: `services/cms/src/event_listener.py::_handle_multi_tenant_notification`;
+    `pipeline/src/workflows/on_solicitation_pushed.py` (`tenant_pref` on the digest step).
+
+**tenant_admin total: 16 steps**
 
 ---
 
@@ -384,6 +443,7 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft` queues draft intent; client then calls `POST /api/tools/proposal.draft_section` which calls Claude Sonnet directly; draft content returned and inserted into canvas.
   - Event: `proposal:proposal.draft_requested:single`; tool event: `tool:tool.invoked:end`.
   - **Verify in-house:** confirm ANTHROPIC_API_KEY is set and a real Claude response is returned (not a mock). This is a live Anthropic call — the pipeline agent workforce does NOT handle drafting; it comes from the frontend directly.
+  - **V1 note (admin-driven AI):** the "Draft with AI" / "Compliance Check" buttons live in the **admin panel** and are gated on `isAdmin` (`proposal-ai-actions.tsx`), matching the as-built flow (proposals are created locked for admin co-draft, then unlocked to the customer). Perform TU-07/TU-08 as `tenant_admin`/`rfp_admin`; a plain `tenant_user` edits manually + per-node AI revise inside the canvas. **"Run AI Review" is intentionally disabled ("coming soon")** — its color-team agent loop is built but not wired for V1, so it no longer emits a request that nothing processes.
 
 ### 6.4 Compliance Check
 
@@ -392,14 +452,79 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Event: `proposal:compliance.checked:single`; tables read: `solicitation_compliance`, `compliance_variables`.
   - Model used: `claude-haiku-4-5-20251001` (hardcoded in route).
 
-### 6.5 Proposal Stage Advancement and Gate Check
+### 6.5 Section Accept/Lock → Lock-Gated Advancement
 
-- [ ] **TU-09** — Attempt to advance a proposal stage without meeting gate requirements.
-  - Expected: `400` response with `code: GATE_REQUIREMENTS_NOT_MET` and `details.unmet` listing missing items.
-  - Route: `POST /api/portal/[tenantSlug]/proposals/[proposalId]/advance`.
+*The proposal advances as one unit only when every section is accepted + locked
+(`PROPOSAL_LIFECYCLE_V1.md §7`). The legacy `stage_gate_requirements` checklist still applies if a
+tenant seeded it.*
 
-- [ ] **TU-10** — Satisfy gate requirements; attempt advance again.
-  - Expected: stage advances; `proposals.stage` updated; `proposal_stage_history` + `proposal_activity_log` rows written.
+- [ ] **TU-09a** — In the workspace (as tenant_admin), open a section, then **Accept & Lock** it.
+  - Expected: `is_locked=true`, `status='approved'`, `accepted_by`/`accepted_at` set; emits
+    `proposal:section.locked`; the accepted content is snapshotted (`canvas_versions`, reason
+    `section_accepted:<stage>`) and harvested to the library (`library:section.harvested`). The
+    contributor "My Sections" view shows "🔒 Accepted & Locked".
+  - Route: `POST …/sections/[sectionId]/lock`.
+
+- [ ] **TU-09b** — Lock every section of one document/volume.
+  - Expected: the last lock of a volume emits `proposal:document.locked` (volumeName, sectionCount);
+    when ALL sections are locked, emits `proposal:proposal.advance_ready`.
+
+- [ ] **TU-09** — Attempt to advance with one or more sections **unlocked**.
+  - Expected: **`422 SECTIONS_NOT_LOCKED`** with `details.openSections` (grouped by volume); the
+    Advance UI lists the blocking sections. (A seeded `stage_gate_requirements` additionally returns
+    `GATE_REQUIREMENTS_NOT_MET`.)
+  - Route: `POST …/advance`.
+
+- [ ] **TU-10** — Accept + lock all sections, then advance.
+  - Expected: stage advances; `proposals.stage` updated; `stage_completion_snapshots` (with each
+    section's `locked` flag), `proposal_stage_history`, `proposal_activity_log` rows written;
+    `proposal:proposal.advanced:end` carries `sectionsLocked`. Locks carry forward to the next stage.
+
+- [ ] **TU-10a** — Admin **force-advance** with sections still open.
+  - Expected: from the Advance UI's blocking panel, "Force advance anyway" (admin only) posts
+    `{force:true}` → advances; the open sections are recorded as `forcedOpenSections` on the
+    `proposal.advanced` event + activity log; those sections are **not** stamped `accepted_by`.
+
+- [ ] **TU-10b** — Visit the **Compliance Review** page.
+  - Expected: "Ready for Final" reflects **lock state** (all sections locked ⇒ ready), not the old
+    `status='complete'` count; the page agrees with the advance gate.
+
+- [ ] **TU-10c** — **AI review on advance → section context boxes** (C3 Increment 2). With the
+    tenant's **Automation** setting `ai_review_on_advance` left **on** (default), advance the proposal
+    (TU-10 or force-advance TU-10a).
+  - Expected: the advance succeeds normally (the review is best-effort and never blocks). For each
+    locked section with content, a `review_section` task is enqueued for `color_team_reviewer`
+    (`agent_task_queue`, `proposal_id`/`section_id` set, `input.requestedBy` = the advancing user).
+    Within one fabric poll cycle (~20s) the worker completes it and writes the review back as a
+    comment with `recommendation_type='ai_review'`. Reopen the section's context box in the canvas
+    sidebar: the recommendation renders with the **"🤖 AI Review"** badge, the section-type category,
+    and a **Dismiss** (not Resolve) action.
+  - Negative: turn `ai_review_on_advance` **off** on the Automation page (TA-13), advance again →
+    **no** `review_section` task is enqueued.
+  - Routes: `POST …/advance` (enqueue, gated on `tenant_automation_preferences.ai_review_on_advance`);
+    pipeline `fabric.process_task_queue` → `_post_section_recommendation`; surfaced via
+    `GET …/comments`. Tables: `agent_task_queue`, `agent_task_results`, `proposal_comments`
+    (`recommendation_type`, `category` — mig 077).
+  - **Verify in-house:** `SELECT recommendation_type, category, left(content,60) FROM proposal_comments
+    WHERE proposal_id='[id]' AND recommendation_type='ai_review';` — confirm one row per reviewed
+    section. Requires the pipeline worker running (`process_task_queue`) and `ANTHROPIC_API_KEY` set.
+
+- [ ] **TU-10d** — **Auto-advance on all locked** (C3 Increment 3b). Turn on
+    `auto_advance_when_all_locked` on the Automation page (TA-13), then lock the **last** open
+    section (or use "Accept & Lock All").
+  - Expected: locking the final section emits `proposal:proposal.advance_ready` and then the lock
+    route advances the proposal one gate via the shared `advanceProposalStage` core — same writes
+    as a manual advance (`stage_completion_snapshots`, `proposal_stage_history`,
+    `proposal:proposal.advanced` with `trigger:'auto'`, activity log). The lock response includes
+    `autoAdvancedTo`, and the admin panel refreshes so the stage badge shows the new stage. One
+    gate per trigger (not a cascade). If `ai_review_on_advance` is also on, the AI review (TU-10c)
+    fires as part of the same advance.
+  - Negative: with the toggle **off** (default), locking the last section emits `advance_ready`
+    but does **not** advance — the stage is unchanged and the admin advances manually (TU-10).
+  - Best-effort: an auto-advance that hits a gate/OCC conflict leaves the proposal at the
+    ready-to-advance state (the lock itself always succeeds).
+  - Routes/code: `POST …/sections/[sectionId]/lock` → `lib/proposal-advance.ts`; pref in
+    `tenant_automation_preferences.auto_advance_when_all_locked`.
 
 ### 6.6 Comments
 
@@ -417,7 +542,7 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
   - Expected: `library_units` rows updated with extracted atoms; event: `library:document.atomized:single`.
   - Route: `POST /api/portal/[tenantSlug]/library/atomize`.
 
-**tenant_user total: 13 steps**
+**tenant_user total: 19 steps**
 
 ---
 
@@ -451,16 +576,25 @@ API_KEY_ENCRYPTION_SECRET         → Pipeline AES key for api_key_registry
 - [ ] **PU-06** — Attempt to navigate to `/portal/[slug]/billing`.
   - Expected: redirect or 403. partner_user must NOT see billing data.
 
-- [ ] **PU-07** — Attempt to navigate to `/portal/[slug]/spotlights`.
-  - Expected: redirect or 403. partner_user is blocked from Spotlight by portal layout guard.
+- [ ] **PU-07** — Attempt to navigate to `/portal/[slug]/spotlights` **and** a deep `/portal/[slug]/spotlights/[opportunityId]` URL.
+  - Expected: both redirect to `/proposals`. The list AND the detail page now enforce the `hasRoleAtLeast(role,'tenant_user')` floor (nav-hiding alone is not access control).
 
-- [ ] **PU-08** — Attempt to call `GET /api/portal/[tenantSlug]/profile` as partner_user.
-  - Expected: 403 response after FE-04 fix. If the fix is not applied this will return 200 with `billing_email` — a known security gap (P0-05). Confirm the fix is live.
+- [ ] **PU-08** — Attempt `GET /api/portal/[tenantSlug]/profile` **and** navigate to `/portal/[slug]/profile` as partner_user.
+  - Expected: API returns `403`; the Settings **page** now also redirects partners to `/proposals` (and the Settings nav link is hidden for partners), so `billing_email` is never rendered. Confirm both layers.
 
-- [ ] **PU-09** — Attempt to access a proposal section NOT in partner's `collaborator_stage_access`.
-  - Expected: `lib/proposal-access.ts::resolveUserAccess()` returns `canView=false`; section content hidden or 403.
+- [ ] **PU-09** — Attempt to open a section editor URL (`…/sections/[sectionId]`) NOT in the partner's `collaborator_stage_access`.
+  - Expected: the **page** calls `resolveUserAccess` and `notFound()`s when the section isn't viewable; a view/comment-only grant opens the canvas **read-only** (`readOnly = isLocked || !partnerCanEdit`). Previously the page only checked tenant membership.
 
-**partner_user total: 9 steps**
+- [ ] **PU-10** — Attempt to open `/portal/[slug]/proposals/[proposalId]/review` and `/portal/[slug]/proposals/[proposalId]` (workspace) for a proposal the partner does NOT collaborate on.
+  - Expected: review page redirects to `/proposals`; the workspace `notFound()`s for a no-grant partner (no leak of title, collaborator roster/emails, compliance matrix, or stage history). Tenant staff (`tenant_user`+) retain tenant-wide access by design.
+
+- [ ] **PU-11** — Attempt `POST …/proposals/[proposalId]/comments` on a section outside the partner's grant.
+  - Expected: `403 FORBIDDEN`. The route resolves `resolveUserAccess` for partners and rejects comments on non-commentable/editable sections; it also 404s a `nodeId` that doesn't belong to the proposal.
+
+- [ ] **PU-12** — Attempt to navigate to `/portal/[slug]/processes` as partner_user.
+  - Expected: redirect to `/proposals` (the process ledger now enforces the `tenant_user`+ view floor).
+
+**partner_user total: 12 steps**
 
 ---
 

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -71,12 +72,24 @@ export default async function ReviewPage({ params }: Props) {
     redirect(`${basePath}/proposals`);
   }
 
+  // Partner scoping: the full-proposal compliance view is collaborator-scoped
+  // for partners. Tenant staff (tenant_user+) keep tenant-wide access.
+  if (role === 'partner_user') {
+    const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+    const hasAny =
+      access.editableSections.length > 0 ||
+      access.commentableSections.length > 0 ||
+      access.viewableSections.length > 0;
+    if (!hasAny) redirect(`${basePath}/proposals`);
+  }
+
   // ── Load sections with content stats ──────────────────────────────
   interface SectionRow {
     id: string;
     sectionNumber: string;
     title: string;
     status: string;
+    isLocked: boolean;
     pageAllocation: number | null;
     contentLength: number;
   }
@@ -89,6 +102,7 @@ export default async function ReviewPage({ params }: Props) {
         section_number,
         title,
         status,
+        is_locked,
         page_allocation,
         COALESCE(length(content), 0) AS content_length
       FROM proposal_sections
@@ -129,16 +143,19 @@ export default async function ReviewPage({ params }: Props) {
   const notAddressed = complianceItems.filter(c => c.status === 'not_addressed').length;
   const mandatoryNotMet = complianceItems.filter(c => c.isMandatory && c.status !== 'satisfied' && c.status !== 'not_applicable').length;
 
-  const completeSections = sections.filter(s => s.status === 'complete').length;
+  // Readiness is driven by lock state (the single source of truth), not `status`
+  // — locking sets status='approved', so a status='complete' count would
+  // under-report locked sections and invert the "ready" signal.
+  const lockedSections = sections.filter(s => s.isLocked).length;
   const totalSections = sections.length;
 
   // Rough page estimate (~3000 chars per page)
   const totalContentChars = sections.reduce((sum, s) => sum + s.contentLength, 0);
   const estimatedPages = Math.ceil(totalContentChars / 3000);
 
-  const allSectionsComplete = completeSections === totalSections && totalSections > 0;
-  const allReqsSatisfied = mandatoryNotMet === 0 && totalReqs > 0;
-  const readyForFinal = allSectionsComplete && allReqsSatisfied;
+  const allSectionsLocked = lockedSections === totalSections && totalSections > 0;
+  const allReqsSatisfied = mandatoryNotMet === 0;
+  const readyForFinal = allSectionsLocked && allReqsSatisfied;
 
   return (
     <div>
@@ -166,7 +183,7 @@ export default async function ReviewPage({ params }: Props) {
               {readyForFinal ? 'Ready for Final Submission' : 'Not Ready — Items Need Attention'}
             </p>
             <p className="text-xs text-gray-600 mt-0.5">
-              {completeSections}/{totalSections} sections complete
+              {lockedSections}/{totalSections} sections accepted &amp; locked
               {' '}&middot;{' '}
               {satisfiedReqs}/{totalReqs} requirements satisfied
               {mandatoryNotMet > 0 && ` · ${mandatoryNotMet} mandatory items unmet`}
@@ -178,8 +195,8 @@ export default async function ReviewPage({ params }: Props) {
       {/* Stats bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase font-medium">Sections</p>
-          <p className="text-2xl font-bold mt-1">{completeSections}/{totalSections}</p>
+          <p className="text-xs text-gray-500 uppercase font-medium">Sections Locked</p>
+          <p className="text-2xl font-bold mt-1">{lockedSections}/{totalSections}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <p className="text-xs text-gray-500 uppercase font-medium">Requirements Met</p>

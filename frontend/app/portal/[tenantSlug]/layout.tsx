@@ -95,9 +95,14 @@ export default async function PortalLayout({
                 {isTenantAdmin && (
                   <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
                 )}
+                {isTenantAdmin && (
+                  <PortalNavLink href={`${basePath}/automation`}>Automation</PortalNavLink>
+                )}
               </>
             )}
-            <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+            {!isPartner && (
+              <PortalNavLink href={`${basePath}/profile`}>Settings</PortalNavLink>
+            )}
           </nav>
         </div>
         <div className="mt-8">

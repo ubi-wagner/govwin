@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { describeEvent as describeEventLabel } from '@/lib/event-labels';
 
 type TimelineEvent = {
   id: string;
@@ -26,32 +27,8 @@ const EVENT_ICONS: Record<string, string> = {
 };
 
 function describeEvent(ev: TimelineEvent): string {
-  const { namespace, type, phase, payload } = ev;
-
-  // Map common event types to human-readable descriptions
-  if (type === 'proposal.created' && phase === 'end') return 'Proposal workspace created';
-  if (type === 'proposal.created' && phase === 'start') return 'Creating proposal workspace...';
-  if (type === 'section_drafted' || type === 'proposal.section_drafted')
-    return `Section drafted${payload?.sectionTitle ? ': ' + String(payload.sectionTitle) : ''}`;
-  if (type === 'proposal.advanced' || type === 'stage_advanced')
-    return `Stage advanced to ${payload?.toStage ?? payload?.stage ?? 'next stage'}`;
-  if (type === 'proposal.locked') return 'Proposal locked for review';
-  if (type === 'proposal.unlocked') return 'Proposal unlocked';
-  if (type === 'section.saved' || type === 'proposal.section_saved')
-    return `Section saved${payload?.sectionTitle ? ': ' + String(payload.sectionTitle) : ''}`;
-  if (type === 'proposal.exported') return 'Proposal exported';
-  if (type === 'proposal.purchased' || type === 'proposal_purchased')
-    return 'Proposal portal purchased';
-  if (type.includes('compliance')) return 'Compliance check performed';
-  if (type.includes('review'))
-    return `Review ${phase === 'start' ? 'started' : 'completed'}`;
-  if (type.includes('draft') && namespace === 'tool')
-    return `AI draft ${phase === 'start' ? 'started' : `completed${ev.durationMs ? ` (${(ev.durationMs / 1000).toFixed(1)}s)` : ''}`}`;
-  if (namespace === 'tool')
-    return `Tool: ${type}${phase === 'end' && ev.durationMs ? ` (${(ev.durationMs / 1000).toFixed(1)}s)` : ''}`;
-
-  // Default
-  return `${namespace}.${type}`;
+  // Canonical label map (keyed on the real emitted `type` + phase + payload).
+  return describeEventLabel(ev);
 }
 
 function relativeTime(iso: string): string {

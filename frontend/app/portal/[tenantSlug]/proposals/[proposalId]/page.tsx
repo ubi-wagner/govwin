@@ -111,6 +111,18 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   }
 
+  // Partner scoping: a partner_user with no grant on THIS proposal must not see
+  // the workspace shell (title, collaborator roster + emails, compliance,
+  // stage history). Tenant staff (tenant_user+) retain tenant-wide access.
+  if (
+    role === 'partner_user' &&
+    access.editableSections.length === 0 &&
+    access.commentableSections.length === 0 &&
+    access.viewableSections.length === 0
+  ) {
+    notFound();
+  }
+
   // ── Load sections (with completion markers) ────────────────────────
   let sections: {
     id: string;
@@ -125,6 +137,9 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     completedAt: Date | null;
     acceptedBy: string | null;
     acceptedByName: string | null;
+    isLocked: boolean;
+    volumeName: string | null;
+    volumeNumber: number | null;
   }[] = [];
 
   try {
@@ -140,6 +155,9 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.completed_stage,
         ps.completed_at,
         ps.accepted_by,
+        ps.is_locked,
+        ps.volume_name,
+        ps.volume_number,
         u.name AS accepted_by_name,
         CASE
           WHEN ps.content IS NOT NULL AND ps.content::text != 'null' AND ps.content::text != ''
@@ -383,7 +401,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       completedStage: s.completedStage ?? null,
       completedAt: s.completedAt ? new Date(s.completedAt).toISOString() : null,
       acceptedByName: s.acceptedByName ?? null,
-      isEditable: s.completedStage === null || s.completedStage === proposal.stage,
+      isLocked: s.isLocked,
+      volumeName: s.volumeName ?? null,
+      volumeNumber: s.volumeNumber ?? null,
+      isEditable: !s.isLocked && (s.completedStage === null || s.completedStage === proposal.stage),
     };
   });
 

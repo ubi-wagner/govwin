@@ -10,7 +10,10 @@ interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
 }
 
-const VALID_STATUSES = ['empty', 'ai_drafted', 'in_progress', 'complete', 'approved'] as const;
+// 'approved' is intentionally NOT client-settable here — it is written ONLY by the
+// section lock route (accept + lock). Lock is the single source of truth for
+// "accepted"; status is a softer pre-lock drafting signal. See PROPOSAL_LIFECYCLE_V1 §9.
+const VALID_STATUSES = ['empty', 'ai_drafted', 'in_progress', 'complete'] as const;
 
 /**
  * PUT /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save

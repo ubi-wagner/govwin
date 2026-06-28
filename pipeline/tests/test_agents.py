@@ -276,3 +276,133 @@ class TestSettableLimits:
         assert cfg["default_monthly_budget"] == DEFAULT_MONTHLY_BUDGET_USD
         assert cfg["default_per_call_ceiling"] == PER_CALL_CEILING_USD
         assert cfg["platform_monthly_cap"] is None
+
+
+# ---------------------------------------------------------------------------
+# AI review write-back -> proposal_comments (C3 Increment 2)
+# ---------------------------------------------------------------------------
+
+import uuid  # noqa: E402
+
+_REQUESTER = "22222222-2222-4222-8222-222222222222"
+_PROPOSAL = "33333333-3333-4333-8333-333333333333"
+_SECTION = "44444444-4444-4444-8444-444444444444"
+
+
+class TestPostSectionRecommendation:
+    """_post_section_recommendation writes a completed AI section review into
+    proposal_comments as an 'ai_review' recommendation, attributed to the admin
+    who requested it, so it surfaces in the section's context-box thread.
+    Best-effort: a failure here must never propagate out of the task loop."""
+
+    def setup_method(self):
+        self.fabric = AgentFabric()
+
+    def _row(self, **overrides):
+        row = {"proposal_id": _PROPOSAL, "section_id": _SECTION}
+        row.update(overrides)
+        return row
+
+    async def test_posts_recommendation_on_happy_path(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": _REQUESTER, "category": "team"},
+            {"result": {"summary": "Tighten the technical approach."}},
+        )
+        conn.execute.assert_awaited_once()
+        args = conn.execute.call_args.args
+        assert "INSERT INTO proposal_comments" in args[0]
+        assert "ai_review" in args[0]
+        assert args[1] == _PROPOSAL
+        assert args[2] == _SECTION
+        assert args[3] == uuid.UUID(_REQUESTER)
+        assert args[4] == "Tighten the technical approach."
+        assert args[5] == "team"
+
+    async def test_accepts_camelcase_requested_by(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requestedBy": _REQUESTER},
+            {"result": {"summary": "ok"}},
+        )
+        conn.execute.assert_awaited_once()
+        assert conn.execute.call_args.args[3] == uuid.UUID(_REQUESTER)
+
+    async def test_falls_back_to_text_when_no_summary(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": _REQUESTER},
+            {"result": {"text": "Body of the review."}},
+        )
+        conn.execute.assert_awaited_once()
+        assert conn.execute.call_args.args[4] == "Body of the review."
+
+    async def test_skips_when_no_section_id(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(section_id=None),
+            {"requested_by": _REQUESTER},
+            {"result": {"summary": "ok"}},
+        )
+        conn.execute.assert_not_called()
+
+    async def test_skips_when_no_requested_by(self):
+        # proposal_comments.user_id is NOT NULL — without an author we must skip.
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"category": "team"},
+            {"result": {"summary": "ok"}},
+        )
+        conn.execute.assert_not_called()
+
+    async def test_skips_when_text_is_blank(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": _REQUESTER},
+            {"result": {"summary": "   "}},  # whitespace-only -> nothing to post
+        )
+        conn.execute.assert_not_called()
+
+    async def test_truncates_text_to_10000_chars(self):
+        conn = unittest.mock.AsyncMock()
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": _REQUESTER},
+            {"result": {"summary": "x" * 20000}},
+        )
+        assert len(conn.execute.call_args.args[4]) == 10000
+
+    async def test_swallows_db_error(self):
+        conn = unittest.mock.AsyncMock()
+        conn.execute.side_effect = Exception("insert failed")
+        # Must not raise — write-back is best-effort.
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": _REQUESTER},
+            {"result": {"summary": "ok"}},
+        )
+
+    async def test_swallows_invalid_requester_uuid(self):
+        conn = unittest.mock.AsyncMock()
+        # A non-UUID requester makes uuid.UUID() raise; the best-effort guard
+        # swallows it and no row is written.
+        await self.fabric._post_section_recommendation(
+            conn,
+            self._row(),
+            {"requested_by": "not-a-uuid"},
+            {"result": {"summary": "ok"}},
+        )
+        conn.execute.assert_not_called()

@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccessMock,
-  emitEventStartMock, emitEventEndMock, isValidUUIDMock } = vi.hoisted(() => {
+  emitEventStartMock, emitEventEndMock, isValidUUIDMock, requestAgentTaskMock, getNodeTextMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
   const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock });
   return {
@@ -33,6 +33,8 @@ const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccess
     emitEventStartMock: vi.fn(),
     emitEventEndMock: vi.fn(),
     isValidUUIDMock: vi.fn(),
+    requestAgentTaskMock: vi.fn(),
+    getNodeTextMock: vi.fn(),
   };
 });
 
@@ -55,6 +57,13 @@ vi.mock('@/lib/events', () => ({
 vi.mock('@/lib/validation', () => ({
   isValidUUID: isValidUUIDMock,
 }));
+
+vi.mock('@/lib/agent-client', () => ({ requestAgentTask: requestAgentTaskMock }));
+
+vi.mock('@/lib/types/canvas-document', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/types/canvas-document')>();
+  return { ...actual, getNodeText: getNodeTextMock };
+});
 
 // ─── Import after mocks ────────────────────────────────────────────────────
 import { POST } from '@/app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route';
@@ -102,6 +111,31 @@ function makeRequest(body: unknown = {}) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Query-aware transaction mock — robust to the order/number of queries inside
+ * the advance transaction (so adding a query, like the lock-state gate, does
+ * not silently misalign a positional mock sequence). Routes each tagged-template
+ * query to a result by matching its SQL text.
+ */
+function wireTx({
+  openSections = [] as Array<Record<string, unknown>>,
+  unmetGates = [] as Array<Record<string, unknown>>,
+  sections = [] as Array<Record<string, unknown>>,
+  updateCount = 1,
+} = {}) {
+  sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
+    const tx = vi.fn((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('is_locked = false')) return Promise.resolve(openSections);
+      if (q.includes('stage_gate_requirements')) return Promise.resolve(unmetGates);
+      if (q.includes('FROM proposal_sections WHERE proposal_id')) return Promise.resolve(sections);
+      if (q.includes('UPDATE proposals')) return Promise.resolve(Object.assign([], { count: updateCount }));
+      return Promise.resolve([]); // INSERTs, mark-completed UPDATE, canvas_versions, stage_history
+    });
+    return cb(tx);
   });
 }
 
@@ -310,20 +344,9 @@ describe('POST advance — OCC version conflict (409)', () => {
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
     // Inside the transaction, the UPDATE affects 0 rows (version mismatch → throws 'CONFLICT')
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([]) // gate requirements query (no unmet gates)
-        .mockResolvedValueOnce([  // sections snapshot
-          { id: 's1', title: 'Section 1', version: 1, status: 'in_progress', content: null },
-        ])
-        .mockResolvedValueOnce([]) // stage_completion_snapshots INSERT
-        .mockResolvedValueOnce([]) // proposal_sections UPDATE (mark completed)
-        // canvas_versions INSERT for loop - no content so not called
-        .mockImplementationOnce(() => {
-          // UPDATE proposals returns count=0 → CONFLICT
-          return Promise.resolve(Object.assign([], { count: 0 }));
-        });
-      return cb(txMock);
+    wireTx({
+      sections: [{ id: 's1', title: 'Section 1', version: 1, status: 'in_progress', content: null }],
+      updateCount: 0, // UPDATE proposals affects 0 rows → CONFLICT
     });
 
     const res = await POST(makeRequest(), makeCtx());
@@ -357,11 +380,7 @@ describe('POST advance — gate requirements', () => {
     setupHappyPath();
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([{ label: 'Executive Summary' }, { label: 'Budget Justification' }]); // unmet gates
-      return cb(txMock);
-    });
+    wireTx({ unmetGates: [{ label: 'Executive Summary' }, { label: 'Budget Justification' }] });
 
     const res = await POST(makeRequest({ force: false }), makeCtx());
     expect(res.status).toBe(422);
@@ -379,22 +398,64 @@ describe('POST advance — gate requirements', () => {
     setupHappyPath();
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([{ label: 'Executive Summary' }]) // unmet gates
-        .mockResolvedValueOnce([])  // sections snapshot (empty)
-        .mockResolvedValueOnce([])  // stage_completion_snapshots INSERT
-        .mockResolvedValueOnce([])  // proposal_sections UPDATE
-        .mockImplementationOnce(() => Promise.resolve(Object.assign([], { count: 1 }))) // UPDATE proposals
-        .mockResolvedValue([]); // stage history
-      return cb(txMock);
-    });
+    wireTx({ unmetGates: [{ label: 'Executive Summary' }] });
 
     // Activity log after transaction
     sqlMock.mockResolvedValue([]);
 
     const res = await POST(makeRequest({ force: true }), makeCtx());
     expect(res.status).toBe(200);
+  });
+});
+
+describe('POST advance — lock-state gate (Phase 2)', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    sqlMock.mockReset();
+    sqlBeginMock.mockReset();
+    getTenantBySlugMock.mockReset();
+    verifyTenantAccessMock.mockReset();
+    emitEventStartMock.mockReset();
+    emitEventEndMock.mockReset();
+    isValidUUIDMock.mockReset();
+    emitEventStartMock.mockResolvedValue('evt-start-id');
+    emitEventEndMock.mockResolvedValue(undefined);
+  });
+
+  it('returns 422 SECTIONS_NOT_LOCKED when a section is unlocked and force is not set', async () => {
+    setupHappyPath();
+    wireTx({ openSections: [{ id: 's1', title: 'Technical Approach', volumeName: 'Technical Volume' }] });
+
+    const res = await POST(makeRequest({ force: false }), makeCtx());
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.code).toBe('SECTIONS_NOT_LOCKED');
+    expect(json.details.openSections).toHaveLength(1);
+    expect(json.details.openSections[0]).toMatchObject({ title: 'Technical Approach', volumeName: 'Technical Volume' });
+    expect(emitEventEndMock).toHaveBeenCalledWith(
+      'evt-start-id',
+      expect.objectContaining({ error: expect.objectContaining({ code: 'SECTIONS_NOT_LOCKED' }) }),
+    );
+  });
+
+  it('force-advances despite unlocked sections and records them as forcedOpenSections', async () => {
+    setupHappyPath();
+    wireTx({ openSections: [{ id: 's1', title: 'Technical Approach', volumeName: 'Technical Volume' }] });
+    sqlMock.mockResolvedValue([]); // activity log after the transaction
+
+    const res = await POST(makeRequest({ force: true }), makeCtx());
+    expect(res.status).toBe(200);
+    expect(emitEventEndMock).toHaveBeenCalledWith(
+      'evt-start-id',
+      expect.objectContaining({
+        result: expect.objectContaining({
+          forced: true,
+          forcedOpenSections: expect.arrayContaining([
+            expect.objectContaining({ title: 'Technical Approach', volumeName: 'Technical Volume' }),
+          ]),
+        }),
+      }),
+    );
   });
 });
 
@@ -416,16 +477,7 @@ describe('POST advance — success path', () => {
     setupHappyPath();
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([]) // gate requirements — no unmet
-        .mockResolvedValueOnce([]) // sections snapshot (empty for simplicity)
-        .mockResolvedValueOnce([]) // stage_completion_snapshots INSERT
-        .mockResolvedValueOnce([]) // proposal_sections UPDATE
-        .mockImplementationOnce(() => Promise.resolve(Object.assign([], { count: 1 }))) // UPDATE proposals (version match)
-        .mockResolvedValue([]); // stage_history INSERT
-      return cb(txMock);
-    });
+    wireTx();
 
     // Activity log
     sqlMock.mockResolvedValue([]);
@@ -470,17 +522,7 @@ describe('POST advance — success path', () => {
     sqlMock.mockResolvedValueOnce([{ count: '1' }]);
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([]) // gate requirements
-        .mockResolvedValueOnce([{ id: 's1', title: 'S1', version: 1, status: 'complete', content: null }])
-        .mockResolvedValueOnce([]) // snapshot insert
-        .mockResolvedValueOnce([]) // proposal_sections update
-        // No canvas_versions (no content)
-        .mockImplementationOnce(() => Promise.resolve(Object.assign([], { count: 1 }))) // UPDATE proposals with is_locked=true
-        .mockResolvedValue([]); // stage_history x2
-      return cb(txMock);
-    });
+    wireTx({ sections: [{ id: 's1', title: 'S1', version: 1, status: 'complete', content: null }] });
 
     sqlMock.mockResolvedValue([]);
 
@@ -504,16 +546,7 @@ describe('POST advance — success path', () => {
     sqlMock.mockResolvedValueOnce([{ count: '1' }]);
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockImplementationOnce(() => Promise.resolve(Object.assign([], { count: 1 })))
-        .mockResolvedValue([]);
-      return cb(txMock);
-    });
+    wireTx();
 
     sqlMock.mockResolvedValue([]);
 
@@ -525,16 +558,7 @@ describe('POST advance — success path', () => {
     setupHappyPath();
     emitEventStartMock.mockResolvedValue('evt-start-id');
 
-    sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<any>) => {
-      const txMock = vi.fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockImplementationOnce(() => Promise.resolve(Object.assign([], { count: 1 })))
-        .mockResolvedValue([]);
-      return cb(txMock);
-    });
+    wireTx();
 
     sqlMock.mockResolvedValue([]);
 
@@ -547,5 +571,68 @@ describe('POST advance — success path', () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.stage).toBe('review'); // next after 'draft'
+  });
+});
+
+describe('POST advance — AI review on advance (Phase 3, C3)', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    sqlMock.mockReset();
+    sqlBeginMock.mockReset();
+    getTenantBySlugMock.mockReset();
+    verifyTenantAccessMock.mockReset();
+    emitEventStartMock.mockReset();
+    emitEventEndMock.mockReset();
+    isValidUUIDMock.mockReset();
+    requestAgentTaskMock.mockReset().mockResolvedValue('task-1');
+    getNodeTextMock.mockReset().mockReturnValue('Reviewable section prose.');
+    emitEventStartMock.mockResolvedValue('evt-start-id');
+    emitEventEndMock.mockResolvedValue(undefined);
+  });
+
+  function wireAdvanceSql({ aiReviewOnAdvance = true, reviewSections = [] as Array<Record<string, unknown>> } = {}) {
+    authMock.mockResolvedValue(makeSession());
+    getTenantBySlugMock.mockResolvedValue(makeTenant());
+    verifyTenantAccessMock.mockResolvedValue(true);
+    isValidUUIDMock.mockReturnValue(true);
+    sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('gate_config')) return Promise.resolve([makeProposal()]);
+      if (q.includes('count(*)::text')) return Promise.resolve([{ count: '1' }]);
+      if (q.includes('ai_review_on_advance')) return Promise.resolve([{ aiReviewOnAdvance }]);
+      if (q.includes('is_locked = true')) return Promise.resolve(reviewSections);
+      return Promise.resolve([]); // activity log + anything else
+    });
+    wireTx();
+  }
+
+  it('enqueues a per-section review_section task when the tenant opted in', async () => {
+    wireAdvanceSql({
+      aiReviewOnAdvance: true,
+      reviewSections: [{ id: 'sec-1', title: 'Technical Approach', content: JSON.stringify({ nodes: [{}] }), sectionType: 'technical.approach' }],
+    });
+
+    const res = await POST(makeRequest(), makeCtx());
+    expect(res.status).toBe(200);
+    expect(requestAgentTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRole: 'color_team_reviewer',
+        taskType: 'review_section',
+        proposalId: PROPOSAL_ID,
+        sectionId: 'sec-1',
+        input: expect.objectContaining({ requestedBy: USER_ID, sectionTitle: 'Technical Approach', category: 'technical.approach' }),
+      }),
+    );
+  });
+
+  it('does not enqueue review when the tenant opted out', async () => {
+    wireAdvanceSql({
+      aiReviewOnAdvance: false,
+      reviewSections: [{ id: 'sec-1', title: 'X', content: JSON.stringify({ nodes: [{}] }), sectionType: null }],
+    });
+
+    const res = await POST(makeRequest(), makeCtx());
+    expect(res.status).toBe(200);
+    expect(requestAgentTaskMock).not.toHaveBeenCalled();
   });
 });

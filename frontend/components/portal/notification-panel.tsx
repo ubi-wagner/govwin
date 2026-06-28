@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { eventHref } from '@/lib/event-labels';
 
 interface Notification {
   id: string;
@@ -8,6 +9,7 @@ interface Notification {
   namespace: string;
   title: string;
   summary: string | null;
+  payload?: Record<string, unknown> | null;
   created_at: string;
   is_read: boolean;
 }
@@ -74,18 +76,6 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
     });
   }, []);
 
-  const EVENT_LABELS: Record<string, string> = {
-    'proposal.created': 'Proposal created',
-    'proposal.stage_advanced': 'Stage advanced',
-    'proposal.locked': 'Proposal locked',
-    'proposal.unlocked': 'Proposal unlocked',
-    'proposal.team_member_invited': 'Team member invited',
-    'section.drafted': 'Section drafted',
-    'section.saved': 'Section saved',
-    'library.upload_completed': 'Library upload',
-    'capture.spotlight_pinned': 'Topic pinned',
-  };
-
   return (
     <div ref={panelRef} className="relative">
       <button
@@ -132,6 +122,7 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
             <ul className="divide-y divide-gray-50">
               {notifications.map((n) => {
                 const isUnseen = !n.is_read && !seenIds.has(n.id);
+                const href = eventHref(tenantSlug, { namespace: n.namespace, type: n.type, payload: n.payload ?? undefined });
                 return (
                 <li
                   key={n.id}
@@ -145,9 +136,16 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
                       <span className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-900 truncate">
-                        {EVENT_LABELS[n.type] || String(n.title)}
-                      </p>
+                      {href ? (
+                        <a
+                          href={href}
+                          className="text-xs font-medium text-gray-900 hover:text-blue-700 truncate block"
+                        >
+                          {n.title}
+                        </a>
+                      ) : (
+                        <p className="text-xs font-medium text-gray-900 truncate">{n.title}</p>
+                      )}
                       {n.summary && (
                         <p className="text-[10px] text-gray-500 mt-0.5 truncate">{n.summary}</p>
                       )}

@@ -113,6 +113,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
       sectionNumber: string;
       title: string;
       status: string;
+      isLocked: boolean;
+      lockedAt: Date | null;
       pageAllocation: number | null;
       version: number;
       completedStage: string | null;
@@ -128,6 +130,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
           ps.section_number,
           ps.title,
           ps.status,
+          ps.is_locked,
+          ps.locked_at,
           ps.page_allocation,
           ps.version,
           ps.completed_stage,
@@ -226,6 +230,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
           sectionNumber: s.sectionNumber,
           title: s.title,
           status: s.status,
+          isLocked: s.isLocked,
+          lockedAt: s.lockedAt,
           pageAllocation: s.pageAllocation,
           version: s.version,
           completedStage: s.completedStage,
@@ -233,7 +239,9 @@ export async function GET(_request: Request, ctx: RouteContext) {
           acceptedBy: s.acceptedBy,
           acceptedByName: s.acceptedByName,
           acceptedAt: s.acceptedAt,
-          isEditable: s.completedStage === null || s.completedStage === proposal.stage,
+          // Lock is authoritative: a locked section is never editable, regardless
+          // of completed_stage. (Matches the section editor page guard.)
+          isEditable: !s.isLocked && (s.completedStage === null || s.completedStage === proposal.stage),
         })),
         stageCompletionHistory: stageSnapshots.map((snap) => ({
           stage: snap.stage,

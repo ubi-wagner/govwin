@@ -250,15 +250,18 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     expect(json.code).toBe('PAYMENT_REQUIRED');
   });
 
-  it('returns 402 when FOUNDING_COHORT_BYPASS is not set', async () => {
+  it('proceeds (no 402) when FOUNDING_COHORT_BYPASS is unset — V1 paywall is opt-in', async () => {
     delete process.env.FOUNDING_COHORT_BYPASS;
 
     authMock.mockResolvedValue(makeSession());
     getTenantBySlugMock.mockResolvedValue(makeTenant());
     verifyTenantAccessMock.mockResolvedValue(true);
+    // Topic lookup → not found, which proves we passed the (now off-by-default) gate.
+    sqlMock.mockResolvedValueOnce([]);
 
     const res = await POST(makeRequest({ topicId: TOPIC_ID }), makeCtx());
-    expect(res.status).toBe(402);
+    expect(res.status).not.toBe(402);
+    expect(res.status).toBe(404);
   });
 
   // ── Input validation ───────────────────────────────────────────────
@@ -364,7 +367,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     sqlBeginMock.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
       const txMock = vi.fn()
         .mockResolvedValueOnce([{ id: PROPOSAL_ID }])
-        .mockResolvedValue([]);
+        .mockResolvedValue([{ id: 'row-id' }]); // artifact + section INSERTs RETURNING id
       return cb(txMock);
     });
 
@@ -456,7 +459,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     sqlBeginMock.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
       const txMock = vi.fn()
         .mockResolvedValueOnce([{ id: PROPOSAL_ID }])
-        .mockResolvedValue([]);
+        .mockResolvedValue([{ id: 'row-id' }]); // artifact + section INSERTs RETURNING id
       return cb(txMock);
     });
 
@@ -495,5 +498,52 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     );
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe('VALIDATION_ERROR');
+  });
+
+  // ── E1: proposal_artifacts container ───────────────────────────────
+  it('E1: creates a proposal_artifacts row per volume, links sections, and emits proposal.v0_provisioned', async () => {
+    authMock.mockResolvedValue(makeSession());
+    getTenantBySlugMock.mockResolvedValue(makeTenant());
+    verifyTenantAccessMock.mockResolvedValue(true);
+
+    sqlMock.mockResolvedValueOnce([makeTopic()]); // topic lookup
+    sqlMock.mockResolvedValueOnce([]); // no duplicate
+    resolveTopicComplianceMock.mockResolvedValue(makeResolvedCompliance());
+
+    // Capture every tagged-template SQL run inside the transaction.
+    const txSql: string[] = [];
+    sqlBeginMock.mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+      let n = 0;
+      const txMock = vi.fn().mockImplementation((strings: TemplateStringsArray) => {
+        const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+        txSql.push(q);
+        n++;
+        if (n === 1) return Promise.resolve([{ id: PROPOSAL_ID }]); // proposal INSERT
+        return Promise.resolve([{ id: `row-${n}` }]); // artifact + section INSERTs RETURNING id
+      });
+      return cb(txMock);
+    });
+
+    sqlMock.mockResolvedValue([]); // post-transaction queries
+
+    const res = await POST(makeRequest({ topicId: TOPIC_ID }), makeCtx());
+    expect(res.status).toBe(200);
+
+    // One artifact row is inserted (the lockable/downloadable document unit).
+    expect(txSql.some((q) => q.includes('INSERT INTO proposal_artifacts'))).toBe(true);
+    // Sections are linked to their artifact (artifact_id in the section INSERT).
+    expect(
+      txSql.some((q) => q.includes('INSERT INTO proposal_sections') && q.includes('artifact_id')),
+    ).toBe(true);
+
+    // The V0 provisioning (copy) event carries the created artifacts.
+    expect(emitEventSingleMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        namespace: 'proposal',
+        type: 'proposal.v0_provisioned',
+        tenantId: TENANT_ID,
+        payload: expect.objectContaining({ proposalId: PROPOSAL_ID, artifacts: expect.any(Array) }),
+      }),
+    );
   });
 });

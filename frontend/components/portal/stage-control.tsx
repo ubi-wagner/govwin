@@ -47,6 +47,7 @@ export function StageControl({
   const [advancing, setAdvancing] = useState(false);
   const [locking, setLocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blockedSections, setBlockedSections] = useState<{ title: string; volumeName: string | null }[] | null>(null);
   const [requirements, setRequirements] = useState<GateRequirement[]>([]);
   const [showChecklist, setShowChecklist] = useState(false);
   const [markingMet, setMarkingMet] = useState<string | null>(null);
@@ -119,10 +120,11 @@ export function StageControl({
     ? Math.ceil((new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
-  const handleAdvance = useCallback(async () => {
+  const handleAdvance = useCallback(async (force = false) => {
     if (!canAdvance || advancing) return;
     setAdvancing(true);
     setError(null);
+    if (!force) setBlockedSections(null);
 
     try {
       const res = await fetch(
@@ -130,14 +132,19 @@ export function StageControl({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify(force ? { force: true } : {}),
         },
       );
       const json = await res.json();
       if (!res.ok) {
+        // The gate tells us exactly what's blocking — surface the open sections.
+        if (json.code === 'SECTIONS_NOT_LOCKED' && Array.isArray(json.details?.openSections)) {
+          setBlockedSections(json.details.openSections);
+        }
         setError(json.error || 'Failed to advance stage');
         return;
       }
+      setBlockedSections(null);
       router.refresh();
     } catch {
       setError('Network error');
@@ -249,20 +256,14 @@ export function StageControl({
             </button>
           )}
 
-          {canAdvance && !isAtLastGate && !isLocked && (!hasUnmetRequirements || isAdmin) && (
+          {canAdvance && !isAtLastGate && !isLocked && (
             <button
-              onClick={handleAdvance}
+              onClick={() => handleAdvance(false)}
               disabled={advancing}
               className="px-4 py-2 text-xs font-semibold bg-emerald-500 text-white rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors"
             >
               {advancing ? 'Advancing...' : `Advance to ${gateConfig[currentIndex + 1]?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} →`}
             </button>
-          )}
-
-          {canAdvance && !isAtLastGate && !isLocked && hasUnmetRequirements && !isAdmin && (
-            <span className="px-4 py-2 text-xs font-semibold bg-gray-100 text-gray-400 rounded-md cursor-not-allowed">
-              Requirements not met
-            </span>
           )}
 
           {canAdvance && isAtFinal && isLocked && (
@@ -316,6 +317,29 @@ export function StageControl({
       {error && (
         <div className="mt-2 text-xs text-red-600 bg-red-50 rounded px-3 py-1.5">
           {error}
+        </div>
+      )}
+
+      {/* Lock-gate: the sections blocking advancement + an admin force override */}
+      {blockedSections && blockedSections.length > 0 && (
+        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="text-xs font-medium text-amber-800">
+            {blockedSections.length} section{blockedSections.length > 1 ? 's' : ''} not yet accepted &amp; locked:
+          </p>
+          <ul className="mt-1 text-xs text-amber-700 list-disc pl-5 space-y-0.5">
+            {blockedSections.map((s, i) => (
+              <li key={i}>{s.title}{s.volumeName ? ` — ${s.volumeName}` : ''}</li>
+            ))}
+          </ul>
+          {isAdmin && (
+            <button
+              onClick={() => handleAdvance(true)}
+              disabled={advancing}
+              className="mt-2 px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 transition-colors"
+            >
+              {advancing ? 'Forcing…' : 'Force advance anyway →'}
+            </button>
+          )}
         </div>
       )}
 

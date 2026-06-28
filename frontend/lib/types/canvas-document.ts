@@ -33,7 +33,31 @@ export interface CanvasRules {
   line_spacing: number;
   max_pages: number | null;
   max_slides: number | null;
+  /** Minimum allowed body font size (pt) — the RFP compliance floor (E2/E4). */
+  min_font_size?: number;
+  /** Whether images/figures are permitted in this artifact (E2/E4). */
+  images_allowed?: boolean;
+  /** Image dimension ceilings, in canvas units (E2/E4). */
+  image_max_width?: number;
+  image_max_height?: number;
   watermark?: { text: string; color?: string; opacity?: number };
+}
+
+/**
+ * ComplianceSpec — the typed, enforceable compliance contract for one artifact,
+ * frozen onto `proposal_artifacts.compliance_spec` at purchase (E2) and checked
+ * by `validateCanvasAgainstSpec` at save/export (E4). Distinct from CanvasRules
+ * (the format/layout spec): this is the set of *limits the content must satisfy*.
+ * A null limit means "unconstrained / not specified by the RFP".
+ */
+export interface ComplianceSpec {
+  max_pages: number | null;
+  max_slides: number | null;
+  min_font_size: number | null;
+  images_allowed: boolean;
+  required_sections: string[];
+  header_required: boolean;
+  footer_required: boolean;
 }
 
 /** Standard presets derived from common RFP requirements. */

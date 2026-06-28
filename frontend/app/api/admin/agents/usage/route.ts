@@ -157,12 +157,12 @@ export async function GET(request: NextRequest) {
       byTenant = await sql<typeof byTenant>`
         SELECT
           atl.tenant_id,
-          t.name AS tenant_name,
+          COALESCE(t.name, 'Platform / System') AS tenant_name,
           COUNT(*)::int AS calls,
           COALESCE(SUM(atl.cost_usd), 0)::text AS cost_usd,
           tac.monthly_budget::text AS monthly_budget
         FROM agent_task_log atl
-        JOIN tenants t ON t.id = atl.tenant_id
+        LEFT JOIN tenants t ON t.id = atl.tenant_id
         LEFT JOIN tenant_agent_config tac ON tac.tenant_id = atl.tenant_id
         WHERE atl.created_at >= now() - ${intervalStr}::interval
         GROUP BY atl.tenant_id, t.name, tac.monthly_budget

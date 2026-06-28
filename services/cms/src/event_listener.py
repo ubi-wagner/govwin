@@ -235,6 +235,69 @@ def _rule_matches(
     return phase != 'start'
 
 
+# ── Tenant automation-preference gate (C3 Increment 3) ───────────────
+# A tenant-scoped rule opts into a customer toggle by naming a column in its
+# action_config.tenant_pref. The listener consults tenant_automation_preferences
+# (shared DB, reachable via the event pool) and skips the action when the tenant
+# has that toggle off. Default-on: a tenant with no preferences row uses the
+# column default. The pref name is allowlisted before it touches SQL.
+_GATED_PREFS: set[str] = {
+    'notify_team_on_document_locked',
+    'notify_collaborators_get_ready',
+    'notify_on_stage_advanced',
+    'notify_on_new_priority_opp',
+}
+_PREF_DEFAULTS: dict[str, bool] = {
+    'notify_team_on_document_locked': True,
+    'notify_collaborators_get_ready': True,
+    'notify_on_stage_advanced': True,
+    'notify_on_new_priority_opp': True,
+}
+
+
+def _extract_tenant_pref(config) -> str | None:
+    """Pull the tenant_pref column name from a rule's action_config (dict form,
+    or the first list item that declares one)."""
+    if isinstance(config, dict):
+        pref = config.get('tenant_pref')
+        return pref if isinstance(pref, str) else None
+    if isinstance(config, list):
+        for action in config:
+            if isinstance(action, dict) and isinstance(action.get('tenant_pref'), str):
+                return action['tenant_pref']
+    return None
+
+
+async def _automation_pref_allows(config, payload: dict) -> bool:
+    """Return False only when a tenant has explicitly turned off the customer
+    toggle this rule opts into. Ungated rules, non-tenant-scoped events, unknown
+    pref names, and lookup failures all return True (never silently suppress)."""
+    pref = _extract_tenant_pref(config)
+    if not pref:
+        return True  # rule is not preference-gated
+    if pref not in _GATED_PREFS:
+        logger.warning('automation rule names unknown tenant_pref %r — not gating', pref)
+        return True
+    tenant_id = payload.get('tenantId') or payload.get('tenant_id')
+    if not tenant_id:
+        return True  # not tenant-scoped; cannot (and must not) suppress
+    pool = get_event_pool()
+    if not pool:
+        return True
+    try:
+        # pref is allowlisted against _GATED_PREFS above, so this interpolation is safe.
+        row = await pool.fetchrow(
+            f'SELECT {pref} AS v FROM tenant_automation_preferences WHERE tenant_id = $1::uuid',
+            str(tenant_id),
+        )
+    except Exception as e:
+        logger.warning('tenant preference lookup failed for %s (tenant %s): %s — allowing', pref, tenant_id, e)
+        return True  # best-effort: a lookup error must not block notifications
+    if row is None:
+        return _PREF_DEFAULTS.get(pref, True)  # lazy row — use the documented default
+    return bool(row['v'])
+
+
 async def _execute_rule(rule, col_names: set, event):
     pool = get_event_pool()
     payload = event.get('payload')
@@ -245,6 +308,13 @@ async def _execute_rule(rule, col_names: set, event):
             payload = {}
     if not payload:
         payload = {}
+
+    # Surface the event's tenant_id column into the payload so tenant-scoped
+    # rules resolve consistently — recipient resolution (to_field=payload.tenantId)
+    # and the preference gate both read payload.tenantId, but emitters store the
+    # tenant on the system_events.tenant_id column rather than in the payload.
+    if 'tenantId' not in payload and event.get('tenant_id'):
+        payload = {**payload, 'tenantId': str(event.get('tenant_id'))}
 
     # Get action config — adapt to column names
     if 'action_config' in col_names:
@@ -264,6 +334,15 @@ async def _execute_rule(rule, col_names: set, event):
 
     rule_id = rule.get('id')
     event_id = event.get('id')
+
+    # Tenant automation-preference gate (C3 Increment 3): if this rule opts into
+    # a customer toggle, skip it when the tenant has that toggle off.
+    if not await _automation_pref_allows(config, payload):
+        logger.info(
+            'Skipping rule "%s" for event %s — tenant preference off',
+            rule.get('name') or rule_id, event_id,
+        )
+        return
 
     # If actions is a list of action objects, process each
     if isinstance(config, list):
@@ -414,6 +493,91 @@ async def _resolve_recipient_email(to_field: str, payload: dict, event: dict) ->
     return None
 
 
+async def _resolve_collaborator_emails(proposal_id, tenant_id) -> list[str]:
+    """Resolve the email addresses of accepted collaborators on a proposal,
+    scoped to the tenant. Prefers the user account's email, falling back to the
+    invite email; de-duplicated. Empty list on any failure (best-effort)."""
+    pool = get_event_pool()
+    if not pool or not proposal_id or not tenant_id:
+        return []
+    try:
+        rows = await pool.fetch(
+            """
+            SELECT DISTINCT COALESCE(u.email, pc.email) AS email
+            FROM proposal_collaborators pc
+            JOIN proposals p ON p.id = pc.proposal_id
+            LEFT JOIN users u ON u.id = pc.user_id
+            WHERE pc.proposal_id = $1::uuid
+              AND p.tenant_id = $2::uuid
+              AND pc.accepted_at IS NOT NULL
+              AND COALESCE(u.email, pc.email) IS NOT NULL
+            """,
+            str(proposal_id), str(tenant_id),
+        )
+        return [r['email'] for r in rows if r['email']]
+    except Exception as e:
+        logger.warning('collaborator email resolution failed (proposal %s): %s', proposal_id, e)
+        return []
+
+
+async def _handle_multi_tenant_notification(event, payload: dict, template_name: str) -> None:
+    """Fan a digest notification.requested (tenant_ids plural) out to each tenant,
+    gating each on the named tenant_pref and de-duplicating per (event, tenant).
+    This is the delivery path for the spotlight "new priority opportunity" digest
+    (gated by notify_on_new_priority_opp)."""
+    pool = get_event_pool()
+    tenant_ids = payload.get('tenant_ids') or []
+    pref = payload.get('tenant_pref')
+
+    html = render_template(template_name, payload)
+    if not html:
+        logger.warning('multi-tenant notification: template "%s" rendered empty, skipping', template_name)
+        return
+    subject = payload.get('subject', f"RFP Pipeline — {template_name.replace('_', ' ').title()}")
+    trigger_event_id = payload.get('trigger_event_id') or (str(event.get('id')) if event.get('id') else None)
+    sender = resolve_sender(
+        identity=payload.get('fromIdentity'),
+        namespace=payload.get('senderNamespace'),
+        template=template_name,
+        default=_SEND_AS,
+    )
+
+    sent = 0
+    for tid in tenant_ids:
+        if not tid:
+            continue
+        # Per-tenant preference gate.
+        if pref and not await _automation_pref_allows({'tenant_pref': pref}, {'tenantId': tid}):
+            logger.info('multi-tenant notification "%s": tenant %s opted out (%s)', template_name, tid, pref)
+            continue
+        # Per-tenant dedup so a re-read event does not double-send to a tenant.
+        if trigger_event_id and pool and await _check_dedup(pool, trigger_event_id, f'send_email:{tid}'):
+            continue
+        to_email = await _resolve_recipient_email('payload.tenantId', {'tenantId': tid}, event)
+        if not to_email:
+            logger.info('multi-tenant notification "%s": no recipient for tenant %s', template_name, tid)
+            continue
+        result = await send_email(to=to_email, subject=subject, html=html, sender=sender)
+        if result.get('error'):
+            # Do NOT write a dedup row on a failed send — leave it un-logged so
+            # the next poll retries this tenant rather than suppressing it forever.
+            logger.warning('multi-tenant notification "%s": send failed for tenant %s: %s',
+                           template_name, tid, result.get('error'))
+            continue
+        sent += 1
+        logger.info('multi-tenant notification "%s": sent to tenant %s (%s): %s', template_name, tid, to_email, result)
+        if trigger_event_id and pool:
+            try:
+                await _log_rule_execution(
+                    pool, None, trigger_event_id, f'send_email:{tid}', 'success',
+                    result={'template': template_name, 'recipient': to_email, 'tenant_id': str(tid),
+                            'source': 'multi_tenant_notification'},
+                )
+            except Exception as e:
+                logger.error('multi-tenant notification log failed: %s', e)
+    logger.info('multi-tenant notification "%s": delivered %d of %d', template_name, sent, len(tenant_ids))
+
+
 async def _handle_notification_requested(event) -> None:
     """Handle a ``system:notification.requested`` event emitted by a workflow
     NOTIFY step.
@@ -444,6 +608,14 @@ async def _handle_notification_requested(event) -> None:
     template_name = payload.get('template', '')
     if not template_name:
         logger.warning('notification.requested event has no template, skipping')
+        return
+
+    # Multi-tenant digest fan-out (e.g. spotlight_new_topics → matched tenants).
+    # The NOTIFY step passes tenant_ids (plural); the single-recipient path below
+    # only handles one. Fan out here, gating each tenant on its tenant_pref.
+    tenant_ids = payload.get('tenant_ids')
+    if isinstance(tenant_ids, list) and tenant_ids:
+        await _handle_multi_tenant_notification(event, payload, template_name)
         return
 
     # Resolve recipient first (hoisted above the render so a render-miss can still
@@ -946,6 +1118,33 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
         html = render_template(template_name, payload)
         if not html:
             logger.warning(f'No template rendered for "{template_name}", skipping send')
+            return
+
+        # Multi-recipient fan-out for collaborator "get ready" emails: when the
+        # rule sets recipients=collaborators, send to every accepted collaborator
+        # on the proposal, falling back to the configured to_field (tenant admin)
+        # when there are none. The preference gate (notify_collaborators_get_ready)
+        # already ran in _execute_rule before dispatch.
+        if config.get('recipients') == 'collaborators':
+            emails = await _resolve_collaborator_emails(
+                payload.get('proposalId') or payload.get('proposal_id'),
+                payload.get('tenantId') or payload.get('tenant_id'),
+            )
+            if not emails:
+                to_field = config.get('to_field')
+                fallback = await _resolve_recipient_email(to_field, payload, event) if to_field else None
+                if fallback:
+                    emails = [fallback]
+            if not emails:
+                logger.warning('collaborator fan-out: no recipients for "%s", skipping', template_name)
+                return
+            sent = 0
+            for addr in dict.fromkeys(emails):  # de-dupe, preserve order
+                result = await send_email(to=addr, subject=subject, html=html)
+                if not result.get('error'):
+                    sent += 1
+                logger.info('Sent "%s" to collaborator %s: %s', template_name, addr, result)
+            logger.info('collaborator fan-out for "%s": sent %d of %d', template_name, sent, len(set(emails)))
             return
 
         # Resolve recipient: use to_field from config, then fall back to payload fields

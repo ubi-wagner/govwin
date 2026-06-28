@@ -23,6 +23,7 @@ const SYSTEM_DEFAULTS: Record<string, unknown> = {
   page_limit_cost: null,
   font_family: 'Times New Roman',
   font_size: '12pt',
+  min_font_size: null,
   margins: '1 inch all sides',
   line_spacing: '1.0',
   header_required: false,
@@ -108,6 +109,7 @@ function mergeCompliance(
     'pageLimitOther',
     'fontFamily',
     'fontSize',
+    'minFontSize',
     'margins',
     'lineSpacing',
     'headerRequired',
@@ -141,6 +143,7 @@ function mergeCompliance(
     pageLimitCost: 'page_limit_cost',
     fontFamily: 'font_family',
     fontSize: 'font_size',
+    minFontSize: 'min_font_size',
     margins: 'margins',
     lineSpacing: 'line_spacing',
     headerRequired: 'header_required',
@@ -253,6 +256,7 @@ async function resolveVolumes(
     slideLimit: number | null;
     fontFamily: string | null;
     fontSize: string | null;
+    minFontSize: number | null;
     margins: string | null;
     lineSpacing: string | null;
     headerFormat: string | null;
@@ -260,11 +264,14 @@ async function resolveVolumes(
     requiredSections: unknown;
     formatRules: unknown;
     customFields: unknown;
+    templateId: string | null;
+    expertNotes: string | null;
   }[]>`
     SELECT volume_id, item_number, item_name, item_type, required,
-           page_limit, slide_limit, font_family, font_size, margins,
+           page_limit, slide_limit, font_family, font_size, min_font_size, margins,
            line_spacing, header_format, footer_format,
-           required_sections, format_rules, custom_fields
+           required_sections, format_rules, custom_fields,
+           template_id, expert_notes
     FROM volume_required_items
     WHERE volume_id = ANY(${volumeIds})
     ORDER BY item_number ASC
@@ -282,7 +289,7 @@ async function resolveVolumes(
   return volumeRows.map((vol: { id: string; volumeNumber: number; volumeName: string }) => ({
     volumeName: vol.volumeName,
     volumeNumber: vol.volumeNumber,
-    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; fontFamily: string | null; fontSize: string | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown }) => ({
+    items: (itemsByVolume.get(vol.id) ?? []).map((item: { itemNumber: number; itemName: string; itemType: string; required: boolean; pageLimit: number | null; slideLimit: number | null; fontFamily: string | null; fontSize: string | null; minFontSize: number | null; margins: string | null; lineSpacing: string | null; headerFormat: string | null; footerFormat: string | null; requiredSections: unknown; formatRules: unknown; customFields: unknown; templateId: string | null; expertNotes: string | null }) => ({
       itemNumber: item.itemNumber,
       itemName: item.itemName,
       itemType: item.itemType,
@@ -291,6 +298,7 @@ async function resolveVolumes(
       slideLimit: item.slideLimit,
       fontFamily: item.fontFamily,
       fontSize: item.fontSize,
+      minFontSize: item.minFontSize,
       margins: item.margins,
       lineSpacing: item.lineSpacing,
       headerFormat: item.headerFormat,
@@ -298,6 +306,8 @@ async function resolveVolumes(
       requiredSections: item.requiredSections,
       formatRules: item.formatRules,
       customFields: item.customFields,
+      templateId: item.templateId,
+      expertNotes: item.expertNotes,
     })),
   }));
   } catch (err) {

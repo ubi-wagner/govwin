@@ -1302,18 +1302,20 @@ class WorkflowManager:
                             """
                             SELECT id, workflow_name, current_step, tenant_id
                             FROM process_instances
-                            WHERE status = 'running'
+                            WHERE status = 'running' AND source = $1
                               AND last_heartbeat_at < now() - interval '5 minutes'
-                            """
+                            """,
+                            self.source,
                         )
                 else:
                     stuck = await conn.fetch(
                         """
                         SELECT id, workflow_name, current_step, tenant_id
                         FROM process_instances
-                        WHERE status = 'running'
+                        WHERE status = 'running' AND source = $1
                           AND last_heartbeat_at < now() - interval '5 minutes'
-                        """
+                        """,
+                        self.source,
                     )
 
                 # Use pool connection for writes if available
@@ -1362,14 +1364,16 @@ class WorkflowManager:
                     async with pool.acquire() as sp_conn:
                         stale_pending = await sp_conn.fetch(
                             """SELECT id, workflow_name FROM process_instances
-                               WHERE status = 'pending' AND created_at < now() - interval '1 hour'
-                               FOR UPDATE SKIP LOCKED"""
+                               WHERE status = 'pending' AND source = $1 AND created_at < now() - interval '1 hour'
+                               FOR UPDATE SKIP LOCKED""",
+                            self.source,
                         )
                 else:
                     stale_pending = await conn.fetch(
                         """SELECT id, workflow_name FROM process_instances
-                           WHERE status = 'pending' AND created_at < now() - interval '1 hour'
-                           FOR UPDATE SKIP LOCKED"""
+                           WHERE status = 'pending' AND source = $1 AND created_at < now() - interval '1 hour'
+                           FOR UPDATE SKIP LOCKED""",
+                        self.source,
                     )
 
                 for sp_row in stale_pending:
@@ -1415,18 +1419,20 @@ class WorkflowManager:
                             """
                             SELECT id, workflow_name, current_step, tenant_id, payload
                             FROM process_instances
-                            WHERE status = 'paused' AND deadline IS NOT NULL
+                            WHERE status = 'paused' AND source = $1 AND deadline IS NOT NULL
                               AND deadline < now()
-                            """
+                            """,
+                            self.source,
                         )
                 else:
                     paused_timeout = await conn.fetch(
                         """
                         SELECT id, workflow_name, current_step, tenant_id, payload
                         FROM process_instances
-                        WHERE status = 'paused' AND deadline IS NOT NULL
+                        WHERE status = 'paused' AND source = $1 AND deadline IS NOT NULL
                           AND deadline < now()
-                        """
+                        """,
+                        self.source,
                     )
 
                 for pt_row in paused_timeout:

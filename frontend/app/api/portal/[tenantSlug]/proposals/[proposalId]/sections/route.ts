@@ -73,6 +73,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       pageAllocation: number | null;
       version: number;
       assignedTo: string | null;
+      artifactId: string | null;
+      volumeName: string | null;
+      volumeNumber: number | null;
+      isLocked: boolean;
+      sectionType: string | null;
     }[];
     try {
       allSections = await sql<{
@@ -83,10 +88,16 @@ export async function GET(_request: Request, ctx: RouteContext) {
         pageAllocation: number | null;
         version: number;
         assignedTo: string | null;
+        artifactId: string | null;
+        volumeName: string | null;
+        volumeNumber: number | null;
+        isLocked: boolean;
+        sectionType: string | null;
       }[]>`
         SELECT
           id, section_number, title, status,
-          page_allocation, version, assigned_to
+          page_allocation, version, assigned_to,
+          artifact_id, volume_name, volume_number, is_locked, section_type
         FROM proposal_sections
         WHERE proposal_id = ${proposalId}
         ORDER BY section_number ASC
@@ -118,6 +129,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
         pageLimit: section.pageAllocation,
         version: section.version,
         assignedTo: section.assignedTo,
+        // E1/E3: artifact grouping + lock state + taxonomy for the workspace UI.
+        artifactId: section.artifactId,
+        volumeName: section.volumeName,
+        volumeNumber: section.volumeNumber,
+        isLocked: section.isLocked,
+        sectionType: section.sectionType,
         permission,
       };
     });

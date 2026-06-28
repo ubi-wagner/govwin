@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import SpotlightDetailActions from '@/components/portal/spotlight-detail-actions';
 import { OpportunityDocuments } from '@/components/portal/opportunity-documents';
@@ -74,6 +74,11 @@ export default async function SpotlightDetailPage({ params }: Props) {
 
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) redirect('/login?error=session');
+
+  // PU-07: Spotlight is tenant-staff only. partner_user is stage-scoped to a
+  // proposal and must not browse the opportunity feed/detail by direct URL
+  // (matches the list page's role floor).
+  if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');
@@ -192,6 +197,27 @@ export default async function SpotlightDetailPage({ params }: Props) {
     console.error('[spotlight-detail] compliance query failed', e);
   }
 
+  // ---------- Spotlight bucket fit (C5) ----------
+  // This opportunity's score + rank within each active bucket, among the
+  // tenant's scored opportunities. Rank is computed at read time so it is fresh.
+  interface BucketFit { bucket: string; score: number; rank: number; total: number }
+  let bucketFit: BucketFit[] = [];
+  try {
+    bucketFit = await sql<BucketFit[]>`
+      SELECT bucket, score, rank, total FROM (
+        SELECT opportunity_id, bucket, score,
+               ROW_NUMBER() OVER (PARTITION BY bucket ORDER BY score DESC)::int AS rank,
+               COUNT(*) OVER (PARTITION BY bucket)::int AS total
+        FROM spotlight_bucket_scores
+        WHERE tenant_id = ${tenantId}::uuid
+      ) q
+      WHERE q.opportunity_id = ${spotlightId}::uuid AND q.score > 0
+      ORDER BY q.score DESC
+    `;
+  } catch (e) {
+    console.error('[spotlight-detail] bucket fit query failed', e);
+  }
+
   // ---------- Derived values ----------
   const days = daysRemaining(opportunity.closeDate);
   const isClosingSoon = days !== null && days < 14;
@@ -269,6 +295,36 @@ export default async function SpotlightDetailPage({ params }: Props) {
             </span>
           )}
         </div>
+
+        {/* Bucket fit (C5) — this opportunity's rank within each active bucket. */}
+        {bucketFit.length > 0 && (
+          <div className="mt-3">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Your fit by bucket</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {bucketFit.map((b) => {
+                const label = ({
+                  technology_innovation: 'Technology & Innovation',
+                  service_offering: 'Service Offering',
+                  capabilities: 'Capabilities',
+                  readiness: 'Readiness',
+                  prior_funding: 'Prior Funding',
+                } as Record<string, string>)[b.bucket] ?? b.bucket;
+                const strong = b.rank <= 3;
+                return (
+                  <span
+                    key={b.bucket}
+                    title={`Ranks #${b.rank} of ${b.total} in your ${label} pipeline`}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded border ${strong ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                  >
+                    {label}
+                    <span className="text-[10px] opacity-70">#{b.rank}/{b.total}</span>
+                    <span className="text-[10px] font-semibold">{b.score}</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Close date */}
         <div className="flex items-center gap-4 mt-3 text-sm">

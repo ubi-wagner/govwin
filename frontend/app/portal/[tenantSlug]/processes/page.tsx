@@ -37,6 +37,10 @@ export default async function ProcessesPage({
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
 
+  // View floor: tenant_user and above (the process ledger is tenant-staff
+  // only; partners are stage-scoped to a proposal).
+  if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
+
   const canAdvance = hasRoleAtLeast(role, 'tenant_admin');
 
   let rows: ProcessRow[] | null = null;
