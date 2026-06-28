@@ -163,3 +163,21 @@ workflow rebuild. Recommended order: J1 (delegation) → J2 (date generator) →
   check (route.ts) and create two proposals — each freezing its own origin card. Pre-existing; does not
   violate single-card immutability. A `UNIQUE` index would need a dedupe pass first (could fail on
   existing dupes). Track with the create-path hardening.
+
+### R3.1 finds (2026-06-28)
+
+- **K3 · P1 · `create_instance` ON CONFLICT could not infer the PARTIAL dedup index — every launch threw.**
+  `manager.create_instance` used `ON CONFLICT (workflow_name, trigger_event_id) DO NOTHING`, but the
+  dedup index (mig 043 `idx_process_instances_dedup`) is PARTIAL (`WHERE trigger_event_id IS NOT NULL`).
+  Postgres cannot infer a partial unique index for ON CONFLICT unless the predicate is restated —
+  verified on PG16: the exact statement throws `there is no unique or exclusion constraint matching the
+  ON CONFLICT specification` on EVERY launch (a minimal INSERT with no R3 columns reproduced it, so it
+  is pre-existing, not introduced by R3). A fresh deploy from these migrations would fail to launch ANY
+  workflow instance. ✅FIX (R3.1): added `WHERE trigger_event_id IS NOT NULL` to the ON CONFLICT — which
+  also RESTORES the intended per-trigger dedup that was previously dead. Caught by the R-track Factor-2
+  live-PG drive of the real manager (the throwaway-DB standard exists for exactly this).
+- **K4 · P2 · `_create_task` wrote corrupt rows when a generic overlay omitted a gate field.** `r(x) or x`
+  fell back to the LITERAL path string, so a missing `taskType`/`assigneeRole` produced a task typed
+  `"payload.taskType"` / assigned to a phantom role `"payload.assigneeRole"` no queue reads. ✅FIX (R3.1):
+  `r_or_none` degrades an unresolved `payload.`/`step.` path to None (caller defaults safely); quoted/bare
+  literals (every existing bespoke template) are unchanged. (Independent-review P2.)

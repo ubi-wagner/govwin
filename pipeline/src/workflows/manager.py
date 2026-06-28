@@ -164,13 +164,32 @@ class WorkflowManager:
         # Calculate deadline from workflow definition (default 1 hour)
         deadline = datetime.now(timezone.utc) + timedelta(hours=1)
 
+        # R3: link the instance to the opportunity spine (additive). The overlay
+        # may carry opportunityId + scope so the control tower can chain/roll up
+        # reaction runs by the immutable opportunity_id. Both nullable — every
+        # existing bespoke On* workflow omits them and is unchanged. scope is
+        # validated against the mig-088 CHECK so a bad overlay value degrades to
+        # null instead of failing the INSERT.
+        opportunity_id = self._safe_uuid(payload.get("opportunityId"))
+        scope = payload.get("scope")
+        if scope not in ("opp", "spotlight", "project", "contract"):
+            scope = None
+
         result = await conn.fetchrow(
             """
             INSERT INTO process_instances
                 (id, workflow_name, trigger_event_id, status, payload,
-                 tenant_id, actor_id, actor_email, source, deadline)
-            VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9)
-            ON CONFLICT (workflow_name, trigger_event_id) DO NOTHING
+                 tenant_id, actor_id, actor_email, source, deadline,
+                 opportunity_id, scope)
+            VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9, $10, $11)
+            -- The dedup index (mig 043) is PARTIAL (WHERE trigger_event_id IS NOT
+            -- NULL); Postgres cannot infer a partial unique index for ON CONFLICT
+            -- unless the predicate is restated here. Without it this INSERT throws
+            -- "no unique or exclusion constraint matching the ON CONFLICT
+            -- specification" on EVERY launch (verified, PG16). A null trigger
+            -- can't conflict anyway, so the predicate is exactly right.
+            ON CONFLICT (workflow_name, trigger_event_id)
+                WHERE trigger_event_id IS NOT NULL DO NOTHING
             RETURNING id
             """,
             uuid.UUID(instance_id),
@@ -182,6 +201,8 @@ class WorkflowManager:
             actor_email,
             self.source,
             deadline,
+            opportunity_id,
+            scope,
         )
 
         if result is None:
@@ -467,11 +488,26 @@ class WorkflowManager:
                 # the create-time 1h default. A 72h HITL review must get a 72h
                 # deadline or the paused-deadline sweep force-fails it ~1h in.
                 # (EVENT_CONTRACT_V3 §3.1 / §6; CLAUDE_CLIFFNOTES Mistake 17.)
-                wait_minutes = (
-                    step.timeout_minutes
-                    if step.timeout_minutes and step.timeout_minutes > 0
-                    else 1440
-                )
+                #
+                # R3 (additive): a generic overlay-driven gate (ProjectCollaboration)
+                # can EXTEND its park ceiling per-launch via payload.parkMinutes — a
+                # weeks-long customer-build gate must not be capped at the static class
+                # default. The TASK due_at/nudges (dueMinutes/nudgeDays) drive the human
+                # cadence; parkMinutes is only the instance abandon backstop. Existing
+                # workflows omit parkMinutes → unchanged (falls back to step timeout).
+                overlay_park = None
+                if isinstance(trigger_payload, dict):
+                    try:
+                        _pm = trigger_payload.get("parkMinutes")
+                        overlay_park = int(_pm) if _pm is not None else None
+                    except (TypeError, ValueError):
+                        overlay_park = None
+                if overlay_park and overlay_park > 0:
+                    wait_minutes = overlay_park
+                elif step.timeout_minutes and step.timeout_minutes > 0:
+                    wait_minutes = step.timeout_minutes
+                else:
+                    wait_minutes = 1440
                 wait_deadline = datetime.now(timezone.utc) + timedelta(minutes=wait_minutes)
                 await conn.execute(
                     """
@@ -807,17 +843,35 @@ class WorkflowManager:
                 return None
             return resolve_input(path, event_dict, step_results)
 
+        def r_or_none(field: Optional[str]) -> Any:
+            """Resolve a task field, but never fall back to a raw dynamic path.
+
+            A generic overlay-driven template declares fields as "payload.X" paths.
+            If the overlay omits the key, resolve_input returns None — and the old
+            `r(x) or x` idiom would then use the LITERAL string "payload.X" as the
+            value, writing a corrupt task (task_type="payload.taskType", a task
+            assigned to a phantom role "payload.assigneeRole" no one queries). So an
+            unresolved payload./step. path degrades to None (caller defaults safely);
+            a quoted/bare literal (every existing bespoke template) is unchanged.
+            """
+            val = r(field)
+            if val is not None:
+                return val
+            if isinstance(field, str) and (field.startswith("payload.") or field.startswith("step.")):
+                return None
+            return field
+
         # tenant scope from the instance
         tenant_id = await conn.fetchval(
             "SELECT tenant_id FROM process_instances WHERE id = $1",
             uuid.UUID(instance_id),
         )
 
-        task_type = r(step.task_type) or step.task_type or "task"
-        title = r(step.task_title) or step.task_title or task_type
-        assignee_role = r(step.assignee_role) or step.assignee_role
+        task_type = r_or_none(step.task_type) or "task"
+        title = r_or_none(step.task_title) or task_type
+        assignee_role = r_or_none(step.assignee_role)
         assignee_user = r(step.assignee_user)
-        entity_type = r(step.entity_type) or step.entity_type
+        entity_type = r_or_none(step.entity_type)
         entity_ref = r(step.entity_ref)
 
         # Due date: explicit due_in_minutes overrides the step timeout.

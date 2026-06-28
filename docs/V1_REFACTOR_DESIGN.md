@@ -91,10 +91,36 @@ backfill~~, ~~`INSTANCE_AUTHORITATIVE` flag~~, ~~the 0-drift reconciliation harn
 - **R0.3** `proposals.origin_card JSONB` + `source_bucket TEXT`; populate in the create txn from the L0 summary + L1 bucket; **compliance NOT included (rendered live)**. `lib/cards/card.ts` assembles the card = origin snapshot + live domain projection. **Accept:** card shows frozen origin + live stage + **live** compliance. **3f:** unit (frozen-origin immutability + live-compliance) · live-PG · review.
 - **R0.4** `/admin/opportunities` rollup page on the view. **Accept:** opp→bucket→project tree. **3f:** route test · live-PG · review.
 
-### R3 — generic template + param store + bridges
-- **R3.1** `ProjectCollaboration` generic Workflow (payload-parameterized; actor human|agent|system; references `proposals.stage` via payload — does NOT write it). **Accept:** runs 1-gate + 3-gate configs; parks/resumes a HITL ToDo; completes (transient). **3f:** pytest matrix · live-PG run · review.
-- **R3.2** `process_templates.definition JSONB` param store + `launchTemplate` reads it; the bounded process-builder writes it. **Accept:** an admin overlay produces the right reaction config. **3f:** unit · live-PG · review.
-- **R3.3** bridges: a real workflow on `purchase.completed` (retire the `AdminProposalSetup` phantom + the dead lock-route completer `lock/route.ts:465-476`); chain via final-step business events carrying `opportunity_id`. **Accept:** purchase fires a real (transient) project reaction; no phantom; no orphan. **3f:** webhook/create test · live-PG event chain · review.
+### R3 — generic template + bridges (engine-grounded after the live map)
+> **Engine reality (verified, 8-point map):** the live engine is `processor` hosting `WorkflowManager`;
+> a launch FREEZES the trigger event's payload as the per-instance **overlay**; **steps are STATIC class
+> attributes** (there is NO `process_templates.definition` column and no dynamic-step machinery — the
+> catalog is on/off + audit only); a `TODO` step parks (`status='paused'`) and writes a `tasks` row whose
+> fields all resolve from the overlay; `Step.condition` is **ignored** for TODO on the Manager path
+> (skip via a `CONDITION` step + `depends_on`, or the trigger lambda). So the generic template is
+> **one static reaction shape, parameterized by the overlay** — NOT a per-launch dynamic step graph.
+> The faithful unit is **one transient gate per launch, launched reactively** (one gate per stage event),
+> not one long instance pre-chaining all stages.
+
+- **R3.1** ✅ `ProjectCollaboration` generic Workflow — trigger `proposal:project.collaboration_requested:single`
+  (launchable via `launchTemplate`); a single overlay-parameterized HITL `collaborate` TODO (assignee/
+  type/title/entity/nudges/due all `payload.X`) + `notify_done`. References `proposals.stage` via payload,
+  never writes it. Transient park→resume→complete. **Engine (additive):** `create_instance` now keys the
+  spine — writes `opportunity_id` + validated `scope` from the overlay (mig 088 cols, previously unset);
+  `execute_instance` lets `payload.parkMinutes` override the park ceiling (decoupled from the task's
+  `dueMinutes`). **Bugs found+fixed (gap report K3/K4):** P1 — the `ON CONFLICT` could not infer the
+  PARTIAL dedup index → every launch threw (predicate restated); P2 — `_create_task` literal-path
+  fallback wrote corrupt tasks (`r_or_none` guard). mig 090 pre-seeds the catalog row. **Done:** pytest
+  10/10 · live-PG drive 20/20 · independent review SHIP.
+- **R3.2** (REFRAMED to engine reality) — **overlay-DEFAULTS, not dynamic steps.** The per-program gate
+  config (assignee/nudges/due/parkMinutes) is supplied IN the launch overlay; a launcher helper merges
+  sensible code defaults. A `process_templates.definition` JSONB to let an admin EDIT those defaults +
+  a bounded builder UI is a **DEFERRED nicety** (R5/roadmap), not on the deploy-now path — the bridges
+  build the overlay directly. (No engine change; the frozen payload already IS the param store.)
+- **R3.3** bridges: the V1 live path — the create-route launches `ProjectCollaboration` (admin-review
+  gate overlay) via `launchTemplate`; remove the dead lock-route completer (`lock/route.ts:465-476`);
+  close the `purchase.completed` orphan (real consumer). **Accept:** a real (transient) project reaction
+  on creation/purchase; no phantom; no orphan. **3f:** route test · live-PG event chain · review.
 
 ### R4 — card UI · R5 — local automation · R6 — V2
 (as the table above; each task carries acceptance + the 3-factor standard; R5 items are the W-track,
