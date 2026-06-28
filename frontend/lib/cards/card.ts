@@ -42,6 +42,9 @@ export interface ComplianceSummary {
   notApplicable: number;
   /** mandatory requirements that are satisfied — the gate-relevant number */
   mandatorySatisfied: number;
+  /** mandatory requirements that are applicable (mandatory minus not_applicable) —
+   *  the burden DENOMINATOR; percentComplete = mandatorySatisfied / this */
+  mandatoryApplicable: number;
   /** 0–100 over mandatory, applicable requirements (the real burden) */
   percentComplete: number;
 }
@@ -100,6 +103,7 @@ const EMPTY_COMPLIANCE: ComplianceSummary = {
   notAddressed: 0,
   notApplicable: 0,
   mandatorySatisfied: 0,
+  mandatoryApplicable: 0,
   percentComplete: 0,
 };
 
@@ -243,6 +247,7 @@ export async function getComplianceSummary(proposalId: string): Promise<Complian
     notAddressed: row.notAddressed,
     notApplicable: row.notApplicable,
     mandatorySatisfied: row.mandatorySatisfied,
+    mandatoryApplicable: row.mandatoryApplicable,
     percentComplete,
   };
 }

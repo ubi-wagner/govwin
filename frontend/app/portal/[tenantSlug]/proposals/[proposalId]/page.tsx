@@ -4,6 +4,8 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
+import { getProposalCard } from '@/lib/cards/card';
+import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +89,31 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   }
 
   if (!proposal) notFound();
+
+  // ── Opportunity card (the spine carrier): frozen origin + live compliance ──
+  // Reuses the canonical read-model (lib/cards/card.ts). Non-fatal — a card
+  // failure must never block the workspace.
+  let cardView: OpportunityCardView | null = null;
+  try {
+    const card = await getProposalCard(proposalId, tenantId);
+    if (card) {
+      cardView = {
+        proposalId: card.proposalId,
+        opportunityId: card.opportunityId,
+        title: card.title,
+        stage: card.stage,
+        isLocked: card.isLocked,
+        lockCount: card.lockCount,
+        unlockDeadline: card.unlockDeadline ? new Date(card.unlockDeadline).toISOString() : null,
+        updatedAt: card.updatedAt ? new Date(card.updatedAt).toISOString() : null,
+        sourceBucket: card.sourceBucket,
+        origin: card.origin,
+        compliance: card.compliance,
+      };
+    }
+  } catch (e) {
+    console.error('[portal/proposals/workspace] card read-model error:', e);
+  }
 
   // ── Resolve user access ───────────────────────────────────────────
   let access;
@@ -443,6 +470,18 @@ export default async function ProposalWorkspacePage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ── Opportunity card (frozen origin + live compliance) ────────── */}
+      {cardView && (
+        <details className="mb-6 group">
+          <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 select-none">
+            Opportunity origin &amp; compliance
+          </summary>
+          <div className="mt-3 max-w-2xl">
+            <OpportunityCard card={cardView} />
+          </div>
+        </details>
+      )}
 
       {/* ── Workspace Client Component ────────────────────────────────── */}
       <ProposalWorkspace
