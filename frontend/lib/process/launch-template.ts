@@ -24,7 +24,8 @@ import { type Role } from '@/lib/rbac';
 export interface LaunchActor {
   id: string;
   email: string | null;
-  role: Role;
+  /** The operator's role (reserved for tenant scoping). Omitted for a system bridge. */
+  role?: Role;
   /** The operator's tenant (null for system admins). Reserved for tenant scoping. */
   tenantId: string | null;
 }
@@ -37,10 +38,17 @@ export async function launchTemplate(opts: {
   workflowName: string;
   overlay: Record<string, unknown>;
   actor: LaunchActor;
+  /**
+   * Who the launch is attributed to. Default 'user' (a GUI/operator launch).
+   * A system bridge (e.g. the Stripe webhook) launches with 'system' — actor.id
+   * is then a label, e.g. 'stripe-webhook' (actor_id is TEXT, not a user FK).
+   */
+  actorType?: 'user' | 'system';
   /** Tenant the launched process belongs to (null = platform/admin process). */
   tenantId?: string | null;
 }): Promise<LaunchResult> {
   const { workflowName, overlay, actor } = opts;
+  const actorType = opts.actorType ?? 'user';
   const tenantId = opts.tenantId ?? null;
 
   // ── Resolve the template from the catalog (active + trigger_key) ────
@@ -112,7 +120,7 @@ export async function launchTemplate(opts: {
       INSERT INTO system_events (
         namespace, type, phase, actor_type, actor_id, actor_email, tenant_id, payload
       ) VALUES (
-        ${namespace}, ${type}, 'single', 'user', ${actor.id}, ${actor.email ?? null},
+        ${namespace}, ${type}, 'single', ${actorType}, ${actor.id}, ${actor.email ?? null},
         ${tenantId}, ${JSON.stringify(overlay ?? {})}::jsonb
       )
       RETURNING id

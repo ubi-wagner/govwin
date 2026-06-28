@@ -117,10 +117,15 @@ backfill~~, ~~`INSTANCE_AUTHORITATIVE` flag~~, ~~the 0-drift reconciliation harn
   sensible code defaults. A `process_templates.definition` JSONB to let an admin EDIT those defaults +
   a bounded builder UI is a **DEFERRED nicety** (R5/roadmap), not on the deploy-now path — the bridges
   build the overlay directly. (No engine change; the frozen payload already IS the param store.)
-- **R3.3** bridges: the V1 live path — the create-route launches `ProjectCollaboration` (admin-review
-  gate overlay) via `launchTemplate`; remove the dead lock-route completer (`lock/route.ts:465-476`);
-  close the `purchase.completed` orphan (real consumer). **Accept:** a real (transient) project reaction
-  on creation/purchase; no phantom; no orphan. **3f:** route test · live-PG event chain · review.
+- **R3.3** ✅ bridges via ONE canonical entry point `lib/process/project-collaboration.ts:launchProjectCollaboration`
+  (guards required overlay fields so a bridge can never write a corrupt/unassigned task; both bridges call it):
+  (a) the create-route launches the `admin_review` gate (scope='project') — replacing the `AdminProposalSetup`
+  PHANTOM comment with the real registered HITL gate; (b) the Stripe webhook launches a `proposal_setup`
+  gate (scope='opp', system-attributed) on an opportunity purchase — **closing the `purchase.completed`
+  orphan (W-D)**; (c) the dead lock-route completer deleted. `launchTemplate` gained `actorType` (system
+  bridges) + `LaunchActor.role` optional. **Done:** unit 7/7 (overlay build + incomplete-launch guard) ·
+  live-PG event chain 10/10 (catalog gate → real trigger match → create_instance keys spine →
+  rfp_admin gate parks) · full frontend suite 500/500 · independent review.
 
 ### R4 — card UI · R5 — local automation · R6 — V2
 (as the table above; each task carries acceptance + the 3-factor standard; R5 items are the W-track,

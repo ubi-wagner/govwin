@@ -181,3 +181,16 @@ workflow rebuild. Recommended order: J1 (delegation) → J2 (date generator) →
   `"payload.taskType"` / assigned to a phantom role `"payload.assigneeRole"` no queue reads. ✅FIX (R3.1):
   `r_or_none` degrades an unresolved `payload.`/`step.` path to None (caller defaults safely); quoted/bare
   literals (every existing bespoke template) are unchanged. (Independent-review P2.)
+
+### R3.3 finds (2026-06-28)
+
+- **K5 · P2 · R0.3 shipped a latent test break (now fixed).** The R0.3 origin-card freeze switched the
+  create-route proposals INSERT to `sql.json(originCard)`, but `__tests__/proposals-create.test.ts`
+  mocks `@/lib/db` with a bare `sql` (no `.json`) → 4 success-path cases threw `sql.json is not a
+  function` → 500. R0.3's commit ran the NEW card test + tsc + a live drive but not this existing
+  route test. ✅FIX (R3.3): mock `sql.json` (identity) + mock `@/lib/process/project-collaboration`.
+  Lesson: run the full `vitest` suite, not just the new file, before committing a shared-route change.
+- **W-D CLOSED · `purchase.completed` orphan.** An opportunity purchase now fires a real transient
+  reaction: the Stripe webhook launches `ProjectCollaboration` (scope='opp', an rfp_admin
+  proposal_setup gate) right after emitting `capture:purchase.completed` (the event still emits for
+  audit). The `AdminProposalSetup` phantom is fully retired (the dead lock-route completer deleted).

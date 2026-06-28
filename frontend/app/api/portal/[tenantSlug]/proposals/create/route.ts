@@ -11,6 +11,7 @@ import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
+import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -694,16 +695,38 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    // ── 72h admin-review SLA ────────────────────────────────────────
-    // The admin is notified now via the inline emails above + the OnProposalCreated
-    // workflow (proposal.created → admin review). A previously-inserted
-    // `AdminProposalSetup` process_instance was a PHANTOM — no such Workflow class
-    // exists, so the manager's stuck-detection sweep force-failed it ~5 min later
-    // (status='running' with no heartbeat), polluting the admin monitor on every
-    // proposal and double-counting against OnProposalCreated. Removed (gap-sweep C1).
-    // A real deadline-tracked HITL gate (pause + nudge + escalation at 72h) belongs
-    // to the structured workflow-template-overlay roadmap item (D) and must be a
-    // registered Workflow with a HITL/TODO step, not a bare row.
+    // ── 72h admin-review HITL gate (R3.3 spine bridge) ──────────────
+    // Launch the generic ProjectCollaboration reaction on the opportunity spine:
+    // a REAL deadline-tracked, nudged HITL gate parked in the rfp_admin task queue
+    // (entity = this proposal), resolved when the admin reviews + unlocks. This is
+    // the registered-Workflow HITL gate that replaces the old `AdminProposalSetup`
+    // PHANTOM (a bare process_instances row with no Workflow class, force-failed by
+    // the stuck sweep ~5 min in — removed in gap-sweep C1). The inline admin emails
+    // above stay as the immediate ping; this adds the tracked, nudged queue item.
+    // Non-fatal: a launch failure never breaks proposal creation.
+    try {
+      const launch = await launchProjectCollaboration({
+        actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+        tenantId,
+        scope: 'project',
+        opportunityId: topicId,
+        proposalId: proposal.id,
+        stage: 'draft',
+        taskType: 'admin_review',
+        taskTitle: `Review & unlock: ${proposalTitle}`,
+        assigneeRole: 'rfp_admin',
+        entityType: 'proposal',
+        entityRef: proposal.id,
+        nudgeDays: [1, 3],
+        dueMinutes: 4320, // 72h review SLA
+        completeTemplate: 'proposal_unlocked',
+      });
+      if (!launch.ok) {
+        console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+      }
+    } catch (launchErr) {
+      console.error('[proposals/create] ProjectCollaboration launch failed (non-fatal):', launchErr);
+    }
 
     return NextResponse.json({
       data: {

@@ -20,6 +20,7 @@ const {
   authMock,
   sqlMock,
   sqlBeginMock,
+  launchProjectCollaborationMock,
   getTenantBySlugMock,
   verifyTenantAccessMock,
   emitEventStartMock,
@@ -31,7 +32,10 @@ const {
   isValidUUIDMock,
 } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
-  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock });
+  // sql.json(v) — postgres.js jsonb param helper (R0.3 origin_card freeze). Plain
+  // function (not a vi.fn) so beforeEach's sqlMock.mockReset() can't wipe it; the
+  // tx ignores the interpolated value, so identity is sufficient for the mock.
+  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock, json: (v: unknown) => v });
   return {
     authMock: vi.fn(),
     sqlMock,
@@ -45,6 +49,7 @@ const {
     copyObjectMock: vi.fn(),
     resolveTopicComplianceMock: vi.fn(),
     isValidUUIDMock: vi.fn(),
+    launchProjectCollaborationMock: vi.fn(),
   };
 });
 
@@ -90,6 +95,13 @@ vi.mock('@/lib/templates', () => ({
 
 vi.mock('@/lib/validation', () => ({
   isValidUUID: isValidUUIDMock,
+}));
+
+// R3.3: the create route launches the ProjectCollaboration admin-review gate.
+// Mock it (unit-tested separately) so this test does not exercise the launch
+// chain; default to a successful launch.
+vi.mock('@/lib/process/project-collaboration', () => ({
+  launchProjectCollaboration: launchProjectCollaborationMock,
 }));
 
 vi.mock('@/lib/storage/paths', () => ({
@@ -189,6 +201,8 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     copyObjectMock.mockReset();
     resolveTopicComplianceMock.mockReset();
     isValidUUIDMock.mockReset();
+    launchProjectCollaborationMock.mockReset();
+    launchProjectCollaborationMock.mockResolvedValue({ ok: true, data: { eventId: 'evt', workflowName: 'ProjectCollaboration', trigger: 'proposal:project.collaboration_requested:single' } });
 
     // Default: FOUNDING_COHORT_BYPASS is true (bypass active)
     originalBypass = process.env.FOUNDING_COHORT_BYPASS;
