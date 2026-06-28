@@ -92,3 +92,50 @@ artifact_id in payload) · I1 (indexes).
 **Roadmap (larger builds, tracked in V1_TASKING):** D (structured workflow-template overlay) ·
 E-c/E-d (E4 validator + E8.2 package-by-artifact) · H (E5/E6 agent wiring + ToolRegistry decision) ·
 G (Template Studio + opp-lifecycle UIs) · I2 (real RLS = F8) · I3/I4 (constraint validate + dead-code cleanup).
+
+---
+
+## J. Task / ToDo layer — deep analysis (2026-06-27, owner-requested)
+
+The proposal-development automation is mostly time/HITL/event-driven over a **User ToDo queue**.
+Deep-dived the `tasks` ledger + completion paths against the owner's vision. **Verdict: the
+foundation is built; 3 bounded extensions remain — not a substantive rebuild.**
+
+**Built (verified):**
+- `tasks` table — **role-queue AND user-queue** (`assignee_role` / `assignee_user_id`), `due_at`,
+  `nudge_schedule`/`nudges_sent`, `params` (criteria/input), `result` (output),
+  `process_instance_id` linkage, status lifecycle (open/in_progress/completed/cancelled/expired),
+  queue indexes (`idx_tasks_role_queue`, `idx_tasks_user_queue`, `idx_tasks_nudge_sweep`).
+- `lib/tasks/tasks.ts` — `listOpenTasksForActor` (per-user/role, tenant-scoped, soonest-due) +
+  `completeTask` (assignee-gated; merges `result`; **resumes the parked instance** via
+  `forceAdvanceProcess`, paused→retrying, which emits). Completing a task IS the HITL emitter that
+  advances the proposal phase. ✅
+- `TaskQueue` UI (`components/tasks/task-queue.tsx`) mounted on tenant + admin landing pages; 30s
+  refresh; overdue/due-soon escalation; complete via POST. ✅
+- Routes `portal/[tenantSlug]/tasks` + `admin/tasks` (GET queue + POST complete). ✅
+- Workflow-created tasks (`manager._create_task` from TODO/HITL steps) + relative nudge sweep
+  (`_sweep_task_nudges`, 1/3/5-day). ✅
+
+**Gaps (each layers onto the existing ledger; engine untouched):**
+- **J1 · P1 · No human/manual task creation (delegation).** `tasks.ts` only lists + completes;
+  tasks originate ONLY from the workflow engine. No `createTask`, no route, no "assign a job" UI.
+  Owner wants admin **and** employees (incl. accepted shadow experts) to assign contributors a job
+  with completion criteria + start/end emitters. **Need:** `createTask` core (insert + emit
+  `proposal/task.assigned`) + a `portal/.../tasks/assign` POST (tenant_user+, same-tenant assignee) +
+  a small assign UI; completion already emits via `completeTask`.
+- **J2 · P1 · No time/date/cron-anchored triggers.** `workflows/base.py` has only `EventTrigger`
+  (+ `wait_for` HITL); no `ScheduleTrigger`/cron. `due_at` + relative nudges + paused-deadline sweep
+  exist, but nothing CREATES tasks/notifications at ABSOLUTE proposal dates. Owner's model: anchors =
+  purchase date + (final due date; +30 = hidden past-due anchor); cron from purchase → RFP publish →
+  interim dates → closeout (≤3 stages + V0/V0.5 within 72h). **Need:** a daily date-anchored
+  generator (sweep) that materializes the stage tasks + `due_at` from the proposal's anchor dates,
+  and/or a `schedule`-type trigger.
+- **J3 · P2 · Completion is generic, not criteria-typed.** `TaskQueue` always renders Approve/Done ·
+  Dismiss (`{approved:bool}`); `params` can hold criteria but the UI doesn't render the CRUD
+  completers the owner wants — **upload required docs / fill a form / review a section**. **Need:**
+  type `params` (`{kind:'upload'|'form'|'review', spec}`) + render the matching completer (reuse the
+  supporting-docs upload, a form, the review-accept), each auto-satisfying on done; the
+  email-with-link modality is the same task reached via a tokenized link.
+
+**Owner framing confirmed:** these are small, well-scoped extensions on a solid ledger — not a
+workflow rebuild. Recommended order: J1 (delegation) → J2 (date generator) → J3 (typed completers).
