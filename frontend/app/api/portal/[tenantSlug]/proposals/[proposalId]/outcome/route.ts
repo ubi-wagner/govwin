@@ -5,6 +5,8 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
+import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { coerceOriginCard } from '@/lib/cards/card';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -113,15 +115,20 @@ export async function POST(request: Request, ctx: RouteContext) {
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
     // ── Verify proposal exists and belongs to tenant ────────────────
-    let proposal: { id: string; stage: string; isLocked: boolean; version: number } | undefined;
+    let proposal:
+      | { id: string; stage: string; isLocked: boolean; version: number; title: string; opportunityId: string; originCard: unknown }
+      | undefined;
     try {
       [proposal] = await sql<Array<{
         id: string;
         stage: string;
         isLocked: boolean;
         version: number;
+        title: string;
+        opportunityId: string;
+        originCard: unknown;
       }>>`
-        SELECT id, stage, is_locked, version
+        SELECT id, stage, is_locked, version, title, opportunity_id, origin_card
         FROM proposals
         WHERE id = ${proposalId} AND tenant_id = ${tenantId}
         LIMIT 1
@@ -284,6 +291,51 @@ export async function POST(request: Request, ctx: RouteContext) {
         atomsUpdated,
       },
     });
+
+    // ── R6 (V2): a WIN seeds a contract on the SAME opportunity_id and launches
+    //    a contract-scope ProjectCollaboration kickoff gate — the spine, one scope
+    //    deeper. Idempotent (one contract per winning proposal); non-fatal.
+    if (outcome === 'awarded') {
+      try {
+        let contractId: string | null = null;
+        const ins = await sql<{ id: string }[]>`
+          INSERT INTO contracts (tenant_id, opportunity_id, proposal_id, title, origin_card)
+          VALUES (${tenantId}::uuid, ${proposal.opportunityId}::uuid, ${proposalId}::uuid,
+                  ${`Contract: ${proposal.title}`}, ${sql.json(coerceOriginCard(proposal.originCard as never) as Parameters<typeof sql.json>[0])})
+          ON CONFLICT (proposal_id) WHERE proposal_id IS NOT NULL DO NOTHING
+          RETURNING id
+        `;
+        if (ins.length > 0) {
+          contractId = ins[0].id;
+        } else {
+          const [existing] = await sql<{ id: string }[]>`
+            SELECT id FROM contracts WHERE proposal_id = ${proposalId}::uuid LIMIT 1
+          `;
+          contractId = existing?.id ?? null;
+        }
+
+        if (contractId) {
+          const launch = await launchProjectCollaboration({
+            actor: { id: sessionUser.id, email: sessionUser.email ?? null, role, tenantId },
+            tenantId,
+            scope: 'contract',
+            opportunityId: proposal.opportunityId,
+            taskType: 'contract_kickoff',
+            taskTitle: `Kick off contract: ${proposal.title}`,
+            assigneeRole: 'tenant_admin',
+            entityType: 'contract',
+            entityRef: contractId,
+            nudgeDays: [3, 1],
+            dueMinutes: 10080, // 7 days to kick off
+          });
+          if (!launch.ok) {
+            console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+          }
+        }
+      } catch (contractErr) {
+        console.error('[proposals/outcome] contract seed failed (non-fatal):', contractErr);
+      }
+    }
 
     // ── Activity log ────────────────────────────────────────────────
     try {
