@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
@@ -25,6 +26,10 @@ type RouteParams = { params: Promise<{ tenantSlug: string; unitId: string }> };
 async function authorize(request: Request, { params }: RouteParams, minRole: Role) {
   try {
     const { tenantSlug, unitId } = await params;
+
+    if (!isValidUUID(unitId)) {
+      return { error: NextResponse.json({ error: 'Invalid unit id', code: 'VALIDATION_ERROR' }, { status: 400 }) };
+    }
 
     const session = await auth();
     if (!session?.user) {

@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -70,6 +71,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Forbidden', code: 'FORBIDDEN' },
         { status: 403 },
+      );
+    }
+
+    if (!isValidUUID(opportunityId)) {
+      return NextResponse.json(
+        { error: 'Invalid opportunity id', code: 'VALIDATION_ERROR' },
+        { status: 400 },
       );
     }
 

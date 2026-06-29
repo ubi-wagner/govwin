@@ -555,7 +555,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           SET is_met = true,
               met_by = ${sessionUser.id}::uuid,
               met_at = now(),
-              evidence = ${JSON.stringify(evidence)}::jsonb,
+              evidence = ${sql.json(evidence as Parameters<typeof sql.json>[0])},
               updated_at = now()
           WHERE id = ${requirementId}::uuid
             AND proposal_id = ${proposalId}::uuid

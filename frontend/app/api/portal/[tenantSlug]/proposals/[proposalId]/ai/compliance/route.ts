@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isAppError } from '@/lib/errors';
 import { assertAgentBudget, recordAgentSpend } from '@/lib/ai/agent-guard';
@@ -144,6 +145,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal id', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
     // ── Input validation ─────────────────────────────────────────
     let body: { sectionId?: string };
     try {
@@ -151,6 +159,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch {
       return NextResponse.json(
         { error: 'Invalid JSON body', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      );
+    }
+
+    if (body.sectionId !== undefined && (typeof body.sectionId !== 'string' || !isValidUUID(body.sectionId))) {
+      return NextResponse.json(
+        { error: 'Invalid section id', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }

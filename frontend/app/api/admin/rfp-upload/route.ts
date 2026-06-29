@@ -40,6 +40,7 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
 import { putObject } from '@/lib/storage/s3-client';
 import { rfpPipelinePath } from '@/lib/storage/paths';
+import { isValidUUID } from '@/lib/validation';
 
 // Max aggregate upload size — guards against memory blowout. Individual
 // Next.js API routes default to 4.5 MB but we accept up to ~30 MB total
@@ -114,6 +115,12 @@ export async function POST(request: Request) {
   // When solicitationId is provided, skip opportunity/solicitation creation
   // and just attach documents to the existing solicitation.
   const existingSolId = formData.get('solicitationId') ? String(formData.get('solicitationId')) : null;
+  if (existingSolId && !isValidUUID(existingSolId)) {
+    return NextResponse.json(
+      { error: 'Invalid solicitationId', code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
   const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
   const requestedIsPrimary = formData.get('isPrimary') === 'true';
 
@@ -404,8 +411,23 @@ export async function POST(request: Request) {
            ${fb.hash},
            ${userId ?? null}::uuid,
            ${isPrimary})
+        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
+      if (docRows.length === 0) {
+        // Lost a concurrent dedup race — another upload inserted this exact file
+        // between the batch pre-check above and here. Return the SAME clean 409
+        // the pre-check returns, not a 500 from the partial-unique violation.
+        // (ON CONFLICT must restate the index's partial predicate.)
+        await emitEventEnd(eventId, { error: { message: 'duplicate content_hash', code: 'DUPLICATE_FILE' } });
+        return NextResponse.json(
+          {
+            error: 'This file has already been uploaded. Navigate to the existing solicitation or rename/modify the file if this is a different document.',
+            code: 'DUPLICATE_FILE',
+          },
+          { status: 409 },
+        );
+      }
       documentIds.push(docRows[0].id);
     } catch (err) {
       console.error('[rfp-upload] document insert failed', err);

@@ -209,8 +209,8 @@ export async function POST(request: Request) {
         ${body.phaseType},
         ${(body.agency as string) ?? null},
         ${(body.programType as string) ?? null},
-        ${JSON.stringify(complianceData)}::jsonb,
-        ${JSON.stringify(volumesData)}::jsonb,
+        ${sql.json(complianceData as Parameters<typeof sql.json>[0])},
+        ${sql.json(volumesData as Parameters<typeof sql.json>[0])},
         false,
         ${user.id ?? null}
       )

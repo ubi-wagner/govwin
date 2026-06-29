@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { readDocx } from '@/lib/import/docx-reader';
@@ -68,7 +69,7 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     const body = await request.json();
     if (Array.isArray(body?.fileIds) && body.fileIds.length > 0) {
-      fileIds = body.fileIds.filter((id: unknown) => typeof id === 'string' && id.length > 0);
+      fileIds = body.fileIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id));
       if (fileIds && fileIds.length === 0) fileIds = null;
     }
   } catch {
