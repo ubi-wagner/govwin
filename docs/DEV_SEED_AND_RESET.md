@@ -4,11 +4,18 @@ How to seed test accounts and (optionally) wipe `govtech_intel` to a clean, slop
 baseline. **Validated** on a fresh local Postgres: clean DB → migrate → seed → all three
 logins verified via the app's `bcryptjs.compare`.
 
-> **Two databases, one reset.** `govtech_intel` (frontend + pipeline business data) is the
-> only DB this touches. **`govtech_cms`** — the public marketing site / page-block content —
-> is a **separate database and is NOT touched.** "Kill all but the public-facing pages" = reset
-> `govtech_intel`; leave `govtech_cms` alone. (There are no public-page tables in
-> `govtech_intel`; if you ever add public content there, tell me and we'll preserve it.)
+> **The public site lives in `govtech_intel` — same DB as the slop.** The front-facing
+> marketing/site pages are served by the **Next.js frontend** from `govtech_intel` tables
+> **`content_pages`** + **`cms_content`** (via `lib/cms.ts` / `app/(marketing)`), edited live in
+> **`/admin/site`**, and **migration-seeded** as the launch baseline by `032`/`059`/`064`
+> (`064 = republish_launch_baseline`). A clean re-migrate currently holds **54 `content_pages`**
+> (14 active pages, 9 resources, 4 guides, 3 blog posts, 1 team member) + **130 `cms_content`** rows.
+>
+> **`govtech_cms`** (the FastAPI CMS/CRM DB) is **NOT the public site** — it's the parked
+> post-alpha CRM, out of the alpha path. So "kill all but the public-facing pages" means: keep
+> `content_pages`/`cms_content` in `govtech_intel`, kill the business/transactional rows around them.
+> There are **two ways** to do that — pick by whether you've made runtime `/admin/site` edits that
+> must survive (see "Two reset options" below).
 
 ## Accounts the seed creates
 
@@ -40,30 +47,43 @@ DATABASE_URL="$INTEL_URL" node scripts/seed_dev_accounts.mjs
 are hashed in Postgres via pgcrypto `crypt()/gen_salt('bf',12)` → `$2a$` bcrypt, verified by the
 app's `bcryptjs`.
 
-## Full baseline reset (DESTRUCTIVE — wipes all `govtech_intel` business data)
+## Two reset options (pick by whether runtime `/admin/site` edits must survive)
 
-Stop the pipeline processor / any writers first, then:
+Because the public site lives in `govtech_intel`, the choice is: rebuild it to the migration
+baseline, or preserve its current rows. Stop the pipeline processor / any writers first.
+
+### Option A — Full schema reset (cleanest; public site → launch baseline)
+
+Rebuilds EVERYTHING from migrations, including the public site (re-published from `064`). Wipes
+ALL business slop **and** any runtime `/admin/site` content edits made since the last baseline
+migration. Use when the migration launch-baseline IS your desired public content.
 
 ```bash
 # 0) BACKUP — the next step is an irreversible DROP SCHEMA
 pg_dump "$INTEL_URL" > intel_backup_$(date +%F).sql
-
-# 1) Drop + rebuild govtech_intel from migrations (000_drop_all runs ONLY with this flag).
-#    Re-creates the schema + the baseline admin + structural seeds (automation rules,
-#    process templates, compliance presets, …).
+# 1) Drop + rebuild govtech_intel (000_drop_all runs ONLY with this flag). Re-seeds the schema,
+#    the baseline admin, the structural seeds, AND the public content_pages/cms_content baseline.
 ALLOW_SCHEMA_RESET=true DATABASE_URL="$INTEL_URL" node db/migrations/migrate.mjs
-
-# 2) Seed the real test accounts AND purge the leftover demo users
-#    (apexdefense.test / techalliance.test). Keeps eric.c.wagner@gmail.com.
+# 2) Seed the real test accounts + purge the leftover demo users (keeps eric.c.wagner@gmail.com).
 PURGE_DEMO=1 DATABASE_URL="$INTEL_URL" node scripts/seed_dev_accounts.mjs
 ```
 
-After this, `govtech_intel` contains: a clean schema, the structural seeds, and exactly four
-users (the two `master_admin`s + the two tenant admins) with two active tenants — **no test
-opportunities, proposals, applications, events, or process instances.** `govtech_cms` is untouched.
+End state: clean schema + structural seeds + the **public site at its launch baseline** + exactly
+four users (two `master_admin` + two `tenant_admin`) and two active tenants — **no test
+opportunities, proposals, applications, events, or process instances.**
 
-### Note on the "slop"
+### Option B — Targeted business-data wipe (preserves the public site AS-IS)
+
+Keeps `content_pages`, `cms_content`, `page_views`, `content_events`, the structural seeds, and
+the admin users **exactly as they are**, and `TRUNCATE … CASCADE`s only the business/transactional
+tables (tenants, proposals + sections/artifacts/comments/collaborators, opportunities + curated
+solicitations/documents, tenant_pipeline_items, applications, tasks, process_instances + transitions,
+system_events, library_units, contracts, agent_task_*). Use when you've published `/admin/site`
+edits you want to keep. **Not scripted yet** — I'll generate the exact, FK-ordered truncate list
+(validated against the schema) once we confirm this is the path.
+
+### Note on the demo "slop"
 A plain re-migrate re-seeds a little demo data via migrations `041/048/051`: migration **051**
-already removes the demo *tenant* at launch, leaving only a few orphaned demo *users* —
-which `PURGE_DEMO=1` clears. If you'd rather the demo never seed at all on a clean build, the
-cleaner long-term fix is to gate migration 041 behind an env flag; say the word and I'll wire it.
+already removes the demo *tenant* at launch, leaving only a few orphaned demo *users* — which
+`PURGE_DEMO=1` clears. To stop the demo seeding at all on a clean build, the cleaner long-term fix
+is to gate migration 041 behind an env flag; say the word and I'll wire it.
