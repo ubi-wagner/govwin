@@ -22,6 +22,7 @@ type RollupRow = {
   proposalsSubmitted: number;
   proposalsArchived: number;
   lastProposalActivity: Date | null;
+  contracts: number;
 };
 
 const LIFECYCLE_COLORS: Record<string, string> = {
@@ -56,6 +57,7 @@ export default async function AdminOpportunityRollupPage() {
              proposals_final::int       AS proposals_final,
              proposals_submitted::int   AS proposals_submitted,
              proposals_archived::int    AS proposals_archived,
+             contracts::int             AS contracts,
              last_proposal_activity
       FROM v_opportunity_rollup
       WHERE ranked_tenants > 0 OR proposals > 0
@@ -114,7 +116,7 @@ export default async function AdminOpportunityRollupPage() {
                     <td className="px-4 py-3 text-gray-700">{r.rankedTenants}</td>
                     <td className="px-4 py-3 text-gray-700">{r.pinnedTenants}</td>
                     <td className="px-4 py-3">
-                      {r.proposals === 0 ? (
+                      {r.proposals === 0 && r.contracts === 0 ? (
                         <span className="text-gray-400">—</span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
@@ -122,6 +124,8 @@ export default async function AdminOpportunityRollupPage() {
                           <Stage n={r.proposalsFinal} label="final" color="bg-purple-50 text-purple-700" />
                           <Stage n={r.proposalsSubmitted} label="submitted" color="bg-green-50 text-green-700" />
                           <Stage n={r.proposalsArchived} label="archived" color="bg-gray-100 text-gray-500" />
+                          {/* V2: contracts won on this opportunity (the spine's V1→V2 arc) */}
+                          <Stage n={r.contracts} label="contract" color="bg-emerald-100 text-emerald-700" />
                         </div>
                       )}
                     </td>
