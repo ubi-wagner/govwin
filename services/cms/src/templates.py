@@ -143,6 +143,34 @@ TEMPLATES = {
         {_button('View in Admin Dashboard', '/admin')}
     '''),
 
+    # ── Task nudges (W-N/O) ────────────────────────────────────────────
+    # Escalating reminder for an assigned task. The login link points at the
+    # in-between landing page (/go?task=...) which routes to the task after login.
+    'task_nudge': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">
+          {'Final reminder' if p.get('is_final') else 'Reminder'}: a task needs your attention
+        </h2>
+        <p>This is {('the final reminder' if p.get('is_final') else f"reminder #{_e(str(p.get('nudge_index', 1)))}")}
+           for a task assigned to you:</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;"><strong>{_e(p.get('title', 'Your task'))}</strong></p>
+            {f"<p style='margin:4px 0;color:#64748b;'>Due {_e(str(p.get('due_at',''))[:10])}</p>" if p.get('due_at') else ''}
+        </div>
+        <p>Log in to pick it up — you'll land right on it:</p>
+        {_button('Open my task', p.get('login_url', '/login'))}
+    '''),
+
+    'task_nudge_manager': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">A task on your team is overdue for action</h2>
+        <p>A task assigned to a member of your team has reached its final reminder without being completed:</p>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;"><strong>{_e(p.get('title', 'A task'))}</strong></p>
+            {f"<p style='margin:4px 0;color:#b91c1c;'>Due {_e(str(p.get('due_at',''))[:10])}</p>" if p.get('due_at') else ''}
+        </div>
+        <p>You may want to follow up or reassign it.</p>
+        {_button('Review in the workspace', p.get('login_url', '/login'))}
+    '''),
+
     'welcome_accepted': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Welcome to RFP Pipeline!</h2>
         <p>Hi {_e(p.get('contactName', 'there'))},</p>

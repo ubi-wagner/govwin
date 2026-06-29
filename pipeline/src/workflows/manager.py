@@ -76,6 +76,7 @@ import asyncio
 import importlib
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -1003,7 +1004,7 @@ class WorkflowManager:
         try:
             rows = await conn.fetch(
                 """
-                SELECT id, tenant_id, assignee_role, title, due_at,
+                SELECT id, tenant_id, assignee_role, assignee_user_id, title, due_at,
                        nudge_schedule, nudges_sent
                 FROM tasks
                 WHERE status IN ('open', 'in_progress') AND due_at IS NOT NULL
@@ -1042,14 +1043,88 @@ class WorkflowManager:
                             },
                         )
                         sent_set.add(days_before)
+                        # nudge_index (1-based) + is_final drive the email escalation:
+                        # the LAST threshold in the schedule CC-escalates to a manager.
+                        nudge_index = len(sent_set)
+                        is_final = len(sent_set) >= len(set(schedule or []))
                         await conn.execute(
                             "UPDATE tasks SET nudges_sent = $2::jsonb, updated_at = now() WHERE id = $1",
                             t["id"], json.dumps(sorted(sent_set, reverse=True)),
                         )
                         fired += 1
+                        # Layered EMAIL push (W-N/O), best-effort: a failure here must
+                        # never undo the in-app nudge or its nudges_sent mark above.
+                        try:
+                            await self._emit_task_nudge_email(conn, t, nudge_index, is_final)
+                        except Exception as ee:
+                            logger.error("[_sweep_task_nudges] email emit failed for %s: %s", t["id"], ee)
                     except Exception as e:
                         logger.error("[_sweep_task_nudges] nudge failed for %s: %s", t["id"], e)
         return fired
+
+    async def _emit_task_nudge_email(
+        self, conn: asyncpg.Connection, t: Any, nudge_index: int, is_final: bool
+    ) -> None:
+        """Emit the EMAIL push for a nudge (W-N/O) via system:notification.requested
+        — the CMS event_listener renders the template + delivers it.
+
+        Only USER-assigned tasks email (a role-bucket task has no single recipient;
+        its in-app nudge suffices). The email carries a login link to the in-between
+        landing page (/go?task=...) that routes the user to the task after login.
+        On the FINAL nudge we ALSO emit a SEPARATE escalation email to the tenant's
+        manager (tenant_admin) — cleaner than a CC and needs no listener change.
+        """
+        assignee_user_id = t["assignee_user_id"]
+        if not assignee_user_id:
+            return  # role-bucket task → in-app nudge only
+
+        base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
+        if not base:
+            # A relative link is a dead CTA in an email client. Skip the email (the
+            # in-app nudge already fired) and log loudly so ops sets the env var,
+            # rather than shipping 100% broken-link nudges.
+            logger.warning(
+                "[_sweep_task_nudges] PORTAL_BASE_URL/NEXTAUTH_URL unset — skipping nudge EMAIL "
+                "for task %s (in-app nudge still delivered)", t["id"],
+            )
+            return
+        login_url = f"{base}/go?task={t['id']}"
+        tenant_str = str(t["tenant_id"]) if t["tenant_id"] else None
+        ctx = {
+            "channel": "email",
+            "template": "task_nudge",
+            "user_id": str(assignee_user_id),
+            "title": t["title"],
+            "due_at": t["due_at"].isoformat(),
+            "login_url": login_url,
+            "nudge_index": nudge_index,
+            "is_final": is_final,
+            "task_id": str(t["id"]),
+        }
+        await self._emit_event(conn, "system", "notification.requested", tenant_str, ctx)
+
+        if is_final and t["tenant_id"]:
+            mgr = await conn.fetchrow(
+                """
+                SELECT id FROM users
+                WHERE tenant_id = $1 AND role = 'tenant_admin' AND is_active = true
+                ORDER BY created_at ASC LIMIT 1
+                """,
+                t["tenant_id"],
+            )
+            if mgr:
+                await self._emit_event(
+                    conn, "system", "notification.requested", tenant_str,
+                    {
+                        "channel": "email",
+                        "template": "task_nudge_manager",
+                        "user_id": str(mgr["id"]),
+                        "title": t["title"],
+                        "due_at": t["due_at"].isoformat(),
+                        "login_url": login_url,
+                        "task_id": str(t["id"]),
+                    },
+                )
 
     async def resume_instance(
         self,
