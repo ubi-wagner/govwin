@@ -103,6 +103,7 @@ class WorkflowManager:
         self._running_instances: dict[str, str] = {}  # instance_id → workflow_name
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._stuck_detection_task: asyncio.Task[None] | None = None
+        self._last_anchor_sweep: datetime | None = None  # J2 date-anchor gate
 
     async def start(self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None) -> None:
         """Start the manager's background tasks.
@@ -1126,6 +1127,88 @@ class WorkflowManager:
                     },
                 )
 
+    async def _sweep_date_anchored_tasks(self, conn: asyncpg.Connection) -> int:
+        """Materialize date-ANCHORED tasks from a proposal's deadline (J2).
+
+        The nudge sweep reacts to a task's due_at; THIS generates the task in the
+        first place from a calendar anchor — the opportunity close_date (the RFP
+        deadline). For each active proposal with a future deadline that has no
+        'final_due' task yet, create one due at close_date, escalating [7,3,1] days
+        out, assigned to the tenant's manager (so the W-N/O email nudges them).
+        Idempotent via NOT EXISTS (one final_due per proposal, ever — it is not
+        regenerated after submission). Gated to ~hourly by the caller.
+
+        This is a date-anchored GENERATOR (a sweep), deliberately not a generic
+        engine ScheduleTrigger — the value is the dated tasks, and the sweep fits
+        the existing loop without a cron-matching layer in the processor.
+        """
+        created = 0
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT p.id, p.tenant_id, p.title, o.close_date,
+                       (SELECT u.id FROM users u
+                          WHERE u.tenant_id = p.tenant_id AND u.role = 'tenant_admin'
+                            AND u.is_active = true
+                          ORDER BY u.created_at ASC LIMIT 1) AS manager_id
+                FROM proposals p
+                JOIN opportunities o ON o.id = p.opportunity_id
+                WHERE p.stage NOT IN ('submitted', 'archived')
+                  AND o.close_date IS NOT NULL
+                  AND o.close_date > now()
+                  AND NOT EXISTS (
+                      SELECT 1 FROM tasks t
+                      WHERE t.entity_type = 'proposal' AND t.entity_id = p.id
+                        AND t.task_type = 'final_due'
+                  )
+                LIMIT 500
+                """
+            )
+        except Exception as e:
+            logger.error("[_sweep_date_anchored_tasks] query failed: %s", e)
+            return 0
+
+        for r in rows:
+            try:
+                task_id = str(uuid.uuid4())
+                await conn.execute(
+                    """
+                    INSERT INTO tasks (
+                        id, tenant_id, assignee_role, assignee_user_id, task_type, title,
+                        entity_type, entity_id, status, due_at, nudge_schedule, params
+                    ) VALUES (
+                        $1, $2, $3, $4, 'final_due', $5, 'proposal', $6, 'open', $7,
+                        '[7,3,1]'::jsonb, $8::jsonb
+                    )
+                    """,
+                    uuid.UUID(task_id),
+                    r["tenant_id"],
+                    None if r["manager_id"] else "tenant_admin",
+                    r["manager_id"],
+                    f"Final submission due: {r['title']}"[:500],
+                    r["id"],
+                    r["close_date"],
+                    json.dumps({"anchor": "final_due", "generated": True}),
+                )
+                await self._emit_event(
+                    conn, "system", "task.created",
+                    str(r["tenant_id"]) if r["tenant_id"] else None,
+                    {
+                        "task_id": task_id,
+                        "task_type": "final_due",
+                        "entity_type": "proposal",
+                        "entity_id": str(r["id"]),
+                        "anchor": "final_due",
+                        "due_at": r["close_date"].isoformat(),
+                    },
+                )
+                created += 1
+            except Exception as e:
+                logger.error("[_sweep_date_anchored_tasks] insert failed for proposal %s: %s", r["id"], e)
+        if created:
+            logger.info("[_sweep_date_anchored_tasks] generated %d final_due task(s)", created)
+        return created
+
     async def resume_instance(
         self,
         conn: asyncpg.Connection,
@@ -1423,6 +1506,21 @@ class WorkflowManager:
                         await self._sweep_task_nudges(nudge_conn)
                 else:
                     await self._sweep_task_nudges(conn)
+
+                # Generate date-ANCHORED tasks from proposal deadlines (J2), at most
+                # ~hourly (it scans proposals, not the hot per-minute path; idempotent
+                # via NOT EXISTS so the cadence only bounds the scan cost).
+                _now = datetime.now(timezone.utc)
+                if self._last_anchor_sweep is None or (_now - self._last_anchor_sweep) > timedelta(hours=1):
+                    self._last_anchor_sweep = _now
+                    try:
+                        if pool:
+                            async with pool.acquire() as anchor_conn:
+                                await self._sweep_date_anchored_tasks(anchor_conn)
+                        else:
+                            await self._sweep_date_anchored_tasks(conn)
+                    except Exception as anchor_err:
+                        logger.error("[anchor_sweep] failed: %s", anchor_err)
 
                 # Check for stale heartbeats on running instances
                 if pool:
