@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { WorkflowMonitorClient } from './workflow-monitor-client';
 import { LaunchContentClient } from './launch-content-client';
+import { LaunchCollaborationClient } from './launch-collaboration-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -212,6 +213,7 @@ export default async function WorkflowMonitorPage() {
         </div>
       </div>
       <LaunchContentClient />
+      <LaunchCollaborationClient />
       <WorkflowMonitorClient
         active={active}
         recent={recent}

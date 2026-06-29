@@ -33,6 +33,11 @@ export function AssignTaskForm({
   const [description, setDescription] = useState('');
   // assignee select value: 'role:tenant_user' | 'role:partner_user' | 'user:<id>'
   const [assignee, setAssignee] = useState('role:tenant_user');
+  // how the assignee completes it (W-M typed completer): a plain review
+  // (approve/dismiss), an upload (go do it then mark done), or a small form.
+  const [completion, setCompletion] = useState<'review' | 'upload' | 'form'>('review');
+  // for completion='form': comma-separated field names → params.spec.fields.
+  const [formFieldsRaw, setFormFieldsRaw] = useState('');
   const [dueAt, setDueAt] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -45,6 +50,24 @@ export function AssignTaskForm({
       return;
     }
     const [kind, value] = assignee.split(':');
+    // Map the completion choice to the task's params.kind (the queue renders the
+    // matching completer). 'review' is the default — send no params so the task
+    // uses the plain approve/dismiss completer.
+    let params: Record<string, unknown> | undefined;
+    if (completion === 'upload') {
+      params = { kind: 'upload' };
+    } else if (completion === 'form') {
+      const fields = formFieldsRaw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => ({ name, label: name }));
+      if (fields.length === 0) {
+        setMsg({ kind: 'err', text: 'Add at least one field name for a form task.' });
+        return;
+      }
+      params = { kind: 'form', spec: { fields } };
+    }
     const body: Record<string, unknown> = {
       taskType: 'delegated_task',
       title: title.trim(),
@@ -55,6 +78,7 @@ export function AssignTaskForm({
       entityId,
       dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
       nudgeDays: [1, 3],
+      ...(params ? { params } : {}),
     };
     setBusy(true);
     try {
@@ -72,6 +96,8 @@ export function AssignTaskForm({
       setTitle('');
       setDescription('');
       setDueAt('');
+      setCompletion('review');
+      setFormFieldsRaw('');
       onAssigned?.();
     } catch {
       setMsg({ kind: 'err', text: 'Network error — please try again.' });
@@ -102,7 +128,7 @@ export function AssignTaskForm({
           maxLength={2000}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Assign to</label>
           <select
@@ -121,6 +147,18 @@ export function AssignTaskForm({
           </select>
         </div>
         <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Completion</label>
+          <select
+            value={completion}
+            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form')}
+            className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white"
+          >
+            <option value="review">Review &amp; approve</option>
+            <option value="upload">Upload a file</option>
+            <option value="form">Fill a form</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Due (optional)</label>
           <input
             type="date"
@@ -130,6 +168,20 @@ export function AssignTaskForm({
           />
         </div>
       </div>
+      {completion === 'form' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Form fields <span className="text-gray-400">(comma-separated)</span>
+          </label>
+          <input
+            value={formFieldsRaw}
+            onChange={(e) => setFormFieldsRaw(e.target.value)}
+            placeholder="e.g. Past performance ref, Contract value, POC email"
+            className="w-full border border-gray-300 rounded px-2 py-1.5"
+            maxLength={500}
+          />
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button
           type="submit"
