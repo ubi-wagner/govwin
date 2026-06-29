@@ -309,7 +309,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${topic.solicitationId},
           ${proposalTitle},
           'draft',
-          ${JSON.stringify(gateConfig)}::jsonb,
+          ${sql.json(gateConfig)},
           true,
           ${sql.json(originCard)},
           ${topBucket?.bucket ?? null}

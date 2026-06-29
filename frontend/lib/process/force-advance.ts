@@ -16,6 +16,7 @@
  * Keep the two in sync — see pipeline/tests/test_force_advance.py.
  */
 import { sql } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 import { canForceAdvanceInstance, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 
@@ -85,8 +86,11 @@ export async function forceAdvanceProcess(opts: {
   }
 
   const currentStep = inst.currentStep;
-  const stepStatus: Record<string, string> = { ...(inst.stepStatus ?? {}) };
-  const stepResults: Record<string, unknown> = { ...(inst.stepResults ?? {}) };
+  // step_status/step_results are written by the Python pipeline (json.dumps::jsonb)
+  // → they read back as STRINGS; spreading a string yields a char-indexed object
+  // and permanently corrupts the real step state. Coerce before spread.
+  const stepStatus: Record<string, string> = { ...coerceJsonb<Record<string, string>>(inst.stepStatus, {}) };
+  const stepResults: Record<string, unknown> = { ...coerceJsonb<Record<string, unknown>>(inst.stepResults, {}) };
   if (currentStep) {
     stepStatus[currentStep] = 'completed';
     stepResults[currentStep] = {

@@ -7,6 +7,7 @@ import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/
 import { sendEmail } from '@/lib/email';
 import { collaboratorInviteEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
+import { coerceJsonb } from '@/lib/jsonb';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -317,7 +318,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
 
       // Create stage access for current stage
-      const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+      const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
       for (const stage of gates) {
         await tx`
           INSERT INTO collaborator_stage_access (
