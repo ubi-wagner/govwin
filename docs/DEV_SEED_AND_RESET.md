@@ -21,17 +21,16 @@ logins verified via the app's `bcryptjs.compare`.
 
 | Email | Role | Tenant | Password (DEV) |
 |---|---|---|---|
-| `eric@rfppipeline.com` | `master_admin` | — | `RFPAdmin` ⚠️ |
+| `eric@rfppipeline.com` | `master_admin` | — | `RFPAdmin2026!` |
 | `eric@lighthouse.com` | `tenant_admin` | Lighthouse (`grinder` tier, active) | `LighthouseAdmin` |
 | `eric@ubihere.com` | `tenant_admin` | Ubihere (`grinder` tier, active) | `UbihereAdmin` |
 
 Preserved (not seeded by this script, kept across a reset): `eric.c.wagner@gmail.com`
 (`master_admin`, password `TestAdmin2026!` from migration 041).
 
-- ⚠️ **`RFPAdmin` is 8 chars.** Login does **not** enforce length, so it works — but the
-  *change-password* form requires **≥12 chars**, so you can't later re-set it to `RFPAdmin`.
-  Override at seed time if you prefer: `RFP_ADMIN_PW='RFPAdmin2026!' …` (also `LIGHTHOUSE_PW`,
-  `UBIHERE_PW`). `LighthouseAdmin` (15) and `UbihereAdmin` (12) already meet the minimum.
+- `RFPAdmin2026!` (13 chars) satisfies both login and the ≥12-char change-password form.
+  `LighthouseAdmin` (15) and `UbihereAdmin` (12) also meet the minimum. Override any at seed time:
+  `RFP_ADMIN_PW=… LIGHTHOUSE_PW=… UBIHERE_PW=… node scripts/seed_dev_accounts.mjs`.
 - All three are seeded with `temp_password=false`, so there's **no forced password-change wall** —
   they log in straight to the portal/admin.
 - `@lighthouse.com` / `@ubihere.com` are **fake inboxes** (no mail delivered). `@rfppipeline.com`

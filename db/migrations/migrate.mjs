@@ -41,19 +41,26 @@ async function run() {
   let skipped = 0;
 
   for (const file of files) {
-    // Skip destructive migrations in production
-    if (file === '000_drop_all.sql' && process.env.ALLOW_SCHEMA_RESET !== 'true') {
+    const isReset = file === '000_drop_all.sql';
+
+    // The destructive reset runs ONLY behind the flag — skipped on normal deploys.
+    if (isReset && process.env.ALLOW_SCHEMA_RESET !== 'true') {
       skipped++;
       continue;
     }
 
-    // Check if already applied
-    const [row] = await sql`
-      SELECT filename FROM _migration_history WHERE filename = ${file}
-    `;
-    if (row) {
-      skipped++;
-      continue;
+    // Normal migrations are applied once (tracked). The reset is NOT subject to the
+    // already-applied check: when the flag is set it must run EVERY time (it IS the
+    // wipe, and it recreates _migration_history empty), or a second reset would be a
+    // no-op because 000 is recorded from the first one.
+    if (!isReset) {
+      const [row] = await sql`
+        SELECT filename FROM _migration_history WHERE filename = ${file}
+      `;
+      if (row) {
+        skipped++;
+        continue;
+      }
     }
 
     // Read and execute
