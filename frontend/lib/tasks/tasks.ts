@@ -11,7 +11,8 @@
  */
 import { sql } from '@/lib/db';
 import { forceAdvanceProcess } from '@/lib/process/force-advance';
-import { hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export interface TaskRow {
   id: string;
@@ -115,6 +116,118 @@ export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
     ORDER BY due_at ASC NULLS LAST, created_at ASC
     LIMIT ${limit}
   `;
+}
+
+export type CreateTaskResult =
+  | { ok: true; data: { taskId: string } }
+  | { ok: false; status: number; error: string; code: string };
+
+/**
+ * Human task delegation (J1) — assign a contributor a job. The counterpart to the
+ * engine's _create_task: same `tasks` ledger, but `process_instance_id` is NULL
+ * (no parked workflow), so completeTask closes it without a resume. Surfaces in
+ * the assignee's queue + gets nudged by the same sweep. Emits proposal:task.assigned.
+ *
+ * Authorization is the caller's job (route: tenant_user+). This core enforces the
+ * data invariants: an assignee (role bucket and/or a specific user), and — when a
+ * specific user is named — that the user is active and in the TASK's tenant
+ * (no cross-tenant assignment). Admin tasks (tenantId=null) assign to admin users.
+ */
+export async function createTask(opts: {
+  actor: { id: string; email: string | null; role: Role; tenantId: string | null };
+  tenantId: string | null;
+  assigneeRole?: string | null;
+  assigneeUserId?: string | null;
+  taskType: string;
+  title: string;
+  description?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  dueAt?: string | null;
+  nudgeDays?: number[];
+  params?: Record<string, unknown>;
+}): Promise<CreateTaskResult> {
+  const { actor, tenantId } = opts;
+  const taskType = opts.taskType?.trim();
+  const title = opts.title?.trim();
+  const assigneeRole = opts.assigneeRole?.trim() || null;
+  const assigneeUserId = opts.assigneeUserId?.trim() || null;
+
+  // ── invariants ──
+  if (!taskType) return { ok: false, status: 400, error: 'taskType is required', code: 'VALIDATION_ERROR' };
+  if (!title) return { ok: false, status: 400, error: 'title is required', code: 'VALIDATION_ERROR' };
+  if (!assigneeRole && !assigneeUserId) {
+    return { ok: false, status: 400, error: 'an assignee role or user is required', code: 'VALIDATION_ERROR' };
+  }
+  if (assigneeRole && !isRole(assigneeRole)) {
+    return { ok: false, status: 400, error: 'invalid assignee role', code: 'VALIDATION_ERROR' };
+  }
+  let dueAtIso: string | null = null;
+  if (opts.dueAt) {
+    const d = new Date(opts.dueAt);
+    if (isNaN(d.getTime())) return { ok: false, status: 400, error: 'invalid dueAt', code: 'VALIDATION_ERROR' };
+    dueAtIso = d.toISOString();
+  }
+  const nudgeDays = Array.isArray(opts.nudgeDays)
+    ? opts.nudgeDays.filter((n) => typeof n === 'number' && Number.isFinite(n) && n > 0)
+    : [];
+
+  // ── same-tenant assignee guard (a named user must belong to the task tenant) ──
+  if (assigneeUserId) {
+    let member: { id: string }[];
+    try {
+      member = await sql<{ id: string }[]>`
+        SELECT id FROM users
+        WHERE id = ${assigneeUserId}::uuid
+          AND is_active = true
+          AND tenant_id IS NOT DISTINCT FROM ${tenantId}::uuid
+      `;
+    } catch (e) {
+      console.error('[tasks] createTask assignee lookup failed:', e);
+      return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+    }
+    if (member.length === 0) {
+      return { ok: false, status: 400, error: 'assignee is not an active member of this tenant', code: 'VALIDATION_ERROR' };
+    }
+  }
+
+  // ── insert (process_instance_id / step_name stay NULL — a human task) ──
+  let inserted: { id: string }[];
+  try {
+    inserted = await sql<{ id: string }[]>`
+      INSERT INTO tasks (
+        tenant_id, assignee_role, assignee_user_id, task_type, title, description,
+        entity_type, entity_id, status, due_at, nudge_schedule, params
+      ) VALUES (
+        ${tenantId}::uuid, ${assigneeRole}, ${assigneeUserId}::uuid, ${taskType}, ${title},
+        ${opts.description?.trim() || null}, ${opts.entityType?.trim() || null},
+        ${opts.entityId?.trim() || null}::uuid, 'open', ${dueAtIso}::timestamptz,
+        ${JSON.stringify(nudgeDays)}::jsonb, ${sql.json((opts.params ?? {}) as Parameters<typeof sql.json>[0])}
+      )
+      RETURNING id
+    `;
+  } catch (e) {
+    console.error('[tasks] createTask insert failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
+  const taskId = inserted[0].id;
+
+  // ── emit proposal:task.assigned (best-effort) ──
+  await emitEventSingle({
+    namespace: 'proposal',
+    type: 'task.assigned',
+    actor: userActor(actor.id, actor.email ?? undefined),
+    tenantId,
+    payload: {
+      taskId, taskType, title, assigneeRole, assigneeUserId,
+      entityType: opts.entityType?.trim() || null,
+      entityId: opts.entityId?.trim() || null,
+      assignedBy: actor.id,
+      dueAt: dueAtIso,
+    },
+  });
+
+  return { ok: true, data: { taskId } };
 }
 
 export type CompleteTaskResult =

@@ -6,6 +6,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
+import { AssignTaskForm } from '@/components/tasks/assign-task-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -479,6 +480,23 @@ export default async function ProposalWorkspacePage({ params }: Props) {
           </summary>
           <div className="mt-3 max-w-2xl">
             <OpportunityCard card={cardView} />
+          </div>
+        </details>
+      )}
+
+      {/* ── Delegate a task (managers) ────────────────────────────────── */}
+      {access.canManageTeam && (
+        <details className="mb-6 group">
+          <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900 select-none">
+            Assign a task
+          </summary>
+          <div className="mt-3 max-w-2xl border border-gray-200 rounded-lg p-4 bg-white">
+            <AssignTaskForm
+              tenantSlug={tenantSlug}
+              entityType="proposal"
+              entityId={proposalId}
+              assignees={collaboratorsWithAccess.map((c) => ({ userId: c.userId, name: c.name, email: c.email }))}
+            />
           </div>
         </details>
       )}
