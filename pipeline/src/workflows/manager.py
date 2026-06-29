@@ -1207,6 +1207,27 @@ class WorkflowManager:
                 logger.error("[_sweep_date_anchored_tasks] insert failed for proposal %s: %s", r["id"], e)
         if created:
             logger.info("[_sweep_date_anchored_tasks] generated %d final_due task(s)", created)
+
+        # W-P: expire HUMAN tasks long past their deadline (the +30d past-due anchor)
+        # so the queue self-cleans and nudges stop. Only process_instance_id IS NULL
+        # (human/anchor) tasks — a workflow-parked task must be reaped by the INSTANCE
+        # deadline sweep (resume path), not orphaned by expiring its task here.
+        try:
+            tag = await conn.execute(
+                """
+                UPDATE tasks SET status = 'expired', updated_at = now()
+                WHERE status IN ('open', 'in_progress')
+                  AND process_instance_id IS NULL
+                  AND due_at IS NOT NULL
+                  AND due_at < now() - interval '30 days'
+                """
+            )
+            n_expired = int(tag.split()[-1]) if tag and tag.startswith("UPDATE") else 0
+            if n_expired:
+                logger.info("[_sweep_date_anchored_tasks] expired %d past-due human task(s)", n_expired)
+        except Exception as e:
+            logger.error("[_sweep_date_anchored_tasks] expiry pass failed: %s", e)
+
         return created
 
     async def resume_instance(
