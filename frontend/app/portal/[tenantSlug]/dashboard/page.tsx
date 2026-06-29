@@ -185,7 +185,7 @@ export default async function DashboardPage({
 
       {/* To-Do queue + in-app deadline nudges (reads the unified tasks ledger) */}
       <div className="mt-6">
-        <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} />
+        <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
       </div>
 
       {/* Get Started checklist */}
