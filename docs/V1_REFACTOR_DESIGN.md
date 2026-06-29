@@ -1,5 +1,21 @@
 # V1 Orchestration Spine — Corrected Design (post 3-factor review)
 
+> ## BUILD STATUS (2026-06-29) — R-track delivered end-to-end (13 commits, branch `claude/nice-hamilton-kBqtD`)
+> Every increment 3-factor validated (unit/route · live-PG drive on a real PG · independent adversarial review).
+> Migration chain 001→091 applies clean; frontend suite + pipeline workflow/task suite green.
+>
+> | Track | What shipped | 
+> |---|---|
+> | **R0** spine | `opportunity_id`+`scope` key on `process_instances` (mig 088) · `v_opportunity_rollup` (domain tables) · `proposals.origin_card` freeze (mig 089) + `getProposalCard` read-model · `/admin/opportunities` |
+> | **R3** template+bridges | generic `ProjectCollaboration` reaction (overlay-driven HITL gate) · `create_instance` keys the spine · `launchProjectCollaboration` canonical launcher · create-route + Stripe-webhook bridges (**phantom retired, purchase.completed orphan closed**) |
+> | **R4** card UI | `Tabs` primitive · `OpportunityCard` (frozen origin / live compliance) on the workspace |
+> | **R5** automation | J1 delegation (`createTask`+assign) · W-N/O nudge→login-email + manager escalation + `/go` landing · J2 date-anchored generation · W-M typed completers · W-Q pin→nudge · W-P past-due expiry · E5 `publish_section_draft` landing primitive |
+> | **R6** V2 | `contracts` table (mig 091) keyed by `opportunity_id` · win → seed contract + contract-scope kickoff gate |
+>
+> **Pre-existing bugs caught by the live-PG factor + fixed:** P1 `create_instance` ON CONFLICT vs the partial dedup index (every launch threw on a fresh deploy) · `_create_task` literal-path corruption · R0.3 jsonb-string read nuance (gap report §K).
+>
+> **Two large features remain (each warrants its own focused effort — see end of §4):** the 3-source AI **generation** (the `section_drafter`/`proposal_architect` workforce, "built but not yet wired" — it lands via the shipped `publish_section_draft`); and **E13 document-level access control** (an ACL subsystem that needs the access-model decisions — the Expert shadow-identity + per-document grants).
+
 **This supersedes the R1/R2 status-cutover draft.** A 3-factor adversarial design review (soundness ·
 migration-safety · best-vs-simpler) **converged unanimously**: *do not make a workflow instance own
 status.* The proposal already owns its status correctly (OCC `version`, the all-locked gate,
