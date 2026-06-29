@@ -61,7 +61,7 @@ export async function listOpenTasksForActor(opts: {
                status, due_at, nudge_schedule, params, created_at
         FROM tasks
         WHERE status IN ('open', 'in_progress')
-          AND (assignee_role = ${role} OR assignee_user_id = ${userId}::uuid)
+          AND (assignee_role IN ('rfp_admin', 'master_admin') OR assignee_user_id = ${userId}::uuid)
           AND (tenant_id IS NULL
                OR ${tenantId}::uuid IS NULL
                OR tenant_id = ${tenantId}::uuid)

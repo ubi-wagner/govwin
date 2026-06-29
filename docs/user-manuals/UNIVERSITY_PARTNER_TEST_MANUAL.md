@@ -10,19 +10,17 @@
 
 ---
 
-## 0. Accept the invite & sign in ⭐ (read this — there's a gotcha)
+## 0. Accept the invite & sign in
 
-Your access only "activates" after you **set a password via the acceptance page**. Until then the workspace will 404 for you.
-
-**Recommended path — the acceptance page:**
-1. Open **`/invite/<your-collaborator-id>`** (the acceptance page; the admin can give you this link).
+You receive an **invite email** ("You've been invited to collaborate on …").
+1. Click the email's **"Accept Invitation"** button → it opens the acceptance page **`/invite/<your-collaborator-id>`**.
    - ✅ Verify it shows who invited you, the proposal title, and the company.
-2. Enter **Password** + **Confirm** (⚠️ **use ≥12 characters** — the page hints "8" but the server requires **12**, so 8–11 will fail) → **"Set Password & Accept"**.
+2. Enter **Password** + **Confirm** — **use at least 12 characters** — → **"Set Password & Accept"**.
 3. ✅ **Verify:** you're taken **straight into the proposal workspace** (`/portal/<slug>/proposals/<proposalId>`).
+   - This step is what activates your access (it records your acceptance). Until you complete it, the workspace would show "Not found".
+4. After onboarding, normal sign-in is **`/login`** with the password you set → you land on your **Proposals** list.
 
-⚠️ **Known onboarding issue:** the invite email's **"Open Proposal"** button links to **`/login`** (sign in with your email + temp password). That path makes a valid session and sends you to your Proposals list, **but your access isn't activated** (the workspace shows "Not found" and your Proposals list is empty) until you've completed the `/invite/<token>` step above. If you get a blank/"Not found" proposal after using the email button, finish onboarding via `/invite/<your-collaborator-id>`, or ask the admin to send that link.
-
-After onboarding, normal sign-in is **`/login`** → you land on your **Proposals** list (`/portal/<slug>/proposals`).
+> If you were **already** a GovWin user (you have an existing account), the invite email instead shows an **"Open Proposal"** button — your access is granted immediately, just sign in and open it.
 
 ---
 
@@ -95,7 +93,7 @@ Your granted sections are grouped by permission:
 ---
 
 ## 5. Known issues to expect (so they aren't logged as new bugs)
-1. ⚠️ **Invite email → `/login` doesn't activate access** — use `/invite/<collaborator-id>` (sets `accepted_at`). Until then the workspace 404s.
-2. ⚠️ **Invite-page password hint mismatch** — page says "8", server requires **12**; use ≥12.
-3. ⚠️ **AI tools render but 403 for partners** — not wired for external collaborators.
-4. ⚠️ **Save not greyed out on comment/view sections** — it fails server-side instead of being disabled.
+1. ⚠️ **AI tools render but 403 for partners** — the AI Revision / "Replace with library content" panel appears but the action is rejected (not wired for external collaborators).
+2. ⚠️ **Save isn't greyed out on comment/view sections** — clicking it fails server-side with a permission error instead of the button being disabled. Use **Comments** on those sections.
+
+> Fixed in this release (previously broken): the invite email now routes new partners to the **Accept Invitation** page (so access activates correctly — no more 404), and the acceptance page now requires the same **12-character** minimum as the server.

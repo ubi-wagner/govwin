@@ -114,7 +114,7 @@ On the **Stage/Gate bar**:
 1. In a proposal's Admin Panel → **Team & Access** → **"+ Invite"** ("Invite Collaborator").
 2. Fill **Email address**, **Full name**, **Role** (**Contributor** or **External** — choose **External** for a university partner), **Permission** (**View only** / **Comment** / **Edit**), and toggle **"Assign to sections:"** chips → **"Send Invite"**.
 3. ✅ **Verify:** the collaborator appears in the roster and the **Access Matrix** (sections × people, E/C/V/—).
-   - ⚠️ **Onboarding caveat for partners:** the invite email's "Open Proposal" button currently points at `/login`, but a partner's access only activates after they set a password via the **`/invite/<token>`** acceptance page. If a partner "can't see the proposal", have them use the `/invite/<their-collaborator-id>` link. (See the University Partner manual.)
+   - The invited person gets an email: a **new** user sees **"Accept Invitation"** (→ sets a password, ≥12 chars, then lands in the proposal); an **existing** GovWin user is granted immediately and sees **"Open Proposal"**. (See the University Partner manual.)
 4. Remove someone with the **"✕"** (confirm "…access will be revoked immediately").
 
 ---

@@ -92,3 +92,45 @@ agent tool layer both sound; shared `opportunities`/`compliance` have no tenant_
 error-shape (every 4xx/5xx has `error`+`code`) · `await sql` wrapping · NEXT_REDIRECT re-throw ·
 unawaited promises · the spine seams (overlay↔template key mapping, scope/opportunity_id propagation,
 Date/jsonb boundaries, `/go` redirects, event wiring).
+
+---
+
+## E. HITL UI launch-readiness sweep (2026-06-29) + fixes
+
+A dedicated sweep traced every human-in-the-loop touchpoint from pipeline parking → `tasks` ledger
+→ mounted UI → wired API. **Verdict: no hard launch blockers — every HITL task a human must act on
+has a real, mounted, wired resolver.**
+
+**Verified ✅ present + wired:** task queue mounted on BOTH dashboards (portal `…/dashboard` →
+`/api/portal/<slug>/tasks`; admin `/admin/dashboard` → `/api/admin/tasks`), correctly scoped ·
+complete-a-task resumes the parked instance (`completeTask → forceAdvanceProcess`, mirrors the
+pipeline) · delegation `AssignTaskForm` mounted on the proposal workspace (canManageTeam) → assign
+route · force-advance present + paused-only on all THREE ledgers (admin Workflows, admin Process
+Ledger, portal Processes), each posting an audit note (+ Retry/Cancel on the workflow monitor) ·
+stage/lock gates (`stage-control.tsx`: Advance, all-locked + "Force advance anyway", Mark Met/Unmark,
+Unlock/Re-lock) · the 72h `admin_review` gate is reachable in the admin queue · in-app urgency
+("N overdue" sort) + email→`/go?task=` landing. Every TODO-parking workflow lands its task in a
+human's queue with the review completer as a natural resolver.
+
+**Fixed in this pass:**
+- **M1 (real) — `master_admin` couldn't complete pipeline admin tasks from the dashboard queue.**
+  `listOpenTasksForActor` matched `assignee_role = <role>` EXACTLY; all pipeline admin tasks are
+  `rfp_admin`, so a `master_admin` saw them only in the read-only triage-todos panel. Fixed: the admin
+  branch now matches `assignee_role IN ('rfp_admin','master_admin')` (consistent with
+  `listOpenAdminTriageTasks`). Live-verified: a master_admin now sees the `admin_review` task.
+- **Partner onboarding (real) — invite email never granted access.** The collaborator invite email
+  pointed at `/login`, but a partner's access requires `proposal_collaborators.accepted_at`, set only
+  by the `/invite/<token>` page → the invitee hit a 404. Fixed: a NEW collaborator's email now links to
+  `/invite/<collaboratorId>` ("Accept Invitation"); an EXISTING user is auto-accepted at invite time
+  (`accepted_at=now()`) and emailed a direct "Open Proposal" link; the `/invite` page password minimum
+  is aligned to the server's 12 chars. Live-verified (accepted_at set for existing, null for new, the
+  resolver grants).
+
+**Documented, non-blocking (weigh, not launch-gating):**
+- **M2 — upload/form typed completers are latent.** They render + are unit-tested, but no parking
+  workflow sets `tasks.params.kind`, so `taskCompleterKind` always returns `review` → every gate is an
+  Approve/Dismiss. Fine while all current gates are review gates; wire `params.kind` (via the overlay
+  / `createTask`) when a gate genuinely needs an upload or a structured form.
+- **M3 — no UI to launch a `ProjectCollaboration` gate by hand.** The only manual launcher is the CMS
+  content form; ProjectCollaboration (incl. `admin_review`) is launched only by the code bridges. Add a
+  generic launch control if ops need to start a review gate manually.
