@@ -12,6 +12,30 @@
 Schema since this baseline: migrations **072** (agent config), **073** (atom-outcome unique),
 **074** (`proposal_sections` lock columns).
 
+> ### Opportunity Spine addendum (2026-06-29) — migrations 088–092; design in `docs/V1_REFACTOR_DESIGN.md`
+> The **`opportunity_id` spine** is now the canonical orchestration pattern: ONE immutable opportunity
+> keys three forked layers (L0 master opp · L1 per-tenant pipeline item + spotlight scores · L2 per-purchase
+> proposal) and now **V2** (contract). Status stays in each domain (proposals.stage / curated_solicitations.status
+> / pursuit_status); the spine is a KEY + a reaction runtime, not a new state machine.
+> - **Engine (§8):** ONE generic `ProjectCollaboration` reaction template (overlay-parameterized HITL gate,
+>   launched by emitting `proposal:project.collaboration_requested:single` via `launchProjectCollaboration`) —
+>   replaces the bespoke-On*-per-event sprawl. `create_instance` now keys instances to the spine
+>   (`opportunity_id` + `scope`). New sweeps: nudge→login-email + manager escalation (W-N/O), date-anchored
+>   `final_due` generation (J2), past-due expiry (W-P). Human delegation via `createTask` (J1); typed completers
+>   (W-M). Bridges retired the `AdminProposalSetup` PHANTOM + closed the `purchase.completed` orphan.
+> - **Data (§7):** `process_instances += opportunity_id,scope` · `proposals += origin_card (frozen),source_bucket` ·
+>   new **`contracts`** table (V2, keyed by opportunity_id) · `v_opportunity_rollup` (+contracts) · `tasks` now
+>   human/anchor-generated too.
+> - **🔴→✅ pre-existing bugs fixed by the live-PG sweep:** `create_instance` ON CONFLICT vs the partial dedup
+>   index (every launch threw on a fresh deploy); the `gate_config` jsonb-string corruption (broke stage advance +
+>   collaborator access); paused-sweep clobber race; cross-entity HITL resume; managed-path `fabric` drop;
+>   CMS disabled-rule firing. **Full sweep report + remaining P2/P3 + the unfinished-code inventory:
+>   `docs/V1_SWEEP_FINDINGS_2026-06-29.md`.**
+> - **§9 correction:** the AI workforce is no longer "built but not wired" — `AgentFabric` is live and
+>   `color_team_reviewer` runs end-to-end; the other archetypes are 🟦 dormant and the 3-source strawman
+>   generation (behind the shipped `publish_section_draft` landing primitive) is the open AI-integration gap.
+> - Schema now through migration **092**.
+
 ## Status Legend
 
 | Symbol | Meaning |

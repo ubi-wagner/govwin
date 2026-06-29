@@ -3,8 +3,12 @@
 ## Project Overview
 Multi-tenant SaaS platform for government contractors to discover, score, and build
 proposals for federal opportunities (SBIR, STTR, BAA, OTA). Product AI (drafting / compliance /
-review) is live via the frontend; an autonomous pipeline agent workforce is built but not yet
-wired. See ARCHITECTURE_V9.md for the full as-built system design (supersedes V5–V8).
+review) is live via the frontend. The pipeline agent workforce (`AgentFabric`) is wired into the
+live loops but only PARTLY exercised: `color_team_reviewer` runs end-to-end (via `agent_task_queue`);
+the other archetypes are dormant (defined + registered, no producer drives them) and the 3-source
+strawman generation is the open AI-integration gap (the `publish_section_draft` landing primitive
+is shipped, callerless). See ARCHITECTURE_V9.md for the as-built design and docs/V1_REFACTOR_DESIGN.md
+for the opportunity spine (the canonical orchestration pattern — `opportunity_id` keys L0→L1→L2→V2).
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
@@ -43,6 +47,17 @@ the only local volume is CMS media).
 - Portal routes MUST verify tenant access — never query by ID alone
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
+
+## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
+- **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
+  is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
+  On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).
+- **ON CONFLICT vs a PARTIAL unique index:** restate the index `WHERE` predicate in the ON CONFLICT
+  or it throws on every call (`ON CONFLICT (a,b) WHERE b IS NOT NULL DO …`).
+- **counts/bigint:** cast `::int` in SQL (or `Number()`); postgres.js returns int8 as a string.
+- **CHECK columns:** confirm a literal is in the column's CHECK (`\d table`) before writing it.
+- **Workflow status writes:** force-fail a paused instance only with `… WHERE id=$1 AND status='paused'`
+  (compare-and-swap) and expire its sibling task; resume HITL only after entity correlation.
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
