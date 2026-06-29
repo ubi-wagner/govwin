@@ -21,10 +21,10 @@ A dedicated sweep confirmed **every human-in-the-loop interaction has a real, mo
 task queues on both dashboards (see + complete → resume the workflow), delegation (Assign a task),
 force-advance on all three process ledgers, the stage/lock gates, in-app nudges + the `/go` email
 landing, and the 72h `admin_review` gate (reachable in the admin queue). **No hard launch blockers.**
-Two non-blocking notes remain: the upload/form **typed completers are latent** (no current gate sets
-`params.kind`, so every gate uses the review Approve/Dismiss completer), and there's **no UI to launch
-a `ProjectCollaboration` gate by hand** (the bridges launch it programmatically). See §HITL in
-`../V1_SWEEP_FINDINGS_2026-06-29.md`.
+The two previously-open notes are now closed: the **typed completers are exercised** (the "Assign a
+task" form picks Review / Upload / Form, setting `params.kind`), and ops can **launch a
+`ProjectCollaboration` review gate by hand** from the admin **Launch Review Gate** form. See §HITL in
+`../V1_SWEEP_FINDINGS_2026-06-29.md` and the full picture in `../V1_END_TO_END_AUTOMATION.md`.
 
 ### Fixed in this release (previously test-affecting)
 - **Partner onboarding** — the invite email now routes a **new** collaborator to the `/invite/<token>`

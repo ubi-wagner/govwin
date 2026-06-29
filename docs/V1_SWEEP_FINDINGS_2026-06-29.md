@@ -20,34 +20,44 @@ live-reproduced), not speculative.
 | **P3** | `proposals.stage` DEFAULT `'outline'` not in its CHECK (latent) · duplicate `canvas_versions` index · `fabric` agent_task_log audit link always null · dead `error_json` read | mig 092 default→`'draft'` + drop dup; fabric/listener cleanups |
 | **LOW** | `/admin/opportunities` never read the `contracts` rollup count (V2 arc invisible) | surfaced it (`::int`) |
 
-## B. Confirmed findings NOT yet fixed (tracked — P2/P3, lower impact)
+## B. P2/P3 backlog — **RESOLVED 2026-06-29** (commits on `claude/nice-hamilton-kBqtD`)
 
-- **BC4 · P2/P3 — `::uuid` cast without shape validation → 500 instead of 400.** ~8 sites:
-  `portal/.../library/[unitId]` (authorize, widest), `opportunities`/`library` bulk
-  `ANY($ids::uuid[])`, `actions`/`reviews`/`ai/compliance` body `sectionId`,
-  `rfp-upload`/`upload-topic-files` `solicitationId`, `compliance`. All inside try/catch
-  (no crash) → a client error surfaces as a server error. Fix: `isValidUUID` guard → 400.
-- **P3 — more jsonb-string read-as-object (client-contract, not corruption):** GET routes
-  return a STRING where the client expects an object — `gates.evidence`, `outline`,
-  automation `action_config`; and `workflows/[id]/retry` + `templates` "save as new"
-  DOUBLE-encode on clone. Fix: `sql.json()` on those writes (or `coerceJsonb` on read).
-- **P2 — check-then-act races (CLASS D):** `applications/[id]/accept` slug + email
-  SELECT→INSERT races (unique_violation → generic 500); `proposals/create` duplicate
-  guard is racy — no DB unique on `(tenant_id, opportunity_id)` (mig 092 added a
-  non-unique index; a unique constraint needs a dedupe pass first). `rfp-upload`/
-  `upload-topic-files` content-hash dedup TOCTOU (500 instead of clean 409). Fix:
-  `ON CONFLICT … WHERE <partial predicate>` (restate the predicate).
-- **P2 — pipeline poll robustness:** the "never trigger on a FAILED op" guard is dead
-  (`processor` poll doesn't SELECT `system_events.error`; `emit_end` writes error into
-  payload, not the column) → failed `:end` events can spawn junk instances; high-water-mark
-  uses strict `>` on `created_at` → events sharing a timestamp (same-tx multi-emit) can be
-  skipped. Fix: select `error` in the poll + write the column; `>=` + the existing dedup set.
-- **INFO — type drift:** `frontend/types/index.ts ProposalStage` lists `outline`/`pink_team`/
-  `red_team`/`gold_team` (rejected by the DB CHECK) and omits `review` — the type lies about
-  the column. `formatCurrency(amount: number)` actually receives a NUMERIC-as-string.
-  `notify_done` reads `payload.tenantId` which the launcher never puts in the overlay (always
-  null; cosmetic). `system_events_namespace_chk` is `NOT VALID` — `VALIDATE` it once prod
-  data is confirmed clean.
+All five were knocked out in the follow-on pass (tsc clean · 576 frontend + 557 pipeline tests
+green · the jsonb mechanism + the failed-op gate live-verified on Postgres):
+
+- **BC4 — `::uuid` shape guards → 400 not 500. ✅ FIXED (10 routes).** `isValidUUID` guards added:
+  `library/[unitId]` (in `authorize()`, covers all methods), `opportunities`/`library` bulk
+  `ANY($ids::uuid[])` (`.every(isValidUUID)`), `opportunities/[id]/actions`, `reviews` (GET+POST),
+  `ai/compliance` (`proposalId` + body `sectionId`), `compliance`, `rfp-upload`/`upload-topic-files`
+  `solicitationId`, and the `library/atomize` `fileIds` filter. Each returns `VALIDATION_ERROR` 400.
+- **Client-contract jsonb double-encode → `sql.json()`. ✅ FIXED.** `gates.evidence`, `outline`
+  (UPDATE+INSERT), automation `action_config` (PATCH+INSERT), `compliance_presets`
+  (`compliance_data`/`volumes_data`), `templates` create + clone, `templates/[id]` PATCH
+  (COALESCE-preserving `sql.json|null` pattern), and `workflows/[id]/retry`
+  (`sql.json(coerceJsonb(...))`). **Empirically confirmed** on real Postgres:
+  `${JSON.stringify(x)}::jsonb` round-trips as a STRING; `${sql.json(x)}` as an object.
+- **Check-then-act races → `ON CONFLICT`. ✅ FIXED (3 of 4).** `applications/[id]/accept`
+  (slug via `ON CONFLICT (slug)` suffix-bump loop; user via `ON CONFLICT (email) DO UPDATE`);
+  `rfp-upload` (conflict → clean 409) and `upload-topic-files` (conflict → silent skip), both
+  restating the partial predicate `WHERE content_hash IS NOT NULL`. **Deferred:** `proposals/create`
+  `(tenant_id, opportunity_id)` — needs a product decision (re-pursue after a loss?) + a dedupe
+  pass before a unique index; the single-request path already returns a clean 409 (see §B-deferred).
+- **Pipeline poll robustness. ✅ FIXED.** The poll SELECTs the `error` JSONB column (present since
+  mig 007) and `emit_end`/`emit_event` write it, so the long-dead "never trigger on a FAILED op"
+  guard (`EventTrigger.matches()` rejects truthy `error` on BOTH the trigger and resume paths) is
+  now armed; high-water-mark switched to `>=` (the `_track_processed` dedup set absorbs the
+  boundary). Live-verified: a failed `end` event sets the column and `matches()` returns False.
+- **`ProposalStage` type drift. ✅ FIXED.** Narrowed to the DB CHECK set
+  `'draft'|'review'|'final'|'submitted'|'archived'` (dropped the legacy color-team literals, added
+  `review`). Zero blast radius (the type had no external importers).
+
+**§B-deferred (1, consciously):** `proposals (tenant_id, opportunity_id)` uniqueness — a DB
+constraint needs a product decision + dedupe first (mig 092 documents the deliberate absence). The
+race yields a rare *silent duplicate* draft, not a 500; the common path returns a clean 409.
+
+**INFO — type drift (residual, cosmetic):** `formatCurrency(amount: number)` actually receives a
+NUMERIC-as-string. `notify_done` reads `payload.tenantId` the launcher never sets (always null).
+`system_events_namespace_chk` is `NOT VALID` — `VALIDATE` once prod data is confirmed clean.
 
 ## C. Unfinished / un-wired code (known gaps — built-but-not-connected)
 
@@ -126,11 +136,13 @@ human's queue with the review completer as a natural resolver.
   is aligned to the server's 12 chars. Live-verified (accepted_at set for existing, null for new, the
   resolver grants).
 
-**Documented, non-blocking (weigh, not launch-gating):**
-- **M2 — upload/form typed completers are latent.** They render + are unit-tested, but no parking
-  workflow sets `tasks.params.kind`, so `taskCompleterKind` always returns `review` → every gate is an
-  Approve/Dismiss. Fine while all current gates are review gates; wire `params.kind` (via the overlay
-  / `createTask`) when a gate genuinely needs an upload or a structured form.
-- **M3 — no UI to launch a `ProjectCollaboration` gate by hand.** The only manual launcher is the CMS
-  content form; ProjectCollaboration (incl. `admin_review`) is launched only by the code bridges. Add a
-  generic launch control if ops need to start a review gate manually.
+**Closed in the follow-on pass (both previously non-blocking):**
+- **M2 — typed completers now exercised. ✅ FIXED.** The delegation form (`AssignTaskForm`) gained a
+  **Completion** selector — Review & approve / Upload a file / Fill a form (comma-separated field
+  names) — that sets `tasks.params.kind` (+ `spec.fields` for a form). `createTask` already persists
+  `params` via `sql.json`; `TaskQueue` already renders the matching completer. Review (default) sends
+  no params → stays the plain approve/dismiss gate.
+- **M3 — manual review-gate launcher. ✅ FIXED.** New `POST /api/admin/workflows/launch-collaboration`
+  (rfp_admin+, routed through the GUARDED `launchProjectCollaboration` helper so a hand-launched gate
+  is always well-formed) + a **"Launch Review Gate"** admin form mounted on `/admin/workflows`. Ops can
+  now start a `ProjectCollaboration` gate by hand for a one-off review no code bridge covers.
