@@ -787,7 +787,9 @@ async def run_workflow_processor(
         if use_manager:
             from workflows.manager import WorkflowManager
             pool = await asyncpg.create_pool(database_url, min_size=2, max_size=4)
-            manager = WorkflowManager(source="pipeline")
+            # Thread fabric so AI_INVOKE steps run on the managed path (previously
+            # dropped → every AI step silently skipped in production).
+            manager = WorkflowManager(source="pipeline", fabric=fabric)
             await manager.start(conn, pool=pool)
             log.info("WorkflowManager enabled — persistent execution with crash recovery")
             # Reflect the discovered .py templates into the process_templates

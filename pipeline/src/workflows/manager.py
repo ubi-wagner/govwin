@@ -93,13 +93,18 @@ logger = logging.getLogger("pipeline.workflows.manager")
 class WorkflowManager:
     """Persistent workflow orchestration with crash recovery."""
 
-    def __init__(self, source: str = "pipeline"):
+    def __init__(self, source: str = "pipeline", fabric: Any = None):
         """Initialize manager.
 
         Args:
             source: 'pipeline' for RFP admin workflows, 'cms' for CMS workflows
+            fabric: the AgentFabric for AI_INVOKE steps. WITHOUT this the managed
+                execution path drops fabric and every AI_INVOKE step silently skips
+                in production (the fire-and-forget fallback had it; the managed path
+                did not). Threaded into _execute_step so AI steps actually run.
         """
         self.source = source
+        self._fabric = fabric
         self._running_instances: dict[str, str] = {}  # instance_id → workflow_name
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._stuck_detection_task: asyncio.Task[None] | None = None
@@ -1339,9 +1344,10 @@ class WorkflowManager:
         from workflows.base import EventTrigger  # local import: avoid cycle at module load
 
         resumed: list[str] = []
+        event_payload = event.get("payload") or {}
         rows = await conn.fetch(
             """
-            SELECT id, workflow_name, current_step FROM process_instances
+            SELECT id, workflow_name, current_step, payload FROM process_instances
             WHERE status = 'paused' AND source = $1
             """,
             self.source,
@@ -1356,12 +1362,47 @@ class WorkflowManager:
             wait_for: Optional[EventTrigger] = getattr(step, "wait_for", None)
             if wait_for is None:
                 continue
-            if wait_for.matches(event):
-                if await self.resume_instance(
-                    conn, str(row["id"]), resume_data={"resumed_by_event": event.get("id")}
-                ):
-                    resumed.append(str(row["id"]))
+            if not wait_for.matches(event):
+                continue
+            # ENTITY CORRELATION: wait_for matches on namespace/type/phase/condition
+            # only, so without this a single 'proposal.advanced'/'user.logged_in'/
+            # 'source_diff.reviewed' would resume EVERY paused gate of that kind —
+            # across proposals, users, even tenants. Resume only when the event is
+            # about the SAME entity as the parked instance.
+            inst_payload = row.get("payload")
+            if isinstance(inst_payload, str):
+                try:
+                    inst_payload = json.loads(inst_payload)
+                except (json.JSONDecodeError, TypeError):
+                    inst_payload = {}
+            if not self._event_correlates(event_payload, inst_payload or {}):
+                continue
+            if await self.resume_instance(
+                conn, str(row["id"]), resume_data={"resumed_by_event": event.get("id")}
+            ):
+                resumed.append(str(row["id"]))
         return resumed
+
+    # Entity keys that disambiguate WHICH parked instance an event belongs to.
+    _CORRELATION_KEYS = (
+        "proposalId", "userId", "sourceId", "opportunityId", "sectionId", "contentId",
+    )
+
+    @classmethod
+    def _event_correlates(cls, event_payload: dict[str, Any], instance_payload: dict[str, Any]) -> bool:
+        """True if the event is about the same entity as the parked instance.
+
+        Require equality on every correlation key present in BOTH payloads. If the
+        two share no correlation key, fall back to True (a workflow that genuinely
+        waits on a non-entity event) — so this only ever TIGHTENS, never loosens.
+        """
+        shared = [
+            k for k in cls._CORRELATION_KEYS
+            if event_payload.get(k) is not None and instance_payload.get(k) is not None
+        ]
+        if not shared:
+            return True
+        return all(event_payload.get(k) == instance_payload.get(k) for k in shared)
 
     @staticmethod
     def _resolve_workflow_class(workflow_name: str):
@@ -1416,7 +1457,11 @@ class WorkflowManager:
         event_dict: dict[str, Any] = {"payload": trigger_payload}
         inputs = resolve_inputs(step.input_map, event_dict, prior_results)
 
-        return await processor_execute_step(conn, step, inputs, trigger_event=event_dict)
+        # Thread fabric so AI_INVOKE steps actually call Claude on the managed path
+        # (when fabric + ANTHROPIC_API_KEY are configured); else it skips as before.
+        return await processor_execute_step(
+            conn, step, inputs, trigger_event=event_dict, fabric=self._fabric
+        )
 
     async def _run_on_timeout(
         self,
@@ -1717,53 +1762,71 @@ class WorkflowManager:
                             conn, pt_row["workflow_name"], pt_row["current_step"],
                             pt_payload or {}, tenant_str, pt_id,
                         )
+                    # COMPARE-AND-SWAP on status='paused': if a human completed the
+                    # task in the SELECT→UPDATE window (resume flipped it to
+                    # 'retrying'), this UPDATE affects 0 rows and we DON'T clobber the
+                    # resume or destroy the completed work. Only on a real fail do we
+                    # expire the sibling task (it can never resume a failed instance —
+                    # the W-P orphan), record the transition, and emit.
                     if pool:
                         async with pool.acquire() as u_conn:
-                            await u_conn.execute(
+                            _tag = await u_conn.execute(
                                 """
                                 UPDATE process_instances
                                 SET status = 'failed',
                                     last_error = 'wait_deadline_exceeded',
                                     last_error_step = $2, completed_at = now()
-                                WHERE id = $1
+                                WHERE id = $1 AND status = 'paused'
                                 """,
                                 pt_row["id"], pt_row["current_step"],
                             )
+                            if _tag.endswith(" 1"):
+                                await u_conn.execute(
+                                    "UPDATE tasks SET status='expired', updated_at=now() "
+                                    "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
+                                    pt_row["id"],
+                                )
+                                await self._record_transition(
+                                    u_conn, pt_id, "paused", "failed",
+                                    actor="cron", reason="wait_deadline_exceeded",
+                                )
+                                await self._emit_event(
+                                    u_conn, "system", "workflow.wait_timed_out", tenant_str,
+                                    {
+                                        "instance_id": pt_id,
+                                        "workflow_name": pt_row["workflow_name"],
+                                        "current_step": pt_row["current_step"],
+                                    },
+                                )
+                    else:
+                        _tag = await conn.execute(
+                            """
+                            UPDATE process_instances
+                            SET status = 'failed',
+                                last_error = 'wait_deadline_exceeded',
+                                last_error_step = $2, completed_at = now()
+                            WHERE id = $1 AND status = 'paused'
+                            """,
+                            pt_row["id"], pt_row["current_step"],
+                        )
+                        if _tag.endswith(" 1"):
+                            await conn.execute(
+                                "UPDATE tasks SET status='expired', updated_at=now() "
+                                "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
+                                pt_row["id"],
+                            )
                             await self._record_transition(
-                                u_conn, pt_id, "paused", "failed",
+                                conn, pt_id, "paused", "failed",
                                 actor="cron", reason="wait_deadline_exceeded",
                             )
                             await self._emit_event(
-                                u_conn, "system", "workflow.wait_timed_out", tenant_str,
+                                conn, "system", "workflow.wait_timed_out", tenant_str,
                                 {
                                     "instance_id": pt_id,
                                     "workflow_name": pt_row["workflow_name"],
                                     "current_step": pt_row["current_step"],
                                 },
                             )
-                    else:
-                        await conn.execute(
-                            """
-                            UPDATE process_instances
-                            SET status = 'failed',
-                                last_error = 'wait_deadline_exceeded',
-                                last_error_step = $2, completed_at = now()
-                            WHERE id = $1
-                            """,
-                            pt_row["id"], pt_row["current_step"],
-                        )
-                        await self._record_transition(
-                            conn, pt_id, "paused", "failed",
-                            actor="cron", reason="wait_deadline_exceeded",
-                        )
-                        await self._emit_event(
-                            conn, "system", "workflow.wait_timed_out", tenant_str,
-                            {
-                                "instance_id": pt_id,
-                                "workflow_name": pt_row["workflow_name"],
-                                "current_step": pt_row["current_step"],
-                            },
-                        )
 
             except asyncio.CancelledError:
                 break
