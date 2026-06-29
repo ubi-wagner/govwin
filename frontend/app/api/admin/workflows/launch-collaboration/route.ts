@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import {
   launchProjectCollaboration,
   type SpineScope,
@@ -79,7 +80,13 @@ export async function POST(request: Request) {
       ? Math.floor(body.dueMinutes)
       : undefined;
     // A tenant-scoped gate carries the tenant; an admin/platform gate is null.
+    // Shape-check here so a bad value from the optional Tenant ID field is a 400,
+    // not a 500 from the system_events.tenant_id uuid/FK cast downstream — keeping
+    // the route's promise that a hand-launched gate is always well-formed.
     const tenantId = str(body.tenantId);
+    if (tenantId && !isValidUUID(tenantId)) {
+      return NextResponse.json({ error: 'Invalid tenantId', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
 
     // launchProjectCollaboration enforces the remaining invariants (required
     // fields present + UUID shape on entityRef/opportunityId/assigneeUser) and

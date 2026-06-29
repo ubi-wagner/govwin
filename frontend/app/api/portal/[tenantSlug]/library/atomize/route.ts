@@ -69,8 +69,18 @@ export async function POST(request: Request, ctx: RouteContext) {
   try {
     const body = await request.json();
     if (Array.isArray(body?.fileIds) && body.fileIds.length > 0) {
-      fileIds = body.fileIds.filter((id: unknown) => typeof id === 'string' && isValidUUID(id));
-      if (fileIds && fileIds.length === 0) fileIds = null;
+      const valid = body.fileIds.filter(
+        (id: unknown) => typeof id === 'string' && isValidUUID(id),
+      ) as string[];
+      if (valid.length === 0) {
+        // The caller scoped to specific ids but none were valid UUIDs — reject
+        // explicitly rather than silently broadening to "atomize ALL pending".
+        return NextResponse.json(
+          { error: 'fileIds contained no valid ids', code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
+      }
+      fileIds = valid;
     }
   } catch {
     // No body or invalid JSON — atomize all pending (backwards compatible)
