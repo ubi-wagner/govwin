@@ -106,6 +106,8 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 2. Click **"Approve / Done"**. ✅ Verify the task disappears (the review gate is resolved).
 3. To actually **unlock the workspace for the customer**, act as a tenant admin in the customer portal: open the proposal → at the **final** stage use **"Unlock for Edit"** (the portal lock route). ⚠️ First unlock grants the customer a **7-day** edit window; after the RFP close date or ≥2 locks, **only rfp_admin/master_admin** can unlock.
 
+> 💡 This gate is launched **automatically** on proposal creation. To start the **same** kind of review gate **by hand** (a one-off review on any proposal/opportunity no bridge covers), use **§4.3's "Launch Review Gate"** form — it lands an identical task in the assignee's queue.
+
 ### 3.4 Manage a tenant + AI budget
 1. Nav **Tenants** → `/admin/tenants` → click a Company → `/admin/tenants/{tenantId}`.
 2. In the **AI Budget & Limits** card set **Monthly budget ($)**, **Rate limit (calls/hour)**, **Per-call ceiling ($)** → **"Save"**.
@@ -118,7 +120,7 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 
 ### 4.1 Dashboard + Task Queue
 1. `/admin/dashboard`: ✅ Verify the 8 stat cards (Pending Applications, Active Tenants, … SBIR Awards), Recent Events, and the embedded **Task Queue**.
-2. The **Task Queue** (`/api/admin/tasks`) is where you complete admin work — **review** tasks (**"Approve / Done"** / **"Dismiss"**), **upload** tasks (**"Open to upload"** / **"Mark uploaded"**), **form** tasks (fill fields → **"Submit"**). ✅ Verify a completed task leaves the list and the "N overdue" pill is accurate.
+2. The **Task Queue** (`/api/admin/tasks`) is where you complete admin work. The control shown depends on the task's **completer kind** (set when the task was created — see §4.3 Launch Review Gate, and the customer's "Assign a task"): **review** tasks (**"Approve / Done"** / **"Dismiss"**), **upload** tasks (**"Open to upload"** / **"Mark uploaded"**), **form** tasks (fill the named fields → **"Submit"**). Most pipeline gates are review gates (the default); upload/form appear when a producer explicitly set them. ✅ Verify a completed task leaves the list and the "N overdue" pill is accurate.
 
 ### 4.2 Accept an application → provision a tenant ⭐
 1. Nav **Applications** → `/admin/applications`. Expand a pending row (SBIR data auto-loads).
@@ -127,9 +129,14 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
    - ✅ Cross-check: the tenant now appears under **Tenants**; the customer's first login forces a password change.
 3. **"Reject"** requires a reason (**≥10 chars**); **"Change Status"** (for decided apps) requires a note (**≥5 chars**).
 
-### 4.3 Workflow / process monitors
-1. Nav **Workflows** → `/admin/workflows`. ✅ Verify stats (Running/Paused/Completed 24h/Failed 24h) + the instance list (auto-refresh ~10s).
-2. On a **paused** instance click **"Advance"** (you act as the human gate — force-advance) → confirm. On a **failed** one, **"Retry"**; any instance, **"Cancel"**. **"Show error"** toggles the error detail.
+### 4.3 Workflow / process monitors + manual launchers
+1. Nav **Workflows** → `/admin/workflows`. At the top are two **launch forms** above the monitor:
+   - **Generate Content** — launches the CMS content vertical (AI drafts the body, then parks at a review ToDo). Fill Title + Brief → **"Generate Content"**.
+   - **Launch Review Gate** ⭐ (M3) — starts a **`ProjectCollaboration` HITL gate by hand** for a one-off review no automatic bridge covers. Pick **Scope** (project/opp/spotlight/contract), **Assign to role**, **Due (hours)**; enter **Task title**, **Task type** (e.g. `admin_review`), **Entity type** (e.g. `proposal`), the **Opportunity ID** (spine key, UUID) and **Entity ref** (the entity's UUID); optionally a **Proposal ID** and a **Tenant ID** (blank = admin-scoped gate).
+     - ✅ **Verify:** on submit you get "Launched… (trigger event …)", and within ~10s the task appears in the assignee's **Task Queue** and a paused instance appears in the monitor / **Process Ledger**.
+     - ⚠️ The form is **guarded** — a missing required field or a non-UUID Opportunity ID / Entity ref / Tenant ID returns a clear validation error (`INCOMPLETE_OVERLAY` / `INVALID_OVERLAY` / `VALIDATION_ERROR`), never a silent corrupt task.
+2. ✅ Verify monitor stats (Running/Paused/Completed 24h/Failed 24h) + the instance list (auto-refresh ~10s).
+3. On a **paused** instance click **"Advance"** (you act as the human gate — force-advance) → confirm. On a **failed** one, **"Retry"**; any instance, **"Cancel"**. **"Show error"** toggles the error detail.
    - ✅ Verify the status transitions accordingly.
    - ⚠️ If you see "Migration Required", the `process_instances` table isn't present in that environment.
 3. Nav **Process Ledger** → `/admin/processes`: ✅ Verify the cross-tenant health view (failing/stalled/waiting/running) with filter chips + a tenant dropdown; **"Advance"** on paused rows.
@@ -145,6 +152,7 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 - [ ] 2nd admin: **Approve** → **Push to Pipeline** → status `pushed_to_pipeline` (+ topics become customer-visible).
 - [ ] Applications → **Accept** → tenant + temp password provisioned.
 - [ ] Dashboard Task Queue → **Approve / Done** clears a review task.
+- [ ] Workflows → **Launch Review Gate** (e.g. an `admin_review` on a proposal) → the task lands in the queue within ~10s.
 - [ ] Workflows → **Advance** a paused instance.
 - [ ] Tenants → set an AI budget and save.
 

@@ -61,6 +61,7 @@ Your granted sections are grouped by permission:
 1. On the proposal page find **"My Dropbox"** → drop zone **"Drop files here or click to upload"**.
 2. ✅ **Verify:** your file uploads (≤50 MB) and you can delete **your own** files.
    - ⚠️ Blocked when the proposal is locked or already submitted/archived.
+   - 💡 If the customer **delegates you a task** to provide a document (e.g. a letter of support), you do it **right here** in My Dropbox — there's no separate To-Do dashboard for partners. You have no task-assignment or gate-launch controls yourself (those are manager/admin-only).
 
 ---
 

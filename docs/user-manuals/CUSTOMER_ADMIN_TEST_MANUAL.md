@@ -117,6 +117,16 @@ On the **Stage/Gate bar**:
    - The invited person gets an email: a **new** user sees **"Accept Invitation"** (→ sets a password, ≥12 chars, then lands in the proposal); an **existing** GovWin user is granted immediately and sees **"Open Proposal"**. (See the University Partner manual.)
 4. Remove someone with the **"✕"** (confirm "…access will be revoked immediately").
 
+### 6.3 Delegate a task to a teammate (choose how it's completed)
+On the proposal page, expand the **"Assign a task"** section (collapsed by default; visible to managers, above the workspace).
+1. Enter a **Task** title, optional **Details**, an **Assign to** (**"Anyone on the team"** or a specific named collaborator), a **Completion** type, and an optional **Due** date → **"Assign task"**.
+2. **Completion** sets how the assignee closes it in their **Dashboard** To-Do queue:
+   - **Review & approve** (default) → the assignee sees **"Approve / Done"** / **"Dismiss"**.
+   - **Upload a file** → the assignee sees **"Open to upload"** + **"Mark uploaded"**.
+   - **Fill a form** → reveals a **Form fields** box; type **comma-separated** field names (e.g. `Past performance ref, Contract value, POC email`). The assignee then fills those named fields → **"Submit"**. ⚠️ A form task with **no** field names is rejected ("Add at least one field name").
+3. ✅ **Verify:** "Task assigned." and the task appears in the assignee's Dashboard To-Do queue with the **matching control** (Approve / Upload / Form). It's nudged toward its due date, and a named assignee gets the `/go?task=` email link (§0).
+   - ⚠️ You can only assign to your own team's roles (teammate, partner) — not to RFP-staff roles.
+
 ---
 
 ## 7. Library, automation, usage
