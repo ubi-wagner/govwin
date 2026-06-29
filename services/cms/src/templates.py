@@ -143,6 +143,19 @@ TEMPLATES = {
         {_button('View in Admin Dashboard', '/admin')}
     '''),
 
+    # The active "Admin alert on new application" rule names this template; without
+    # it the notify_admin handler silently fell back to the generic admin_notification.
+    'admin_new_application': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">New founding-cohort application</h2>
+        <p>A new company has applied to the RFP Pipeline:</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;"><strong>{_e(p.get('companyName', p.get('tenantName', 'A company')))}</strong></p>
+            <p style="margin:4px 0;color:#64748b;">{_e(p.get('contactName', ''))} · {_e(p.get('contactEmail', ''))}</p>
+        </div>
+        <p>Review and accept or reject it in the admin console.</p>
+        {_button('Review applications', '/admin/applications')}
+    '''),
+
     # ── Task nudges (W-N/O) ────────────────────────────────────────────
     # Escalating reminder for an assigned task. The login link points at the
     # in-between landing page (/go?task=...) which routes to the task after login.

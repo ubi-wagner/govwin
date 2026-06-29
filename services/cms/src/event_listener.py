@@ -110,9 +110,20 @@ async def _process_new_events():
     if not col_names:
         return
 
-    # Fetch rules
+    # Fetch only ENABLED rules. Without this, rules an operator explicitly disabled
+    # (is_active=false / enabled=false) still fire — e.g. duplicate admin emails for
+    # events a live workflow NOTIFY already covers. Build the filter from the columns
+    # that actually exist (the schema has both `is_active` and legacy `enabled`).
+    if 'is_active' in col_names and 'enabled' in col_names:
+        active_filter = ' WHERE COALESCE(is_active, enabled, TRUE) = TRUE'
+    elif 'is_active' in col_names:
+        active_filter = ' WHERE COALESCE(is_active, TRUE) = TRUE'
+    elif 'enabled' in col_names:
+        active_filter = ' WHERE COALESCE(enabled, TRUE) = TRUE'
+    else:
+        active_filter = ''
     try:
-        rules = await pool.fetch('SELECT * FROM automation_rules')
+        rules = await pool.fetch(f'SELECT * FROM automation_rules{active_filter}')
     except Exception as e:
         logger.warning(f'Cannot fetch automation_rules: {e}')
         return
@@ -158,7 +169,7 @@ async def _process_new_events():
         # Never run automation for a FAILED operation. A failed op still emits a
         # terminal phase='end' event with error set; matching rules on it would
         # e.g. send a welcome email for an acceptance that failed. (Launch Review #3.)
-        if event.get('error') or event.get('error_json'):
+        if event.get('error'):  # system_events has `error` (jsonb); no `error_json` column
             continue
 
         if (ns, etype) in FRONTEND_HANDLED:
