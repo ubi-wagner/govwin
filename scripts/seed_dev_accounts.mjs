@@ -34,7 +34,7 @@ if (!CONN) {
 // 'grinder' = top tier → nothing feature-gated during a full project-loop test.
 const CUSTOMER_TIER = 'grinder';
 
-const ADMIN = { email: 'eric@rfppipeline.com', name: 'Eric (RFP Pipeline Admin)', pw: process.env.RFP_ADMIN_PW || 'RFPAdmin' };
+const ADMIN = { email: 'eric@rfppipeline.com', name: 'Eric (RFP Pipeline Admin)', pw: process.env.RFP_ADMIN_PW || 'RFPAdmin2026!' };
 const TENANTS = [
   { slug: 'lighthouse', name: 'Lighthouse', adminEmail: 'eric@lighthouse.com', adminName: 'Eric (Lighthouse Admin)', pw: process.env.LIGHTHOUSE_PW || 'LighthouseAdmin' },
   { slug: 'ubihere', name: 'Ubihere', adminEmail: 'eric@ubihere.com', adminName: 'Eric (Ubihere Admin)', pw: process.env.UBIHERE_PW || 'UbihereAdmin' },
