@@ -108,8 +108,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
     const typeVal = typeof body.templateType === 'string' ? body.templateType : null;
     const agencyVal = typeof body.agency === 'string' ? body.agency : null;
     const programVal = typeof body.programType === 'string' ? body.programType : null;
-    const presetJson = body.canvasPreset !== undefined ? JSON.stringify(body.canvasPreset) : null;
-    const docJson = body.canvasDocument !== undefined ? JSON.stringify(body.canvasDocument) : null;
+    // sql.json (not JSON.stringify::jsonb, which round-trips as a STRING) — null
+    // when the field is omitted, so the COALESCE below preserves the existing value.
+    const presetParam =
+      body.canvasPreset !== undefined ? sql.json(body.canvasPreset as Parameters<typeof sql.json>[0]) : null;
+    const docParam =
+      body.canvasDocument !== undefined ? sql.json(body.canvasDocument as Parameters<typeof sql.json>[0]) : null;
     const nodeCount = body.canvasDocument !== undefined && Array.isArray((body.canvasDocument as { nodes?: unknown[] })?.nodes)
       ? (body.canvasDocument as { nodes: unknown[] }).nodes.length
       : null;
@@ -122,8 +126,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
           template_type   = COALESCE(${typeVal}, template_type),
           agency          = COALESCE(${agencyVal}, agency),
           program_type    = COALESCE(${programVal}, program_type),
-          canvas_preset   = COALESCE(${presetJson}::jsonb, canvas_preset),
-          canvas_document = COALESCE(${docJson}::jsonb, canvas_document),
+          canvas_preset   = COALESCE(${presetParam}::jsonb, canvas_preset),
+          canvas_document = COALESCE(${docParam}::jsonb, canvas_document),
           node_count      = COALESCE(${nodeCount}, node_count),
           updated_at      = now()
         WHERE id = ${templateId}::uuid

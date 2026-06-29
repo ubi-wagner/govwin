@@ -7,6 +7,7 @@ import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/
 import { sendEmail } from '@/lib/email';
 import { collaboratorInviteEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
+import { coerceJsonb } from '@/lib/jsonb';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -302,22 +303,26 @@ export async function POST(request: Request, ctx: RouteContext) {
         existingUser = { id: newUser.id, tenantId: tenantId };
       }
 
-      // Create collaborator record
+      // Create collaborator record. An EXISTING user is auto-accepted (they already
+      // have an account — no acceptance ceremony, just set accepted_at so the access
+      // resolver grants them immediately). A NEW user is left pending until they set
+      // a password via /invite/<collaboratorId>, which sets accepted_at.
+      const acceptedAt = isNewUser ? null : new Date().toISOString();
       const [collaborator] = await tx<{ id: string }[]>`
         INSERT INTO proposal_collaborators (
           proposal_id, user_id, email, name, role, invited_by,
-          assigned_sections, dropbox_enabled
+          assigned_sections, dropbox_enabled, accepted_at
         )
         VALUES (
           ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
           ${collabRole}, ${sessionUser.id},
-          ${sql.array(assignedSections)}, true
+          ${sql.array(assignedSections)}, true, ${acceptedAt}::timestamptz
         )
         RETURNING id
       `;
 
       // Create stage access for current stage
-      const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+      const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
       for (const stage of gates) {
         await tx`
           INSERT INTO collaborator_stage_access (
@@ -333,7 +338,13 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     // Send collaborator invite email (non-blocking — failure is logged, not fatal)
-    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+    const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+    // NEW user → the acceptance page (sets their password + accepted_at, then lands
+    // them in the proposal). EXISTING user → straight to the proposal (already accepted).
+    // The old code pointed BOTH at /login, which never set accepted_at → the workspace
+    // 404'd for the invitee (sweep finding).
+    const acceptUrl = `${base}/invite/${collaboratorId}`;
+    const proposalUrl = `${base}/portal/${tenantSlug}/proposals/${proposalId}`;
     const inviterName = (session.user as { name?: string }).name || sessionUser.email || 'A team member';
     let emailResult: { provider: string; error?: string } = { provider: 'skipped' };
     try {
@@ -345,8 +356,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         role: collabRole,
         permission,
         isNewUser,
-        tempPassword,
-        loginUrl,
+        acceptUrl,
+        proposalUrl,
       });
       emailResult = await sendEmail({
         to: email,

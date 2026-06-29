@@ -15,6 +15,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { coerceJsonb } from '@/lib/jsonb';
 
 interface RouteContext {
   params: Promise<{ instanceId: string }>;
@@ -108,13 +109,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
           ${original.workflowName},
           ${null},
           'retrying',
-          ${JSON.stringify(original.payload ?? {})}::jsonb,
+          ${sql.json(coerceJsonb<Record<string, unknown>>(original.payload, {}) as Parameters<typeof sql.json>[0])},
           ${original.tenantId},
           ${original.actorId},
           ${original.actorEmail},
           ${original.source},
-          ${JSON.stringify(original.stepResults ?? {})}::jsonb,
-          ${JSON.stringify(original.stepStatus ?? {})}::jsonb,
+          ${sql.json(coerceJsonb<Record<string, unknown>>(original.stepResults, {}) as Parameters<typeof sql.json>[0])},
+          ${sql.json(coerceJsonb<Record<string, string>>(original.stepStatus, {}) as Parameters<typeof sql.json>[0])},
           ${original.retryCount + 1},
           ${instanceId}::uuid,
           now() + interval '1 hour'

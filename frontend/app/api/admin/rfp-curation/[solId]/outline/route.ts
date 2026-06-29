@@ -186,7 +186,7 @@ export async function POST(
     if (existingOutline.length > 0) {
       [row] = await sql<{ id: string; outline: unknown }[]>`
         UPDATE solicitation_outlines
-        SET outline = ${JSON.stringify(outline)}::jsonb,
+        SET outline = ${sql.json(outline as Parameters<typeof sql.json>[0])},
             created_by = ${actorId}::uuid,
             updated_at = now()
         WHERE solicitation_id = ${solId}::uuid
@@ -197,7 +197,7 @@ export async function POST(
         INSERT INTO solicitation_outlines
           (solicitation_id, outline, created_by)
         VALUES
-          (${solId}::uuid, ${JSON.stringify(outline)}::jsonb, ${actorId}::uuid)
+          (${solId}::uuid, ${sql.json(outline as Parameters<typeof sql.json>[0])}, ${actorId}::uuid)
         RETURNING id, outline
       `;
     }

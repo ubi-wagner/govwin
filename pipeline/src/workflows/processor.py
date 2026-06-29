@@ -787,7 +787,9 @@ async def run_workflow_processor(
         if use_manager:
             from workflows.manager import WorkflowManager
             pool = await asyncpg.create_pool(database_url, min_size=2, max_size=4)
-            manager = WorkflowManager(source="pipeline")
+            # Thread fabric so AI_INVOKE steps run on the managed path (previously
+            # dropped → every AI step silently skipped in production).
+            manager = WorkflowManager(source="pipeline", fabric=fabric)
             await manager.start(conn, pool=pool)
             log.info("WorkflowManager enabled — persistent execution with crash recovery")
             # Reflect the discovered .py templates into the process_templates
@@ -813,9 +815,9 @@ async def run_workflow_processor(
                 events = await conn.fetch(
                     """
                     SELECT id, namespace, type, phase, actor_type, actor_id,
-                           tenant_id, parent_event_id, payload, created_at
+                           tenant_id, parent_event_id, payload, error, created_at
                     FROM system_events
-                    WHERE created_at > $1
+                    WHERE created_at >= $1
                       AND namespace != 'system'
                     ORDER BY created_at ASC
                     LIMIT 100
@@ -836,6 +838,18 @@ async def run_workflow_processor(
                     else:
                         payload = raw_payload
 
+                    # error is a dedicated JSONB column (NULL on success). asyncpg
+                    # returns JSONB as a string unless a codec is registered, so
+                    # parse it the same way as payload. Non-NULL ⇒ a failed op.
+                    raw_error = event_row["error"]
+                    if isinstance(raw_error, str):
+                        try:
+                            error_val = json.loads(raw_error) if raw_error else None
+                        except json.JSONDecodeError:
+                            error_val = raw_error
+                    else:
+                        error_val = raw_error  # dict (codec) or None
+
                     event_dict: dict[str, Any] = {
                         "id": str(event_row["id"]),
                         "namespace": event_row["namespace"],
@@ -851,7 +865,7 @@ async def run_workflow_processor(
                         else None,
                         "payload": payload,
                         "created_at": event_row["created_at"],
-                        "error": event_row.get("error") or event_row.get("error_json") or None,
+                        "error": error_val,
                     }
 
                     # Duplicate detection — skip if already processed
@@ -864,6 +878,11 @@ async def run_workflow_processor(
                         last_processed_at = event_row["created_at"]
                         continue
 
+                    # NB: a FAILED op's end event (non-NULL error) is rejected by
+                    # EventTrigger.matches() on BOTH paths below — get_workflow_for_event
+                    # and match_waiting_instances — so it neither triggers a workflow
+                    # nor resumes a paused instance. That guard was dead until the
+                    # poll began SELECTing the `error` column (above); see test_error_gating.
                     workflow_cls = get_workflow_for_event(event_dict)
                     if workflow_cls:
                         try:

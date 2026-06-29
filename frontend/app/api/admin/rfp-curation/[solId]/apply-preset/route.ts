@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
 import type { Role } from '@/lib/rbac';
 
@@ -123,8 +124,11 @@ export async function POST(request: Request, ctx: RouteContext) {
           { status: 404 },
         );
       }
-      complianceData = preset.complianceData;
-      volumesData = preset.volumesData;
+      // compliance_data/volumes_data are JSON.stringify::jsonb on the preset → read
+      // back as STRINGS; without coercion every field is undefined → all-NULL
+      // compliance written to every topic.
+      complianceData = coerceJsonb<Record<string, unknown>>(preset.complianceData, {});
+      volumesData = coerceJsonb<PresetVolume[]>(preset.volumesData, []);
     } catch (err) {
       console.error('[apply-preset] preset lookup failed:', err);
       return NextResponse.json(

@@ -48,7 +48,10 @@ export interface Opportunity {
 }
 
 // === Proposals ===
-export type ProposalStage = 'outline' | 'draft' | 'pink_team' | 'red_team' | 'gold_team' | 'final' | 'submitted' | 'archived';
+// Mirrors the DB CHECK on proposals.stage (migration 029 / 030a). The legacy
+// color-team values (outline/pink_team/red_team/gold_team) were migrated to
+// 'draft' and removed from the CHECK; 'review' is the live mid-stage.
+export type ProposalStage = 'draft' | 'review' | 'final' | 'submitted' | 'archived';
 export type CollaboratorPermission = 'view' | 'comment' | 'edit';
 
 export interface Proposal {

@@ -139,3 +139,58 @@ foundation is built; 3 bounded extensions remain — not a substantive rebuild.*
 
 **Owner framing confirmed:** these are small, well-scoped extensions on a solid ledger — not a
 workflow rebuild. Recommended order: J1 (delegation) → J2 (date generator) → J3 (typed completers).
+
+---
+
+## K. Findings surfaced during the R-track refactor (2026-06-28)
+
+- **K1 · P2 · postgres.js jsonb text-cast reads back as a STRING.** Verified (3 probes, single
+  result-set): a jsonb value written `${JSON.stringify(x)}::jsonb` reads back as a **string**, while
+  `${sql.json(x)}` or a DDL `DEFAULT` reads back as a parsed **object** — within the *same* column
+  descriptor. The whole codebase writes jsonb via `JSON.stringify(...)::jsonb`. Concretely this means
+  a **custom** `gate_config` (written that way in `proposals/create`) reads back as a string in
+  `lib/proposal-advance.ts:116` (`(proposal.gateConfig || [...])`), so `gates.indexOf(stage)` /
+  `gates[idx+1]` would operate on a string. The **default** gate (`["draft","final"]`, from the column
+  DDL default) reads back as an array and works — which is why this is latent (almost all proposals
+  use default gates). **R0.3 fix pattern (canonical going forward):** write jsonb via `sql.json()` so
+  it round-trips as an object, and have read-models normalize defensively (`coerceOriginCard`).
+  **TODO (own task, NOT on the untouched advance path this pass):** audit every `JSON.stringify(...)::jsonb`
+  write whose column is later read as an object; either migrate writes to `sql.json()` or normalize on
+  read. Highest-priority real consumer: custom `gate_config` in advance.
+- **K2 · P3 · No DB uniqueness backs the duplicate-proposal guard.** `proposals` has no
+  `UNIQUE(tenant_id, opportunity_id)` (the 001 UNIQUE is on the tenant-scoring table; the opportunity
+  index is non-unique). Two concurrent `proposals/create` POSTs can both pass the app-level duplicate
+  check (route.ts) and create two proposals — each freezing its own origin card. Pre-existing; does not
+  violate single-card immutability. A `UNIQUE` index would need a dedupe pass first (could fail on
+  existing dupes). Track with the create-path hardening.
+
+### R3.1 finds (2026-06-28)
+
+- **K3 · P1 · `create_instance` ON CONFLICT could not infer the PARTIAL dedup index — every launch threw.**
+  `manager.create_instance` used `ON CONFLICT (workflow_name, trigger_event_id) DO NOTHING`, but the
+  dedup index (mig 043 `idx_process_instances_dedup`) is PARTIAL (`WHERE trigger_event_id IS NOT NULL`).
+  Postgres cannot infer a partial unique index for ON CONFLICT unless the predicate is restated —
+  verified on PG16: the exact statement throws `there is no unique or exclusion constraint matching the
+  ON CONFLICT specification` on EVERY launch (a minimal INSERT with no R3 columns reproduced it, so it
+  is pre-existing, not introduced by R3). A fresh deploy from these migrations would fail to launch ANY
+  workflow instance. ✅FIX (R3.1): added `WHERE trigger_event_id IS NOT NULL` to the ON CONFLICT — which
+  also RESTORES the intended per-trigger dedup that was previously dead. Caught by the R-track Factor-2
+  live-PG drive of the real manager (the throwaway-DB standard exists for exactly this).
+- **K4 · P2 · `_create_task` wrote corrupt rows when a generic overlay omitted a gate field.** `r(x) or x`
+  fell back to the LITERAL path string, so a missing `taskType`/`assigneeRole` produced a task typed
+  `"payload.taskType"` / assigned to a phantom role `"payload.assigneeRole"` no queue reads. ✅FIX (R3.1):
+  `r_or_none` degrades an unresolved `payload.`/`step.` path to None (caller defaults safely); quoted/bare
+  literals (every existing bespoke template) are unchanged. (Independent-review P2.)
+
+### R3.3 finds (2026-06-28)
+
+- **K5 · P2 · R0.3 shipped a latent test break (now fixed).** The R0.3 origin-card freeze switched the
+  create-route proposals INSERT to `sql.json(originCard)`, but `__tests__/proposals-create.test.ts`
+  mocks `@/lib/db` with a bare `sql` (no `.json`) → 4 success-path cases threw `sql.json is not a
+  function` → 500. R0.3's commit ran the NEW card test + tsc + a live drive but not this existing
+  route test. ✅FIX (R3.3): mock `sql.json` (identity) + mock `@/lib/process/project-collaboration`.
+  Lesson: run the full `vitest` suite, not just the new file, before committing a shared-route change.
+- **W-D CLOSED · `purchase.completed` orphan.** An opportunity purchase now fires a real transient
+  reaction: the Stripe webhook launches `ProjectCollaboration` (scope='opp', an rfp_admin
+  proposal_setup gate) right after emitting `capture:purchase.completed` (the event still emits for
+  audit). The `AdminProposalSetup` phantom is fully retired (the dead lock-route completer deleted).

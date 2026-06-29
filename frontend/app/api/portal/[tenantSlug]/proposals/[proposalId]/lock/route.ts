@@ -462,18 +462,11 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       console.error('[portal/proposals/lock] customer notification setup failed:', notifyErr);
     }
 
-    // ── Mark AdminProposalSetup process_instance complete ────────────
-    try {
-      await sql`
-        UPDATE process_instances
-        SET status = 'completed', completed_at = now()
-        WHERE workflow_name = 'AdminProposalSetup'
-          AND status = 'running'
-          AND payload->>'proposalId' = ${proposalId}
-      `;
-    } catch (piErr) {
-      console.error('[portal/proposals/lock] process_instance completion failed (non-fatal)', piErr);
-    }
+    // NOTE: the old `AdminProposalSetup` process_instance completer was removed
+    // (R3.3). That workflow_name never existed (the phantom — gap-sweep C1), so the
+    // UPDATE matched zero rows on every unlock. The real admin-review gate is now a
+    // ProjectCollaboration HITL task launched at proposal creation; an admin resolves
+    // it by completing the task (or it auto-resolves on review), not via this route.
 
     // ── Emit proposal.ready_for_customer event ───────────────────────
     try {

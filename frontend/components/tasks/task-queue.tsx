@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Urgency, urgencyOf, sortByUrgency } from '@/lib/tasks/urgency';
+import { taskCompleterKind, formFields, uploadHref } from '@/lib/tasks/completers';
 
 export interface QueueTask {
   id: string;
@@ -22,6 +23,7 @@ export interface QueueTask {
   stepName: string | null;
   dueAt: string | null;
   tenantId: string | null;
+  params?: Record<string, unknown> | null;
 }
 
 const URGENCY_STYLE: Record<Urgency, { chip: string; label: string }> = {
@@ -48,10 +50,13 @@ export function TaskQueue({
   apiBase,
   title = 'Your To-Dos',
   emptyText = 'Nothing needs your attention right now.',
+  tenantSlug,
 }: {
   apiBase: string;
   title?: string;
   emptyText?: string;
+  /** Enables the upload-completer CTA to route to the entity workspace. */
+  tenantSlug?: string;
 }) {
   const [tasks, setTasks] = useState<QueueTask[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,26 +162,154 @@ export function TaskQueue({
               {t.description && (
                 <p className="mt-1 text-xs text-gray-500">{t.description}</p>
               )}
-              <div className="mt-2 flex gap-2">
-                <button
-                  onClick={() => complete(t.id, { approved: true })}
-                  disabled={busy[t.id]}
-                  className="rounded border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-                >
-                  {busy[t.id] ? '…' : 'Approve / Done'}
-                </button>
-                <button
-                  onClick={() => complete(t.id, { approved: false })}
-                  disabled={busy[t.id]}
-                  className="rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
-                >
-                  Dismiss
-                </button>
-              </div>
+              <TaskCompleter
+                task={t}
+                tenantSlug={tenantSlug}
+                busy={!!busy[t.id]}
+                onComplete={(decision) => complete(t.id, decision)}
+              />
             </li>
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+// ── Typed completers (W-M) ──────────────────────────────────────────────────
+
+function TaskCompleter({
+  task,
+  tenantSlug,
+  busy,
+  onComplete,
+}: {
+  task: QueueTask;
+  tenantSlug?: string;
+  busy: boolean;
+  onComplete: (decision: Record<string, unknown>) => void;
+}) {
+  const kind = taskCompleterKind(task.params);
+  if (kind === 'form') return <FormCompleter task={task} busy={busy} onComplete={onComplete} />;
+  if (kind === 'upload') {
+    return <UploadCompleter task={task} tenantSlug={tenantSlug} busy={busy} onComplete={onComplete} />;
+  }
+  return <ReviewCompleter busy={busy} onComplete={onComplete} />;
+}
+
+function ReviewCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
+  return (
+    <div className="mt-2 flex gap-2">
+      <button
+        onClick={() => onComplete({ approved: true })}
+        disabled={busy}
+        className="rounded border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+      >
+        {busy ? '…' : 'Approve / Done'}
+      </button>
+      <button
+        onClick={() => onComplete({ approved: false })}
+        disabled={busy}
+        className="rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+function UploadCompleter({
+  task,
+  tenantSlug,
+  busy,
+  onComplete,
+}: {
+  task: QueueTask;
+  tenantSlug?: string;
+  busy: boolean;
+  onComplete: (d: Record<string, unknown>) => void;
+}) {
+  const href = tenantSlug ? uploadHref(tenantSlug, task.entityType, task.entityId) : null;
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      {href && (
+        <a
+          href={href}
+          className="rounded border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+        >
+          Open to upload
+        </a>
+      )}
+      <button
+        onClick={() => onComplete({ uploaded: true })}
+        disabled={busy}
+        className="rounded border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+      >
+        {busy ? '…' : 'Mark uploaded'}
+      </button>
+    </div>
+  );
+}
+
+function FormCompleter({
+  task,
+  busy,
+  onComplete,
+}: {
+  task: QueueTask;
+  busy: boolean;
+  onComplete: (d: Record<string, unknown>) => void;
+}) {
+  const fields = formFields(task.params);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [err, setErr] = useState<string | null>(null);
+
+  // No spec'd fields → degrade to a single freeform note so the task stays completable.
+  const effective = fields.length > 0 ? fields : [{ name: 'note', label: 'Notes', type: 'textarea' as const, required: false }];
+
+  function submit() {
+    for (const f of effective) {
+      if (f.required && !(values[f.name] ?? '').trim()) {
+        setErr(`${f.label} is required.`);
+        return;
+      }
+    }
+    setErr(null);
+    onComplete({ form: values });
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {effective.map((f) => (
+        <div key={f.name}>
+          <label className="block text-xs font-medium text-gray-500 mb-0.5">
+            {f.label}{f.required && <span className="text-red-500"> *</span>}
+          </label>
+          {f.type === 'textarea' ? (
+            <textarea
+              rows={2}
+              value={values[f.name] ?? ''}
+              onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+            />
+          ) : (
+            <input
+              type={f.type === 'number' ? 'number' : 'text'}
+              value={values[f.name] ?? ''}
+              onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
+              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+            />
+          )}
+        </div>
+      ))}
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <button
+        onClick={submit}
+        disabled={busy}
+        className="rounded border border-green-300 bg-white px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+      >
+        {busy ? '…' : 'Submit'}
+      </button>
     </div>
   );
 }

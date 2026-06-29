@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
 import { customerProposalPath } from '@/lib/storage/paths';
 
@@ -43,6 +44,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+    }
+
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json({ error: 'Invalid proposal id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // Verify proposal belongs to tenant

@@ -29,8 +29,14 @@ async def emit_event(
     tenant_id: Optional[str] = None,
     parent_event_id: Optional[str] = None,
     payload: Optional[dict[str, Any]] = None,
+    error: Optional[dict[str, Any]] = None,
 ) -> str:
-    """Write one event to system_events. Returns the event id."""
+    """Write one event to system_events. Returns the event id.
+
+    `error` populates the dedicated JSONB `error` column (NULL on success). The
+    poll loop reads it to skip failed-op events, so a failure MUST land in the
+    column, not only inside the payload.
+    """
     event_payload = payload or {}
     if "correlationId" not in event_payload:
         event_payload["correlationId"] = str(uuid.uuid4())
@@ -40,8 +46,8 @@ async def emit_event(
             """
             INSERT INTO system_events (
                 namespace, type, phase, actor_type, actor_id, actor_email,
-                tenant_id, parent_event_id, payload
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                tenant_id, parent_event_id, payload, error
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
             """,
             namespace,
@@ -53,6 +59,7 @@ async def emit_event(
             uuid.UUID(tenant_id) if tenant_id else None,
             uuid.UUID(parent_event_id) if parent_event_id else None,
             json.dumps(event_payload),
+            json.dumps(error) if error is not None else None,
         )
         return str(row["id"]) if row else ""
     except Exception as e:
@@ -107,6 +114,9 @@ async def emit_end(
         if result:
             payload.update(result)
         if error:
+            # Mirror into payload for any consumer that still reads payload.error,
+            # but the dedicated column (below) is the source of truth the poll
+            # loop's failed-op guard reads.
             payload["error"] = error
 
         await emit_event(
@@ -119,6 +129,7 @@ async def emit_end(
             tenant_id=str(start_row["tenant_id"]) if start_row["tenant_id"] else None,
             parent_event_id=str(start_event_id),
             payload=payload,
+            error=error,
         )
     except Exception as e:
         log.error("emit_end failed for start=%s: %s", start_event_id, e)

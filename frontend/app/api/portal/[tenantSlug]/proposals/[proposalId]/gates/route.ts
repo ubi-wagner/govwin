@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
@@ -309,10 +310,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Stage must be a valid DB value AND in this proposal's gate_config
-    const proposalGates = (proposal.gateConfig && proposal.gateConfig.length > 0)
-      ? proposal.gateConfig
-      : ['draft', 'final'];
+    // Stage must be a valid DB value AND in this proposal's gate_config.
+    // Coerce: gate_config can read back as a JSON string (postgres.js nuance) —
+    // .includes()/.join() on a string substring-match / throw otherwise.
+    const proposalGates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
     if (!(DB_STAGES as readonly string[]).includes(stage) || !proposalGates.includes(stage)) {
       return NextResponse.json(
         { error: `stage must be one of: ${proposalGates.join(', ')}`, code: 'VALIDATION_ERROR' },
@@ -554,7 +555,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           SET is_met = true,
               met_by = ${sessionUser.id}::uuid,
               met_at = now(),
-              evidence = ${JSON.stringify(evidence)}::jsonb,
+              evidence = ${sql.json(evidence as Parameters<typeof sql.json>[0])},
               updated_at = now()
           WHERE id = ${requirementId}::uuid
             AND proposal_id = ${proposalId}::uuid

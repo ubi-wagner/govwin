@@ -91,59 +91,54 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // eslint-disable-next-line
     const result = await sql.begin(async (tsql: any) => {
-      // Create tenant with unique slug
-      const slug = slugify(app.companyName);
-      let finalSlug = slug;
-      let existingTenant = (await tsql`
-        SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
-      `)[0];
-      let suffix = 2;
-      while (existingTenant) {
-        finalSlug = `${slug}-${suffix}`;
-        existingTenant = (await tsql`
-          SELECT id FROM tenants WHERE slug = ${finalSlug} LIMIT 1
-        `)[0];
-        suffix++;
-      }
-      const [newTenant] = await tsql`
-        INSERT INTO tenants (name, slug, status)
-        VALUES (${app.companyName}, ${finalSlug}, 'active')
-        RETURNING id
-      `;
-      const tenantId = newTenant.id;
-
-      // Create or find existing user, reset temp password for re-acceptance
-      let newUserId: string;
-
-      const [existingUser] = await tsql`
-        SELECT id FROM users WHERE LOWER(email) = ${app.contactEmail.toLowerCase().trim()} LIMIT 1
-      `;
-      if (existingUser) {
-        newUserId = existingUser.id;
-        await tsql`
-          UPDATE users
-          SET password_hash = ${hash},
-              temp_password = true,
-              tenant_id = ${tenantId},
-              is_active = true
-          WHERE id = ${existingUser.id}
-        `;
-      } else {
-        const [created] = await tsql`
-          INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
-          VALUES (
-            ${app.contactEmail.toLowerCase().trim()},
-            ${app.contactName},
-            'tenant_admin',
-            ${tenantId},
-            ${hash},
-            true,
-            true
-          )
+      // Create a tenant with a unique slug. A probe-then-insert loop races on
+      // tenants_slug_key under concurrent accepts, so INSERT with ON CONFLICT and
+      // bump the suffix until one lands — race-free (the loser of a race just
+      // tries the next suffix instead of 500-ing on the unique violation).
+      const baseSlug = slugify(app.companyName);
+      let finalSlug = baseSlug;
+      let tenantId: string | undefined;
+      for (let suffix = 2; suffix < 1000; suffix++) {
+        const inserted = await tsql`
+          INSERT INTO tenants (name, slug, status)
+          VALUES (${app.companyName}, ${finalSlug}, 'active')
+          ON CONFLICT (slug) DO NOTHING
           RETURNING id
         `;
-        newUserId = created.id;
+        if (inserted.length > 0) {
+          tenantId = inserted[0].id;
+          break;
+        }
+        finalSlug = `${baseSlug}-${suffix}`;
       }
+      if (!tenantId) {
+        throw new Error('could not allocate a unique tenant slug');
+      }
+
+      // Upsert the user (reset temp password for a re-acceptance). A
+      // SELECT-then-INSERT races on users.email under concurrent accepts; ON
+      // CONFLICT (email) collapses the existing-user reset and the new-user
+      // insert into one race-free statement. Email is stored lowercased, so the
+      // unique index on email aligns with the LOWER(email) lookups elsewhere.
+      const [userRow] = await tsql`
+        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
+        VALUES (
+          ${app.contactEmail.toLowerCase().trim()},
+          ${app.contactName},
+          'tenant_admin',
+          ${tenantId},
+          ${hash},
+          true,
+          true
+        )
+        ON CONFLICT (email) DO UPDATE
+          SET password_hash = EXCLUDED.password_hash,
+              temp_password = true,
+              tenant_id = EXCLUDED.tenant_id,
+              is_active = true
+        RETURNING id
+      `;
+      const newUserId = userRow.id;
 
       // Update application status AFTER tenant+user creation succeeds
       await tsql`

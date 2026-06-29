@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -215,7 +216,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const { action, itemIds } = body;
-    if (!action || !Array.isArray(itemIds) || itemIds.length === 0) {
+    if (!action || !Array.isArray(itemIds) || itemIds.length === 0 || !itemIds.every((id) => typeof id === 'string' && isValidUUID(id))) {
       return NextResponse.json(
         { error: 'action (string) and itemIds (non-empty array) are required', code: 'VALIDATION_ERROR' },
         { status: 400 },

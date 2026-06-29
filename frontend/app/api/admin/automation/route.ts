@@ -157,7 +157,7 @@ export async function POST(request: Request) {
         action_type, action_config, created_by
       ) VALUES (
         ${name}, ${description}, ${isActive}, ${triggerNamespace}, ${triggerType},
-        ${actionType}, ${JSON.stringify(actionConfig)}::jsonb, ${userId}::uuid
+        ${actionType}, ${sql.json(actionConfig as Parameters<typeof sql.json>[0])}, ${userId}::uuid
       )
       RETURNING id
     `;

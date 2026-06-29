@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
+import { coerceJsonb } from '@/lib/jsonb';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -111,7 +112,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     return NextResponse.json({
       data: {
         stage: proposal.stage,
-        gateConfig: proposal.gateConfig || ['draft', 'final'],
+        gateConfig: coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']),
         isLocked: proposal.isLocked,
         lockCount: proposal.lockCount,
         downloadCount: proposal.downloadCount,
@@ -214,7 +215,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+    const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
     const currentIndex = gates.indexOf(proposal.stage);
 
     if (currentIndex === -1 || currentIndex >= gates.length - 1) {

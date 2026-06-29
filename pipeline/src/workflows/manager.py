@@ -76,6 +76,7 @@ import asyncio
 import importlib
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -92,16 +93,22 @@ logger = logging.getLogger("pipeline.workflows.manager")
 class WorkflowManager:
     """Persistent workflow orchestration with crash recovery."""
 
-    def __init__(self, source: str = "pipeline"):
+    def __init__(self, source: str = "pipeline", fabric: Any = None):
         """Initialize manager.
 
         Args:
             source: 'pipeline' for RFP admin workflows, 'cms' for CMS workflows
+            fabric: the AgentFabric for AI_INVOKE steps. WITHOUT this the managed
+                execution path drops fabric and every AI_INVOKE step silently skips
+                in production (the fire-and-forget fallback had it; the managed path
+                did not). Threaded into _execute_step so AI steps actually run.
         """
         self.source = source
+        self._fabric = fabric
         self._running_instances: dict[str, str] = {}  # instance_id → workflow_name
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._stuck_detection_task: asyncio.Task[None] | None = None
+        self._last_anchor_sweep: datetime | None = None  # J2 date-anchor gate
 
     async def start(self, conn: asyncpg.Connection, pool: asyncpg.Pool | None = None) -> None:
         """Start the manager's background tasks.
@@ -164,13 +171,32 @@ class WorkflowManager:
         # Calculate deadline from workflow definition (default 1 hour)
         deadline = datetime.now(timezone.utc) + timedelta(hours=1)
 
+        # R3: link the instance to the opportunity spine (additive). The overlay
+        # may carry opportunityId + scope so the control tower can chain/roll up
+        # reaction runs by the immutable opportunity_id. Both nullable — every
+        # existing bespoke On* workflow omits them and is unchanged. scope is
+        # validated against the mig-088 CHECK so a bad overlay value degrades to
+        # null instead of failing the INSERT.
+        opportunity_id = self._safe_uuid(payload.get("opportunityId"))
+        scope = payload.get("scope")
+        if scope not in ("opp", "spotlight", "project", "contract"):
+            scope = None
+
         result = await conn.fetchrow(
             """
             INSERT INTO process_instances
                 (id, workflow_name, trigger_event_id, status, payload,
-                 tenant_id, actor_id, actor_email, source, deadline)
-            VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9)
-            ON CONFLICT (workflow_name, trigger_event_id) DO NOTHING
+                 tenant_id, actor_id, actor_email, source, deadline,
+                 opportunity_id, scope)
+            VALUES ($1, $2, $3, 'pending', $4::jsonb, $5, $6, $7, $8, $9, $10, $11)
+            -- The dedup index (mig 043) is PARTIAL (WHERE trigger_event_id IS NOT
+            -- NULL); Postgres cannot infer a partial unique index for ON CONFLICT
+            -- unless the predicate is restated here. Without it this INSERT throws
+            -- "no unique or exclusion constraint matching the ON CONFLICT
+            -- specification" on EVERY launch (verified, PG16). A null trigger
+            -- can't conflict anyway, so the predicate is exactly right.
+            ON CONFLICT (workflow_name, trigger_event_id)
+                WHERE trigger_event_id IS NOT NULL DO NOTHING
             RETURNING id
             """,
             uuid.UUID(instance_id),
@@ -182,6 +208,8 @@ class WorkflowManager:
             actor_email,
             self.source,
             deadline,
+            opportunity_id,
+            scope,
         )
 
         if result is None:
@@ -467,11 +495,26 @@ class WorkflowManager:
                 # the create-time 1h default. A 72h HITL review must get a 72h
                 # deadline or the paused-deadline sweep force-fails it ~1h in.
                 # (EVENT_CONTRACT_V3 §3.1 / §6; CLAUDE_CLIFFNOTES Mistake 17.)
-                wait_minutes = (
-                    step.timeout_minutes
-                    if step.timeout_minutes and step.timeout_minutes > 0
-                    else 1440
-                )
+                #
+                # R3 (additive): a generic overlay-driven gate (ProjectCollaboration)
+                # can EXTEND its park ceiling per-launch via payload.parkMinutes — a
+                # weeks-long customer-build gate must not be capped at the static class
+                # default. The TASK due_at/nudges (dueMinutes/nudgeDays) drive the human
+                # cadence; parkMinutes is only the instance abandon backstop. Existing
+                # workflows omit parkMinutes → unchanged (falls back to step timeout).
+                overlay_park = None
+                if isinstance(trigger_payload, dict):
+                    try:
+                        _pm = trigger_payload.get("parkMinutes")
+                        overlay_park = int(_pm) if _pm is not None else None
+                    except (TypeError, ValueError):
+                        overlay_park = None
+                if overlay_park and overlay_park > 0:
+                    wait_minutes = overlay_park
+                elif step.timeout_minutes and step.timeout_minutes > 0:
+                    wait_minutes = step.timeout_minutes
+                else:
+                    wait_minutes = 1440
                 wait_deadline = datetime.now(timezone.utc) + timedelta(minutes=wait_minutes)
                 await conn.execute(
                     """
@@ -807,17 +850,35 @@ class WorkflowManager:
                 return None
             return resolve_input(path, event_dict, step_results)
 
+        def r_or_none(field: Optional[str]) -> Any:
+            """Resolve a task field, but never fall back to a raw dynamic path.
+
+            A generic overlay-driven template declares fields as "payload.X" paths.
+            If the overlay omits the key, resolve_input returns None — and the old
+            `r(x) or x` idiom would then use the LITERAL string "payload.X" as the
+            value, writing a corrupt task (task_type="payload.taskType", a task
+            assigned to a phantom role "payload.assigneeRole" no one queries). So an
+            unresolved payload./step. path degrades to None (caller defaults safely);
+            a quoted/bare literal (every existing bespoke template) is unchanged.
+            """
+            val = r(field)
+            if val is not None:
+                return val
+            if isinstance(field, str) and (field.startswith("payload.") or field.startswith("step.")):
+                return None
+            return field
+
         # tenant scope from the instance
         tenant_id = await conn.fetchval(
             "SELECT tenant_id FROM process_instances WHERE id = $1",
             uuid.UUID(instance_id),
         )
 
-        task_type = r(step.task_type) or step.task_type or "task"
-        title = r(step.task_title) or step.task_title or task_type
-        assignee_role = r(step.assignee_role) or step.assignee_role
+        task_type = r_or_none(step.task_type) or "task"
+        title = r_or_none(step.task_title) or task_type
+        assignee_role = r_or_none(step.assignee_role)
         assignee_user = r(step.assignee_user)
-        entity_type = r(step.entity_type) or step.entity_type
+        entity_type = r_or_none(step.entity_type)
         entity_ref = r(step.entity_ref)
 
         # Due date: explicit due_in_minutes overrides the step timeout.
@@ -949,7 +1010,7 @@ class WorkflowManager:
         try:
             rows = await conn.fetch(
                 """
-                SELECT id, tenant_id, assignee_role, title, due_at,
+                SELECT id, tenant_id, assignee_role, assignee_user_id, title, due_at,
                        nudge_schedule, nudges_sent
                 FROM tasks
                 WHERE status IN ('open', 'in_progress') AND due_at IS NOT NULL
@@ -988,14 +1049,191 @@ class WorkflowManager:
                             },
                         )
                         sent_set.add(days_before)
+                        # nudge_index (1-based) + is_final drive the email escalation:
+                        # the LAST threshold in the schedule CC-escalates to a manager.
+                        nudge_index = len(sent_set)
+                        is_final = len(sent_set) >= len(set(schedule or []))
                         await conn.execute(
                             "UPDATE tasks SET nudges_sent = $2::jsonb, updated_at = now() WHERE id = $1",
                             t["id"], json.dumps(sorted(sent_set, reverse=True)),
                         )
                         fired += 1
+                        # Layered EMAIL push (W-N/O), best-effort: a failure here must
+                        # never undo the in-app nudge or its nudges_sent mark above.
+                        try:
+                            await self._emit_task_nudge_email(conn, t, nudge_index, is_final)
+                        except Exception as ee:
+                            logger.error("[_sweep_task_nudges] email emit failed for %s: %s", t["id"], ee)
                     except Exception as e:
                         logger.error("[_sweep_task_nudges] nudge failed for %s: %s", t["id"], e)
         return fired
+
+    async def _emit_task_nudge_email(
+        self, conn: asyncpg.Connection, t: Any, nudge_index: int, is_final: bool
+    ) -> None:
+        """Emit the EMAIL push for a nudge (W-N/O) via system:notification.requested
+        — the CMS event_listener renders the template + delivers it.
+
+        Only USER-assigned tasks email (a role-bucket task has no single recipient;
+        its in-app nudge suffices). The email carries a login link to the in-between
+        landing page (/go?task=...) that routes the user to the task after login.
+        On the FINAL nudge we ALSO emit a SEPARATE escalation email to the tenant's
+        manager (tenant_admin) — cleaner than a CC and needs no listener change.
+        """
+        assignee_user_id = t["assignee_user_id"]
+        if not assignee_user_id:
+            return  # role-bucket task → in-app nudge only
+
+        base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
+        if not base:
+            # A relative link is a dead CTA in an email client. Skip the email (the
+            # in-app nudge already fired) and log loudly so ops sets the env var,
+            # rather than shipping 100% broken-link nudges.
+            logger.warning(
+                "[_sweep_task_nudges] PORTAL_BASE_URL/NEXTAUTH_URL unset — skipping nudge EMAIL "
+                "for task %s (in-app nudge still delivered)", t["id"],
+            )
+            return
+        login_url = f"{base}/go?task={t['id']}"
+        tenant_str = str(t["tenant_id"]) if t["tenant_id"] else None
+        ctx = {
+            "channel": "email",
+            "template": "task_nudge",
+            "user_id": str(assignee_user_id),
+            "title": t["title"],
+            "due_at": t["due_at"].isoformat(),
+            "login_url": login_url,
+            "nudge_index": nudge_index,
+            "is_final": is_final,
+            "task_id": str(t["id"]),
+        }
+        await self._emit_event(conn, "system", "notification.requested", tenant_str, ctx)
+
+        if is_final and t["tenant_id"]:
+            mgr = await conn.fetchrow(
+                """
+                SELECT id FROM users
+                WHERE tenant_id = $1 AND role = 'tenant_admin' AND is_active = true
+                ORDER BY created_at ASC LIMIT 1
+                """,
+                t["tenant_id"],
+            )
+            if mgr:
+                await self._emit_event(
+                    conn, "system", "notification.requested", tenant_str,
+                    {
+                        "channel": "email",
+                        "template": "task_nudge_manager",
+                        "user_id": str(mgr["id"]),
+                        "title": t["title"],
+                        "due_at": t["due_at"].isoformat(),
+                        "login_url": login_url,
+                        "task_id": str(t["id"]),
+                    },
+                )
+
+    async def _sweep_date_anchored_tasks(self, conn: asyncpg.Connection) -> int:
+        """Materialize date-ANCHORED tasks from a proposal's deadline (J2).
+
+        The nudge sweep reacts to a task's due_at; THIS generates the task in the
+        first place from a calendar anchor — the opportunity close_date (the RFP
+        deadline). For each active proposal with a future deadline that has no
+        'final_due' task yet, create one due at close_date, escalating [7,3,1] days
+        out, assigned to the tenant's manager (so the W-N/O email nudges them).
+        Idempotent via NOT EXISTS (one final_due per proposal, ever — it is not
+        regenerated after submission). Gated to ~hourly by the caller.
+
+        This is a date-anchored GENERATOR (a sweep), deliberately not a generic
+        engine ScheduleTrigger — the value is the dated tasks, and the sweep fits
+        the existing loop without a cron-matching layer in the processor.
+        """
+        created = 0
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT p.id, p.tenant_id, p.title, o.close_date,
+                       (SELECT u.id FROM users u
+                          WHERE u.tenant_id = p.tenant_id AND u.role = 'tenant_admin'
+                            AND u.is_active = true
+                          ORDER BY u.created_at ASC LIMIT 1) AS manager_id
+                FROM proposals p
+                JOIN opportunities o ON o.id = p.opportunity_id
+                WHERE p.stage NOT IN ('submitted', 'archived')
+                  AND o.close_date IS NOT NULL
+                  AND o.close_date > now()
+                  AND NOT EXISTS (
+                      SELECT 1 FROM tasks t
+                      WHERE t.entity_type = 'proposal' AND t.entity_id = p.id
+                        AND t.task_type = 'final_due'
+                  )
+                LIMIT 500
+                """
+            )
+        except Exception as e:
+            logger.error("[_sweep_date_anchored_tasks] query failed: %s", e)
+            return 0
+
+        for r in rows:
+            try:
+                task_id = str(uuid.uuid4())
+                await conn.execute(
+                    """
+                    INSERT INTO tasks (
+                        id, tenant_id, assignee_role, assignee_user_id, task_type, title,
+                        entity_type, entity_id, status, due_at, nudge_schedule, params
+                    ) VALUES (
+                        $1, $2, $3, $4, 'final_due', $5, 'proposal', $6, 'open', $7,
+                        '[7,3,1]'::jsonb, $8::jsonb
+                    )
+                    """,
+                    uuid.UUID(task_id),
+                    r["tenant_id"],
+                    None if r["manager_id"] else "tenant_admin",
+                    r["manager_id"],
+                    f"Final submission due: {r['title']}"[:500],
+                    r["id"],
+                    r["close_date"],
+                    json.dumps({"anchor": "final_due", "generated": True}),
+                )
+                await self._emit_event(
+                    conn, "system", "task.created",
+                    str(r["tenant_id"]) if r["tenant_id"] else None,
+                    {
+                        "task_id": task_id,
+                        "task_type": "final_due",
+                        "entity_type": "proposal",
+                        "entity_id": str(r["id"]),
+                        "anchor": "final_due",
+                        "due_at": r["close_date"].isoformat(),
+                    },
+                )
+                created += 1
+            except Exception as e:
+                logger.error("[_sweep_date_anchored_tasks] insert failed for proposal %s: %s", r["id"], e)
+        if created:
+            logger.info("[_sweep_date_anchored_tasks] generated %d final_due task(s)", created)
+
+        # W-P: expire HUMAN tasks long past their deadline (the +30d past-due anchor)
+        # so the queue self-cleans and nudges stop. Only process_instance_id IS NULL
+        # (human/anchor) tasks — a workflow-parked task must be reaped by the INSTANCE
+        # deadline sweep (resume path), not orphaned by expiring its task here.
+        try:
+            tag = await conn.execute(
+                """
+                UPDATE tasks SET status = 'expired', updated_at = now()
+                WHERE status IN ('open', 'in_progress')
+                  AND process_instance_id IS NULL
+                  AND due_at IS NOT NULL
+                  AND due_at < now() - interval '30 days'
+                """
+            )
+            n_expired = int(tag.split()[-1]) if tag and tag.startswith("UPDATE") else 0
+            if n_expired:
+                logger.info("[_sweep_date_anchored_tasks] expired %d past-due human task(s)", n_expired)
+        except Exception as e:
+            logger.error("[_sweep_date_anchored_tasks] expiry pass failed: %s", e)
+
+        return created
 
     async def resume_instance(
         self,
@@ -1106,9 +1344,10 @@ class WorkflowManager:
         from workflows.base import EventTrigger  # local import: avoid cycle at module load
 
         resumed: list[str] = []
+        event_payload = event.get("payload") or {}
         rows = await conn.fetch(
             """
-            SELECT id, workflow_name, current_step FROM process_instances
+            SELECT id, workflow_name, current_step, payload FROM process_instances
             WHERE status = 'paused' AND source = $1
             """,
             self.source,
@@ -1123,12 +1362,47 @@ class WorkflowManager:
             wait_for: Optional[EventTrigger] = getattr(step, "wait_for", None)
             if wait_for is None:
                 continue
-            if wait_for.matches(event):
-                if await self.resume_instance(
-                    conn, str(row["id"]), resume_data={"resumed_by_event": event.get("id")}
-                ):
-                    resumed.append(str(row["id"]))
+            if not wait_for.matches(event):
+                continue
+            # ENTITY CORRELATION: wait_for matches on namespace/type/phase/condition
+            # only, so without this a single 'proposal.advanced'/'user.logged_in'/
+            # 'source_diff.reviewed' would resume EVERY paused gate of that kind —
+            # across proposals, users, even tenants. Resume only when the event is
+            # about the SAME entity as the parked instance.
+            inst_payload = row.get("payload")
+            if isinstance(inst_payload, str):
+                try:
+                    inst_payload = json.loads(inst_payload)
+                except (json.JSONDecodeError, TypeError):
+                    inst_payload = {}
+            if not self._event_correlates(event_payload, inst_payload or {}):
+                continue
+            if await self.resume_instance(
+                conn, str(row["id"]), resume_data={"resumed_by_event": event.get("id")}
+            ):
+                resumed.append(str(row["id"]))
         return resumed
+
+    # Entity keys that disambiguate WHICH parked instance an event belongs to.
+    _CORRELATION_KEYS = (
+        "proposalId", "userId", "sourceId", "opportunityId", "sectionId", "contentId",
+    )
+
+    @classmethod
+    def _event_correlates(cls, event_payload: dict[str, Any], instance_payload: dict[str, Any]) -> bool:
+        """True if the event is about the same entity as the parked instance.
+
+        Require equality on every correlation key present in BOTH payloads. If the
+        two share no correlation key, fall back to True (a workflow that genuinely
+        waits on a non-entity event) — so this only ever TIGHTENS, never loosens.
+        """
+        shared = [
+            k for k in cls._CORRELATION_KEYS
+            if event_payload.get(k) is not None and instance_payload.get(k) is not None
+        ]
+        if not shared:
+            return True
+        return all(event_payload.get(k) == instance_payload.get(k) for k in shared)
 
     @staticmethod
     def _resolve_workflow_class(workflow_name: str):
@@ -1183,7 +1457,11 @@ class WorkflowManager:
         event_dict: dict[str, Any] = {"payload": trigger_payload}
         inputs = resolve_inputs(step.input_map, event_dict, prior_results)
 
-        return await processor_execute_step(conn, step, inputs, trigger_event=event_dict)
+        # Thread fabric so AI_INVOKE steps actually call Claude on the managed path
+        # (when fabric + ANTHROPIC_API_KEY are configured); else it skips as before.
+        return await processor_execute_step(
+            conn, step, inputs, trigger_event=event_dict, fabric=self._fabric
+        )
 
     async def _run_on_timeout(
         self,
@@ -1294,6 +1572,21 @@ class WorkflowManager:
                         await self._sweep_task_nudges(nudge_conn)
                 else:
                     await self._sweep_task_nudges(conn)
+
+                # Generate date-ANCHORED tasks from proposal deadlines (J2), at most
+                # ~hourly (it scans proposals, not the hot per-minute path; idempotent
+                # via NOT EXISTS so the cadence only bounds the scan cost).
+                _now = datetime.now(timezone.utc)
+                if self._last_anchor_sweep is None or (_now - self._last_anchor_sweep) > timedelta(hours=1):
+                    self._last_anchor_sweep = _now
+                    try:
+                        if pool:
+                            async with pool.acquire() as anchor_conn:
+                                await self._sweep_date_anchored_tasks(anchor_conn)
+                        else:
+                            await self._sweep_date_anchored_tasks(conn)
+                    except Exception as anchor_err:
+                        logger.error("[anchor_sweep] failed: %s", anchor_err)
 
                 # Check for stale heartbeats on running instances
                 if pool:
@@ -1469,53 +1762,71 @@ class WorkflowManager:
                             conn, pt_row["workflow_name"], pt_row["current_step"],
                             pt_payload or {}, tenant_str, pt_id,
                         )
+                    # COMPARE-AND-SWAP on status='paused': if a human completed the
+                    # task in the SELECT→UPDATE window (resume flipped it to
+                    # 'retrying'), this UPDATE affects 0 rows and we DON'T clobber the
+                    # resume or destroy the completed work. Only on a real fail do we
+                    # expire the sibling task (it can never resume a failed instance —
+                    # the W-P orphan), record the transition, and emit.
                     if pool:
                         async with pool.acquire() as u_conn:
-                            await u_conn.execute(
+                            _tag = await u_conn.execute(
                                 """
                                 UPDATE process_instances
                                 SET status = 'failed',
                                     last_error = 'wait_deadline_exceeded',
                                     last_error_step = $2, completed_at = now()
-                                WHERE id = $1
+                                WHERE id = $1 AND status = 'paused'
                                 """,
                                 pt_row["id"], pt_row["current_step"],
                             )
+                            if _tag.endswith(" 1"):
+                                await u_conn.execute(
+                                    "UPDATE tasks SET status='expired', updated_at=now() "
+                                    "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
+                                    pt_row["id"],
+                                )
+                                await self._record_transition(
+                                    u_conn, pt_id, "paused", "failed",
+                                    actor="cron", reason="wait_deadline_exceeded",
+                                )
+                                await self._emit_event(
+                                    u_conn, "system", "workflow.wait_timed_out", tenant_str,
+                                    {
+                                        "instance_id": pt_id,
+                                        "workflow_name": pt_row["workflow_name"],
+                                        "current_step": pt_row["current_step"],
+                                    },
+                                )
+                    else:
+                        _tag = await conn.execute(
+                            """
+                            UPDATE process_instances
+                            SET status = 'failed',
+                                last_error = 'wait_deadline_exceeded',
+                                last_error_step = $2, completed_at = now()
+                            WHERE id = $1 AND status = 'paused'
+                            """,
+                            pt_row["id"], pt_row["current_step"],
+                        )
+                        if _tag.endswith(" 1"):
+                            await conn.execute(
+                                "UPDATE tasks SET status='expired', updated_at=now() "
+                                "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
+                                pt_row["id"],
+                            )
                             await self._record_transition(
-                                u_conn, pt_id, "paused", "failed",
+                                conn, pt_id, "paused", "failed",
                                 actor="cron", reason="wait_deadline_exceeded",
                             )
                             await self._emit_event(
-                                u_conn, "system", "workflow.wait_timed_out", tenant_str,
+                                conn, "system", "workflow.wait_timed_out", tenant_str,
                                 {
                                     "instance_id": pt_id,
                                     "workflow_name": pt_row["workflow_name"],
                                     "current_step": pt_row["current_step"],
                                 },
                             )
-                    else:
-                        await conn.execute(
-                            """
-                            UPDATE process_instances
-                            SET status = 'failed',
-                                last_error = 'wait_deadline_exceeded',
-                                last_error_step = $2, completed_at = now()
-                            WHERE id = $1
-                            """,
-                            pt_row["id"], pt_row["current_step"],
-                        )
-                        await self._record_transition(
-                            conn, pt_id, "paused", "failed",
-                            actor="cron", reason="wait_deadline_exceeded",
-                        )
-                        await self._emit_event(
-                            conn, "system", "workflow.wait_timed_out", tenant_str,
-                            {
-                                "instance_id": pt_id,
-                                "workflow_name": pt_row["workflow_name"],
-                                "current_step": pt_row["current_step"],
-                            },
-                        )
 
             except asyncio.CancelledError:
                 break

@@ -19,6 +19,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { putObject } from '@/lib/storage/s3-client';
 import { emitEventSingle } from '@/lib/events';
+import { isValidUUID } from '@/lib/validation';
 
 // Common topic-number patterns in filenames
 const TOPIC_RE = /([A-Z]{1,5}\d{2,3}[._-]\w{1,10})/i;
@@ -52,8 +53,8 @@ export async function POST(request: Request) {
   }
 
   const solicitationId = String(formData.get('solicitationId') ?? '');
-  if (!solicitationId) {
-    return NextResponse.json({ error: 'solicitationId required', code: 'VALIDATION_ERROR' }, { status: 400 });
+  if (!solicitationId || !isValidUUID(solicitationId)) {
+    return NextResponse.json({ error: 'A valid solicitationId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
   // Verify solicitation exists + get its primary opportunity for path generation
@@ -139,12 +140,19 @@ export async function POST(request: Request) {
         VALUES
           (${solicitationId}::uuid, 'topic', ${displayName}, ${storageKey},
            ${file.size}, ${file.type || null}, ${hash}, ${userId ?? null}::uuid,
-           ${JSON.stringify({ parsed_topic_number: topicNumber, parsed_title: title })}::jsonb)
+           ${sql.json({ parsed_topic_number: topicNumber, parsed_title: title })})
+        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
         RETURNING id
       `;
     } catch (err) {
       console.error('[upload-topic-files] document insert failed', err);
       return NextResponse.json({ error: 'Failed to record document', code: 'DB_ERROR' }, { status: 500 });
+    }
+    // A concurrent upload of the same file won the dedup race — skip silently
+    // (matches the SELECT-based skip above) instead of 500-ing on the partial
+    // unique violation. The ON CONFLICT must restate the index's partial predicate.
+    if (docRows.length === 0) {
+      continue;
     }
     uploaded.push({
       documentId: docRows[0].id,

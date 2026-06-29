@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
 
@@ -239,7 +240,7 @@ export async function POST(
   const { action, unitIds, category: newCategory, tags: newTags } = body;
 
   // ---------- Validate ----------
-  if (!action || !Array.isArray(unitIds) || unitIds.length === 0) {
+  if (!action || !Array.isArray(unitIds) || unitIds.length === 0 || !unitIds.every((id) => typeof id === 'string' && isValidUUID(id))) {
     return NextResponse.json(
       { error: 'action (string) and unitIds (non-empty array) are required', code: 'VALIDATION_ERROR' },
       { status: 400 },

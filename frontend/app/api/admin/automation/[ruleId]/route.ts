@@ -110,7 +110,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       if (typeof body.actionConfig === 'object' && body.actionConfig !== null) {
         await sql`
           UPDATE automation_rules
-          SET action_config = ${JSON.stringify(body.actionConfig)}::jsonb, updated_at = now()
+          SET action_config = ${sql.json(body.actionConfig as Parameters<typeof sql.json>[0])}, updated_at = now()
           WHERE id = ${ruleId}::uuid
         `;
         changes.push('action_config updated');

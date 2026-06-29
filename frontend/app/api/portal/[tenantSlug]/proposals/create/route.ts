@@ -11,6 +11,7 @@ import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
+import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -264,17 +265,54 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/create] section_standards load failed (non-fatal):', stdErr);
     }
 
+    // ── R0.3: resolve the source spotlight bucket for the IMMUTABLE origin card ─
+    // Best-effort — an admin-granted opportunity that was never spotlighted simply
+    // has no bucket (source_bucket stays null). Read before the txn so the freeze
+    // is atomic in the INSERT (no post-insert UPDATE window).
+    let topBucket: { bucket: string; score: number } | null = null;
+    try {
+      const [b] = await sql<{ bucket: string; score: number }[]>`
+        SELECT bucket, score FROM spotlight_bucket_scores
+        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${topicId}::uuid
+        ORDER BY score DESC NULLS LAST
+        LIMIT 1
+      `;
+      topBucket = b ?? null;
+    } catch (bucketErr) {
+      console.error('[api/portal/proposals/create] source bucket lookup failed (non-fatal):', bucketErr);
+    }
+
+    // The IMMUTABLE origin layer of the card: the L0 opportunity summary + the L1
+    // source bucket, frozen at purchase so a later master edit / close / amendment
+    // never rewrites the project's audit. Compliance is deliberately NOT frozen
+    // here — it renders LIVE from the matrix (an amendment must raise the live
+    // burden; freezing it would understate it — mig 089 / 3-factor review flaw #7).
+    const originCard = {
+      opportunity: {
+        id: topicId,
+        title: topic.title,
+        agency: topic.agency,
+        programType: topic.programType,
+        topicNumber: topic.topicNumber,
+        solicitationNumber: topic.solicitationNumber,
+      },
+      bucket: topBucket ? { key: topBucket.bucket, score: topBucket.score } : null,
+      frozenAt: new Date().toISOString(),
+    };
+
     const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
-        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked)
+        INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (
           ${tenantId},
           ${topicId},
           ${topic.solicitationId},
           ${proposalTitle},
           'draft',
-          ${JSON.stringify(gateConfig)}::jsonb,
-          true
+          ${sql.json(gateConfig)},
+          true,
+          ${sql.json(originCard)},
+          ${topBucket?.bucket ?? null}
         )
         RETURNING id
       `;
@@ -657,16 +695,38 @@ export async function POST(request: Request, ctx: RouteContext) {
       // Best-effort — never break the main flow
     }
 
-    // ── 72h admin-review SLA ────────────────────────────────────────
-    // The admin is notified now via the inline emails above + the OnProposalCreated
-    // workflow (proposal.created → admin review). A previously-inserted
-    // `AdminProposalSetup` process_instance was a PHANTOM — no such Workflow class
-    // exists, so the manager's stuck-detection sweep force-failed it ~5 min later
-    // (status='running' with no heartbeat), polluting the admin monitor on every
-    // proposal and double-counting against OnProposalCreated. Removed (gap-sweep C1).
-    // A real deadline-tracked HITL gate (pause + nudge + escalation at 72h) belongs
-    // to the structured workflow-template-overlay roadmap item (D) and must be a
-    // registered Workflow with a HITL/TODO step, not a bare row.
+    // ── 72h admin-review HITL gate (R3.3 spine bridge) ──────────────
+    // Launch the generic ProjectCollaboration reaction on the opportunity spine:
+    // a REAL deadline-tracked, nudged HITL gate parked in the rfp_admin task queue
+    // (entity = this proposal), resolved when the admin reviews + unlocks. This is
+    // the registered-Workflow HITL gate that replaces the old `AdminProposalSetup`
+    // PHANTOM (a bare process_instances row with no Workflow class, force-failed by
+    // the stuck sweep ~5 min in — removed in gap-sweep C1). The inline admin emails
+    // above stay as the immediate ping; this adds the tracked, nudged queue item.
+    // Non-fatal: a launch failure never breaks proposal creation.
+    try {
+      const launch = await launchProjectCollaboration({
+        actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+        tenantId,
+        scope: 'project',
+        opportunityId: topicId,
+        proposalId: proposal.id,
+        stage: 'draft',
+        taskType: 'admin_review',
+        taskTitle: `Review & unlock: ${proposalTitle}`,
+        assigneeRole: 'rfp_admin',
+        entityType: 'proposal',
+        entityRef: proposal.id,
+        nudgeDays: [1, 3],
+        dueMinutes: 4320, // 72h review SLA
+        completeTemplate: 'proposal_unlocked',
+      });
+      if (!launch.ok) {
+        console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+      }
+    } catch (launchErr) {
+      console.error('[proposals/create] ProjectCollaboration launch failed (non-fatal):', launchErr);
+    }
 
     return NextResponse.json({
       data: {

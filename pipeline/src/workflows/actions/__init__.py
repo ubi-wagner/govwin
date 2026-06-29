@@ -45,6 +45,7 @@ from workflows.actions.create_library_defaults import create_default_categories
 from workflows.actions.generate_preview import generate_preview
 from workflows.actions.create_drafts_from_scout import create_drafts_from_scout
 from workflows.actions.cms_content import draft_content, publish_content
+from workflows.actions.publish_section_draft import publish_section_draft
 
 __all__ = [
     "shred",
@@ -55,4 +56,5 @@ __all__ = [
     "create_drafts_from_scout",
     "draft_content",
     "publish_content",
+    "publish_section_draft",
 ]

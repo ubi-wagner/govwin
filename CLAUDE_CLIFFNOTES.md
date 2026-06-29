@@ -1136,3 +1136,77 @@ before writing SQL against them. Full journal: `docs/V1_TASKING.md` §11.
 - Events added: `proposal.v0_provisioned` (create-route copy), `artifact.locked` (section lock route).
 - Modules: `frontend/lib/artifact-spec.ts` (`buildArtifactSpecs`), `pipeline/src/agents/platform_guard.py`
   (`platform_ai_allowed` / `log_platform_call`).
+
+---
+
+## 4b. Common Mistakes — hidden-bug sweep, 2026-06-29 (full report: docs/V1_SWEEP_FINDINGS_2026-06-29.md)
+
+### Mistake 18: jsonb written `JSON.stringify(x)::jsonb` reads back as a STRING
+**The single most damaging class found.** A jsonb column written `${JSON.stringify(x)}::jsonb`
+double-encodes and reads back through postgres.js as a **string** (JSON text), NOT a parsed
+array/object. A string still has `.indexOf`/`.includes`/`.length`/`for..of`/spread, so array
+ops silently run on CHARACTERS instead of throwing. This broke `gate_config` (stage advance →
+single char → CHECK 500; collaborator stage-access → ~18 garbage rows), `step_status`/`step_results`
+(admin unstick → char-indexed object → state loss), and preset `compliance_data` (all-NULL writes).
+- **Rule (WRITE):** write jsonb via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the
+  column is later read as an object/array. A DDL `DEFAULT` literal reads back parsed; an explicit
+  `JSON.stringify::jsonb` does not.
+- **Rule (READ):** at any site consuming a jsonb column as an object/array, coerce with
+  `coerceJsonb<T>(value, fallback)` (`frontend/lib/jsonb.ts`) — it parses the string form AND
+  passes a real object through, repairing existing rows. Python side: `json.loads(x) if isinstance(x, str) else x`.
+
+### Mistake 19: ON CONFLICT against a PARTIAL unique index must restate the predicate
+A `CREATE UNIQUE INDEX … WHERE <pred>` cannot be inferred by `ON CONFLICT (cols) DO …` unless the
+`WHERE <pred>` is restated — otherwise it throws `no unique or exclusion constraint matching the
+ON CONFLICT specification` at runtime, on EVERY call. This was a P1 (`create_instance` dedup index;
+every workflow launch threw on a fresh deploy).
+- **Rule:** `ON CONFLICT (workflow_name, trigger_event_id) WHERE trigger_event_id IS NOT NULL DO …`.
+  Check `\d <table>` for the index's `WHERE` and copy it verbatim. (Verified clean across the
+  codebase after the fix — keep it that way.)
+
+### Mistake 20: count()/bigint read as a string in TS
+postgres.js returns `int8`/`bigint` (every `count(*)`, `sum`) as a **string**. `x === 5` is false;
+`x + 1` concatenates. The rollup view bit the `/admin/opportunities` page.
+- **Rule:** cast in SQL (`count(*)::int AS n`) or `Number(x)` at the boundary. The codebase is
+  otherwise disciplined here — match it.
+
+### Mistake 21: inserting a literal a CHECK constraint rejects
+Writing a value not in a column's CHECK throws at runtime (hit `canvas_versions.source='strawman'`
+— the enum is `ai_draft|human_edit|ai_revision|library_import|template|system`). Before writing a
+literal to a constrained column, confirm it via `\d <table>` / `pg_get_constraintdef`. Map logical
+labels onto the allowed set.
+
+### Mistake 22: force-failing a paused workflow without a compare-and-swap (+ orphan task)
+The paused-deadline sweep must `UPDATE … SET status='failed' WHERE id=$1 AND status='paused'` — a
+human can resume (paused→retrying) in the SELECT→UPDATE window, and without the guard the sweep
+clobbers the completed work. And when a paused instance IS failed, expire its sibling `tasks` row
+(`process_instance_id=$1 AND status IN ('open','in_progress')`) or it lingers open + nudged forever.
+
+### Mistake 23: resuming HITL on an event without entity correlation
+`match_waiting_instances` matches `wait_for` on namespace/type/phase only — resuming on that alone
+wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate the event's entity id
+(proposalId/userId/sourceId/…) to the parked instance's payload before resuming (`_event_correlates`).
+
+---
+
+## 1b. Schema additions — the opportunity spine (migs 088–092)
+
+- **`process_instances`** += `opportunity_id UUID` (idx WHERE NOT NULL) + `scope TEXT CHECK(opp|spotlight|project|contract)`.
+  Set by `create_instance` from the overlay (`payload.opportunityId`/`scope`). The spine KEY for chaining/control-tower.
+- **`proposals`** += `origin_card JSONB DEFAULT '{}'` (FROZEN at purchase — opp summary + source bucket; compliance is
+  NEVER frozen, renders live) + `source_bucket TEXT`. + `stage` DEFAULT now `'draft'` (was CHECK-invalid `'outline'`).
+- **`contracts`** (mig 091): V2 scope. Keyed by `opportunity_id` (the spine) + `proposal_id` (winning proposal, partial
+  unique). Carries `origin_card` forward. CHECK status `active|closed|terminated`.
+- **`v_opportunity_rollup`**: `GROUP BY opportunity_id` over `opportunities ⋈ tenant_pipeline_items ⋈ proposals ⋈ contracts`
+  — all `count(DISTINCT …)` (no fan-out). Counts are bigint → cast `::int` when consumed.
+- **`tasks`** (mig 053): now also written by HUMAN delegation (`createTask`, `process_instance_id` NULL → completeTask
+  closes without resume) + date-anchored generation (`_sweep_date_anchored_tasks`, `task_type='final_due'`). `params.kind`
+  (`upload|form|review`) selects the typed completer.
+
+## 3b. Event namespaces — spine additions
+- `proposal:project.collaboration_requested:single` — launches the generic `ProjectCollaboration` HITL reaction (the
+  ONLY consumer). Emitted by `launchProjectCollaboration` (create route + Stripe webhook bridges).
+- `proposal:task.assigned`, `proposal:section.drafted`, `system:task.created` — emitted, read-only/audit (no workflow consumer by design).
+- The AI workforce is PARTLY wired: `AgentFabric` is live, `color_team_reviewer` runs end-to-end via `agent_task_queue`;
+  the other archetypes are dormant (no producer). `publish_section_draft` is the shipped draft-landing primitive but has
+  no caller yet (the 3-source strawman generation is the open AI integration). (Update CLAUDE.md's "built but not wired".)

@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
 interface RouteContext {
@@ -67,6 +68,13 @@ export async function GET(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Forbidden', code: 'FORBIDDEN' },
         { status: 403 },
+      );
+    }
+
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal id', code: 'VALIDATION_ERROR' },
+        { status: 400 },
       );
     }
 
@@ -166,6 +174,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json(
         { error: 'Forbidden', code: 'FORBIDDEN' },
         { status: 403 },
+      );
+    }
+
+    if (!isValidUUID(proposalId)) {
+      return NextResponse.json(
+        { error: 'Invalid proposal id', code: 'VALIDATION_ERROR' },
+        { status: 400 },
       );
     }
 

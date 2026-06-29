@@ -1,4 +1,5 @@
 import { sql } from '@/lib/db';
+import { coerceJsonb } from '@/lib/jsonb';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
@@ -113,7 +114,9 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   }
 
   // ── Determine next stage from gate_config ────────────────────────
-  const gates = (proposal.gateConfig || ['draft', 'final']) as string[];
+  // gate_config can read back as a JSON STRING (postgres.js + JSON.stringify::jsonb
+  // write) — coerce or .indexOf/.length/[i] silently operate on characters.
+  const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
   const currentIndex = gates.indexOf(proposal.stage);
 
   if (currentIndex === -1) {

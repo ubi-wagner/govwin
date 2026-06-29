@@ -5,7 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { authMock, sqlMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
-  sqlMock: vi.fn(),
+  // sql.json(v) — postgres.js jsonb param helper; passthrough in tests (the
+  // tagged-template mock just records interpolated values, doesn't run SQL).
+  sqlMock: Object.assign(vi.fn(), { json: (v: unknown) => v }),
 }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));

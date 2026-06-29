@@ -5,6 +5,7 @@ import { getAmountCents, type ProductType } from '@/lib/stripe';
 import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
+import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 
 /**
  * Stripe webhook handler. Verifies the webhook signature and processes
@@ -170,6 +171,32 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         tenantId,
         payload: { correlationId: randomUUID(), sessionId, productType, opportunityId },
       });
+
+      // R3.3: close the purchase.completed orphan. An opportunity purchase now
+      // fires a REAL transient project reaction on the spine — a ProjectCollaboration
+      // HITL gate parked in the rfp_admin queue to set up the proposal workspace for
+      // this tenant + opportunity (scope='opp', entity = the opportunity). Previously
+      // purchase.completed had no consumer at all. System-attributed launch.
+      if (opportunityId) {
+        try {
+          await launchProjectCollaboration({
+            actor: { id: 'stripe-webhook', email: null, tenantId },
+            actorType: 'system',
+            tenantId,
+            scope: 'opp',
+            opportunityId,
+            taskType: 'proposal_setup',
+            taskTitle: 'Set up the proposal workspace for this purchase',
+            assigneeRole: 'rfp_admin',
+            entityType: 'opportunity',
+            entityRef: opportunityId,
+            nudgeDays: [1, 3],
+            dueMinutes: 4320,
+          });
+        } catch (setupErr) {
+          console.error('[stripe/webhook] workspace-setup launch failed (non-fatal):', setupErr);
+        }
+      }
     }
   } catch (evtErr) {
     console.error('[stripe/webhook] checkout event emission failed:', evtErr);
