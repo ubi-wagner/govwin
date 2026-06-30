@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { AutomationClient } from './automation-client';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,15 @@ export default async function AutomationPage() {
     updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
   }));
 
+  const ruleItem = (r: AutomationRuleRow) => ({
+    left: r.name,
+    sub: `${r.triggerNamespace}.${r.triggerType} → ${r.actionType}`,
+    right: r.isActive ? 'active' : 'off',
+  });
+  const allRulesPreview: StatPreview = { title: 'Automation Rules', items: rules.slice(0, 6).map(ruleItem), emptyText: 'No rules yet' };
+  const activeRulesPreview: StatPreview = { title: 'Active Rules', items: rules.filter((r) => r.isActive).slice(0, 6).map(ruleItem), emptyText: 'No active rules' };
+  const inactiveRulesPreview: StatPreview = { title: 'Inactive Rules', items: rules.filter((r) => !r.isActive).slice(0, 6).map(ruleItem), emptyText: 'No inactive rules' };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -110,24 +120,12 @@ export default async function AutomationPage() {
         </Link>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats bar — hover any card for the rules behind the number */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Total Rules</div>
-          <div className="text-2xl font-bold text-gray-800 mt-1">{stats.total}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Active</div>
-          <div className="text-2xl font-bold text-green-600 mt-1">{stats.active}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Inactive</div>
-          <div className="text-2xl font-bold text-gray-400 mt-1">{stats.inactive}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Executions (24h)</div>
-          <div className="text-2xl font-bold text-blue-600 mt-1">{stats.recentExecutions}</div>
-        </div>
+        <StatCard label="Total Rules" value={stats.total} preview={allRulesPreview} />
+        <StatCard label="Active" value={<span className="text-green-600">{stats.active}</span>} preview={activeRulesPreview} />
+        <StatCard label="Inactive" value={<span className="text-gray-400">{stats.inactive}</span>} preview={inactiveRulesPreview} />
+        <StatCard label="Executions (24h)" value={<span className="text-blue-600">{stats.recentExecutions}</span>} href="/admin/events" />
       </div>
 
       <AutomationClient initialRules={serializedRules} />

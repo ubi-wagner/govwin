@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -152,6 +153,36 @@ export default async function BillingPage() {
 
   const formatVal = (v: number) => (v === -1 ? 'N/A' : v.toLocaleString());
 
+  // Hover previews built from the recent-purchases / tenants lists already fetched above.
+  const revenuePreview: StatPreview = {
+    title: 'Recent Completed Purchases',
+    items: purchases.filter((p) => p.status === 'completed').slice(0, 6)
+      .map((p) => ({ left: p.tenantName, sub: p.proposalTitle ?? p.productType, right: formatCents(p.amountCents) })),
+    emptyText: 'No completed purchases',
+    href: '/admin/purchases',
+  };
+  const activeSubsPreview: StatPreview = {
+    title: 'Active Subscriptions',
+    items: tenants.filter((t) => t.subscriptionStatus === 'active').slice(0, 6)
+      .map((t) => ({ left: t.name, right: t.subscriptionStatus ?? '' })),
+    emptyText: 'No active subscriptions',
+    href: '/admin/tenants',
+  };
+  const pendingPreview: StatPreview = {
+    title: 'Recent Pending Purchases',
+    items: purchases.filter((p) => p.status === 'pending').slice(0, 6)
+      .map((p) => ({ left: p.tenantName, sub: p.productType, right: formatCents(p.amountCents) })),
+    emptyText: 'No pending purchases',
+    href: '/admin/purchases',
+  };
+  const refundedPreview: StatPreview = {
+    title: 'Recent Refunds',
+    items: purchases.filter((p) => p.status === 'refunded').slice(0, 6)
+      .map((p) => ({ left: p.tenantName, sub: p.productType, right: formatCents(p.amountCents) })),
+    emptyText: 'No refunds',
+    href: '/admin/purchases',
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <header className="mb-6">
@@ -161,10 +192,10 @@ export default async function BillingPage() {
 
       {/* ── Revenue Overview ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <MetricCard label="Total Revenue" value={formatCents(totalRevenueCents)} />
-        <MetricCard label="Active Subscriptions" value={formatVal(activeSubscriptions)} />
-        <MetricCard label="Pending Purchases" value={formatVal(pendingPurchases)} />
-        <MetricCard label="Refunded" value={formatVal(refundedPurchases)} />
+        <StatCard label="Total Revenue" value={formatCents(totalRevenueCents)} href="/admin/purchases" preview={revenuePreview} />
+        <StatCard label="Active Subscriptions" value={formatVal(activeSubscriptions)} href="/admin/tenants" preview={activeSubsPreview} />
+        <StatCard label="Pending Purchases" value={formatVal(pendingPurchases)} href="/admin/purchases" preview={pendingPreview} />
+        <StatCard label="Refunded" value={formatVal(refundedPurchases)} href="/admin/purchases" preview={refundedPreview} />
       </div>
 
       {/* ── Recent Purchases ─────────────────────────────────────── */}
@@ -276,15 +307,6 @@ export default async function BillingPage() {
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-xs text-gray-500 uppercase font-medium">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
     </div>
   );
 }

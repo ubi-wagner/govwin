@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { getRecentSessions } from '@/lib/analytics-admin';
 import { RecentSessions } from '@/components/admin/recent-sessions';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -200,6 +201,43 @@ export default async function AnalyticsPage() {
 
   const formatVal = (v: number) => (v === -1 ? 'N/A' : v.toLocaleString());
 
+  // Hover-preview content, all built from data already fetched above (no extra queries).
+  const proposalsPreview: StatPreview = {
+    title: 'Proposals by Stage',
+    items: proposalsByStage.slice(0, 6).map((s) => ({ left: s.stage.replace(/_/g, ' '), right: String(s.count) })),
+    emptyText: 'No proposals yet',
+    href: '/admin/proposals',
+  };
+  const atomsPreview: StatPreview = {
+    title: 'Atoms by Category',
+    items: atomsByCategory.slice(0, 6).map((c) => ({ left: c.category, right: String(c.count) })),
+    emptyText: 'No atoms yet',
+  };
+  const eventsPreview: StatPreview = {
+    title: 'Events / day (7d)',
+    items: [...eventsByDay].reverse().slice(0, 6).map((d) => ({
+      left: new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      right: String(d.count),
+    })),
+    emptyText: 'No events recorded',
+    href: '/admin/events',
+  };
+  const pagesPreview: StatPreview = {
+    title: 'Top Pages (7d)',
+    items: topPages.slice(0, 6).map((p) => ({ left: p.pagePath, right: String(p.views) })),
+    emptyText: 'No page views yet',
+  };
+  const referrersPreview: StatPreview = {
+    title: 'Top Referrers (7d)',
+    items: topReferrers.slice(0, 5).map((r) => ({ left: r.referrer, right: String(r.count) })),
+    emptyText: 'No referrer data yet',
+  };
+  const devicePreview: StatPreview = {
+    title: 'Devices (7d)',
+    items: deviceBreakdown.slice(0, 6).map((d) => ({ left: d.deviceType, right: String(d.count) })),
+    emptyText: 'No device data yet',
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <header className="mb-6">
@@ -209,21 +247,22 @@ export default async function AnalyticsPage() {
 
       {/* Top-level metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <MetricCard label="Total Tenants" value={formatVal(totalTenants)} />
-        <MetricCard label="Active Tenants" value={formatVal(activeTenants)} />
-        <MetricCard label="Total Proposals" value={formatVal(totalProposals)} />
-        <MetricCard label="Library Atoms" value={formatVal(totalLibraryAtoms)} />
-        <MetricCard label="Winning Atoms" value={formatVal(winningAtoms)} />
+        <StatCard label="Total Tenants" value={formatVal(totalTenants)} href="/admin/tenants" />
+        <StatCard label="Active Tenants" value={formatVal(activeTenants)} href="/admin/tenants" />
+        <StatCard label="Total Proposals" value={formatVal(totalProposals)} href="/admin/proposals" preview={proposalsPreview} />
+        <StatCard label="Library Atoms" value={formatVal(totalLibraryAtoms)} preview={atomsPreview} />
+        <StatCard label="Winning Atoms" value={formatVal(winningAtoms)} preview={atomsPreview} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <MetricCard
+        <StatCard
           label="Total Revenue"
           value={totalRevenueCents === -1 ? 'N/A' : `$${(totalRevenueCents / 100).toFixed(2)}`}
+          href="/admin/billing"
         />
-        <MetricCard label="Active Subscriptions" value={formatVal(activeSubscriptions)} />
-        <MetricCard label="Source Changes (7d)" value={formatVal(sourceChangesWeek)} />
-        <MetricCard label="Events Today" value={formatVal(eventsToday)} />
+        <StatCard label="Active Subscriptions" value={formatVal(activeSubscriptions)} href="/admin/billing" />
+        <StatCard label="Source Changes (7d)" value={formatVal(sourceChangesWeek)} href="/admin/sources" />
+        <StatCard label="Events Today" value={formatVal(eventsToday)} href="/admin/events" preview={eventsPreview} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -300,19 +339,19 @@ export default async function AnalyticsPage() {
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <MetricCard label="Unique Visitors (24h)" value={formatVal(visitors24h)} />
-        <MetricCard label="Page Views (24h)" value={formatVal(pageViews24h)} />
-        <MetricCard label="Unique Visitors (7d)" value={formatVal(visitors7d)} />
-        <MetricCard label="Page Views (7d)" value={formatVal(pageViews7d)} />
+        <StatCard label="Unique Visitors (24h)" value={formatVal(visitors24h)} preview={devicePreview} />
+        <StatCard label="Page Views (24h)" value={formatVal(pageViews24h)} preview={pagesPreview} />
+        <StatCard label="Unique Visitors (7d)" value={formatVal(visitors7d)} preview={referrersPreview} />
+        <StatCard label="Page Views (7d)" value={formatVal(pageViews7d)} preview={pagesPreview} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <MetricCard
+        <StatCard
           label="Avg. Time on Page (7d)"
           value={avgDuration === -1 ? 'N/A' : avgDuration === 0 ? '0s' : `${(avgDuration / 1000).toFixed(1)}s`}
         />
         {deviceBreakdown.map((d) => (
-          <MetricCard
+          <StatCard
             key={d.deviceType}
             label={`${d.deviceType.charAt(0).toUpperCase() + d.deviceType.slice(1)} Visitors (7d)`}
             value={formatVal(d.count)}
@@ -394,15 +433,6 @@ export default async function AnalyticsPage() {
         </p>
         <RecentSessions sessions={recentSessions} />
       </div>
-    </div>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-xs text-gray-500 uppercase font-medium">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
     </div>
   );
 }

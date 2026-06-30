@@ -3,14 +3,16 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { TaskQueue } from '@/components/tasks/task-queue';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
-type StatCard = {
+type Stat = {
   label: string;
   value: number;
   href: string;
   color: string;
+  preview?: StatPreview;
 };
 
 type RecentEvent = {
@@ -88,18 +90,7 @@ export default async function DashboardPage() {
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM sbir_awards`),
   ]);
 
-  const stats: StatCard[] = [
-    { label: 'Pending Applications', value: pendingApps, href: '/admin/applications', color: 'border-amber-400 bg-amber-50' },
-    { label: 'Active Tenants', value: activeTenants, href: '/admin/tenants', color: 'border-blue-400 bg-blue-50' },
-    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/analytics', color: 'border-teal-400 bg-teal-50' },
-    { label: 'Active Proposals', value: activeProposals, href: '/admin/proposals', color: 'border-purple-400 bg-purple-50' },
-    { label: 'RFPs in Curation', value: rfpsCuration, href: '/admin/rfp-curation', color: 'border-green-400 bg-green-50' },
-    { label: 'Events Today', value: eventsToday, href: '/admin/events', color: 'border-indigo-400 bg-indigo-50' },
-    { label: 'SBIR Companies', value: sbirCompanies, href: '/admin/analytics', color: 'border-orange-400 bg-orange-50' },
-    { label: 'SBIR Awards', value: sbirAwards, href: '/admin/analytics', color: 'border-pink-400 bg-pink-50' },
-  ];
-
-  // Recent events
+  // Recent events — drives both the table below and the "Events Today" hover-preview.
   let recentEvents: RecentEvent[] = [];
   try {
     recentEvents = await sql<RecentEvent[]>`
@@ -111,6 +102,28 @@ export default async function DashboardPage() {
   } catch (e) {
     console.error('[admin/dashboard] recent events query failed:', e);
   }
+
+  const eventsPreview: StatPreview = {
+    title: 'Recent Events',
+    items: recentEvents.slice(0, 6).map((ev) => ({
+      left: `${ev.namespace}.${ev.type}`,
+      sub: ev.actorEmail ?? ev.actorId ?? undefined,
+      right: relativeTime(ev.createdAt),
+    })),
+    emptyText: 'No events recorded',
+    href: '/admin/events',
+  };
+
+  const stats: Stat[] = [
+    { label: 'Pending Applications', value: pendingApps, href: '/admin/applications', color: 'border-amber-400 bg-amber-50' },
+    { label: 'Active Tenants', value: activeTenants, href: '/admin/tenants', color: 'border-blue-400 bg-blue-50' },
+    { label: 'Library Atoms', value: libraryAtoms, href: '/admin/analytics', color: 'border-teal-400 bg-teal-50' },
+    { label: 'Active Proposals', value: activeProposals, href: '/admin/proposals', color: 'border-purple-400 bg-purple-50' },
+    { label: 'RFPs in Curation', value: rfpsCuration, href: '/admin/rfp-curation', color: 'border-green-400 bg-green-50' },
+    { label: 'Events Today', value: eventsToday, href: '/admin/events', color: 'border-indigo-400 bg-indigo-50', preview: eventsPreview },
+    { label: 'SBIR Companies', value: sbirCompanies, href: '/admin/analytics', color: 'border-orange-400 bg-orange-50' },
+    { label: 'SBIR Awards', value: sbirAwards, href: '/admin/analytics', color: 'border-pink-400 bg-pink-50' },
+  ];
 
   // Pending actions counts
   let unclaimed = 0;
@@ -139,20 +152,14 @@ export default async function DashboardPage() {
       {/* Stat cards grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {stats.map((s) => (
-          <Link
+          <StatCard
             key={s.label}
+            label={s.label}
+            value={s.value === -1 ? <span className="text-gray-400 text-sm">unavailable</span> : s.value.toLocaleString()}
             href={s.href}
-            className={`block border-l-4 rounded-lg p-4 hover:shadow-md transition-shadow ${s.color}`}
-          >
-            <p className="text-xs text-gray-500 uppercase font-medium">{s.label}</p>
-            <p className="text-2xl font-bold mt-1">
-              {s.value === -1 ? (
-                <span className="text-gray-400 text-sm">unavailable</span>
-              ) : (
-                s.value.toLocaleString()
-              )}
-            </p>
-          </Link>
+            color={s.color}
+            preview={s.preview}
+          />
         ))}
       </div>
 
