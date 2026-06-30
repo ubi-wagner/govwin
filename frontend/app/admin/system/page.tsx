@@ -24,6 +24,7 @@ import {
 } from '@/lib/capacity';
 import { list as listTools } from '@/lib/tools';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,20 @@ export default async function SystemAdminPage() {
 
   const tools = listTools();
 
+  const errorsPreview: StatPreview = {
+    title: 'Recent Errors',
+    items: errors.slice(0, 6).map((e) => ({
+      left: `${e.namespace}.${e.type}`,
+      sub:
+        e.error && typeof e.error === 'object' && 'message' in e.error
+          ? String((e.error as { message: unknown }).message)
+          : undefined,
+      right: new Date(e.createdAt).toLocaleTimeString(),
+    })),
+    emptyText: 'No errors recorded',
+    href: '/admin/events',
+  };
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
       <header>
@@ -61,13 +76,14 @@ export default async function SystemAdminPage() {
 
       {/* ─── Top-line metrics ────────────────────────────────────── */}
       <section className="grid grid-cols-3 gap-4">
-        <MetricCard label="Queue depth" value={depth.toLocaleString()} hint="agent_task_queue pending rows" />
-        <MetricCard label="Events (1h)" value={rates.eventsLastHour.toLocaleString()} hint="system_events rows in the last hour" />
-        <MetricCard
+        <StatCard label="Queue depth" value={depth.toLocaleString()} hint="agent_task_queue pending rows" href="/admin/system-state" />
+        <StatCard label="Events (1h)" value={rates.eventsLastHour.toLocaleString()} hint="system_events rows in the last hour" href="/admin/events" />
+        <StatCard
           label="Errors (1h)"
-          value={rates.errorsLastHour.toLocaleString()}
+          value={<span className={rates.errorsLastHour > 0 ? 'text-red-600' : 'text-green-600'}>{rates.errorsLastHour.toLocaleString()}</span>}
           hint="system_events rows with error IS NOT NULL in the last hour"
-          emphasis={rates.errorsLastHour > 0 ? 'danger' : 'ok'}
+          href="/admin/events"
+          preview={errorsPreview}
         />
       </section>
 
@@ -185,34 +201,6 @@ export default async function SystemAdminPage() {
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-// ─── Helper component ─────────────────────────────────────────────
-
-function MetricCard({
-  label,
-  value,
-  hint,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  emphasis?: 'ok' | 'danger';
-}) {
-  const valueClass =
-    emphasis === 'danger'
-      ? 'text-red-600'
-      : emphasis === 'ok'
-        ? 'text-green-600'
-        : 'text-gray-900';
-  return (
-    <div className="border border-gray-200 rounded p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`mt-2 text-3xl font-bold ${valueClass}`}>{value}</p>
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
   );
 }

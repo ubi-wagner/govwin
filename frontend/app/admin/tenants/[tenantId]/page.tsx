@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { TenantAiConfigCard } from '@/components/admin/tenant-ai-config-card';
+import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -179,6 +180,16 @@ export default async function TenantDetailPage({ params }: Props) {
     console.error('[admin/tenants/detail] events query failed', e);
   }
 
+  const usersPreview: StatPreview = {
+    title: 'Users',
+    items: users.slice(0, 6).map((u) => ({
+      left: u.name ?? u.email,
+      sub: u.name ? u.email : undefined,
+      right: u.role,
+    })),
+    emptyText: 'No users',
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -197,22 +208,10 @@ export default async function TenantDetailPage({ params }: Props) {
 
       {/* Info cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase font-medium">Users</p>
-          <p className="text-2xl font-bold mt-1">{users.length}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase font-medium">Proposals</p>
-          <p className="text-2xl font-bold mt-1">{proposalCount}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase font-medium">Library Atoms</p>
-          <p className="text-2xl font-bold mt-1">{libraryCount}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <p className="text-xs text-gray-500 uppercase font-medium">Revenue</p>
-          <p className="text-2xl font-bold mt-1">${(purchaseTotal / 100).toFixed(2)}</p>
-        </div>
+        <StatCard label="Users" value={users.length} preview={usersPreview} />
+        <StatCard label="Proposals" value={proposalCount} href="/admin/proposals" />
+        <StatCard label="Library Atoms" value={libraryCount} href="/admin/analytics" />
+        <StatCard label="Revenue" value={`$${(purchaseTotal / 100).toFixed(2)}`} href="/admin/billing" />
       </div>
 
       {/* Company details */}
