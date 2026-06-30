@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -78,9 +79,9 @@ export function StatCard({ label, value, hint, href, color, preview, className =
           <span
             aria-hidden
             className="text-gray-300 group-hover:text-gray-500 transition-colors text-xs leading-none"
-            title="Opens in a new tab"
+            title="Open this admin page"
           >
-            ↗
+            →
           </span>
         )}
       </div>
@@ -100,9 +101,9 @@ export function StatCard({ label, value, hint, href, color, preview, className =
       onBlur={scheduleHide}
     >
       {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={tileClass}>
+        <Link href={href} className={tileClass}>
           {tileInner}
-        </a>
+        </Link>
       ) : (
         <div className={tileClass}>{tileInner}</div>
       )}
@@ -139,14 +140,12 @@ export function StatCard({ label, value, hint, href, color, preview, className =
               </ul>
             )}
             {preview?.href && (
-              <a
+              <Link
                 href={preview.href}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="block px-3 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 border-t border-gray-100"
               >
-                {preview.hrefLabel ?? 'View all'} ↗
-              </a>
+                {preview.hrefLabel ?? 'View all'} →
+              </Link>
             )}
           </div>
         </div>

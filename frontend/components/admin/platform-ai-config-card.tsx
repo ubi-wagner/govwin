@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
 interface PlatformConfig {
   defaultMonthlyBudget: number;
@@ -28,6 +29,11 @@ export function PlatformAiConfigCard() {
   const [cap, setCap] = useState('');
   const [aiEnabled, setAiEnabled] = useState(true);
 
+  // Unsaved-changes guard: applyConfig (load + save) re-baselines the snapshot.
+  const snapshot = JSON.stringify({ budget, rate, ceiling, capEnabled, cap, aiEnabled });
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  useUnsavedChanges(snapshot !== savedSnapshot);
+
   function applyConfig(c: PlatformConfig) {
     setBudget(String(c.defaultMonthlyBudget));
     setRate(String(c.defaultRateLimitPerHour));
@@ -35,6 +41,14 @@ export function PlatformAiConfigCard() {
     setCapEnabled(c.platformMonthlyCap != null);
     setCap(c.platformMonthlyCap != null ? String(c.platformMonthlyCap) : '');
     setAiEnabled(c.aiEnabled);
+    setSavedSnapshot(JSON.stringify({
+      budget: String(c.defaultMonthlyBudget),
+      rate: String(c.defaultRateLimitPerHour),
+      ceiling: String(c.defaultPerCallCeiling),
+      capEnabled: c.platformMonthlyCap != null,
+      cap: c.platformMonthlyCap != null ? String(c.platformMonthlyCap) : '',
+      aiEnabled: c.aiEnabled,
+    }));
   }
 
   useEffect(() => {

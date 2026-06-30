@@ -1,7 +1,10 @@
 import { AdminNavLink } from '@/components/admin/admin-nav-link';
+import { AdminNavProvider } from '@/components/admin/admin-nav-context';
+import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
+    <AdminNavProvider>
     <div className="min-h-screen flex">
       <aside className="w-64 bg-navy-900 text-white p-6 flex flex-col">
         <AdminNavLink href="/admin/dashboard">
@@ -49,7 +52,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>
         </div>
       </aside>
-      <main className="flex-1 p-8 bg-gray-50 min-h-screen">{children}</main>
+      <main className="flex-1 p-8 bg-gray-50 min-h-screen">
+        <AdminNavTrail />
+        {children}
+      </main>
     </div>
+    </AdminNavProvider>
   );
 }

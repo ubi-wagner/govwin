@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
 interface Props {
   tenantId: string;
@@ -32,6 +33,10 @@ export function TenantAiConfigCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const snapshot = JSON.stringify({ budget, rate, ceiling });
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  useUnsavedChanges(snapshot !== savedSnapshot);
 
   async function save() {
     setError(null);
@@ -75,6 +80,7 @@ export function TenantAiConfigCard({
         return;
       }
       setNotice('Saved.');
+      setSavedSnapshot(snapshot);
     } catch {
       setError('Network error while saving');
     } finally {

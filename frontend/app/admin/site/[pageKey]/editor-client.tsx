@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { PageVersion, PageBlock } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 import { MarketingIcon, ICON_CATALOG } from '@/components/marketing/icons';
 
 function shortActor(s: string | null): string {
@@ -107,6 +108,9 @@ export default function EditorClient({
 }) {
   const initial = (draft ?? active)?.blocks ?? [];
   const [blocks, setBlocks] = useState<EditBlock[]>(initial.map(toEdit));
+  // Snapshot of the last saved/published state; drives the unsaved-changes guard.
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(initial.map(toEdit)));
+  useUnsavedChanges(JSON.stringify(blocks) !== savedSnapshot);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -149,7 +153,7 @@ export default function EditorClient({
         note: note || 'Saved',
       });
       setMsg(ok ? `Saved draft v${versionOf(json)}.` : String(json.error ?? 'Save failed'));
-      if (ok) setNote('');
+      if (ok) { setNote(''); setSavedSnapshot(JSON.stringify(blocks)); }
     } finally {
       setBusy(false);
     }
@@ -171,7 +175,7 @@ export default function EditorClient({
         note: note || 'Published',
       });
       setMsg(ok ? `Published v${versionOf(json)} — live.` : String(json.error ?? 'Publish failed'));
-      if (ok) setNote('');
+      if (ok) { setNote(''); setSavedSnapshot(JSON.stringify(blocks)); }
     } finally {
       setBusy(false);
     }
