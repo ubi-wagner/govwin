@@ -1,6 +1,6 @@
 # RFP Pipeline — End-to-End Spec & Implementation Plan
 
-**Date:** 2026-06-30 · **Rev:** 4 (collaborator ownership = Option B)
+**Date:** 2026-06-30 · **Rev:** 5 (audit spine = legal shield)
 **Status:** Authoritative model + plan. Synthesizes the eleven grounded investigations and the companion analyses (`DOC_ANNOTATION_ATOM_GAP_ANALYSIS_2026-06-30.md`, `END_TO_END_SPINE_ANALYSIS_2026-06-30.md`). Every "as-built" claim is grounded; every extension is marked NEW; schema choices are marked RECOMMENDED (pending sign-off); held items are gated.
 
 > **Ground rules.** (1) No assumptions — as-built = verified in code; NEW = extension; RECOMMENDED = a schema choice awaiting confirmation; DECISION = open. (2) Some `docs/V1_*` gap lists are stale (pre-R5); code is truth. (3) The skeleton-extraction / cross-tenant transfer is **HELD** pending the published content-use policy.
@@ -78,6 +78,7 @@ Keep the **section atom** as the unit of approval/outcome/dedup (the learning lo
 - **Private content loop** (per tenant): harvest → `library_units` → AI-assist-for-*their*-win. **Never shared.**
 - **Shared skeleton loop** (cross tenant, HELD): extract **structure only** — `section_standards` taxonomy + format spec, **never verbatim text/headings** — → shared `document_templates`, filled with **synthetic example content**. Cross-tenant transfer requires consent + the published content-use policy.
 - At purchase the expert may extract a **skeleton-as-template** from the customer's library — **for that customer's own reuse now**; cross-tenant promotion is held.
+- **The share marker is the rights-transfer event.** When a collaborator marks content shared/approved, they release rights for that use; the act is recorded immutably. If a customer later reuses a prior proposal's collaborator-approved atoms (even after the collaborator restricted/deleted access for the *next* build), that is the **customer's decision on the customer's proposal** — the audit shows who shared what, when, in what context, keeping the **platform a neutral recorder, not a party** to the dispute.
 - **Collaborator delete/restrict is forward-looking** — removes future reuse + un-ingested library items, but does **not retract content already ingested + locked into a proposal artifact** (that's the customer's proposal). A collaborator's **reusable IP travels across customers only as a content-free skeleton** (held), never as content.
 
 ---
@@ -129,6 +130,7 @@ Keep the **section atom** as the unit of approval/outcome/dedup (the learning lo
 - **T1.2** Library scopes per D2: **platform tenant** + collaborator `owner_user_id`/`visibility`. *Test: platform atoms invisible to any tenant; collaborator `owner_only` atoms hidden from peers, visible to tenant admin.*
 - **T1.3 (a)** First-class **source anchoring** per matrix entry (persist + overlay; default PDF section/header). *Test: matrix entry deep-links to page/rects.*
 - **T1.4 (c)** **CMS context dropbox** → tagged record feeding scouting/spotlight-nudge/marcom. *Test: an "AFWERX announcement" surfaces as a scouting/nudge signal.*
+- **T1.5** Rights-audit events: emit `share_approved` / `restricted` / `deleted` / `collaborator_assigned` / `locked` with **actor + role-snapshot + share context** on the event (per Invariant 8). *Test: a collaborator share writes an immutable event whose actor-role + context survive a later role change.*
 
 ### Phase 2 — 4-level matrix + master card read-model
 - **T2.1** Service-Org + Department rule sets + component axis; extend the merge. *Test: topic inherits office→agency; topic override wins; "max props/company" flows to all topics.*
@@ -169,3 +171,4 @@ Keep the **section atom** as the unit of approval/outcome/dedup (the learning lo
 5. **Same architecture everywhere:** upload-card → atoms (node-addressable) → canvas → collaborate → generate → convert → download. Collaborators/employees **mark complete**; admins **lock + accept**.
 6. **Source anchoring is the audit spine** — every matrix entry and drafted section traces to its origin.
 7. **Master holds truth; mirrors are derived** — updates flow master → mirror → rerank/alert.
+8. **Every state change emits an immutable event = the audit spine = the legal shield.** Each event carries **actor + role/category snapshot + time + context** (`system_events`: `actor_type ∈ user/system/pipeline/agent` + `actor_id`/`actor_email` + `payload` + `tenant_id` + `created_at`), covering **us, customers, employees, collaborators, agents, automation**. The rights-bearing actions — `share_approved` (rights transfer), `restricted`, `deleted`, `collaborator_assigned`, `locked` — **must each emit** with the actor's role + share context **snapshotted on the event** (self-contained, survives later account/role changes). The platform records; it is never a party to a collaborator↔customer dispute.
