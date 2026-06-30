@@ -16,6 +16,7 @@ import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
 /** Metadata about the last AI revision, used to tag the save with the correct source */
 interface RevisionMeta {
@@ -93,6 +94,9 @@ function CanvasEditorInner({
   const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
+
+  // Sync the editor's dirty flag to the admin nav guard (no-op outside /admin).
+  useUnsavedChanges(dirty);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';

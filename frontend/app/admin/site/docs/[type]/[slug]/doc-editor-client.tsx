@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PageVersion } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
 function shortActor(s: string | null): string {
   return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
@@ -47,6 +48,11 @@ export default function DocEditorClient({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  // Unsaved-changes guard: compare the current field values against the last saved snapshot.
+  const snapshot = JSON.stringify({ title, slugVal, body, excerpt, tags, featuredImage, externalUrl });
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  useUnsavedChanges(snapshot !== savedSnapshot);
+
   const effectiveSlug = isNew ? (slugVal.trim() || slugify(title)) : slug;
 
   function payload() {
@@ -87,6 +93,7 @@ export default function DocEditorClient({
       return false;
     }
     setMsg('Saved draft.');
+    setSavedSnapshot(snapshot);
     if (isNew) router.replace(`/admin/site/docs/${type}/${encodeURIComponent(s)}`);
     return true;
   }
