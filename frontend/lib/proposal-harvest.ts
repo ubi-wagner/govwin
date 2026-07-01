@@ -334,7 +334,7 @@ async function harvestSectionNodes(
           ${category},
           ${subcategory},
           ${tags}::text[],
-          ${JSON.stringify(atomMeta)}::jsonb,
+          ${sql.json(atomMeta as unknown as Parameters<typeof sql.json>[0])},
           0.9,
           'approved',
           'harvest',
