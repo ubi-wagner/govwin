@@ -30,19 +30,30 @@ const SECTION = '44444444-4444-4444-8444-444444444444';
 const node = { id: 'n1', type: 'text_block', provenance: { source: 'ai' }, history: [] };
 const canvas = (nodes: unknown[]) => JSON.stringify({ nodes });
 
+// Query-aware sql mock — robust to the context/author lookups the harvest now does
+// (loadHarvestContext + resolveAuthor) instead of brittle call-order counting.
+let sectionRows: unknown[];
+let existingRows: unknown[];
+
 beforeEach(() => {
+  sectionRows = [];
+  existingRows = [];
   sqlMock.mockReset();
+  // sql.json(x) — pass-through so the value flows into the tagged-template args (mirrors the real wrapper).
+  (sqlMock as unknown as { json: (v: unknown) => unknown }).json = (v) => v;
+  sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+    const q = Array.isArray(strings) ? strings.join(' ? ') : String(strings);
+    if (q.includes('FROM proposal_sections')) return Promise.resolve(sectionRows);
+    if (q.includes('FROM library_units') && q.includes('atom_hash')) return Promise.resolve(existingRows);
+    return Promise.resolve([]);
+  });
   emitEventSingleMock.mockReset().mockResolvedValue(undefined);
   getNodeTextMock.mockReset().mockReturnValue('This is a sufficiently long accepted content block.');
 });
 
 describe('harvestSectionToLibrary', () => {
   it('harvests a new node and emits section.harvested', async () => {
-    sqlMock
-      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }])) // load section
-      .mockImplementationOnce(() => Promise.resolve([]))  // existing-atom check → none
-      .mockImplementationOnce(() => Promise.resolve([]))  // INSERT library_units
-      .mockImplementationOnce(() => Promise.resolve([])); // INSERT library_harvest_log
+    sectionRows = [{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }];
 
     const res = await harvestSectionToLibrary(TENANT, PROPOSAL, SECTION, 'user-1');
     expect(res.atomsHarvested).toBe(1);
@@ -57,11 +68,7 @@ describe('harvestSectionToLibrary', () => {
   });
 
   it('classifies the harvested atom with the C1 standard bucket (C2)', async () => {
-    sqlMock
-      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }]))
-      .mockImplementationOnce(() => Promise.resolve([]))  // existing-atom check
-      .mockImplementationOnce(() => Promise.resolve([]))  // INSERT library_units
-      .mockImplementationOnce(() => Promise.resolve([])); // INSERT harvest_log
+    sectionRows = [{ id: SECTION, title: 'Technical Approach', content: canvas([node]), volumeName: 'Technical Volume', sectionType: 'technical.innovation', standardCategory: 'technical' }];
 
     await harvestSectionToLibrary(TENANT, PROPOSAL, SECTION, 'user-1');
 
@@ -77,18 +84,17 @@ describe('harvestSectionToLibrary', () => {
     // tags include the section_type tag
     const tagsArg = values.find((v) => Array.isArray(v)) as string[] | undefined;
     expect(tagsArg).toContain('type:technical.innovation');
-    // meta JSON carries the structured classification
-    const metaArg = values.find((v) => typeof v === 'string' && v.includes('standardCategory')) as string | undefined;
+    // meta carries the structured classification (now written via sql.json → an object)
+    const metaArg = values.find(
+      (v) => v && typeof v === 'object' && !Array.isArray(v) && 'standardCategory' in (v as Record<string, unknown>),
+    ) as Record<string, unknown> | undefined;
     expect(metaArg).toBeDefined();
-    const meta = JSON.parse(metaArg as string);
-    expect(meta).toMatchObject({ sectionType: 'technical.innovation', standardCategory: 'technical' });
+    expect(metaArg).toMatchObject({ sectionType: 'technical.innovation', standardCategory: 'technical' });
   });
 
   it('dedups when the atom hash already exists (usage bump, no insert)', async () => {
-    sqlMock
-      .mockImplementationOnce(() => Promise.resolve([{ id: SECTION, title: 'X', content: canvas([node]), volumeName: null }])) // load section
-      .mockImplementationOnce(() => Promise.resolve([{ id: 'existing-atom' }])) // existing-atom check → hit
-      .mockImplementationOnce(() => Promise.resolve([])); // UPDATE usage_count
+    sectionRows = [{ id: SECTION, title: 'X', content: canvas([node]), volumeName: null }];
+    existingRows = [{ id: 'existing-atom' }]; // existing-atom check → hit → usage bump, no insert
 
     const res = await harvestSectionToLibrary(TENANT, PROPOSAL, SECTION, 'user-1');
     expect(res.atomsHarvested).toBe(0);
@@ -96,7 +102,7 @@ describe('harvestSectionToLibrary', () => {
   });
 
   it('is a no-op when the section is missing', async () => {
-    sqlMock.mockImplementationOnce(() => Promise.resolve([])); // no section row
+    sectionRows = []; // no section row (default)
     const res = await harvestSectionToLibrary(TENANT, PROPOSAL, SECTION, 'user-1');
     expect(res).toEqual({ atomsHarvested: 0, atomsSkipped: 0 });
     expect(emitEventSingleMock).not.toHaveBeenCalled();

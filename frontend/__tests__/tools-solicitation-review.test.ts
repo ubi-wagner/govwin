@@ -35,6 +35,13 @@ vi.mock('@/lib/capacity', () => ({
   recordInvoke: vi.fn(async () => undefined),
 }));
 
+// Isolate the push unit test from the bridge integration (the approve→push→bridge
+// fan-out is verified separately). Without this its buildCardSnapshot SELECT would
+// add an extra sql call to the push tool's own count.
+vi.mock('@/lib/opportunity-bridge', () => ({
+  publishAndFanOut: vi.fn(async () => null),
+}));
+
 import { __resetForTest, register, invoke } from '@/lib/tools/registry';
 import { solicitationRequestReviewTool } from '@/lib/tools/solicitation-request-review';
 import { solicitationApproveTool } from '@/lib/tools/solicitation-approve';
