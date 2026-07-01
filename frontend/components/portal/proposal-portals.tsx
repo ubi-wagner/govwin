@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 interface Portal {
   id: string;
   opportunityId: string;
+  proposalId: string | null;
   label: string;
   status: string;
   guardrailConfig: Record<string, unknown> | null;
@@ -95,6 +96,9 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
                 {p.status === 'guardrails_pending' && (
                   <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'accept', { guardrailConfig: DEFAULT_GUARDRAILS })} className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-1 disabled:opacity-50">Accept guardrails &amp; launch</button>
                 )}
+                {p.proposalId && (
+                  <a href={`/portal/${tenantSlug}/proposals/${p.proposalId}`} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1">Open build &rarr;</a>
+                )}
                 {(p.status === 'launched' || p.status === 'executing') && (
                   <>
                     <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'advance-stage')} className="text-xs font-medium text-blue-700 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50">Advance stage</button>
@@ -104,7 +108,11 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
                 <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'revoke-shadow')} className="text-xs text-rose-600 border border-rose-200 rounded px-2.5 py-1 hover:bg-rose-50 ml-auto">Revoke shadow admin</button>
               </div>
             )}
-            <p className="text-[11px] text-gray-400 mt-2">ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>.</p>
+            <p className="text-[11px] text-gray-400 mt-2">
+              {p.proposalId
+                ? <>Build ready — <a href={`/portal/${tenantSlug}/proposals/${p.proposalId}`} className="text-blue-600 hover:underline">open the canvas</a> to run V1. ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>.</>
+                : <>ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>. Accept guardrails to provision the build.</>}
+            </p>
           </div>
         ))}
         {portals.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No portals yet. Open one from a pinned opportunity.</p>}
