@@ -25,6 +25,7 @@ import {
 } from '@/lib/errors';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { publishAndFanOut } from '@/lib/opportunity-bridge';
 import { defineTool } from './base';
 import { writeCurationMemory } from './curation-memory';
 
@@ -230,6 +231,19 @@ export const solicitationPushTool = defineTool<Input, Output>({
         topicCount,
       },
     });
+
+    // 5b. Publish the card to the forward-only bridge + fan out a thin copy to
+    // every subscribed tenant (greenfield opportunity-card spine, mig 094).
+    // Best-effort: the push already succeeded; replication is idempotent and can be
+    // re-driven by a backfill, so a failure here must not fail the push.
+    try {
+      const result = await publishAndFanOut(r.opportunityId, 'published', actorId, new Date().toISOString());
+      if (result) {
+        ctx.log?.info?.({ msg: 'bridge published + fanned out', opportunityId: r.opportunityId, version: result.event.version, tenantsApplied: result.tenantsApplied });
+      }
+    } catch (bridgeErr) {
+      ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', opportunityId: r.opportunityId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
+    }
 
     // 6. HITL memory write — the BIG one. Push is the final curation
     // signal; file it as a curator memory so §H's read side picks up
