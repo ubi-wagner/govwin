@@ -7,6 +7,7 @@ import { PdfViewer, type TextSelection } from './pdf-viewer';
 import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
+import AnnotationAtomizeRail from './annotation-atomize-rail';
 
 interface Solicitation {
   id: string;
@@ -641,6 +642,8 @@ export function CurationWorkspace({
 
   return (
     <div className="max-w-6xl">
+      {/* Atomization rail — classify/tag/accept the drawn annotations as section anchors */}
+      <AnnotationAtomizeRail solId={sol.id} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <button
