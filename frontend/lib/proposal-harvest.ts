@@ -116,6 +116,88 @@ export interface HarvestResult {
 }
 
 /**
+ * Dept:Agency:Sol:Topic context that contextually binds a harvested atom to the
+ * effort it was refined in (and makes it retrievable by that hierarchy later).
+ */
+interface HarvestContext {
+  opportunityId?: string | null;
+  agency?: string | null;
+  office?: string | null;
+  programType?: string | null;
+  namespace?: string | null;
+}
+
+/** The person a harvested atom is attributed to (queryable "original author"). */
+interface HarvestAuthor {
+  id: string | null;
+  name: string | null;
+}
+
+/** Resolve harvestedBy (a user id) → {id, name} once, for atom authorship in meta. */
+async function resolveAuthor(userId: string): Promise<HarvestAuthor> {
+  if (!userId) return { id: null, name: null };
+  try {
+    const [u] = await sql<Array<{ id: string; name: string | null }>>`
+      SELECT id, name FROM users WHERE id = ${userId}::uuid LIMIT 1
+    `;
+    return u ? { id: u.id, name: u.name } : { id: userId, name: null };
+  } catch {
+    // harvestedBy wasn't a resolvable uuid — keep the raw id, no name.
+    return { id: userId, name: null };
+  }
+}
+
+/**
+ * Where a refined atom sits in the parent→child→grandchild tree. Atoms are
+ * immutable, so each harvest crystallizes the NEXT generation and carries its
+ * root + depth in meta.lineage (a denormalized convenience; the authoritative
+ * chain is always parent_unit_id, walkable via the recursive lineage query).
+ */
+interface AtomLineage {
+  parentUnitId: string | null;
+  rootUnitId?: string;
+  generation: number;
+}
+
+/** Derive a child's lineage (root + generation) from its parent's carried lineage. */
+async function loadParentLineage(parentUnitId: string, tenantId: string): Promise<{ rootUnitId: string; generation: number }> {
+  try {
+    const [p] = await sql<Array<{ id: string; parentUnitId: string | null; lineage: { rootUnitId?: string; generation?: number } | null }>>`
+      SELECT id, parent_unit_id AS "parentUnitId", meta->'lineage' AS lineage
+      FROM library_units
+      WHERE id = ${parentUnitId}::uuid AND tenant_id = ${tenantId}::uuid
+      LIMIT 1
+    `;
+    if (!p) return { rootUnitId: parentUnitId, generation: 1 };
+    const parentGen = typeof p.lineage?.generation === 'number' ? p.lineage.generation : (p.parentUnitId ? 1 : 0);
+    const parentRoot = p.lineage?.rootUnitId ?? p.parentUnitId ?? p.id;
+    return { rootUnitId: parentRoot, generation: parentGen + 1 };
+  } catch (err) {
+    console.error('[harvest] parent lineage load failed:', err);
+    return { rootUnitId: parentUnitId, generation: 1 };
+  }
+}
+
+/** Load the proposal's opportunity/solicitation context once, for atom binding. */
+async function loadHarvestContext(proposalId: string): Promise<HarvestContext> {
+  try {
+    const [row] = await sql<Array<{ opportunityId: string | null; agency: string | null; office: string | null; programType: string | null; namespace: string | null }>>`
+      SELECT o.id AS "opportunityId", o.agency, o.office,
+             o.program_type AS "programType", cs.namespace
+      FROM proposals p
+      LEFT JOIN opportunities o ON o.id = p.opportunity_id
+      LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id
+      WHERE p.id = ${proposalId}::uuid
+      LIMIT 1
+    `;
+    return row ?? {};
+  } catch (err) {
+    console.error('[harvest] context load failed:', err);
+    return {};
+  }
+}
+
+/**
  * Harvest the canvas nodes of a single section into the tenant's library.
  * Shared by the whole-proposal harvest (final lock) and the per-section
  * harvest (on accept+lock). `provenanceTag` distinguishes the source
@@ -127,6 +209,8 @@ async function harvestSectionNodes(
   proposalId: string,
   section: { id: string; title: string; content: string | null; volumeName?: string | null; sectionType?: string | null; standardCategory?: string | null },
   provenanceTag: string,
+  ctx: HarvestContext = {},
+  author: HarvestAuthor = { id: null, name: null },
 ): Promise<HarvestResult> {
   let atomsHarvested = 0;
   let atomsSkipped = 0;
@@ -151,26 +235,14 @@ async function harvestSectionNodes(
   const subcategory = section.standardCategory ?? null;
   const sectionSlug = slugify(section.title);
   const volumeSlug = section.volumeName ? slugify(section.volumeName) : null;
-  // Inherit the section's standard classification (C1/C2) so atoms are
-  // retrievable by section_type — the foundation for matrix-driven canvas selection.
-  const tags = [
-    'harvested',
-    provenanceTag,
-    sectionSlug,
-    ...(volumeSlug ? [volumeSlug] : []),
-    ...(section.sectionType ? [`type:${section.sectionType}`] : []),
+  // Dept:Agency:Sol:Topic context tags — contextually bind the harvested atom to
+  // where it was refined, and make it retrievable by hierarchy (matrix-driven reuse).
+  const ctxTags = [
+    ...(ctx.agency ? [`agency:${slugify(ctx.agency)}`] : []),
+    ...(ctx.office ? [`org:${slugify(ctx.office)}`] : []),
+    ...(ctx.programType ? [`program:${slugify(ctx.programType)}`] : []),
+    ...(ctx.namespace ? [`sol:${slugify(ctx.namespace)}`] : []),
   ];
-  // Classified-shred metadata (C2 — "JSON now, vector-ready"). Carried on each
-  // atom so Phase-4 retrieval can filter/rank by the standard taxonomy; the
-  // embedding column already exists (library_units.embedding) and stays NULL
-  // until Phase-4 populates real vectors.
-  const atomMeta = {
-    sectionType: section.sectionType ?? null,
-    standardCategory: subcategory,
-    provenance: provenanceTag,
-    proposalId,
-    sectionId: section.id,
-  };
 
   for (const node of canvasDoc.nodes) {
     if (!isHarvestable(node)) {
@@ -180,23 +252,66 @@ async function harvestSectionNodes(
 
     const text = getNodeText(node);
     const atomHash = computeAtomHash(text);
+    // LINEAGE: the library atom this node was inserted from, if any. Atoms are
+    // NEVER mutated — each use crystallizes a NEW context-bound child whose
+    // parent_unit_id points back at the atom it was refined from. Over time this
+    // builds the user's content tree (X → refined-in-proposal-A → Y → … ).
+    const parentUnitId = node.provenance?.library_unit_id ?? null;
+
+    // Generational lineage: a refined node is the NEXT generation of its parent —
+    // carry the root + depth so progeny (child → grandchild → …) re-added at the end
+    // of the proposal cycle record their place in the tree.
+    const lineage: AtomLineage = parentUnitId
+      ? { parentUnitId, ...(await loadParentLineage(parentUnitId, tenantId)) }
+      : { parentUnitId: null, generation: 0 };
+
+    // Per-node so the lineage + context bind correctly.
+    const tags = [
+      'harvested',
+      provenanceTag,
+      sectionSlug,
+      ...(volumeSlug ? [volumeSlug] : []),
+      ...(section.sectionType ? [`type:${section.sectionType}`] : []),
+      ...ctxTags,
+      ...(parentUnitId ? ['refined'] : []),
+    ];
+    // Classified-shred + contextual-binding metadata (vector-ready). Carries the
+    // refined-from link and the Dept:Agency:Sol:Topic context the atom was used in.
+    const atomMeta = {
+      sectionType: section.sectionType ?? null,
+      standardCategory: subcategory,
+      provenance: provenanceTag,
+      proposalId,
+      sectionId: section.id,
+      refinedFromUnitId: parentUnitId,
+      // Original author — makes atoms searchable by who authored them.
+      authorUserId: author.id,
+      authorName: author.name,
+      // Parent→child→grandchild position (root + generation depth).
+      lineage,
+      context: {
+        opportunityId: ctx.opportunityId ?? null,
+        agency: ctx.agency ?? null,
+        office: ctx.office ?? null,
+        programType: ctx.programType ?? null,
+        namespace: ctx.namespace ?? null,
+      },
+    };
 
     try {
-      // Check if this exact content already exists for this tenant
+      // Context-bound dedup: re-harvesting the same content from the SAME proposal
+      // is a re-lock (bump usage). The same content in a DIFFERENT proposal is a
+      // NEW context-bound child (different context = a new atom in the tree).
       const existing = await sql<Array<{ id: string }>>`
         SELECT id FROM library_units
         WHERE tenant_id = ${tenantId}::uuid
           AND atom_hash = ${atomHash}
+          AND original_proposal_id = ${proposalId}::uuid
         LIMIT 1
       `;
 
       if (existing.length > 0) {
-        // Deduplicate — just increment usage count
-        await sql`
-          UPDATE library_units
-          SET usage_count = usage_count + 1
-          WHERE id = ${existing[0].id}
-        `;
+        await sql`UPDATE library_units SET usage_count = usage_count + 1 WHERE id = ${existing[0].id}`;
         atomsSkipped++;
         continue;
       }
@@ -207,11 +322,11 @@ async function harvestSectionNodes(
         nodeId: node.id,
       });
 
-      await sql`
+      const [created] = await sql<Array<{ id: string }>>`
         INSERT INTO library_units (
           tenant_id, content, category, subcategory, tags, meta,
           confidence, status, source_type, source_id,
-          original_proposal_id, original_node_id, atom_hash,
+          parent_unit_id, original_proposal_id, original_node_id, atom_hash,
           outcome, outcome_score
         ) VALUES (
           ${tenantId}::uuid,
@@ -219,23 +334,52 @@ async function harvestSectionNodes(
           ${category},
           ${subcategory},
           ${tags}::text[],
-          ${JSON.stringify(atomMeta)}::jsonb,
+          ${sql.json(atomMeta as unknown as Parameters<typeof sql.json>[0])},
           0.9,
           'approved',
           'harvest',
           ${sourceId},
+          ${parentUnitId}::uuid,
           ${proposalId}::uuid,
           ${node.id},
           ${atomHash},
           'pending',
           0.7
-        )
+        ) RETURNING id
       `;
 
       await sql`
         INSERT INTO library_harvest_log (tenant_id, proposal_id, harvested_at)
         VALUES (${tenantId}::uuid, ${proposalId}::uuid, now())
       `;
+
+      // LINEAGE: the source atom was used again — bump its lifetime usage and emit
+      // the usage-chain event (the audit trail of how an atom propagates across the
+      // user's work, parent → child).
+      if (parentUnitId) {
+        await sql`
+          UPDATE library_units SET usage_count = usage_count + 1
+          WHERE id = ${parentUnitId}::uuid AND tenant_id = ${tenantId}::uuid
+        `;
+        try {
+          await emitEventSingle({
+            namespace: 'library',
+            type: 'atom.refined',
+            actor: systemActor('harvest'),
+            tenantId,
+            payload: {
+              correlationId: randomUUID(),
+              parentUnitId,
+              newUnitId: created?.id ?? null,
+              proposalId,
+              sectionId: section.id,
+              nodeId: node.id,
+            },
+          });
+        } catch {
+          // best-effort
+        }
+      }
 
       atomsHarvested++;
     } catch (err) {
@@ -282,8 +426,10 @@ export async function harvestProposalToLibrary(
     return { atomsHarvested: 0, atomsSkipped: 0 };
   }
 
+  const ctx = await loadHarvestContext(proposalId);
+  const author = await resolveAuthor(harvestedBy);
   for (const section of sections) {
-    const r = await harvestSectionNodes(tenantId, proposalId, section, 'proposal_final');
+    const r = await harvestSectionNodes(tenantId, proposalId, section, 'proposal_final', ctx, author);
     atomsHarvested += r.atomsHarvested;
     atomsSkipped += r.atomsSkipped;
   }
@@ -337,7 +483,9 @@ export async function harvestSectionToLibrary(
   }
   if (!section) return { atomsHarvested: 0, atomsSkipped: 0 };
 
-  const result = await harvestSectionNodes(tenantId, proposalId, section, 'section_accepted');
+  const ctx = await loadHarvestContext(proposalId);
+  const author = await resolveAuthor(harvestedBy);
+  const result = await harvestSectionNodes(tenantId, proposalId, section, 'section_accepted', ctx, author);
 
   try {
     await emitEventSingle({
@@ -359,4 +507,179 @@ export async function harvestSectionToLibrary(
   }
 
   return result;
+}
+
+/**
+ * Harvest a SINGLE canvas node into the library on demand — the node-level complement
+ * to the lock-triggered section/proposal harvest, powering the "accept this node into
+ * my library" action on the canvas rail (and, soon, agent-accepted bubbles). Same
+ * immutability + lineage + context binding: never mutates, crystallizes a
+ * context-bound atom with author + generational lineage, deduped per proposal.
+ */
+export async function harvestNodeToLibrary(
+  tenantId: string,
+  proposalId: string,
+  sectionId: string,
+  node: {
+    nodeId: string;
+    heading?: string | null;
+    text: string;
+    sectionType?: string | null;
+    tags?: string[] | null;
+    parentUnitId?: string | null;
+  },
+  harvestedBy: string,
+): Promise<{ unitId: string | null; deduped: boolean }> {
+  const text = (node.text ?? '').trim();
+  if (text.length < 20) return { unitId: null, deduped: false };
+
+  // Section context (title → category, section_type → standard bucket).
+  let section: { title: string | null; sectionType: string | null; standardCategory: string | null } | undefined;
+  try {
+    [section] = await sql<Array<{ title: string | null; sectionType: string | null; standardCategory: string | null }>>`
+      SELECT title, section_type AS "sectionType",
+             (SELECT ss.category FROM section_standards ss WHERE ss.key = section_type) AS "standardCategory"
+      FROM proposal_sections
+      WHERE id = ${sectionId} AND proposal_id = ${proposalId}
+      LIMIT 1
+    `;
+  } catch (err) {
+    console.error('[harvest-node] section load failed:', err);
+  }
+
+  const sectionType = node.sectionType ?? section?.sectionType ?? null;
+  const category = section?.title ? sectionToCategory(section.title) : 'general';
+  let subcategory = section?.standardCategory ?? null;
+  if (sectionType) {
+    try {
+      const [std] = await sql<Array<{ category: string | null }>>`
+        SELECT category FROM section_standards WHERE key = ${sectionType} LIMIT 1
+      `;
+      if (std?.category) subcategory = std.category;
+    } catch {
+      // keep the section's standard category as fallback
+    }
+  }
+
+  const ctx = await loadHarvestContext(proposalId);
+  const author = await resolveAuthor(harvestedBy);
+  const atomHash = computeAtomHash(text);
+  const parentUnitId = node.parentUnitId ?? null;
+
+  // Context-bound dedup: same content re-accepted in the SAME proposal bumps usage.
+  try {
+    const existing = await sql<Array<{ id: string }>>`
+      SELECT id FROM library_units
+      WHERE tenant_id = ${tenantId}::uuid AND atom_hash = ${atomHash} AND original_proposal_id = ${proposalId}::uuid
+      LIMIT 1
+    `;
+    if (existing.length > 0) {
+      await sql`UPDATE library_units SET usage_count = usage_count + 1 WHERE id = ${existing[0].id}`;
+      return { unitId: existing[0].id, deduped: true };
+    }
+  } catch (err) {
+    console.error('[harvest-node] dedup check failed:', err);
+  }
+
+  const lineage: AtomLineage = parentUnitId
+    ? { parentUnitId, ...(await loadParentLineage(parentUnitId, tenantId)) }
+    : { parentUnitId: null, generation: 0 };
+
+  const ctxTags = [
+    ...(ctx.agency ? [`agency:${slugify(ctx.agency)}`] : []),
+    ...(ctx.office ? [`org:${slugify(ctx.office)}`] : []),
+    ...(ctx.programType ? [`program:${slugify(ctx.programType)}`] : []),
+    ...(ctx.namespace ? [`sol:${slugify(ctx.namespace)}`] : []),
+  ];
+  const providedTags = (node.tags ?? []).filter((t) => t && !t.startsWith('type:'));
+  const tags = Array.from(
+    new Set([
+      'harvested',
+      'canvas_accepted',
+      ...(sectionType ? [`type:${sectionType}`] : []),
+      ...ctxTags,
+      ...providedTags,
+      ...(parentUnitId ? ['refined'] : []),
+    ]),
+  );
+
+  const atomMeta = {
+    sectionType,
+    standardCategory: subcategory,
+    provenance: 'canvas_accepted',
+    proposalId,
+    sectionId,
+    refinedFromUnitId: parentUnitId,
+    authorUserId: author.id,
+    authorName: author.name,
+    lineage,
+    context: {
+      opportunityId: ctx.opportunityId ?? null,
+      agency: ctx.agency ?? null,
+      office: ctx.office ?? null,
+      programType: ctx.programType ?? null,
+      namespace: ctx.namespace ?? null,
+    },
+  };
+
+  const sourceId = JSON.stringify({ proposalId, sectionId, nodeId: node.nodeId });
+  let createdId: string | null = null;
+  try {
+    const [created] = await sql<Array<{ id: string }>>`
+      INSERT INTO library_units (
+        tenant_id, content, category, subcategory, tags, meta, heading_text,
+        confidence, status, source_type, source_id,
+        parent_unit_id, original_proposal_id, original_node_id, atom_hash,
+        outcome, outcome_score
+      ) VALUES (
+        ${tenantId}::uuid, ${text}, ${category}, ${subcategory}, ${tags}::text[],
+        ${sql.json(atomMeta as unknown as Parameters<typeof sql.json>[0])}, ${node.heading ?? null},
+        0.9, 'approved', 'harvest', ${sourceId},
+        ${parentUnitId}::uuid, ${proposalId}::uuid, ${node.nodeId}, ${atomHash},
+        'pending', 0.7
+      ) RETURNING id
+    `;
+    createdId = created?.id ?? null;
+  } catch (err) {
+    console.error('[harvest-node] insert failed:', err);
+    return { unitId: null, deduped: false };
+  }
+
+  try {
+    await sql`
+      INSERT INTO library_harvest_log (tenant_id, proposal_id, harvested_at)
+      VALUES (${tenantId}::uuid, ${proposalId}::uuid, now())
+    `;
+  } catch {
+    // best-effort
+  }
+
+  // Lineage bump + audit event (parent → child), or a first-accept event.
+  try {
+    if (parentUnitId) {
+      await sql`
+        UPDATE library_units SET usage_count = usage_count + 1
+        WHERE id = ${parentUnitId}::uuid AND tenant_id = ${tenantId}::uuid
+      `;
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'atom.refined',
+        actor: systemActor('canvas'),
+        tenantId,
+        payload: { correlationId: randomUUID(), parentUnitId, newUnitId: createdId, proposalId, sectionId, nodeId: node.nodeId },
+      });
+    } else {
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'node.accepted',
+        actor: systemActor('canvas'),
+        tenantId,
+        payload: { correlationId: randomUUID(), newUnitId: createdId, proposalId, sectionId, nodeId: node.nodeId },
+      });
+    }
+  } catch {
+    // best-effort
+  }
+
+  return { unitId: createdId, deduped: false };
 }

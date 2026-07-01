@@ -82,6 +82,18 @@ export async function POST(
     );
   }
 
+  // Resolve the uploader once — persisted into each atom's meta so uploaded
+  // company docs (bios, capability statements) are searchable by original author.
+  let authorName: string | null = null;
+  try {
+    const [u] = await sql<{ name: string | null }[]>`
+      SELECT name FROM users WHERE id = ${sessionUser.id}::uuid LIMIT 1
+    `;
+    authorName = u?.name ?? null;
+  } catch {
+    // non-critical — author name simply stays null
+  }
+
   // ---------- Parse form data ----------
   let formData: FormData;
   try {
@@ -170,6 +182,8 @@ export async function POST(
           status,
           source_type,
           source_id,
+          source_filename,
+          meta,
           tags
         ) VALUES (
           ${tenantId}::uuid,
@@ -178,6 +192,8 @@ export async function POST(
           'draft',
           'upload',
           ${storageKey},
+          ${displayName},
+          ${sql.json({ authorUserId: sessionUser.id, authorName, lineage: { parentUnitId: null, generation: 0 } })},
           ${sql.array([ext])}
         )
         RETURNING id

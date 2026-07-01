@@ -135,6 +135,19 @@ export async function POST(request: Request, ctx: RouteContext) {
 
   const userId = sessionUser.id;
 
+  // Resolve the atomizer once — child atoms carry the author + generation-1 lineage
+  // (children of the seminal uploaded doc) so they're searchable by original author
+  // and show up in the parent→child lineage tree.
+  let authorName: string | null = null;
+  try {
+    const [u] = await sql<{ name: string | null }[]>`
+      SELECT name FROM users WHERE id = ${userId}::uuid LIMIT 1
+    `;
+    authorName = u?.name ?? null;
+  } catch {
+    // non-critical — author name simply stays null
+  }
+
   // ── Start event for multi-step atomization ─────────────────────
   const eventId = await emitEventStart({
     namespace: 'library',
@@ -246,7 +259,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             is_seminal = true,
             source_filename = ${sourceFilename},
             source_storage_key = ${storageKey},
-            document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
+            document_metadata = ${sql.json(importResult.metadata as Parameters<typeof sql.json>[0])},
             updated_at = now()
         WHERE id = ${unit.id}::uuid
       `;
@@ -268,7 +281,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         [row] = await sql<{ id: string }[]>`
           INSERT INTO library_units
             (tenant_id, content, category, tags, status, source_type, source_id,
-             parent_unit_id, canvas_nodes, document_metadata, source_filename,
+             parent_unit_id, canvas_nodes, document_metadata, meta, source_filename,
              source_storage_key, heading_text, char_offset, char_length)
           VALUES
             (${tenantId}::uuid,
@@ -279,8 +292,9 @@ export async function POST(request: Request, ctx: RouteContext) {
              'upload',
              ${atomType},
              ${unit.id}::uuid,
-             ${JSON.stringify(atom.nodes)}::jsonb,
-             ${JSON.stringify(importResult.metadata)}::jsonb,
+             ${sql.json(atom.nodes as unknown as Parameters<typeof sql.json>[0])},
+             ${sql.json(importResult.metadata as Parameters<typeof sql.json>[0])},
+             ${sql.json({ authorUserId: userId, authorName, lineage: { parentUnitId: unit.id, rootUnitId: unit.id, generation: 1 } })},
              ${importResult.sourceFilename},
              ${storageKey},
              ${atom.headingText},

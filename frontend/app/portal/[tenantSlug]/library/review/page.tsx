@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import AtomReviewWrapper from '@/components/portal/atom-review-wrapper';
+import AtomizeRailReview from '@/components/portal/atomize-rail-review';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,13 +147,30 @@ export default async function LibraryReviewPage({
     tags: row.tags ?? [],
     headingText: row.metadata?.heading_text ?? null,
     confidence: row.confidence ?? 0.5,
-    canvasNodes: row.metadata?.canvas_nodes,
   }));
+
+  // Section-standards taxonomy (canonical, shared with matching) for the rail's
+  // classify dropdown. Best-effort — an empty list just yields a free-tag rail.
+  let standards: Array<{ key: string; label: string; category: string | null }> = [];
+  try {
+    standards = await sql<Array<{ key: string; label: string; category: string | null }>>`
+      SELECT key, label, category
+      FROM section_standards
+      ORDER BY sort_order NULLS LAST, label
+    `;
+  } catch (e) {
+    console.error('[library/review] section_standards query failed', e);
+  }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div />
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-bold">Atomize</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Click a bubble to classify, tag, and accept each atom into your library.
+          </p>
+        </div>
         <a
           href={`/portal/${tenantSlug}/library`}
           className="text-sm text-blue-600 hover:underline"
@@ -161,9 +178,10 @@ export default async function LibraryReviewPage({
           Back to Library
         </a>
       </div>
-      <AtomReviewWrapper
+      <AtomizeRailReview
         tenantSlug={tenantSlug}
         atoms={atoms}
+        standards={standards}
         sourceFilename={sourceFilename}
         documentMetadata={documentMetadata}
         redirectTo={`/portal/${tenantSlug}/library`}

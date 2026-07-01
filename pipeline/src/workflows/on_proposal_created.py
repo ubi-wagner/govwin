@@ -99,10 +99,26 @@ class OnProposalCreated(Workflow):
     )
 
     steps = [
+        # B5 — the 3-source V0 strawman. Draft every EMPTY section (RFP excerpt +
+        # library atoms + tenant profile, via section_drafter) and land each through
+        # publish_section_draft BEFORE the human review gate. Guarded: only
+        # empty/ai_drafted sections are touched, and it is a safe no-op if the
+        # fabric / API key is unavailable.
+        Step(
+            name="draft_sections",
+            step_type=StepType.ACTION,
+            action="workflows.actions.draft_v0.draft_v0",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=15,
+        ),
         Step(
             name="notify_admin_review",
             step_type=StepType.NOTIFY,
             action="system.notify",
+            depends_on="draft_sections",
             input_map={
                 "channel": '"email"',
                 "template": '"admin_proposal_review_required"',

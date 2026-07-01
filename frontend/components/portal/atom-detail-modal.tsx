@@ -63,6 +63,33 @@ export interface LibraryUnit {
   charLength: number | null;
   isSeminal: boolean | null;
   parentUnitId: string | null;
+  // Classified-shred metadata (author, context, generational lineage). Present on
+  // atoms fetched via the library API (SELECT lu.*); absent on the server page's
+  // narrower initial SELECT, hence optional.
+  meta?: AtomMeta | null;
+  ownerName?: string | null;
+  /** Access-control scope (093): tenant | owner_only | shared_for_proposal. */
+  visibility?: string | null;
+}
+
+/** The `meta` JSONB carried by library atoms (written by proposal-harvest). */
+export interface AtomMeta {
+  sectionType?: string | null;
+  standardCategory?: string | null;
+  provenance?: string | null;
+  proposalId?: string | null;
+  sectionId?: string | null;
+  refinedFromUnitId?: string | null;
+  authorUserId?: string | null;
+  authorName?: string | null;
+  lineage?: { parentUnitId?: string | null; rootUnitId?: string; generation?: number } | null;
+  context?: {
+    opportunityId?: string | null;
+    agency?: string | null;
+    office?: string | null;
+    programType?: string | null;
+    namespace?: string | null;
+  } | null;
 }
 
 interface AtomDetailModalProps {

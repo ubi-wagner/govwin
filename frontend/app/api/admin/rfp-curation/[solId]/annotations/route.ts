@@ -183,8 +183,8 @@ export async function POST(
           (solicitation_id, actor_id, kind, source_location, payload, compliance_variable_name)
         VALUES
           (${solId}::uuid, ${actorId}::uuid, ${kind},
-           ${JSON.stringify(sourceLocation)}::jsonb,
-           ${JSON.stringify(payload ?? {})}::jsonb,
+           ${sql.json(sourceLocation as Parameters<typeof sql.json>[0])},
+           ${sql.json((payload ?? {}) as Parameters<typeof sql.json>[0])},
            ${typeof complianceVariableName === 'string' ? complianceVariableName : null})
         RETURNING *
       `;

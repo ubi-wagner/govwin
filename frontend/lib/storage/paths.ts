@@ -241,6 +241,19 @@ export function customerProposalPath(tenantSlug: string, proposalId: string, fil
 }
 
 /**
+ * The tenant's copied opportunity folder (pin = full copy). On pin, the global
+ * read-only opp docs are copied here so the customer owns a local, shard-safe copy.
+ */
+export function customerPinnedPath(tenantSlug: string, opportunityId: string, filename: string): string {
+  assertTenantSlug(tenantSlug);
+  assertUuid(opportunityId, 'opportunity id');
+  if (!filename || filename.includes('..')) {
+    throw new Error(`[storage/paths] invalid pinned filename: ${JSON.stringify(filename)}`);
+  }
+  return `customers/${tenantSlug}/pinned/${opportunityId}/${filename}`;
+}
+
+/**
  * Guard helper — throws if a key does not belong to the given tenant.
  * Use at the boundary of any operation that takes a user-supplied
  * object key and must enforce tenant isolation.

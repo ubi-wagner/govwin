@@ -477,13 +477,24 @@ export async function POST(
       await sql`
         UPDATE library_units
         SET content = ${fullText.slice(0, 100000)},
-            document_metadata = ${JSON.stringify(importResult.metadata)}::jsonb,
+            document_metadata = ${sql.json(importResult.metadata as Parameters<typeof sql.json>[0])},
             updated_at = now()
         WHERE id = ${ctx.unitId}::uuid
       `;
     } catch (err) {
       console.error('[library/unit/reatomize] parent unit update failed:', err);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Resolve the acting user once — child atoms carry author + gen-1 lineage.
+    let authorName: string | null = null;
+    try {
+      const [u] = await sql<{ name: string | null }[]>`
+        SELECT name FROM users WHERE id = ${ctx.userId}::uuid LIMIT 1
+      `;
+      authorName = u?.name ?? null;
+    } catch {
+      // non-critical
     }
 
     // 7. Create new child atoms
@@ -498,7 +509,7 @@ export async function POST(
         await sql`
           INSERT INTO library_units
             (tenant_id, content, category, tags, status, source_type, source_id,
-             parent_unit_id, canvas_nodes, document_metadata, source_filename,
+             parent_unit_id, canvas_nodes, document_metadata, meta, source_filename,
              source_storage_key, heading_text, char_offset, char_length)
           VALUES
             (${ctx.tenantId}::uuid,
@@ -509,8 +520,9 @@ export async function POST(
              'upload',
              ${atomType},
              ${ctx.unitId}::uuid,
-             ${JSON.stringify(atom.nodes)}::jsonb,
-             ${JSON.stringify(importResult.metadata)}::jsonb,
+             ${sql.json(atom.nodes as unknown as Parameters<typeof sql.json>[0])},
+             ${sql.json(importResult.metadata as Parameters<typeof sql.json>[0])},
+             ${sql.json({ authorUserId: ctx.userId, authorName, lineage: { parentUnitId: ctx.unitId, rootUnitId: ctx.unitId, generation: 1 } })},
              ${importResult.sourceFilename},
              ${unit.sourceStorageKey},
              ${atom.headingText},

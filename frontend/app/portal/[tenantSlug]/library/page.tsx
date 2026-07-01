@@ -185,6 +185,7 @@ export default async function LibraryPage({
         initialTotal={total}
         stats={stats}
         proposals={proposals}
+        viewerRole={role}
       />
     </div>
   );

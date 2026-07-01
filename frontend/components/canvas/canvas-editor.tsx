@@ -8,15 +8,31 @@
  * Manages the document state, node CRUD, and save/export actions.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
-import { createNode } from '@/lib/types/canvas-document';
+import { createNode, getNodeText } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
+
+/** The classified section-type is carried as a `type:<key>` entry in library_tags. */
+function typeFromLibraryTags(tags?: string[]): string | null {
+  const t = (tags ?? []).find((x) => x.startsWith('type:'));
+  return t ? t.slice('type:'.length) : null;
+}
+
+/** A short bubble heading for a node — the heading text, or a content snippet. */
+function nodeHeading(n: CanvasNode): string {
+  if (n.type === 'heading' && n.content && typeof n.content === 'object' && 'text' in n.content) {
+    return String((n.content as { text?: string }).text ?? '') || 'Heading';
+  }
+  const t = getNodeText(n);
+  return t ? t.slice(0, 60) : '(empty)';
+}
 
 /** Metadata about the last AI revision, used to tag the save with the correct source */
 interface RevisionMeta {
@@ -95,8 +111,33 @@ function CanvasEditorInner({
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
+  // ── Atomization rail: accept library-eligible nodes into the tenant library ──
+  const canAtomize = Boolean(tenantSlug && proposalId && sectionId && !readOnly);
+  const [showAtomRail, setShowAtomRail] = useState(false);
+  const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);
+  const [atomBusyId, setAtomBusyId] = useState<string | null>(null);
+  const [acceptedNodeIds, setAcceptedNodeIds] = useState<Set<string>>(new Set());
+
   // Sync the editor's dirty flag to the admin nav guard (no-op outside /admin).
   useUnsavedChanges(dirty);
+
+  // Load the section-standards vocabulary once for the rail's classify dropdown.
+  useEffect(() => {
+    if (!canAtomize || !tenantSlug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/section-standards`);
+        if (!res.ok) return;
+        const body = await res.json();
+        const rows: Array<{ key: string; label: string }> = body.data?.standards ?? [];
+        if (!cancelled) setStandards(rows.map((s) => ({ key: s.key, label: s.label })));
+      } catch {
+        // non-critical — rail falls back to a free-tag flow
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canAtomize, tenantSlug]);
 
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
@@ -374,6 +415,106 @@ function CanvasEditorInner({
     }
   }, [doc, onSave]);
 
+  // ── Atomization rail wiring ──
+  const atomItems: AtomBubble[] = useMemo(
+    () =>
+      doc.nodes
+        .filter((n) => n.library_eligible && getNodeText(n).trim().length >= 20)
+        .map((n) => ({
+          id: n.id,
+          heading: nodeHeading(n),
+          snippet: getNodeText(n).slice(0, 180),
+          nodeType: n.type,
+          suggestedType: typeFromLibraryTags(n.library_tags),
+          sectionType: typeFromLibraryTags(n.library_tags),
+          tags: (n.library_tags ?? []).filter((t) => !t.startsWith('type:')),
+          status: acceptedNodeIds.has(n.id) || n.provenance.library_unit_id ? 'approved' : 'draft',
+        })),
+    [doc.nodes, acceptedNodeIds],
+  );
+
+  const railClassify = useCallback(
+    (nodeId: string, key: string) => {
+      updateDoc((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          n.id === nodeId
+            ? { ...n, library_tags: [...(n.library_tags ?? []).filter((t) => !t.startsWith('type:')), `type:${key}`] }
+            : n,
+        ),
+      }));
+    },
+    [updateDoc],
+  );
+
+  const railAddTag = useCallback(
+    (nodeId: string, tag: string) => {
+      const clean = tag.trim();
+      if (!clean) return;
+      updateDoc((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          n.id === nodeId
+            ? { ...n, library_tags: (n.library_tags ?? []).includes(clean) ? n.library_tags : [...(n.library_tags ?? []), clean] }
+            : n,
+        ),
+      }));
+    },
+    [updateDoc],
+  );
+
+  const railRemoveTag = useCallback(
+    (nodeId: string, tag: string) => {
+      updateDoc((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          n.id === nodeId ? { ...n, library_tags: (n.library_tags ?? []).filter((t) => t !== tag) } : n,
+        ),
+      }));
+    },
+    [updateDoc],
+  );
+
+  const railAccept = useCallback(
+    async (nodeId: string) => {
+      if (!tenantSlug || !proposalId || !sectionId) return;
+      const node = doc.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      setAtomBusyId(nodeId);
+      try {
+        const res = await fetch(
+          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/atomize-node`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nodeId: node.id,
+              heading: node.type === 'heading' ? nodeHeading(node) : null,
+              text: getNodeText(node),
+              sectionType: typeFromLibraryTags(node.library_tags),
+              tags: (node.library_tags ?? []).filter((t) => !t.startsWith('type:')),
+              parentUnitId: node.provenance.library_unit_id ?? null,
+            }),
+          },
+        );
+        if (res.ok) setAcceptedNodeIds((prev) => new Set(prev).add(nodeId));
+      } catch {
+        // non-critical — surfaced by the bubble staying in draft
+      } finally {
+        setAtomBusyId(null);
+      }
+    },
+    [tenantSlug, proposalId, sectionId, doc.nodes],
+  );
+
+  const railAcceptAll = useCallback(async () => {
+    const pending = atomItems.filter((i) => i.status !== 'approved');
+    for (const it of pending) {
+      // eslint-disable-next-line no-await-in-loop
+      await railAccept(it.id);
+    }
+  }, [atomItems, railAccept]);
+
   return (
     <div className="flex h-full">
       {/* Canvas area */}
@@ -465,6 +606,17 @@ function CanvasEditorInner({
             >
               Redo
             </button>
+            {canAtomize && (
+              <button
+                onClick={() => setShowAtomRail((v) => !v)}
+                className={`px-3 py-1.5 text-xs border rounded ${
+                  showAtomRail ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'hover:bg-gray-50'
+                }`}
+                title="Atomize library-eligible content into your library"
+              >
+                Library{atomItems.length > 0 ? ` (${atomItems.length})` : ''}
+              </button>
+            )}
             <button
               onClick={handleSave}
               disabled={saving || !dirty}
@@ -498,6 +650,23 @@ function CanvasEditorInner({
           />
         )}
       </div>
+
+      {/* Atomization rail — accept library-eligible nodes into the tenant library */}
+      {canAtomize && showAtomRail && (
+        <AtomBubbleRail
+          title="Atomize"
+          items={atomItems}
+          standards={standards}
+          onClassify={railClassify}
+          onAccept={railAccept}
+          onAcceptAll={railAcceptAll}
+          onAddTag={railAddTag}
+          onRemoveTag={railRemoveTag}
+          onBubbleClick={setSelectedNodeId}
+          busyId={atomBusyId}
+          emptyText="No library-eligible content yet — add sections to atomize."
+        />
+      )}
 
       {/* Sidebar */}
       <CanvasSidebar
