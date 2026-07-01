@@ -15,6 +15,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { acceptGuardrails, revokeShadowAdmin, setPortalStatus } from '@/lib/portal-launch';
+import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, advancePortalStage, type GuardrailConfig } from '@/lib/portal-workflow';
 
 const STATUSES = ['guardrails_pending', 'launched', 'executing', 'closeout', 'archived', 'abandoned'];
 
@@ -30,7 +31,7 @@ async function gate(tenantSlug: string, portalId: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id };
+  return { tenantId, userId: u.id, role };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; portalId: string }> }) {
@@ -64,11 +65,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if ('error' in g) return g.error;
 
     if (action === 'accept') {
-      let body: { guardrailConfig?: unknown; revokeShadow?: boolean };
+      let body: { guardrailConfig?: GuardrailConfig; revokeShadow?: boolean };
       try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
-      const { launched } = await acceptGuardrails(g.tenantId, portalId, body.guardrailConfig ?? {}, { revokeShadow: body.revokeShadow, acceptedBy: g.userId });
+      const config = (body.guardrailConfig ?? {}) as GuardrailConfig;
+      // Enforce the RFP-admin guardrail limits (max 3 stages, 10 collaborators, 1 manager, 3 nudges).
+      const limits = await getGuardrailLimits();
+      const v = validateGuardrailConfig(config, limits);
+      if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
+      const { launched } = await acceptGuardrails(g.tenantId, portalId, config, { revokeShadow: body.revokeShadow, acceptedBy: g.userId });
       if (!launched) return NextResponse.json({ error: 'Portal not pending (already launched?)', code: 'CONFLICT' }, { status: 409 });
-      return NextResponse.json({ data: { launched: true } });
+      // Instantiate the portal's workflow: stage-0 ToDos into the tasks/nudge ledger.
+      const actor = { id: g.userId, email: null, role: g.role, tenantId: g.tenantId };
+      const { tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config);
+      return NextResponse.json({ data: { launched: true, tasksCreated } });
+    }
+    if (action === 'advance-stage') {
+      let body: { force?: boolean } = {};
+      try { body = await request.json(); } catch { /* body optional */ }
+      const actor = { id: g.userId, email: null, role: g.role, tenantId: g.tenantId };
+      const result = await advancePortalStage(actor, g.tenantId, portalId, { force: body.force === true });
+      if (!result.advanced) {
+        const status = result.reason === 'not_found' ? 404 : 409;
+        return NextResponse.json({ error: `Cannot advance: ${result.reason}`, code: 'STAGE_GATE' }, { status });
+      }
+      return NextResponse.json({ data: result });
     }
     if (action === 'revoke-shadow') {
       const { revoked } = await revokeShadowAdmin(g.tenantId, portalId, g.userId);
