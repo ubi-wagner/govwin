@@ -82,6 +82,10 @@ export default async function PortalLayout({
                 <PortalNavLink href={`${basePath}/spotlights`}>Spotlight</PortalNavLink>
                 <PortalNavLink href={`${basePath}/pipeline`}>Pipeline</PortalNavLink>
                 <PortalNavLink href={`${basePath}/library`}>Library</PortalNavLink>
+                <div className="mt-2 mb-1 px-3 text-[10px] uppercase tracking-wider text-white/40">Greenfield</div>
+                <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>
+                <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>
+                <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>
               </>
             )}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
