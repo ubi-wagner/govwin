@@ -68,6 +68,8 @@ export interface LibraryUnit {
   // narrower initial SELECT, hence optional.
   meta?: AtomMeta | null;
   ownerName?: string | null;
+  /** Access-control scope (093): tenant | owner_only | shared_for_proposal. */
+  visibility?: string | null;
 }
 
 /** The `meta` JSONB carried by library atoms (written by proposal-harvest). */

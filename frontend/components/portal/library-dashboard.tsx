@@ -7,6 +7,8 @@ import AtomDetailModal, {
   formatCategory,
 } from './atom-detail-modal';
 import BulkUpload from './bulk-upload';
+import { buildDisplayTags, type DisplayTag } from '@/lib/atom-tags';
+import type { Role } from '@/lib/rbac';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,8 @@ interface LibraryDashboardProps {
   initialTotal: number;
   stats: LibraryStats;
   proposals: Proposal[];
+  /** Viewer's role — gates admin-only (access/owner/role) meta-tags in the portal. */
+  viewerRole: Role | null;
 }
 
 type SortOption = 'outcome_score' | 'created_at' | 'usage_count';
@@ -61,6 +65,7 @@ export default function LibraryDashboard({
   initialTotal,
   stats,
   proposals,
+  viewerRole,
 }: LibraryDashboardProps) {
   const [units, setUnits] = useState<LibraryUnit[]>(initialUnits);
   const [total, setTotal] = useState(initialTotal);
@@ -618,6 +623,7 @@ export default function LibraryDashboard({
                       tenantSlug={tenantSlug}
                       proposals={proposals}
                       onUpdated={fetchUnits}
+                      viewerRole={viewerRole}
                     />
                   ))}
                 </div>
@@ -769,6 +775,7 @@ function AtomCard({
   tenantSlug,
   proposals,
   onUpdated,
+  viewerRole,
 }: {
   unit: LibraryUnit;
   expanded: boolean;
@@ -778,11 +785,14 @@ function AtomCard({
   tenantSlug: string;
   proposals: Proposal[];
   onUpdated: () => void;
+  viewerRole: Role | null;
 }) {
   const [showAssign, setShowAssign] = useState(false);
   const author = unit.meta?.authorName ?? unit.ownerName ?? null;
   const generation = unit.meta?.lineage?.generation ?? null;
   const hasLineage = unit.parentUnitId != null || (generation != null && generation > 0);
+  // Several discrete, namespaced meta-tags — access/owner chips are admin-only.
+  const displayTags = buildDisplayTags(unit, viewerRole);
 
   const isWinner = unit.outcome === 'awarded';
   const scorePercent = Math.round((unit.outcomeScore ?? 0.5) * 100);
@@ -871,20 +881,23 @@ function AtomCard({
         )}
       </div>
 
-      {/* Tags */}
+      {/* Tags — several discrete namespaced meta-tags; access/owner chips render
+          only for admins (canSeeAdminTags via buildDisplayTags). */}
       <div className="px-4 py-2">
         <div className="flex flex-wrap gap-1">
           <SourceBadge sourceType={unit.sourceType} />
-          {(unit.tags ?? []).slice(0, 3).map((tag) => (
+          {displayTags.slice(0, 5).map((t: DisplayTag) => (
             <span
-              key={tag}
-              className="inline-block px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-600"
+              key={t.raw}
+              title={`${t.nsLabel}: ${t.value}`}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${t.tone}`}
             >
-              {tag}
+              {t.ns !== 'freeform' && <span className="opacity-60">{t.nsLabel}</span>}
+              {t.value}
             </span>
           ))}
-          {(unit.tags ?? []).length > 3 && (
-            <span className="text-xs text-gray-400">+{unit.tags.length - 3}</span>
+          {displayTags.length > 5 && (
+            <span className="text-xs text-gray-400">+{displayTags.length - 5}</span>
           )}
         </div>
       </div>
