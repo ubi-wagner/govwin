@@ -508,3 +508,178 @@ export async function harvestSectionToLibrary(
 
   return result;
 }
+
+/**
+ * Harvest a SINGLE canvas node into the library on demand — the node-level complement
+ * to the lock-triggered section/proposal harvest, powering the "accept this node into
+ * my library" action on the canvas rail (and, soon, agent-accepted bubbles). Same
+ * immutability + lineage + context binding: never mutates, crystallizes a
+ * context-bound atom with author + generational lineage, deduped per proposal.
+ */
+export async function harvestNodeToLibrary(
+  tenantId: string,
+  proposalId: string,
+  sectionId: string,
+  node: {
+    nodeId: string;
+    heading?: string | null;
+    text: string;
+    sectionType?: string | null;
+    tags?: string[] | null;
+    parentUnitId?: string | null;
+  },
+  harvestedBy: string,
+): Promise<{ unitId: string | null; deduped: boolean }> {
+  const text = (node.text ?? '').trim();
+  if (text.length < 20) return { unitId: null, deduped: false };
+
+  // Section context (title → category, section_type → standard bucket).
+  let section: { title: string | null; sectionType: string | null; standardCategory: string | null } | undefined;
+  try {
+    [section] = await sql<Array<{ title: string | null; sectionType: string | null; standardCategory: string | null }>>`
+      SELECT title, section_type AS "sectionType",
+             (SELECT ss.category FROM section_standards ss WHERE ss.key = section_type) AS "standardCategory"
+      FROM proposal_sections
+      WHERE id = ${sectionId} AND proposal_id = ${proposalId}
+      LIMIT 1
+    `;
+  } catch (err) {
+    console.error('[harvest-node] section load failed:', err);
+  }
+
+  const sectionType = node.sectionType ?? section?.sectionType ?? null;
+  const category = section?.title ? sectionToCategory(section.title) : 'general';
+  let subcategory = section?.standardCategory ?? null;
+  if (sectionType) {
+    try {
+      const [std] = await sql<Array<{ category: string | null }>>`
+        SELECT category FROM section_standards WHERE key = ${sectionType} LIMIT 1
+      `;
+      if (std?.category) subcategory = std.category;
+    } catch {
+      // keep the section's standard category as fallback
+    }
+  }
+
+  const ctx = await loadHarvestContext(proposalId);
+  const author = await resolveAuthor(harvestedBy);
+  const atomHash = computeAtomHash(text);
+  const parentUnitId = node.parentUnitId ?? null;
+
+  // Context-bound dedup: same content re-accepted in the SAME proposal bumps usage.
+  try {
+    const existing = await sql<Array<{ id: string }>>`
+      SELECT id FROM library_units
+      WHERE tenant_id = ${tenantId}::uuid AND atom_hash = ${atomHash} AND original_proposal_id = ${proposalId}::uuid
+      LIMIT 1
+    `;
+    if (existing.length > 0) {
+      await sql`UPDATE library_units SET usage_count = usage_count + 1 WHERE id = ${existing[0].id}`;
+      return { unitId: existing[0].id, deduped: true };
+    }
+  } catch (err) {
+    console.error('[harvest-node] dedup check failed:', err);
+  }
+
+  const lineage: AtomLineage = parentUnitId
+    ? { parentUnitId, ...(await loadParentLineage(parentUnitId, tenantId)) }
+    : { parentUnitId: null, generation: 0 };
+
+  const ctxTags = [
+    ...(ctx.agency ? [`agency:${slugify(ctx.agency)}`] : []),
+    ...(ctx.office ? [`org:${slugify(ctx.office)}`] : []),
+    ...(ctx.programType ? [`program:${slugify(ctx.programType)}`] : []),
+    ...(ctx.namespace ? [`sol:${slugify(ctx.namespace)}`] : []),
+  ];
+  const providedTags = (node.tags ?? []).filter((t) => t && !t.startsWith('type:'));
+  const tags = Array.from(
+    new Set([
+      'harvested',
+      'canvas_accepted',
+      ...(sectionType ? [`type:${sectionType}`] : []),
+      ...ctxTags,
+      ...providedTags,
+      ...(parentUnitId ? ['refined'] : []),
+    ]),
+  );
+
+  const atomMeta = {
+    sectionType,
+    standardCategory: subcategory,
+    provenance: 'canvas_accepted',
+    proposalId,
+    sectionId,
+    refinedFromUnitId: parentUnitId,
+    authorUserId: author.id,
+    authorName: author.name,
+    lineage,
+    context: {
+      opportunityId: ctx.opportunityId ?? null,
+      agency: ctx.agency ?? null,
+      office: ctx.office ?? null,
+      programType: ctx.programType ?? null,
+      namespace: ctx.namespace ?? null,
+    },
+  };
+
+  const sourceId = JSON.stringify({ proposalId, sectionId, nodeId: node.nodeId });
+  let createdId: string | null = null;
+  try {
+    const [created] = await sql<Array<{ id: string }>>`
+      INSERT INTO library_units (
+        tenant_id, content, category, subcategory, tags, meta, heading_text,
+        confidence, status, source_type, source_id,
+        parent_unit_id, original_proposal_id, original_node_id, atom_hash,
+        outcome, outcome_score
+      ) VALUES (
+        ${tenantId}::uuid, ${text}, ${category}, ${subcategory}, ${tags}::text[],
+        ${sql.json(atomMeta as unknown as Parameters<typeof sql.json>[0])}, ${node.heading ?? null},
+        0.9, 'approved', 'harvest', ${sourceId},
+        ${parentUnitId}::uuid, ${proposalId}::uuid, ${node.nodeId}, ${atomHash},
+        'pending', 0.7
+      ) RETURNING id
+    `;
+    createdId = created?.id ?? null;
+  } catch (err) {
+    console.error('[harvest-node] insert failed:', err);
+    return { unitId: null, deduped: false };
+  }
+
+  try {
+    await sql`
+      INSERT INTO library_harvest_log (tenant_id, proposal_id, harvested_at)
+      VALUES (${tenantId}::uuid, ${proposalId}::uuid, now())
+    `;
+  } catch {
+    // best-effort
+  }
+
+  // Lineage bump + audit event (parent → child), or a first-accept event.
+  try {
+    if (parentUnitId) {
+      await sql`
+        UPDATE library_units SET usage_count = usage_count + 1
+        WHERE id = ${parentUnitId}::uuid AND tenant_id = ${tenantId}::uuid
+      `;
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'atom.refined',
+        actor: systemActor('canvas'),
+        tenantId,
+        payload: { correlationId: randomUUID(), parentUnitId, newUnitId: createdId, proposalId, sectionId, nodeId: node.nodeId },
+      });
+    } else {
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'node.accepted',
+        actor: systemActor('canvas'),
+        tenantId,
+        payload: { correlationId: randomUUID(), newUnitId: createdId, proposalId, sectionId, nodeId: node.nodeId },
+      });
+    }
+  } catch {
+    // best-effort
+  }
+
+  return { unitId: createdId, deduped: false };
+}
