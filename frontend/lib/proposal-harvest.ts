@@ -127,6 +127,57 @@ interface HarvestContext {
   namespace?: string | null;
 }
 
+/** The person a harvested atom is attributed to (queryable "original author"). */
+interface HarvestAuthor {
+  id: string | null;
+  name: string | null;
+}
+
+/** Resolve harvestedBy (a user id) → {id, name} once, for atom authorship in meta. */
+async function resolveAuthor(userId: string): Promise<HarvestAuthor> {
+  if (!userId) return { id: null, name: null };
+  try {
+    const [u] = await sql<Array<{ id: string; name: string | null }>>`
+      SELECT id, name FROM users WHERE id = ${userId}::uuid LIMIT 1
+    `;
+    return u ? { id: u.id, name: u.name } : { id: userId, name: null };
+  } catch {
+    // harvestedBy wasn't a resolvable uuid — keep the raw id, no name.
+    return { id: userId, name: null };
+  }
+}
+
+/**
+ * Where a refined atom sits in the parent→child→grandchild tree. Atoms are
+ * immutable, so each harvest crystallizes the NEXT generation and carries its
+ * root + depth in meta.lineage (a denormalized convenience; the authoritative
+ * chain is always parent_unit_id, walkable via the recursive lineage query).
+ */
+interface AtomLineage {
+  parentUnitId: string | null;
+  rootUnitId?: string;
+  generation: number;
+}
+
+/** Derive a child's lineage (root + generation) from its parent's carried lineage. */
+async function loadParentLineage(parentUnitId: string, tenantId: string): Promise<{ rootUnitId: string; generation: number }> {
+  try {
+    const [p] = await sql<Array<{ id: string; parentUnitId: string | null; lineage: { rootUnitId?: string; generation?: number } | null }>>`
+      SELECT id, parent_unit_id AS "parentUnitId", meta->'lineage' AS lineage
+      FROM library_units
+      WHERE id = ${parentUnitId}::uuid AND tenant_id = ${tenantId}::uuid
+      LIMIT 1
+    `;
+    if (!p) return { rootUnitId: parentUnitId, generation: 1 };
+    const parentGen = typeof p.lineage?.generation === 'number' ? p.lineage.generation : (p.parentUnitId ? 1 : 0);
+    const parentRoot = p.lineage?.rootUnitId ?? p.parentUnitId ?? p.id;
+    return { rootUnitId: parentRoot, generation: parentGen + 1 };
+  } catch (err) {
+    console.error('[harvest] parent lineage load failed:', err);
+    return { rootUnitId: parentUnitId, generation: 1 };
+  }
+}
+
 /** Load the proposal's opportunity/solicitation context once, for atom binding. */
 async function loadHarvestContext(proposalId: string): Promise<HarvestContext> {
   try {
@@ -159,6 +210,7 @@ async function harvestSectionNodes(
   section: { id: string; title: string; content: string | null; volumeName?: string | null; sectionType?: string | null; standardCategory?: string | null },
   provenanceTag: string,
   ctx: HarvestContext = {},
+  author: HarvestAuthor = { id: null, name: null },
 ): Promise<HarvestResult> {
   let atomsHarvested = 0;
   let atomsSkipped = 0;
@@ -206,6 +258,13 @@ async function harvestSectionNodes(
     // builds the user's content tree (X → refined-in-proposal-A → Y → … ).
     const parentUnitId = node.provenance?.library_unit_id ?? null;
 
+    // Generational lineage: a refined node is the NEXT generation of its parent —
+    // carry the root + depth so progeny (child → grandchild → …) re-added at the end
+    // of the proposal cycle record their place in the tree.
+    const lineage: AtomLineage = parentUnitId
+      ? { parentUnitId, ...(await loadParentLineage(parentUnitId, tenantId)) }
+      : { parentUnitId: null, generation: 0 };
+
     // Per-node so the lineage + context bind correctly.
     const tags = [
       'harvested',
@@ -225,6 +284,11 @@ async function harvestSectionNodes(
       proposalId,
       sectionId: section.id,
       refinedFromUnitId: parentUnitId,
+      // Original author — makes atoms searchable by who authored them.
+      authorUserId: author.id,
+      authorName: author.name,
+      // Parent→child→grandchild position (root + generation depth).
+      lineage,
       context: {
         opportunityId: ctx.opportunityId ?? null,
         agency: ctx.agency ?? null,
@@ -363,8 +427,9 @@ export async function harvestProposalToLibrary(
   }
 
   const ctx = await loadHarvestContext(proposalId);
+  const author = await resolveAuthor(harvestedBy);
   for (const section of sections) {
-    const r = await harvestSectionNodes(tenantId, proposalId, section, 'proposal_final', ctx);
+    const r = await harvestSectionNodes(tenantId, proposalId, section, 'proposal_final', ctx, author);
     atomsHarvested += r.atomsHarvested;
     atomsSkipped += r.atomsSkipped;
   }
@@ -419,7 +484,8 @@ export async function harvestSectionToLibrary(
   if (!section) return { atomsHarvested: 0, atomsSkipped: 0 };
 
   const ctx = await loadHarvestContext(proposalId);
-  const result = await harvestSectionNodes(tenantId, proposalId, section, 'section_accepted', ctx);
+  const author = await resolveAuthor(harvestedBy);
+  const result = await harvestSectionNodes(tenantId, proposalId, section, 'section_accepted', ctx, author);
 
   try {
     await emitEventSingle({
