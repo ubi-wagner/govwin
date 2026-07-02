@@ -1,11 +1,16 @@
 /**
  * solicitation.approve (Phase 1 §E7).
  *
- * The SECOND admin reviews + approves curation work. Hard rule
- * (D-Phase1-09 in docs/DECISIONS.md): the approver MUST be a
- * different user than the curator. Enforced in the WHERE clause
- * (`AND curated_by != ${actorId}`) so the DB is the authority, not
- * application logic that could drift.
+ * An admin approves curation work, moving it toward release.
+ *
+ * Segregation-of-duties policy (updated from D-Phase1-09): a single RFP admin
+ * MAY approve their own curation so a lone operator can run ingest → curate →
+ * approve → push end-to-end. This is deliberate — the original two-admin rule
+ * (curator ≠ approver) blocked solo operation. Self-approvals are not hidden:
+ * they are flagged (`metadata.selfApproved = true`) in curation_revisions and
+ * are self-evident in triage_actions (actor_id == curated_by), so a reviewer
+ * can still audit them. Re-introduce a hard curator≠approver gate here if/when
+ * true multi-admin peer review is required.
  *
  * State transition: `review_requested` → `approved`
  *
@@ -17,7 +22,6 @@
 import { z } from 'zod';
 import { sql } from '@/lib/db';
 import {
-  ForbiddenError,
   NotFoundError,
   StateTransitionError,
 } from '@/lib/errors';
@@ -44,7 +48,7 @@ export const solicitationApproveTool = defineTool<Input, Output>({
   name: 'solicitation.approve',
   namespace: 'solicitation',
   description:
-    'Second admin approves a curated solicitation. The approver must not be the same user as the curator (enforced in SQL).',
+    'Admin approves a curated solicitation (review_requested → approved). A single admin may self-approve for solo operation; self-approvals are audit-flagged.',
   inputSchema: InputSchema,
   requiredRole: 'rfp_admin',
   tenantScoped: false,
@@ -62,7 +66,6 @@ export const solicitationApproveTool = defineTool<Input, Output>({
         WHERE id = ${solicitationId}::uuid
           AND status = 'review_requested'
           AND curated_by IS NOT NULL
-          AND curated_by != ${actorId}::uuid
         RETURNING id, curated_by, namespace
       `;
     } catch (err) {
@@ -92,14 +95,6 @@ export const solicitationApproveTool = defineTool<Input, Output>({
           { solicitationId, currentStatus: existing[0].status },
         );
       }
-      if (existing[0].curatedBy === actorId) {
-        throw new ForbiddenError(
-          'same person cannot curate and approve: two-admin rule',
-          // details carry a stable error code distinguishing this from
-          // other ForbiddenError cases (wrong role, tenant mismatch, etc.)
-          { code: 'SAME_PERSON_REVIEW', solicitationId, actorId },
-        );
-      }
       // Null curated_by shouldn't be possible in review_requested state
       // (request_review populates it), but guard anyway.
       throw new StateTransitionError(
@@ -109,6 +104,7 @@ export const solicitationApproveTool = defineTool<Input, Output>({
     }
 
     const { curatedBy, namespace } = rows[0];
+    const selfApproved = curatedBy === actorId;
 
     try {
       await sql`
@@ -136,7 +132,7 @@ export const solicitationApproveTool = defineTool<Input, Output>({
           'status',
           'review_requested',
           'approved',
-          ${JSON.stringify({ curatedBy, notes: notes ?? null })}::jsonb
+          ${JSON.stringify({ curatedBy, notes: notes ?? null, selfApproved })}::jsonb
         )
       `;
     } catch (revErr) {

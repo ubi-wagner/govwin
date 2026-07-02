@@ -49,7 +49,6 @@ import { solicitationRejectReviewTool } from '@/lib/tools/solicitation-reject-re
 import { solicitationPushTool } from '@/lib/tools/solicitation-push';
 import { ToolValidationError } from '@/lib/tools/errors';
 import {
-  ForbiddenError,
   NotFoundError,
   StateTransitionError,
   ValidationError,
@@ -152,18 +151,27 @@ describe('solicitation.approve', () => {
     expect(sqlMock).toHaveBeenCalledTimes(4);
   });
 
-  it('throws ForbiddenError (SAME_PERSON_REVIEW) when curator == approver', async () => {
-    // Mock actor.id matches curated_by in the existing row
-    const selfApproverId = '11111111-1111-4111-8111-111111111111';
+  it('allows self-approve (single-admin operation), audit-flagged', async () => {
+    // curated_by == actor.id — the two-admin rule was relaxed so a lone RFP
+    // admin can curate then approve. The UPDATE now returns a row (no filter).
+    const selfId = '11111111-1111-4111-8111-111111111111'; // == ctx() actor.id
     sqlMock
-      .mockResolvedValueOnce([]) // UPDATE fails because curated_by == actor
-      .mockResolvedValueOnce([{
-        status: 'review_requested', curatedBy: selfApproverId,
-      }]);
+      .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: selfId, namespace: NAMESPACE }]) // UPDATE succeeds
+      .mockResolvedValueOnce(undefined) // triage_actions
+      .mockResolvedValueOnce(undefined) // memory INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision INSERT
 
-    await expect(
-      invoke('solicitation.approve', { solicitationId: SOL_ID }, ctx()),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const result = await invoke('solicitation.approve',
+      { solicitationId: SOL_ID }, ctx(),
+    ) as { status: string; curatedBy: string; approvedBy: string };
+
+    expect(result.status).toBe('approved');
+    // self-approve: curator and approver are the same actor
+    expect(result.curatedBy).toBe(selfId);
+    expect(result.approvedBy).toBe(selfId);
+    expect(emitSingleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'solicitation.approved' }),
+    );
   });
 
   it('throws StateTransitionError from wrong state', async () => {
