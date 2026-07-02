@@ -55,6 +55,9 @@ const ms = (s: string | null): number => (s ? new Date(s).getTime() : 0);
 const lastUpdateMs = (c: MasterCard): number => Math.max(ms(c.ingestedAt), ms(c.oppUpdatedAt), ms(c.curationUpdatedAt), ms(c.lastPublishedAt));
 const fmtDate = (s: string | null): string => (s ? new Date(s).toLocaleDateString() : '—');
 const fmtDateTime = (s: string | null): string => (s ? new Date(s).toLocaleString() : '—');
+// ms-based formatters — guard against NaN/0 so a missing timestamp never throws (new Date(NaN).toISOString()).
+const fmtMs = (n: number): string => (Number.isFinite(n) && n > 0 ? new Date(n).toLocaleDateString() : '—');
+const fmtMsTime = (n: number): string => (Number.isFinite(n) && n > 0 ? new Date(n).toLocaleString() : '—');
 
 export function MasterCards({ cards }: { cards: MasterCard[] }) {
   const router = useRouter();
@@ -69,16 +72,17 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
   }, [router]);
 
   const toggleSort = useCallback((key: SortKey) => {
-    setSortKey((prevKey) => {
-      if (prevKey === key) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return prevKey;
-      }
+    // Pure setState calls — never nest setSortDir inside the setSortKey updater
+    // (StrictMode double-invokes updaters, which would toggle the direction twice
+    // and make a same-column re-sort a no-op in dev).
+    if (key === sortKey) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
       // New column: strings default asc, everything else desc (most-recent / most-first).
+      setSortKey(key);
       setSortDir(key === 'title' || key === 'curationStatus' ? 'asc' : 'desc');
-      return key;
-    });
-  }, []);
+    }
+  }, [sortKey]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -200,7 +204,7 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${LIFECYCLE_COLORS[lc] ?? 'bg-gray-100 text-gray-600'}`}>{lc}</span>
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtDateTime(c.ingestedAt)}>{fmtDate(c.ingestedAt)}</td>
-                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtDateTime(new Date(lastUpdateMs(c)).toISOString())}>{fmtDate(new Date(lastUpdateMs(c)).toISOString())}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtMsTime(lastUpdateMs(c))}>{fmtMs(lastUpdateMs(c))}</td>
                     <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{fmtDate(c.closeDate)}</td>
                   </tr>
                 );
