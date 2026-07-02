@@ -153,7 +153,12 @@ export const solicitationPushTool = defineTool<Input, Output>({
       // in this same txn.
       await tx`
         UPDATE opportunities
-        SET is_active = true, updated_at = now()
+        SET is_active = true, updated_at = now(),
+            submission_stage = 'open',
+            open_date   = COALESCE(open_date, now()),
+            released_by = COALESCE(released_by, ${actorId}::uuid),
+            released_at = COALESCE(released_at, now()),
+            built_by    = COALESCE(built_by, (SELECT curated_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid))
         WHERE solicitation_id = ${solicitationId}::uuid
            OR id = ${r.opportunityId}::uuid
       `;

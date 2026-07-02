@@ -17,11 +17,15 @@ export interface IntakeInput {
   title: string;
   agency: string;
   office?: string | null;
+  orgUnit?: string | null;              // 3rd org level (department:org:unit)
   solicitationNumber?: string | null;
   programType?: string | null;
   closeDate?: string | null;
   postedDate?: string | null;
+  preReleaseDate?: string | null;
   description?: string | null;
+  expertNotes?: string | null;          // RFP Expert Notes at the opp level
+  submissionStage?: 'nofo' | 'pre_release'; // initial pre-release stage (default pre_release)
   namespace?: string | null;
   // Scout-shaped metadata (the "and other meta-data, etc." the notice carries).
   intakeMeta?: {
@@ -51,18 +55,25 @@ export async function stageIntake(input: IntakeInput, actorId: string | null): P
   const oppId = randomUUID();
   const foundBy = input.intakeMeta?.foundBy ?? 'admin';
   const sourceId = `intake-${oppId}`;
+  // Ingested (not yet released) opps sit in the pre-release band; push moves them to 'open'.
+  const stage = input.submissionStage === 'nofo' ? 'nofo' : 'pre_release';
+  // built_by is a users FK — only set it when the actor is a real user id.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const builtBy = actorId && UUID_RE.test(actorId) ? actorId : null;
 
   try {
     const result = await sql.begin(async (tx: any) => {
       const [opp] = await tx<Array<{ id: string }>>`
         INSERT INTO opportunities
-          (id, source, source_id, title, agency, office, program_type,
-           solicitation_number, close_date, posted_date, description, content_hash, is_active)
+          (id, source, source_id, title, agency, office, org_unit, program_type,
+           solicitation_number, close_date, posted_date, pre_release_date, description, expert_notes,
+           submission_stage, lifecycle_status, built_by, content_hash, is_active)
         VALUES
           (${oppId}::uuid, ${'intake:' + foundBy}, ${sourceId},
-           ${title}, ${agency}, ${input.office ?? null}, ${input.programType ?? null},
+           ${title}, ${agency}, ${input.office ?? null}, ${input.orgUnit ?? null}, ${input.programType ?? null},
            ${input.solicitationNumber ?? null}, ${input.closeDate ?? null}, ${input.postedDate ?? null},
-           ${input.description ?? null}, md5(${title} || ${input.description ?? ''}),
+           ${input.preReleaseDate ?? null}, ${input.description ?? null}, ${input.expertNotes ?? null},
+           ${stage}, 'open', ${builtBy}, md5(${title} || ${input.description ?? ''}),
            false)
         RETURNING id
       `;

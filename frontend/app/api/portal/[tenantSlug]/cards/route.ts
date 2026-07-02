@@ -47,7 +47,7 @@ export async function GET(
       const cards = await withTenant(tenantId, async (tx) => {
         // Explicit tenant predicate (belt) + RLS (suspenders, once the app runs as govtech_app).
         return tx`
-          SELECT id, opportunity_id, card, bridge_version, lifecycle_status, pursuit_status,
+          SELECT id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage, pursuit_status,
                  is_pinned, pin_update_available, pinned_at, created_at, updated_at
           FROM tenant_opportunity_cards
           WHERE tenant_id = ${tenantId}::uuid

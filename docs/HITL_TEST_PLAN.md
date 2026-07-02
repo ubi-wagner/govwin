@@ -55,3 +55,38 @@ gate (you decide / approve / accept).
 ## Two things to know while testing
 - **Two independent stage tracks.** *Proposal* stages (draft→final, Stage Control in the canvas — the one that leads to Download) are separate from the *portal* workflow stages on the Builds page (the collaboration/ToDo wrapper). For a solo run, drive the proposal track to get the download; the portal "Advance stage" ToDos are the collaboration layer.
 - **No agent fleet / pipeline worker needed.** Every AI step here (Draft-all, revise, review) is a button that runs in the web app. The autonomous worker only *auto-fires* the V0 draft — replaced here by the "Draft all sections" click.
+
+---
+
+# Tranche 1 HITL test — the 6-state card lifecycle
+
+Verifies the canonical submission lifecycle (NOFO → Pre-Release → Open → Updated →
+Closed → Archived), the rich release metadata, and that a lifecycle change on a
+*released* card fans out to every customer's replicant card. `⛱` = HITL gate.
+
+**T1-1 · Ingest with stage + metadata.** `/admin/intake`. Set **Initial stage = NOFO** (or Pre-Release),
+**Unit** (e.g. `AFRL/RIED`), **Pre-release date**, and **RFP Expert Notes**, plus the usual title/agency.
+Stage it. ✅ On `/admin/cards` the row shows a **NOFO** (or **Pre-Release**) stage badge; the Opportunity
+cell shows agency · office · unit; the card is not yet released (no bridge version, 0 replicated).
+
+**T1-2 · Curate → self-approve → push.** Run Phase A (claim → curate → request review → approve → push).
+✅ `/admin/cards`: the stage flips to **Open**, Bridge shows **v1 · published**, **released by `<you>` · `<date>`**
+appears, and **Replicated: N tenants** climbs.
+
+**T1-3 · `⛱` Move the stage from the cockpit.** On `/admin/cards`, use the row's **move →** dropdown:
+Open → **Updated**. ✅ Bridge bumps to **v2 · updated**; the row badge shows **Updated**.
+
+**T1-4 · Verify replication.** Shadow into a tenant (`/admin/tenants → tenant → /portal/<slug>/cards`).
+✅ The card shows an **Updated** badge (mirrored from the master). Refresh `/admin/cards` — the replicated
+count is unchanged, but the tenant card's stage now matches.
+
+**T1-5 · Close → reopen → archive.** Back on `/admin/cards`, move the card **Open → Closed** (✅ bridge
+`closed`, tenant card badge **Closed**, and it drops out of the customer's default pipeline view — toggle
+"Include closed" to see it). Then **Closed → Open** (reopen ✅), then **Open → Archived** (✅ archived).
+
+**T1-6 · `⛱` Illegal transitions are blocked.** Try an illegal jump (e.g. from **Archived**, only "Open"
+is offered; the dropdown never offers Closed→Updated). ✅ The move-list only ever shows legal next states;
+a stale/raced transition returns a 409 with a clear message.
+
+**Prereqs:** migration 100 applied (`submission_stage` + metadata columns); the fan-out steps require the
+opp to be **released** (T1-2) — pre-release stage changes don't reach customers until the first push.
