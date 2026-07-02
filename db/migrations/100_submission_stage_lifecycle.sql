@@ -50,6 +50,16 @@ ALTER TABLE tenant_opportunity_cards
   ADD COLUMN IF NOT EXISTS submission_stage TEXT NOT NULL DEFAULT 'open'
     CHECK (submission_stage IN ('nofo','pre_release','open','updated','closed','archived'));
 
+-- Backfill the tenant mirror from the master so existing replicant cards reflect the
+-- real stage immediately (rather than all 'open'). The app also self-heals on the next
+-- bridge event; this makes day-one state correct. Only touches column-default rows.
+UPDATE tenant_opportunity_cards toc
+SET submission_stage = o.submission_stage
+FROM opportunities o
+WHERE o.id = toc.opportunity_id
+  AND toc.submission_stage = 'open'
+  AND o.submission_stage <> 'open';
+
 -- ── Bridge: 'archived' becomes a first-class event type ──
 ALTER TABLE opportunity_bridge DROP CONSTRAINT IF EXISTS opportunity_bridge_event_type_check;
 ALTER TABLE opportunity_bridge ADD CONSTRAINT opportunity_bridge_event_type_check

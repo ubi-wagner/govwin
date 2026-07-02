@@ -167,7 +167,17 @@ export async function publishToBridge(
 /** Upsert one tenant's denormalized card from a bridge event (tenant-scoped via RLS GUC). */
 async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
   // Canonical stage from the card drives the coarse lifecycle_status the feed uses.
-  const stage: SubmissionStage = isSubmissionStage(ev.card.submissionStage) ? ev.card.submissionStage : 'open';
+  // Fall back to the event type / coarse lifecycleStatus for LEGACY cards whose JSON
+  // predates submission_stage — otherwise a re-fanned/backfilled closed or archived
+  // opp would resurface as 'open' in the customer feed.
+  const stage: SubmissionStage = isSubmissionStage(ev.card.submissionStage)
+    ? ev.card.submissionStage
+    : ev.eventType === 'closed' ? 'closed'
+    : ev.eventType === 'archived' ? 'archived'
+    : ev.eventType === 'reopened' ? 'open'
+    : ev.card.lifecycleStatus === 'archived' ? 'archived'
+    : ev.card.lifecycleStatus === 'closed' ? 'closed'
+    : 'open';
   const lifecycle = coarseStatus(stage);
   await withTenant(tenantId, async (tx) => {
     await tx`

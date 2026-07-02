@@ -75,31 +75,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
       const { launched } = await acceptGuardrails(g.tenantId, portalId, config, { revokeShadow: body.revokeShadow, acceptedBy: g.userId });
       if (!launched) return NextResponse.json({ error: 'Portal not pending (already launched?)', code: 'CONFLICT' }, { status: 409 });
-      // Provision a real proposal build (the V0→V1 substrate) if this portal isn't
-      // yet bound to one — accept-at-launch IS the build approval. Best-effort: a
-      // provisioning failure must not sink the launch (workflow still instantiates).
-      const [portalRow] = await withTenant(g.tenantId, async (tx) =>
-        tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
-          SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
-          FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
-      );
-      let proposalId: string | null = portalRow?.proposalId ?? null;
-      if (portalRow && !proposalId) {
-        const prov = await provisionProposalForPortal({
-          tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
-          opportunityId: portalRow.opportunityId, label: portalRow.label,
-          actorId: g.userId, actorEmail: g.userEmail,
-        });
-        if ('proposalId' in prov) {
-          proposalId = prov.proposalId;
-          await linkPortalProposal(g.tenantId, portalId, proposalId);
-        } else {
-          console.error('[portal/portals/:id] provision failed', prov.error);
+      // The portal is now committed as launched. Everything below is BEST-EFFORT:
+      // provision the proposal build (V0→V1 substrate) if not yet bound, and
+      // instantiate the workflow ToDos. A failure here must not 500 — the portal is
+      // already launched, and a retry would hit the guardrails_pending CAS and 409.
+      let proposalId: string | null = null;
+      let tasksCreated = 0;
+      try {
+        const [portalRow] = await withTenant(g.tenantId, async (tx) =>
+          tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
+            SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
+            FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
+        );
+        proposalId = portalRow?.proposalId ?? null;
+        if (portalRow && !proposalId) {
+          const prov = await provisionProposalForPortal({
+            tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
+            opportunityId: portalRow.opportunityId, label: portalRow.label,
+            actorId: g.userId, actorEmail: g.userEmail,
+          });
+          if ('proposalId' in prov) {
+            proposalId = prov.proposalId;
+            await linkPortalProposal(g.tenantId, portalId, proposalId);
+          } else {
+            console.error('[portal/portals/:id] provision failed', prov.error);
+          }
         }
+        // Instantiate the portal's workflow: stage-0 ToDos into the tasks/nudge ledger.
+        const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
+        ({ tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config));
+      } catch (postErr) {
+        console.error('[portal/portals/:id] post-launch side effects failed (portal is launched)', postErr);
       }
-      // Instantiate the portal's workflow: stage-0 ToDos into the tasks/nudge ledger.
-      const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
-      const { tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config);
       return NextResponse.json({ data: { launched: true, tasksCreated, proposalId } });
     }
     if (action === 'advance-stage') {

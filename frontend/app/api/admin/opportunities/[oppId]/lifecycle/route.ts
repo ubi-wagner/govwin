@@ -167,7 +167,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         await tx`
           INSERT INTO opportunity_lifecycle_actions
             (opportunity_id, actor_id, action, from_status, to_status, reason, metadata)
-          VALUES (${oppId}::uuid, ${user.id}::uuid, 'set_stage', ${fromStage}, ${toStage}, ${reason}, '{}'::jsonb)
+          VALUES (${oppId}::uuid, ${user.id}::uuid, ${action}, ${fromStage}, ${toStage}, ${reason},
+                  ${JSON.stringify({ toStage })}::jsonb)
         `;
         return res.count;
       });
