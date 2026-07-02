@@ -1,0 +1,214 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+export interface MasterCard {
+  opportunityId: string;
+  title: string | null;
+  agency: string | null;
+  office: string | null;
+  programType: string | null;
+  solicitationNumber: string | null;
+  topicNumber: string | null;
+  lifecycleStatus: string | null;
+  isActive: boolean;
+  closeDate: string | null;
+  postedDate: string | null;
+  ingestedAt: string;
+  oppUpdatedAt: string | null;
+  solicitationId: string | null;
+  curationStatus: string | null;
+  namespace: string | null;
+  curationUpdatedAt: string | null;
+  pageLimitTechnical: number | null;
+  pageLimitCost: number | null;
+  submissionFormat: string | null;
+  volumeCount: number;
+  itemCount: number;
+  bridgeVersion: number | null;
+  lastPublishedAt: string | null;
+  bridgeEvent: string | null;
+  replicantCount: number;
+  pinnedCount: number;
+}
+
+type SortKey = 'ingestedAt' | 'lastUpdate' | 'title' | 'curationStatus' | 'matrix' | 'bridgeVersion' | 'replicantCount' | 'closeDate';
+type SortDir = 'asc' | 'desc';
+
+const CURATION_COLORS: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-700',
+  claimed: 'bg-yellow-100 text-yellow-700',
+  curation_in_progress: 'bg-orange-100 text-orange-700',
+  review_requested: 'bg-purple-100 text-purple-700',
+  approved: 'bg-teal-100 text-teal-700',
+  pushed_to_pipeline: 'bg-green-100 text-green-700',
+  dismissed: 'bg-gray-100 text-gray-500',
+};
+const LIFECYCLE_COLORS: Record<string, string> = {
+  open: 'bg-green-100 text-green-700',
+  closed: 'bg-amber-100 text-amber-700',
+  archived: 'bg-gray-100 text-gray-500',
+};
+
+const ms = (s: string | null): number => (s ? new Date(s).getTime() : 0);
+const lastUpdateMs = (c: MasterCard): number => Math.max(ms(c.ingestedAt), ms(c.oppUpdatedAt), ms(c.curationUpdatedAt), ms(c.lastPublishedAt));
+const fmtDate = (s: string | null): string => (s ? new Date(s).toLocaleDateString() : '—');
+const fmtDateTime = (s: string | null): string => (s ? new Date(s).toLocaleString() : '—');
+
+export function MasterCards({ cards }: { cards: MasterCard[] }) {
+  const router = useRouter();
+  const [q, setQ] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('ingestedAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Auto-refresh every 30s (matches /admin/system-state) so the fan-out counts stay live.
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), 30_000);
+    return () => clearInterval(id);
+  }, [router]);
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSortKey((prevKey) => {
+      if (prevKey === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prevKey;
+      }
+      // New column: strings default asc, everything else desc (most-recent / most-first).
+      setSortDir(key === 'title' || key === 'curationStatus' ? 'asc' : 'desc');
+      return key;
+    });
+  }, []);
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const filtered = needle
+      ? cards.filter((c) =>
+          [c.title, c.agency, c.solicitationNumber, c.topicNumber, c.programType, c.namespace]
+            .some((v) => v && v.toLowerCase().includes(needle)),
+        )
+      : cards.slice();
+
+    const cmp = (a: MasterCard, b: MasterCard): number => {
+      let d = 0;
+      switch (sortKey) {
+        case 'title': d = (a.title ?? '').localeCompare(b.title ?? ''); break;
+        case 'curationStatus': d = (a.curationStatus ?? '').localeCompare(b.curationStatus ?? ''); break;
+        case 'matrix': d = (a.volumeCount * 1000 + a.itemCount) - (b.volumeCount * 1000 + b.itemCount); break;
+        case 'bridgeVersion': d = (a.bridgeVersion ?? -1) - (b.bridgeVersion ?? -1); break;
+        case 'replicantCount': d = a.replicantCount - b.replicantCount; break;
+        case 'closeDate': d = ms(a.closeDate) - ms(b.closeDate); break;
+        case 'lastUpdate': d = lastUpdateMs(a) - lastUpdateMs(b); break;
+        case 'ingestedAt': default: d = ms(a.ingestedAt) - ms(b.ingestedAt); break;
+      }
+      return sortDir === 'asc' ? d : -d;
+    };
+    return filtered.sort(cmp);
+  }, [cards, q, sortKey, sortDir]);
+
+  const published = cards.filter((c) => c.bridgeVersion != null).length;
+  const replicated = cards.filter((c) => c.replicantCount > 0).length;
+
+  const Th = ({ label, k, className = '' }: { label: string; k?: SortKey; className?: string }) => (
+    <th className={`px-3 py-2 font-medium ${k ? 'cursor-pointer select-none hover:text-gray-900' : ''} ${className}`} onClick={k ? () => toggleSort(k) : undefined}>
+      {label}{k && sortKey === k && <span className="ml-1 text-gray-400">{sortDir === 'asc' ? '▲' : '▼'}</span>}
+    </th>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Filter by title, agency, solicitation #, topic, namespace…"
+          className="border border-gray-300 rounded px-3 py-1.5 text-sm w-96 max-w-full"
+        />
+        <button onClick={() => router.refresh()} className="text-sm text-blue-600 hover:underline">Refresh</button>
+        <span className="flex items-center gap-1.5 text-xs text-gray-400">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+          </span>
+          auto-refreshing 30s
+        </span>
+        <span className="text-xs text-gray-400 ml-auto">
+          {rows.length} shown · {cards.length} total · {published} on bridge · {replicated} replicated
+        </span>
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="text-sm text-gray-400 py-10 text-center">No opportunities ingested yet.</p>
+      ) : (
+        <div className="border border-gray-200 rounded-lg overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                <Th label="Opportunity" k="title" />
+                <Th label="Curation" k="curationStatus" />
+                <Th label="Matrix" k="matrix" />
+                <Th label="Bridge" k="bridgeVersion" />
+                <Th label="Replicated" k="replicantCount" />
+                <Th label="Lifecycle" />
+                <Th label="Ingested" k="ingestedAt" className="whitespace-nowrap" />
+                <Th label="Last update" k="lastUpdate" className="whitespace-nowrap" />
+                <Th label="Close" k="closeDate" className="whitespace-nowrap" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => {
+                const cur = c.curationStatus ?? 'uncurated';
+                const lc = c.lifecycleStatus ?? 'open';
+                const hasMatrix = c.volumeCount > 0 || c.itemCount > 0;
+                return (
+                  <tr key={c.opportunityId} className="border-t border-gray-100 hover:bg-gray-50 align-top">
+                    <td className="px-3 py-2 max-w-xs">
+                      <div className="font-medium text-gray-900 truncate" title={c.title ?? ''}>{c.title || 'Untitled'}</div>
+                      <div className="text-xs text-gray-400 truncate">
+                        {[c.agency, c.programType].filter(Boolean).join(' · ') || '—'}
+                        {c.topicNumber ? ` · ${c.topicNumber}` : c.solicitationNumber ? ` · ${c.solicitationNumber}` : ''}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${CURATION_COLORS[cur] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {cur.replace(/_/g, ' ')}
+                      </span>
+                      {c.namespace && <div className="text-[10px] text-gray-400 mt-0.5 font-mono truncate max-w-[9rem]" title={c.namespace}>{c.namespace}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-600">
+                      {hasMatrix ? (
+                        <div className="space-y-0.5">
+                          <div>{c.volumeCount} vol · {c.itemCount} items</div>
+                          {c.submissionFormat && <div className="text-gray-400">{c.submissionFormat}</div>}
+                          {(c.pageLimitTechnical != null || c.pageLimitCost != null) && (
+                            <div className="text-gray-400">≤{c.pageLimitTechnical ?? '–'}p tech / {c.pageLimitCost ?? '–'}p cost</div>
+                          )}
+                        </div>
+                      ) : <span className="text-gray-300">— no matrix</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      {c.bridgeVersion != null
+                        ? <span className="text-gray-700">v{c.bridgeVersion}<span className="text-gray-400"> · {c.bridgeEvent}</span></span>
+                        : <span className="text-gray-300">not published</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      {c.replicantCount > 0
+                        ? <span className="text-gray-700">{c.replicantCount} tenants{c.pinnedCount > 0 ? <span className="text-blue-600"> · {c.pinnedCount} pinned</span> : null}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${LIFECYCLE_COLORS[lc] ?? 'bg-gray-100 text-gray-600'}`}>{lc}</span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtDateTime(c.ingestedAt)}>{fmtDate(c.ingestedAt)}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtDateTime(new Date(lastUpdateMs(c)).toISOString())}>{fmtDate(new Date(lastUpdateMs(c)).toISOString())}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{fmtDate(c.closeDate)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

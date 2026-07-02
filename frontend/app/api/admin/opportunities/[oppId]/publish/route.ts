@@ -1,5 +1,5 @@
 /**
- * POST /api/admin/opportunities/[opportunityId]/publish
+ * POST /api/admin/opportunities/[oppId]/publish
  *
  * Publish an opportunity card version to the forward-only bridge + fan it out to
  * every subscribed tenant (mig 094). Normally fired automatically on curation push
@@ -8,6 +8,10 @@
  *
  * Body: { eventType?: 'published'|'updated'|'closed'|'reopened'|'awarded' }
  * Returns: { data: { event: {version, ...}, tenantsApplied } }
+ *
+ * NOTE: this segment is named [oppId] to match the sibling
+ * app/api/admin/opportunities/[oppId]/lifecycle route — Next.js requires a single
+ * slug name per dynamic path position.
  */
 
 import { NextResponse } from 'next/server';
@@ -20,7 +24,7 @@ const EVENTS: BridgeEventType[] = ['published', 'updated', 'closed', 'reopened',
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ opportunityId: string }> },
+  { params }: { params: Promise<{ oppId: string }> },
 ) {
   try {
     const session = await auth();
@@ -31,15 +35,15 @@ export async function POST(
     if (user.role !== 'master_admin' && user.role !== 'rfp_admin') {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
-    const { opportunityId } = await params;
-    if (!isValidUUID(opportunityId)) {
+    const { oppId } = await params;
+    if (!isValidUUID(oppId)) {
       return NextResponse.json({ error: 'Invalid opportunity id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     let body: { eventType?: string } = {};
     try { body = await request.json(); } catch { /* default */ }
     const eventType: BridgeEventType = EVENTS.includes(body.eventType as BridgeEventType) ? (body.eventType as BridgeEventType) : 'updated';
 
-    const result = await publishAndFanOut(opportunityId, eventType, user.id ?? null, new Date().toISOString());
+    const result = await publishAndFanOut(oppId, eventType, user.id ?? null, new Date().toISOString());
     if (!result) {
       return NextResponse.json({ error: 'Opportunity not found or snapshot failed', code: 'NOT_FOUND' }, { status: 404 });
     }

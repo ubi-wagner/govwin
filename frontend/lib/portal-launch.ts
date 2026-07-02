@@ -33,6 +33,18 @@ export async function createPortal(
   });
 }
 
+/** Bind a provisioned proposal to the portal (the V0→V1 substrate). Idempotent: only fills a null. */
+export async function linkPortalProposal(tenantId: string, portalId: string, proposalId: string): Promise<boolean> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ id: string }>>`
+      UPDATE proposal_portals SET proposal_id = ${proposalId}::uuid
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid AND proposal_id IS NULL
+      RETURNING id
+    `;
+    return rows.length > 0;
+  });
+}
+
 /** Assume the T&C shadow-admin grant at purchase (role-based when admin_user_id is null). */
 export async function assumeShadowAdmin(
   tenantId: string,

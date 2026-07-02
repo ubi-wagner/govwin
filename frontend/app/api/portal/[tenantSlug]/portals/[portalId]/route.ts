@@ -14,15 +14,16 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { acceptGuardrails, revokeShadowAdmin, setPortalStatus } from '@/lib/portal-launch';
+import { acceptGuardrails, revokeShadowAdmin, setPortalStatus, linkPortalProposal } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, advancePortalStage, type GuardrailConfig } from '@/lib/portal-workflow';
+import { provisionProposalForPortal } from '@/lib/provision-proposal';
 
 const STATUSES = ['guardrails_pending', 'launched', 'executing', 'closeout', 'archived', 'abandoned'];
 
 async function gate(tenantSlug: string, portalId: string, minRole: Role) {
   const session = await auth();
   if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
-  const u = session.user as { id?: string; role?: unknown };
+  const u = session.user as { id?: string; role?: unknown; email?: string | null };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
@@ -31,7 +32,7 @@ async function gate(tenantSlug: string, portalId: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id, role };
+  return { tenantId, userId: u.id, role, tenantName: (tenant.name as string) ?? tenantSlug, userEmail: u.email ?? null };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; portalId: string }> }) {
@@ -74,10 +75,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
       const { launched } = await acceptGuardrails(g.tenantId, portalId, config, { revokeShadow: body.revokeShadow, acceptedBy: g.userId });
       if (!launched) return NextResponse.json({ error: 'Portal not pending (already launched?)', code: 'CONFLICT' }, { status: 409 });
+      // Provision a real proposal build (the V0→V1 substrate) if this portal isn't
+      // yet bound to one — accept-at-launch IS the build approval. Best-effort: a
+      // provisioning failure must not sink the launch (workflow still instantiates).
+      const [portalRow] = await withTenant(g.tenantId, async (tx) =>
+        tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
+          SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
+          FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
+      );
+      let proposalId: string | null = portalRow?.proposalId ?? null;
+      if (portalRow && !proposalId) {
+        const prov = await provisionProposalForPortal({
+          tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
+          opportunityId: portalRow.opportunityId, label: portalRow.label,
+          actorId: g.userId, actorEmail: g.userEmail,
+        });
+        if ('proposalId' in prov) {
+          proposalId = prov.proposalId;
+          await linkPortalProposal(g.tenantId, portalId, proposalId);
+        } else {
+          console.error('[portal/portals/:id] provision failed', prov.error);
+        }
+      }
       // Instantiate the portal's workflow: stage-0 ToDos into the tasks/nudge ledger.
-      const actor = { id: g.userId, email: null, role: g.role, tenantId: g.tenantId };
+      const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
       const { tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config);
-      return NextResponse.json({ data: { launched: true, tasksCreated } });
+      return NextResponse.json({ data: { launched: true, tasksCreated, proposalId } });
     }
     if (action === 'advance-stage') {
       let body: { force?: boolean } = {};

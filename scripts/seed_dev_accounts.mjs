@@ -15,6 +15,9 @@
  *   • Lighthouse  (tenant)  + eric@lighthouse.com → tenant_admin
  *   • Ubihere     (tenant)  + eric@ubihere.com    → tenant_admin
  *
+ * Then backfills every active/trial tenant's opportunity pipeline from the bridge
+ * head so seeded tenants land fully populated (no manual /backfill-cards call).
+ *
  * temp_password = FALSE so the seeded credential works directly (no /change-password
  * wall) — these are test logins. Emails are lowercased to match auth.ts's login lookup.
  *
@@ -41,6 +44,56 @@ const TENANTS = [
 ];
 
 const sql = postgres(CONN, { max: 1, idle_timeout: 5 });
+
+/**
+ * Replay the bridge head (latest version of every opportunity) into a tenant's
+ * pipeline — the same logic as frontend/lib/opportunity-bridge.ts backfillTenant,
+ * inlined here (standalone script; no Next.js/@ imports). Idempotent upsert, so a
+ * seeded tenant lands with its full card pipeline even when opportunities were
+ * pushed BEFORE the tenant existed (fan-out only covers tenants live at push time).
+ *
+ * NOTE: this script's `sql` has no camelCase column transform, so bridge rows come
+ * back snake_case (opportunity_id, event_type, …). The `card` JSONB keeps the keys
+ * it was written with (camelCase: card.lifecycleStatus). Cards are rewritten via
+ * sql.json() to avoid the stringify-into-jsonb char-iteration bug.
+ */
+async function backfillTenantCards(tenantId) {
+  const heads = await sql`
+    SELECT DISTINCT ON (opportunity_id) id, opportunity_id, version, event_type, card
+    FROM opportunity_bridge
+    ORDER BY opportunity_id, version DESC
+  `;
+  let applied = 0;
+  for (const h of heads) {
+    const card = h.card;
+    if (!card) continue;
+    const lifecycle =
+      h.event_type === 'closed' ? 'closed'
+      : h.event_type === 'reopened' ? 'open'
+      : card.lifecycleStatus === 'archived' ? 'archived'
+      : card.lifecycleStatus === 'closed' ? 'closed'
+      : 'open';
+    await sql`
+      INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status)
+      VALUES (${tenantId}::uuid, ${h.opportunity_id}::uuid, ${sql.json(card)}, ${h.version}, ${lifecycle})
+      ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
+        card = EXCLUDED.card,
+        bridge_version = EXCLUDED.bridge_version,
+        lifecycle_status = EXCLUDED.lifecycle_status,
+        pin_update_available = CASE
+          WHEN tenant_opportunity_cards.is_pinned AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
+          THEN true ELSE tenant_opportunity_cards.pin_update_available END,
+        updated_at = now()
+    `;
+    await sql`
+      INSERT INTO tenant_bridge_cursor (tenant_id, last_posted_at, last_event_id, last_applied_at)
+      VALUES (${tenantId}::uuid, now(), ${h.id}::uuid, now())
+      ON CONFLICT (tenant_id) DO UPDATE SET last_event_id = EXCLUDED.last_event_id, last_applied_at = now()
+    `;
+    applied++;
+  }
+  return applied;
+}
 
 async function upsertUser({ email, name, role, tenantId, password }) {
   const e = email.toLowerCase().trim();
@@ -89,6 +142,20 @@ async function run() {
     const delTenants = await sql`DELETE FROM tenants WHERE slug = 'apex-defense' RETURNING slug`;
     console.log(`✓ PURGE_DEMO: removed ${delUsers.length} demo user(s) + ${delTenants.length} demo tenant(s) (kept eric.c.wagner@gmail.com)`);
   }
+
+  // 4) Fully populate every active/trial tenant's pipeline from the bridge head —
+  //    the same audience fan-out targets. Idempotent: no-op on a fresh DB (empty
+  //    bridge), and catches every tenant up to the current head once RFPs are
+  //    pushed, in EITHER order (seed-then-push or push-then-seed). This removes the
+  //    "tenant created after a release has an empty pipeline" dead-end.
+  const activeTenants = await sql`SELECT id, slug FROM tenants WHERE status IN ('active', 'trial')`;
+  let totalCards = 0;
+  for (const t of activeTenants) {
+    const n = await backfillTenantCards(t.id);
+    totalCards += n;
+    console.log(`✓ pipeline: backfilled ${n} card(s) into tenant '${t.slug}'`);
+  }
+  console.log(`✓ pipeline backfill complete — ${totalCards} card(s) across ${activeTenants.length} active/trial tenant(s)`);
 
   console.log('\nDone. Sign in at /login with the emails above. (@lighthouse/@ubihere are fake inboxes; @rfppipeline is real.)');
 }

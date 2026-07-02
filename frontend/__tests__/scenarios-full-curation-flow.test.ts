@@ -10,7 +10,7 @@
  *   4. (shredder runs, writes ai_extracted — simulated as a direct mock)
  *   5. admin A: compliance.save_variable_value  → HITL write (memory!)
  *   6. admin A: solicitation.request_review
- *   7. admin B: solicitation.approve            → same-person rule
+ *   7. admin B: solicitation.approve            → approves (a lone admin may also self-approve)
  *   8. admin B: solicitation.push               → goes live
  *
  * All under the same test file with a shared sqlMock queue. The test
@@ -215,21 +215,21 @@ describe('Phase 1 §E24 — full curation flow', () => {
     ]);
   });
 
-  it('admin A cannot approve their own curation (same-person rule)', async () => {
-    // Simulate: admin A is the curator (curated_by = ADMIN_A_ID)
-    // When admin A tries to approve, the UPDATE's WHERE clause
-    // `curated_by != actor.id` filters them out — 0 rows returned.
-    // The disambiguation query returns the existing row with
-    // curated_by == actor.id, which the tool recognizes as same-
-    // person and raises ForbiddenError with code=SAME_PERSON_REVIEW.
+  it('allows a single admin to approve their own curation (self-approve)', async () => {
+    // The two-admin rule was relaxed so a lone RFP admin can run
+    // ingest → curate → approve → push. Admin A (the curator) approves:
+    // the UPDATE returns a row (no curator≠approver filter) and the
+    // approval is audit-flagged (metadata.selfApproved) in curation_revisions.
     sqlMock
-      .mockResolvedValueOnce([])                                       // UPDATE 0 rows
-      .mockResolvedValueOnce([{ status: 'review_requested', curatedBy: ADMIN_A_ID }]);
+      .mockResolvedValueOnce([{ id: SOL_ID, curatedBy: ADMIN_A_ID, namespace: NAMESPACE }]) // UPDATE succeeds
+      .mockResolvedValueOnce(undefined) // triage_actions
+      .mockResolvedValueOnce(undefined) // approve memory INSERT
+      .mockResolvedValueOnce(undefined); // curation_revision
 
-    const { ForbiddenError } = await import('@/lib/errors');
-    await expect(
-      invoke('solicitation.approve', { solicitationId: SOL_ID },
-        ctx(ADMIN_A_ID, 'admin-a@example.com')),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    const approve = await invoke('solicitation.approve', { solicitationId: SOL_ID },
+      ctx(ADMIN_A_ID, 'admin-a@example.com')) as { status: string; curatedBy: string; approvedBy: string };
+    expect(approve.status).toBe('approved');
+    expect(approve.curatedBy).toBe(ADMIN_A_ID);
+    expect(approve.approvedBy).toBe(ADMIN_A_ID);
   });
 });
