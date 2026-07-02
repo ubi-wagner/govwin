@@ -11,6 +11,7 @@ import { getNodeText } from '@/lib/types/canvas-document';
 import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
 import { CommentThread, type NodeComment } from './collaboration';
+import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
 
 interface Props {
   document: CanvasDocument;
@@ -321,9 +322,11 @@ export function CanvasSidebar({
   const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
-  const pageEstimate = Math.max(1, Math.ceil(doc.nodes.length / 8));
   const maxPages = doc.canvas.max_pages;
-  const pageOk = !maxPages || pageEstimate <= maxPages;
+  // Real word-budget fit (the section "mold") — replaces the old ceil(nodeCount/8) guess.
+  const budget = computeSectionBudget({ pageLimit: maxPages, fontSize: doc.canvas.font_default?.size, lineSpacing: doc.canvas.line_spacing });
+  const fit = evaluateFit(doc.nodes, budget);
+  const pageOk = fit.withinBudget;
 
   const aiNodes = doc.nodes.filter((n) => n.provenance.source === 'ai_draft').length;
   const libraryNodes = doc.nodes.filter((n) => n.provenance.source === 'library').length;
@@ -371,12 +374,21 @@ export function CanvasSidebar({
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Compliance</h3>
               <div className="space-y-2 text-sm">
-                {maxPages && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Page limit</span>
-                    <span className={`font-medium ${pageOk ? 'text-green-600' : 'text-red-600'}`}>
-                      ~{pageEstimate} / {maxPages}
-                    </span>
+                {budget && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Length</span>
+                      <span className={`font-medium ${pageOk ? 'text-green-600' : 'text-red-600'}`}>
+                        {fit.words} / {budget.maxWords} words
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${pageOk ? 'bg-green-500' : 'bg-red-500'}`}
+                           style={{ width: `${Math.min(100, Math.round((fit.fill ?? 0) * 100))}%` }} />
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {maxPages}-page limit · ~{budget.targetWords}-word target{pageOk ? '' : ' · OVER budget'}
+                    </div>
                   </div>
                 )}
                 <div className="flex justify-between">
