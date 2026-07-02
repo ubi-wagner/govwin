@@ -29,6 +29,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modu
 # Migration files + entrypoint — run automatically on deploy
 COPY --chown=nextjs:nodejs db/migrations/*.sql ./db/migrations/
 COPY --chown=nextjs:nodejs db/migrations/migrate.mjs ./db/migrations/migrate.mjs
+# Dev/test account seed — shipped so entrypoint can run it after migrations when
+# SEED_DEV_ACCOUNTS=true (opt-in; never runs in prod unless explicitly enabled).
+COPY --chown=nextjs:nodejs scripts/seed_dev_accounts.mjs ./scripts/seed_dev_accounts.mjs
 COPY --chown=nextjs:nodejs frontend/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
