@@ -41,6 +41,21 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
   const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [referenceId, setReferenceId] = useState<string | null>(null);
+
+  const upload = useCallback(async (file: File) => {
+    setBusy(true); setMsg(null);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/upload`, { method: 'POST', body: fd });
+      if (res.ok) {
+        const d = (await res.json()).data as { referenceAtomId: string | null; blocks: Array<{ id: string; heading: string | null; text: string; kind: string }> };
+        setBlocks(d.blocks.map((b) => ({ id: b.id, text: b.heading && b.heading !== b.text ? `${b.heading}\n${b.text}` : (b.text || b.heading || ''), kind: b.kind === 'heading' ? 'heading' : 'narrative' })));
+        setReferenceId(d.referenceAtomId); setSel(new Set());
+        setMsg(`Uploaded — ${d.blocks.length} objects registered. Select what to atomize.`);
+      } else { setMsg((await res.json().catch(() => ({}))).error || 'Upload failed'); }
+    } catch { setMsg('Upload failed'); } finally { setBusy(false); }
+  }, [tenantSlug]);
 
   useEffect(() => {
     fetch(`/api/portal/${tenantSlug}/taxonomy`).then((r) => (r.ok ? r.json() : null)).then((j) => j && setTax(j.data)).catch(() => {});
@@ -78,7 +93,8 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ grain: 'primitive', title: b.text.slice(0, 60), content: b.text,
               canvasNodes: [{ type: b.kind === 'heading' ? 'heading' : 'text_block', content: b.kind === 'heading' ? { level: 2, text: b.text } : { text: b.text } }],
-              source: 'upload', status: 'approved' }),
+              source: 'upload', status: 'approved',
+              sourceAnchor: referenceId ? [{ sourceAtomId: referenceId, blockIds: [b.id] }] : undefined }),
           });
           if (res.ok) ids.push((await res.json()).data.atomId);
         }
@@ -95,6 +111,7 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
           memberAtomIds,
           source: 'upload', status: 'approved',
           tags: tags.map((t) => ({ ...t, source: 'admin', confirmed: true })),
+          sourceAnchor: referenceId ? [{ sourceAtomId: referenceId, blockIds: selectedBlocks.map((b) => b.id) }] : undefined,
         }),
       });
       if (res.ok) {
@@ -103,7 +120,7 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
         setSel(new Set()); setTags([]); setTitle(''); setSummary(''); setAsGroup(false);
       } else { setMsg((await res.json().catch(() => ({}))).error || 'Create failed'); }
     } catch { setMsg('Create failed'); } finally { setBusy(false); }
-  }, [selectedBlocks, asGroup, tenantSlug, title, summary, tags, words]);
+  }, [selectedBlocks, asGroup, tenantSlug, title, summary, tags, words, referenceId]);
 
   const inputCls = 'border border-gray-300 rounded px-2 py-1 text-sm';
 
@@ -114,7 +131,15 @@ export function Atomizer({ tenantSlug }: { tenantSlug: string }) {
         <div className="border border-gray-200 rounded-xl p-4 bg-white">
           <label className="block text-xs text-gray-500 mb-1">Paste document content to shred</label>
           <textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={5} className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-sm" placeholder="Paste a bio, a past-performance blurb, a whole team section…" />
-          <button onClick={shred} disabled={!raw.trim()} className="mt-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:opacity-50">Deconstruct into objects</button>
+          <div className="mt-2 flex items-center gap-3">
+            <button onClick={shred} disabled={!raw.trim() || busy} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:opacity-50">Deconstruct into objects</button>
+            <label className="text-sm text-blue-600 hover:underline cursor-pointer">
+              or upload a file
+              <input type="file" accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.md" className="hidden" disabled={busy}
+                     onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
+            </label>
+            <span className="text-[11px] text-gray-400">registers the doc + its objects; nothing is atomized until you select</span>
+          </div>
         </div>
         {blocks.length > 0 && (
           <div className="border border-gray-200 rounded-xl bg-white divide-y divide-gray-100">

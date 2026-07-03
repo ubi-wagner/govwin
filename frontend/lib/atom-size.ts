@@ -16,7 +16,7 @@ export interface AtomSize {
   estPages: number;
 }
 
-function textOfNodes(nodes: CanvasNode[] | null | undefined): string {
+export function textOfNodes(nodes: CanvasNode[] | null | undefined): string {
   if (!Array.isArray(nodes)) return '';
   const parts: string[] = [];
   for (const n of nodes) {
