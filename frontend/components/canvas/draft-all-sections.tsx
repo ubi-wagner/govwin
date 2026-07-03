@@ -5,8 +5,9 @@
  *
  * When a proposal is provisioned with empty sections, this component
  * shows a "Draft All Sections" button that:
- *   1. For each empty section, searches the library for relevant atoms
- *   2. Calls Claude to draft content using library + RFP context
+ *   1. For each empty section, ranks the tenant's library atoms with the
+ *      scored selector (/atoms/select — scope by vol/kind, boost by context)
+ *   2. Calls Claude to draft content using the selected atoms + RFP context
  *   3. Inserts the drafted nodes into each section's canvas
  *   4. Updates each section's status to 'ai_drafted'
  *
@@ -18,37 +19,42 @@ import { useState } from 'react';
 import { useTool } from '@/lib/hooks/use-tool';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
-// ─── Section title → library category mapping ────────────────────────
-// When searching the library for relevant atoms, we map common RFP
-// section titles to canonical library categories so the search returns
-// atoms from the same domain regardless of naming differences.
+// ─── Section title → unified-taxonomy vol (mig 101/102) ──────────────
+// Map common RFP section titles to a canonical `vol` so the scored atom
+// selector scopes to atoms from the same section family. Unmapped titles
+// fall through to a slugified value (which matches no seeded vol → the
+// section simply drafts without library atoms — the same graceful fallback
+// the old keyword search had when nothing matched).
 
-const SECTION_CATEGORY_MAP: Record<string, string> = {
-  'technical proposal': 'technical_approach',
-  'technical approach': 'technical_approach',
-  'technical volume': 'technical_approach',
-  'key personnel': 'key_personnel',
-  'personnel': 'key_personnel',
-  'staffing plan': 'key_personnel',
-  'past performance': 'past_performance',
-  'relevant experience': 'past_performance',
-  'corporate experience': 'past_performance',
-  'commercialization': 'commercialization',
-  'commercialization plan': 'commercialization',
-  'commercialization strategy': 'commercialization',
-  'facilities': 'facilities',
-  'facilities and equipment': 'facilities',
-  'equipment': 'facilities',
-  'management approach': 'management_approach',
-  'management plan': 'management_approach',
-  'cost proposal': 'cost_proposal',
-  'cost volume': 'cost_proposal',
-  'budget': 'cost_proposal',
+const SECTION_VOL_MAP: Record<string, string> = {
+  'technical proposal': 'technical', 'technical approach': 'technical', 'technical volume': 'technical',
+  'key personnel': 'key_personnel', 'personnel': 'key_personnel', 'staffing plan': 'key_personnel', 'qualifications': 'key_personnel',
+  'principal investigator': 'principal_investigator',
+  'past performance': 'past_performance', 'relevant experience': 'past_performance', 'corporate experience': 'past_performance',
+  'commercialization': 'commercialization', 'commercialization plan': 'commercialization', 'commercialization strategy': 'commercialization',
+  'facilities': 'facilities', 'facilities and equipment': 'facilities', 'equipment': 'equipment',
+  'management approach': 'management', 'management plan': 'management',
+  'cost proposal': 'cost', 'cost volume': 'cost', 'budget': 'cost',
+  'abstract': 'abstract', 'summary': 'summary', 'project summary': 'summary',
+  'statement of work': 'statement_of_work', 'work plan': 'work_plan',
+  'milestones': 'milestones', 'schedule': 'milestones',
+  'transition plan': 'transition_plan', 'objectives': 'objectives',
 };
 
-function sectionToCategory(title: string): string {
+// Distinctive atom kinds per vol — kinds that unambiguously belong to that
+// section, used to broaden recall past the vol tag. Left empty where the vol
+// tag alone is the right scope (a generic 'narrative' kind would over-match
+// every section, since the selector's kind clause is an OR against the vol).
+const VOL_DEFAULT_KINDS: Record<string, string[]> = {
+  key_personnel: ['bio', 'resume', 'headshot'],
+  principal_investigator: ['bio', 'resume'],
+  past_performance: ['past_perf_blurb'],
+  cost: ['budget_data', 'table'],
+};
+
+function sectionToVol(title: string): string {
   const normalized = title.toLowerCase().trim();
-  return SECTION_CATEGORY_MAP[normalized] ?? normalized.replace(/\s+/g, '_');
+  return SECTION_VOL_MAP[normalized] ?? normalized.replace(/\s+/g, '_');
 }
 
 interface Section {
@@ -62,18 +68,23 @@ interface Section {
 
 interface Props {
   proposalId: string;
+  tenantSlug: string;
   sections: Section[];
   rfpExcerpt?: string;
   evaluationCriteria?: string[];
+  // Opportunity context slugs (agency/program/phase/tech) that boost atom ranking.
+  context?: string[];
   onSectionDrafted: (sectionId: string, nodes: CanvasNode[]) => void;
   onComplete: () => void;
 }
 
 export function DraftAllSections({
   proposalId,
+  tenantSlug,
   sections,
   rfpExcerpt,
   evaluationCriteria,
+  context = [],
   onSectionDrafted,
   onComplete,
 }: Props) {
@@ -94,36 +105,26 @@ export function DraftAllSections({
       setProgress((prev) => ({ ...prev, [sec.id]: 'drafting' }));
 
       try {
-        // Search library for relevant atoms — try category match first,
-        // then fall back to text search on the section title. This catches
-        // atoms even when category slugs don't match exactly.
+        // Pull the best-matching library atoms via the scored selector
+        // (scope by vol/kind, boost by shared opportunity context, tie-break
+        // on outcome/usage/recency). Groups return their members' assembled
+        // content. Feeds the drafter's <library_atoms>. Non-fatal on failure.
         let libraryAtoms: Array<{ id: string; content: string; category: string; tags?: string[] }> = [];
         try {
-          const categorySlug = sectionToCategory(sec.title);
-          const libResult = await invoke<{
-            atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
-            total: number;
-          }>('library.search_atoms', {
-            category: categorySlug,
-            limit: 5,
-          });
-          libraryAtoms = libResult.atoms ?? [];
-
-          // If category match found few results, supplement with text search
-          if (libraryAtoms.length < 3) {
-            const textResult = await invoke<{
-              atoms: Array<{ id: string; content: string; category: string; tags?: string[] }>;
-            }>('library.search_atoms', {
-              query: sec.title,
-              limit: 5 - libraryAtoms.length,
-            });
-            const existingIds = new Set(libraryAtoms.map((a) => a.id));
-            for (const atom of textResult.atoms ?? []) {
-              if (!existingIds.has(atom.id)) libraryAtoms.push(atom);
-            }
+          const vol = sectionToVol(sec.title);
+          const kinds = VOL_DEFAULT_KINDS[vol] ?? [];
+          const qs = new URLSearchParams({ vol, limit: '5' });
+          if (kinds.length) qs.set('kinds', kinds.join(','));
+          if (context.length) qs.set('context', context.join(','));
+          const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
+          if (res.ok) {
+            const ranked = ((await res.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;
+            libraryAtoms = ranked
+              .filter((a) => a.content && a.content.trim())
+              .map((a) => ({ id: a.id, content: a.content as string, category: vol }));
           }
         } catch {
-          // Library search failure is non-fatal — draft without library context
+          // Library selection failure is non-fatal — draft without library context
         }
 
         // Draft the section

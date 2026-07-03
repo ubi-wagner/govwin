@@ -158,7 +158,7 @@ export interface SectionQuery {
   limit?: number;
 }
 export interface RankedAtom {
-  id: string; title: string | null; summary: string | null; grain: Grain;
+  id: string; title: string | null; summary: string | null; content: string | null; grain: Grain;
   wordCount: number; charCount: number; outcomeScore: number; usageCount: number;
   ctxMatches: number; score: number;
 }
@@ -169,11 +169,17 @@ export async function selectForSection(tenantId: string, q: SectionQuery): Promi
   const context = q.context ?? [];
   const limit = Math.min(50, q.limit ?? 8);
 
-  const rows = await withTenant<Array<{ id: string; title: string | null; summary: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
+  const rows = await withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
     tx`
       SELECT a.id, a.title, a.summary, a.grain,
              a.word_count AS "wordCount", a.char_count AS "charCount",
              a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount",
+             -- a group carries no content of its own; assemble it from its ordered members
+             coalesce(a.content, (
+               SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
+               FROM atom_members am JOIN library_atoms m ON m.id = am.member_atom_id
+               WHERE am.group_atom_id = a.id
+             )) AS content,
              (SELECT count(*)::int FROM atom_tags t
                 WHERE t.atom_id = a.id
                   AND t.dimension IN ('agency','program','phase','tech','dept')

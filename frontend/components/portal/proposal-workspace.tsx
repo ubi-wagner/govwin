@@ -319,6 +319,7 @@ export function ProposalWorkspace({
       {userRole === 'admin' && showDrafter && emptySectionCount > 0 && !isLocked && (
         <DraftAllSections
           proposalId={proposalId}
+          tenantSlug={tenantSlug}
           sections={sections.map((s) => ({
             id: s.id,
             title: s.title,
