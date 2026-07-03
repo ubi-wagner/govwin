@@ -113,9 +113,11 @@ export function DraftAllSections({
         try {
           const vol = sectionToVol(sec.title);
           const kinds = VOL_DEFAULT_KINDS[vol] ?? [];
-          const qs = new URLSearchParams({ vol, limit: '5' });
+          const qs = new URLSearchParams({ vol, limit: '5', sectionId: sec.id });
           if (kinds.length) qs.set('kinds', kinds.join(','));
           if (context.length) qs.set('context', context.join(','));
+          // sectionId lets the selector record these as the section's source atoms,
+          // so the atom return at lock can set lineage back to them.
           const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
           if (res.ok) {
             const ranked = ((await res.json()).data?.atoms ?? []) as Array<{ id: string; content: string | null }>;

@@ -50,6 +50,10 @@ export interface CreateAtomInput {
   memberAtomIds?: string[];            // grain='group'
   parentAtomIds?: string[];            // lineage: derived_from
   tags?: AtomTagInput[];
+  // When true and originSectionId is set, reuse the section's existing derivative
+  // atom (UPDATE in place) instead of inserting a duplicate. Makes the section
+  // return idempotent across lock → unlock → re-lock (one atom per section, refreshed).
+  idempotentBySection?: boolean;
 }
 
 // ── create ──
@@ -64,21 +68,53 @@ export async function createAtom(
   const creatorKind = input.creatorKind ?? actor.kind ?? 'admin';
 
   return withTenant(tenantId, async (tx) => {
-    const [atom] = await tx<Array<{ id: string }>>`
-      INSERT INTO library_atoms
-        (tenant_id, grain, title, content, canvas_nodes, summary, word_count, char_count,
-         status, source, creator_kind, created_by, owner_user_id, visibility,
-         cocoon_id, source_anchor, origin_proposal_id, origin_section_id)
-      VALUES
-        (${tenantId}::uuid, ${input.grain}, ${input.title ?? null}, ${input.content ?? null},
-         ${input.canvasNodes ? tx.json(input.canvasNodes) : null}, ${input.summary ?? null},
-         ${size.words}, ${size.chars}, ${input.status ?? 'draft'}, ${input.source ?? 'manual'},
-         ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'},
-         ${input.cocoonId ?? null}, ${input.sourceAnchor ? tx.json(input.sourceAnchor) : null},
-         ${input.originProposalId ?? null}, ${input.originSectionId ?? null})
-      RETURNING id
-    `;
-    const atomId = atom.id;
+    // Idempotent-by-section: when asked, refresh the section's existing derivative
+    // in place (matched on origin_section_id + source) rather than inserting a
+    // duplicate on re-lock. Falls through to INSERT when there's no prior atom.
+    const reuse = input.idempotentBySection && input.originSectionId
+      ? (await tx<Array<{ id: string }>>`
+          SELECT id FROM library_atoms
+          WHERE tenant_id = ${tenantId}::uuid
+            AND origin_section_id = ${input.originSectionId}::uuid
+            AND source = ${input.source ?? 'manual'}
+          ORDER BY created_at ASC
+          LIMIT 1
+        `)[0] ?? null
+      : null;
+
+    let atomId: string;
+    if (reuse) {
+      await tx`
+        UPDATE library_atoms SET
+          title = ${input.title ?? null},
+          content = ${input.content ?? null},
+          canvas_nodes = ${input.canvasNodes ? tx.json(input.canvasNodes) : null},
+          summary = ${input.summary ?? null},
+          word_count = ${size.words},
+          char_count = ${size.chars},
+          status = ${input.status ?? 'draft'},
+          cocoon_id = ${input.cocoonId ?? null},
+          origin_proposal_id = ${input.originProposalId ?? null}
+        WHERE id = ${reuse.id}::uuid
+      `;
+      atomId = reuse.id;
+    } else {
+      const [atom] = await tx<Array<{ id: string }>>`
+        INSERT INTO library_atoms
+          (tenant_id, grain, title, content, canvas_nodes, summary, word_count, char_count,
+           status, source, creator_kind, created_by, owner_user_id, visibility,
+           cocoon_id, source_anchor, origin_proposal_id, origin_section_id)
+        VALUES
+          (${tenantId}::uuid, ${input.grain}, ${input.title ?? null}, ${input.content ?? null},
+           ${input.canvasNodes ? tx.json(input.canvasNodes) : null}, ${input.summary ?? null},
+           ${size.words}, ${size.chars}, ${input.status ?? 'draft'}, ${input.source ?? 'manual'},
+           ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'},
+           ${input.cocoonId ?? null}, ${input.sourceAnchor ? tx.json(input.sourceAnchor) : null},
+           ${input.originProposalId ?? null}, ${input.originSectionId ?? null})
+        RETURNING id
+      `;
+      atomId = atom.id;
+    }
 
     // tags (each carries auto/admin + confirmed provenance)
     for (const t of input.tags ?? []) {
@@ -112,15 +148,20 @@ export async function createAtom(
       await tx`UPDATE library_atoms SET member_summary = ${tx.json(rollup)} WHERE id = ${atomId}::uuid`;
     }
 
-    // lineage (this atom derived_from parents; a child ← many parents)
+    // lineage (this atom derived_from parents; a child ← many parents). Only bump
+    // the parent's usage_count when the edge is NEWLY inserted, so an idempotent
+    // re-harvest of the same section doesn't inflate the source atom's usage.
     for (const p of input.parentAtomIds ?? []) {
       if (p === atomId) continue;
-      await tx`
+      const linked = await tx<Array<{ parent_atom_id: string }>>`
         INSERT INTO atom_lineage (parent_atom_id, child_atom_id, relation)
         VALUES (${p}::uuid, ${atomId}::uuid, 'derived_from')
         ON CONFLICT (parent_atom_id, child_atom_id) DO NOTHING
+        RETURNING parent_atom_id
       `;
-      await tx`UPDATE library_atoms SET usage_count = usage_count + 1 WHERE id = ${p}::uuid`;
+      if (linked.length > 0) {
+        await tx`UPDATE library_atoms SET usage_count = usage_count + 1 WHERE id = ${p}::uuid`;
+      }
     }
 
     return { atomId, size };

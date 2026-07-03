@@ -44,6 +44,13 @@ BEGIN
   -- lock/collab tests mutate the fixture sections; reset them so re-runs start clean.
   UPDATE proposal_sections SET is_locked = false, status = 'in_progress', completed_stage = NULL, accepted_by = NULL, accepted_at = NULL
    WHERE id IN ('d0000000-0000-4000-8000-000000000003', 'd2000000-0000-4000-8000-000000000002');
+  -- atomloop.tenant: the lock section carries source-atom lineage (A1) + a vol, so on
+  -- lock the returned derivative atom is tagged (vol=technical) and links derived_from A1
+  -- (the "child that can become a parent" — closing the atomize→mold→draft→library loop).
+  UPDATE proposal_sections
+     SET section_type = 'technical',
+         meta = coalesce(meta, '{}'::jsonb) || jsonb_build_object('sourceAtomIds', jsonb_build_array('a1a1a1a1-0000-4000-8000-000000000001'))
+   WHERE id = 'd0000000-0000-4000-8000-000000000003';
 
   -- matrix.tenant: an RFP chain (solicitation + 1 volume + 2 required items + topic).
   INSERT INTO opportunities (id, source, source_id, title, is_active) VALUES

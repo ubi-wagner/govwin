@@ -12,6 +12,8 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { selectForSection, viewerFromRole } from '@/lib/atoms';
+import { withTenant } from '@/lib/rls';
+import { isValidUUID } from '@/lib/validation';
 
 export async function GET(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -35,6 +37,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       context: csv('context'),
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
     }, viewerFromRole(u.id, role));
+
+    // Record the selection onto the section (meta.sourceAtomIds) so the atom
+    // return at lock can set lineage (derived_from) to these source atoms. The
+    // drafter passes &sectionId; the admin picker omits it. Best-effort.
+    const sectionId = url.searchParams.get('sectionId');
+    if (sectionId && isValidUUID(sectionId) && atoms.length > 0) {
+      try {
+        await withTenant(tenantId, async (tx) =>
+          tx`UPDATE proposal_sections
+             SET meta = coalesce(meta, '{}'::jsonb) || ${tx.json({ sourceAtomIds: atoms.map((a) => a.id) })}
+             WHERE id = ${sectionId}::uuid
+               AND proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)`,
+        );
+      } catch (e) {
+        console.error('[portal/atoms/select] source-atom record failed (non-fatal)', e);
+      }
+    }
     return NextResponse.json({ data: { atoms } });
   } catch (err) {
     console.error('[portal/atoms/select] error', err);

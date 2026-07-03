@@ -22,6 +22,7 @@ import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { harvestSectionToLibrary } from '@/lib/proposal-harvest';
+import { harvestSectionToAtomLibrary } from '@/lib/proposal-atom-harvest';
 import { advanceProposalStage } from '@/lib/proposal-advance';
 
 interface RouteContext {
@@ -210,11 +211,21 @@ export async function POST(_request: Request, ctx: RouteContext) {
     }
   }
 
-  // 2. Harvest the accepted section into the tenant library (Option 1).
+  // 2. Harvest the accepted section into the tenant library (Option 1, legacy library_units).
   try {
     await harvestSectionToLibrary(tenantId, proposalId, section.id, userId);
   } catch (e) {
     console.error('[sections/lock] section harvest failed:', e);
+  }
+
+  // 2a. Greenfield atom return — the finalized section goes back to the unified
+  //     library_atoms as a DERIVATIVE atom bound to the proposal's document cocoon,
+  //     with lineage to its source atoms. Closes the atomize → mold → draft →
+  //     back-to-library loop. Best-effort: never fail the lock over the return.
+  try {
+    await harvestSectionToAtomLibrary(tenantId, proposalId, section.id, userId);
+  } catch (e) {
+    console.error('[sections/lock] greenfield atom return failed (non-fatal):', e);
   }
 
   // 2b. Artifact roll-up (E1): when every section of this section's artifact is
