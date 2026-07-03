@@ -7,6 +7,7 @@ import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import { getProposalCard } from '@/lib/cards/card';
 import { OpportunityCard, type OpportunityCardView } from '@/components/cards/opportunity-card';
 import { AssignTaskForm } from '@/components/tasks/assign-task-form';
+import { opportunityContextSlugs } from '@/lib/opportunity-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -505,6 +506,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       <ProposalWorkspace
         proposalId={proposalId}
         tenantSlug={tenantSlug}
+        contextSlugs={opportunityContextSlugs({ agency: proposal.agency, program: proposal.programType })}
         sections={sectionsWithPermission}
         hasEmptySections={hasEmptySections}
         proposalStage={proposal.stage}
