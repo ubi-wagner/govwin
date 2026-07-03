@@ -148,10 +148,10 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null }[]>`
-        SELECT id, version, status, title, content, completed_stage, completed_at FROM proposal_sections
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean }[]>`
+        SELECT id, version, status, title, content, completed_stage, completed_at, is_locked FROM proposal_sections
         WHERE id = ${sectionId}
           AND proposal_id = ${proposalId}
         LIMIT 1
@@ -163,6 +163,18 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     if (!section) {
       return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // A locked (accepted) section is read-only through the API. The editor UI
+    // hides itself for locked sections, but the API is the real enforcement —
+    // without this, a section locked in the CURRENT stage (is_locked=true,
+    // completed_stage===stage) slips past the cross-stage guard below and its
+    // accepted content gets overwritten. Reject regardless of stage.
+    if (section.isLocked) {
+      return NextResponse.json({
+        error: 'This section is locked and cannot be edited. Unlock it first.',
+        code: 'SECTION_LOCKED',
+      }, { status: 423 });
     }
 
     // Block edits on sections completed in a previous stage
