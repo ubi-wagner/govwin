@@ -13,6 +13,7 @@
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coarseStatus, isSubmissionStage, type SubmissionStage, type BridgeEventType } from '@/lib/lifecycle';
+import { autoScoreCard, type CardFields } from '@/lib/bucket-ranking';
 
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
@@ -197,6 +198,14 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
           THEN true ELSE tenant_opportunity_cards.pin_update_available END,
         updated_at = now()
     `;
+    // Auto-rank the arriving card against the tenant's active spotlight buckets so
+    // the pipeline is ranked on arrival (the automated scoring producer for the new
+    // spine). Best-effort — a scoring failure must not fail the card fan-out.
+    try {
+      await autoScoreCard(tx, tenantId, ev.opportunityId, ev.card as CardFields, Date.now());
+    } catch (scoreErr) {
+      console.error('[bridge] auto-score on fan-out failed (non-fatal)', tenantId, scoreErr);
+    }
   });
   // System cursor (not tenant-RLS'd) — records forward-only progress.
   await sql`
