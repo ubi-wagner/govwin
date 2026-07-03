@@ -31,19 +31,31 @@ BEGIN
   -- lock.tenant + collab.tenant: two proposals + sections (own opportunities).
   INSERT INTO opportunities (id, source, source_id, title, is_active) VALUES
     ('d1000000-0000-4000-8000-00000000000a', 'manual_upload', 'fx-lock-opp',  'Lock Fixture Opp',  true),
-    ('d1000000-0000-4000-8000-00000000000b', 'manual_upload', 'fx-collab-opp','Collab Fixture Opp', true)
+    ('d1000000-0000-4000-8000-00000000000b', 'manual_upload', 'fx-collab-opp','Collab Fixture Opp', true),
+    ('d1000000-0000-4000-8000-00000000000c', 'manual_upload', 'fx-fullloop-opp','Fullloop Fixture Opp', true)
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO proposals (id, tenant_id, opportunity_id, title, stage, is_locked) VALUES
     ('d0000000-0000-4000-8000-000000000002', lh, 'd1000000-0000-4000-8000-00000000000a', 'Lock Fixture Proposal',  'draft', false),
-    ('d2000000-0000-4000-8000-000000000001', lh, 'd1000000-0000-4000-8000-00000000000b', 'Collab Fixture Proposal', 'draft', false)
+    ('d2000000-0000-4000-8000-000000000001', lh, 'd1000000-0000-4000-8000-00000000000b', 'Collab Fixture Proposal', 'draft', false),
+    ('d3000000-0000-4000-8000-000000000001', lh, 'd1000000-0000-4000-8000-00000000000c', 'Fullloop Fixture Proposal', 'draft', false)
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO proposal_sections (id, proposal_id, section_number, title, status, version, is_locked, content) VALUES
     ('d0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000002', '1', 'Lock Fixture Section',  'in_progress', 1, false, '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"seed"}}]}'),
-    ('d2000000-0000-4000-8000-000000000002', 'd2000000-0000-4000-8000-000000000001', '1', 'Collab Fixture Section', 'in_progress', 1, false, '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"seed"}}]}')
+    ('d2000000-0000-4000-8000-000000000002', 'd2000000-0000-4000-8000-000000000001', '1', 'Collab Fixture Section', 'in_progress', 1, false, '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"seed"}}]}'),
+    ('d3000000-0000-4000-8000-000000000002', 'd3000000-0000-4000-8000-000000000001', '1', 'Fullloop Section', 'in_progress', 1, false, '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"seed"}}]}')
   ON CONFLICT (id) DO NOTHING;
   -- lock/collab tests mutate the fixture sections; reset them so re-runs start clean.
   UPDATE proposal_sections SET is_locked = false, status = 'in_progress', completed_stage = NULL, accepted_by = NULL, accepted_at = NULL
    WHERE id IN ('d0000000-0000-4000-8000-000000000003', 'd2000000-0000-4000-8000-000000000002');
+  -- fullloop.tenant drives the WHOLE greenfield loop (upload→primitive→select→lock→return);
+  -- reset its section fully (unlock + clear the selector-recorded sourceAtomIds + a vol so the
+  -- returned derivative is tagged) so each run starts clean regardless of prior selections.
+  UPDATE proposal_sections
+     SET is_locked = false, status = 'in_progress', completed_stage = NULL, accepted_by = NULL, accepted_at = NULL,
+         section_type = 'technical',
+         content = '{"version":1,"nodes":[{"id":"n1","type":"text_block","content":{"text":"seed"}}]}',
+         meta = coalesce(meta, '{}'::jsonb) - 'sourceAtomIds'
+   WHERE id = 'd3000000-0000-4000-8000-000000000002';
   -- atomloop.tenant: the lock section carries source-atom lineage (A1) + a vol, so on
   -- lock the returned derivative atom is tagged (vol=technical) and links derived_from A1
   -- (the "child that can become a parent" — closing the atomize→mold→draft→library loop).
