@@ -1,5 +1,26 @@
 # HITL Wiring Audit — 2026-07-03 (MVP: opportunity card + ingest→lock)
 
+> **FINISH-OUT + LIVE VERIFICATION (final state).** Beyond the MVP audit below, the
+> greenfield finish-out landed and was driven-verified end-to-end against the **full
+> live stack** (frontend :3000 + the **Python workflow engine** :8080 + Postgres):
+> - **Driven suite: 17/17 green** — all pages (reachability) + the full spine (fanout,
+>   matrix, lock, ranking, library, collab ×3, redirects).
+> - **Library**: atom visibility/ownership enforced on reads (fixed a data-exposure
+>   bug); collaborators get scoped access; upload provenance fixed; marking UI.
+> - **Canvas P0**: save-auth hole closed, editor comments revived, real optimistic lock.
+> - **Rankings**: cards auto-scored on bridge fan-out; `/cards` ordered by bucket score.
+> - **Legacy→greenfield**: dashboard/origin-bucket reads repointed off `tenant_pipeline_items`.
+> - **Event audit**: found + fixed a systemic bug — payloads were jsonb STRING scalars
+>   (so `payload->>` returned null everywhere); now objects (80/80), migration 103
+>   back-fills. Bucket/atom config UIs surfaced.
+> - **Automation, live**: the workflow engine registered **12 templates** and created
+>   `process_instances` **carrying `opportunity_id`** from the frozen event overlay —
+>   `ProjectCollaboration` (carries opp), `OnSolicitationPushed` (carries opp),
+>   `OnProposalCreated`, `OnProposalSectionEdited`. The payload fix is load-bearing here.
+>
+> See ARCHITECTURE_V10.md for the as-built design and CLAUDE_CLIFFNOTES.md for the
+> greenfield schema + the event-payload rule.
+
 Driven audit of the MVP spine against a **real running instance** (Next `next start`
 on a migrated + seeded scratch DB, Playwright driving the actual UI/APIs as the RFP
 admin and a tenant admin). Method + verdict scale: `docs/HITL_WIRING_AUDIT_RUNBOOK.md`.

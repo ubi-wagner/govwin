@@ -3,12 +3,25 @@
 ## Project Overview
 Multi-tenant SaaS platform for government contractors to discover, score, and build
 proposals for federal opportunities (SBIR, STTR, BAA, OTA). Product AI (drafting / compliance /
-review) is live via the frontend. The pipeline agent workforce (`AgentFabric`) is wired into the
-live loops but only PARTLY exercised: `color_team_reviewer` runs end-to-end (via `agent_task_queue`);
-the other archetypes are dormant (defined + registered, no producer drives them) and the 3-source
-strawman generation is the open AI-integration gap (the `publish_section_draft` landing primitive
-is shipped, callerless). See ARCHITECTURE_V9.md for the as-built design and docs/V1_REFACTOR_DESIGN.md
-for the opportunity spine (the canonical orchestration pattern — `opportunity_id` keys L0→L1→L2→V2).
+review) is live via the frontend.
+
+The **greenfield opportunity-card spine is now the canonical customer surface** (see
+ARCHITECTURE_V10.md — the as-built successor to V9): admin approval → `solicitation.push`
+fans EVERY activated opportunity (umbrella + all topics) onto the forward-only
+`opportunity_bridge` → a denormalized `tenant_opportunity_cards` row per tenant, ranked by
+`tenant_spotlight_buckets`/`tenant_bucket_scores` (auto-scored on arrival), and drafted from
+the unified `library_atoms` library (visibility-enforced, taxonomy-tagged, upload→atomize→select).
+The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED — `/spotlights` +
+`/pipeline` redirect to `/cards`. The compliance matrix (`proposal_compliance_matrix`) populates
+at provision and advances on section lock. Verified end-to-end (Playwright 17/17 + the live Python
+workflow engine creating `process_instances` that carry `opportunity_id`).
+
+The pipeline agent workforce (`AgentFabric`, 10 archetypes) is wired to the workflow engine:
+`color_team_reviewer` runs on advance; `section_drafter` + `compliance_reviewer` run on portal
+launch / review advance (gated on the pipeline `ANTHROPIC_API_KEY`) — the "strawman is callerless"
+note in older docs is STALE (`draft_v0` → `publish_section_draft`, wired 2026-06-30). The remaining
+~7 archetypes are dormant (registered, no producer). `opportunity_id` keys the spine (mig 088);
+docs/V1_REFACTOR_DESIGN.md has the orchestration pattern.
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
