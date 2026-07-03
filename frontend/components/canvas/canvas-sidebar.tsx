@@ -118,7 +118,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Comments</h3>
       {loading && <p className="text-xs text-gray-400">Loading comments...</p>}
       {!loading && comments.length === 0 && (
-        <p className="text-xs text-gray-400 italic mb-2">No comments on this node</p>
+        <p className="text-xs text-gray-400 italic mb-2">No comments on this section</p>
       )}
       <CommentThread
         comments={comments}
@@ -677,10 +677,12 @@ export function CanvasSidebar({
               </div>
             </div>
 
-            {/* Comments — only in portal context */}
-            {proposalId && tenantSlug && (
+            {/* Comments — section-scoped (proposal_comments keys on section_id).
+                Previously passed the canvas node id, which the API validated as a
+                section id → every read was empty and every post 404'd. */}
+            {proposalId && tenantSlug && sectionId && (
               <CommentsSection
-                nodeId={selectedNode.id}
+                nodeId={sectionId}
                 proposalId={proposalId}
                 tenantSlug={tenantSlug}
               />
