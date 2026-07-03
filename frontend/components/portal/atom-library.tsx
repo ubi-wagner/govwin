@@ -12,12 +12,17 @@ interface Atom {
   id: string; grain: string; title: string | null; summary: string | null;
   word_count: number; status: string; creator_kind: string; source: string;
   member_count: number; child_count: number; tags: string[];
+  owner_name: string | null; owner_email: string | null; visibility: string; is_mine: boolean;
 }
+
+// Non-default visibilities get a badge; 'tenant' (shared) is the unmarked default.
+const VIS_LABEL: Record<string, string> = { owner_only: 'private', admin_only: 'admin-only', shared_for_proposal: 'shared' };
 
 export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const [atoms, setAtoms] = useState<Atom[]>([]);
   const [q, setQ] = useState('');
   const [grain, setGrain] = useState('');
+  const [mine, setMine] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [groupTitle, setGroupTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,11 +31,12 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
     const qs = new URLSearchParams();
     if (q.trim()) qs.set('q', q.trim());
     if (grain) qs.set('grain', grain);
+    if (mine) qs.set('mine', '1');
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/atoms?${qs}`);
       if (res.ok) setAtoms((await res.json()).data?.atoms ?? []);
     } catch { /* keep */ }
-  }, [tenantSlug, q, grain]);
+  }, [tenantSlug, q, grain, mine]);
   useEffect(() => { load(); }, [load]);
 
   const toggle = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -62,6 +68,12 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
         <select value={grain} onChange={(e) => setGrain(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
           <option value="">all grains</option><option value="primitive">primitive</option><option value="group">group</option><option value="reference">reference</option>
         </select>
+        <button
+          onClick={() => setMine((m) => !m)}
+          className={`text-xs font-medium rounded px-2.5 py-1.5 border ${mine ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+        >
+          {mine ? 'My atoms' : 'All atoms'}
+        </button>
         <button onClick={load} className="text-sm text-blue-600 hover:underline">Refresh</button>
         <span className="text-xs text-gray-400 ml-auto">{atoms.length} atoms</span>
       </div>
@@ -85,7 +97,15 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                 <span className="text-[11px] text-gray-400">{a.word_count} words</span>
                 {a.member_count > 0 && <span className="text-[11px] text-purple-500">{a.member_count} members</span>}
                 {a.child_count > 0 && <span className="text-[11px] text-blue-500">{a.child_count} children</span>}
-                <span className="text-[10px] text-gray-400 ml-auto">{a.creator_kind} · {a.source}</span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  {a.visibility && a.visibility !== 'tenant' && (
+                    <span className="text-[9px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1 py-0.5">{VIS_LABEL[a.visibility] ?? a.visibility}</span>
+                  )}
+                  {a.is_mine && <span className="text-[9px] uppercase bg-blue-100 text-blue-700 rounded px-1 py-0.5">mine</span>}
+                  <span className="text-[10px] text-gray-400" title={a.owner_email ?? undefined}>
+                    {a.owner_name || a.creator_kind} · {a.source}
+                  </span>
+                </span>
               </div>
               {a.summary && <p className="text-xs text-gray-500 truncate mt-0.5">{a.summary}</p>}
               {a.tags?.length > 0 && (
