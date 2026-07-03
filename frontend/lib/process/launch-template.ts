@@ -121,7 +121,7 @@ export async function launchTemplate(opts: {
         namespace, type, phase, actor_type, actor_id, actor_email, tenant_id, payload
       ) VALUES (
         ${namespace}, ${type}, 'single', ${actorType}, ${actor.id}, ${actor.email ?? null},
-        ${tenantId}, ${JSON.stringify(overlay ?? {})}::jsonb
+        ${tenantId}, ${sql.json((overlay ?? {}) as Parameters<typeof sql.json>[0])}
       )
       RETURNING id
     `;
