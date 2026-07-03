@@ -50,13 +50,6 @@ const REQUIRED_COMPLIANCE = [
   'submission_format',
 ] as const;
 
-// Non-null check that tolerates empty string ("" ≠ populated).
-function isPopulated(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  return true;
-}
-
 export const solicitationPushTool = defineTool<Input, Output>({
   name: 'solicitation.push',
   namespace: 'solicitation',
@@ -80,14 +73,29 @@ export const solicitationPushTool = defineTool<Input, Output>({
         submissionFormat: string | null;
         pageLimitTechnical: number | null;
         customVariables: Record<string, unknown> | null;
+        hasSubmissionFormat: boolean;
       }[]
     >`
       SELECT cs.status, cs.namespace, cs.opportunity_id,
              sc.submission_format, sc.page_limit_technical,
-             sc.custom_variables
+             sc.custom_variables,
+             -- Gate satisfiability: submission_format populated ANYWHERE for this
+             -- solicitation — the curator's verified layer (custom_variables.value,
+             -- written by compliance.save_variable_value) OR a named column, at the
+             -- solicitation OR any topic level. The interactive curation flow writes
+             -- only custom_variables, so a named-column-only check blocked solo push.
+             EXISTS (
+               SELECT 1 FROM solicitation_compliance x
+               WHERE x.solicitation_id = cs.id AND (
+                 NULLIF(x.submission_format, '') IS NOT NULL
+                 OR NULLIF(x.custom_variables->'submission_format'->>'value', '') IS NOT NULL
+               )
+             ) AS has_submission_format
       FROM curated_solicitations cs
+      -- Read the solicitation-level row (topic_id IS NULL) — the same row
+      -- buildCardSnapshot uses, so the gate and the customer card agree.
       LEFT JOIN solicitation_compliance sc
-        ON sc.solicitation_id = cs.id
+        ON sc.solicitation_id = cs.id AND sc.topic_id IS NULL
       WHERE cs.id = ${solicitationId}::uuid
     `;
     } catch (err) {
@@ -107,10 +115,13 @@ export const solicitationPushTool = defineTool<Input, Output>({
       );
     }
 
-    // 2. Validate required compliance variables.
+    // 2. Validate required compliance variables. submission_format counts as
+    //    present if the curator set it either via the interactive tool
+    //    (custom_variables.value) or a named column (preset/shredder) — see the
+    //    has_submission_format existence check in the preflight.
     const missing: string[] = [];
     for (const varName of REQUIRED_COMPLIANCE) {
-      if (varName === 'submission_format' && !isPopulated(r.submissionFormat)) {
+      if (varName === 'submission_format' && !r.hasSubmissionFormat) {
         missing.push(varName);
       }
     }
