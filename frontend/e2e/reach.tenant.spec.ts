@@ -6,8 +6,11 @@
 import { test, expect } from '@playwright/test';
 
 const BASE = '/portal/lighthouse';
+// Canonical customer surface (design A). `spotlights` + `pipeline` are now
+// redirects onto `cards`/`buckets` (see redirect.tenant.spec.ts), so they're not
+// in this page-load sweep — their destination `cards` is.
 const PORTAL_ROUTES = [
-  'dashboard', 'spotlights', 'pipeline', 'library', 'library/upload', 'library/review',
+  'dashboard', 'library', 'library/upload', 'library/review',
   'cards', 'buckets', 'atoms', 'portals', 'proposals', 'processes', 'activity', 'team',
   'documents', 'billing', 'profile', 'automation', 'agents',
 ].map((p) => `${BASE}/${p}`);
