@@ -181,6 +181,19 @@ export async function POST(_request: Request, ctx: RouteContext) {
     console.error('[sections/lock] event emission failed:', e);
   }
 
+  // Compliance matrix: accepting (locking) a section satisfies the requirements
+  // it addresses — this is what drives the proposal card's percentComplete up.
+  // Best-effort: never fail the lock over a matrix update.
+  try {
+    await sql`
+      UPDATE proposal_compliance_matrix
+      SET status = 'satisfied', updated_at = now()
+      WHERE section_id = ${section.id}::uuid AND status <> 'not_applicable'
+    `;
+  } catch (e) {
+    console.error('[sections/lock] compliance matrix update failed (non-fatal):', e);
+  }
+
   // ── Capture approved content + close-state signals (all best-effort: a
   //    failure here must not fail the lock the user just performed) ──────────
   // 1. Snapshot the accepted canvas version (preserves the approved version).
@@ -376,6 +389,18 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     } catch (e) {
       console.error('[sections/unlock] artifact reopen failed (non-fatal):', e);
     }
+  }
+
+  // Compliance matrix: reopening a section makes its requirements unsatisfied
+  // again (mirror of the lock path). Best-effort.
+  try {
+    await sql`
+      UPDATE proposal_compliance_matrix
+      SET status = 'not_addressed', updated_at = now()
+      WHERE section_id = ${section.id}::uuid AND status = 'satisfied'
+    `;
+  } catch (e) {
+    console.error('[sections/unlock] compliance matrix reset failed (non-fatal):', e);
   }
 
   try {

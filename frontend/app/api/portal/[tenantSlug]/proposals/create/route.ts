@@ -18,6 +18,27 @@ interface RouteContext {
 }
 
 /**
+ * Turn a required item into one or more compliance-matrix requirement labels.
+ * If the item enumerates required_sections (shall-statements / named subsections)
+ * each becomes its own requirement; otherwise the item itself is the requirement.
+ */
+function requirementLabels(itemName: string, requiredSections: unknown): string[] {
+  const subs = Array.isArray(requiredSections)
+    ? requiredSections
+        .map((s) =>
+          typeof s === 'string'
+            ? s
+            : (s as { name?: string; label?: string; text?: string } | null)?.name ??
+              (s as { label?: string } | null)?.label ??
+              (s as { text?: string } | null)?.text ??
+              null,
+        )
+        .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    : [];
+  return subs.length > 0 ? subs.map((s) => `${itemName} — ${s}`) : [itemName];
+}
+
+/**
  * POST /api/portal/[tenantSlug]/proposals/create
  *
  * Creates a new proposal for a given topic (opportunity). Admin-granted
@@ -221,6 +242,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       volumeNumber: number | null;
       templateId: string | null;
       expertNotes: string | null;
+      requiredSections: unknown;
     }> = [];
 
     let globalItemIndex = 0;
@@ -236,6 +258,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           volumeNumber: (vol.volumeNumber as number) ?? null,
           templateId: (item.templateId as string) ?? null,
           expertNotes: (item.expertNotes as string) ?? null,
+          requiredSections: (item as { requiredSections?: unknown }).requiredSections ?? null,
         });
       }
     }
@@ -372,6 +395,19 @@ export async function POST(request: Request, ctx: RouteContext) {
             RETURNING id
           `;
 
+          // Compliance matrix: one requirement row per required item (or per named
+          // required-section within it), linked to the section that addresses it.
+          // This is what the proposal card's percentComplete and the workspace
+          // compliance tab read — previously never populated (always 0%). Rows
+          // start 'not_addressed' and flip to 'satisfied' when the section locks.
+          for (const reqText of requirementLabels(item.itemName, item.requiredSections)) {
+            await tx`
+              INSERT INTO proposal_compliance_matrix
+                (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+              VALUES (${proposalRow.id}, ${reqText}, ${item.volumeName ?? 'RFP'}, true, 'not_addressed', ${section.id})
+            `;
+          }
+
           // E3: resolve the starter template — DB-backed first (expert-authored
           // via the Template Studio, linked per required-item via template_id),
           // then the in-code registry as fallback.
@@ -425,7 +461,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         `;
         artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
         createdArtifacts.push({ id: defArt.id, volumeName: 'Technical Volume', artifactType: 'narrative' });
-        await tx`
+        const [defSection] = await tx<{ id: string }[]>`
           INSERT INTO proposal_sections (
             proposal_id, artifact_id, section_number, title, content, status,
             volume_name, volume_number
@@ -439,6 +475,13 @@ export async function POST(request: Request, ctx: RouteContext) {
             'Technical Volume',
             1
           )
+          RETURNING id
+        `;
+        // Matrix: at least one requirement so the card burden isn't an empty shell.
+        await tx`
+          INSERT INTO proposal_compliance_matrix
+            (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+          VALUES (${proposalRow.id}, 'Technical Volume', 'RFP', true, 'not_addressed', ${defSection.id})
         `;
         count = 1;
       }
