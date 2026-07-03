@@ -22,8 +22,8 @@ regression-tested against the live app.
 | Login + tenant scoping (both personas) | ✅ WIRED | driven: both sessions reach gated pages, no bounce |
 | Admin RFP ingest (upload → solicitation + topics) | ✅ WIRED | `rfp-upload/route.ts`; topics persist via `opportunity.bulk_add_topics` |
 | Solo curate → **release** | ✅ FIXED | was 🔴 blocked; push gate now accepts interactive compliance (A1) |
-| 10 topics → customer surface | 🔴 SPLIT-BRAIN | topics reach customers via **legacy Spotlight** (`tenant_pipeline_items`); the new Cards/bridge carries only the umbrella — **decision needed** |
-| Opportunity **card** snapshot + pin + buckets | 🟡 PARTIAL | card/pin/bucket all WIRED individually, but `/cards` pin (new) ≠ `/pipeline` pin (legacy) — same split-brain |
+| 10 topics → customer surface | ✅ FIXED | **design A chosen + built**: multi-topic fan-out now publishes every topic to the bridge → each is a customer card (driven-verified) |
+| Opportunity **card** snapshot + pin + buckets | ✅ FIXED | split-brain retired — legacy Spotlight/Pipeline redirect to the canonical `/cards`; nav promotes Cards/Buckets |
 | Purchase → provision (admin-granted) | ✅ WIRED | `proposals/create`; Stripe checkout records but does not provision (by design) |
 | **Compliance matrix** | ✅ FIXED | was 🔴 empty shell (0% always); now populated at provision + advances on lock (driven) |
 | **Volume-doc tree** | 🟡 PARTIAL | real in data (volumes→artifacts→sections, page allocations); workspace still renders **flat** (no volume grouping) — pending |
@@ -43,11 +43,11 @@ regression-tested against the live app.
 | Matrix | `proposal_compliance_matrix` never populated (card % always 0) | populate at provision (per required item / required-section); advance to `satisfied` on section lock, reset on unlock | `e2e/matrix.tenant.spec.ts` |
 
 ## Remaining to launch-ready (prioritized)
-1. **Split-brain decision (blocking the card MVP).** Pick the canonical customer
-   opportunity surface — new Greenfield Cards (recommended) vs legacy Spotlight —
-   then make multi-topic fan-out carry all N topics onto the bridge and retire the
-   other path. Until then a customer sees the umbrella in `/cards` but the topics in
-   `/spotlights`, and pins don't cross.
+1. ~~**Split-brain decision.**~~ ✅ RESOLVED — design **A** (Greenfield Cards
+   canonical): multi-topic fan-out carries every topic onto the bridge; legacy
+   Spotlight/Pipeline redirect to `/cards`. Follow-ups: retire the orphaned
+   `/spotlight/pin` API + legacy spotlight components (dead code now), and migrate
+   any legacy `tenant_pipeline_items` bucket scoring onto `tenant_bucket_scores`.
 2. **Matrix on the portal-accept path.** `provisionProposalForPortal`
    (`lib/provision-proposal.ts`) doesn't yet populate the matrix — a portal-launched
    proposal still shows an empty matrix. Replicate the provision population (extract a
@@ -64,8 +64,10 @@ regression-tested against the live app.
 
 ## Verdict
 The **ingest → curate → release → purchase → provision → build-push ×3 → lock →
-download** spine is **end-to-end wired and driven-green**, with the compliance matrix
-now real and the build→lock loop's data-integrity bugs fixed. The remaining launch
-gaps are concentrated in the **customer opportunity surface** (the split-brain, #1)
-and **feature completeness** (portal-provision matrix, volume grouping, templates) —
-not in the core proposal-build spine.
+download** spine is **end-to-end wired and driven-green**, the compliance matrix is
+now real, and the build→lock loop's data-integrity bugs are fixed. The opportunity
+card also converged on design A (multi-topic fan-out + Cards canonical), so a
+multi-topic RFP now lands one customer card per topic on the canonical surface. The
+remaining launch gaps are **feature completeness** (portal-provision matrix, volume
+grouping, templates→skeleton) and **dead-code cleanup** (legacy spotlight
+API/components) — not in the core spine.
