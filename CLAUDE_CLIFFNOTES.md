@@ -1306,7 +1306,10 @@ opportunity_lifecycle_actions.action CHECK += 'set_stage'
 
 ### Unified library — atoms + taxonomy + lineage + cocoons (migs 101–102)
 ```
-library_atoms  (RLS FORCE — the greenfield atom store; replaces nothing yet, additive to library_units)
+library_atoms  (RLS FORCE — the greenfield atom store; now the CANONICAL customer library.
+               The atomize→mold→draft→return loop runs entirely on this table; the legacy
+               `library_units` library is OBSOLETE — deprecate in phases, see
+               docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
   id, tenant_id (FK), grain CHECK IN ('primitive','group','reference'),
   title, content (TEXT), canvas_nodes (JSONB — CanvasNode[]), summary,
   word_count, char_count, member_summary (JSONB — count-by-kind for groups),
@@ -1376,3 +1379,15 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
   others = `visibility='tenant'` + own. Reads open to `partner_user`; writes `tenant_user`+.
   `createAtom` writes `owner_user_id`/`created_by` = actor, `creator_kind`, `source_anchor`, tags
   (auto/admin + `confirmed`), group `atom_members`, and `derived_from` `atom_lineage`.
+- **The atom loop is CLOSED (S4).** `atomize → library → mold → draft → back-to-library`, all on
+  `library_atoms`: upload (`atoms/upload` → `reference` atom + blocks) → register (`POST /atoms`
+  primitive, `source_anchor`→ref) → mold (`/atoms/select` ranks AND records the section's
+  `meta.sourceAtomIds`; the drafter passes `&sectionId`) → lock → `harvestSectionToAtomLibrary`
+  (`lib/proposal-atom-harvest.ts`) returns a **derivative** atom (`source='download_derivative'`,
+  bound to the proposal's `document_cocoon`, tagged by vol, `derived_from` the source atoms).
+  **Idempotent by section:** `createAtom({idempotentBySection:true})` refreshes the section's one
+  derivative in place (matched `origin_section_id` + `source`) on re-lock — no duplicate; a parent's
+  `usage_count` only bumps on a NEWLY inserted lineage edge. Driven proof: `e2e/fullloop.tenant.spec.ts`
+  (whole loop) + `e2e/atomloop.tenant.spec.ts` (return + idempotency). The legacy `library_units`
+  harvest (`harvestSectionToLibrary`) still runs alongside but is obsolete — see
+  docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md.
