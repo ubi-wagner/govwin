@@ -294,10 +294,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     // is atomic in the INSERT (no post-insert UPDATE window).
     let topBucket: { bucket: string; score: number } | null = null;
     try {
+      // Greenfield spine: read the card's best bucket score from tenant_bucket_scores
+      // (auto-populated on fan-out), joined to the bucket for its name — not the
+      // legacy spotlight_bucket_scores, which the new spine never writes.
       const [b] = await sql<{ bucket: string; score: number }[]>`
-        SELECT bucket, score FROM spotlight_bucket_scores
-        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${topicId}::uuid
-        ORDER BY score DESC NULLS LAST
+        SELECT tsb.name AS bucket, s.score
+        FROM tenant_bucket_scores s
+        JOIN tenant_spotlight_buckets tsb ON tsb.id = s.bucket_id
+        WHERE s.tenant_id = ${tenantId}::uuid AND s.opportunity_id = ${topicId}::uuid
+        ORDER BY s.score DESC NULLS LAST
         LIMIT 1
       `;
       topBucket = b ?? null;
