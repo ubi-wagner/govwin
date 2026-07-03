@@ -187,6 +187,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
       .mockResolvedValueOnce([{                                  // preflight
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15, customVariables: {},
+        hasSubmissionFormat: true,
       }])
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active
