@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { createAtom, listAtoms, type CreateAtomInput, type CreatorKind } from '@/lib/atoms';
+import { createAtom, listAtoms, viewerFromRole, type CreateAtomInput, type CreatorKind } from '@/lib/atoms';
 
 async function gate(tenantSlug: string, minRole: Role) {
   const session = await auth();
@@ -35,7 +35,9 @@ const CREATOR_KINDS = ['admin', 'ai', 'collaborator', 'system', 'import'];
 export async function GET(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
     const { tenantSlug } = await params;
-    const g = await gate(tenantSlug, 'tenant_user');
+    // Read is open to collaborators (partner_user); visibility is enforced by the
+    // viewer predicate in listAtoms. Writes stay at tenant_user (POST below).
+    const g = await gate(tenantSlug, 'partner_user');
     if ('error' in g) return g.error;
     const url = new URL(request.url);
     const atoms = await listAtoms(g.tenantId, {
@@ -44,8 +46,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       grain: (url.searchParams.get('grain') as CreateAtomInput['grain']) ?? undefined,
       status: (url.searchParams.get('status') as 'draft' | 'approved' | 'archived') ?? undefined,
       q: url.searchParams.get('q') ?? undefined,
+      mine: url.searchParams.get('mine') === '1' || url.searchParams.get('mine') === 'true',
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
-    });
+    }, viewerFromRole(g.userId, g.role));
     return NextResponse.json({ data: { atoms } });
   } catch (err) {
     console.error('[portal/atoms] GET error', err);

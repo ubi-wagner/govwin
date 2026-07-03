@@ -65,7 +65,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         grain: 'reference', title: file.name, content: fullText || null, canvasNodes: allNodes.length ? allNodes : null,
         summary: `Uploaded ${parsed.sourceFormat} · ${parsed.atoms.length} objects`, source: 'upload', status: 'approved',
         tags: [{ dimension: 'fmt', value: FMT_OF[parsed.sourceFormat] ?? 'doc', source: 'auto', confirmed: true }],
-      }, { id: u.id, kind: 'admin' });
+        // Provenance follows the actual uploader — a collaborator's upload is
+        // 'collaborator', not 'admin'. createAtom stamps owner_user_id = uploader.
+      }, { id: u.id, kind: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' ? 'admin' : 'collaborator' });
       referenceAtomId = ref.atomId;
     } catch (e) {
       console.error('[atoms/upload] reference atom create failed (non-fatal)', e);

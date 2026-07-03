@@ -10,7 +10,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { getAtom, confirmTags, type AtomTagInput } from '@/lib/atoms';
+import { getAtom, confirmTags, viewerFromRole, type AtomTagInput } from '@/lib/atoms';
 
 async function gate(tenantSlug: string, atomId: string, minRole: Role) {
   const session = await auth();
@@ -24,15 +24,16 @@ async function gate(tenantSlug: string, atomId: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id };
+  return { tenantId, userId: u.id, role };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; atomId: string }> }) {
   try {
     const { tenantSlug, atomId } = await params;
-    const g = await gate(tenantSlug, atomId, 'tenant_user');
+    // Read open to collaborators; getAtom enforces visibility via the viewer.
+    const g = await gate(tenantSlug, atomId, 'partner_user');
     if ('error' in g) return g.error;
-    const atom = await getAtom(g.tenantId, atomId);
+    const atom = await getAtom(g.tenantId, atomId, viewerFromRole(g.userId, g.role));
     if (!atom) return NextResponse.json({ error: 'Atom not found', code: 'NOT_FOUND' }, { status: 404 });
     return NextResponse.json({ data: { atom } });
   } catch (err) {

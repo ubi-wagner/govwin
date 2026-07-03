@@ -26,6 +26,14 @@ const ACCOUNTS = {
     file: 'lighthouse.json',
     landing: '/portal/lighthouse/dashboard',
   },
+  // A partner_user collaborator in the Lighthouse tenant (seeded via SQL in the
+  // library/collab fixtures) — used to prove scoped library visibility + access.
+  collaborator: {
+    email: process.env.COLLAB_EMAIL || 'collab@lighthouse.com',
+    password: process.env.COLLAB_PW || 'CollabPass1',
+    file: 'collaborator.json',
+    landing: '/portal/lighthouse/proposals',
+  },
 } as const;
 
 for (const [name, acct] of Object.entries(ACCOUNTS)) {

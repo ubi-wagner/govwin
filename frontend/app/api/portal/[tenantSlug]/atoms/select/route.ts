@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { selectForSection } from '@/lib/atoms';
+import { selectForSection, viewerFromRole } from '@/lib/atoms';
 
 export async function GET(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const u = session.user as { id?: string; role?: unknown };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
-    if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    if (!hasRoleAtLeast(role, 'partner_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       kinds: csv('kinds'),
       context: csv('context'),
       limit: url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
-    });
+    }, viewerFromRole(u.id, role));
     return NextResponse.json({ data: { atoms } });
   } catch (err) {
     console.error('[portal/atoms/select] error', err);

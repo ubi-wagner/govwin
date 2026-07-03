@@ -13,6 +13,7 @@
 
 import { withTenant } from '@/lib/rls';
 import { atomSize, type AtomSize } from '@/lib/atom-size';
+import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
@@ -150,6 +151,18 @@ export async function confirmTags(
   });
 }
 
+// A viewer for library visibility. Admins (tenant_admin / rfp_admin / master_admin)
+// get the whole tenant library (management view); everyone else sees tenant-shared
+// atoms plus the ones they own. owner_only / shared_for_proposal / admin_only are
+// hidden from other non-admins (per-proposal sharing is a later increment).
+export interface Viewer { userId: string; isAdmin: boolean }
+
+/** Build a library Viewer from a session user + role. Admin tiers see the whole
+ *  tenant library; tenant_user / partner_user see tenant-shared + their own. */
+export function viewerFromRole(userId: string, role: Role): Viewer {
+  return { userId, isAdmin: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' };
+}
+
 // ── the scored selector (pre-vector): scope → context boost → quality ──
 export interface SectionQuery {
   vol?: string | null;
@@ -163,7 +176,7 @@ export interface RankedAtom {
   ctxMatches: number; score: number;
 }
 
-export async function selectForSection(tenantId: string, q: SectionQuery): Promise<RankedAtom[]> {
+export async function selectForSection(tenantId: string, q: SectionQuery, viewer: Viewer): Promise<RankedAtom[]> {
   const vol = q.vol ?? null;
   const kinds = q.kinds ?? [];
   const context = q.context ?? [];
@@ -188,6 +201,7 @@ export async function selectForSection(tenantId: string, q: SectionQuery): Promi
       WHERE a.tenant_id = ${tenantId}::uuid
         AND a.status = 'approved'
         AND a.grain <> 'reference'
+        AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
         AND EXISTS (
           SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
             (${vol}::text IS NOT NULL AND t.dimension = 'vol' AND t.value = ${vol})
@@ -206,18 +220,24 @@ export async function selectForSection(tenantId: string, q: SectionQuery): Promi
 }
 
 // ── list / facet ──
-export interface AtomListFilter { dimension?: string; value?: string; grain?: Grain; status?: AtomStatus; q?: string; limit?: number }
-export async function listAtoms(tenantId: string, f: AtomListFilter = {}): Promise<Array<Record<string, unknown>>> {
+export interface AtomListFilter { dimension?: string; value?: string; grain?: Grain; status?: AtomStatus; q?: string; limit?: number; mine?: boolean }
+export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Viewer): Promise<Array<Record<string, unknown>>> {
   const limit = Math.min(500, f.limit ?? 200);
   return withTenant(tenantId, async (tx) =>
     tx`
       SELECT a.id, a.grain, a.title, a.summary, a.word_count, a.char_count, a.status,
              a.creator_kind, a.source, a.outcome_score, a.usage_count, a.created_at,
+             a.owner_user_id, a.created_by, a.visibility,
+             u.name AS owner_name, u.email AS owner_email,
+             (a.owner_user_id = ${viewer.userId}::uuid) AS is_mine,
              (SELECT count(*)::int FROM atom_members m WHERE m.group_atom_id = a.id) AS member_count,
              (SELECT count(*)::int FROM atom_lineage l WHERE l.parent_atom_id = a.id) AS child_count,
              coalesce((SELECT array_agg(t.dimension || ':' || t.value ORDER BY t.dimension) FROM atom_tags t WHERE t.atom_id = a.id), '{}') AS tags
       FROM library_atoms a
+      LEFT JOIN users u ON u.id = a.owner_user_id
       WHERE a.tenant_id = ${tenantId}::uuid
+        AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
+        ${f.mine ? tx`AND a.owner_user_id = ${viewer.userId}::uuid` : tx``}
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
         ${f.status ? tx`AND a.status = ${f.status}` : tx``}
         ${f.q ? tx`AND (a.title ILIKE ${'%' + f.q.replace(/[%_\\]/g, '\\$&') + '%'} OR a.summary ILIKE ${'%' + f.q.replace(/[%_\\]/g, '\\$&') + '%'})` : tx``}
@@ -229,10 +249,13 @@ export async function listAtoms(tenantId: string, f: AtomListFilter = {}): Promi
 }
 
 // ── full atom (tags + members + lineage) ──
-export async function getAtom(tenantId: string, atomId: string): Promise<Record<string, unknown> | null> {
+export async function getAtom(tenantId: string, atomId: string, viewer: Viewer): Promise<Record<string, unknown> | null> {
   return withTenant(tenantId, async (tx) => {
     const [atom] = await tx<Array<Record<string, unknown>>>`
-      SELECT * FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid LIMIT 1
+      SELECT * FROM library_atoms
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid
+        AND (${viewer.isAdmin} OR visibility = 'tenant' OR owner_user_id = ${viewer.userId}::uuid)
+      LIMIT 1
     `;
     if (!atom) return null;
     const tags = await tx`SELECT dimension, value, is_other, tag_source, confirmed FROM atom_tags WHERE atom_id = ${atomId}::uuid ORDER BY dimension`;
