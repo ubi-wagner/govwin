@@ -4,7 +4,7 @@
  * Canvas Editor Page — wraps CanvasEditor with save/export wiring.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
@@ -19,6 +19,7 @@ interface Props {
   actorName: string;
   readOnly?: boolean;
   tenantSlug?: string;
+  initialVersion?: number;
 }
 
 export function CanvasEditorPage({
@@ -29,9 +30,14 @@ export function CanvasEditorPage({
   actorName,
   readOnly = false,
   tenantSlug,
+  initialVersion,
 }: Props) {
   const router = useRouter();
   const { invoke } = useTool();
+  // The DB row version this editor loaded — sent as baseVersion so the save is a
+  // real optimistic lock (reject if someone else saved since load), and synced
+  // forward from each successful save so subsequent saves stay in step.
+  const versionRef = useRef<number | undefined>(initialVersion);
 
   const saveUrl = tenantSlug
     ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
@@ -45,6 +51,7 @@ export function CanvasEditorPage({
     // Extract revision metadata if present (set by AI revision panel)
     const meta = doc.__revisionMeta;
     const payload: Record<string, unknown> = { content: doc };
+    if (versionRef.current != null) payload.baseVersion = versionRef.current;
     if (meta) {
       payload.source = meta.source;
       payload.aiInstruction = meta.aiInstruction;
@@ -56,8 +63,17 @@ export function CanvasEditorPage({
     });
     if (!resp.ok) {
       const json = await resp.json().catch(() => ({}));
-      throw new Error(json.error ?? `Save failed (HTTP ${resp.status})`);
+      // On a 409 the section changed under us — reflect the new base version and
+      // surface a clear conflict so the user reloads rather than silently losing work.
+      if (resp.status === 409 && typeof json.currentVersion === 'number') versionRef.current = json.currentVersion;
+      throw new Error(
+        resp.status === 409
+          ? 'This section was changed by someone else since you opened it. Reload to get the latest before saving.'
+          : json.error ?? `Save failed (HTTP ${resp.status})`,
+      );
     }
+    const okJson = await resp.json().catch(() => null);
+    if (okJson?.data?.version != null) versionRef.current = okJson.data.version;
   }, [saveUrl]);
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {

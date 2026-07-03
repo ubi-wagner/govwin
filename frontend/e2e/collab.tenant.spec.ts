@@ -34,6 +34,20 @@ test('save auth (#3): admin can save; unassigned collaborator is rejected', asyn
   }
 });
 
+test('optimistic lock (#2): a save on a stale base version is rejected (409)', async ({ request }) => {
+  // Learn the current version (a save without baseVersion falls back + returns the new one).
+  const s0 = await request.put(`${base}/sections/${SID}/save`, { data: saveBody('sync') });
+  expect(s0.status(), await s0.text()).toBe(200);
+  const v = (await s0.json()).data.version as number;
+  // A save on the correct base advances the version.
+  const s1 = await request.put(`${base}/sections/${SID}/save`, { data: { ...saveBody('edit on base'), baseVersion: v } });
+  expect(s1.status()).toBe(200);
+  // A second save on the now-stale base must be rejected — the lost-update guard.
+  const s2 = await request.put(`${base}/sections/${SID}/save`, { data: { ...saveBody('stale edit'), baseVersion: v } });
+  expect(s2.status(), 'stale base version must 409').toBe(409);
+  expect((await s2.json()).code).toBe('CONFLICT');
+});
+
 test('editor comments (#1): post a section comment and read it back', async ({ request }) => {
   const text = `review note ${Date.now() % 100000}`;
   const post = await request.post(`${base}/comments`, { data: { nodeId: SID, text } });

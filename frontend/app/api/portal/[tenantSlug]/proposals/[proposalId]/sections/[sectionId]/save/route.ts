@@ -60,7 +60,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown };
+    let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown; baseVersion?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -251,7 +251,15 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     // ── Update section with optimistic concurrency ─────────────────
     const contentJson = JSON.stringify(body.content);
-    const nextVersion = section.version + 1;
+    // Real optimistic lock: compare-and-swap against the version the CLIENT loaded
+    // (baseVersion), not the version re-read in this request. Without this, two
+    // users who both opened v5 and save minutes apart BOTH succeed (each request
+    // re-reads the current version and matches it) — last write silently wins.
+    // Falls back to the server-read version for older clients that omit baseVersion.
+    const base = typeof body.baseVersion === 'number' && Number.isInteger(body.baseVersion)
+      ? body.baseVersion
+      : section.version;
+    const nextVersion = base + 1;
 
     let updateResult;
     try {
@@ -266,7 +274,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               editing_since = NULL,
               updated_at = now()
           WHERE id = ${sectionId}
-            AND version = ${section.version}
+            AND version = ${base}
         `;
       } else {
         updateResult = await sql`
@@ -278,7 +286,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               editing_since = NULL,
               updated_at = now()
           WHERE id = ${sectionId}
-            AND version = ${section.version}
+            AND version = ${base}
         `;
       }
     } catch (e) {

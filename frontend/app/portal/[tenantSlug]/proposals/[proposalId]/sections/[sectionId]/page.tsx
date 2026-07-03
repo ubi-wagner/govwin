@@ -66,10 +66,11 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     status: string;
     isLocked: boolean;
     proposalId: string;
+    version: number;
   }[] = [];
   try {
     sectionRows = await sql<typeof sectionRows>`
-      SELECT id, title, content, status, is_locked, proposal_id
+      SELECT id, title, content, status, is_locked, proposal_id, version
       FROM proposal_sections
       WHERE id = ${sectionId}::uuid
         AND proposal_id = ${proposalId}::uuid
@@ -126,6 +127,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       proposalId={proposalId}
       actorId={userId}
       actorName={userName}
+      initialVersion={section.version}
       readOnly={proposal.isLocked || partnerReadOnly || section.isLocked}
       tenantSlug={tenantSlug}
     />
