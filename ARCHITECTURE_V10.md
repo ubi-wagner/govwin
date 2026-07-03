@@ -1,0 +1,529 @@
+# ARCHITECTURE_V10.md — RFP Pipeline Portal: Greenfield-Canonical As-Built
+
+**Date:** 2026-07-03
+**Status:** As-built successor to ARCHITECTURE_V9.md. V9 remains the baseline for the retained
+core (proposal workspace, canvas, stages/gates, auth, provisioning, admin curation, CMS, pipeline
+ingest/shred/score, memory). **This document records the greenfield refactor that converged the
+customer-facing surface onto the opportunity-card spine** and the drive-verification that proved it.
+**Branch:** `claude/nice-hamilton-kBqtD` (schema through migration **103**).
+**Verification method:** Driven end-to-end against a live stack — Next.js `next start` on a migrated +
+seeded scratch DB, the Python workflow engine on `:8080`, Postgres — with the full Playwright suite
+(**17/17 green**) and a live workflow-engine run (12 templates registered, `process_instances` created
+carrying `opportunity_id`). Not a code-read.
+**Evidence location:** `docs/HITL_WIRING_AUDIT_2026-07-03.md` (finish-out + live-verification block),
+`docs/HITL_WIRING_AUDIT_RUNBOOK.md` (method), `frontend/e2e/` (the suite).
+
+## Status Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | Live and wired — actively called at runtime, and driven-verified this pass |
+| 🟡 | Shipped with gaps — code works but specific paths incomplete |
+| 🟦 | Built-but-dormant — code is correct but never called at runtime |
+| 🔴 | Broken — code exists but has a confirmed runtime defect |
+
+---
+
+## 0. What Supersedes What
+
+```
+ARCHITECTURE_V7 (2026-05-21) — Master system index; SUPERSEDED by V9
+ARCHITECTURE_V8 (2026-06-02) — Content-subsystem delta; FOLDED INTO V9
+ARCHITECTURE_V9 (2026-06-23) — As-built baseline (file-by-file); STILL CANONICAL for the retained core
+ARCHITECTURE_V10 (2026-07-03) — THIS DOCUMENT — the greenfield-canonical customer surface + drive-verify
+```
+
+V10 does **not** re-verify the whole 900-file tree. It documents the **new canonical layer** and the
+**convergence** that shipped on `claude/nice-hamilton-kBqtD`, and points at V9 for everything the
+refactor left intact. Where V9 and V10 conflict on the customer opportunity surface, **V10 wins**;
+everywhere else, **V9 stands**.
+
+---
+
+## 1. Executive Summary
+
+The V1 build reached a fork: two parallel customer opportunity surfaces existed — the legacy
+**Spotlight/Pipeline** stack (`tenant_pipeline_items`, per-tenant scoring rows) and a greenfield
+**opportunity-card** stack (a forward-only bridge → denormalized per-tenant cards). This refactor
+**resolved the split-brain by making the greenfield card spine canonical (design A)** and driving the
+whole ingest→lock spine green against a live instance.
+
+What is now true that was not in V9:
+
+1. **The opportunity-card spine is the canonical L0→L1 orchestration surface.** Admin approval
+   (`solicitation.push`) publishes **every activated opportunity — the umbrella solicitation PLUS every
+   topic** — to the append-only `opportunity_bridge`, which fans out a denormalized
+   `tenant_opportunity_cards` row per subscribed tenant. A multi-topic BAA now lands **one customer card
+   per topic** (was: one umbrella card).
+2. **The legacy Spotlight/Pipeline surface is RETIRED.** `tenant_pipeline_items` is off the customer
+   path; `/portal/[t]/spotlights` and `/portal/[t]/pipeline` are server redirects to `/cards`; the nav
+   promotes **Opportunities / Buckets / Atoms**; dashboard and origin-bucket reads are repointed to the
+   greenfield tables.
+3. **The library is unified around atoms.** `library_atoms` (primitive | group | reference) with a
+   single taxonomy (`taxonomy_terms`), ownership/visibility, provenance, and a size currency that
+   compares directly to a section mold. Upload → deconstruct → register → atomize → tag → **scored
+   select** feeds the AI drafter. Reads are visibility-enforced; collaborators get scoped access.
+4. **The compliance matrix is real.** Populated at provision (one row per required item / required
+   section), advanced to `satisfied` on section lock, reset on unlock — was an always-0% empty shell.
+5. **Rankings are automated.** `tenant_bucket_scores` is auto-populated on bridge fan-out
+   (`autoScoreCard`) and the `/cards` feed is ordered by best bucket score (pinned → score → recency).
+6. **The build→lock loop is hardened.** Section-lock compare-and-swap, locked-save rejection (423),
+   assigned-section enforcement, a real client-baseVersion optimistic lock (409), and section-scoped
+   editor comments — all driven-verified.
+7. **Event payloads are jsonb OBJECTS.** A systemic bug (payloads written as jsonb string scalars, so
+   `payload->>'field'` returned null for every audit/automation consumer) is fixed at the emitter and
+   back-filled by migration 103. This is load-bearing for the workflow spine below.
+8. **The workflow engine is live.** It registered **12 templates** and created `process_instances`
+   **carrying `opportunity_id`** frozen from the trigger overlay — the spine keys reaction runs by the
+   immutable opportunity.
+
+---
+
+## 2. The Greenfield-Canonical Model
+
+### 2.1 One immutable opportunity, three forked layers (unchanged spine, new surface)
+
+V9's opportunity spine (the `opportunity_id` keying L0 master → L1 per-tenant → L2 proposal, see
+`docs/V1_REFACTOR_DESIGN.md`) is retained. What changed is **how L0 reaches L1**: not a scoring job
+writing `tenant_pipeline_items`, but a **forward-only bridge** that replicates a thin, self-contained
+**card** to each tenant.
+
+```
+L0  opportunities (master, immutable key)              ─ admin-owned pool
+         │  admin approval → solicitation.push
+         ▼
+    opportunity_bridge      (global, append-only, versioned card snapshots)   [mig 094]
+         │  fanOutBridgeEvent → applyToTenant (per subscribed tenant)
+         ▼
+L1  tenant_opportunity_cards (denormalized, RLS-scoped, one row per tenant×opp) [mig 094]
+         │  pin → pull docs local · autoScoreCard → tenant_bucket_scores        [mig 095/096]
+         ▼
+L2  proposals (per build; origin_card frozen, opportunity_id key)             ─ V9 retained
+         │  provision → artifacts → sections → compliance matrix
+         ▼
+L3  proposal_portals (execute/guardrail layer, "Builds")                      [mig 097/098]
+```
+
+**Why a card, not a JOIN.** `tenant_opportunity_cards.opportunity_id` is a **soft reference** — there is
+no FK back to the global `opportunities` table. Each tenant's pipeline is self-sufficient (shard-ready),
+and the customer feed reads its own rows with **zero joins to admin data**. The card is the *only* part
+of an opportunity that crosses the admin→customer boundary. File: `frontend/lib/opportunity-bridge.ts`.
+
+### 2.2 The bridge is the sole admin→customer coupling
+
+`opportunity_bridge` is a **forward-only, append-only** log: each publish inserts a new
+`(opportunity_id, version, event_type, card, posted_by)` row (monotonic version per opportunity). The
+consumer (`fanOutBridgeEvent` → `applyToTenant`) upserts each subscribed tenant's card and advances a
+per-tenant cursor (`tenant_bridge_cursor`). Everything is **idempotent and re-drivable** — a fan-out
+failure to one tenant never fails the publish, and `backfillTenant()` replays the latest version of
+every opportunity onto a new tenant.
+
+| Concern | Mechanism |
+|---------|-----------|
+| Publish | `publishToBridge()` — `INSERT … version = max(version)+1` (append-only) |
+| Replicate | `fanOutBridgeEvent()` → `applyToTenant()` per `status IN ('active','trial')` tenant |
+| Tenant isolation | `applyToTenant` runs inside `withTenant(tenantId)` (SET LOCAL `app.tenant_id`) |
+| Pin-update signal | on re-publish, `pin_update_available` flips true only if the tenant pinned an older version |
+| Lifecycle propagation | `republishIfReleased()` re-publishes + re-fans a released opp on stage/content edits |
+| New-customer backfill | `backfillTenant()` applies the head version of every opportunity (currently a manual admin route) |
+
+### 2.3 Convergence — what was retired
+
+| Legacy | Fate | Replacement |
+|--------|------|-------------|
+| `tenant_pipeline_items` (per-tenant scoring rows) | Off the customer path | `tenant_opportunity_cards` |
+| `/portal/[t]/spotlights` page | Server `redirect()` → `/cards` | Greenfield Opportunities |
+| `/portal/[t]/pipeline` page | Server `redirect()` → `/cards` | pin state on the card |
+| Spotlight scoring job | Retired for the feed | `autoScoreCard` on fan-out → `tenant_bucket_scores` |
+| Nav: Spotlight / Pipeline | Removed | **Opportunities / Buckets / Atoms / Builds** |
+| Dashboard / origin-bucket reads | Repointed | `tenant_opportunity_cards`, `origin_card` |
+
+Legacy page bodies survive only as one-line redirects (prior implementations in git history). The
+orphaned `/spotlight/pin` API and legacy spotlight components are now dead code (cleanup backlogged).
+
+---
+
+## 3. Data Flow — Ingest → Bridge → Cards → Buckets / Rankings
+
+```
+rfp_admin curates + approves a solicitation (V9 Stage 2–3, retained)
+    │
+    ▼  solicitation.push tool  (frontend/lib/tools/solicitation-push.ts)
+    ├─ 1. Gate: submission_format present ANYWHERE for the solicitation —
+    │      custom_variables->'submission_format'->>'value' (interactive layer) OR a named column.
+    │      (Fixes A1: the solo/interactive curation flow only writes custom_variables, so the old
+    │       named-column-only check blocked a solo release.)
+    ├─ 2. Atomic txn: curated_solicitations approved → pushed_to_pipeline;
+    │      opportunities.is_active=true + submission_stage='open' for the FULL activation set —
+    │      the landing opportunity (id = cs.opportunity_id) PLUS every topic (solicitation_id = sol.id).
+    ├─ 3. emit finder:solicitation.pushed:single  (topicCount = size of the activation set)
+    └─ 4. For EACH activated opportunity: publishAndFanOut('published')
+              │
+              ▼  publishToBridge → buildCardSnapshot(opportunityId)
+              │      resolves solicitation for BOTH umbrella (cs.opportunity_id=o.id) AND
+              │      topics (o.solicitation_id=cs.id) — without the topic arm a topic card
+              │      came out with null namespace/compliance/volume_count.
+              ▼  fanOutBridgeEvent → applyToTenant(tenant) for every active/trial tenant
+                     ├─ upsert tenant_opportunity_cards (card jsonb, bridge_version, lifecycle_status, submission_stage)
+                     └─ autoScoreCard(tx, tenant, opp, card)  → tenant_bucket_scores (per active bucket)
+```
+
+**Multi-topic fan-out (the headline behavior change).** Because the activation set and the publish loop
+both include the umbrella *and* every topic, a 10-topic BAA now produces **10 customer cards** (plus the
+umbrella if it is itself an opportunity row), each a self-contained snapshot. Contract C1.a in
+`solicitation-push.ts` keeps the activation `WHERE`, the `topicCount`, and the publish loop identical so
+the event, the DB flip, and the customer cards always agree.
+
+**Reading the pipeline.** `GET /api/portal/[t]/cards` (`app/api/portal/[tenantSlug]/cards/route.ts`)
+reads the tenant's cards under `withTenant()` and LATERAL-joins the card's **best** bucket score:
+
+```sql
+ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
+```
+
+So the feed is genuinely **ranked** (pinned → best bucket score → recency), not recency with a "ranked
+by your buckets" label.
+
+**Buckets / rankings.** `tenant_spotlight_buckets` (mig 096) are customer-defined ranking lenses; each
+holds weighted `criteria` (keywords, naics, agencies, programTypes, setAsides, timeline). `scoreCard()`
+(`lib/bucket-ranking.ts`) scores a card 0–100 against a bucket; `autoScoreCard()` runs on fan-out (so a
+card is ranked the instant it lands), and `rankBucket()` re-ranks the whole local pipeline on demand
+(so a bucket registered at any time immediately ranks the available universe). Scores upsert to
+`tenant_bucket_scores` (unique `(tenant_id, bucket_id, opportunity_id)`).
+
+**Lifecycle.** `lib/lifecycle.ts` defines the canonical six submission stages
+`nofo → pre_release → open ⇄ updated → closed → archived` (mig 100). `submission_stage` on the master
+opportunity and the card is the source of truth; `lifecycle_status` (open/closed/archived) is the coarse
+projection the feed/ranking filters use. A stage change on a *released* opp re-fans via the bridge event
+from `eventTypeForStage()`.
+
+---
+
+## 4. Data Flow — Provision → Matrix → Build → Lock → Download
+
+The build loop is V9-retained; V10 makes the **compliance matrix real** and **hardens lock**.
+
+```
+Purchase / admin grant → provision (two entry points):
+    • create route:  app/api/portal/[t]/proposals/create/route.ts   (legacy + matrix)
+    • portal launch: lib/provision-proposal.ts                       (greenfield, UNLOCKED)
+        resolveTopicCompliance → proposal_artifacts (per volume) → proposal_sections (per required item)
+        + proposal_compliance_matrix rows (one per required item / required-section), status='not_addressed'
+        + origin_card frozen onto proposals.origin_card
+        + emit proposal:proposal.created:end  → OnProposalCreated (draft_v0 strawman on deploy)
+    │
+    ▼  BUILD  (canvas editor — V9 §2 Stage 7, retained)
+    │   versioned saves iterate unbounded within a stage; optimistic-lock CAS on section.version
+    │
+    ▼  LOCK   app/api/portal/[t]/proposals/[p]/sections/[s]/lock  (POST)
+    │   CAS: UPDATE … WHERE id=$s AND is_locked=false  (0 rows ⇒ already locked ⇒ skip side effects)
+    │   ├─ proposal_compliance_matrix: status → 'satisfied' for this section's requirements
+    │   ├─ canvas snapshot + harvest section → library
+    │   ├─ artifact roll-up: when every section of an artifact is locked → artifact.locked (atomic)
+    │   └─ document/proposal-ready signals + opt-in auto-advance (shared gated core)
+    │      DELETE (unlock): matrix status → 'not_addressed'; artifact reopened (mirror)
+    │
+    ▼  ADVANCE (gated) → SUBMIT/LOCK → DOWNLOAD (docx/json, in-memory, S3-independent)   ─ V9 retained
+```
+
+**Compliance matrix (`proposal_compliance_matrix`, pre-exists mig 001; now populated).** The create route
+inserts one row per required item (or per named required-section within it), sourced from the volume,
+linked to the section that addresses it, starting `not_addressed`. The lock route flips matched rows to
+`satisfied`; unlock resets to `not_addressed`. Status CHECK: `not_addressed | partial | satisfied |
+not_applicable`. This is what the proposal card's `percentComplete` and the workspace compliance tab
+read — previously always 0%.
+
+> **Known gap (V10):** `provisionProposalForPortal` (the portal launch path) does **not yet** populate
+> the matrix — a portal-launched proposal still shows an empty matrix until a shared helper is extracted.
+> The legacy create route does populate it. (`docs/HITL_WIRING_AUDIT_2026-07-03.md` remaining #2.)
+
+---
+
+## 5. Data Flow — Upload → Atoms → Selector → Drafter (Unified Library)
+
+The content library is re-founded on **atoms** (mig 101/102). Files: `frontend/lib/atoms.ts`,
+`lib/atom-size.ts`, `components/portal/{atoms-workbench,atomizer,atom-library}.tsx`,
+`app/api/portal/[tenantSlug]/atoms/*`.
+
+### 5.1 The atom model
+
+An atom is one `library_atoms` row of a given **grain**:
+
+| Grain | Meaning |
+|-------|---------|
+| `primitive` | one object (a bio, a past-performance blurb, one paragraph) |
+| `group` | an ordered aggregate of member atoms (`atom_members`) — a whole team section |
+| `reference` | the registered source document (full content kept for later atomization) |
+
+Every atom records its **`creator_kind`** (`admin | ai | collaborator | system | import`), its
+**`owner_user_id`**, a **`source_anchor`** back to the objects it was cut from, and its **size**
+(`word_count`/`char_count` + a physical estimate via `atomSize()`) in the same currency a section mold
+uses — so fit against a compliance-bound skeleton is a direct comparison. Lineage is a DAG
+(`atom_lineage`, parent→child `derived_from`); tags are the **unified taxonomy** (`atom_tags` keyed to
+`taxonomy_terms`, each tag `auto`/`admin`-sourced and confirmable). Reusable skeletons live in
+`document_cocoons`.
+
+**Visibility** (`tenant | owner_only | shared_for_proposal | admin_only`) is enforced on every read via a
+`Viewer` (`viewerFromRole`): admin tiers (tenant_admin / rfp_admin / master_admin) see the whole tenant
+library; tenant_user / partner_user see tenant-shared atoms plus the ones they own. `partner_user`
+collaborators get scoped read access (they can select atoms for a section but only see what they're
+entitled to). This closed a data-exposure bug where library reads ignored ownership.
+
+### 5.2 The loop
+
+```
+Upload (POST /atoms/upload, multipart) → readDocument (existing import readers)
+    → register the whole doc as a `reference` atom (fmt tag auto-confirmed; provenance = uploader)
+    → return deconstructed objects (heading + narrative chunks, suggested vol tags)
+Atomize (components/portal/atomizer.tsx): paste OR upload → deconstruct into selectable objects →
+    box/multi-select → "Make atom" (primitive, or a group of N member primitives) → tag against the
+    unified taxonomy (curated dims via <select>, open dims free-text) → POST /atoms → createAtom()
+Select  (GET /atoms/select?vol=&kinds=&context=): selectForSection() — the scored, pre-vector selector:
+    scope by vol/kind → context boost (shared opp values: agency/program/phase/tech/dept) → tie-break by
+    outcome_score, usage, recency. A group's content is assembled from its ordered members.
+Draft   the ranked atoms feed the AI drafter's <library_atoms> context (and the admin picker).
+```
+
+`selectForSection` blends the signals as `ctxMatches*2 + outcome_score + log1p(usage)*0.1`, with the
+same visibility predicate applied — so the drafter never receives an atom the requesting user can't see.
+`embedding vector(1536)` exists on `library_atoms` for a later vector-select increment (default-off).
+
+---
+
+## 6. Event / Workflow Spine
+
+### 6.1 The jsonb-object payload fix (load-bearing)
+
+**Bug class (systemic):** event payloads were written as `${JSON.stringify(x)}::jsonb`, which stores a
+jsonb **string scalar** — so `payload->>'field'` returned **null** for every audit/automation/workflow
+consumer, and `create_instance` could not read `opportunityId` off a trigger overlay. **Fix:**
+`frontend/lib/events.ts` now writes via `sql.json(x)` (jsonb **object**) in all three emitters
+(`emitEventStart`/`emitEventEnd`/`emitEventSingle`); `lib/opportunity-bridge.ts` and
+`lib/process/launch-template.ts` use the same `jsonParam` idiom. **Migration 103**
+(`db/migrations/103_event_payload_jsonb_fix.sql`) back-fills historical rows: it converts `payload`/`error`
+from string scalars to objects only where `jsonb_typeof = 'string'` and the unwrapped text starts with
+`{`/`[` (guard so genuine string values are left alone). This restored `payload->>` for the CMS
+automation listener, the audit surface, and the spine correlation below.
+
+### 6.2 Namespaces → templates → instances (carrying the opportunity)
+
+The 7 canonical namespaces are unchanged (V9 §8.2: `finder | capture | identity | proposal | library |
+system | tool`). The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
+templates** on boot (each writes a `process_templates` row with `active` + `trigger_key`), up from 9 in
+V9 — the additions are `ProjectCollaboration`, `OnProposalSectionEdited`, and `OnProposalOutcomeRecorded`.
+
+| Template | Trigger (`namespace:type:phase`) | Carries `opportunity_id` |
+|----------|----------------------------------|--------------------------|
+| `ProjectCollaboration` | `proposal:project.collaboration_requested:single` | ✅ opp + scope (generic overlay gate) |
+| `OnSolicitationPushed` | `finder:solicitation.pushed:single` | ✅ opp (scope NULL) |
+| `OnProposalCreated` | `proposal:proposal.created:end` | — (opp link via sibling `ProjectCollaboration`) |
+| `OnProposalSectionEdited` | `proposal:section.saved:single` | — |
+| `OnProposalOutcomeRecorded` | `proposal:outcome.recorded:end` | — |
+| `OnProposalAdvancedToReview` | `proposal:proposal.advanced:end` (targetStage==review) | — |
+| `OnProposalAdvancedToFinal` | `proposal:proposal.advanced:end` (targetStage==final) | — |
+| `OnRfpUploaded` | `finder:rfp.uploaded:end` | — |
+| `OnOpportunitiesDetected` | `finder:opportunities.detected:single` | — |
+| `OnSourceChangeDetected` | `finder:source.change_detected:single` | — |
+| `OnCmsContentRequested` | `library:content.requested:single` | — |
+| `OnApplicationAccepted` | `capture:application.accepted:end` | — |
+
+(The two `OnProposalAdvanced*` modules carry a stale `:single` header comment; the registered trigger is
+`proposal:proposal.advanced:end` — `phase="end"` in code.)
+
+**How the opportunity is frozen onto the instance.** Carrying the opportunity is **generic, not
+template-coded**. `WorkflowManager.create_instance()` (`pipeline/src/workflows/manager.py` L180–213) reads
+`opportunityId` and `scope` off the (now-object) trigger payload, validates `scope ∈ {opp, spotlight,
+project, contract}` (the mig-088 CHECK; a bad value degrades to NULL), and writes both onto the
+`process_instances` row alongside the **frozen payload** (the overlay JSON, `json.dumps(payload)`). So a
+template carries the opportunity **iff its emitter puts `opportunityId` in the event payload** — today
+only `ProjectCollaboration` (opp + scope) and `OnSolicitationPushed` (opp) do. `OnProposalCreated`'s
+event carries `topicId`/`solicitationId` (not `opportunityId`), so its spine link instead arrives via the
+**sibling `ProjectCollaboration` launch** in the same create route (`opportunityId: topicId, scope:
+'project'`). A reaction run keyed this way can be chained / rolled up by `opportunity_id`
+(`v_opportunity_rollup`, mig 088) — the "spine as a KEY + reaction runtime, not a new state machine."
+`process_instances` gained `opportunity_id` + `scope` in mig 088; the frozen overlay lives in its
+`payload` jsonb (mig 043).
+
+`launchTemplate()` (`frontend/lib/process/launch-template.ts`) is the GUI/bridge on-demand entry point:
+it re-checks the catalog gate, then emits the template's `single`-phase trigger with the overlay as
+payload; the pipeline picks it up on its next poll and `create_instance` freezes that overlay.
+
+### 6.3 The two consumers (unchanged shape)
+
+Consumer 1 = the pipeline workflow processor (matches `system_events` → templates → `process_instances`
+via `WorkflowManager`). Consumer 2 = the CMS `event_listener` (matches `automation_rules`). Both depend
+on `payload->>` working — hence §6.1 is load-bearing for both.
+
+---
+
+## 7. New / Changed Schema (migrations 093 → 103)
+
+Highest migration on the branch: **103**. Domains added to V9's 72-table / 14-domain map:
+
+| Migration | Adds |
+|-----------|------|
+| `093_collaborator_library_scope` | `library_unit_shares`, `collaborator_library_prefs` (per-collaborator scope on legacy `library_units`) |
+| `094_oppcard_bridge_spine` | **`opportunity_bridge`**, **`tenant_opportunity_cards`** (RLS forced), **`tenant_bridge_cursor`**; `govtech_app` role |
+| `095_oppcard_pin_docs` | `tenant_opportunity_cards.pinned_docs` jsonb (pin-pulls-docs-local manifest) |
+| `096_tenant_spotlight_buckets` | **`tenant_spotlight_buckets`**, **`tenant_bucket_scores`** (both RLS forced) |
+| `097_portals_shadow_guardrails` | `proposal_portals`, `shadow_admin_grants`, `guardrail_templates` (L3 execute layer, RLS) |
+| `098_portal_workflow_guardrails` | `proposal_portals.current_stage_index`; seeds a global guardrail template |
+| `099_intake_meta` | `curated_solicitations.intake_meta` jsonb |
+| `100_submission_stage_lifecycle` | `submission_stage` (+ release metadata) on `opportunities` and `tenant_opportunity_cards`; extends `opportunity_bridge.event_type` (+`archived`) |
+| `101_unified_library_taxonomy` | **`taxonomy_terms`, `document_cocoons`, `library_atoms`** (RLS), **`atom_tags`, `atom_lineage`, `atom_members`**; enables `vector` |
+| `102_atomizer_support` | `library_atoms.{creator_kind, created_by, source_anchor}` |
+| `103_event_payload_jsonb_fix` | back-fills `system_events.payload`/`.error` from string scalars → objects |
+
+Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in `CLAUDE_CLIFFNOTES.md`):
+
+- **`opportunity_bridge`** — `(opportunity_id → opportunities, version, event_type, card jsonb, posted_by)`,
+  UNIQUE `(opportunity_id, version)`, append-only, **not** RLS (global feed).
+- **`tenant_opportunity_cards`** — `(tenant_id → tenants, opportunity_id [soft ref, no FK], card jsonb,
+  bridge_version, lifecycle_status, submission_stage, pursuit_status, is_pinned, pin_update_available,
+  pinned_docs jsonb)`, UNIQUE `(tenant_id, opportunity_id)`, RLS ENABLE+FORCE on `app.tenant_id`.
+- **`tenant_spotlight_buckets`** `(tenant_id, name, criteria jsonb, is_active)` + **`tenant_bucket_scores`**
+  `(tenant_id, bucket_id CASCADE, opportunity_id, score, factors jsonb)` UNIQUE `(tenant_id, bucket_id,
+  opportunity_id)` — both RLS forced.
+- **`library_atoms`** (RLS forced) + **`atom_tags`** PK `(atom_id, dimension, value)`, **`atom_members`**
+  PK `(group_atom_id, member_atom_id)`, **`atom_lineage`** PK `(parent_atom_id, child_atom_id)` CHECK
+  parent≠child, **`document_cocoons`**, **`taxonomy_terms`** UNIQUE `(dimension, value)`.
+- **`proposal_compliance_matrix`** (pre-exists mig 001) — now *populated*.
+
+### RLS reality (updated from V9 §7.4)
+
+The greenfield tenant tables ship with **RLS ENABLE + FORCE and real policies** keyed on the
+`app.tenant_id` GUC. `withTenant()` (`lib/rls.ts`) wraps each tenant operation in a txn that
+`SELECT set_config('app.tenant_id', $1, true)` (SET LOCAL). Enforcement goes live once the app connects
+as the non-owner **`govtech_app`** role (created in mig 094); under the current owner connection the GUC
+is set (harmless) and the explicit `WHERE tenant_id = $1` predicates remain the belt. This is the first
+subsystem with policies (V9's four memory tables had RLS enabled but zero policies).
+
+---
+
+## 8. Canvas Build→Lock Hardening (correctness)
+
+Driven and fixed against the live app (regression-tested in `frontend/e2e/`):
+
+| ID | Bug | Fix | Spec |
+|----|-----|-----|------|
+| D1 | A **locked** section was still editable via the SAVE API → overwrote accepted content | `save` selects `is_locked`, rejects with **423** | `e2e/lock.tenant.spec.ts` |
+| D2 | Section lock/unlock had **no CAS** → double-submit re-ran one-time side effects (harvest, artifact roll-up, auto-advance) | `UPDATE … WHERE is_locked=false/true` compare-and-swap + idempotent no-op | `e2e/lock.tenant.spec.ts` |
+| D3 | Orphaned `PATCH /stage` bypassed the "all sections locked" gate | delegate to `advanceProposalStage` (gated core) | build path removed |
+| #2 | Optimistic lock was not real — no base-version check | client sends `baseVersion`; a stale save is rejected **409** | `e2e/collab.tenant.spec.ts` |
+| #3 | Save-auth hole — an **unassigned** collaborator could save | `resolveUserAccess` enforces `assigned_sections`; unassigned → **403** | `e2e/collab.tenant.spec.ts` |
+| #1 | Editor comments were dead | section-scoped editor comments post + read back | `e2e/collab.tenant.spec.ts` |
+
+Artifact roll-up (E1) is atomic: locking the final section of an artifact flips the artifact to `locked`
+and emits `proposal:artifact.locked` in one statement, so two concurrent final-section locks can't both
+observe "not all locked."
+
+---
+
+## 9. What V9 Retained (pointer, not repeated)
+
+Everything below is **unchanged** by this refactor — V9 is the source of truth:
+
+| Subsystem | See |
+|-----------|-----|
+| Proposal workspace + canvas editor (Tiptap, versions, drafting) | V9 §2 Stage 7, §4.7 |
+| Stages / gates / force-advance / stage snapshots | V9 §2, §4.4 (`lib/proposal-advance.ts`, `force-advance.ts`) |
+| Auth (NextAuth v5), 5 roles, RBAC, middleware, tenant isolation | V9 §4.3, §10 |
+| Provisioning substrate (artifacts, sections, template seed, artifact-spec) | V9 lifecycle addendum, §2 Stage 6 |
+| Admin curation + shredder (PDF → Claude → compliance/documents) | V9 §2 Stage 3, §5.4 |
+| Pipeline ingest / scoring / source scout / memory lifecycle | V9 §5 |
+| AI: Product-AI (frontend-direct) + pipeline agent workforce (advisory, on-deploy) | V9 §9 |
+| CMS/CRM (87 endpoints, 7 workers, Vite SPA, event listener) | V9 §6 |
+| Storage (S3/R2, three prefixes) | V9 §11 |
+| Deployment (Railway, migrations at deploy, CI) | V9 §12 |
+| Event system shape (system_events, 7 namespaces, start/end/single) | V9 §8 |
+
+The 3-source strawman generation remains the open AI-integration gap (the `publish_section_draft`
+landing primitive is shipped; `OnProposalCreated → draft_v0` fires only when the pipeline
+`ANTHROPIC_API_KEY` is set on deploy) — unchanged from V9's §9 correction.
+
+---
+
+## 10. As-Built Verification
+
+This refactor was **driven**, not code-read. Method + verdict scale: `docs/HITL_WIRING_AUDIT_RUNBOOK.md`.
+
+### 10.1 Playwright suite — 17/17 green
+
+`frontend/e2e/` runs serially (`workers:1`, chromium, `screenshot:only-on-failure`,
+`trace:retain-on-failure`) against an **externally booted + seeded** `next start` on `:3000` — no
+`webServer` block; boot + seed (`scripts/seed_dev_accounts.mjs`, `scripts/e2e_fixtures.sql`) are Step 0
+of the runbook. Three projects: `setup` (persona login → storageState), `admin`, `tenant`.
+
+**17 total test cases = 3 auth-setup personas + 14 spec cases across 11 spec files** (`npm run test:e2e`):
+
+| Spec | Cases | Drives |
+|------|-------|--------|
+| `auth.setup.ts` | 3 | real Credentials-form login → storageState (admin, lighthouse tenant, partner collaborator) |
+| `smoke.admin` / `smoke.tenant` | 1 + 1 | each persona reaches a gated surface without bouncing to `/login` |
+| `reach.admin` / `reach.tenant` | 1 + 1 | reachability sweep (30 `/admin/*` + 17 `/portal/*` routes, fail only on 5xx/crash) |
+| `fanout.admin` | 1 | multi-topic push fans out one card per topic to the tenant |
+| `redirect.tenant` | 2 | legacy `/spotlights` and `/pipeline` land on `/cards` |
+| `matrix.tenant` | 1 | provision builds a real matrix; a requirement advances to `satisfied` on lock, resets on unlock |
+| `lock.tenant` | 1 | locked section rejects save (423, D1); lock/unlock idempotent (D2) |
+| `collab.tenant` | 3 | save-authz (admin ok / unassigned 403); stale-baseVersion 409; editor comments round-trip |
+| `library.tenant` | 1 | atom visibility: admin sees all; collaborator sees tenant + own only |
+| `ranking.tenant` | 1 | cards auto-scored on push, surfaced + ordered on `/cards` (`topScore > 0`) |
+
+### 10.2 Live workflow-engine run
+
+Against the **full live stack** (frontend `:3000` + the **Python workflow engine** `:8080` + Postgres),
+the engine **registered 12 templates** and **created `process_instances` carrying `opportunity_id`** from
+the frozen event overlay — witnessed for `ProjectCollaboration` (carries opp), `OnSolicitationPushed`
+(carries opp), `OnProposalCreated`, and `OnProposalSectionEdited`. The §6.1 payload fix is what made the
+`opportunity_id` correlation possible (a string-scalar payload returned null on `payload->>'opportunityId'`).
+Evidence: `docs/HITL_WIRING_AUDIT_2026-07-03.md` finish-out block.
+
+### 10.3 Verdict
+
+The **ingest → curate → release → fan-out (per topic) → pin → provision → build ×N → lock → download**
+spine is end-to-end wired and driven-green; the customer surface is converged on the canonical cards;
+the library is unified on atoms with enforced visibility; the compliance matrix and rankings are real;
+and the workflow engine runs live keyed to the opportunity spine.
+
+---
+
+## 11. Known Gaps & Remaining Work
+
+From the driven audit (`docs/HITL_WIRING_AUDIT_2026-07-03.md`) — feature-completeness and cleanup, not
+core-spine breaks:
+
+| Item | Status | Note |
+|------|--------|------|
+| Portal-launch matrix | 🟡 | `provisionProposalForPortal` doesn't populate `proposal_compliance_matrix` yet (create route does) — extract a shared helper |
+| Volume-doc tree grouping | 🟡 | data is real (volumes→artifacts→sections + page allocations); workspace still renders flat |
+| Templates → skeleton | 🟡 | nothing sets `volume_required_items.template_id`, so authored templates don't reach provisioning; fix the admin template-list fetch shape |
+| New-customer backfill | 🟡 | `backfillTenant()` runs only via a manual admin route → fresh tenants miss historical opportunities |
+| Fan-out entitlement gate | 🟡 | every active/trial tenant receives every card regardless of Spotlight subscription (confirm intended) |
+| Legacy spotlight dead code | 🧹 | `/spotlight/pin` API + legacy spotlight components are now orphaned — remove |
+| 3-source strawman (`draft_v0`) | 🟦 | wired to `OnProposalCreated`; real Claude activates on deploy (`ANTHROPIC_API_KEY`) — unchanged from V9 |
+
+---
+
+## 12. What Changed Since V9
+
+| Topic | V9 (2026-06-23) | V10 (2026-07-03) verified truth |
+|-------|-----------------|----------------------------------|
+| Customer opportunity surface | `tenant_pipeline_items` + Spotlight/Pipeline (scoring rows) | **Retired.** Canonical = `tenant_opportunity_cards` via the bridge; Spotlight/Pipeline redirect to `/cards` |
+| Multi-topic RFP | umbrella card only | **one card per topic** (umbrella + every topic activated + published) |
+| Admin→customer coupling | scoring job writes per-tenant rows | **forward-only `opportunity_bridge`** → fan-out to denormalized cards |
+| Rankings | Spotlight threshold on scoring rows | **`tenant_bucket_scores`** auto-populated on fan-out; `/cards` ordered by best bucket score |
+| Library | `library_units` (harvest log, atom-outcomes) | **`library_atoms`** (primitive/group/reference) + unified `taxonomy_terms` + visibility/provenance/lineage |
+| Compliance matrix | empty shell (always 0%) | **populated at provision, advanced on lock, reset on unlock** |
+| Section lock | editable-when-locked; no CAS | **423 reject + CAS + idempotent**; real optimistic lock (409); assigned-section authz |
+| Event payloads | jsonb **string scalars** (`payload->>` = null) | **jsonb objects** via `sql.json`; migration 103 back-fills |
+| Workflow templates | 9 | **12** (adds ProjectCollaboration, OnProposalSectionEdited, OnProposalOutcomeRecorded) |
+| `process_instances` ↔ opportunity | spine columns added, unproven | **live: instances created carrying `opportunity_id`** from frozen overlay |
+| RLS | enabled on 4 memory tables, **zero policies** | greenfield tenant tables ship **RLS + real policies** on `app.tenant_id` (`govtech_app` role) |
+| Verification | file-by-file code read | **driven** — Playwright 17/17 + live engine run |
+
+---
+
+*This document records the greenfield-canonical refactor shipped on `claude/nice-hamilton-kBqtD` and its
+drive-verification. It is a delta over ARCHITECTURE_V9.md, which remains canonical for the retained core.
+Source of truth for the verification claims is `docs/HITL_WIRING_AUDIT_2026-07-03.md` and the
+`frontend/e2e/` suite; for the greenfield schema, `CLAUDE_CLIFFNOTES.md` and `db/migrations/094–103`.*
