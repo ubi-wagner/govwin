@@ -248,17 +248,33 @@ export const solicitationPushTool = defineTool<Input, Output>({
       },
     });
 
-    // 5b. Publish the card to the forward-only bridge + fan out a thin copy to
-    // every subscribed tenant (greenfield opportunity-card spine, mig 094).
-    // Best-effort: the push already succeeded; replication is idempotent and can be
-    // re-driven by a backfill, so a failure here must not fail the push.
+    // 5b. Publish EVERY activated opportunity to the forward-only bridge + fan out
+    // a thin card to every subscribed tenant (greenfield opportunity-card spine,
+    // mig 094). The activation set is the landing opportunity PLUS every topic of
+    // the solicitation — so a multi-topic BAA lands N topic cards for customers,
+    // not just one umbrella card (the bridge is the canonical admin→customer
+    // coupling). Best-effort: the push already succeeded; replication is
+    // idempotent and can be re-driven by a backfill, so a failure here (per
+    // opportunity or overall) must not fail the push.
     try {
-      const result = await publishAndFanOut(r.opportunityId, 'published', actorId, new Date().toISOString());
-      if (result) {
-        ctx.log?.info?.({ msg: 'bridge published + fanned out', opportunityId: r.opportunityId, version: result.event.version, tenantsApplied: result.tenantsApplied });
+      const activated = await sql<{ id: string }[]>`
+        SELECT id FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+           OR id = ${r.opportunityId}::uuid
+      `;
+      const stamp = new Date().toISOString();
+      let published = 0;
+      for (const opp of activated) {
+        try {
+          const result = await publishAndFanOut(opp.id, 'published', actorId, stamp);
+          if (result) published++;
+        } catch (oneErr) {
+          ctx.log?.warn?.({ msg: 'bridge publish failed for opportunity (non-fatal)', opportunityId: opp.id, err: oneErr instanceof Error ? oneErr.message : String(oneErr) });
+        }
       }
+      ctx.log?.info?.({ msg: 'bridge published + fanned out', solicitationId, opportunitiesPublished: published, ofActivated: activated.length });
     } catch (bridgeErr) {
-      ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', opportunityId: r.opportunityId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
+      ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', solicitationId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
     }
 
     // 6. HITL memory write — the BIG one. Push is the final curation

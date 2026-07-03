@@ -75,7 +75,11 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              (SELECT count(*)::int FROM solicitation_volumes sv
                 WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
       FROM opportunities o
-      LEFT JOIN curated_solicitations cs ON cs.opportunity_id = o.id
+      -- Resolve the solicitation for BOTH the umbrella (cs.opportunity_id = o.id)
+      -- and its topics (o.solicitation_id = cs.id). Without the topic arm, a topic
+      -- card came out with null namespace/compliance/volume_count once multi-topic
+      -- fan-out started publishing topics as cards.
+      LEFT JOIN curated_solicitations cs ON cs.id = o.solicitation_id OR cs.opportunity_id = o.id
       LEFT JOIN solicitation_compliance sc ON sc.solicitation_id = cs.id AND sc.topic_id IS NULL
       LEFT JOIN users ub ON ub.id = o.built_by
       LEFT JOIN users ur ON ur.id = o.released_by
