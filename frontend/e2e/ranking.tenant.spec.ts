@@ -11,8 +11,9 @@
 import { test, expect, request as pwRequest } from '@playwright/test';
 
 const SLUG = 'lighthouse';
-const SOL = 'c3000000-0000-4000-8000-000000000001';
-const T1 = '91000000-0000-4000-8000-000000000001';
+// Ranking uses its OWN solicitation (c4) so it never contends with fanout (c3).
+const SOL = 'c4000000-0000-4000-8000-000000000001';
+const T1 = '92000000-0000-4000-8000-000000000001';
 
 test('bucket ranking: cards auto-scored on push, surfaced + ordered on /cards', async ({ request, baseURL }) => {
   // Tenant creates a bucket that matches AF SBIR opportunities.
