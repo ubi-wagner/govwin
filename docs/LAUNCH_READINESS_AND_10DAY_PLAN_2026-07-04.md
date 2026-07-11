@@ -371,3 +371,20 @@ links go to localhost), `NEXT_PUBLIC_APP_URL`, `API_KEY_ENCRYPTION_SECRET`, **`A
 - **Still owed on Day 1 (needs the operator / real infra):** set the Railway env (frontend
   `ANTHROPIC_API_KEY`/`AWS_S3_BUCKET_NAME`/`NEXTAUTH_URL` + Stripe price IDs), configure + verify a real
   email provider, and rewrite `RAILWAY.md` build-context/migration steps.
+
+**2026-07-04 — Day-4/5 slice landed + driven-green (decision-independent wiring P0s):**
+- **P0-9 (docx download)** — the Export button now POSTs `/package?format=docx` and downloads the
+  binary (label → "Download Proposal (.docx)"). Drive-verified: 200, a real 8.8 KB `.docx` (valid PK/zip),
+  `Content-Disposition` attachment. Fixed two crashers found while driving it: `docx-exporter` now defaults
+  a missing/partial canvas config **and** per-node `style` (US-Letter / 1" / 12 pt Times) instead of
+  throwing `reading 'family'` on any hand-authored/template section.
+- **P0-8 (release deadlock)** — an RFP/master admin can now release a `lock_count===0` provisioned proposal
+  (the intended "unlock → release to the customer"); a tenant user still gets "Nothing to unlock". Also fixed
+  the release notification querying a **phantom `tenant_memberships`** table → `users.tenant_id`, so the
+  "your proposal is ready" email actually fires. Drive-verified: tenant_admin→409, admin→200 `is_locked=false`,
+  server log clean. NOTE: the live portal-launch path already provisions `is_locked=false` (editable); this
+  fixes the legacy/admin-provision path's trap.
+- **P1-5 (greenfield matrix)** — `provision-proposal.ts` now populates `proposal_compliance_matrix`
+  (one `not_addressed` row per required item). Drive-verified via a real portal accept: the provisioned
+  proposal came up editable with **2 matrix rows** (Technical Approach | Key Personnel) — was 0 (card stuck 0%).
+- Gates: `tsc` 0, `vitest` 603/603, Playwright **20/20**.

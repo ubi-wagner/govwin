@@ -304,12 +304,19 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Workspace is not locked', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
 
-    if (proposal.lockCount === 0) {
-      return NextResponse.json({ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }, { status: 409 });
-    }
-
     const userRole = isRole(sessionUser.role) ? sessionUser.role : role;
     const isAdminRole = userRole === 'master_admin' || userRole === 'rfp_admin';
+
+    // lock_count === 0 means the proposal was provisioned LOCKED and never customer-
+    // submitted — i.e. it is pending its INITIAL RELEASE to the customer. Releasing is
+    // an RFP-admin action (unlock → the customer can now edit; they get notified below).
+    // A tenant user genuinely has nothing to unlock at count 0. Without this an
+    // admin-provisioned (is_locked=true) proposal could never be released — a deadlock,
+    // since the only is_locked=false setter is here (the create-route email even
+    // instructs the admin to "unlock the proposal to release it to the customer").
+    if (proposal.lockCount === 0 && !isAdminRole) {
+      return NextResponse.json({ error: 'Nothing to unlock', code: 'VALIDATION_ERROR' }, { status: 409 });
+    }
 
     // Business rule: after RFP close date, only admins can unlock
     if (proposal.opportunityCloseDate) {
@@ -414,13 +421,13 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
 
     // ── Notify tenant members that proposal is ready for editing ────
     try {
+      // Membership is users.tenant_id (there is no tenant_memberships table).
       const tenantMembers = await sql<{ email: string; name: string | null }[]>`
-        SELECT u.email, u.name
-        FROM users u
-        JOIN tenant_memberships tm ON tm.user_id = u.id
-        WHERE tm.tenant_id = ${tenantId}::uuid
-          AND tm.role IN ('tenant_admin', 'tenant_user')
-          AND u.is_active = true
+        SELECT email, name
+        FROM users
+        WHERE tenant_id = ${tenantId}::uuid
+          AND role IN ('tenant_admin', 'tenant_user')
+          AND is_active = true
         LIMIT 20
       `;
 

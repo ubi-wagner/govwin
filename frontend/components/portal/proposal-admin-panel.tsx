@@ -189,8 +189,10 @@ export function ProposalAdminPanel({
     setExportLoading(true);
     setExportMessage(null);
     try {
+      // Request the assembled Word document (the package route builds a real .docx
+      // from every section); download the binary blob rather than a JSON manifest.
       const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/package`,
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=docx`,
         { method: 'POST' },
       );
       if (!res.ok) {
@@ -198,15 +200,14 @@ export function ProposalAdminPanel({
         setExportMessage({ type: 'error', text: json.error || 'Export failed' });
         return;
       }
-      const json = await res.json();
-      const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: 'application/json' });
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `proposal-package-${proposalId.slice(0, 8)}.json`;
+      a.download = `proposal-${proposalId.slice(0, 8)}.docx`;
       a.click();
       URL.revokeObjectURL(url);
-      setExportMessage({ type: 'success', text: 'Package exported successfully' });
+      setExportMessage({ type: 'success', text: 'Proposal exported (.docx)' });
     } catch {
       setExportMessage({ type: 'error', text: 'Network error' });
     } finally {
@@ -549,7 +550,7 @@ export function ProposalAdminPanel({
               disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {exportLoading ? 'Exporting...' : 'Export Package'}
+              {exportLoading ? 'Exporting...' : 'Download Proposal (.docx)'}
             </button>
             {(!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived') && (
               <span className="text-xs text-gray-400">Lock the proposal or advance to submitted stage to export</span>
