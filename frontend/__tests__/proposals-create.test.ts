@@ -329,6 +329,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
         // section INSERTs + compliance query + other writes
         return [{ id: `section-${callCount}` }];
       });
+      Object.assign(txMock, { json: (v: unknown) => v });
       return cb(txMock);
     });
 
@@ -382,6 +383,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
       const txMock = vi.fn()
         .mockResolvedValueOnce([{ id: PROPOSAL_ID }])
         .mockResolvedValue([{ id: 'row-id' }]); // artifact + section INSERTs RETURNING id
+      Object.assign(txMock, { json: (v: unknown) => v });
       return cb(txMock);
     });
 
@@ -474,6 +476,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
       const txMock = vi.fn()
         .mockResolvedValueOnce([{ id: PROPOSAL_ID }])
         .mockResolvedValue([{ id: 'row-id' }]); // artifact + section INSERTs RETURNING id
+      Object.assign(txMock, { json: (v: unknown) => v });
       return cb(txMock);
     });
 
@@ -535,6 +538,7 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
         if (n === 1) return Promise.resolve([{ id: PROPOSAL_ID }]); // proposal INSERT
         return Promise.resolve([{ id: `row-${n}` }]); // artifact + section INSERTs RETURNING id
       });
+      Object.assign(txMock, { json: (v: unknown) => v });
       return cb(txMock);
     });
 

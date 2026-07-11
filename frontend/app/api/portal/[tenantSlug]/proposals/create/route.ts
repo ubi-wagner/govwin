@@ -395,7 +395,7 @@ export async function POST(request: Request, ctx: RouteContext) {
               ${item.volumeName},
               ${item.volumeNumber},
               ${inferSectionType(item.itemName, sectionStandards)},
-              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}::jsonb
+              ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}
             )
             RETURNING id
           `;
