@@ -160,10 +160,10 @@ export async function POST(request: Request) {
         ${input.desiredOutcomes}::text[],
         ${input.motivation}, ${input.referralSource},
         'pending', now(), 'v1',
-        ${userAgent}, ${JSON.stringify({
+        ${userAgent}, ${sql.json({
           termsSignature: input.termsSignature ?? null,
           termsVersion: input.termsVersion,
-        })}::jsonb
+        })}
       )
       RETURNING id
     `;

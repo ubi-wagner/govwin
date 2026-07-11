@@ -350,3 +350,24 @@ links go to localhost), `NEXT_PUBLIC_APP_URL`, `API_KEY_ENCRYPTION_SECRET`, **`A
 ---
 
 *Evidence for every claim: the 8-track sweep in `scratchpad/sweep_findings.md` (this session) + the cited `file:line`.*
+
+---
+
+## §7. Execution log
+
+**2026-07-04 — Day-1/Day-2 slice landed + driven-green (decision-independent P0s):**
+- **P0-5 (credential delivery)** — `accept/route.ts` now returns `tempPassword` + `emailError`; the admin
+  UI already renders them. Drive-verified: accept response carried `tempPassword` + the exact
+  "no email provider configured" reason (email `skipped` in the test env).
+- **P0-6 (backfill-on-signup)** — accept now calls `backfillTenant` post-commit (best-effort) + emits a
+  tenant-scoped `capture:tenant.cards_backfilled`. Drive-verified: a fresh accepted tenant landed **6
+  mirrored `tenant_opportunity_cards`** (matched `cardsBackfilled:6`); event emitted with the right tenant.
+- **P0-1 (Stripe var names, doc side)** — `.env.example` corrected to the code's names + real amounts.
+- **P1-6** — `admin/waitlist` repointed to the real `waitlist` table (was reading `applications`).
+- **Copy/hygiene** — welcome-email "Spotlight" → "opportunity cards"; `applications`/`waitlist` jsonb
+  metadata now via `sql.json()` (Mistake-36).
+- **Regression** — `e2e/onboarding.admin.spec.ts` added (apply → accept → temp-password + cards mirror).
+  Gates: `tsc` 0, `vitest` 603/603, Playwright **20/20** (incl. the new onboarding spec).
+- **Still owed on Day 1 (needs the operator / real infra):** set the Railway env (frontend
+  `ANTHROPIC_API_KEY`/`AWS_S3_BUCKET_NAME`/`NEXTAUTH_URL` + Stripe price IDs), configure + verify a real
+  email provider, and rewrite `RAILWAY.md` build-context/migration steps.
