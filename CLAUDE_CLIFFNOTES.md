@@ -1391,3 +1391,28 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
   (whole loop) + `e2e/atomloop.tenant.spec.ts` (return + idempotency). The legacy `library_units`
   harvest (`harvestSectionToLibrary`) still runs alongside but is obsolete — see
   docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md.
+
+---
+
+## As-built delta — 2026-07-05 (Alpha hardening + Immobileyes rehearsal)
+
+**Latest migration: 104** (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
+index). The greenfield spine (ingest → skeleton → push → signup-mirror → provision-with-template → release →
+build → lock → download) is **driven-green end-to-end** — verified as RFP-admin→shadow→**Immobileyes**
+(`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/ALPHA_ARCHITECTURE_ASBUILT.md`,
+`docs/ALPHA_TODO_BACKLOG.md`, `docs/ALPHA_HITL_RUNBOOK.md`.
+
+### Two verified bug-class lessons (definitively reproduced, not reasoned)
+- **Mistake 39 — `${JSON.stringify(x)}::jsonb` is ALWAYS a jsonb STRING SCALAR here** (objects AND arrays):
+  `col->>'k'` returns NULL. Reproduced on this repo's postgres.js (write+read `jsonb_typeof`). **Always use
+  `${sql.json(x)}` / `${tx.json(x)}`** (works inside tx blocks too). All 56 offending writes were converted;
+  mig 104 backfills existing rows. When agents "reason" about postgres.js jsonb behavior they get it backwards
+  — trust a reproduction, not an argument.
+- **Mistake 40 — `${cond ? 't' : 'f'}::bool` evaluates FALSE even when cond is true** (a bound text `'t'`
+  ≠ the literal `'t'::bool`). Use a raw JS boolean `${cond}`. This silently no-op'd every conditional-field
+  UPDATE in the affected tools (item + topic edits). Swept clean.
+
+### Manager/anti-lie protocol
+Dispatched verifier agents contradicted each other on identical code; the main loop reproduced in the sandbox
+to settle it. Standard: a finding is trusted only after (a) an adversarial verifier that reproduces AND
+(b) a sandbox reproduction. Encoded in the bug-hunt workflow + `docs/ALPHA_TODO_BACKLOG.md` Tier 3.5.
