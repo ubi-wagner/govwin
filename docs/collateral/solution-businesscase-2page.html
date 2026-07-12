@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFP Pipeline — Capture Brief</title>
+<style>
+  :root{
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+
+    --plane:#e9edf2;
+    --paper:#ffffff;
+    --ink:#0e1f33;
+    --ink-2:#41506a;
+    --muted:#8593a3;
+    --hair:#e5eaf1;
+    --hair-2:#d5dde7;
+    --navy:#12233b;
+    --accent:#2f6fd0;
+    --accent-ink:#1f5299;
+    --accent-wash:#eef4fc;
+    --value:#0f7a5f;
+    --value-ink:#0c6650;
+    --value-wash:#eaf5f0;
+
+    --surface-chart:#ffffff;
+    --c-consultant:#e05f2e;
+    --c-consultant-wash:#f7e4da;
+    --c-platform:#2a78d6;
+    --c-contrib:#2a78d6;
+    --c-total:#12876a;
+    --grid:#e7ebf1;
+    --axis:#c3ccd8;
+    --chart-ink:#41506a;
+    --chart-muted:#8593a3;
+
+    --shadow: 0 1px 2px rgba(14,31,51,.06), 0 12px 34px rgba(14,31,51,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --plane:#0a0c0f;
+      --paper:#15181d;
+      --ink:#eef2f7;
+      --ink-2:#b3bfcd;
+      --muted:#7f8b99;
+      --hair:#252b33;
+      --hair-2:#2f3640;
+      --navy:#0a1420;
+      --accent:#5a97ee;
+      --accent-ink:#7fb2f4;
+      --accent-wash:#131f30;
+      --value:#39c79c;
+      --value-ink:#4fd3ab;
+      --value-wash:#10241d;
+
+      --surface-chart:#15181d;
+      --c-consultant:#df6a3c;
+      --c-consultant-wash:#3a241a;
+      --c-platform:#3987e5;
+      --c-contrib:#3987e5;
+      --c-total:#1baf7a;
+      --grid:#242a32;
+      --axis:#39414b;
+      --chart-ink:#b3bfcd;
+      --chart-muted:#7f8b99;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+      --plane:#0a0c0f; --paper:#15181d; --ink:#eef2f7; --ink-2:#b3bfcd; --muted:#7f8b99;
+      --hair:#252b33; --hair-2:#2f3640; --navy:#0a1420; --accent:#5a97ee; --accent-ink:#7fb2f4;
+      --accent-wash:#131f30; --value:#39c79c; --value-ink:#4fd3ab; --value-wash:#10241d;
+      --surface-chart:#15181d; --c-consultant:#df6a3c; --c-consultant-wash:#3a241a; --c-platform:#3987e5;
+      --c-contrib:#3987e5; --c-total:#1baf7a; --grid:#242a32; --axis:#39414b; --chart-ink:#b3bfcd; --chart-muted:#7f8b99;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.55);
+  }
+  :root[data-theme="light"]{
+      --plane:#e9edf2; --paper:#ffffff; --ink:#0e1f33; --ink-2:#41506a; --muted:#8593a3;
+      --hair:#e5eaf1; --hair-2:#d5dde7; --navy:#12233b; --accent:#2f6fd0; --accent-ink:#1f5299;
+      --accent-wash:#eef4fc; --value:#0f7a5f; --value-ink:#0c6650; --value-wash:#eaf5f0;
+      --surface-chart:#ffffff; --c-consultant:#e05f2e; --c-consultant-wash:#f7e4da; --c-platform:#2a78d6;
+      --c-contrib:#2a78d6; --c-total:#12876a; --grid:#e7ebf1; --axis:#c3ccd8; --chart-ink:#41506a; --chart-muted:#8593a3;
+      --shadow: 0 1px 2px rgba(14,31,51,.06), 0 12px 34px rgba(14,31,51,.10);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:var(--sans);
+    background:var(--plane);
+    color:var(--ink);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:26px 18px 44px;
+  }
+  .doc{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+
+  .sheet{
+    background:var(--paper);
+    border:1px solid var(--hair);
+    border-radius:3px;
+    box-shadow:var(--shadow);
+    padding:42px 46px 30px;
+    position:relative;
+    overflow:hidden;
+  }
+  .sheet::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;
+    background:linear-gradient(90deg,var(--accent) 0%,var(--accent) 55%,var(--value) 100%);}
+
+  /* ---- masthead ---- */
+  .mast{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;
+    padding-bottom:16px;border-bottom:1px solid var(--hair);}
+  .brandwrap{max-width:70%}
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--value);display:inline-block}
+  .wordmark{font-size:31px;font-weight:800;letter-spacing:-.022em;line-height:1;color:var(--ink);
+    text-wrap:balance;margin:0}
+  .tagline{font-size:13px;color:var(--ink-2);margin-top:9px;max-width:46ch}
+  .tagline b{color:var(--ink);font-weight:600}
+  .ctrl{font-family:var(--mono);font-size:9.5px;line-height:1.75;color:var(--muted);text-align:right;
+    white-space:nowrap;padding-top:3px}
+  .ctrl .k{color:var(--accent-ink)}
+  .ctrl .v{color:var(--ink-2)}
+
+  .lead{font-size:12px;color:var(--ink-2);margin:15px 0 4px;max-width:70ch}
+  .lead b{color:var(--ink);font-weight:600}
+
+  /* ---- section kicker ---- */
+  .sec{margin-top:20px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}
+  .sec-head h2{font-size:15px;font-weight:700;letter-spacing:-.01em;margin:0;color:var(--ink)}
+  .sec-head .idx{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--muted);
+    text-transform:uppercase;font-weight:600}
+  .sec-sub{font-size:11px;color:var(--muted);margin:0 0 12px}
+
+  /* ---- value spine steps ---- */
+  .spine-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:10px;
+    border-top:1px solid var(--hair)}
+  .step{padding:11px 12px 4px;border-right:1px solid var(--hair)}
+  .step:last-child{border-right:none}
+  .step .n{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.05em}
+  .step h3{font-size:11.5px;font-weight:700;margin:3px 0 4px;color:var(--ink);letter-spacing:-.005em}
+  .step p{font-size:10px;line-height:1.45;color:var(--ink-2);margin:0}
+
+  /* ---- differentiators ---- */
+  .moat{margin-top:8px}
+  .moat-icons svg{width:100%;height:auto;display:block}
+  .moat-text{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:1px}
+  .moat-text .d{text-align:center;padding:0 6px}
+  .moat-text .d h3{font-size:11.5px;font-weight:700;margin:0 0 3px;color:var(--ink)}
+  .moat-text .d p{font-size:10px;line-height:1.45;color:var(--ink-2);margin:0}
+
+  /* ---- figures / svg ---- */
+  figure{margin:0}
+  .fullfig{margin:6px 0 4px}
+  .fullfig svg{width:100%;height:auto;display:block}
+
+  /* ---- value-prop table ---- */
+  table{width:100%;border-collapse:collapse;font-size:10.5px}
+  .vtable{margin-top:8px;table-layout:fixed}
+  .vtable col.lens{width:20%}
+  .vtable th{font-family:var(--mono);font-size:9px;letter-spacing:.11em;text-transform:uppercase;
+    text-align:left;color:var(--muted);font-weight:600;padding:0 10px 7px;border-bottom:1.5px solid var(--hair-2);
+    vertical-align:bottom}
+  .vtable th.sb{color:var(--accent-ink)}
+  .vtable th.ed{color:var(--value-ink)}
+  .vtable td{padding:8px 10px;border-bottom:1px solid var(--hair);vertical-align:top;color:var(--ink-2);
+    line-height:1.4}
+  .vtable td.lens{font-weight:700;color:var(--ink);font-size:10.5px}
+  .vtable tr:last-child td{border-bottom:none}
+
+  /* ---- financials ---- */
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:10px}
+  .chartcard{border:1px solid var(--hair);border-radius:4px;padding:12px 12px 8px;background:var(--paper)}
+  .chartcard .ct{font-size:11px;font-weight:700;color:var(--ink);margin:0 0 1px}
+  .chartcard .cs{font-size:9.5px;color:var(--muted);margin:0 0 4px}
+  .chartcard svg{width:100%;height:auto;display:block}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:5px;font-size:9px;color:var(--ink-2);
+    font-family:var(--mono);letter-spacing:.03em}
+  .legend i{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+  .fin{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:16px}
+  .ftable .cap{font-size:10.5px;font-weight:700;color:var(--ink);margin:0 0 5px;display:flex;
+    align-items:center;gap:7px}
+  .ftable .cap .tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);border:1px solid var(--hair-2);border-radius:3px;padding:1px 5px;font-weight:600}
+  .mtable td,.mtable th{font-size:10px;padding:5px 8px}
+  .mtable th{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);text-align:left;border-bottom:1.5px solid var(--hair-2);font-weight:600}
+  .mtable td{border-bottom:1px solid var(--hair);color:var(--ink-2);vertical-align:top}
+  .mtable td.lbl{color:var(--ink);font-weight:600}
+  .mtable td.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);
+    white-space:nowrap}
+  .mtable tr.sum td{border-top:1.5px solid var(--hair-2);border-bottom:none;font-weight:700;color:var(--ink)}
+  .mtable tr.sum td.num{color:var(--value-ink)}
+  .mtable .cut{color:var(--c-consultant)}
+  .mtable caption{caption-side:bottom;text-align:left;font-size:8.5px;color:var(--muted);
+    padding-top:5px;font-style:italic}
+
+  /* ---- scenario callout ---- */
+  .scenario{margin-top:15px;border:1px solid var(--hair);border-left:3px solid var(--accent);
+    border-radius:4px;background:var(--accent-wash);padding:11px 14px}
+  .scenario .lab{font-family:var(--mono);font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--accent-ink);font-weight:600;margin-bottom:4px}
+  .scenario p{font-size:10.5px;color:var(--ink-2);margin:0;line-height:1.5}
+  .scenario b{color:var(--ink);font-weight:600}
+  .scenario .big{font-family:var(--mono);color:var(--value-ink);font-weight:700}
+
+  /* ---- disclaimer band ---- */
+  .disc{margin-top:15px;border-top:1px solid var(--hair);padding-top:9px;
+    font-size:9px;color:var(--muted);line-height:1.55;font-family:var(--mono);letter-spacing:.01em}
+  .disc b{color:var(--ink-2);font-weight:600}
+
+  .foot{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:14px;
+    padding-top:10px;border-top:1px solid var(--hair);font-family:var(--mono);font-size:9px;
+    color:var(--muted);letter-spacing:.03em}
+  .foot .pg{color:var(--ink-2)}
+
+  /* ---- shared svg text ---- */
+  svg text{font-family:var(--sans)}
+  .lbl-mono{font-family:var(--mono)}
+
+  @media (max-width:680px){
+    .sheet{padding:30px 22px 24px}
+    .spine-steps{grid-template-columns:1fr 1fr;border-top:none}
+    .step{border:1px solid var(--hair);margin-top:-1px;margin-right:-1px}
+    .moat-text{grid-template-columns:1fr 1fr;gap:12px 16px}
+    .charts,.fin{grid-template-columns:1fr}
+    .mast{flex-direction:column}
+    .ctrl{text-align:left}
+    .brandwrap{max-width:100%}
+  }
+
+  @media print{
+    body{background:#fff;padding:0}
+    .doc{gap:0;max-width:none}
+    .sheet{box-shadow:none;border:none;border-radius:0;padding:0.55in 0.6in}
+    .sheet + .sheet{break-before:page}
+    .sheet::before{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ============================ PAGE 1 ============================ -->
+  <section class="sheet" aria-label="Page 1 — Solution overview">
+    <header class="mast">
+      <div class="brandwrap">
+        <div class="eyebrow"><span class="dot"></span>Capture Brief · Non-Dilutive Federal Funding</div>
+        <h1 class="wordmark">RFP&nbsp;Pipeline</h1>
+        <p class="tagline">Discover, rank, and build winning proposals for
+          <b>SBIR · STTR · OTA · CSO · BAA</b> — the expert-curated proposal engine, not another search box.</p>
+      </div>
+      <div class="ctrl">
+        <div><span class="k">SURFACE</span>&nbsp; <span class="v">Opportunity-card spine</span></div>
+        <div><span class="k">SERVES</span>&nbsp;&nbsp;&nbsp; <span class="v">Gov-contracting SMBs</span></div>
+        <div><span class="k">&nbsp;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="v">+ EconDev sponsors</span></div>
+        <div><span class="k">MODEL</span>&nbsp;&nbsp;&nbsp;&nbsp; <span class="v">Founding cohort</span></div>
+      </div>
+    </header>
+
+    <p class="lead">RFP Pipeline is a multi-tenant platform for the small businesses chasing federal
+      non-dilutive funding — and the economic-development organizations that back them. Expert curators turn
+      raw solicitations into a <b>ranked, personalized feed</b>, pre-build the <b>compliant skeleton</b> for
+      every opportunity, and let AI draft each section into that skeleton from your own reusable content. You
+      review, collaborate, lock sections, and <b>download a submission-ready Word volume</b> — never starting
+      from a blank page.</p>
+
+    <div class="sec">
+      <div class="sec-head"><span class="idx">01 — Spine</span><h2>The value spine</h2></div>
+      <p class="sec-sub">One path from the federal opportunity river to a submitted proposal.</p>
+
+      <figure class="fullfig" aria-label="Five-stage value spine: Curate, Rank, Build library, Skeleton, Draft and submit">
+        <!-- SVG 1: VALUE SPINE -->
+        <svg viewBox="0 0 1040 196" role="img" aria-label="Value spine diagram">
+          <defs>
+            <linearGradient id="spinegrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" style="stop-color:var(--accent)" />
+              <stop offset="1" style="stop-color:var(--value)" />
+            </linearGradient>
+          </defs>
+          <text x="14" y="24" class="lbl-mono" font-size="11" letter-spacing="1.4" style="fill:var(--muted)">OPPORTUNITY&#160;RIVER</text>
+          <text x="1026" y="24" text-anchor="end" class="lbl-mono" font-size="11" letter-spacing="1.4" style="fill:var(--value)">SUBMISSION-READY</text>
+
+          <!-- spine line -->
+          <line x1="120" y1="86" x2="920" y2="86" stroke="url(#spinegrad)" stroke-width="3" stroke-linecap="round"/>
+          <!-- chevrons -->
+          <g stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--hair-2)">
+            <path d="M 218 80 l 6 6 l -6 6"/>
+            <path d="M 418 80 l 6 6 l -6 6"/>
+            <path d="M 618 80 l 6 6 l -6 6"/>
+            <path d="M 818 80 l 6 6 l -6 6"/>
+          </g>
+
+          <!-- stations -->
+          <g>
+            <!-- station template repeated with cx = 120,320,520,720,920 -->
+            <g>
+              <rect x="93" y="59" width="54" height="54" rx="14" stroke-width="2.5" style="fill:var(--paper);stroke:var(--accent)" />
+              <text x="120" y="94" text-anchor="middle" class="lbl-mono" font-size="22" font-weight="700" style="fill:var(--accent-ink)">1</text>
+              <text x="120" y="140" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">Curate</text>
+              <text x="120" y="158" text-anchor="middle" class="lbl-mono" font-size="9.5" style="fill:var(--muted)">ingest solicitations</text>
+            </g>
+            <g>
+              <rect x="293" y="59" width="54" height="54" rx="14" stroke-width="2.5" style="fill:var(--paper);stroke:var(--accent)" />
+              <text x="320" y="94" text-anchor="middle" class="lbl-mono" font-size="22" font-weight="700" style="fill:var(--accent-ink)">2</text>
+              <text x="320" y="140" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">Rank</text>
+              <text x="320" y="158" text-anchor="middle" class="lbl-mono" font-size="9.5" style="fill:var(--muted)">score into buckets</text>
+            </g>
+            <g>
+              <rect x="493" y="59" width="54" height="54" rx="14" stroke-width="2.5" style="fill:var(--paper);stroke:var(--accent)" />
+              <text x="520" y="94" text-anchor="middle" class="lbl-mono" font-size="22" font-weight="700" style="fill:var(--accent-ink)">3</text>
+              <text x="520" y="140" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">Build library</text>
+              <text x="520" y="158" text-anchor="middle" class="lbl-mono" font-size="9.5" style="fill:var(--muted)">upload &#8594; atomize</text>
+            </g>
+            <g>
+              <rect x="693" y="59" width="54" height="54" rx="14" stroke-width="2.5" style="fill:var(--paper);stroke:var(--accent)" />
+              <text x="720" y="94" text-anchor="middle" class="lbl-mono" font-size="22" font-weight="700" style="fill:var(--accent-ink)">4</text>
+              <text x="720" y="140" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">Skeleton</text>
+              <text x="720" y="158" text-anchor="middle" class="lbl-mono" font-size="9.5" style="fill:var(--muted)">matrix + molds</text>
+            </g>
+            <g>
+              <rect x="893" y="59" width="54" height="54" rx="14" stroke-width="2.5" style="fill:var(--value-wash);stroke:var(--value)" />
+              <text x="920" y="94" text-anchor="middle" class="lbl-mono" font-size="22" font-weight="700" style="fill:var(--value-ink)">5</text>
+              <text x="920" y="140" text-anchor="middle" font-size="13" font-weight="700" style="fill:var(--ink)">Draft &amp; submit</text>
+              <text x="920" y="158" text-anchor="middle" class="lbl-mono" font-size="9.5" style="fill:var(--muted)">AI draft &#8594; lock</text>
+            </g>
+          </g>
+        </svg>
+      </figure>
+
+      <div class="spine-steps">
+        <div class="step"><div class="n">01</div><h3>Curate</h3><p>Expert RFP admins ingest federal solicitations into one global opportunity river.</p></div>
+        <div class="step"><div class="n">02</div><h3>Rank</h3><p>A personalized, scored feed through up to five Spotlight buckets — one card per opportunity.</p></div>
+        <div class="step"><div class="n">03</div><h3>Build library</h3><p>Company docs are atomized into tagged, reusable content atoms. The library learns from every win.</p></div>
+        <div class="step"><div class="n">04</div><h3>Skeleton</h3><p>Curators ship a compliance matrix, a section outline, and canvas "mold" templates per document.</p></div>
+        <div class="step"><div class="n">05</div><h3>Draft &amp; submit</h3><p>AI drafts into the mold; review, collaborate, lock, and download a submission-ready Word volume.</p></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="idx">02 — Moat</span><h2>Why it wins</h2></div>
+      <p class="sec-sub">Four things a generic opportunity search will never do.</p>
+      <div class="moat">
+        <div class="moat-icons" aria-hidden="true">
+          <svg viewBox="0 0 1040 76" role="img" aria-label="Differentiator icons: curated skeletons, a learning library, baked-in compliance, built for sponsors">
+            <!-- 1 · curated skeleton -->
+            <g transform="translate(130,38) scale(1.3)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--accent)">
+              <rect x="-11" y="-15" width="22" height="30" rx="3"/>
+              <line x1="-5" y1="-15" x2="-5" y2="15" style="stroke:var(--hair-2)"/>
+              <line x1="-5" y1="-7" x2="7" y2="-7"/>
+              <line x1="-5" y1="0" x2="7" y2="0"/>
+              <line x1="-5" y1="7" x2="3" y2="7"/>
+            </g>
+            <!-- 2 · learning library -->
+            <g transform="translate(390,34) scale(1.3)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--accent)">
+              <rect x="-13" y="0" width="7" height="15" rx="1.5"/>
+              <rect x="-4" y="-3" width="7" height="18" rx="1.5"/>
+              <rect x="5" y="2" width="7" height="13" rx="1.5"/>
+              <path d="M -9 -9 A 11 11 0 1 1 -12 -3" style="stroke:var(--value)"/>
+              <path d="M -12 -3 l -2.5 -4 M -12 -3 l 4 -1.5" style="stroke:var(--value)"/>
+            </g>
+            <!-- 3 · compliance matrix -->
+            <g transform="translate(650,38) scale(1.3)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--accent)">
+              <rect x="-14" y="-14" width="28" height="28" rx="3"/>
+              <line x1="-14" y1="-4.5" x2="14" y2="-4.5" style="stroke:var(--hair-2)"/>
+              <line x1="-14" y1="4.5" x2="14" y2="4.5" style="stroke:var(--hair-2)"/>
+              <line x1="-4.5" y1="-14" x2="-4.5" y2="14" style="stroke:var(--hair-2)"/>
+              <line x1="4.5" y1="-14" x2="4.5" y2="14" style="stroke:var(--hair-2)"/>
+              <path d="M -9 0.5 l 5 5 l 11 -12" stroke-width="2.6" style="stroke:var(--value)"/>
+            </g>
+            <!-- 4 · built for sponsors -->
+            <g transform="translate(910,36) scale(1.3)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--accent)">
+              <line x1="0" y1="0" x2="-13" y2="-10"/>
+              <line x1="0" y1="0" x2="13" y2="-10"/>
+              <line x1="0" y1="0" x2="0" y2="14"/>
+              <circle cx="0" cy="-2" r="6"/>
+              <circle cx="-13" cy="-11" r="3.6" style="stroke:var(--value)"/>
+              <circle cx="13" cy="-11" r="3.6" style="stroke:var(--value)"/>
+              <circle cx="0" cy="15" r="3.6" style="stroke:var(--value)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="moat-text">
+          <div class="d">
+            <h3>Curated skeletons</h3>
+            <p>A curator's compliance matrix and molds per document — not a DIY search box.</p>
+          </div>
+          <div class="d">
+            <h3>A library that learns</h3>
+            <p>Content atoms compound; every win makes the next proposal faster to build.</p>
+          </div>
+          <div class="d">
+            <h3>Compliance baked in</h3>
+            <p>A matrix tracks Section L/M completeness section by section — not bolted on at the end.</p>
+          </div>
+          <div class="d">
+            <h3>Built for sponsors</h3>
+            <p>Stage-scoped roles let an EconDev org shadow-support a whole portfolio of firms.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>RFP Pipeline — Capture Brief</span>
+      <span class="pg">Solution overview · Page 1 / 2</span>
+    </div>
+  </section>
+
+  <!-- ============================ PAGE 2 ============================ -->
+  <section class="sheet" aria-label="Page 2 — Value propositions and financial justification">
+    <header class="mast">
+      <div class="brandwrap">
+        <div class="eyebrow"><span class="dot"></span>Value &amp; Financial Justification</div>
+        <h1 class="wordmark" style="font-size:24px">What it's worth — to both sides of the table</h1>
+        <p class="tagline">The value each audience receives, and an <b>illustrative model</b> for the economics
+          of building proposals on RFP Pipeline versus a traditional consultant.</p>
+      </div>
+      <div class="ctrl">
+        <div><span class="k">ANCHOR</span>&nbsp; <span class="v">SBIR Phase I</span></div>
+        <div><span class="k">&nbsp;</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="v">~$150K–$300K</span></div>
+        <div><span class="k">BASIS</span>&nbsp;&nbsp;&nbsp; <span class="v">4 submissions/yr</span></div>
+        <div><span class="k">STATUS</span>&nbsp; <span class="v" style="color:var(--c-consultant)">Illustrative</span></div>
+      </div>
+    </header>
+
+    <div class="sec">
+      <div class="sec-head"><span class="idx">03 — Value</span><h2>Value propositions</h2></div>
+      <p class="sec-sub">One platform, two beneficiaries — the small business that builds, and the sponsor that backs it.</p>
+      <table class="vtable">
+        <colgroup><col class="lens"><col><col></colgroup>
+        <thead><tr>
+          <th>Lens</th>
+          <th class="sb">For the small business</th>
+          <th class="ed">For the EconDev sponsor</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="lens">Discovery &amp; ranking</td>
+            <td>Stop drowning in the river — a scored feed surfaces only the opportunities that fit your buckets.</td>
+            <td>See at a glance which regional firms match which pools of federal money.</td></tr>
+          <tr><td class="lens">Content library</td>
+            <td>Upload once, reuse everywhere; winning drafted content returns to the library.</td>
+            <td>Portfolio-wide capability that compounds across every client you support.</td></tr>
+          <tr><td class="lens">Skeleton &amp; compliance</td>
+            <td>Never a blank page; a live matrix guards Section L/M completeness.</td>
+            <td>Fewer disqualified submissions — clients actually finish and submit.</td></tr>
+          <tr><td class="lens">Drafting &amp; output</td>
+            <td>AI drafts into the compliant mold; download a submission-ready Word volume.</td>
+            <td>Expert-grade output without hiring a proposal expert for every client.</td></tr>
+          <tr><td class="lens">Roles &amp; collaboration</td>
+            <td>Invite teammates and partners with stage-scoped view / comment / edit access.</td>
+            <td>Shadow-support the whole portfolio from a single seat.</td></tr>
+          <tr><td class="lens">Economics</td>
+            <td>Subscription + per-proposal instead of a $10–25k consultant <em>(illustrative)</em>.</td>
+            <td>Steward scarce non-dilutive capital into your region, at scale.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="idx">04 — ROI</span><h2>Illustrative unit economics</h2></div>
+      <p class="sec-sub">Public anchor: SBIR Phase I awards are typically ~$150K–$300K non-dilutive. Everything below is an
+        illustrative model for a firm pursuing four Phase I submissions a year — not a quote, not a guarantee.</p>
+
+      <div class="charts">
+        <div class="chartcard">
+          <p class="ct">Cost to reach one submission</p>
+          <p class="cs">Fully-loaded, per proposal — lower is better</p>
+          <!-- SVG 2: COST COMPARISON -->
+          <svg viewBox="0 0 500 300" role="img" aria-label="Cost comparison: a proposal consultant runs $10k to $25k, about $17,500 on average, versus about $3,400 with RFP Pipeline">
+            <g class="lbl-mono" font-size="10" text-anchor="end" font-variant-numeric="tabular-nums" style="fill:var(--chart-muted)">
+              <text x="60" y="252">$0</text>
+              <text x="60" y="176">$10k</text>
+              <text x="60" y="100">$20k</text>
+              <text x="60" y="24">$30k</text>
+            </g>
+            <g stroke-width="1" style="stroke:var(--grid)">
+              <line x1="70" y1="248" x2="486" y2="248"/>
+              <line x1="70" y1="172" x2="486" y2="172"/>
+              <line x1="70" y1="96" x2="486" y2="96"/>
+              <line x1="70" y1="20" x2="486" y2="20"/>
+            </g>
+            <line x1="70" y1="248" x2="486" y2="248" stroke-width="1.5" style="stroke:var(--axis)" />
+
+            <!-- consultant range band: $10k (y172) to $25k (y58) -->
+            <rect x="134" y="58" width="72" height="114" rx="4" style="fill:var(--c-consultant)" />
+            <text x="170" y="112" text-anchor="middle" class="lbl-mono" font-size="9" fill="#ffffff" opacity="0.9">avg</text>
+            <text x="170" y="128" text-anchor="middle" class="lbl-mono" font-size="13" font-weight="700" fill="#ffffff" font-variant-numeric="tabular-nums">$17,500</text>
+
+            <!-- platform bar to $3,400 (top y222) -->
+            <path d="M 304 226 q 0 -4 4 -4 l 64 0 q 4 0 4 4 l 0 22 l -72 0 Z" style="fill:var(--c-platform)" />
+            <text x="340" y="212" text-anchor="middle" class="lbl-mono" font-size="13" font-weight="700" font-variant-numeric="tabular-nums" style="fill:var(--chart-ink)">$3,400</text>
+
+            <!-- category labels -->
+            <text x="170" y="270" text-anchor="middle" font-size="10.5" font-weight="600" style="fill:var(--chart-ink)">Proposal consultant</text>
+            <text x="170" y="285" text-anchor="middle" class="lbl-mono" font-size="8.5" style="fill:var(--chart-muted)">$10k&#8211;$25k engagement</text>
+            <text x="340" y="270" text-anchor="middle" font-size="10.5" font-weight="600" style="fill:var(--chart-ink)">RFP Pipeline</text>
+            <text x="340" y="285" text-anchor="middle" class="lbl-mono" font-size="8.5" style="fill:var(--chart-muted)">build + sub. share</text>
+          </svg>
+          <div class="legend">
+            <span><i style="background:var(--c-consultant)"></i>Consultant</span>
+            <span><i style="background:var(--c-platform)"></i>RFP Pipeline</span>
+            <span style="color:var(--muted)">≈ 5× lower to submit</span>
+          </div>
+        </div>
+
+        <div class="chartcard">
+          <p class="ct">Illustrative annual value</p>
+          <p class="cs">One firm, four Phase I submissions a year</p>
+          <!-- SVG 3: ROI WATERFALL -->
+          <svg viewBox="0 0 500 300" role="img" aria-label="Value waterfall: cost savings of about $56.4k plus expected-value lift of about $30k build to a total illustrative annual value of about $86.4k">
+            <g class="lbl-mono" font-size="10" text-anchor="end" font-variant-numeric="tabular-nums" style="fill:var(--chart-muted)">
+              <text x="62" y="252">$0</text>
+              <text x="62" y="195">$25k</text>
+              <text x="62" y="138">$50k</text>
+              <text x="62" y="81">$75k</text>
+              <text x="62" y="24">$100k</text>
+            </g>
+            <g stroke-width="1" style="stroke:var(--grid)">
+              <line x1="72" y1="248" x2="486" y2="248"/>
+              <line x1="72" y1="191" x2="486" y2="191"/>
+              <line x1="72" y1="134" x2="486" y2="134"/>
+              <line x1="72" y1="77" x2="486" y2="77"/>
+              <line x1="72" y1="20" x2="486" y2="20"/>
+            </g>
+            <line x1="72" y1="248" x2="486" y2="248" stroke-width="1.5" style="stroke:var(--axis)" />
+
+            <!-- connectors -->
+            <g stroke-width="1.2" style="stroke:var(--axis)">
+              <line x1="173" y1="119" x2="240" y2="119"/>
+              <line x1="302" y1="51" x2="369" y2="51"/>
+            </g>
+
+            <!-- col1 cost savings 0..56.4k  (baseline 248 -> top 119) -->
+            <path d="M 111 123 q 0 -4 4 -4 l 54 0 q 4 0 4 4 l 0 125 l -62 0 Z" style="fill:var(--c-contrib)" />
+            <text x="142" y="110" text-anchor="middle" class="lbl-mono" font-size="11.5" font-weight="700" font-variant-numeric="tabular-nums" style="fill:var(--chart-ink)">+$56.4k</text>
+
+            <!-- col2 EV lift 56.4k..86.4k  (float 119 -> 51) -->
+            <rect x="240" y="51" width="62" height="68" rx="4" style="fill:var(--c-contrib)" />
+            <text x="271" y="42" text-anchor="middle" class="lbl-mono" font-size="11.5" font-weight="700" font-variant-numeric="tabular-nums" style="fill:var(--chart-ink)">+$30.0k</text>
+
+            <!-- col3 total 0..86.4k  (baseline 248 -> top 51) -->
+            <path d="M 369 55 q 0 -4 4 -4 l 54 0 q 4 0 4 4 l 0 193 l -62 0 Z" style="fill:var(--c-total)" />
+            <text x="400" y="42" text-anchor="middle" class="lbl-mono" font-size="11.5" font-weight="700" font-variant-numeric="tabular-nums" style="fill:var(--value-ink)">$86.4k</text>
+
+            <!-- x labels -->
+            <text x="142" y="268" text-anchor="middle" font-size="10" font-weight="600" style="fill:var(--chart-ink)">Cost saved</text>
+            <text x="142" y="283" text-anchor="middle" class="lbl-mono" font-size="8.5" style="fill:var(--chart-muted)">vs. consultant</text>
+            <text x="271" y="268" text-anchor="middle" font-size="10" font-weight="600" style="fill:var(--chart-ink)">Value lift</text>
+            <text x="271" y="283" text-anchor="middle" class="lbl-mono" font-size="8.5" style="fill:var(--chart-muted)">award × win %</text>
+            <text x="400" y="268" text-anchor="middle" font-size="10" font-weight="600" style="fill:var(--chart-ink)">Total value</text>
+            <text x="400" y="283" text-anchor="middle" class="lbl-mono" font-size="8.5" style="fill:var(--chart-muted)">illustrative</text>
+          </svg>
+          <div class="legend">
+            <span><i style="background:var(--c-contrib)"></i>Contribution</span>
+            <span><i style="background:var(--c-total)"></i>Total value</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fin">
+        <div class="ftable">
+          <p class="cap">Cost to reach a submission <span class="tag">per proposal</span></p>
+          <table class="mtable">
+            <thead><tr><th>Line item</th><th style="text-align:right">Consultant</th><th style="text-align:right">RFP Pipeline</th></tr></thead>
+            <tbody>
+              <tr><td class="lbl">Build fee</td><td class="num">$10k–$25k</td><td class="num">$2,500 *</td></tr>
+              <tr><td class="lbl">Subscription share</td><td class="num">—</td><td class="num">$897</td></tr>
+              <tr><td class="lbl">Blank-page rework</td><td class="cut">High</td><td style="color:var(--value-ink)">Low</td></tr>
+              <tr class="sum"><td class="lbl">Fully-loaded</td><td class="num">≈ $17,500</td><td class="num">≈ $3,400</td></tr>
+            </tbody>
+            <caption>* Illustrative per-proposal build fee. Subscription share = ¼ of $3,588/yr.</caption>
+          </table>
+        </div>
+        <div class="ftable">
+          <p class="cap">Annual model <span class="tag">4 submissions/yr</span></p>
+          <table class="mtable">
+            <thead><tr><th>Driver</th><th style="text-align:right">Assumption</th><th style="text-align:right">Annual</th></tr></thead>
+            <tbody>
+              <tr><td class="lbl">Consultant path</td><td class="num">4 × $17,500</td><td class="num cut">($70,000)</td></tr>
+              <tr><td class="lbl">RFP Pipeline path</td><td class="num">$3,588 + 4×$2,500</td><td class="num">($13,588)</td></tr>
+              <tr><td class="lbl">Cost saved</td><td class="num">difference</td><td class="num">$56,412</td></tr>
+              <tr><td class="lbl">Value lift</td><td class="num">4 × $150k × +5pts</td><td class="num">$30,000</td></tr>
+              <tr class="sum"><td class="lbl">Total value</td><td class="num">illustrative</td><td class="num">$86,412</td></tr>
+            </tbody>
+            <caption>Value lift = award × improvement in win probability, if win rate rises by even 5 points.</caption>
+          </table>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="lab">Illustrative scenario — Immobileyes (hypothetical, CV property intelligence)</div>
+        <p>A firm like <b>Immobileyes</b> runs a Spotlight bucket for DoD sensing topics, drafts four Phase I
+          proposals a year from its learning library, and reaches submission for <b>≈ $3,400 each</b> instead of a
+          $10–25k consultant. On this model, a single additional <b>$150K</b> Phase I award — from more
+          competitive, compliant, on-time submissions — returns <span class="big">≈ 11×</span> the entire
+          $13,588 annual platform + build spend. <b>Illustrative model — not a guarantee.</b></p>
+      </div>
+
+      <div class="disc">
+        <b>Basis &amp; disclaimers.</b> SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar
+        amounts — consultant costs, the $2,500 build fee, the 4-submission cadence, and the +5-point win-rate lift —
+        are an <b>illustrative model, not a quote and not a guarantee</b>; actual results vary by firm, agency, and
+        solicitation. Founding-cohort pricing: <b>~$299/mo Spotlight subscription + per-proposal build fees</b>.
+        Immobileyes is used only as a hypothetical example.
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>RFP Pipeline — Capture Brief</span>
+      <span class="pg">Value &amp; financials · Page 2 / 2</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

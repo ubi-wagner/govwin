@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFP Pipeline — Founder's Overview</title>
+<style>
+  :root{
+    color-scheme: light dark;
+    --paper:#efe9df; --sheet:#fdfbf7; --panel:#f5f0e8; --panel-2:#f0e9dc;
+    --ink:#1a1816; --ink-soft:#45403a; --muted:#7a6d5e; --faint:#968775;
+    --rule:#e2dbcf; --rule-strong:#d4cdc3;
+    --coral:#e85d4a; --coral-deep:#c93c2b; --coral-tint:#fbe2dc;
+    --gold:#c69327; --gold-deep:#8a6520; --gold-tint:#f7eccb;
+    --green:#2d8b4e; --green-deep:#1c5a34; --green-tint:#d5eddc;
+    --shadow: 0 1px 2px rgba(26,24,22,.06), 0 24px 60px -28px rgba(26,24,22,.35);
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: "SF Mono", ui-monospace, "Menlo", "Consolas", monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0d0c0b; --sheet:#1a1816; --panel:#211e1b; --panel-2:#262320;
+      --ink:#f5f0e8; --ink-soft:#e2d8c8; --muted:#b0a494; --faint:#8d8271;
+      --rule:#332f2a; --rule-strong:#413b34;
+      --coral:#f47a64; --coral-deep:#f9a393; --coral-tint:#3a201b;
+      --gold:#e5ad3a; --gold-deep:#ecc463; --gold-tint:#332a15;
+      --green:#4faa72; --green-deep:#7cc497; --green-tint:#16331f;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 30px 70px -30px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="light"]{
+    color-scheme: light;
+    --paper:#efe9df; --sheet:#fdfbf7; --panel:#f5f0e8; --panel-2:#f0e9dc;
+    --ink:#1a1816; --ink-soft:#45403a; --muted:#7a6d5e; --faint:#968775;
+    --rule:#e2dbcf; --rule-strong:#d4cdc3;
+    --coral:#e85d4a; --coral-deep:#c93c2b; --coral-tint:#fbe2dc;
+    --gold:#c69327; --gold-deep:#8a6520; --gold-tint:#f7eccb;
+    --green:#2d8b4e; --green-deep:#1c5a34; --green-tint:#d5eddc;
+    --shadow: 0 1px 2px rgba(26,24,22,.06), 0 24px 60px -28px rgba(26,24,22,.35);
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --paper:#0d0c0b; --sheet:#1a1816; --panel:#211e1b; --panel-2:#262320;
+    --ink:#f5f0e8; --ink-soft:#e2d8c8; --muted:#b0a494; --faint:#8d8271;
+    --rule:#332f2a; --rule-strong:#413b34;
+    --coral:#f47a64; --coral-deep:#f9a393; --coral-tint:#3a201b;
+    --gold:#e5ad3a; --gold-deep:#ecc463; --gold-tint:#332a15;
+    --green:#4faa72; --green-deep:#7cc497; --green-tint:#16331f;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 30px 70px -30px rgba(0,0,0,.7);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    font-size:16px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    display:flex; justify-content:center;
+    padding:22px 16px;
+  }
+
+  .sheet{
+    position:relative;
+    width:min(8.5in, 100%);
+    background:var(--sheet);
+    box-shadow:var(--shadow);
+    border:1px solid var(--rule);
+    border-radius:3px;
+    padding:0.4in 0.6in 0.4in 0.7in;
+    overflow:hidden;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .sheet::before{
+    content:""; position:absolute; left:0.34in; top:0.4in; bottom:0.4in; width:3px; border-radius:3px;
+    background:linear-gradient(180deg,var(--coral) 0%, var(--coral) 20%, var(--gold) 55%, var(--green) 100%);
+    opacity:.9;
+  }
+
+  .eyebrow{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--coral-deep); font-weight:600; }
+  h1,h2,h3{ margin:0; text-wrap:balance; }
+  .hero-h{ font-family:var(--font-serif); font-weight:700; color:var(--ink); font-size:23px; line-height:1.05; letter-spacing:-.01em; margin-top:5px; }
+  .hero-h .em{ color:var(--coral); font-style:italic; }
+  .lede{ font-size:10.5px; line-height:1.4; color:var(--ink-soft); max-width:6.3in; margin-top:6px; }
+  .lede b{ color:var(--ink); font-weight:650; }
+
+  .sec-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  .sec-num{ font-family:var(--font-mono); font-size:10px; color:var(--coral); font-weight:600; letter-spacing:.04em; }
+  .sec-title{ font-family:var(--font-serif); font-size:14.5px; font-weight:700; color:var(--ink); letter-spacing:-.005em; }
+  .sec-title .thin{ color:var(--muted); font-weight:400; font-style:italic; }
+  .sec-rule{ flex:1 1 auto; height:1px; background:var(--rule); align-self:center; }
+
+  header.mast{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:8px; border-bottom:1.5px solid var(--ink); }
+  .lockup{ display:flex; align-items:center; gap:11px; }
+  .lockup .mark{ width:38px; height:38px; flex:none; }
+  .word{ display:flex; flex-direction:column; line-height:1; }
+  .word .wm{ font-family:var(--font-sans); font-weight:800; font-size:18px; letter-spacing:-.01em; }
+  .word .wm .p{ color:var(--coral); }
+  .word .tag{ font-family:var(--font-mono); font-size:8.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+  .mast-right{ text-align:right; }
+  .mast-right .k{ font-family:var(--font-mono); font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .mast-right .v{ font-family:var(--font-serif); font-style:italic; font-size:12px; color:var(--ink-soft); margin-top:2px; }
+
+  section{ margin-top:9px; }
+  .hero{ margin-top:9px; }
+
+  .band{ background:linear-gradient(180deg,var(--panel) 0%, var(--panel-2) 100%); border:1px solid var(--rule-strong); border-radius:9px; padding:9px 12px 9px; }
+  .band .money-body{ font-size:10.3px; line-height:1.4; color:var(--ink-soft); max-width:6.6in; }
+  .band .money-body b{ color:var(--ink); font-weight:650; }
+  .tiles{ display:grid; grid-template-columns:1.15fr 1fr 1fr; gap:9px; margin-top:8px; }
+  .tile{ background:var(--sheet); border:1px solid var(--rule-strong); border-radius:7px; padding:6px 9px; }
+  .tile .fig{ font-family:var(--font-mono); font-weight:600; font-size:16px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; color:var(--gold-deep); }
+  .tile.eq .fig{ color:var(--green); }
+  .tile .lab{ font-size:9.6px; font-weight:700; color:var(--ink); margin-top:1px; }
+  .tile .sub{ font-size:9px; color:var(--muted); margin-top:1px; line-height:1.3; }
+  .foot-note{ font-family:var(--font-mono); font-size:8px; color:var(--faint); margin-top:6px; letter-spacing:.01em; }
+
+  .diagram{ width:100%; height:auto; display:block; margin:0 0 6px; }
+  .steps{ display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .step{ border-top:2px solid var(--coral); padding-top:5px; }
+  .step:nth-child(5){ border-top-color:var(--green); }
+  .step .sn{ font-family:var(--font-mono); font-size:9px; color:var(--coral); font-weight:600; letter-spacing:.03em; }
+  .step:nth-child(5) .sn{ color:var(--green); }
+  .step .st{ font-size:10px; font-weight:700; color:var(--ink); margin-top:2px; line-height:1.16; }
+  .step .sd{ font-size:9px; color:var(--muted); margin-top:2px; line-height:1.3; }
+
+  .pillars{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+  .pillar{ background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:8px 10px; }
+  .pill-ico{ width:20px; height:20px; display:block; margin-bottom:5px; }
+  .pillar h3{ font-family:var(--font-sans); font-size:11px; font-weight:750; color:var(--ink); letter-spacing:-.005em; }
+  .pillar p{ margin:3px 0 0; font-size:9.3px; line-height:1.36; color:var(--muted); }
+  .pillar p b{ color:var(--ink-soft); font-weight:650; }
+
+  .close{ margin-top:10px; display:grid; grid-template-columns:118px 1fr; gap:15px; align-items:center;
+    background:var(--panel); border:1px solid var(--rule-strong); border-radius:11px; padding:10px 13px; }
+  .ring-wrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .ring{ width:96px; height:96px; }
+  .ring-cap{ font-family:var(--font-mono); font-size:7.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--green-deep); text-align:center; }
+  .close-main .pr-eye{ font-family:var(--font-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .close-main h2{ font-family:var(--font-serif); font-size:16px; font-weight:700; color:var(--ink); margin-top:3px; line-height:1.12; }
+  .close-main h2 .em{ color:var(--coral); font-style:italic; }
+  .pricing{ font-size:10px; line-height:1.38; color:var(--ink-soft); margin-top:5px; max-width:4.9in; }
+  .pricing b{ color:var(--ink); font-weight:700; }
+  .price-num{ font-family:var(--font-mono); font-weight:600; color:var(--coral-deep); font-variant-numeric:tabular-nums; }
+  .illus{ display:inline-block; font-family:var(--font-mono); font-size:8px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--gold-deep); background:var(--gold-tint); border:1px solid var(--gold); border-radius:20px; padding:1px 7px; margin-left:2px; vertical-align:1px; }
+  .cta-row{ display:flex; align-items:center; gap:13px; margin-top:8px; flex-wrap:wrap; }
+  .cta{ display:inline-flex; align-items:center; gap:8px; text-decoration:none;
+    background:var(--coral); color:#fff8f4; font-weight:750; font-size:11px;
+    padding:7px 13px; border-radius:8px; border:1px solid var(--coral-deep); box-shadow:0 1px 0 var(--coral-deep); }
+  .cta .arr{ transition:transform .18s ease; }
+  .cta-note{ font-size:9.3px; color:var(--muted); max-width:2.9in; line-height:1.36; }
+
+  .colophon{ margin-top:8px; display:flex; justify-content:space-between; gap:12px; align-items:baseline; border-top:1px solid var(--rule); padding-top:5px; }
+  .colophon .c-l{ font-size:8.5px; color:var(--muted); max-width:6.8in; }
+  .colophon .c-r{ font-family:var(--font-mono); font-size:8px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); white-space:nowrap; }
+
+  a.cta:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  @media (prefers-reduced-motion: no-preference){ .cta:hover .arr{ transform:translateX(3px); } }
+
+  .fSheet{fill:var(--sheet);} .fInk{fill:var(--ink);} .fMuted{fill:var(--muted);} .fFaint{fill:var(--faint);}
+  .fCoral{fill:var(--coral);} .fGreen{fill:var(--green);} .fGold{fill:var(--gold);}
+  .sInk{stroke:var(--ink-soft);} .sMuted{stroke:var(--muted);} .sRule{stroke:var(--rule-strong);}
+  .sCoral{stroke:var(--coral);} .sGreen{stroke:var(--green);} .sGold{stroke:var(--gold);}
+  .tInk{fill:var(--ink);} .tMuted{fill:var(--muted);} .tCoral{fill:var(--coral);} .tGreen{fill:var(--green-deep);}
+
+  @media print{
+    body{ padding:0; background:#fff; }
+    .sheet{ box-shadow:none; border:none; border-radius:0; width:100%; min-height:auto; padding:0.4in 0.55in; }
+    @page{ size:letter; margin:0; }
+  }
+  @media (max-width:640px){
+    .sheet{ padding:0.4in 0.4in 0.4in 0.48in; }
+    .hero-h{ font-size:21px; }
+    .tiles{ grid-template-columns:1fr; }
+    .steps{ grid-template-columns:repeat(2,1fr); }
+    .pillars{ grid-template-columns:1fr; }
+    .close{ grid-template-columns:1fr; justify-items:center; text-align:center; }
+    .cta-row{ justify-content:center; }
+  }
+</style>
+</head>
+<body>
+<main class="sheet">
+
+  <!-- ============ MASTHEAD + HERO MARK (SVG 1) ============ -->
+  <header class="mast">
+    <div class="lockup">
+      <svg class="mark" viewBox="0 0 100 100" role="img" aria-label="RFP Pipeline mark: coral flow arrows resolving into an award-green marker">
+        <title>RFP Pipeline</title>
+        <defs>
+          <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#f0674f"/><stop offset="1" stop-color="#c93c2b"/>
+          </linearGradient>
+        </defs>
+        <rect x="5" y="5" width="90" height="90" rx="22" fill="url(#badge)"/>
+        <rect x="5" y="5" width="90" height="90" rx="22" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="1.5"/>
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+          <path d="M26 34 L40 50 L26 66" stroke="#fbeee6" stroke-opacity="0.6"/>
+          <path d="M42 34 L56 50 L42 66" stroke="#fdf6ef" stroke-opacity="0.9"/>
+          <path d="M58 34 L72 50 L58 66" stroke="#7cc497"/>
+        </g>
+      </svg>
+      <div class="word">
+        <div class="wm">RFP&nbsp;<span class="p">Pipeline</span></div>
+        <div class="tag">Solution overview · founders &amp; PIs</div>
+      </div>
+    </div>
+    <div class="mast-right">
+      <div class="k">Non-dilutive · SBIR / STTR / OTA / CSO / BAA</div>
+      <div class="v">Discover · Rank · Build · Submit</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">You have the technology. You don't have a proposal team.</div>
+    <h1 class="hero-h">From <span class="em">&ldquo;I could never write a federal proposal&rdquo;</span><br>to a submission-ready Word document.</h1>
+    <p class="lede">RFP Pipeline is the guided, AI-accelerated, compliance-safe path a technical founder takes to a
+      <b>submitted</b> federal proposal. We rank the opportunities worth your time, turn your own company docs into
+      reusable content, and draft every section into an expert-built, compliance-bound template &mdash; so the paperwork
+      stops being the wall.</p>
+  </section>
+
+  <!-- ============ 01 · MONEY IS REAL ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <span class="sec-title">Federal money is real. <span class="thin">The paperwork was the obstacle &mdash; not the money.</span></span>
+      <span class="sec-rule"></span>
+    </div>
+    <div class="band">
+      <p class="money-body">Agencies fund early-stage R&amp;D through SBIR, STTR, OTA, CSO, and BAA programs &mdash; and it is
+        <b>non-dilutive</b>: you keep 100% of your equity and IP, no investor, no board seat given up. The barrier was
+        never the money. It was the proposal itself &mdash; hundreds of pages of rules, formatting, and volumes.
+        <b>That is the part we remove.</b></p>
+      <div class="tiles">
+        <div class="tile"><div class="fig">$150K&ndash;$300K</div><div class="lab">SBIR / STTR Phase&nbsp;I</div><div class="sub">Typical award to prove feasibility.</div></div>
+        <div class="tile"><div class="fig">$1M&#43;</div><div class="lab">Phase&nbsp;II</div><div class="sub">To develop &amp; scale, agency-dependent.</div></div>
+        <div class="tile eq"><div class="fig">100%</div><div class="lab">Equity &amp; IP retained</div><div class="sub">Non-dilutive means you keep it all.</div></div>
+      </div>
+      <div class="foot-note">Ranges are public program figures and vary by agency and year. Confirm the current number in each solicitation — not a quote.</div>
+    </div>
+  </section>
+
+  <!-- ============ 02 · FIVE STEPS (SVG 2) ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <span class="sec-title">From opportunity to submission <span class="thin">in five steps.</span></span>
+      <span class="sec-rule"></span>
+    </div>
+
+    <svg class="diagram" viewBox="0 17 720 74" role="img" aria-label="Five-step pipeline: ranked feed, your library, expert skeleton, AI draft, then review, lock and download a Word document.">
+      <title>The five-step pipeline</title>
+      <defs>
+        <linearGradient id="track" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#e85d4a"/><stop offset="0.5" stop-color="#c69327"/><stop offset="1" stop-color="#2d8b4e"/>
+        </linearGradient>
+      </defs>
+      <rect x="60" y="42" width="600" height="9" rx="4.5" fill="url(#track)"/>
+      <g fill="#fffaf3" fill-opacity="0.85">
+        <path d="M182 43 l7 3.5 -7 3.5 z"/><path d="M332 43 l7 3.5 -7 3.5 z"/><path d="M482 43 l7 3.5 -7 3.5 z"/><path d="M632 43 l7 3.5 -7 3.5 z"/>
+      </g>
+      <g stroke-linecap="round" stroke-linejoin="round">
+        <!-- 1 ranked feed -->
+        <circle cx="60" cy="46.5" r="22" class="fSheet sCoral" stroke-width="2.5"/>
+        <g class="sCoral" fill="none" stroke-width="2.4"><rect x="49" y="37" width="22" height="19" rx="2.5"/><line x1="53" y1="43" x2="60" y2="43"/><line x1="53" y1="47" x2="67" y2="47"/><line x1="53" y1="51" x2="64" y2="51"/></g>
+        <path d="M67 34.5 l1.4 2.9 3.2 .3 -2.4 2.1 .7 3.1 -2.9 -1.6 -2.9 1.6 .7 -3.1 -2.4 -2.1 3.2 -.3 z" class="fGold"/>
+        <!-- 2 library -->
+        <circle cx="210" cy="46.5" r="22" class="fSheet sCoral" stroke-width="2.5"/>
+        <g class="sCoral" fill="none" stroke-width="2.4"><path d="M200 54 h20"/><path d="M210 54 v-13"/><path d="M204 46 l6 -6 6 6"/></g>
+        <rect x="216" y="34" width="9" height="6" rx="1.5" class="fGold"/>
+        <!-- 3 skeleton -->
+        <circle cx="360" cy="46.5" r="22" class="fSheet sCoral" stroke-width="2.5"/>
+        <g class="sCoral" fill="none" stroke-width="2.4"><rect x="350" y="36" width="20" height="21" rx="2.5"/><line x1="354" y1="42" x2="366" y2="42"/><line x1="354" y1="47" x2="366" y2="47"/><line x1="354" y1="52" x2="361" y2="52"/></g>
+        <path d="M363 50.5 l2 2 3.6 -4" class="sGreen" fill="none" stroke-width="2.6"/>
+        <!-- 4 AI draft -->
+        <circle cx="510" cy="46.5" r="22" class="fSheet sCoral" stroke-width="2.5"/>
+        <g class="sCoral" fill="none" stroke-width="2.4"><path d="M516 37 l6 6 -13 13 -6 0 0 -6 z"/><line x1="513" y1="40" x2="519" y2="46"/></g>
+        <path d="M500 37 l1 2.2 2.2 1 -2.2 1 -1 2.2 -1 -2.2 -2.2 -1 2.2 -1 z" class="fGold"/>
+        <!-- 5 download -->
+        <circle cx="660" cy="46.5" r="22" class="fSheet sGreen" stroke-width="2.5"/>
+        <g class="sGreen" fill="none" stroke-width="2.4"><path d="M660 37 v13"/><path d="M654 45 l6 6 6 -6"/><path d="M651 56 h18"/></g>
+      </g>
+      <g font-family="Georgia, serif" text-anchor="middle">
+        <text x="60" y="85" font-size="11.5" font-weight="700" class="tInk">Ranked feed</text>
+        <text x="210" y="85" font-size="11.5" font-weight="700" class="tInk">Your library</text>
+        <text x="360" y="85" font-size="11.5" font-weight="700" class="tInk">Expert skeleton</text>
+        <text x="510" y="85" font-size="11.5" font-weight="700" class="tInk">AI draft</text>
+        <text x="660" y="85" font-size="11.5" font-weight="700" class="tGreen">Download .docx</text>
+      </g>
+    </svg>
+
+    <div class="steps">
+      <div class="step"><div class="sn">STEP 01</div><div class="st">Ranked feed</div><div class="sd">Spotlight buckets rank the opportunity river to your agency, tech &amp; program fit.</div></div>
+      <div class="step"><div class="sn">STEP 02</div><div class="st">Your library</div><div class="sd">Upload company docs once; we atomize them into tagged, reusable content.</div></div>
+      <div class="step"><div class="sn">STEP 03</div><div class="st">Expert skeleton</div><div class="sd">Curators pre-build the compliance matrix, outline &amp; a template mold per document.</div></div>
+      <div class="step"><div class="sn">STEP 04</div><div class="st">AI draft into the mold</div><div class="sd">AI writes each section from your library + the live RFP, inside the compliant template.</div></div>
+      <div class="step"><div class="sn">STEP 05</div><div class="st">Review, lock, download</div><div class="sd">Collaborate, lock sections, watch the matrix hit 100%, export a ready .docx.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 03 · WHY IT WINS ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <span class="sec-title">Why it wins <span class="thin">for a first-time applicant.</span></span>
+      <span class="sec-rule"></span>
+    </div>
+    <div class="pillars">
+      <div class="pillar">
+        <svg class="pill-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="3" width="16" height="18" rx="2.5" class="sCoral" stroke-width="2"/>
+          <line x1="7.5" y1="8" x2="16.5" y2="8" class="sCoral" stroke-width="2" stroke-linecap="round"/>
+          <line x1="7.5" y1="12" x2="16.5" y2="12" class="sCoral" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 16.2 l2 2 3.5 -4" class="sGreen" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h3>Expert skeletons, not DIY search.</h3>
+        <p>You start from a curator's <b>compliance matrix and document molds</b> &mdash; the real structure a winning proposal needs. Never a blank page.</p>
+      </div>
+      <div class="pillar">
+        <svg class="pill-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 21 C7 16 3 13.5 3 9 A4 4 0 0 1 12 7 A4 4 0 0 1 21 9 C21 13.5 17 16 12 21 Z" class="sCoral" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M9.5 11.5 l1.8 1.8 3.4 -3.6" class="sGreen" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h3>Your content, reused and learning.</h3>
+        <p>Winning drafted sections return to <b>your library</b> for the next proposal. The more you build, the faster and stronger each one gets.</p>
+      </div>
+      <div class="pillar">
+        <svg class="pill-ico" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3 l7 3 v5 c0 4.5 -3 7.5 -7 9 c-4 -1.5 -7 -4.5 -7 -9 V6 Z" class="sGreen" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M8.5 12 l2.3 2.3 4.4 -4.6" class="sGreen" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h3>Compliance baked in, not bolted on.</h3>
+        <p>Every section is drafted <b>inside</b> a compliance-bound template and tracked by a live matrix &mdash; so &ldquo;submission-ready&rdquo; means exactly that.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPLIANCE RING (SVG 3) + PRICING + CTA ============ -->
+  <div class="close">
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 120 120" role="img" aria-label="Compliance meter at one hundred percent: submission ready.">
+        <title>Compliance at 100%</title>
+        <circle cx="60" cy="60" r="46" fill="none" class="sRule" stroke-width="11"/>
+        <circle cx="60" cy="60" r="46" fill="none" class="sGreen" stroke-width="11" stroke-linecap="round"
+                stroke-dasharray="289.02" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+        <path d="M45 61 l10 11 22 -25" class="sGreen" fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text x="60" y="97" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="13" font-weight="600" class="tGreen">100%</text>
+      </svg>
+      <div class="ring-cap">Compliance matrix · complete</div>
+    </div>
+    <div class="close-main">
+      <div class="pr-eye">Start here</div>
+      <h2>Claim your Spotlight &mdash; bring <span class="em">one opportunity you'd love to win.</span></h2>
+      <p class="pricing">Founding-cohort model <span class="illus">Illustrative</span> &mdash; about
+        <span class="price-num">$299</span>/mo for your Spotlight subscription (the ranked feed, your library, and expert
+        skeletons), plus a <b>per-proposal build fee</b> when you're ready to draft and submit. Final pricing is set per
+        cohort; the figure above is a model, not a quote.</p>
+      <div class="cta-row">
+        <a class="cta" href="#start">Start with a Spotlight <span class="arr">&rarr;</span></a>
+        <span class="cta-note">We'll show you the expert skeleton for your opportunity and draft your first section from your own library.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="colophon">
+    <div class="c-l">Worked example: &ldquo;Immobileyes,&rdquo; a hypothetical CV property-intelligence startup. Non-dilutive = you keep your equity and IP.</div>
+    <div class="c-r">RFP Pipeline</div>
+  </div>
+
+</main>
+</body>
+</html>

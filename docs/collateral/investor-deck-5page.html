@@ -1,0 +1,646 @@
+<title>RFP Pipeline — Investor Overview</title>
+<style>
+  /* ============================ RESET / BASE ============================ */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+
+  :root {
+    color-scheme: light dark;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    /* surfaces / ink (light) */
+    --plane:  #e8ebf1;
+    --paper:  #ffffff;
+    --panel:  #f5f7fb;
+    --ink:    #0c1424;
+    --ink-soft:#48546b;
+    --muted:  #78849a;
+    --line:   rgba(12,20,36,.11);
+    --line-2: rgba(12,20,36,.18);
+    --shadow: 0 24px 60px -28px rgba(11,26,58,.45), 0 2px 8px -4px rgba(11,26,58,.25);
+
+    /* brand accents (light) */
+    --blue:      #2456d6;
+    --blue-brt:  #3f7cf0;
+    --aqua:      #0f9e8e;
+    --amber:     #dd8f10;
+    --amber-2:   #f0a92b;
+    --coral:     #e0554b;
+
+    /* constant hero navy (both themes) */
+    --navy:   #0a1730;
+    --navy-2: #10203f;
+    --navy-3: #16305e;
+    --on-navy:      #eaf0ff;
+    --on-navy-soft: #9db1d8;
+    --on-navy-mut:  #6c81ab;
+
+    /* validated ordinal funnel ramp (light) */
+    --f1:#6ea8ee; --f2:#3f86e6; --f3:#2765c9; --f4:#16468f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --plane:  #08090d;
+      --paper:  #14171f;
+      --panel:  #1b1f29;
+      --ink:    #f1f4fb;
+      --ink-soft:#b4bfd2;
+      --muted:  #7e8a9d;
+      --line:   rgba(255,255,255,.11);
+      --line-2: rgba(255,255,255,.18);
+      --shadow: 0 26px 64px -30px rgba(0,0,0,.8), 0 2px 8px -4px rgba(0,0,0,.6);
+      --blue:      #4f86f2;
+      --blue-brt:  #6f9dff;
+      --aqua:      #1fb6a3;
+      --amber:     #eaa42e;
+      --amber-2:   #f4b850;
+      --coral:     #ef6a60;
+      --f1:#a6c9f5; --f2:#6ba0ed; --f3:#4380d6; --f4:#2360ad;
+    }
+  }
+  :root[data-theme="dark"] {
+    --plane:  #08090d;
+    --paper:  #14171f;
+    --panel:  #1b1f29;
+    --ink:    #f1f4fb;
+    --ink-soft:#b4bfd2;
+    --muted:  #7e8a9d;
+    --line:   rgba(255,255,255,.11);
+    --line-2: rgba(255,255,255,.18);
+    --shadow: 0 26px 64px -30px rgba(0,0,0,.8), 0 2px 8px -4px rgba(0,0,0,.6);
+    --blue:      #4f86f2;
+    --blue-brt:  #6f9dff;
+    --aqua:      #1fb6a3;
+    --amber:     #eaa42e;
+    --amber-2:   #f4b850;
+    --coral:     #ef6a60;
+    --f1:#a6c9f5; --f2:#6ba0ed; --f3:#4380d6; --f4:#2360ad;
+  }
+
+  body {
+    font-family: var(--sans);
+    background:
+      radial-gradient(120% 80% at 12% -10%, color-mix(in srgb, var(--blue) 9%, transparent), transparent 60%),
+      var(--plane);
+    color: var(--ink);
+    padding: 30px 20px 44px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .deck { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+
+  .deckhead {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; max-width: 1180px; margin: 0 auto 4px; padding: 0 2px;
+    color: var(--muted); font: 600 12px/1.4 var(--mono);
+    letter-spacing: .16em; text-transform: uppercase;
+  }
+  .deckhead b { color: var(--ink-soft); font-weight: 700; }
+  .deckhead .dot { color: var(--blue); }
+
+  /* ============================ SLIDE FRAME ============================ */
+  .slide {
+    position: relative;
+    container-type: inline-size;
+    aspect-ratio: 16 / 9;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    color: var(--ink);
+  }
+  .slide__inner {
+    position: absolute; inset: 0;
+    padding: 4.5cqw 5cqw 5.1cqw;
+    display: flex; flex-direction: column;
+  }
+
+  /* running chrome */
+  .accentbar { position: absolute; top: 0; left: 0; right: 0; height: .7cqw;
+    background: linear-gradient(90deg, var(--blue) 0%, var(--aqua) 55%, var(--amber) 100%); }
+  .foot { position: absolute; left: 5cqw; right: 5cqw; bottom: 1.75cqw;
+    display: flex; align-items: center; justify-content: space-between;
+    font: 600 .96cqw/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+    color: var(--muted); }
+  .foot .fbrand { display: flex; align-items: center; gap: .8cqw; }
+  .foot .fdot { width: .8cqw; height: .8cqw; border-radius: 50%;
+    background: conic-gradient(from 210deg, var(--blue), var(--aqua), var(--amber), var(--blue)); }
+  .pageno b { color: var(--ink-soft); }
+
+  /* typographic atoms */
+  .eyebrow { font: 700 1.16cqw/1 var(--mono); letter-spacing: .3em; text-transform: uppercase;
+    color: var(--blue); display: inline-flex; align-items: center; gap: .8cqw; }
+  .eyebrow::before { content: ""; width: 2.4cqw; height: .18cqw; background: currentColor; border-radius: 2px; }
+  .headline { font-weight: 800; font-size: 3.5cqw; line-height: 1.04; letter-spacing: -.017em;
+    margin: 1.5cqw 0 0; color: var(--ink); max-width: 30ch; }
+  .headline .hl { color: var(--blue); }
+  .headline .hla { color: var(--aqua); }
+  .lead { font-size: 1.48cqw; line-height: 1.46; color: var(--ink-soft); margin: 1.2cqw 0 0; max-width: 74ch; }
+  .p { font-size: 1.4cqw; line-height: 1.46; color: var(--ink-soft); }
+  .kick { font: 700 1.05cqw/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .svg-mono { font-family: var(--mono); }
+  .svg-sans { font-family: var(--sans); }
+
+  /* ============================ SLIDE 1 · TITLE ============================ */
+  .slide--hero { background:
+      radial-gradient(90% 120% at 88% 8%, var(--navy-3) 0%, transparent 55%),
+      radial-gradient(70% 90% at 6% 100%, #0d2a54 0%, transparent 60%),
+      linear-gradient(150deg, var(--navy) 0%, var(--navy-2) 100%);
+    color: var(--on-navy); border-color: rgba(255,255,255,.09); }
+  .slide--hero .foot { color: var(--on-navy-mut); }
+  .slide--hero .pageno b { color: var(--on-navy-soft); }
+  .hero-grid { flex: 1; display: grid; grid-template-columns: 1.15fr .85fr; align-items: center; gap: 3cqw; }
+  .lockup { display: flex; align-items: center; gap: 1.5cqw; }
+  .lockup .mark { width: 5.4cqw; height: 5.4cqw; flex: none; color: var(--on-navy); }
+  .lockup .wm { font-weight: 800; font-size: 3cqw; letter-spacing: -.02em; color: var(--on-navy); }
+  .lockup .wm span { color: var(--blue-brt); }
+  .hero-eyebrow { font: 700 1.16cqw/1 var(--mono); letter-spacing: .34em; text-transform: uppercase;
+    color: var(--amber-2); }
+  .hero-title { font-weight: 800; font-size: 5.6cqw; line-height: 1.02; letter-spacing: -.022em;
+    margin: 2cqw 0 0; color: var(--on-navy); }
+  .hero-title em { font-style: normal; color: var(--blue-brt); }
+  .hero-thesis { font-size: 1.62cqw; line-height: 1.5; color: var(--on-navy-soft); margin: 1.8cqw 0 0; max-width: 46ch; }
+  .chips { display: flex; flex-wrap: wrap; gap: .7cqw; margin-top: 2.4cqw; }
+  .chip { font: 700 1.02cqw/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--on-navy-soft); border: 1px solid rgba(255,255,255,.16); border-radius: 100px;
+    padding: .7cqw 1.1cqw; background: rgba(255,255,255,.04); }
+  .chip b { color: var(--on-navy); font-weight: 700; }
+
+  /* ============================ SLIDE 2 · PROBLEM ============================ */
+  .prob-grid { margin-top: 1.3cqw; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.05cqw; }
+  .fcard { border: 1px solid var(--line); border-radius: 10px; padding: 1.15cqw 1.35cqw;
+    background: var(--panel); display: flex; gap: 1.2cqw; align-items: flex-start; }
+  .fcard .fnum { flex: none; width: 2.4cqw; height: 2.4cqw; border-radius: 8px;
+    display: grid; place-items: center; font: 800 1.3cqw/1 var(--sans); color: #fff;
+    background: linear-gradient(150deg, var(--blue), var(--blue-brt)); }
+  .fcard:nth-child(3) .fnum, .fcard:nth-child(4) .fnum { background: linear-gradient(150deg, var(--coral), #ec7a54); }
+  .fcard h4 { margin: .1cqw 0 .3cqw; font-size: 1.42cqw; letter-spacing: -.01em; color: var(--ink); }
+  .fcard p { margin: 0; font-size: 1.12cqw; line-height: 1.34; color: var(--ink-soft); }
+  .statband { margin-top: auto; padding-top: .9cqw; }
+  .statcap { margin: .5cqw 0 0; font-size: .98cqw; color: var(--muted); }
+  .statcap b { color: var(--ink-soft); font-weight: 700; }
+
+  /* ============================ SLIDE 3 · SOLUTION ============================ */
+  .spine-wrap { margin-top: 1.0cqw; }
+  .moat { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqw; padding-top: 1.0cqw; }
+  .moat .m { border: 1px solid var(--line); border-left: .35cqw solid var(--aqua); border-radius: 8px;
+    padding: .95cqw 1.25cqw; background: var(--panel); }
+  .moat .m:nth-child(1){ border-left-color: var(--blue); }
+  .moat .m:nth-child(3){ border-left-color: var(--amber); }
+  .moat .m .mt { font: 700 1cqw/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .moat .m .md { margin: .45cqw 0 0; font-size: 1.2cqw; line-height: 1.3; color: var(--ink); font-weight: 600; letter-spacing: -.01em; }
+
+  /* ============================ SLIDE 4 · MARKET ============================ */
+  .mkt-grid { margin-top: 1.2cqw; flex: 1; display: grid; grid-template-columns: .9fr 1.1fr; gap: 2.6cqw; align-items: start; }
+  .wedge { border: 1px solid var(--line); border-radius: 10px; padding: 1.4cqw 1.5cqw;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--amber) 12%, var(--panel)), var(--panel)); }
+  .wedge .wt { font: 700 1.02cqw/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--amber); }
+  .wedge p { margin: .7cqw 0 0; font-size: 1.32cqw; line-height: 1.4; color: var(--ink); }
+  .wedge p b { color: var(--ink); }
+  .modeltable { width: 100%; border-collapse: collapse; margin-top: 1.4cqw; font-size: 1.18cqw; }
+  .modeltable caption { text-align: left; font: 700 1.02cqw/1 var(--mono); letter-spacing: .18em;
+    text-transform: uppercase; color: var(--blue); padding-bottom: .7cqw; }
+  .modeltable th, .modeltable td { text-align: left; padding: .78cqw .3cqw; border-bottom: 1px solid var(--line);
+    vertical-align: baseline; }
+  .modeltable th { color: var(--ink-soft); font-weight: 600; }
+  .modeltable td { color: var(--ink); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .modeltable tr.hi td { color: var(--blue); }
+  .modeltable tr.hi th { color: var(--ink); font-weight: 800; }
+  .disc { margin-top: 1.1cqw; font-size: 1.02cqw; line-height: 1.4; color: var(--muted); }
+  .disc b { color: var(--ink-soft); font-weight: 700; }
+  .illtag { display: inline-block; font: 700 .92cqw/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); border-radius: 5px;
+    padding: .32cqw .5cqw; vertical-align: middle; }
+
+  /* ============================ SLIDE 5 · WHY NOW / ASK ============================ */
+  .road-wrap { margin-top: 1.2cqw; }
+  .ask-grid { margin-top: auto; display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.8cqw; padding-top: 1.0cqw; }
+  .ask { background: linear-gradient(150deg, var(--navy), var(--navy-2)); color: var(--on-navy);
+    border-radius: 11px; padding: 1.6cqw 1.8cqw; }
+  .ask .at { font: 700 1.05cqw/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--amber-2); }
+  .ask p { margin: .8cqw 0 0; font-size: 1.5cqw; line-height: 1.4; color: var(--on-navy); font-weight: 600; letter-spacing: -.005em; }
+  .ask p b { color: var(--blue-brt); }
+  .use { display: flex; flex-direction: column; gap: .85cqw; justify-content: center; }
+  .use .u { display: flex; gap: 1cqw; align-items: baseline; font-size: 1.22cqw; color: var(--ink-soft); line-height: 1.3; }
+  .use .u b { color: var(--ink); font-weight: 700; }
+  .use .u .ubullet { flex: none; width: .8cqw; height: .8cqw; border-radius: 2px; background: var(--blue); transform: translateY(.05cqw); }
+  .use .u:nth-child(2) .ubullet { background: var(--aqua); }
+  .use .u:nth-child(3) .ubullet { background: var(--amber); }
+  .contact { margin-top: .4cqw; font: 700 1.02cqw/1.5 var(--mono); letter-spacing: .04em; color: var(--muted); }
+  .contact b { color: var(--ink-soft); }
+
+  /* ============================ RESPONSIVE / PRINT ============================ */
+  @media (max-width: 560px) {
+    body { padding: 16px 10px 26px; }
+    .deck { gap: 18px; }
+    .deckhead { font-size: 10px; }
+  }
+  @media print {
+    :root { color-scheme: light; }
+    @page { size: landscape; margin: 0; }
+    body { background: #fff !important; padding: 0; }
+    .deckhead { display: none; }
+    .deck { gap: 0; max-width: none; }
+    .slide { break-inside: avoid; page-break-after: always; border-radius: 0; box-shadow: none;
+      border: none; width: 100%; }
+    .slide:last-child { page-break-after: auto; }
+  }
+</style>
+
+<div class="deckhead">
+  <span><b>RFP Pipeline</b> — Investor Overview</span>
+  <span>Confidential <span class="dot">/</span> Illustrative model figures only</span>
+</div>
+
+<div class="deck">
+
+  <!-- ===================== SLIDE 1 · TITLE ===================== -->
+  <section class="slide slide--hero" aria-label="Slide 1: Title">
+    <div class="accentbar"></div>
+    <div class="slide__inner">
+      <div class="lockup">
+        <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="RFP Pipeline mark">
+          <g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round">
+            <path d="M7 19 H24"/><path d="M7 32 H21"/><path d="M7 45 H24"/>
+            <path d="M24 19 Q31 19 32 26" opacity=".8"/>
+            <path d="M24 45 Q31 45 32 38" opacity=".8"/>
+          </g>
+          <circle cx="32" cy="32" r="4.6" fill="var(--amber-2)"/>
+          <rect x="37.5" y="15.5" width="20.5" height="33" rx="4.2" fill="none" stroke="currentColor" stroke-width="3.2"/>
+          <g fill="var(--blue-brt)"><rect x="42" y="22" width="11.5" height="3.2" rx="1.6"/></g>
+          <g fill="currentColor" opacity=".85"><rect x="42" y="30" width="11.5" height="2.6" rx="1.3"/><rect x="42" y="36.5" width="8" height="2.6" rx="1.3"/></g>
+        </svg>
+        <div class="wm">RFP&nbsp;<span>Pipeline</span></div>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <div class="hero-eyebrow">The proposal operating system</div>
+          <h1 class="hero-title">Non-dilutive<br>capital, <em>on rails.</em></h1>
+          <p class="hero-thesis">
+            We turn the federal non-dilutive funding maze — SBIR, STTR, OTA, CSO, BAA — into a guided path:
+            expert-curated opportunities, <b style="color:var(--on-navy)">ranked</b> to each company and
+            <b style="color:var(--on-navy)">drafted by AI</b> into compliance-ready proposals you download and submit.
+          </p>
+          <div class="chips">
+            <span class="chip"><b>Curate</b></span>
+            <span class="chip"><b>Rank</b></span>
+            <span class="chip"><b>Library</b></span>
+            <span class="chip"><b>Skeleton</b></span>
+            <span class="chip"><b>AI&nbsp;Draft</b></span>
+            <span class="chip"><b>Download</b></span>
+          </div>
+        </div>
+
+        <!-- HERO SVG: opportunity river -> lens -> ranked cards -->
+        <svg viewBox="0 0 520 400" role="img" aria-label="An opportunity river scored through a ranking lens into ranked opportunity cards" class="svg-sans">
+          <defs>
+            <linearGradient id="lens" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--aqua)"/><stop offset="1" stop-color="var(--blue-brt)"/>
+            </linearGradient>
+          </defs>
+          <!-- river of solicitations -->
+          <g stroke="var(--on-navy-mut)" stroke-linecap="round" opacity=".55">
+            <path d="M6 40 H150" stroke-width="3"/><path d="M6 66 H120" stroke-width="3"/>
+            <path d="M6 92 H165" stroke-width="3"/><path d="M6 118 H108" stroke-width="3"/>
+            <path d="M6 144 H150" stroke-width="3"/><path d="M6 170 H132" stroke-width="3"/>
+            <path d="M6 196 H160" stroke-width="3"/><path d="M6 222 H116" stroke-width="3"/>
+            <path d="M6 248 H150" stroke-width="3"/><path d="M6 274 H126" stroke-width="3"/>
+            <path d="M6 300 H158" stroke-width="3"/><path d="M6 326 H112" stroke-width="3"/>
+            <path d="M6 352 H150" stroke-width="3"/>
+          </g>
+          <text x="6" y="390" class="svg-mono" font-size="12" letter-spacing="1.5" fill="var(--on-navy-mut)">GLOBAL OPPORTUNITY RIVER</text>
+          <!-- scoring lens -->
+          <rect x="182" y="20" width="26" height="336" rx="13" fill="url(#lens)" opacity=".95"/>
+          <text transform="translate(195,188) rotate(-90)" class="svg-mono" font-size="10.5" letter-spacing="3" font-weight="700" fill="var(--navy)" text-anchor="middle">SPOTLIGHT SCORING</text>
+          <!-- connectors into cards -->
+          <g stroke="var(--blue-brt)" stroke-width="2" fill="none" opacity=".7">
+            <path d="M208 96 C250 96 250 92 290 92"/>
+            <path d="M208 170 C250 170 250 168 290 168"/>
+            <path d="M208 244 C250 244 250 244 290 244"/>
+            <path d="M208 318 C250 318 250 320 290 320"/>
+          </g>
+          <!-- ranked cards -->
+          <g class="svg-sans">
+            <!-- card 1 (top rank, highlighted) -->
+            <rect x="292" y="60" width="222" height="64" rx="9" fill="var(--navy-3)" stroke="var(--blue-brt)" stroke-width="2"/>
+            <circle cx="316" cy="92" r="13" fill="var(--amber-2)"/><text x="316" y="97" font-size="14" font-weight="800" text-anchor="middle" fill="var(--navy)">1</text>
+            <rect x="338" y="78" width="120" height="7" rx="3.5" fill="var(--on-navy)"/>
+            <rect x="338" y="93" width="86" height="6" rx="3" fill="var(--on-navy-mut)"/>
+            <rect x="470" y="80" width="34" height="18" rx="9" fill="var(--aqua)"/><text x="487" y="93" font-size="11" font-weight="800" text-anchor="middle" fill="#04201c">94</text>
+            <!-- card 2 -->
+            <rect x="298" y="134" width="216" height="58" rx="9" fill="var(--navy-2)" stroke="rgba(255,255,255,.14)" stroke-width="1.5"/>
+            <circle cx="320" cy="163" r="12" fill="var(--on-navy-mut)"/><text x="320" y="168" font-size="13" font-weight="800" text-anchor="middle" fill="var(--navy)">2</text>
+            <rect x="340" y="151" width="104" height="6" rx="3" fill="var(--on-navy-soft)"/>
+            <rect x="340" y="164" width="74" height="5" rx="2.5" fill="var(--on-navy-mut)"/>
+            <rect x="470" y="153" width="32" height="17" rx="8.5" fill="rgba(255,255,255,.12)"/><text x="486" y="165" font-size="10.5" font-weight="800" text-anchor="middle" fill="var(--on-navy-soft)">88</text>
+            <!-- card 3 -->
+            <rect x="298" y="204" width="216" height="52" rx="9" fill="var(--navy-2)" stroke="rgba(255,255,255,.10)" stroke-width="1.5" opacity=".82"/>
+            <circle cx="320" cy="230" r="11" fill="var(--on-navy-mut)" opacity=".8"/><text x="320" y="234" font-size="12" font-weight="800" text-anchor="middle" fill="var(--navy)">3</text>
+            <rect x="339" y="219" width="96" height="6" rx="3" fill="var(--on-navy-mut)"/>
+            <rect x="339" y="231" width="66" height="5" rx="2.5" fill="var(--on-navy-mut)" opacity=".7"/>
+            <!-- card 4 -->
+            <rect x="298" y="268" width="216" height="46" rx="9" fill="var(--navy-2)" stroke="rgba(255,255,255,.08)" stroke-width="1.5" opacity=".62"/>
+            <circle cx="320" cy="291" r="10" fill="var(--on-navy-mut)" opacity=".6"/>
+            <rect x="338" y="284" width="88" height="5.5" rx="2.7" fill="var(--on-navy-mut)" opacity=".7"/>
+            <rect x="338" y="295" width="58" height="4.5" rx="2.2" fill="var(--on-navy-mut)" opacity=".5"/>
+          </g>
+          <text x="406" y="340" class="svg-mono" font-size="12" letter-spacing="2" fill="var(--on-navy-mut)" text-anchor="middle">RANKED, ONE CARD / OPPORTUNITY</text>
+        </svg>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="fbrand"><span class="fdot"></span> RFP&nbsp;Pipeline · Investor Overview</span>
+      <span class="pageno"><b>01</b> / 05</span>
+    </div>
+  </section>
+
+  <!-- ===================== SLIDE 2 · PROBLEM ===================== -->
+  <section class="slide" aria-label="Slide 2: Problem">
+    <div class="accentbar"></div>
+    <div class="slide__inner">
+      <div class="eyebrow">The problem</div>
+      <h2 class="headline">Billions in non-dilutive funding go unclaimed — a <span class="hl">path</span> problem, not a money problem.</h2>
+
+      <div class="prob-grid">
+        <div class="fcard"><div class="fnum">1</div><div><h4>Discovery is noise</h4>
+          <p>Thousands of solicitations across dozens of agencies and portals. The right one is a needle in a haystack — and deadlines pass unseen.</p></div></div>
+        <div class="fcard"><div class="fnum">2</div><div><h4>The blank page</h4>
+          <p>Even a strong company stalls at a blank Volume I — 20–50 pages of tightly-specified, compliance-bound technical writing.</p></div></div>
+        <div class="fcard"><div class="fnum">3</div><div><h4>Compliance is pass / fail</h4>
+          <p>Miss a required section, a page limit, a format rule — and a fundable idea is thrown out unread, before the science is ever evaluated.</p></div></div>
+        <div class="fcard"><div class="fnum">4</div><div><h4>Support doesn't scale</h4>
+          <p>EconDev orgs, accelerators &amp; PTACs want whole portfolios of SMBs to win — but hand-holding each proposal one-by-one doesn't scale.</p></div></div>
+      </div>
+
+      <div class="statband">
+        <!-- PROBLEM STAT BAND -->
+        <svg viewBox="0 0 1040 108" role="img" aria-label="Program scale: about four billion dollars per year in SBIR and STTR across eleven agencies; typical Phase I award $150K to $300K plus; zero percent equity" class="svg-sans">
+          <g>
+            <line x1="262" y1="12" x2="262" y2="102" stroke="var(--line-2)"/>
+            <line x1="522" y1="12" x2="522" y2="102" stroke="var(--line-2)"/>
+            <line x1="792" y1="12" x2="792" y2="102" stroke="var(--line-2)"/>
+          </g>
+          <!-- tile 1 -->
+          <rect x="0" y="6" width="38" height="4" rx="2" fill="var(--blue)"/>
+          <text x="0" y="54" font-size="40" font-weight="800" letter-spacing="-1" fill="var(--ink)">~$4B<tspan font-size="23" dy="-12">+</tspan></text>
+          <text x="2" y="78" font-size="14.5" font-weight="700" fill="var(--ink-soft)">/yr non-dilutive R&amp;D</text>
+          <text x="2" y="98" font-size="12" fill="var(--muted)" class="svg-mono">SBIR / STTR · PUBLIC</text>
+          <!-- tile 2 -->
+          <rect x="290" y="6" width="38" height="4" rx="2" fill="var(--aqua)"/>
+          <text x="290" y="54" font-size="40" font-weight="800" letter-spacing="-1" fill="var(--ink)">11</text>
+          <text x="292" y="78" font-size="14.5" font-weight="700" fill="var(--ink-soft)">participating agencies</text>
+          <text x="292" y="98" font-size="12" fill="var(--muted)" class="svg-mono">DOZENS OF PORTALS</text>
+          <!-- tile 3 -->
+          <rect x="550" y="6" width="38" height="4" rx="2" fill="var(--blue)"/>
+          <text x="550" y="54" font-size="34" font-weight="800" letter-spacing="-1.2" fill="var(--ink)">$150–300K<tspan font-size="20" dy="-10">+</tspan></text>
+          <text x="552" y="78" font-size="14.5" font-weight="700" fill="var(--ink-soft)">typical Phase&nbsp;I award</text>
+          <text x="552" y="98" font-size="12" fill="var(--muted)" class="svg-mono">PUBLIC RANGE</text>
+          <!-- tile 4 -->
+          <rect x="810" y="6" width="38" height="4" rx="2" fill="var(--amber)"/>
+          <text x="810" y="54" font-size="40" font-weight="800" letter-spacing="-1" fill="var(--ink)">0%</text>
+          <text x="812" y="78" font-size="14.5" font-weight="700" fill="var(--ink-soft)">equity given up</text>
+          <text x="812" y="98" font-size="12" fill="var(--muted)" class="svg-mono">IT IS GRANT CAPITAL</text>
+        </svg>
+        <p class="statcap">Program scale is <b>public and defensible</b> — the friction between a capable company and that capital is the opportunity.</p>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="fbrand"><span class="fdot"></span> RFP&nbsp;Pipeline · Investor Overview</span>
+      <span class="pageno"><b>02</b> / 05</span>
+    </div>
+  </section>
+
+  <!-- ===================== SLIDE 3 · SOLUTION ===================== -->
+  <section class="slide" aria-label="Slide 3: Solution and product">
+    <div class="accentbar"></div>
+    <div class="slide__inner">
+      <div class="eyebrow">The solution &amp; product</div>
+      <h2 class="headline">One spine: <span class="hl">curated → ranked → drafted → compliant → submitted.</span></h2>
+      <p class="lead" style="margin-top:.9cqw">Experts pre-build the skeleton so the customer never faces a blank page; AI drafts each section into a compliance-bound mold from the company's own learning library.</p>
+
+      <div class="spine-wrap">
+        <!-- PRODUCT SPINE DIAGRAM -->
+        <svg viewBox="0 0 1040 214" role="img" aria-label="Six-step product spine: Curate, Rank, Library, Skeleton, AI Draft, Review and Download, with a learning loop returning won content to the library" class="svg-sans">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/>
+            </marker>
+            <marker id="ahq" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--aqua)"/>
+            </marker>
+          </defs>
+
+          <!-- connector arrows between nodes -->
+          <g stroke="var(--blue)" stroke-width="2.4" fill="none" marker-end="url(#ah)" opacity=".9">
+            <path d="M143 74 H176"/><path d="M323 74 H356"/><path d="M503 74 H536"/><path d="M683 74 H716"/><path d="M863 74 H896"/>
+          </g>
+
+          <!-- NODE template: rect + glyph + title + sub. width 140, gap 40. x: 0,180,360,540,720,900 -->
+          <!-- n0 Curate -->
+          <g><rect x="0" y="24" width="140" height="100" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+            <g transform="translate(24,44)" stroke="var(--blue)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M0 0 H24 L15 12 V22 L9 25 V12 Z"/></g>
+            <text x="18" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">Curate</text>
+            <text x="18" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">EXPERTS · RIVER</text></g>
+          <!-- n1 Rank -->
+          <g><rect x="180" y="24" width="140" height="100" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+            <g transform="translate(204,46)" fill="var(--blue)"><rect x="0" y="14" width="6" height="12" rx="2"/><rect x="9" y="7" width="6" height="19" rx="2"/><rect x="18" y="0" width="6" height="26" rx="2"/></g>
+            <path d="M232 48 l4 4 l7 -8" stroke="var(--amber)" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="198" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">Rank</text>
+            <text x="198" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">5 SPOTLIGHTS</text></g>
+          <!-- n2 Library -->
+          <g><rect x="360" y="24" width="140" height="100" rx="11" fill="var(--panel)" stroke="var(--aqua)" stroke-opacity=".55"/>
+            <g transform="translate(384,44)" fill="none" stroke="var(--aqua)" stroke-width="2.3"><rect x="0" y="0" width="10" height="10" rx="2.5"/><rect x="14" y="0" width="10" height="10" rx="2.5"/><rect x="0" y="14" width="10" height="10" rx="2.5"/><rect x="14" y="14" width="10" height="10" rx="2.5" fill="var(--aqua)"/></g>
+            <text x="378" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">Library</text>
+            <text x="378" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">ATOMS · LEARNS</text></g>
+          <!-- n3 Skeleton -->
+          <g><rect x="540" y="24" width="140" height="100" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+            <g transform="translate(564,44)" stroke="var(--blue)" stroke-width="2.3" fill="none"><rect x="0" y="0" width="24" height="24" rx="3"/><path d="M0 8 H24 M0 16 H24 M9 8 V24" stroke-width="1.8"/></g>
+            <text x="558" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">Skeleton</text>
+            <text x="558" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">MOLD · MATRIX</text></g>
+          <!-- n4 AI Draft (the magic step) -->
+          <g><rect x="720" y="24" width="140" height="100" rx="11" fill="color-mix(in srgb, var(--amber) 12%, var(--panel))" stroke="var(--amber)" stroke-opacity=".65"/>
+            <g transform="translate(744,44)"><path d="M12 0 l3 9 l9 3 l-9 3 l-3 9 l-3 -9 l-9 -3 l9 -3 z" fill="var(--amber)"/><circle cx="24" cy="2" r="2.4" fill="var(--amber)"/></g>
+            <text x="738" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">AI&nbsp;Draft</text>
+            <text x="738" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">INTO THE MOLD</text></g>
+          <!-- n5 Review & Download -->
+          <g><rect x="900" y="24" width="140" height="100" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+            <g transform="translate(926,44)" fill="none" stroke="var(--blue)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 0 h12 l6 6 v18 h-24 z"/><path d="M11 9 v9 M7 14 l4 4 l4 -4"/></g>
+            <text x="918" y="94" font-size="15.5" font-weight="800" fill="var(--ink)">Review&nbsp;&amp;&nbsp;Download</text>
+            <text x="918" y="112" font-size="11.5" fill="var(--muted)" class="svg-mono">LOCK · .DOCX</text></g>
+
+          <!-- LEARNING LOOP: from Review (cx 970) back to Library (cx 430) -->
+          <path d="M970 124 C970 180 946 198 700 198 C520 198 494 198 430 128"
+                fill="none" stroke="var(--aqua)" stroke-width="2.4" stroke-dasharray="2 7" stroke-linecap="round" marker-end="url(#ahq)"/>
+          <rect x="556" y="186" width="290" height="24" rx="12" fill="var(--paper)" stroke="var(--aqua)" stroke-opacity=".4"/>
+          <text x="701" y="202" font-size="12.5" font-weight="700" fill="var(--aqua)" text-anchor="middle" class="svg-mono">WON CONTENT → NEW ATOMS · THE LOOP</text>
+        </svg>
+      </div>
+
+      <div class="moat">
+        <div class="m"><div class="mt">Moat · 01</div><div class="md">Expert-curated skeletons &amp; molds — not DIY search.</div></div>
+        <div class="m"><div class="mt">Moat · 02</div><div class="md">A learning atom library that compounds every proposal.</div></div>
+        <div class="m"><div class="mt">Moat · 03</div><div class="md">Compliance baked in — tracked, not bolted on.</div></div>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="fbrand"><span class="fdot"></span> RFP&nbsp;Pipeline · Investor Overview</span>
+      <span class="pageno"><b>03</b> / 05</span>
+    </div>
+  </section>
+
+  <!-- ===================== SLIDE 4 · MARKET / MODEL ===================== -->
+  <section class="slide" aria-label="Slide 4: Market, wedge and business model">
+    <div class="accentbar"></div>
+    <div class="slide__inner">
+      <div class="eyebrow">Market · wedge · model</div>
+      <h2 class="headline">Land through <span class="hla">EconDev</span>; expand across every SBIR-seeking SMB.</h2>
+
+      <div class="mkt-grid">
+        <!-- MARKET FUNNEL -->
+        <svg viewBox="0 0 520 384" role="img" aria-label="Bottoms-up market funnel from R&amp;D-active US small businesses down to a founding cohort beachhead; all counts illustrative" class="svg-sans">
+          <!-- band 0 -->
+          <polygon points="30,18 350,18 316,92 64,92" fill="var(--f1)"/>
+          <text x="190" y="52" text-anchor="middle" font-size="15.5" font-weight="800" fill="var(--navy)">R&amp;D-active US SMBs</text>
+          <text x="190" y="74" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--navy)" opacity=".8" class="svg-mono">100k+ *</text>
+          <!-- band 1 -->
+          <polygon points="68,98 312,98 286,172 94,172" fill="var(--f2)"/>
+          <text x="190" y="132" text-anchor="middle" font-size="15.5" font-weight="800" fill="#fff">SBIR / STTR-seeking</text>
+          <text x="190" y="154" text-anchor="middle" font-size="13.5" font-weight="700" fill="#fff" opacity=".92" class="svg-mono">~25k *</text>
+          <!-- band 2 (THE WEDGE) -->
+          <polygon points="98,178 282,178 256,252 124,252" fill="var(--f3)" stroke="var(--amber)" stroke-width="3"/>
+          <text x="190" y="208" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">Reachable via EconDev</text>
+          <text x="190" y="226" text-anchor="middle" font-size="11.5" font-weight="600" fill="#fff" opacity=".9">accelerator · PTAC network</text>
+          <text x="190" y="244" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" class="svg-mono">~10k *</text>
+          <!-- wedge tag -->
+          <g><rect x="300" y="196" width="118" height="40" rx="8" fill="color-mix(in srgb, var(--amber) 16%, var(--paper))" stroke="var(--amber)"/>
+            <text x="359" y="212" text-anchor="middle" font-size="11.5" font-weight="800" fill="var(--amber)" class="svg-mono">◄ THE WEDGE</text>
+            <text x="359" y="228" text-anchor="middle" font-size="10.5" fill="var(--ink-soft)">1 partner → a portfolio</text></g>
+          <!-- band 3 (beachhead) -->
+          <polygon points="128,258 252,258 226,320 154,320" fill="var(--f4)"/>
+          <text x="190" y="284" text-anchor="middle" font-size="13.5" font-weight="800" fill="#fff">Founding cohort</text>
+          <text x="190" y="303" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff" opacity=".9" class="svg-mono">BEACHHEAD</text>
+          <!-- formula strip -->
+          <text x="30" y="356" font-size="13" font-weight="700" fill="var(--ink-soft)" class="svg-mono">SMBs × ( $299/mo + builds × fee )</text>
+          <text x="30" y="376" font-size="12" fill="var(--muted)">= recurring + per-proposal revenue</text>
+          <text x="490" y="356" text-anchor="end" font-size="11" fill="var(--amber)" class="svg-mono" font-weight="700">* ILLUSTRATIVE MODEL</text>
+        </svg>
+
+        <div>
+          <div class="wedge">
+            <div class="wt">Go-to-market wedge</div>
+            <p>Land <b>one EconDev organization</b> and reach its entire portfolio of small businesses. The stage-scoped <b>"shadow" role</b> lets that org support every build — a force multiplier, not a single seat.</p>
+          </div>
+
+          <table class="modeltable">
+            <caption>Business model — founding cohort</caption>
+            <tbody>
+              <tr><th>Spotlight subscription <span class="illtag">list</span></th><td>$299 / mo</td></tr>
+              <tr><th>Per-proposal build fee</th><td>per build*</td></tr>
+              <tr><th>Reachable SMBs via EconDev network</th><td>~10,000*</td></tr>
+              <tr class="hi"><th>Subscription revenue @ reach</th><td>~$36M / yr*</td></tr>
+              <tr><th>Per-proposal builds</th><td>additive upside*</td></tr>
+            </tbody>
+          </table>
+          <p class="disc"><b>Illustrative model — not a forecast.</b> Only the $299/mo list price and public SBIR award ranges are actual; every count and roll-up marked&nbsp;* is illustrative.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="fbrand"><span class="fdot"></span> RFP&nbsp;Pipeline · Investor Overview</span>
+      <span class="pageno"><b>04</b> / 05</span>
+    </div>
+  </section>
+
+  <!-- ===================== SLIDE 5 · WHY NOW / ASK ===================== -->
+  <section class="slide" aria-label="Slide 5: Why now, roadmap and the ask">
+    <div class="accentbar"></div>
+    <div class="slide__inner">
+      <div class="eyebrow">Why now · roadmap · the ask</div>
+      <h2 class="headline">The tailwinds just turned — <span class="hl">and the spine is live.</span></h2>
+
+      <div class="road-wrap">
+        <!-- ROADMAP / WHY-NOW MOTIF -->
+        <svg viewBox="0 0 1040 214" role="img" aria-label="Three why-now tailwinds above a Now, Next, Then roadmap" class="svg-sans">
+          <defs>
+            <marker id="rah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--blue)"/>
+            </marker>
+          </defs>
+          <!-- why-now tailwind pills -->
+          <g class="svg-mono">
+            <g><rect x="20" y="6" width="300" height="34" rx="17" fill="color-mix(in srgb, var(--blue) 11%, var(--paper))" stroke="var(--blue)" stroke-opacity=".4"/>
+              <path d="M300 23 h10 M304 18 l6 5 l-6 5" stroke="var(--blue)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="40" y="27.5" font-size="13" font-weight="700" fill="var(--ink)">AI can finally draft to spec</text></g>
+            <g><rect x="370" y="6" width="300" height="34" rx="17" fill="color-mix(in srgb, var(--aqua) 12%, var(--paper))" stroke="var(--aqua)" stroke-opacity=".45"/>
+              <path d="M650 23 h10 M654 18 l6 5 l-6 5" stroke="var(--aqua)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="390" y="27.5" font-size="13" font-weight="700" fill="var(--ink)">Non-dilutive capital in demand</text></g>
+            <g><rect x="720" y="6" width="300" height="34" rx="17" fill="color-mix(in srgb, var(--amber) 13%, var(--paper))" stroke="var(--amber)" stroke-opacity=".5"/>
+              <path d="M1000 23 h10 M1004 18 l6 5 l-6 5" stroke="var(--amber)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="740" y="27.5" font-size="13" font-weight="700" fill="var(--ink)">Government is digitizing</text></g>
+          </g>
+
+          <!-- baseline -->
+          <line x1="70" y1="86" x2="980" y2="86" stroke="var(--line-2)" stroke-width="2" marker-end="url(#rah)"/>
+
+          <!-- NOW -->
+          <circle cx="150" cy="86" r="9" fill="var(--blue)"/><circle cx="150" cy="86" r="15" fill="none" stroke="var(--blue)" stroke-opacity=".35" stroke-width="2"/>
+          <text x="150" y="70" text-anchor="middle" font-size="12.5" font-weight="800" fill="var(--blue)" class="svg-mono" letter-spacing="2">NOW</text>
+          <g class="svg-sans" fill="var(--ink-soft)" font-size="13">
+            <text x="150" y="118" text-anchor="middle" font-weight="800" fill="var(--ink)" font-size="13.5">Live &amp; shipping</text>
+            <text x="150" y="140" text-anchor="middle">Spine end-to-end</text>
+            <text x="150" y="160" text-anchor="middle">Agents drafting +</text>
+            <text x="150" y="177" text-anchor="middle">compliance review</text>
+            <text x="150" y="197" text-anchor="middle">Founding cohort onboarding</text>
+          </g>
+
+          <!-- NEXT -->
+          <circle cx="520" cy="86" r="9" fill="var(--aqua)"/><circle cx="520" cy="86" r="15" fill="none" stroke="var(--aqua)" stroke-opacity=".35" stroke-width="2"/>
+          <text x="520" y="70" text-anchor="middle" font-size="12.5" font-weight="800" fill="var(--aqua)" class="svg-mono" letter-spacing="2">NEXT</text>
+          <g class="svg-sans" fill="var(--ink-soft)" font-size="13">
+            <text x="520" y="118" text-anchor="middle" font-weight="800" fill="var(--ink)" font-size="13.5">Prove the wedge</text>
+            <text x="520" y="140" text-anchor="middle">First EconDev partnership</text>
+            <text x="520" y="160" text-anchor="middle">Curated skeletons across</text>
+            <text x="520" y="177" text-anchor="middle">more agencies</text>
+            <text x="520" y="197" text-anchor="middle">Learning library hardened</text>
+          </g>
+
+          <!-- THEN -->
+          <circle cx="890" cy="86" r="9" fill="var(--amber)"/><circle cx="890" cy="86" r="15" fill="none" stroke="var(--amber)" stroke-opacity=".4" stroke-width="2"/>
+          <text x="890" y="70" text-anchor="middle" font-size="12.5" font-weight="800" fill="var(--amber)" class="svg-mono" letter-spacing="2">THEN</text>
+          <g class="svg-sans" fill="var(--ink-soft)" font-size="13">
+            <text x="890" y="118" text-anchor="middle" font-weight="800" fill="var(--ink)" font-size="13.5">Scale the network</text>
+            <text x="890" y="140" text-anchor="middle">Multi-partner EconDev</text>
+            <text x="890" y="160" text-anchor="middle">OTA / CSO / BAA depth</text>
+            <text x="890" y="180" text-anchor="middle">Agent workforce scale</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="ask-grid">
+        <div class="ask">
+          <div class="at">The ask</div>
+          <p>We're raising to expand <b>expert curation</b>, advance the <b>AI drafting &amp; compliance</b> engine, and stand up the <b>founding cohort.</b></p>
+        </div>
+        <div class="use">
+          <div class="u"><span class="ubullet"></span><span><b>Curation</b> — widen expert-built skeletons &amp; molds across agencies and programs.</span></div>
+          <div class="u"><span class="ubullet"></span><span><b>AI</b> — grow the agent workforce and the learning atom library.</span></div>
+          <div class="u"><span class="ubullet"></span><span><b>Cohort</b> — onboard founding SMBs + a lead EconDev partner.</span></div>
+          <div class="contact"><b>RFP&nbsp;Pipeline</b> · Investor Overview · Confidential</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="fbrand"><span class="fdot"></span> RFP&nbsp;Pipeline · Investor Overview</span>
+      <span class="pageno"><b>05</b> / 05</span>
+    </div>
+  </section>
+
+</div>
