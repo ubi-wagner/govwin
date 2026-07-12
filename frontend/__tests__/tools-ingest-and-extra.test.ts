@@ -11,7 +11,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
 // module-import time — set it BEFORE any imports below.
 process.env.PIPELINE_INTERNAL_URL ??= 'http://pipeline.internal';
 
-const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
+const { sqlMock } = vi.hoisted(() => ({ sqlMock: Object.assign(vi.fn(), { json: (v) => v }) }));
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({ sql: sqlMock }));

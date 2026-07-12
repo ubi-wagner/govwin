@@ -491,7 +491,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${profileId}::uuid, ${userId}::uuid, 'import_topics',
           ${'Parsed ' + inserted.length + ' topics from pasted ' + format + ' content'},
           ${inserted.length},
-          ${JSON.stringify({ format, skippedCount: skipped.length, solicitationId })}::jsonb
+          ${sql.json({ format, skippedCount: skipped.length, solicitationId })}
         )
       `;
     } catch (e) {

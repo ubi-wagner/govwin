@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { authMock, sqlMock, sqlBeginMock, isValidUUIDMock, emitEventSingleMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
-  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock });
+  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock, json: (v) => v });
   return { authMock: vi.fn(), sqlMock, sqlBeginMock, isValidUUIDMock: vi.fn(), emitEventSingleMock: vi.fn() };
 });
 

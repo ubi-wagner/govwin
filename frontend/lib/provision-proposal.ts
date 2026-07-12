@@ -114,7 +114,7 @@ export async function provisionProposalForPortal(opts: {
           const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
-            VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+            VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
@@ -157,7 +157,7 @@ export async function provisionProposalForPortal(opts: {
         const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance });
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
-          VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+          VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
           RETURNING id
         `;
         const [defSection] = await tx<{ id: string }[]>`

@@ -343,7 +343,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${userRole},
                 'section_saved', ${sectionId}::uuid, ${section.title}, ${nextVersion},
-                ${JSON.stringify({ previous_version: section.version })}::jsonb)
+                ${sql.json({ previous_version: section.version })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/sections/save] activity log failed', logErr);

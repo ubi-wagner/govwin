@@ -370,7 +370,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
             VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType},
-                    ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+                    ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
@@ -461,7 +461,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
           VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative',
-                  ${JSON.stringify(defFormat)}::jsonb, ${JSON.stringify(defCompliance)}::jsonb)
+                  ${sql.json((defFormat) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((defCompliance) as unknown as Parameters<typeof sql.json>[0])})
           RETURNING id
         `;
         artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
@@ -669,7 +669,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposal.id}::uuid, ${tenantId}::uuid, ${userId}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'proposal_created',
-                ${JSON.stringify({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })}::jsonb)
+                ${sql.json({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/create] activity log failed', logErr);

@@ -265,7 +265,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
            sections_complete, sections_approved, notes)
         VALUES (
           ${proposalId}::uuid, ${previousStage}, ${actorId}::uuid,
-          ${JSON.stringify(sectionsSnapshot)}::jsonb,
+          ${sql.json(sectionsSnapshot)},
           ${sections.length},
           ${completeSections},
           ${approvedSections},
@@ -398,7 +398,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
       VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${actorId}::uuid,
               ${actorEmail ?? null}, ${actorRole},
               'stage_advanced', ${proposal.version + 1},
-              ${JSON.stringify({
+              ${sql.json({
                 from_stage: previousStage,
                 to_stage: finalStageValue,
                 notes: notes ?? undefined,
@@ -409,7 +409,7 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
                 forced: force,
                 forced_open: forcedOpenSections.length,
                 trigger,
-              })}::jsonb)
+              })})
     `;
   } catch (logErr) {
     console.error('[proposal-advance] activity log failed', logErr);

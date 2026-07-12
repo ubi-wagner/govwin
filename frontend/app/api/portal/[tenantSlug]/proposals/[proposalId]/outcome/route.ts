@@ -346,7 +346,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'outcome_recorded',
-                ${JSON.stringify({ outcome, notes: notes ?? undefined, atoms_updated: atomsUpdated })}::jsonb)
+                ${sql.json({ outcome, notes: notes ?? undefined, atoms_updated: atomsUpdated })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/outcome] activity log failed', logErr);

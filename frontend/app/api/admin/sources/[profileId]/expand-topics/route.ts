@@ -202,7 +202,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           'expand_topics',
           'pending',
           2,
-          ${JSON.stringify(metadata)}::jsonb
+          ${sql.json((metadata) as Parameters<typeof sql.json>[0])}
         )
         RETURNING id
       `;

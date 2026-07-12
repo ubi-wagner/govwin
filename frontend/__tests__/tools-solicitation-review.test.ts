@@ -15,6 +15,7 @@ const { sqlMock } = vi.hoisted(() => {
   const mock = vi.fn() as any;
   // sql.begin(async (tx) => { ... }) — pass the mock itself as tx
   mock.begin = vi.fn(async (fn: any) => fn(mock));
+  mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));

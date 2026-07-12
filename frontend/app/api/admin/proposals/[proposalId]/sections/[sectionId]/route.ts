@@ -66,7 +66,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     try {
       await sql`
         INSERT INTO canvas_versions (section_id, version_number, content, created_by, snapshot_reason)
-        VALUES (${sectionId}::uuid, ${versionNumber}, ${JSON.stringify(content)}::jsonb, ${userId ?? null}::uuid, 'auto_save')
+        VALUES (${sectionId}::uuid, ${versionNumber}, ${sql.json((content) as Parameters<typeof sql.json>[0])}, ${userId ?? null}::uuid, 'auto_save')
         ON CONFLICT (section_id, version_number) DO UPDATE SET
           content = EXCLUDED.content,
           created_at = now()

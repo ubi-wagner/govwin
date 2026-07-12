@@ -436,7 +436,7 @@ export const sourceScoutTool = defineTool<Input, Output>({
             (${sourceId}::uuid, ${region.id}::uuid,
              ${lastSnapshot?.id ?? null}::uuid, ${newSnapshotId}::uuid,
              ${isMeaningful}, ${summary},
-             ${JSON.stringify(extractedOpps)}::jsonb, ${severity},
+             ${sql.json((extractedOpps) as Parameters<typeof sql.json>[0])}, ${severity},
              ${analysis?.model ?? null}, ${analysis?.tokensUsed ?? null})
         `;
       } catch (err) {

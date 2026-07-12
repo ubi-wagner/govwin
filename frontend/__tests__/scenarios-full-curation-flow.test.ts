@@ -23,6 +23,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 const { sqlMock } = vi.hoisted(() => {
   const mock = vi.fn() as any;
   mock.begin = vi.fn(async (fn: any) => fn(mock));
+  mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));

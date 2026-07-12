@@ -105,8 +105,8 @@ export const memoryWriteTool = defineTool<Input, Output>({
             ${input.content},
             ${input.observation_type},
             ${input.importance},
-            ${JSON.stringify(input.entities)}::jsonb,
-            ${JSON.stringify(input.metadata)}::jsonb,
+            ${sql.json((input.entities) as Parameters<typeof sql.json>[0])},
+            ${sql.json((input.metadata) as Parameters<typeof sql.json>[0])},
             ${input.source ?? null}
           )
           RETURNING id
@@ -153,8 +153,8 @@ export const memoryWriteTool = defineTool<Input, Output>({
           ${ZERO_EMBEDDING_1536}::vector,
           ${input.name},
           ${input.description},
-          ${JSON.stringify(input.steps)}::jsonb,
-          ${JSON.stringify(input.trigger_conditions)}::jsonb
+          ${sql.json((input.steps) as Parameters<typeof sql.json>[0])},
+          ${sql.json((input.trigger_conditions) as Parameters<typeof sql.json>[0])}
         )
         RETURNING id
       `;

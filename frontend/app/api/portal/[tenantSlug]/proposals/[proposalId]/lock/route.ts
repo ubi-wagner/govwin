@@ -187,7 +187,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'proposal_locked', ${proposal.version + 1},
-                ${JSON.stringify({ lock_count: newLockCount })}::jsonb)
+                ${sql.json({ lock_count: newLockCount })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/lock] activity log failed', logErr);
@@ -413,7 +413,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'proposal_unlocked', ${proposal.version + 1},
-                ${JSON.stringify({ lock_count: proposal.lockCount, unlock_deadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null })}::jsonb)
+                ${sql.json({ lock_count: proposal.lockCount, unlock_deadline: proposal.lockCount === 1 ? unlockDeadline.toISOString() : null })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/lock] unlock activity log failed', logErr);

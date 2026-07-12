@@ -467,7 +467,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                   ${sessionUser.email ?? null}, ${role},
                   'proposal_exported',
-                  ${JSON.stringify({ section_count: parsedSections.length, format: 'docx' })}::jsonb)
+                  ${sql.json({ section_count: parsedSections.length, format: 'docx' })})
         `;
       } catch (logErr) {
         console.error('[portal/proposals/package] activity log failed', logErr);
@@ -650,7 +650,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'proposal_exported',
-                ${JSON.stringify({ section_count: sectionData.length, format: 'json' })}::jsonb)
+                ${sql.json({ section_count: sectionData.length, format: 'json' })})
       `;
     } catch (logErr) {
       console.error('[portal/proposals/package] activity log failed', logErr);

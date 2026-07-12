@@ -132,7 +132,7 @@ export const solicitationApproveTool = defineTool<Input, Output>({
           'status',
           'review_requested',
           'approved',
-          ${JSON.stringify({ curatedBy, notes: notes ?? null, selfApproved })}::jsonb
+          ${sql.json({ curatedBy, notes: notes ?? null, selfApproved })}
         )
       `;
     } catch (revErr) {

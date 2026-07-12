@@ -87,7 +87,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         'scout_source',
         'pending',
         3,
-        ${JSON.stringify({ source_id: profileId, triggered_by: userId })}::jsonb
+        ${sql.json({ source_id: profileId, triggered_by: userId })}
       )
       RETURNING id
     `;

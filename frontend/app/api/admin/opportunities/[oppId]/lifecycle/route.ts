@@ -105,7 +105,7 @@ export async function POST(request: Request, ctx: RouteContext) {
             INSERT INTO opportunity_lifecycle_actions
               (opportunity_id, actor_id, action, from_status, to_status, reason, metadata)
             VALUES (${oppId}::uuid, ${user.id}::uuid, 'close_date_change', ${fromStage}, ${fromStage}, ${reason},
-                    ${JSON.stringify({ newCloseDate })}::jsonb)
+                    ${sql.json({ newCloseDate })})
           `;
         });
       } catch (e) {
@@ -168,7 +168,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           INSERT INTO opportunity_lifecycle_actions
             (opportunity_id, actor_id, action, from_status, to_status, reason, metadata)
           VALUES (${oppId}::uuid, ${user.id}::uuid, ${action}, ${fromStage}, ${toStage}, ${reason},
-                  ${JSON.stringify({ toStage })}::jsonb)
+                  ${sql.json({ toStage })})
         `;
         return res.count;
       });

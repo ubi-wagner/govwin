@@ -202,7 +202,7 @@ export async function createTask(opts: {
         ${tenantId}::uuid, ${assigneeRole}, ${assigneeUserId}::uuid, ${taskType}, ${title},
         ${opts.description?.trim() || null}, ${opts.entityType?.trim() || null},
         ${opts.entityId?.trim() || null}::uuid, 'open', ${dueAtIso}::timestamptz,
-        ${JSON.stringify(nudgeDays)}::jsonb, ${sql.json((opts.params ?? {}) as Parameters<typeof sql.json>[0])}
+        ${sql.json(nudgeDays)}, ${sql.json((opts.params ?? {}) as Parameters<typeof sql.json>[0])}
       )
       RETURNING id
     `;
@@ -295,7 +295,7 @@ export async function completeTask(opts: {
     closed = await sql<{ id: string }[]>`
       UPDATE tasks
       SET status = 'completed',
-          result = ${JSON.stringify(result ?? {})}::jsonb,
+          result = ${sql.json((result ?? {}) as Parameters<typeof sql.json>[0])},
           completed_by = ${actor.id}::uuid,
           completed_at = now(),
           updated_at = now()

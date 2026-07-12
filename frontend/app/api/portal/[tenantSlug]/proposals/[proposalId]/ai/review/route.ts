@@ -175,7 +175,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                   ${sessionUser.email ?? null}, ${role},
                   'ai_review_requested',
-                  ${JSON.stringify({ sections_queued: sectionsQueued, review_type: reviewType })}::jsonb)
+                  ${sql.json({ sections_queued: sectionsQueued, review_type: reviewType })})
         `;
       } catch (logErr) {
         console.error('[portal/proposals/ai/review] activity log failed', logErr);
