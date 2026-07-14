@@ -64,6 +64,10 @@ interface Section {
   nodeCount: number;
   pageLimit?: number;
   requiredSubsections?: string[];
+  // Expert's curation note for this section (the "blank mold + prompt"). Passed to
+  // the drafter as the grounding instruction so a section with no atoms can still
+  // draft from the expert's prompt + the fallback all-proposal atoms.
+  expertNotes?: string;
 }
 
 interface Props {
@@ -138,6 +142,7 @@ export function DraftAllSections({
           evaluationCriteria,
           rfpExcerpt: rfpExcerpt?.slice(0, 10000),
           libraryAtoms,
+          instruction: sec.expertNotes?.trim() || undefined,
         });
 
         if (result.nodes && result.nodes.length > 0) {

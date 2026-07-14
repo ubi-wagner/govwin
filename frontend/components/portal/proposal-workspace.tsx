@@ -28,6 +28,7 @@ interface SectionItem {
   isLocked?: boolean;
   volumeName?: string | null;
   volumeNumber?: number | null;
+  expertNotes?: string | null;
 }
 
 interface StageHistoryEntry {
@@ -330,6 +331,7 @@ export function ProposalWorkspace({
             status: s.status,
             nodeCount: s.nodeCount,
             pageLimit: s.pageAllocation ?? undefined,
+            expertNotes: s.expertNotes ?? undefined,
           }))}
           onSectionDrafted={handleSectionDrafted}
           onComplete={handleDraftComplete}

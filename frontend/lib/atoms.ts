@@ -223,36 +223,46 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
   const context = q.context ?? [];
   const limit = Math.min(50, q.limit ?? 8);
 
-  const rows = await withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
-    tx`
-      SELECT a.id, a.title, a.summary, a.grain,
-             a.word_count AS "wordCount", a.char_count AS "charCount",
-             a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount",
-             -- a group carries no content of its own; assemble it from its ordered members
-             coalesce(a.content, (
-               SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
-               FROM atom_members am JOIN library_atoms m ON m.id = am.member_atom_id
-               WHERE am.group_atom_id = a.id
-             )) AS content,
-             (SELECT count(*)::int FROM atom_tags t
-                WHERE t.atom_id = a.id
-                  AND t.dimension IN ('agency','program','phase','tech','dept')
-                  AND t.value = ANY(${context}::text[])) AS "ctxMatches"
-      FROM library_atoms a
-      WHERE a.tenant_id = ${tenantId}::uuid
-        AND a.status = 'approved'
-        AND a.grain <> 'reference'
-        AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
-        AND EXISTS (
-          SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
-            (${vol}::text IS NOT NULL AND t.dimension = 'vol' AND t.value = ${vol})
-            OR (t.dimension = 'kind' AND t.value = ANY(${kinds}::text[]))
-          )
-        )
-      ORDER BY "ctxMatches" DESC, a.outcome_score DESC, a.usage_count DESC, a.created_at DESC
-      LIMIT ${limit}
-    `,
-  );
+  // `requireTag=true` scopes to the section's vol/kind atoms; `false` drops that
+  // filter → ALL of the tenant's approved atoms (still context-ranked). We run the
+  // scoped pass first, then fall back to the broad pass when the section has no
+  // matching atoms — Eric's "no atoms selected → the agent uses all other proposal
+  // atoms in place to try to generate" (the blank-mold-with-a-prompt path). Raw
+  // ${boolean} — never `${cond?'t':'f'}::bool`, which binds text and evaluates false.
+  const runQuery = (requireTag: boolean) =>
+    withTenant<Array<{ id: string; title: string | null; summary: string | null; content: string | null; grain: Grain; wordCount: number; charCount: number; outcomeScore: number; usageCount: number; ctxMatches: number }>>(tenantId, async (tx) =>
+      tx`
+        SELECT a.id, a.title, a.summary, a.grain,
+               a.word_count AS "wordCount", a.char_count AS "charCount",
+               a.outcome_score AS "outcomeScore", a.usage_count AS "usageCount",
+               -- a group carries no content of its own; assemble it from its ordered members
+               coalesce(a.content, (
+                 SELECT string_agg(m.content, E'\n\n' ORDER BY am.ordinal)
+                 FROM atom_members am JOIN library_atoms m ON m.id = am.member_atom_id
+                 WHERE am.group_atom_id = a.id
+               )) AS content,
+               (SELECT count(*)::int FROM atom_tags t
+                  WHERE t.atom_id = a.id
+                    AND t.dimension IN ('agency','program','phase','tech','dept')
+                    AND t.value = ANY(${context}::text[])) AS "ctxMatches"
+        FROM library_atoms a
+        WHERE a.tenant_id = ${tenantId}::uuid
+          AND a.status = 'approved'
+          AND a.grain <> 'reference'
+          AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
+          AND (${!requireTag} OR EXISTS (
+            SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND (
+              (${vol}::text IS NOT NULL AND t.dimension = 'vol' AND t.value = ${vol})
+              OR (t.dimension = 'kind' AND t.value = ANY(${kinds}::text[]))
+            )
+          ))
+        ORDER BY "ctxMatches" DESC, a.outcome_score DESC, a.usage_count DESC, a.created_at DESC
+        LIMIT ${limit}
+      `,
+    );
+
+  let rows = await runQuery(true);
+  if (rows.length === 0) rows = await runQuery(false); // fallback: all proposal atoms
   // final blended score (context is authoritative; quality/usage break ties)
   return rows.map((r) => ({
     ...r,
