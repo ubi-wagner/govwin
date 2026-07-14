@@ -14,11 +14,62 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { acceptGuardrails, revokeShadowAdmin, setPortalStatus, linkPortalProposal } from '@/lib/portal-launch';
+import { acceptGuardrails, releaseFromCuration, revokeShadowAdmin, setPortalStatus, linkPortalProposal } from '@/lib/portal-launch';
 import { getGuardrailLimits, validateGuardrailConfig, instantiatePortalWorkflow, advancePortalStage, type GuardrailConfig } from '@/lib/portal-workflow';
 import { provisionProposalForPortal } from '@/lib/provision-proposal';
+import { emitEventSingle } from '@/lib/events';
+import { randomUUID } from 'crypto';
 
-const STATUSES = ['guardrails_pending', 'launched', 'executing', 'closeout', 'archived', 'abandoned'];
+const STATUSES = ['guardrails_pending', 'curation_pending', 'launched', 'executing', 'closeout', 'archived', 'abandoned'];
+
+/** Minimal single-operator guardrails used when an admin releases a purchased workspace
+ *  (no collaborators/nudges — the customer just builds). Passes the guardrail limits. */
+const DEFAULT_RELEASE_GUARDRAILS = {
+  nudgeDays: [],
+  collaborators: [],
+  stages: [
+    { key: 'draft', label: 'Draft', todos: [] },
+    { key: 'review', label: 'Review', todos: [] },
+    { key: 'final', label: 'Final', todos: [] },
+  ],
+} as unknown as GuardrailConfig;
+
+/** Shared post-launch/release side effects: provision the build (if unbound) + instantiate ToDos. */
+async function provisionAndInstantiate(
+  g: { tenantId: string; tenantName: string; userId: string; userEmail: string | null; role: Role },
+  tenantSlug: string,
+  portalId: string,
+  config: GuardrailConfig,
+): Promise<{ proposalId: string | null; tasksCreated: number }> {
+  let proposalId: string | null = null;
+  let tasksCreated = 0;
+  try {
+    const [portalRow] = await withTenant(g.tenantId, async (tx) =>
+      tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
+        SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
+        FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
+    );
+    proposalId = portalRow?.proposalId ?? null;
+    if (portalRow && !proposalId) {
+      const prov = await provisionProposalForPortal({
+        tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
+        opportunityId: portalRow.opportunityId, label: portalRow.label,
+        actorId: g.userId, actorEmail: g.userEmail,
+      });
+      if ('proposalId' in prov) {
+        proposalId = prov.proposalId;
+        await linkPortalProposal(g.tenantId, portalId, proposalId);
+      } else {
+        console.error('[portal/portals/:id] provision failed', prov.error);
+      }
+    }
+    const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
+    ({ tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config));
+  } catch (postErr) {
+    console.error('[portal/portals/:id] post-launch/release side effects failed', postErr);
+  }
+  return { proposalId, tasksCreated };
+}
 
 async function gate(tenantSlug: string, portalId: string, minRole: Role) {
   const session = await auth();
@@ -108,6 +159,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         console.error('[portal/portals/:id] post-launch side effects failed (portal is launched)', postErr);
       }
       return NextResponse.json({ data: { launched: true, tasksCreated, proposalId } });
+    }
+    if (action === 'release') {
+      // RFP expert releases a PURCHASED workspace (curation_pending → launched) after
+      // finishing the skeleton curation: flip live, then provision the build UNLOCKED so
+      // the customer can pick atoms + draft. rfp_admin acts here via global tenant access.
+      let body: { guardrailConfig?: GuardrailConfig } = {};
+      try { body = await request.json(); } catch { /* body optional — default guardrails */ }
+      const config = (body.guardrailConfig ?? DEFAULT_RELEASE_GUARDRAILS) as GuardrailConfig;
+      const limits = await getGuardrailLimits();
+      const v = validateGuardrailConfig(config, limits);
+      if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
+      const { released } = await releaseFromCuration(g.tenantId, portalId, config, { releasedBy: g.userId });
+      if (!released) return NextResponse.json({ error: 'Portal is not awaiting curation (already released?)', code: 'CONFLICT' }, { status: 409 });
+      const { proposalId, tasksCreated } = await provisionAndInstantiate(g, tenantSlug, portalId, config);
+      try {
+        await emitEventSingle({
+          namespace: 'capture',
+          type: 'workspace.released',
+          actor: { type: 'user', id: g.userId, email: g.userEmail ?? undefined },
+          tenantId: g.tenantId,
+          payload: { correlationId: randomUUID(), portalId, proposalId },
+        });
+      } catch (evtErr) {
+        console.error('[portal/portals/:id] release event emit failed (non-fatal)', evtErr);
+      }
+      return NextResponse.json({ data: { released: true, proposalId, tasksCreated } });
     }
     if (action === 'advance-stage') {
       let body: { force?: boolean } = {};

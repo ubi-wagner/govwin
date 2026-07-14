@@ -34,7 +34,7 @@ const DEFAULT_GUARDRAILS = {
   ],
 };
 
-export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug: string; canManage: boolean }) {
+export default function ProposalPortals({ tenantSlug, canManage, isExpert = false }: { tenantSlug: string; canManage: boolean; isExpert?: boolean }) {
   const [portals, setPortals] = useState<Portal[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOpp, setNewOpp] = useState('');
@@ -134,6 +134,11 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
               <div className="flex flex-wrap items-center gap-2">
                 {p.status === 'guardrails_pending' && (
                   <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'accept', { guardrailConfig: DEFAULT_GUARDRAILS })} className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-1 disabled:opacity-50">Accept guardrails &amp; launch</button>
+                )}
+                {isExpert && p.status === 'curation_pending' && (
+                  <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'release')} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1 disabled:opacity-50" title="Finish curation, provision the build, and unlock it for the customer">
+                    {busy === p.id ? 'Releasing…' : 'Release to customer'}
+                  </button>
                 )}
                 {p.proposalId && (
                   <a href={`/portal/${tenantSlug}/proposals/${p.proposalId}`} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1">Open build &rarr;</a>

@@ -100,9 +100,11 @@ export async function listOpenTasksForActor(opts: {
  * the curation dashboard: a master_admin must see the rfp_admin triage ToDos that
  * the detection workflow parks (C2.b), not just tasks for their own role.
  *
- * Admin-scoped only (tenant_id IS NULL), mirroring the events convention. Soonest
- * due first, then oldest — the natural urgency order. Read-only; completion stays
- * with completeTask.
+ * Admin-scoped by default (tenant_id IS NULL), mirroring the events convention —
+ * PLUS the tenant-scoped `proposal_setup` gate (a customer purchase that needs expert
+ * curation + release; it must carry the buyer's tenant/opp, so it can't be null-tenant).
+ * Soonest due first, then oldest — the natural urgency order. Read-only; completion
+ * stays with completeTask.
  */
 export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
   return await sql<TaskRow[]>`
@@ -111,8 +113,8 @@ export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
            status, due_at, nudge_schedule, params, created_at
     FROM tasks
     WHERE status IN ('open', 'in_progress')
-      AND tenant_id IS NULL
       AND assignee_role IN ('rfp_admin', 'master_admin')
+      AND (tenant_id IS NULL OR task_type = 'proposal_setup')
     ORDER BY due_at ASC NULLS LAST, created_at ASC
     LIMIT ${limit}
   `;
