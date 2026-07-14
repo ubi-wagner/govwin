@@ -31,6 +31,7 @@ interface CheckResult {
 interface HealthResponse {
   ok: boolean;
   version: string;
+  release: string;
   environment: string;
   uptimeMs: number;
   checks: {
@@ -40,6 +41,10 @@ interface HealthResponse {
 }
 
 const BOOTED_AT = Date.now();
+// Coordinated cross-service release tag — bumped to force + verify a deploy of
+// every service (frontend/pipeline/CMS) in the same merge cycle. Curl /api/health
+// and compare `release` across services to confirm they're all on this build.
+const RELEASE = 'alpha-e2e-2026-07-14';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,6 +66,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   const body: HealthResponse = {
     ok: allOk,
     version: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev',
+    release: RELEASE,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
     checks: { db, s3 },

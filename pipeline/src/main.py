@@ -134,7 +134,10 @@ def handle_signal(sig: signal.Signals) -> None:
 async def main() -> None:
     env = os.getenv("RAILWAY_ENVIRONMENT_NAME", "local")
     sha = os.getenv("RAILWAY_GIT_COMMIT_SHA", "dev")[:7]
-    log.info("RFP Pipeline worker starting... (env=%s, version=%s)", env, sha)
+    # Coordinated cross-service release tag — bumped to force + verify a deploy of
+    # every service (frontend/pipeline/CMS) in the same merge cycle.
+    release = "alpha-e2e-2026-07-14"
+    log.info("RFP Pipeline worker starting... (release=%s, env=%s, version=%s)", release, env, sha)
 
     # Bootstrap seed: ensure a master_admin user exists so the
     # platform has a working login immediately after deploy.
