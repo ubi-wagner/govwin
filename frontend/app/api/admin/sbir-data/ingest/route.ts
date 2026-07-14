@@ -364,7 +364,9 @@ async function insertAwardBatch(rows: RawRow[]): Promise<void> {
         pi_name, pi_title, pi_phone, pi_email,
         ri_name, ri_poc_name, ri_poc_phone
       ) VALUES ${placeholders.join(', ')}
-      ON CONFLICT DO NOTHING`,
+      ON CONFLICT (agency_tracking_number)
+        WHERE agency_tracking_number IS NOT NULL AND agency_tracking_number <> ''
+        DO NOTHING`,
       params,
     );
   } catch (err) {

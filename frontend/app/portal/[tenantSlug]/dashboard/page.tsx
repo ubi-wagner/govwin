@@ -100,7 +100,7 @@ export default async function DashboardPage({
 
   try {
     const [pinRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM tenant_pipeline_items
+      SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards
       WHERE tenant_id = ${tenantId} AND is_pinned = true
     `;
     pinnedCount = parseInt(pinRow?.count ?? '0', 10);
@@ -121,7 +121,8 @@ export default async function DashboardPage({
   }
   try {
     const [spotRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM tenant_pipeline_items WHERE tenant_id = ${tenantId}
+      SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards
+      WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived'
     `;
     spotlightCount = parseInt(spotRow?.count ?? '0', 10);
   } catch (e) {

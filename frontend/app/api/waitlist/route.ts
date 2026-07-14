@@ -55,14 +55,16 @@ export async function POST(request: Request) {
 
     // ── Insert into waitlist ─────────────────────────────────────
     try {
-      const metadata = JSON.stringify({
+      // Write jsonb via sql.json so it round-trips as an object on read (a
+      // `${JSON.stringify(x)}::jsonb` write reads back as a STRING — CLIFFNOTES Mistake 36).
+      const metadata = sql.json({
         website: body.website ?? null,
         notes: body.notes ?? null,
       });
 
       const [entry] = await sql<{ id: string; createdAt: string }[]>`
         INSERT INTO waitlist (email, company_name, metadata)
-        VALUES (${body.email.toLowerCase().trim()}, ${body.company_name ?? null}, ${metadata}::jsonb)
+        VALUES (${body.email.toLowerCase().trim()}, ${body.company_name ?? null}, ${metadata})
         ON CONFLICT (email) DO UPDATE SET
           company_name = COALESCE(EXCLUDED.company_name, waitlist.company_name),
           metadata = waitlist.metadata || EXCLUDED.metadata

@@ -50,13 +50,6 @@ const REQUIRED_COMPLIANCE = [
   'submission_format',
 ] as const;
 
-// Non-null check that tolerates empty string ("" ≠ populated).
-function isPopulated(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  return true;
-}
-
 export const solicitationPushTool = defineTool<Input, Output>({
   name: 'solicitation.push',
   namespace: 'solicitation',
@@ -80,14 +73,29 @@ export const solicitationPushTool = defineTool<Input, Output>({
         submissionFormat: string | null;
         pageLimitTechnical: number | null;
         customVariables: Record<string, unknown> | null;
+        hasSubmissionFormat: boolean;
       }[]
     >`
       SELECT cs.status, cs.namespace, cs.opportunity_id,
              sc.submission_format, sc.page_limit_technical,
-             sc.custom_variables
+             sc.custom_variables,
+             -- Gate satisfiability: submission_format populated ANYWHERE for this
+             -- solicitation — the curator's verified layer (custom_variables.value,
+             -- written by compliance.save_variable_value) OR a named column, at the
+             -- solicitation OR any topic level. The interactive curation flow writes
+             -- only custom_variables, so a named-column-only check blocked solo push.
+             EXISTS (
+               SELECT 1 FROM solicitation_compliance x
+               WHERE x.solicitation_id = cs.id AND (
+                 NULLIF(x.submission_format, '') IS NOT NULL
+                 OR NULLIF(x.custom_variables->'submission_format'->>'value', '') IS NOT NULL
+               )
+             ) AS has_submission_format
       FROM curated_solicitations cs
+      -- Read the solicitation-level row (topic_id IS NULL) — the same row
+      -- buildCardSnapshot uses, so the gate and the customer card agree.
       LEFT JOIN solicitation_compliance sc
-        ON sc.solicitation_id = cs.id
+        ON sc.solicitation_id = cs.id AND sc.topic_id IS NULL
       WHERE cs.id = ${solicitationId}::uuid
     `;
     } catch (err) {
@@ -107,10 +115,13 @@ export const solicitationPushTool = defineTool<Input, Output>({
       );
     }
 
-    // 2. Validate required compliance variables.
+    // 2. Validate required compliance variables. submission_format counts as
+    //    present if the curator set it either via the interactive tool
+    //    (custom_variables.value) or a named column (preset/shredder) — see the
+    //    has_submission_format existence check in the preflight.
     const missing: string[] = [];
     for (const varName of REQUIRED_COMPLIANCE) {
-      if (varName === 'submission_format' && !isPopulated(r.submissionFormat)) {
+      if (varName === 'submission_format' && !r.hasSubmissionFormat) {
         missing.push(varName);
       }
     }
@@ -153,7 +164,12 @@ export const solicitationPushTool = defineTool<Input, Output>({
       // in this same txn.
       await tx`
         UPDATE opportunities
-        SET is_active = true, updated_at = now()
+        SET is_active = true, updated_at = now(),
+            submission_stage = 'open',
+            open_date   = COALESCE(open_date, now()),
+            released_by = COALESCE(released_by, ${actorId}::uuid),
+            released_at = COALESCE(released_at, now()),
+            built_by    = COALESCE(built_by, (SELECT curated_by FROM curated_solicitations WHERE id = ${solicitationId}::uuid))
         WHERE solicitation_id = ${solicitationId}::uuid
            OR id = ${r.opportunityId}::uuid
       `;
@@ -232,17 +248,33 @@ export const solicitationPushTool = defineTool<Input, Output>({
       },
     });
 
-    // 5b. Publish the card to the forward-only bridge + fan out a thin copy to
-    // every subscribed tenant (greenfield opportunity-card spine, mig 094).
-    // Best-effort: the push already succeeded; replication is idempotent and can be
-    // re-driven by a backfill, so a failure here must not fail the push.
+    // 5b. Publish EVERY activated opportunity to the forward-only bridge + fan out
+    // a thin card to every subscribed tenant (greenfield opportunity-card spine,
+    // mig 094). The activation set is the landing opportunity PLUS every topic of
+    // the solicitation — so a multi-topic BAA lands N topic cards for customers,
+    // not just one umbrella card (the bridge is the canonical admin→customer
+    // coupling). Best-effort: the push already succeeded; replication is
+    // idempotent and can be re-driven by a backfill, so a failure here (per
+    // opportunity or overall) must not fail the push.
     try {
-      const result = await publishAndFanOut(r.opportunityId, 'published', actorId, new Date().toISOString());
-      if (result) {
-        ctx.log?.info?.({ msg: 'bridge published + fanned out', opportunityId: r.opportunityId, version: result.event.version, tenantsApplied: result.tenantsApplied });
+      const activated = await sql<{ id: string }[]>`
+        SELECT id FROM opportunities
+        WHERE solicitation_id = ${solicitationId}::uuid
+           OR id = ${r.opportunityId}::uuid
+      `;
+      const stamp = new Date().toISOString();
+      let published = 0;
+      for (const opp of activated) {
+        try {
+          const result = await publishAndFanOut(opp.id, 'published', actorId, stamp);
+          if (result) published++;
+        } catch (oneErr) {
+          ctx.log?.warn?.({ msg: 'bridge publish failed for opportunity (non-fatal)', opportunityId: opp.id, err: oneErr instanceof Error ? oneErr.message : String(oneErr) });
+        }
       }
+      ctx.log?.info?.({ msg: 'bridge published + fanned out', solicitationId, opportunitiesPublished: published, ofActivated: activated.length });
     } catch (bridgeErr) {
-      ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', opportunityId: r.opportunityId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
+      ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', solicitationId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
     }
 
     // 6. HITL memory write — the BIG one. Push is the final curation

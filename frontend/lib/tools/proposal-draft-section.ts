@@ -18,16 +18,19 @@ import { createNode } from '@/lib/types/canvas-document';
 import type { CanvasNode, HeadingContent, TextBlockContent, ListContent } from '@/lib/types/canvas-document';
 import { ToolAuthorizationError, ToolExecutionError, ToolExternalError } from './errors';
 import { assertAgentBudget, recordAgentSpend } from '@/lib/ai/agent-guard';
+import { computeSectionBudget, evaluateFit, type SectionBudget, type FitResult } from '@/lib/section-budget';
 
 // ─── Input schema ──────────────────────────────────────────────────
 
 const InputSchema = z.object({
   proposalId: z.string().uuid(),
   sectionTitle: z.string().min(1).max(500),
-  // Compliance constraints that bound the AI's output
+  // Compliance constraints that bound the AI's output (the section "mold")
   pageLimit: z.number().int().min(1).max(100).optional(),
   fontFamily: z.string().max(100).optional(),
   fontSize: z.number().optional(),
+  lineSpacing: z.number().optional(),
+  imagesAllowed: z.boolean().optional(),
   requiredSubsections: z.array(z.string()).optional(),
   evaluationCriteria: z.array(z.string()).optional(),
   // Context for the AI
@@ -49,12 +52,13 @@ interface Output {
   inputTokens: number;
   outputTokens: number;
   model: string;
+  fit?: FitResult;
   error?: string;
 }
 
 // ─── System prompt construction ────────────────────────────────────
 
-function buildSystemPrompt(input: Input): string {
+function buildSystemPrompt(input: Input, budget: SectionBudget | null): string {
   const lines: string[] = [
     'You are a senior government proposal writer. Your task is to draft a section of a federal proposal.',
     'You must output ONLY a valid JSON array of CanvasNode objects. Do not include any text outside the JSON array.',
@@ -80,13 +84,20 @@ function buildSystemPrompt(input: Input): string {
     '- Address evaluation criteria directly when provided.',
   ];
 
-  // Compliance constraints
-  if (input.pageLimit) {
-    lines.push(`- The section must fit within ${input.pageLimit} page(s). Be concise.`);
+  // Compliance constraints — the section "mold" that bounds the fill.
+  if (budget) {
+    lines.push(
+      `- HARD LENGTH BUDGET: this section is limited to ${input.pageLimit} page(s) ≈ ${budget.targetWords} words. Aim for about ${budget.targetWords} words and DO NOT exceed ${budget.maxWords} words total. Exceeding a federal page limit disqualifies the proposal, so prioritize the required subsections and evaluation criteria within the budget and cut all filler.`,
+    );
   }
   if (input.fontFamily || input.fontSize) {
     const font = [input.fontFamily, input.fontSize ? `${input.fontSize}pt` : ''].filter(Boolean).join(' ');
     lines.push(`- Target font: ${font}. Adjust content density accordingly.`);
+  }
+  if (input.imagesAllowed === false) {
+    lines.push('- Images and figures are NOT permitted in this section. Do not reference figures, images, or graphics — convey everything in prose, lists, and tables.');
+  } else if (input.imagesAllowed === true) {
+    lines.push('- Figures are permitted. Where a graphic materially strengthens the argument you may insert a "[Figure N: <caption>]" placeholder, but never fabricate image data.');
   }
 
   // Required subsections
@@ -155,64 +166,80 @@ async function draftWithClaude(input: Input, actorId: string, actorName: string)
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const systemPrompt = buildSystemPrompt(input);
-  const userMessage = buildUserMessage(input);
+  const budget = computeSectionBudget({ pageLimit: input.pageLimit, fontSize: input.fontSize, lineSpacing: input.lineSpacing });
+  // Cap generation to the budget (~1.6 tokens/word) + headroom for JSON structure.
+  const maxTokens = budget ? Math.min(8192, Math.ceil(budget.maxWords * 1.6) + 1024) : 8192;
+  const systemPrompt = buildSystemPrompt(input, budget);
 
-  let response;
-  try {
-    response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Anthropic API call failed';
-    throw new ToolExternalError(`Claude API error: ${message}`, { originalError: message });
-  }
-
-  // Extract text from the response
-  const textBlock = response.content.find((b) => b.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new ToolExecutionError('Claude returned no text content');
-  }
-
-  const rawJson = textBlock.text.trim();
-
-  // Parse the JSON response
-  let parsedNodes: Array<{ type: string; content: unknown }>;
-  try {
-    // Strip markdown fences if Claude added them despite instructions
-    const cleaned = rawJson.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-    parsedNodes = JSON.parse(cleaned);
-  } catch {
-    throw new ToolExecutionError('Failed to parse Claude response as JSON', 422, {
-      rawResponse: rawJson.slice(0, 500),
-    });
-  }
-
-  if (!Array.isArray(parsedNodes)) {
-    throw new ToolExecutionError('Claude response is not a JSON array', 422);
-  }
-
-  // Convert parsed nodes to CanvasNode[] with provenance
-  const nodes: CanvasNode[] = parsedNodes.map((raw) => {
-    const nodeType = raw.type as CanvasNode['type'];
-    return createNode({
-      type: nodeType,
+  // One Claude round-trip → parsed CanvasNode[] + usage.
+  const gen = async (userMessage: string): Promise<{ nodes: CanvasNode[]; inputTokens: number; outputTokens: number; model: string }> => {
+    let response;
+    try {
+      response = await client.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Anthropic API call failed';
+      throw new ToolExternalError(`Claude API error: ${message}`, { originalError: message });
+    }
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new ToolExecutionError('Claude returned no text content');
+    }
+    const rawJson = textBlock.text.trim();
+    let parsedNodes: Array<{ type: string; content: unknown }>;
+    try {
+      const cleaned = rawJson.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+      parsedNodes = JSON.parse(cleaned);
+    } catch {
+      throw new ToolExecutionError('Failed to parse Claude response as JSON', 422, { rawResponse: rawJson.slice(0, 500) });
+    }
+    if (!Array.isArray(parsedNodes)) {
+      throw new ToolExecutionError('Claude response is not a JSON array', 422);
+    }
+    const nodes: CanvasNode[] = parsedNodes.map((raw) => createNode({
+      type: raw.type as CanvasNode['type'],
       content: raw.content as CanvasNode['content'],
       source: 'ai_draft',
       actorId,
       actorName,
-    });
-  });
-
-  return {
-    nodes,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    model: response.model,
+    }));
+    return { nodes, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, model: response.model };
   };
+
+  const userMessage = buildUserMessage(input);
+  const first = await gen(userMessage);
+  let nodes = first.nodes;
+  let inputTokens = first.inputTokens;
+  let outputTokens = first.outputTokens;
+  let model = first.model;
+  let fit = evaluateFit(nodes, budget);
+
+  // The mold defines what fits: if the draft overflows the section's hard ceiling,
+  // do exactly ONE tighten-regenerate pass before handing it back.
+  if (budget && !fit.withinBudget) {
+    const tightenMsg = [
+      userMessage,
+      '',
+      `Your previous draft was ${fit.words} words — OVER the ${budget.maxWords}-word ceiling for this ${input.pageLimit}-page section.`,
+      `Produce a TIGHTER version of the same content — keep every required subsection and evaluation-criteria response — under ${budget.maxWords} words. Cut redundancy and filler. Respond with ONLY the JSON array.`,
+    ].join('\n');
+    try {
+      const second = await gen(tightenMsg);
+      nodes = second.nodes;
+      inputTokens += second.inputTokens;
+      outputTokens += second.outputTokens;
+      model = second.model;
+      fit = evaluateFit(nodes, budget);
+    } catch {
+      // Keep the first (over-budget) draft; fit.withinBudget=false flags it for the user.
+    }
+  }
+
+  return { nodes, inputTokens, outputTokens, model, fit };
 }
 
 // ─── Placeholder drafting (no API key) ─────────────────────────────
@@ -306,11 +333,13 @@ function draftPlaceholder(input: Input, actorId: string, actorName: string): Out
     }));
   }
 
+  const budget = computeSectionBudget({ pageLimit: input.pageLimit, fontSize: input.fontSize, lineSpacing: input.lineSpacing });
   return {
     nodes,
     inputTokens: 0,
     outputTokens: 0,
     model: 'placeholder',
+    fit: evaluateFit(nodes, budget),
   };
 }
 

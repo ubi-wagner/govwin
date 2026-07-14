@@ -32,9 +32,11 @@ async function run() {
     )
   `;
 
-  // List migration files
+  // List migration files. Match any 3-digit-prefixed .sql (000..NNN, incl. letter
+  // suffixes like 030a). NOTE: the prior /^0\d+/ only matched the 0xx range, so
+  // migration 100+ would have been silently skipped — keep this digit-count based.
   const files = (await readdir(__dirname))
-    .filter(f => /^0\d+.*\.sql$/.test(f))
+    .filter(f => /^\d{3}.*\.sql$/.test(f))
     .sort();
 
   let applied = 0;

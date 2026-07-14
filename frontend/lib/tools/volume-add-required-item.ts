@@ -28,6 +28,11 @@ const InputSchema = z.object({
   headerFormat: z.string().max(500).optional(),
   footerFormat: z.string().max(500).optional(),
   appliesToPhase: z.array(z.string().max(100)).optional(),
+  // Link an authored canvas template + a per-item grounding note. Provisioning
+  // consumes these (provision-proposal.ts / create-route: SELECT canvas_document by
+  // template_id → interpolate into the section mold; expert_notes → section.meta).
+  templateId: z.string().uuid().nullable().optional(),
+  expertNotes: z.string().max(5000).nullable().optional(),
 });
 
 type Input = z.infer<typeof InputSchema>;
@@ -58,7 +63,8 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
         INSERT INTO volume_required_items
           (volume_id, item_number, item_name, item_type, required,
            page_limit, slide_limit, font_family, font_size, margins,
-           line_spacing, header_format, footer_format, applies_to_phase)
+           line_spacing, header_format, footer_format, applies_to_phase,
+           template_id, expert_notes)
         VALUES
           (${input.volumeId}::uuid,
            ${input.itemNumber},
@@ -73,7 +79,9 @@ export const volumeAddRequiredItemTool = defineTool<Input, Output>({
            ${input.lineSpacing ?? null},
            ${input.headerFormat ?? null},
            ${input.footerFormat ?? null},
-           ${input.appliesToPhase ?? null}::text[])
+           ${input.appliesToPhase ?? null}::text[],
+           ${input.templateId ?? null}::uuid,
+           ${input.expertNotes ?? null})
         RETURNING id
       `;
     } catch (err) {

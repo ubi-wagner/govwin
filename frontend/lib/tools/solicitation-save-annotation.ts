@@ -77,8 +77,8 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
         VALUES
           (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
            ${complianceVariableName ?? null},
-           ${JSON.stringify(sourceLocation)}::jsonb,
-           ${JSON.stringify(payload)}::jsonb)
+           ${sql.json(sourceLocation)},
+           ${sql.json((payload) as Parameters<typeof sql.json>[0])})
         RETURNING id, created_at
       `;
     } catch (err) {
@@ -98,7 +98,7 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
           'annotation_added',
           ${complianceVariableName ?? null},
           ${kind},
-          ${JSON.stringify({ annotationId: rows[0].id, sourceLocation, payload })}::jsonb
+          ${sql.json(({ annotationId: rows[0].id, sourceLocation, payload }) as Parameters<typeof sql.json>[0])}
         )
       `;
     } catch (revErr) {

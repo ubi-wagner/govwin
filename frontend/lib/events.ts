@@ -25,6 +25,12 @@ import { createLogger } from './logger';
 
 const log = createLogger('events');
 
+// Write jsonb payloads as OBJECTS via sql.json (NOT `${JSON.stringify(x)}::jsonb`,
+// which stores a jsonb string scalar so `payload->>'field'` returns null for every
+// audit/automation consumer). sql.json's JSONValue type is stricter than our loose
+// payloads, so cast at the boundary (same idiom as lib/opportunity-bridge).
+const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 /**
@@ -117,7 +123,7 @@ export async function emitEventStart(params: EmitStartParams): Promise<string> {
         ${params.actor.email ?? null},
         ${params.tenantId ?? null},
         ${params.parentEventId ?? null},
-        ${JSON.stringify(params.payload ?? {})}::jsonb
+        ${jsonParam(params.payload ?? {})}
       )
       RETURNING id
     `;
@@ -193,8 +199,8 @@ export async function emitEventEnd(
         ${start.actorEmail},
         ${start.tenantId},
         ${startEventId},
-        ${JSON.stringify(params.result ?? {})}::jsonb,
-        ${params.error ? JSON.stringify(params.error) : null}::jsonb,
+        ${jsonParam(params.result ?? {})},
+        ${params.error ? jsonParam(params.error) : null},
         ${durationMs}
       )
     `;
@@ -225,7 +231,7 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
         ${params.actor.id},
         ${params.actor.email ?? null},
         ${params.tenantId ?? null},
-        ${JSON.stringify(params.payload ?? {})}::jsonb
+        ${jsonParam(params.payload ?? {})}
       )
     `;
   } catch (err) {

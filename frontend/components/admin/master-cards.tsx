@@ -2,21 +2,29 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { STAGE_LABEL, allowedTransitions, isSubmissionStage, type SubmissionStage } from '@/lib/lifecycle';
 
 export interface MasterCard {
   opportunityId: string;
   title: string | null;
   agency: string | null;
   office: string | null;
+  orgUnit: string | null;
   programType: string | null;
   solicitationNumber: string | null;
   topicNumber: string | null;
   lifecycleStatus: string | null;
+  submissionStage: string | null;
   isActive: boolean;
   closeDate: string | null;
   postedDate: string | null;
+  preReleaseDate: string | null;
+  openDate: string | null;
   ingestedAt: string;
   oppUpdatedAt: string | null;
+  releasedByEmail: string | null;
+  releasedAt: string | null;
+  expertNotes: string | null;
   solicitationId: string | null;
   curationStatus: string | null;
   namespace: string | null;
@@ -33,7 +41,7 @@ export interface MasterCard {
   pinnedCount: number;
 }
 
-type SortKey = 'ingestedAt' | 'lastUpdate' | 'title' | 'curationStatus' | 'matrix' | 'bridgeVersion' | 'replicantCount' | 'closeDate';
+type SortKey = 'ingestedAt' | 'lastUpdate' | 'title' | 'curationStatus' | 'stage' | 'matrix' | 'bridgeVersion' | 'replicantCount' | 'closeDate';
 type SortDir = 'asc' | 'desc';
 
 const CURATION_COLORS: Record<string, string> = {
@@ -45,11 +53,15 @@ const CURATION_COLORS: Record<string, string> = {
   pushed_to_pipeline: 'bg-green-100 text-green-700',
   dismissed: 'bg-gray-100 text-gray-500',
 };
-const LIFECYCLE_COLORS: Record<string, string> = {
+const STAGE_COLORS: Record<string, string> = {
+  nofo: 'bg-slate-100 text-slate-700',
+  pre_release: 'bg-indigo-100 text-indigo-700',
   open: 'bg-green-100 text-green-700',
+  updated: 'bg-blue-100 text-blue-700',
   closed: 'bg-amber-100 text-amber-700',
   archived: 'bg-gray-100 text-gray-500',
 };
+const STAGE_RANK: Record<string, number> = { nofo: 0, pre_release: 1, open: 2, updated: 3, closed: 4, archived: 5 };
 
 const ms = (s: string | null): number => (s ? new Date(s).getTime() : 0);
 const lastUpdateMs = (c: MasterCard): number => Math.max(ms(c.ingestedAt), ms(c.oppUpdatedAt), ms(c.curationUpdatedAt), ms(c.lastPublishedAt));
@@ -64,6 +76,22 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
   const [q, setQ] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('ingestedAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Move a card through the canonical 6-state lifecycle. Fans out to tenant cards
+  // server-side (lib/lifecycle transitions are enforced there too).
+  const changeStage = useCallback(async (oppId: string, toStage: SubmissionStage) => {
+    setBusy(oppId); setErr(null);
+    try {
+      const res = await fetch(`/api/admin/opportunities/${oppId}/lifecycle`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_stage', toStage }),
+      });
+      if (res.ok) router.refresh();
+      else { const j = await res.json().catch(() => ({})); setErr((j as { error?: string }).error || 'Stage change failed'); }
+    } catch { setErr('Stage change failed'); } finally { setBusy(null); }
+  }, [router]);
 
   // Auto-refresh every 30s (matches /admin/system-state) so the fan-out counts stay live.
   useEffect(() => {
@@ -98,6 +126,7 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
       switch (sortKey) {
         case 'title': d = (a.title ?? '').localeCompare(b.title ?? ''); break;
         case 'curationStatus': d = (a.curationStatus ?? '').localeCompare(b.curationStatus ?? ''); break;
+        case 'stage': d = (STAGE_RANK[a.submissionStage ?? ''] ?? -1) - (STAGE_RANK[b.submissionStage ?? ''] ?? -1); break;
         case 'matrix': d = (a.volumeCount * 1000 + a.itemCount) - (b.volumeCount * 1000 + b.itemCount); break;
         case 'bridgeVersion': d = (a.bridgeVersion ?? -1) - (b.bridgeVersion ?? -1); break;
         case 'replicantCount': d = a.replicantCount - b.replicantCount; break;
@@ -140,6 +169,7 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
           {rows.length} shown · {cards.length} total · {published} on bridge · {replicated} replicated
         </span>
       </div>
+      {err && <p className="text-xs text-rose-600 -mt-1">{err}</p>}
 
       {cards.length === 0 ? (
         <p className="text-sm text-gray-400 py-10 text-center">No opportunities ingested yet.</p>
@@ -153,7 +183,7 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
                 <Th label="Matrix" k="matrix" />
                 <Th label="Bridge" k="bridgeVersion" />
                 <Th label="Replicated" k="replicantCount" />
-                <Th label="Lifecycle" />
+                <Th label="Stage" k="stage" />
                 <Th label="Ingested" k="ingestedAt" className="whitespace-nowrap" />
                 <Th label="Last update" k="lastUpdate" className="whitespace-nowrap" />
                 <Th label="Close" k="closeDate" className="whitespace-nowrap" />
@@ -162,16 +192,20 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
             <tbody>
               {rows.map((c) => {
                 const cur = c.curationStatus ?? 'uncurated';
-                const lc = c.lifecycleStatus ?? 'open';
                 const hasMatrix = c.volumeCount > 0 || c.itemCount > 0;
                 return (
                   <tr key={c.opportunityId} className="border-t border-gray-100 hover:bg-gray-50 align-top">
                     <td className="px-3 py-2 max-w-xs">
                       <div className="font-medium text-gray-900 truncate" title={c.title ?? ''}>{c.title || 'Untitled'}</div>
                       <div className="text-xs text-gray-400 truncate">
-                        {[c.agency, c.programType].filter(Boolean).join(' · ') || '—'}
+                        {[c.agency, c.office, c.orgUnit, c.programType].filter(Boolean).join(' · ') || '—'}
                         {c.topicNumber ? ` · ${c.topicNumber}` : c.solicitationNumber ? ` · ${c.solicitationNumber}` : ''}
                       </div>
+                      {c.releasedByEmail && (
+                        <div className="text-[10px] text-gray-400 truncate" title={`Released ${fmtDateTime(c.releasedAt)}`}>
+                          released by {c.releasedByEmail}{c.releasedAt ? ` · ${fmtDate(c.releasedAt)}` : ''}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${CURATION_COLORS[cur] ?? 'bg-gray-100 text-gray-500'}`}>
@@ -201,7 +235,27 @@ export function MasterCards({ cards }: { cards: MasterCard[] }) {
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${LIFECYCLE_COLORS[lc] ?? 'bg-gray-100 text-gray-600'}`}>{lc}</span>
+                      {(() => {
+                        const stage: SubmissionStage = isSubmissionStage(c.submissionStage) ? c.submissionStage : 'open';
+                        const opts = allowedTransitions(stage);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${STAGE_COLORS[stage] ?? 'bg-gray-100 text-gray-600'}`}>{STAGE_LABEL[stage]}</span>
+                            {opts.length > 0 && (
+                              <select
+                                aria-label="Change stage"
+                                disabled={busy === c.opportunityId}
+                                value=""
+                                onChange={(e) => { if (isSubmissionStage(e.target.value)) changeStage(c.opportunityId, e.target.value); }}
+                                className="text-[11px] border border-gray-200 rounded px-1 py-0.5 text-gray-500 max-w-[7.5rem] disabled:opacity-50"
+                              >
+                                <option value="">move →</option>
+                                {opts.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtDateTime(c.ingestedAt)}>{fmtDate(c.ingestedAt)}</td>
                     <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title={fmtMsTime(lastUpdateMs(c))}>{fmtMs(lastUpdateMs(c))}</td>

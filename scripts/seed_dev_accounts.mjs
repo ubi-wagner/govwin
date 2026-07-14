@@ -67,19 +67,26 @@ async function backfillTenantCards(tenantId) {
   for (const h of heads) {
     const card = h.card;
     if (!card) continue;
-    const lifecycle =
-      h.event_type === 'closed' ? 'closed'
+    const STAGES = ['nofo', 'pre_release', 'open', 'updated', 'closed', 'archived'];
+    // Canonical 6-state stage — prefer the card's own stage, else derive from event/lifecycle.
+    const stage =
+      STAGES.includes(card.submissionStage) ? card.submissionStage
+      : h.event_type === 'closed' ? 'closed'
+      : h.event_type === 'archived' ? 'archived'
       : h.event_type === 'reopened' ? 'open'
       : card.lifecycleStatus === 'archived' ? 'archived'
       : card.lifecycleStatus === 'closed' ? 'closed'
       : 'open';
+    // Coarse lifecycle_status the feed filters on (nofo/pre_release/updated all read as open).
+    const lifecycle = stage === 'closed' ? 'closed' : stage === 'archived' ? 'archived' : 'open';
     await sql`
-      INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status)
-      VALUES (${tenantId}::uuid, ${h.opportunity_id}::uuid, ${sql.json(card)}, ${h.version}, ${lifecycle})
+      INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage)
+      VALUES (${tenantId}::uuid, ${h.opportunity_id}::uuid, ${sql.json(card)}, ${h.version}, ${lifecycle}, ${stage})
       ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
         card = EXCLUDED.card,
         bridge_version = EXCLUDED.bridge_version,
         lifecycle_status = EXCLUDED.lifecycle_status,
+        submission_stage = EXCLUDED.submission_stage,
         pin_update_available = CASE
           WHEN tenant_opportunity_cards.is_pinned AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
           THEN true ELSE tenant_opportunity_cards.pin_update_available END,

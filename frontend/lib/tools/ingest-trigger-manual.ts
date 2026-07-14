@@ -50,7 +50,7 @@ export const ingestTriggerManualTool = defineTool<Input, Output>({
           (source, kind, status, priority, metadata)
         VALUES
           (${source}, 'ingest', 'pending', ${priority},
-           ${JSON.stringify({ run_type: runType, triggered_by: actorId, manual: true })}::jsonb)
+           ${sql.json({ run_type: runType, triggered_by: actorId, manual: true })})
         RETURNING id
       `;
     } catch (err) {

@@ -416,7 +416,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'collaborator_invited',
-                ${JSON.stringify({ email, name, role: collabRole, permission, sections_assigned: assignedSections, is_new_user: isNewUser })}::jsonb)
+                ${sql.json({ email, name, role: collabRole, permission, sections_assigned: assignedSections, is_new_user: isNewUser })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/collaborators] activity log failed', logErr);

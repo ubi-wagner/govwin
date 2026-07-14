@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
+import { resolveUserAccess } from '@/lib/proposal-access';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -59,7 +60,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     // ── Input validation ─────────────────────────────────────────────
-    let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown };
+    let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown; baseVersion?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -121,37 +122,28 @@ export async function PUT(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Edit window expired', code: 'EDIT_WINDOW_EXPIRED' }, { status: 423 });
     }
 
-    // 2a. Edit permission check
-    if (!hasRoleAtLeast(role, 'tenant_admin')) {
-      // Non-admin users: check collaborator edit permission for current stage
-      let collabAccess: { permission: string } | undefined;
-      try {
-        [collabAccess] = await sql<{ permission: string }[]>`
-          SELECT csa.permission
-          FROM proposal_collaborators pc
-          JOIN collaborator_stage_access csa
-            ON csa.collaborator_id = pc.id
-            AND csa.proposal_id = pc.proposal_id
-          WHERE pc.proposal_id = ${proposalId}
-            AND pc.user_id = ${sessionUser.id}
-            AND csa.stage = ${proposal.stage}
-            AND csa.access_revoked_at IS NULL
-          LIMIT 1
-        `;
-      } catch (e) {
-        console.error('[portal/proposals/sections/save] collaborator access query failed:', e);
-        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
-      }
-      if (!collabAccess || collabAccess.permission !== 'edit') {
-        return NextResponse.json({ error: 'Edit permission required', code: 'FORBIDDEN' }, { status: 403 });
-      }
+    // 2a. Edit permission — require this SECTION to be in the user's editable set.
+    // resolveUserAccess returns every section for an admin, and only the
+    // assigned + edit-permission sections for a collaborator. The prior check
+    // validated stage-level edit only, so any stage-edit collaborator could PUT
+    // ANY section (not just their assignments) — this closes that hole and also
+    // covers the accepted_at check inside resolveUserAccess.
+    let access;
+    try {
+      access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+    } catch (e) {
+      console.error('[portal/proposals/sections/save] access resolve failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (!access.editableSections.includes(sectionId)) {
+      return NextResponse.json({ error: 'You do not have edit access to this section', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Verify section belongs to this proposal ─────────────────────
-    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null } | undefined;
+    let section: { id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean } | undefined;
     try {
-      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null }[]>`
-        SELECT id, version, status, title, content, completed_stage, completed_at FROM proposal_sections
+      [section] = await sql<{ id: string; version: number; status: string; title: string; content: string | null; completedStage: string | null; completedAt: Date | null; isLocked: boolean }[]>`
+        SELECT id, version, status, title, content, completed_stage, completed_at, is_locked FROM proposal_sections
         WHERE id = ${sectionId}
           AND proposal_id = ${proposalId}
         LIMIT 1
@@ -163,6 +155,18 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     if (!section) {
       return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // A locked (accepted) section is read-only through the API. The editor UI
+    // hides itself for locked sections, but the API is the real enforcement —
+    // without this, a section locked in the CURRENT stage (is_locked=true,
+    // completed_stage===stage) slips past the cross-stage guard below and its
+    // accepted content gets overwritten. Reject regardless of stage.
+    if (section.isLocked) {
+      return NextResponse.json({
+        error: 'This section is locked and cannot be edited. Unlock it first.',
+        code: 'SECTION_LOCKED',
+      }, { status: 423 });
     }
 
     // Block edits on sections completed in a previous stage
@@ -247,7 +251,15 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
     // ── Update section with optimistic concurrency ─────────────────
     const contentJson = JSON.stringify(body.content);
-    const nextVersion = section.version + 1;
+    // Real optimistic lock: compare-and-swap against the version the CLIENT loaded
+    // (baseVersion), not the version re-read in this request. Without this, two
+    // users who both opened v5 and save minutes apart BOTH succeed (each request
+    // re-reads the current version and matches it) — last write silently wins.
+    // Falls back to the server-read version for older clients that omit baseVersion.
+    const base = typeof body.baseVersion === 'number' && Number.isInteger(body.baseVersion)
+      ? body.baseVersion
+      : section.version;
+    const nextVersion = base + 1;
 
     let updateResult;
     try {
@@ -262,7 +274,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               editing_since = NULL,
               updated_at = now()
           WHERE id = ${sectionId}
-            AND version = ${section.version}
+            AND version = ${base}
         `;
       } else {
         updateResult = await sql`
@@ -274,7 +286,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
               editing_since = NULL,
               updated_at = now()
           WHERE id = ${sectionId}
-            AND version = ${section.version}
+            AND version = ${base}
         `;
       }
     } catch (e) {
@@ -331,7 +343,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${userRole},
                 'section_saved', ${sectionId}::uuid, ${section.title}, ${nextVersion},
-                ${JSON.stringify({ previous_version: section.version })}::jsonb)
+                ${sql.json({ previous_version: section.version })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/sections/save] activity log failed', logErr);

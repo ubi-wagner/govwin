@@ -213,7 +213,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
             (solicitation_id, custom_variables, verified_by, verified_at)
           VALUES
             (${solicitationId}::uuid,
-             jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
+             jsonb_build_object(${variableName}, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
              ${actorId}::uuid, now())
           RETURNING verified_at
         `;
@@ -222,7 +222,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
         const rows = await sql<{ verifiedAt: Date }[]>`
           UPDATE solicitation_compliance
           SET custom_variables = COALESCE(custom_variables, '{}'::jsonb)
-                                 || jsonb_build_object(${variableName}, ${JSON.stringify(payload)}::jsonb),
+                                 || jsonb_build_object(${variableName}, ${sql.json((payload) as Parameters<typeof sql.json>[0])}),
               verified_by = ${actorId}::uuid,
               verified_at = now(),
               updated_at = now()
@@ -249,7 +249,7 @@ export const complianceSaveVariableValueTool = defineTool<Input, Output>({
           ${variableName},
           ${priorValue !== null && priorValue !== undefined ? JSON.stringify(priorValue) : null},
           ${JSON.stringify(coerced)},
-          ${JSON.stringify({ action, sourceExcerpt: sourceExcerpt ?? null })}::jsonb
+          ${sql.json({ action, sourceExcerpt: sourceExcerpt ?? null })}
         )
       `;
     } catch (revErr) {

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { authMock, sqlMock, sqlBeginMock, isValidUUIDMock, emitEventSingleMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
-  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock });
+  const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock, json: (v) => v });
   return { authMock: vi.fn(), sqlMock, sqlBeginMock, isValidUUIDMock: vi.fn(), emitEventSingleMock: vi.fn() };
 });
 
@@ -36,7 +36,9 @@ function wire({ role = 'rfp_admin', status = 'open', updateCount = 1, oppFound =
   authMock.mockResolvedValue({ user: { id: USER, email: 'admin@x.com', role } });
   isValidUUIDMock.mockReturnValue(true);
   sqlMock.mockReset();
-  sqlMock.mockResolvedValueOnce(oppFound ? [{ id: OPP, title: 'Quantum Radar SBIR', lifecycleStatus: status, closeDate: null }] : []);
+  sqlMock
+    .mockResolvedValueOnce(oppFound ? [{ id: OPP, title: 'Quantum Radar SBIR', submissionStage: status, closeDate: null }] : [])
+    .mockResolvedValue([{ v: null }]); // republishIfReleased head check → not released (fan-out is a no-op)
   sqlBeginMock.mockImplementation(async (cb: (tx: any) => Promise<unknown>) => {
     const tx = vi.fn((strings: TemplateStringsArray) => {
       const q = Array.isArray(strings) ? strings.join('?') : String(strings);
@@ -94,12 +96,12 @@ describe('POST opportunity lifecycle', () => {
     const res = await POST(req({ action: 'close', reason: 'Solicitation withdrawn' }), ctx());
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data).toMatchObject({ action: 'close', fromStatus: 'open', toStatus: 'closed' });
+    expect(json.data).toMatchObject({ action: 'close', fromStage: 'open', toStage: 'closed' });
     expect(emitEventSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'finder',
         type: 'opportunity.closed',
-        payload: expect.objectContaining({ opportunityId: OPP, fromStatus: 'open', toStatus: 'closed' }),
+        payload: expect.objectContaining({ opportunityId: OPP, fromStage: 'open', toStage: 'closed' }),
       }),
     );
   });
@@ -116,7 +118,7 @@ describe('POST opportunity lifecycle', () => {
     wire({ status: 'closed', updateCount: 1 });
     const res = await POST(req({ action: 'reopen' }), ctx());
     expect(res.status).toBe(200);
-    expect((await res.json()).data.toStatus).toBe('open');
+    expect((await res.json()).data.toStage).toBe('open');
     expect(emitEventSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'opportunity.reopened' }),
     );

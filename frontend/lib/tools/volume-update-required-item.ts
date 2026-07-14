@@ -23,6 +23,10 @@ const InputSchema = z.object({
   footerFormat: z.string().max(500).nullable().optional(),
   customFields: z.record(z.string(), z.unknown()).optional(),
   appliesToPhase: z.array(z.string().max(100)).nullable().optional(),
+  // Link an authored canvas template + a per-item grounding note (consumed by
+  // provisioning: template_id → interpolated section mold; expert_notes → section.meta).
+  templateId: z.string().uuid().nullable().optional(),
+  expertNotes: z.string().max(5000).nullable().optional(),
 });
 
 type Input = z.infer<typeof InputSchema>;
@@ -43,28 +47,32 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
         SET
         item_name = COALESCE(${input.itemName ?? null}, item_name),
         required = COALESCE(${input.required ?? null}, required),
-        page_limit = CASE WHEN ${input.pageLimit !== undefined ? 't' : 'f'}::bool
+        page_limit = CASE WHEN ${input.pageLimit !== undefined}
                           THEN ${input.pageLimit ?? null} ELSE page_limit END,
-        slide_limit = CASE WHEN ${input.slideLimit !== undefined ? 't' : 'f'}::bool
+        slide_limit = CASE WHEN ${input.slideLimit !== undefined}
                            THEN ${input.slideLimit ?? null} ELSE slide_limit END,
-        font_family = CASE WHEN ${input.fontFamily !== undefined ? 't' : 'f'}::bool
+        font_family = CASE WHEN ${input.fontFamily !== undefined}
                            THEN ${input.fontFamily ?? null} ELSE font_family END,
-        font_size = CASE WHEN ${input.fontSize !== undefined ? 't' : 'f'}::bool
+        font_size = CASE WHEN ${input.fontSize !== undefined}
                          THEN ${input.fontSize ?? null} ELSE font_size END,
-        margins = CASE WHEN ${input.margins !== undefined ? 't' : 'f'}::bool
+        margins = CASE WHEN ${input.margins !== undefined}
                        THEN ${input.margins ?? null} ELSE margins END,
-        line_spacing = CASE WHEN ${input.lineSpacing !== undefined ? 't' : 'f'}::bool
+        line_spacing = CASE WHEN ${input.lineSpacing !== undefined}
                             THEN ${input.lineSpacing ?? null} ELSE line_spacing END,
-        header_format = CASE WHEN ${input.headerFormat !== undefined ? 't' : 'f'}::bool
+        header_format = CASE WHEN ${input.headerFormat !== undefined}
                              THEN ${input.headerFormat ?? null} ELSE header_format END,
-        footer_format = CASE WHEN ${input.footerFormat !== undefined ? 't' : 'f'}::bool
+        footer_format = CASE WHEN ${input.footerFormat !== undefined}
                              THEN ${input.footerFormat ?? null} ELSE footer_format END,
-        custom_fields = CASE WHEN ${input.customFields !== undefined ? 't' : 'f'}::bool
+        custom_fields = CASE WHEN ${input.customFields !== undefined}
                              THEN ${input.customFields ? JSON.stringify(input.customFields) : '{}'}::jsonb
                              ELSE custom_fields END,
-        applies_to_phase = CASE WHEN ${input.appliesToPhase !== undefined ? 't' : 'f'}::bool
+        applies_to_phase = CASE WHEN ${input.appliesToPhase !== undefined}
                                 THEN ${input.appliesToPhase ?? null}::text[]
                                 ELSE applies_to_phase END,
+        template_id = CASE WHEN ${input.templateId !== undefined}
+                           THEN ${input.templateId ?? null}::uuid ELSE template_id END,
+        expert_notes = CASE WHEN ${input.expertNotes !== undefined}
+                            THEN ${input.expertNotes ?? null} ELSE expert_notes END,
         verified_by = ${ctx.actor.id}::uuid,
         verified_at = now(),
         updated_at = now()

@@ -141,7 +141,7 @@ export async function writeCurationMemory(
          ${content},
          'decision',
          ${importance},
-         ${JSON.stringify(metadata)}::jsonb,
+         ${sql.json((metadata) as Parameters<typeof sql.json>[0])},
          ${input.solicitationId},
          ${input.namespace})
     `;

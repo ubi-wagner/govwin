@@ -87,10 +87,11 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE tenant_id = ${tenantId}::uuid AND stage != 'archived'
       `;
 
-      // Matched opportunities count (exclude passed/dismissed)
+      // Matched opportunities count (greenfield card pipeline; exclude passed/dismissed/archived)
       const [opportunityCount] = await sql<{ count: string }[]>`
-        SELECT count(*)::text AS count FROM tenant_pipeline_items
+        SELECT count(*)::text AS count FROM tenant_opportunity_cards
         WHERE tenant_id = ${tenantId}::uuid
+          AND lifecycle_status <> 'archived'
           AND (pursuit_status IS NULL OR pursuit_status NOT IN ('passed', 'dismissed'))
       `;
 

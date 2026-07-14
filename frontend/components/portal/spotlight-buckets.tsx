@@ -15,6 +15,8 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
   const [keywords, setKeywords] = useState('');
   const [agencies, setAgencies] = useState('');
   const [programTypes, setProgramTypes] = useState('');
+  const [naics, setNaics] = useState('');
+  const [includeClosed, setIncludeClosed] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -31,14 +33,25 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
       keywords: keywords.split(',').map((s) => s.trim()).filter(Boolean),
       agencies: agencies.split(',').map((s) => s.trim()).filter(Boolean),
       programTypes: programTypes.split(',').map((s) => s.trim()).filter(Boolean),
+      naics: naics.split(',').map((s) => s.trim()).filter(Boolean),
+      includeClosed,
       useTimeline: true,
     };
     try {
       await fetch(`/api/portal/${tenantSlug}/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, criteria }) });
-      setName(''); setKeywords(''); setAgencies(''); setProgramTypes('');
+      setName(''); setKeywords(''); setAgencies(''); setProgramTypes(''); setNaics(''); setIncludeClosed(false);
       await load();
     } catch { /* ignore */ } finally { setBusy(false); }
-  }, [tenantSlug, name, keywords, agencies, programTypes, load]);
+  }, [tenantSlug, name, keywords, agencies, programTypes, naics, includeClosed, load]);
+
+  const del = useCallback(async (id: string) => {
+    setBusy(true);
+    try {
+      await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
+      if (openId === id) { setRanked(null); setOpenId(null); }
+      await load();
+    } catch { /* ignore */ } finally { setBusy(false); }
+  }, [tenantSlug, openId, load]);
 
   const rank = useCallback(async (id: string) => {
     setBusy(true);
@@ -61,15 +74,25 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
             <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="keywords, comma-sep" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm mb-2" />
             <input value={agencies} onChange={(e) => setAgencies(e.target.value)} placeholder="agencies, comma-sep" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm mb-2" />
             <input value={programTypes} onChange={(e) => setProgramTypes(e.target.value)} placeholder="program types (SBIR, STTR)" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm mb-2" />
+            <input value={naics} onChange={(e) => setNaics(e.target.value)} placeholder="NAICS codes, comma-sep" className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm mb-2" />
+            <label className="flex items-center gap-2 text-xs text-gray-600 mb-2">
+              <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} />
+              Include closed opportunities
+            </label>
             <button disabled={busy || !name.trim()} onClick={create} className="w-full text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1.5 disabled:opacity-50">Create</button>
           </div>
         )}
         <div className="space-y-2">
           {buckets.map((b) => (
             <div key={b.id} className="border border-gray-200 rounded-lg p-3 bg-white">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-800">{b.name}</span>
-                <button disabled={busy} onClick={() => rank(b.id)} className="text-xs font-medium text-blue-600 hover:underline">Rank →</button>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-gray-800 truncate">{b.name}</span>
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  <button disabled={busy} onClick={() => rank(b.id)} className="text-xs font-medium text-blue-600 hover:underline">Rank →</button>
+                  {canEdit && (
+                    <button disabled={busy} onClick={() => del(b.id)} title="Delete bucket" className="text-xs text-gray-300 hover:text-rose-600">✕</button>
+                  )}
+                </span>
               </div>
             </div>
           ))}
@@ -84,11 +107,20 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
           <div className="space-y-1.5">
             <p className="text-xs text-gray-400 mb-2">{ranked.length} opportunities ranked{openId ? ` · bucket ${buckets.find((b) => b.id === openId)?.name}` : ''}</p>
             {ranked.map((r, i) => (
-              <div key={r.opportunityId} className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2 bg-white">
-                <span className="text-xs font-bold text-gray-400 w-6">#{i + 1}</span>
-                <span className="flex-1 text-sm text-gray-800 truncate">{str(r.card, 'title') ?? r.opportunityId}</span>
-                {r.isPinned && <span className="text-[10px] text-blue-600">pinned</span>}
-                <span className="text-sm font-semibold text-gray-700 w-10 text-right">{r.score}</span>
+              <div key={r.opportunityId} className="border border-gray-200 rounded-lg px-3 py-2 bg-white">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-400 w-6">#{i + 1}</span>
+                  <span className="flex-1 text-sm text-gray-800 truncate">{str(r.card, 'title') ?? r.opportunityId}</span>
+                  {r.isPinned && <span className="text-[10px] text-blue-600">pinned</span>}
+                  <span className="text-sm font-semibold text-gray-700 w-10 text-right">{r.score}</span>
+                </div>
+                {r.factors && Object.keys(r.factors).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1 pl-9">
+                    {Object.entries(r.factors).map(([k, v]) => (
+                      <span key={k} className="text-[9px] bg-gray-100 text-gray-500 rounded px-1 py-0.5">{k} {v}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {ranked.length === 0 && <p className="text-sm text-gray-400">No cards to rank yet — releases populate the pipeline.</p>}

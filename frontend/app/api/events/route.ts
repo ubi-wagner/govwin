@@ -172,7 +172,7 @@ export async function POST(request: Request) {
           'user',
           ${sessionUser.id ?? 'unknown'},
           ${body.tenantId ?? null},
-          ${JSON.stringify(body.payload ?? {})}::jsonb
+          ${sql.json((body.payload ?? {}) as Parameters<typeof sql.json>[0])}
         )
         RETURNING id
       `;

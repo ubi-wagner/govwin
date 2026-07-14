@@ -112,7 +112,7 @@ export const solicitationReleaseTool = defineTool<Input, Output>({
           (source, kind, status, priority, metadata)
         VALUES
           ('system', 'shred_solicitation', 'pending', 3,
-           ${JSON.stringify({ solicitation_id: solicitationId })}::jsonb)
+           ${sql.json({ solicitation_id: solicitationId })})
         RETURNING id
       `;
       shredJobId = jobRows[0].id;

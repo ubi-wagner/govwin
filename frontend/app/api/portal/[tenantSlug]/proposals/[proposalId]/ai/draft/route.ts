@@ -168,7 +168,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                   ${sessionUser.email ?? null}, ${role},
                   'ai_draft_requested',
-                  ${JSON.stringify({ sections_queued: sectionsQueued, instructions: body.instructions ?? null })}::jsonb)
+                  ${sql.json({ sections_queued: sectionsQueued, instructions: body.instructions ?? null })})
         `;
       } catch (logErr) {
         console.error('[portal/proposals/ai/draft] activity log failed', logErr);

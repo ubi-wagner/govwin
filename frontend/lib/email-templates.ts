@@ -112,7 +112,7 @@ export function applicationAcceptedEmail(params: {
   <li style="margin-bottom:6px;">Log in at the link below</li>
   <li style="margin-bottom:6px;">Set your permanent password</li>
   <li style="margin-bottom:6px;">Upload your company documents</li>
-  <li style="margin-bottom:6px;">Review your Spotlight for matched opportunities</li>
+  <li style="margin-bottom:6px;">Review your opportunity cards for matched opportunities</li>
 </ol>
 
 ${button('Log In to RFP Pipeline', loginUrl)}
@@ -178,7 +178,7 @@ export function welcomeOnboardedEmail(params: {
 
 <p>Here is what you can do now:</p>
 <ul style="padding-left:20px;margin:8px 0;">
-  <li style="margin-bottom:6px;">Browse your personalized Spotlight for matched opportunities</li>
+  <li style="margin-bottom:6px;">Browse your personalized opportunity cards for matched opportunities</li>
   <li style="margin-bottom:6px;">Invite team members from your dashboard</li>
   <li style="margin-bottom:6px;">Upload company capability documents to improve match quality</li>
   <li style="margin-bottom:6px;">Start building proposals with AI-assisted workflows</li>

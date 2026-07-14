@@ -907,6 +907,44 @@ The constant has been removed from `config.py`.
 **Rule:** Never use `config.STORAGE_ROOT` for pipeline file paths. Use the S3 key
 scheme (see ARCHITECTURE_V9.md §11).
 
+### Mistake 36: Event/audit jsonb payload written as a STRING via `${JSON.stringify(x)}::jsonb`
+The `system_events.payload` / `.error` emitters wrote `${JSON.stringify(x)}::jsonb`, which stores a
+jsonb **string scalar** (`"{\"a\":1}"`) instead of an object. Every consumer that does
+`payload->>'field'` then reads **NULL** — the proposal activity feed, RFP-curation event history,
+storage dedup, and the workflow-overlay pickup all silently lost their fields. (Same class as §4b
+Mistake 18, but on the event journal — so it starved audit + automation, not just `gate_config`.)
+- **Rule (WRITE):** emit jsonb via `sql.json(x)`, NOT `${JSON.stringify(x)}::jsonb`. `sql.json`'s
+  `JSONValue` type is stricter than our loose payloads, so cast at the boundary —
+  `const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0])` (the idiom now in
+  `lib/events.ts` + `lib/opportunity-bridge.ts` + `lib/bucket-ranking.ts`). Applies to ANY jsonb column
+  read back as an object/array.
+- **Back-fill:** migration `103` repairs rows already written (`SET payload = (payload #>> '{}')::jsonb`
+  guarded by `jsonb_typeof = 'string'` AND `left(ltrim(...),1) IN ('{','[')` so a genuine string scalar
+  is skipped) — for both `payload` and `error`. Never re-edit 103 to add rows; write a new migration
+  (Mistake 23).
+
+### Mistake 37: Atom library reads must enforce visibility/owner — not tenant-only
+`listAtoms` / `getAtom` / `selectForSection` (`lib/atoms.ts`) filtered by `tenant_id` alone, so every
+member saw every colleague's `owner_only` / `admin_only` atoms (data exposure). Reads now take a
+**Viewer** `{ userId, isAdmin }` (built by `viewerFromRole`: admin = `tenant_admin`+ / `rfp_admin` /
+`master_admin`) and gate every row with
+`(${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)`.
+- **Rule:** every atom read passes a Viewer and restates that predicate. Admins see the whole tenant
+  library; non-admins see `visibility='tenant'` + their own. `owner_only` / `shared_for_proposal` /
+  `admin_only` never leak to other non-admins. Library **reads** are open to `partner_user`
+  (collaborators); **writes** stay `tenant_user`+.
+
+### Mistake 38: Legacy customer opportunity surface retired — read the card spine, not `tenant_pipeline_items`
+The customer Pipeline + Spotlights pages (`portal/[tenantSlug]/pipeline`, `.../spotlights`) now
+`redirect()` to `/cards`. The canonical customer read is `tenant_opportunity_cards` (+ per-bucket
+`tenant_bucket_scores`), NOT `tenant_pipeline_items` / `spotlight_bucket_scores` (mig 081, the retired
+global buckets).
+- **Rule:** new customer-facing opportunity/ranking reads target `tenant_opportunity_cards` +
+  `tenant_bucket_scores` via `withTenant()` (RLS GUC). Do NOT add readers of `tenant_pipeline_items` or
+  `spotlight_bucket_scores` on the customer surface — this supersedes Mistake 16's
+  `tenant_pipeline_items.total_score` guidance there. (Admin `v_opportunity_rollup` still joins
+  `tenant_pipeline_items` for the control-tower rollup — that path is untouched.)
+
 ---
 
 ## 5. Project Architecture Quick Reference
@@ -1210,3 +1248,171 @@ wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate t
 - The AI workforce is PARTLY wired: `AgentFabric` is live, `color_team_reviewer` runs end-to-end via `agent_task_queue`;
   the other archetypes are dormant (no producer). `publish_section_draft` is the shipped draft-landing primitive but has
   no caller yet (the 3-source strawman generation is the open AI integration). (Update CLAUDE.md's "built but not wired".)
+
+---
+
+## 1c. Schema — greenfield opportunity-card spine + unified library (migs 094–103)
+
+The CANONICAL customer surface. Verify column names here before writing SQL. Every **tenant** table
+below `ENABLE` + **FORCE** row-level security with a `tenant_isolation` policy keyed on the
+`app.tenant_id` GUC (set per-tx by `lib/rls.ts` `withTenant()`); FORCE is bypassed only by the
+owner/superuser connection until the app runs as the non-owner `govtech_app` role (GRANTs are in
+place). Reach these tables through `withTenant(tenantId, tx => …)`, never the bare `sql` client.
+
+### Opportunity-card bridge + tenant cards (mig 094, +100)
+```
+opportunity_bridge  (L0 global, admin-write, append-only, forward-only — NOT tenant-RLS)
+  id, opportunity_id (FK opportunities), version (INT — monotonic per opportunity),
+  event_type CHECK IN ('published','updated','closed','reopened','awarded','archived'),  -- 'archived' added mig 100
+  card (JSONB — full customer-visible snapshot at this version), posted_by (FK users), posted_at
+  UNIQUE (opportunity_id, version)
+
+tenant_opportunity_cards  (L1 per-tenant denormalized card — RLS FORCE; NO FK to global opportunities)
+  id, tenant_id (FK tenants), opportunity_id (SOFT ref — card is self-contained/shard-safe),
+  card (JSONB), bridge_version (INT default 0 — last applied bridge version),
+  lifecycle_status CHECK IN ('open','closed','archived'),   -- coarse projection the feed/ranking filter on
+  submission_stage CHECK IN ('nofo','pre_release','open','updated','closed','archived'),  -- canonical 6-state (mig 100)
+  pursuit_status   CHECK IN ('unreviewed','pursuing','monitoring','passed'),
+  is_pinned, pin_update_available, pinned_at, created_at, updated_at
+  UNIQUE (tenant_id, opportunity_id)
+
+tenant_bridge_cursor  (system fan-out cursor — NOT tenant-RLS)
+  tenant_id (PK, FK tenants), last_posted_at, last_event_id, last_applied_at
+```
+
+### Per-tenant spotlight buckets (mig 096) — retires the global mig 081 spotlight_bucket_scores
+```
+tenant_spotlight_buckets  (RLS FORCE — a customer-owned ranking definition)
+  id, tenant_id (FK), name, description,
+  criteria (JSONB — weighted signals: keywords[], naics[], agencies[], programTypes[],
+    setAsides[], useAccessibility, useTimeline, includeClosed, trlBand(reserved), weights{}),
+  is_active, created_by (FK users), created_at, updated_at
+
+tenant_bucket_scores  (RLS FORCE — per tenant×bucket×card score)
+  id, tenant_id (FK), bucket_id (FK tenant_spotlight_buckets ON DELETE CASCADE),
+  opportunity_id, score (INT 0-100), factors (JSONB — per-signal), computed_at
+  UNIQUE (tenant_id, bucket_id, opportunity_id)
+```
+
+### opportunities — release metadata + canonical stage (mig 100)
+```
+opportunities +=
+  submission_stage CHECK IN ('nofo','pre_release','open','updated','closed','archived') DEFAULT 'open',
+  open_date, pre_release_date, org_unit (3rd org level below agency:office),
+  expert_notes (opp/topic RFP Expert Notes), built_by (FK users — curator),
+  released_by (FK users — the pusher), released_at
+opportunity_lifecycle_actions.action CHECK += 'set_stage'
+```
+
+### Unified library — atoms + taxonomy + lineage + cocoons (migs 101–102)
+```
+library_atoms  (RLS FORCE — the greenfield atom store; now the CANONICAL customer library.
+               The atomize→mold→draft→return loop runs entirely on this table; the legacy
+               `library_units` library is OBSOLETE — deprecate in phases, see
+               docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
+  id, tenant_id (FK), grain CHECK IN ('primitive','group','reference'),
+  title, content (TEXT), canvas_nodes (JSONB — CanvasNode[]), summary,
+  word_count, char_count, member_summary (JSONB — count-by-kind for groups),
+  status CHECK IN ('draft','approved','archived'), confidence (REAL),
+  outcome CHECK IN ('pending','awarded','rejected','withdrawn'), outcome_score (REAL), usage_count,
+  source CHECK IN ('upload','harvest','download_derivative','manual'),
+  cocoon_id (FK document_cocoons), origin_proposal_id, origin_section_id,
+  embedding (vector(1536) — NULL until vectorized),
+  owner_user_id (FK users),
+  visibility CHECK IN ('tenant','owner_only','shared_for_proposal','admin_only') DEFAULT 'tenant',
+  creator_kind CHECK IN ('admin','ai','collaborator','system','import') DEFAULT 'admin' (mig 102),
+  created_by (FK users) (mig 102), source_anchor (JSONB — [{sourceAtomId,nodeIds[],region?}]) (mig 102),
+  created_at, updated_at
+
+atom_tags  (PK (atom_id, dimension, value)) — the unified taxonomy ON an atom
+  atom_id (FK library_atoms CASCADE), dimension, value, is_other,
+  tag_source CHECK IN ('auto','admin'), confirmed, confirmed_by (FK users), confirmed_at, created_at
+
+atom_members  (PK (group_atom_id, member_atom_id); CHECK group<>member) — a group aggregates ordered members
+  group_atom_id (FK CASCADE), member_atom_id (FK CASCADE), ordinal, created_at
+
+atom_lineage  (PK (parent_atom_id, child_atom_id); CHECK parent<>child) — parent→child DAG
+  parent_atom_id (FK CASCADE), child_atom_id (FK CASCADE),
+  relation CHECK IN ('derived_from','reused_from'), created_at
+
+taxonomy_terms  (the ONE curated vocabulary — UNIQUE (dimension, value))
+  id, dimension (curated: vol|kind|grain|fmt|dept|agency|program|phase|party_role|access;
+    open free-value dims tech/party/sol/topic are NOT seeded),
+  value (slug), label, program_types (TEXT[] — {} = applies to all programs), sort_order, is_active, created_at
+  -- every curated dimension seeds an 'other' escape value
+
+document_cocoons  (a section/document skeleton = reusable template)
+  id, tenant_id (FK — NULL = system skeleton), name, program_type,
+  scope CHECK IN ('section','document'), structure (JSONB — the skeleton),
+  origin_proposal_id, source CHECK IN ('upload','download','system','harvest'), created_at
+```
+`library_atom_outcomes` (pre-existing, mig 073, `UNIQUE(unit_id, proposal_id)`) remains the
+outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_score` columns.
+
+## Greenfield card spine + library — operating rules
+
+- **Multi-topic fan-out.** `solicitation.push` (`lib/tools/solicitation-push.ts`) activates the whole
+  topic SET (`opportunities WHERE solicitation_id = ${solId} OR id = ${landingOppId}`) and calls
+  `publishAndFanOut` **per opportunity** — the umbrella AND every topic each become their own bridge
+  version + `tenant_opportunity_cards` row (a multi-topic BAA lands N topic cards, not one umbrella
+  card). Admin single-opp (re)publish: `POST /api/admin/opportunities/[oppId]/publish`.
+- **Bridge → card.** `publishToBridge` writes the next `version`; `fanOutBridgeEvent` replicates to
+  every `status IN ('active','trial')` tenant via `applyToTenant` (upsert on
+  `(tenant_id, opportunity_id)`; a pinned card whose `bridge_version` advanced flips
+  `pin_update_available`). `buildCardSnapshot` joins the solicitation for BOTH umbrella
+  (`cs.opportunity_id = o.id`) AND topics (`o.solicitation_id = cs.id`) — without the topic arm a topic
+  card loses namespace / compliance / volume_count. `backfillTenant` applies each opp's latest version
+  to a new customer.
+- **Auto-score on fan-out.** `applyToTenant` calls `autoScoreCard` (`lib/bucket-ranking.ts`) inside the
+  same tenant tx, so a landing card is ranked against the tenant's active buckets immediately — the
+  automated scoring producer for the new spine (best-effort; a scoring failure must not fail the
+  fan-out). Manual re-rank of one bucket over the local pipeline: `rankBucket`. `/cards`
+  (`GET /api/portal/[tenantSlug]/cards`) LEFT JOIN LATERALs the top `tenant_bucket_scores.score` and
+  orders `is_pinned DESC, top_score DESC NULLS LAST, updated_at DESC`.
+- **Compliance matrix lifecycle.** `proposal_compliance_matrix` is now POPULATED at provision (proposals
+  create route: one `not_addressed` row per required item / required-section, ≥1 row so the card burden
+  is not an empty 0% shell) and advanced to `'satisfied'` on section lock
+  (`WHERE section_id=$1 AND status <> 'not_applicable'`), reset to `'not_addressed'` on unlock. Both are
+  best-effort (never fail the lock). Columns unchanged (Mistake 12): `requirement_text`,
+  `requirement_source`, `is_mandatory`, `status`, `section_id`, `notes`.
+- **Library visibility model.** Reads take a `Viewer` (Mistake 37): admins = whole tenant library,
+  others = `visibility='tenant'` + own. Reads open to `partner_user`; writes `tenant_user`+.
+  `createAtom` writes `owner_user_id`/`created_by` = actor, `creator_kind`, `source_anchor`, tags
+  (auto/admin + `confirmed`), group `atom_members`, and `derived_from` `atom_lineage`.
+- **The atom loop is CLOSED (S4).** `atomize → library → mold → draft → back-to-library`, all on
+  `library_atoms`: upload (`atoms/upload` → `reference` atom + blocks) → register (`POST /atoms`
+  primitive, `source_anchor`→ref) → mold (`/atoms/select` ranks AND records the section's
+  `meta.sourceAtomIds`; the drafter passes `&sectionId`) → lock → `harvestSectionToAtomLibrary`
+  (`lib/proposal-atom-harvest.ts`) returns a **derivative** atom (`source='download_derivative'`,
+  bound to the proposal's `document_cocoon`, tagged by vol, `derived_from` the source atoms).
+  **Idempotent by section:** `createAtom({idempotentBySection:true})` refreshes the section's one
+  derivative in place (matched `origin_section_id` + `source`) on re-lock — no duplicate; a parent's
+  `usage_count` only bumps on a NEWLY inserted lineage edge. Driven proof: `e2e/fullloop.tenant.spec.ts`
+  (whole loop) + `e2e/atomloop.tenant.spec.ts` (return + idempotency). The legacy `library_units`
+  harvest (`harvestSectionToLibrary`) still runs alongside but is obsolete — see
+  docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md.
+
+---
+
+## As-built delta — 2026-07-05 (Alpha hardening + Immobileyes rehearsal)
+
+**Latest migration: 104** (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
+index). The greenfield spine (ingest → skeleton → push → signup-mirror → provision-with-template → release →
+build → lock → download) is **driven-green end-to-end** — verified as RFP-admin→shadow→**Immobileyes**
+(`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/ALPHA_ARCHITECTURE_ASBUILT.md`,
+`docs/ALPHA_TODO_BACKLOG.md`, `docs/ALPHA_HITL_RUNBOOK.md`.
+
+### Two verified bug-class lessons (definitively reproduced, not reasoned)
+- **Mistake 39 — `${JSON.stringify(x)}::jsonb` is ALWAYS a jsonb STRING SCALAR here** (objects AND arrays):
+  `col->>'k'` returns NULL. Reproduced on this repo's postgres.js (write+read `jsonb_typeof`). **Always use
+  `${sql.json(x)}` / `${tx.json(x)}`** (works inside tx blocks too). All 56 offending writes were converted;
+  mig 104 backfills existing rows. When agents "reason" about postgres.js jsonb behavior they get it backwards
+  — trust a reproduction, not an argument.
+- **Mistake 40 — `${cond ? 't' : 'f'}::bool` evaluates FALSE even when cond is true** (a bound text `'t'`
+  ≠ the literal `'t'::bool`). Use a raw JS boolean `${cond}`. This silently no-op'd every conditional-field
+  UPDATE in the affected tools (item + topic edits). Swept clean.
+
+### Manager/anti-lie protocol
+Dispatched verifier agents contradicted each other on identical code; the main loop reproduced in the sandbox
+to settle it. Standard: a finding is trusted only after (a) an adversarial verifier that reproduces AND
+(b) a sandbox reproduction. Encoded in the bug-hunt workflow + `docs/ALPHA_TODO_BACKLOG.md` Tier 3.5.

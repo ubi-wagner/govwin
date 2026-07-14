@@ -25,7 +25,7 @@ export interface BucketCriteria {
   weights?: Record<string, number>;
 }
 
-interface CardFields {
+export interface CardFields {
   title?: string | null;
   description?: string | null;
   office?: string | null;
@@ -74,6 +74,34 @@ export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: num
   const factors: Record<string, number> = {};
   for (const p of parts) factors[p.key] = Math.round(p.v * 100);
   return { score, factors };
+}
+
+/**
+ * Score ONE card against every active bucket of a tenant and upsert the scores.
+ * Runs inside an existing tenant-scoped tx (the bridge fan-out), so a card is
+ * ranked the moment it lands — not only after a manual "Rank" click. Best-effort
+ * at the call site.
+ */
+export async function autoScoreCard(
+  tx: any,
+  tenantId: string,
+  opportunityId: string,
+  card: CardFields,
+  nowMs: number,
+): Promise<number> {
+  const buckets = await tx<Array<{ id: string; criteria: BucketCriteria }>>`
+    SELECT id, criteria FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}::uuid AND is_active
+  `;
+  for (const b of buckets) {
+    const { score, factors } = scoreCard(card, b.criteria ?? {}, nowMs);
+    await tx`
+      INSERT INTO tenant_bucket_scores (tenant_id, bucket_id, opportunity_id, score, factors)
+      VALUES (${tenantId}::uuid, ${b.id}::uuid, ${opportunityId}::uuid, ${score}, ${tx.json(factors)})
+      ON CONFLICT (tenant_id, bucket_id, opportunity_id) DO UPDATE SET
+        score = EXCLUDED.score, factors = EXCLUDED.factors, computed_at = now()
+    `;
+  }
+  return buckets.length;
 }
 
 /** Rank a bucket against the tenant's local pipeline; upsert per-card scores. */

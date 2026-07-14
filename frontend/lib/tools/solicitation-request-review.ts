@@ -88,7 +88,7 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
         VALUES
           (${solicitationId}::uuid, ${actorId}::uuid, 'request_review',
            'curation_in_progress', 'review_requested', ${notes ?? null},
-           ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null })}::jsonb)
+           ${sql.json({ requestedReviewerId: requestedReviewerId ?? null })})
       `;
     } catch (err) {
       console.error('[solicitation.request_review] triage_actions insert failed:', err);
@@ -108,7 +108,7 @@ export const solicitationRequestReviewTool = defineTool<Input, Output>({
           'status',
           'curation_in_progress',
           'review_requested',
-          ${JSON.stringify({ requestedReviewerId: requestedReviewerId ?? null, notes: notes ?? null })}::jsonb
+          ${sql.json({ requestedReviewerId: requestedReviewerId ?? null, notes: notes ?? null })}
         )
       `;
     } catch (revErr) {

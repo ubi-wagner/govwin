@@ -56,14 +56,14 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       UPDATE opportunities
       SET
         title = COALESCE(${input.title ?? null}, title),
-        description = CASE WHEN ${input.description !== undefined ? 't' : 'f'}::bool
+        description = CASE WHEN ${input.description !== undefined}
                            THEN ${input.description ?? null}
                            ELSE description END,
         topic_status = COALESCE(${input.topicStatus ?? null}, topic_status),
-        tech_focus_areas = CASE WHEN ${input.techFocusAreas !== undefined ? 't' : 'f'}::bool
+        tech_focus_areas = CASE WHEN ${input.techFocusAreas !== undefined}
                                  THEN ${input.techFocusAreas ?? []}::text[]
                                  ELSE tech_focus_areas END,
-        topic_branch = CASE WHEN ${input.topicBranch !== undefined ? 't' : 'f'}::bool
+        topic_branch = CASE WHEN ${input.topicBranch !== undefined}
                             THEN ${input.topicBranch ?? null}
                             ELSE topic_branch END,
         updated_at = now()

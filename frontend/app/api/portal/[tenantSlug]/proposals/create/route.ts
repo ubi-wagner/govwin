@@ -18,6 +18,27 @@ interface RouteContext {
 }
 
 /**
+ * Turn a required item into one or more compliance-matrix requirement labels.
+ * If the item enumerates required_sections (shall-statements / named subsections)
+ * each becomes its own requirement; otherwise the item itself is the requirement.
+ */
+function requirementLabels(itemName: string, requiredSections: unknown): string[] {
+  const subs = Array.isArray(requiredSections)
+    ? requiredSections
+        .map((s) =>
+          typeof s === 'string'
+            ? s
+            : (s as { name?: string; label?: string; text?: string } | null)?.name ??
+              (s as { label?: string } | null)?.label ??
+              (s as { text?: string } | null)?.text ??
+              null,
+        )
+        .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    : [];
+  return subs.length > 0 ? subs.map((s) => `${itemName} — ${s}`) : [itemName];
+}
+
+/**
  * POST /api/portal/[tenantSlug]/proposals/create
  *
  * Creates a new proposal for a given topic (opportunity). Admin-granted
@@ -221,6 +242,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       volumeNumber: number | null;
       templateId: string | null;
       expertNotes: string | null;
+      requiredSections: unknown;
     }> = [];
 
     let globalItemIndex = 0;
@@ -236,6 +258,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           volumeNumber: (vol.volumeNumber as number) ?? null,
           templateId: (item.templateId as string) ?? null,
           expertNotes: (item.expertNotes as string) ?? null,
+          requiredSections: (item as { requiredSections?: unknown }).requiredSections ?? null,
         });
       }
     }
@@ -271,10 +294,15 @@ export async function POST(request: Request, ctx: RouteContext) {
     // is atomic in the INSERT (no post-insert UPDATE window).
     let topBucket: { bucket: string; score: number } | null = null;
     try {
+      // Greenfield spine: read the card's best bucket score from tenant_bucket_scores
+      // (auto-populated on fan-out), joined to the bucket for its name — not the
+      // legacy spotlight_bucket_scores, which the new spine never writes.
       const [b] = await sql<{ bucket: string; score: number }[]>`
-        SELECT bucket, score FROM spotlight_bucket_scores
-        WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${topicId}::uuid
-        ORDER BY score DESC NULLS LAST
+        SELECT tsb.name AS bucket, s.score
+        FROM tenant_bucket_scores s
+        JOIN tenant_spotlight_buckets tsb ON tsb.id = s.bucket_id
+        WHERE s.tenant_id = ${tenantId}::uuid AND s.opportunity_id = ${topicId}::uuid
+        ORDER BY s.score DESC NULLS LAST
         LIMIT 1
       `;
       topBucket = b ?? null;
@@ -342,7 +370,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
             VALUES (${proposalRow.id}, ${volNum}, ${volName}, ${artifactType},
-                    ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+                    ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
@@ -367,10 +395,23 @@ export async function POST(request: Request, ctx: RouteContext) {
               ${item.volumeName},
               ${item.volumeNumber},
               ${inferSectionType(item.itemName, sectionStandards)},
-              ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}::jsonb
+              ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}
             )
             RETURNING id
           `;
+
+          // Compliance matrix: one requirement row per required item (or per named
+          // required-section within it), linked to the section that addresses it.
+          // This is what the proposal card's percentComplete and the workspace
+          // compliance tab read — previously never populated (always 0%). Rows
+          // start 'not_addressed' and flip to 'satisfied' when the section locks.
+          for (const reqText of requirementLabels(item.itemName, item.requiredSections)) {
+            await tx`
+              INSERT INTO proposal_compliance_matrix
+                (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+              VALUES (${proposalRow.id}, ${reqText}, ${item.volumeName ?? 'RFP'}, true, 'not_addressed', ${section.id})
+            `;
+          }
 
           // E3: resolve the starter template — DB-backed first (expert-authored
           // via the Template Studio, linked per required-item via template_id),
@@ -420,12 +461,12 @@ export async function POST(request: Request, ctx: RouteContext) {
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
           VALUES (${proposalRow.id}, 1, 'Technical Volume', 'narrative',
-                  ${JSON.stringify(defFormat)}::jsonb, ${JSON.stringify(defCompliance)}::jsonb)
+                  ${sql.json((defFormat) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((defCompliance) as unknown as Parameters<typeof sql.json>[0])})
           RETURNING id
         `;
         artifactByVolKey.set(volKey(1, 'Technical Volume'), defArt.id);
         createdArtifacts.push({ id: defArt.id, volumeName: 'Technical Volume', artifactType: 'narrative' });
-        await tx`
+        const [defSection] = await tx<{ id: string }[]>`
           INSERT INTO proposal_sections (
             proposal_id, artifact_id, section_number, title, content, status,
             volume_name, volume_number
@@ -439,6 +480,13 @@ export async function POST(request: Request, ctx: RouteContext) {
             'Technical Volume',
             1
           )
+          RETURNING id
+        `;
+        // Matrix: at least one requirement so the card burden isn't an empty shell.
+        await tx`
+          INSERT INTO proposal_compliance_matrix
+            (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+          VALUES (${proposalRow.id}, 'Technical Volume', 'RFP', true, 'not_addressed', ${defSection.id})
         `;
         count = 1;
       }
@@ -621,7 +669,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposal.id}::uuid, ${tenantId}::uuid, ${userId}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'proposal_created',
-                ${JSON.stringify({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })}::jsonb)
+                ${sql.json({ title: proposalTitle, topic_id: topicId, section_count: sectionCount })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/create] activity log failed', logErr);

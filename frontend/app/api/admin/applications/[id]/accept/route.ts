@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
+import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
+import { backfillTenant } from '@/lib/opportunity-bridge';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -171,12 +172,32 @@ export async function POST(request: Request, ctx: RouteContext) {
       html: emailContent.html,
     });
 
+    // ── Carbon-copy mirror: clone the opportunity river onto the new tenant so a
+    //    fresh customer lands with a populated /cards (not an empty pipeline).
+    //    Post-commit + best-effort: a backfill failure must NEVER fail the accept.
+    //    Awaited (not fire-and-forget) so serverless doesn't kill it mid-replay; if
+    //    the river grows large, move this to an out-of-band job keyed on the event.
+    let cardsBackfilled = 0;
+    try {
+      cardsBackfilled = await backfillTenant(tenantId);
+      await emitEventSingle({
+        namespace: 'capture',
+        type: 'tenant.cards_backfilled',
+        actor: userActor(userId, (session.user as { email?: string }).email),
+        tenantId,
+        payload: { tenantId, tenantSlug: finalSlug, cardsBackfilled },
+      });
+    } catch (backfillErr) {
+      console.error('[api/admin/applications/accept] card backfill failed (non-fatal):', backfillErr);
+    }
+
     await emitEventEnd(eventId, {
       result: {
         tenantId,
         tenantSlug: finalSlug,
         userId: newUserId,
         emailSent: emailResult.provider !== 'skipped',
+        cardsBackfilled,
       },
     });
 
@@ -191,6 +212,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         emailSent: emailResult.provider !== 'skipped',
         emailProvider: emailResult.provider,
         emailFailed: !!emailResult.error,
+        // The admin UI relays these to the customer when email delivery is
+        // unconfigured/unverified — otherwise an approved customer has no way in.
+        tempPassword: tempPw,
+        emailError: emailResult.error ?? null,
+        cardsBackfilled,
       },
     });
   } catch (e) {

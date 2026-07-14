@@ -15,6 +15,7 @@ const { sqlMock } = vi.hoisted(() => {
   const mock = vi.fn() as any;
   // sql.begin(async (tx) => { ... }) — pass the mock itself as tx
   mock.begin = vi.fn(async (fn: any) => fn(mock));
+  mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
@@ -252,7 +253,7 @@ describe('solicitation.push', () => {
       .mockResolvedValueOnce([{
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15,
-        customVariables: {},
+        customVariables: {}, hasSubmissionFormat: true,
       }])
       .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
       .mockResolvedValueOnce(undefined) // opportunities UPDATE
@@ -271,8 +272,9 @@ describe('solicitation.push', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.pushed' }),
     );
-    // 7 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + COUNT topics + memory + revision
-    expect(sqlMock).toHaveBeenCalledTimes(7);
+    // 8 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + revision + COUNT topics
+    //        + memory + SELECT activated-set (multi-topic fan-out publishes each opp)
+    expect(sqlMock).toHaveBeenCalledTimes(8);
   });
 
   it('throws ValidationError when submission_format is missing', async () => {

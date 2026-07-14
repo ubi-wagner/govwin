@@ -24,11 +24,18 @@ interface CardRow {
   solicitationNumber: string | null;
   topicNumber: string | null;
   lifecycleStatus: string | null;
+  submissionStage: string | null;
   isActive: boolean;
+  orgUnit: string | null;
   closeDate: Date | null;
   postedDate: Date | null;
+  preReleaseDate: Date | null;
+  openDate: Date | null;
   ingestedAt: Date;
   oppUpdatedAt: Date | null;
+  releasedByEmail: string | null;
+  releasedAt: Date | null;
+  expertNotes: string | null;
   solicitationId: string | null;
   curationStatus: string | null;
   namespace: string | null;
@@ -58,11 +65,12 @@ export default async function AdminMasterCardsPage() {
     rows = await sql<CardRow[]>`
       SELECT
         o.id AS opportunity_id,
-        o.title, o.agency, o.office, o.program_type,
+        o.title, o.agency, o.office, o.org_unit, o.program_type,
         o.solicitation_number, o.topic_number,
-        o.lifecycle_status, o.is_active,
-        o.close_date, o.posted_date,
+        o.lifecycle_status, o.submission_stage, o.is_active,
+        o.close_date, o.posted_date, o.pre_release_date, o.open_date,
         o.created_at AS ingested_at, o.updated_at AS opp_updated_at,
+        o.released_at, o.expert_notes, ur.email AS released_by_email,
         cs.id AS solicitation_id, cs.status AS curation_status, cs.namespace,
         cs.updated_at AS curation_updated_at,
         sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
@@ -77,6 +85,7 @@ export default async function AdminMasterCardsPage() {
       FROM opportunities o
       LEFT JOIN curated_solicitations cs ON cs.opportunity_id = o.id
       LEFT JOIN solicitation_compliance sc ON sc.solicitation_id = cs.id AND sc.topic_id IS NULL
+      LEFT JOIN users ur ON ur.id = o.released_by
       LEFT JOIN LATERAL (
         SELECT version, posted_at, event_type FROM opportunity_bridge ob
         WHERE ob.opportunity_id = o.id ORDER BY version DESC LIMIT 1
@@ -104,11 +113,18 @@ export default async function AdminMasterCardsPage() {
     solicitationNumber: r.solicitationNumber,
     topicNumber: r.topicNumber,
     lifecycleStatus: r.lifecycleStatus,
+    submissionStage: r.submissionStage,
     isActive: r.isActive,
+    orgUnit: r.orgUnit,
     closeDate: iso(r.closeDate),
     postedDate: iso(r.postedDate),
+    preReleaseDate: iso(r.preReleaseDate),
+    openDate: iso(r.openDate),
     ingestedAt: iso(r.ingestedAt) ?? '',
     oppUpdatedAt: iso(r.oppUpdatedAt),
+    releasedByEmail: r.releasedByEmail,
+    releasedAt: iso(r.releasedAt),
+    expertNotes: r.expertNotes,
     solicitationId: r.solicitationId,
     curationStatus: r.curationStatus,
     namespace: r.namespace,

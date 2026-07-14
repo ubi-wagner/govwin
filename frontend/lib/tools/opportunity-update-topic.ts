@@ -135,23 +135,23 @@ export const opportunityUpdateTopicTool = defineTool<Input, Output>({
         UPDATE opportunities
         SET
           title = COALESCE(${input.title ?? null}, title),
-          description = CASE WHEN ${input.description !== undefined ? 't' : 'f'}::bool
+          description = CASE WHEN ${input.description !== undefined}
                              THEN ${input.description ?? null}
                              ELSE description END,
-          tech_focus_areas = CASE WHEN ${input.techFocusAreas !== undefined ? 't' : 'f'}::bool
+          tech_focus_areas = CASE WHEN ${input.techFocusAreas !== undefined}
                                   THEN ${input.techFocusAreas ?? []}::text[]
                                   ELSE tech_focus_areas END,
-          topic_branch = CASE WHEN ${input.topicBranch !== undefined ? 't' : 'f'}::bool
+          topic_branch = CASE WHEN ${input.topicBranch !== undefined}
                               THEN ${input.topicBranch ?? null}
                               ELSE topic_branch END,
           topic_status = COALESCE(${input.topicStatus ?? null}, topic_status),
-          poc_name = CASE WHEN ${input.pocName !== undefined ? 't' : 'f'}::bool
+          poc_name = CASE WHEN ${input.pocName !== undefined}
                           THEN ${input.pocName ?? null}
                           ELSE poc_name END,
-          poc_email = CASE WHEN ${input.pocEmail !== undefined ? 't' : 'f'}::bool
+          poc_email = CASE WHEN ${input.pocEmail !== undefined}
                            THEN ${input.pocEmail ?? null}
                            ELSE poc_email END,
-          content_hash = CASE WHEN ${canRehash ? 't' : 'f'}::bool
+          content_hash = CASE WHEN ${canRehash}
                               THEN md5(${solId ?? ''} || ${topicNumber ?? ''} || ${input.title ?? ''})
                               ELSE content_hash END,
           updated_at = now()

@@ -54,11 +54,22 @@ export async function exportToDocx(
 ): Promise<Buffer> {
   const { canvas, nodes } = doc;
 
+  // Canvas config is optional / may be partial on a hand-authored or freshly
+  // provisioned section; fall back to document defaults (US Letter, 1" margins,
+  // 12pt Times, single spacing) so export NEVER crashes on a missing
+  // font_default / margins / page size. Header/footer guards also tolerate a
+  // header/footer that carries no font.
+  const fontDefault = canvas?.font_default ?? { family: 'Times New Roman', size: 12 };
+  const lineSpacing = canvas?.line_spacing ?? 1.15;
+  const margins = canvas?.margins ?? { top: 72, right: 72, bottom: 72, left: 72 };
+  const pageWidth = canvas?.width ?? 612;
+  const pageHeight = canvas?.height ?? 792;
+
   const sub = (t: string) =>
     t.replace(/\{(\w+)\}/g, (_, k) => variables[k] ?? `{${k}}`);
 
   // Build header/footer
-  const headers = canvas.header ? {
+  const headers = canvas?.header?.font ? {
     default: new Header({
       children: [
         new Paragraph({
@@ -72,7 +83,7 @@ export async function exportToDocx(
     }),
   } : undefined;
 
-  const footers = canvas.footer ? {
+  const footers = canvas?.footer?.font ? {
     default: new Footer({
       children: [
         new Paragraph({
@@ -96,16 +107,16 @@ export async function exportToDocx(
 
   // Convert margins from points to twips (1 point = 20 twips)
   const marginTwips = {
-    top: canvas.margins.top * 20,
-    right: canvas.margins.right * 20,
-    bottom: canvas.margins.bottom * 20,
-    left: canvas.margins.left * 20,
+    top: margins.top * 20,
+    right: margins.right * 20,
+    bottom: margins.bottom * 20,
+    left: margins.left * 20,
   };
 
   // Build children from nodes
   const children: (Paragraph | Table)[] = [];
   for (const node of nodes) {
-    const elements = nodeToDocx(node, canvas.font_default, canvas.line_spacing, nodes);
+    const elements = nodeToDocx(node, fontDefault, lineSpacing, nodes);
     children.push(...elements);
   }
 
@@ -131,8 +142,8 @@ export async function exportToDocx(
         page: {
           margin: marginTwips,
           size: {
-            width: canvas.width * 20,
-            height: canvas.height * 20,
+            width: pageWidth * 20,
+            height: pageHeight * 20,
           },
         },
       },
@@ -144,12 +155,12 @@ export async function exportToDocx(
       default: {
         document: {
           run: {
-            font: canvas.font_default.family,
-            size: canvas.font_default.size * 2,
+            font: fontDefault.family,
+            size: fontDefault.size * 2,
           },
           paragraph: {
             spacing: {
-              line: Math.round(canvas.line_spacing * 240),
+              line: Math.round(lineSpacing * 240),
             },
           },
         },
@@ -167,14 +178,17 @@ function nodeToDocx(
   lineSpacing: number,
   allNodes: CanvasNode[],
 ): (Paragraph | Table)[] {
-  const font = node.style.family ?? fontDefault.family;
-  const size = (node.style.size ?? fontDefault.size) * 2;
+  // A node may carry no explicit style (hand-authored content / template output);
+  // default it so per-node style reads never crash. Field fallbacks below still apply.
+  const style = node.style ?? ({} as NonNullable<CanvasNode['style']>);
+  const font = style.family ?? fontDefault.family;
+  const size = (style.size ?? fontDefault.size) * 2;
   const alignment = ({
     left: AlignmentType.LEFT,
     center: AlignmentType.CENTER,
     right: AlignmentType.RIGHT,
     justify: AlignmentType.JUSTIFIED,
-  } as const)[node.style.alignment ?? 'left'] ?? AlignmentType.LEFT;
+  } as const)[style.alignment ?? 'left'] ?? AlignmentType.LEFT;
 
   switch (node.type) {
     case 'heading': {
@@ -194,16 +208,16 @@ function nodeToDocx(
     case 'text_block': {
       const c = node.content as TextBlockContent;
       const runs = createFormattedRuns(c, font, size, {
-        color: node.style.color,
-        bold: node.style.weight === 'bold',
-        italic: node.style.style === 'italic',
+        color: style.color,
+        bold: style.weight === 'bold',
+        italic: style.style === 'italic',
       });
       return [new Paragraph({
         alignment,
-        indent: node.style.indent ? { left: node.style.indent * 20 } : undefined,
+        indent: style.indent ? { left: style.indent * 20 } : undefined,
         spacing: {
-          before: (node.style.space_before ?? 0) * 20,
-          after: (node.style.space_after ?? 0) * 20,
+          before: (style.space_before ?? 0) * 20,
+          after: (style.space_after ?? 0) * 20,
         },
         children: runs,
       })];

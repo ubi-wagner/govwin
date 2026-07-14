@@ -46,14 +46,25 @@ export async function GET(
     try {
       const cards = await withTenant(tenantId, async (tx) => {
         // Explicit tenant predicate (belt) + RLS (suspenders, once the app runs as govtech_app).
+        // top_score = the card's best score across the tenant's buckets (mig 096),
+        // so the pipeline is actually ranked (pinned first, then score, then recency)
+        // — not just recency with a "ranked by your buckets" label.
         return tx`
-          SELECT id, opportunity_id, card, bridge_version, lifecycle_status, pursuit_status,
-                 is_pinned, pin_update_available, pinned_at, created_at, updated_at
-          FROM tenant_opportunity_cards
-          WHERE tenant_id = ${tenantId}::uuid
-            ${includeClosed ? tx`` : tx`AND lifecycle_status <> 'archived'`}
-            ${pinnedOnly ? tx`AND is_pinned = true` : tx``}
-          ORDER BY is_pinned DESC, updated_at DESC
+          SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
+                 c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
+                 bs.top_score, bs.top_bucket_id
+          FROM tenant_opportunity_cards c
+          LEFT JOIN LATERAL (
+            SELECT s.score AS top_score, s.bucket_id AS top_bucket_id
+            FROM tenant_bucket_scores s
+            WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
+            ORDER BY s.score DESC
+            LIMIT 1
+          ) bs ON true
+          WHERE c.tenant_id = ${tenantId}::uuid
+            ${includeClosed ? tx`` : tx`AND c.lifecycle_status <> 'archived'`}
+            ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}
+          ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
           LIMIT 1000
         `;
       });

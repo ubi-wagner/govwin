@@ -320,7 +320,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'comment_added', ${nodeId}::uuid,
-                ${JSON.stringify({ comment_id: comment.id, text: text.slice(0, 200) })}::jsonb)
+                ${sql.json({ comment_id: comment.id, text: text.slice(0, 200) })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/comments] activity log failed', logErr);

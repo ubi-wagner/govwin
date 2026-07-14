@@ -113,7 +113,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${profileId}::uuid, ${userId}::uuid,
           ${action as VisitAction}, ${url}, ${notes},
           ${filesCount}, ${topicsCount},
-          ${JSON.stringify(metadata)}::jsonb
+          ${sql.json((metadata) as Parameters<typeof sql.json>[0])}
         )
         RETURNING id
       `;

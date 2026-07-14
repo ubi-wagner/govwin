@@ -96,7 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             await sql`
               INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, actor_email, payload)
               VALUES ('identity', 'user.login_failed', 'single', 'system', 'auth', ${email},
-                      ${JSON.stringify({ correlationId: crypto.randomUUID() })}::jsonb)
+                      ${sql.json({ correlationId: crypto.randomUUID() })})
             `;
           } catch { /* non-critical */ }
           return null;
@@ -108,7 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           await sql`
             INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, actor_email, payload)
             VALUES ('identity', 'user.logged_in', 'single', 'user', ${user.id}, ${user.email},
-                    ${JSON.stringify({ correlationId: crypto.randomUUID() })}::jsonb)
+                    ${sql.json({ correlationId: crypto.randomUUID() })})
           `;
         } catch { /* non-critical */ }
 

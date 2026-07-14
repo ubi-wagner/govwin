@@ -115,7 +115,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
         VALUES (${proposalId}::uuid, ${tenantId}::uuid, ${sessionUser.id}::uuid,
                 ${sessionUser.email ?? null}, ${role},
                 'comment_resolved',
-                ${JSON.stringify({ comment_id: commentId })}::jsonb)
+                ${sql.json({ comment_id: commentId })})
       `;
     } catch (logErr) {
       console.error('[api/portal/proposals/comments/resolve] activity log failed', logErr);

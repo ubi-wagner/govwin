@@ -23,6 +23,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 const { sqlMock } = vi.hoisted(() => {
   const mock = vi.fn() as any;
   mock.begin = vi.fn(async (fn: any) => fn(mock));
+  mock.json = (v: any) => v;
   return { sqlMock: mock };
 });
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
@@ -187,6 +188,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
       .mockResolvedValueOnce([{                                  // preflight
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15, customVariables: {},
+        hasSubmissionFormat: true,
       }])
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active

@@ -9,10 +9,19 @@ interface Card {
   card: Record<string, unknown> | null;
   bridgeVersion: number;
   lifecycleStatus: string;
+  submissionStage: string;
   pursuitStatus: string;
   isPinned: boolean;
   pinUpdateAvailable: boolean;
 }
+
+const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
+  nofo: { label: 'NOFO', cls: 'bg-slate-100 text-slate-600' },
+  pre_release: { label: 'Pre-Release', cls: 'bg-indigo-100 text-indigo-700' },
+  updated: { label: 'Updated', cls: 'bg-blue-100 text-blue-700' },
+  closed: { label: 'Closed', cls: 'bg-amber-100 text-amber-700' },
+  archived: { label: 'Archived', cls: 'bg-gray-100 text-gray-500' },
+};
 
 export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string; role: Role }) {
   const [cards, setCards] = useState<Card[]>([]);
@@ -63,7 +72,9 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
           <div key={c.id} className={`border rounded-xl p-4 bg-white ${c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="text-sm font-semibold text-gray-800">{str(c, 'title') ?? 'Untitled opportunity'}</h3>
-              {c.lifecycleStatus !== 'open' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase">{c.lifecycleStatus}</span>}
+              {STAGE_BADGE[c.submissionStage] && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${STAGE_BADGE[c.submissionStage].cls}`}>{STAGE_BADGE[c.submissionStage].label}</span>
+              )}
             </div>
             <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${str(c, 'programType')}` : ''}</p>
             {str(c, 'closeDate') && <p className="text-[11px] text-gray-400 mt-1">Closes {new Date(str(c, 'closeDate') as string).toLocaleDateString()}</p>}

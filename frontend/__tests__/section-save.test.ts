@@ -22,7 +22,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock,
-  emitEventSingleMock, isValidUUIDMock } = vi.hoisted(() => {
+  emitEventSingleMock, isValidUUIDMock, resolveUserAccessMock } = vi.hoisted(() => {
   const sqlMock = vi.fn();
   return {
     authMock: vi.fn(),
@@ -31,6 +31,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock,
     verifyTenantAccessMock: vi.fn(),
     emitEventSingleMock: vi.fn(),
     isValidUUIDMock: vi.fn(),
+    resolveUserAccessMock: vi.fn(),
   };
 });
 
@@ -51,6 +52,12 @@ vi.mock('@/lib/events', () => ({
 
 vi.mock('@/lib/validation', () => ({
   isValidUUID: isValidUUIDMock,
+}));
+
+// Save auth now goes through resolveUserAccess (per-section editable set) instead
+// of an inline collaborator query, so mock it here.
+vi.mock('@/lib/proposal-access', () => ({
+  resolveUserAccess: resolveUserAccessMock,
 }));
 
 // ─── Import after mocks ────────────────────────────────────────────────────
@@ -97,6 +104,7 @@ function makeSection(overrides: Partial<{
     content: null,
     completedStage: null,
     completedAt: null,
+    isLocked: false,
     ...overrides,
   };
 }
@@ -132,6 +140,12 @@ function setupAuth(role = 'tenant_admin') {
   isValidUUIDMock.mockReturnValue(true);
   getTenantBySlugMock.mockResolvedValue(makeTenant());
   verifyTenantAccessMock.mockResolvedValue(true);
+  // Default: the actor can edit this section (admins get all sections; a
+  // collaborator gets their assigned+edit set). Denial tests override to [].
+  resolveUserAccessMock.mockResolvedValue({
+    role: 'admin', editableSections: [SECTION_ID], commentableSections: [SECTION_ID],
+    viewableSections: [SECTION_ID], accessibleStages: ['draft', 'final'],
+  });
 }
 
 // A successful save requires: proposal query → section query → canvas_versions INSERT → UPDATE → event + activity log
@@ -143,15 +157,18 @@ function setupFullHappyPath({
   collabPermission = 'edit',
 } = {}) {
   setupAuth(role);
+  // A collaborator's editable set is decided by resolveUserAccess (mocked); if the
+  // caller wants a non-edit collaborator, model it by emptying editableSections.
+  if (collabPermission !== 'edit') {
+    resolveUserAccessMock.mockResolvedValue({
+      role: 'contributor', editableSections: [], commentableSections: [SECTION_ID],
+      viewableSections: [SECTION_ID], accessibleStages: ['draft', 'final'],
+    });
+  }
   // Proposal query
   sqlMock.mockResolvedValueOnce([proposal]);
 
-  if (role !== 'tenant_admin' && role !== 'rfp_admin' && role !== 'master_admin') {
-    // collaborator access check
-    sqlMock.mockResolvedValueOnce([{ permission: collabPermission }]);
-  }
-
-  // Section query
+  // Section query (resolveUserAccess is mocked → no collaborator SQL in the sequence)
   sqlMock.mockResolvedValueOnce([section]);
 
   // canvas_versions INSERT (non-fatal snapshot)
@@ -353,11 +370,11 @@ describe('PUT section/save — collaborator (partner_user) edit permission', () 
     emitEventSingleMock.mockResolvedValue(undefined);
   });
 
-  it('returns 403 when partner_user has no collaborator entry', async () => {
+  it('returns 403 when partner_user is not assigned this section', async () => {
     setupAuth('partner_user');
-
+    // resolveUserAccess grants no editable sections → save is denied.
+    resolveUserAccessMock.mockResolvedValue({ role: 'external', editableSections: [], commentableSections: [], viewableSections: [SECTION_ID], accessibleStages: ['draft'] });
     sqlMock.mockResolvedValueOnce([makeProposal()]); // proposal
-    sqlMock.mockResolvedValueOnce([]);               // no collaborator access
 
     const res = await PUT(makeRequest({ content: VALID_CONTENT }), makeCtx());
     expect(res.status).toBe(403);
@@ -365,11 +382,10 @@ describe('PUT section/save — collaborator (partner_user) edit permission', () 
     expect(json.code).toBe('FORBIDDEN');
   });
 
-  it('returns 403 when partner_user has view (not edit) permission', async () => {
+  it('returns 403 when partner_user has view (not edit) on this section', async () => {
     setupAuth('partner_user');
-
+    resolveUserAccessMock.mockResolvedValue({ role: 'external', editableSections: [], commentableSections: [SECTION_ID], viewableSections: [SECTION_ID], accessibleStages: ['draft'] });
     sqlMock.mockResolvedValueOnce([makeProposal()]); // proposal
-    sqlMock.mockResolvedValueOnce([{ permission: 'view' }]); // view-only
 
     const res = await PUT(makeRequest({ content: VALID_CONTENT }), makeCtx());
     expect(res.status).toBe(403);
@@ -377,11 +393,9 @@ describe('PUT section/save — collaborator (partner_user) edit permission', () 
     expect(json.code).toBe('FORBIDDEN');
   });
 
-  it('returns 200 when partner_user has edit permission', async () => {
-    setupAuth('partner_user');
-
+  it('returns 200 when partner_user has edit on this section', async () => {
+    setupAuth('partner_user'); // default resolveUserAccess grants this section
     sqlMock.mockResolvedValueOnce([makeProposal()]); // proposal
-    sqlMock.mockResolvedValueOnce([{ permission: 'edit' }]); // edit permission
     sqlMock.mockResolvedValueOnce([makeSection()]);   // section
     sqlMock.mockResolvedValueOnce([]);                // canvas_versions INSERT
     const updateResult = Object.assign([], { count: 1 });

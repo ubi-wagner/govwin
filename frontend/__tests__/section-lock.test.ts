@@ -64,7 +64,10 @@ function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFoun
     if (q.includes('auto_advance_when_all_locked')) return Promise.resolve([{ autoAdvanceWhenAllLocked: autoAdvance }]);
     // Document-close + proposal-ready counts: report all sections locked.
     if (q.includes('count(*)')) return Promise.resolve([{ total: 1, locked: 1 }]);
-    return Promise.resolve([]); // UPDATE / INSERT
+    // The section lock/unlock is a compare-and-swap with RETURNING id — return a
+    // row so lockedRows/unlockedRows.length === 1 and the side effects run.
+    if (q.includes('UPDATE proposal_sections') && q.includes('RETURNING id')) return Promise.resolve([{ id: SECTION }]);
+    return Promise.resolve([]); // other UPDATE / INSERT / matrix
   });
 }
 

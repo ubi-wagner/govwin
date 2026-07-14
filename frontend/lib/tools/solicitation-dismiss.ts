@@ -144,7 +144,7 @@ export const solicitationDismissTool = defineTool<Input, Output>({
         VALUES
           (${solicitationId}::uuid, ${actorId}::uuid, 'dismiss',
            ${current.status}, 'dismissed', ${notes ?? null},
-           ${JSON.stringify({ phaseClassification: phaseClassification ?? null })}::jsonb)
+           ${sql.json({ phaseClassification: phaseClassification ?? null })})
       `;
     } catch (err) {
       console.error('[solicitation.dismiss] triage_actions insert failed:', err);

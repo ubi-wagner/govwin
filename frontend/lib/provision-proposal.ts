@@ -114,7 +114,7 @@ export async function provisionProposalForPortal(opts: {
           const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType, items: (vol.items as Array<Record<string, unknown>>) ?? [], compliance: resolved.compliance });
           const [art] = await tx<{ id: string }[]>`
             INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
-            VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+            VALUES (${p.id}, ${volNum}, ${volName}, ${artifactType}, ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
             RETURNING id
           `;
           artifactByVolKey.set(volKey(volNum, volName), art.id);
@@ -123,8 +123,17 @@ export async function provisionProposalForPortal(opts: {
           const artifactId = artifactByVolKey.get(volKey(item.volumeNumber, item.volumeName)) ?? null;
           const [section] = await tx<{ id: string }[]>`
             INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, title, content, status, page_allocation, volume_name, volume_number, section_type, meta)
-            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${JSON.stringify({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })}::jsonb)
+            VALUES (${p.id}, ${artifactId}, ${String(item.itemNumber)}, ${item.itemName}, ${null}, 'empty', ${item.pageLimit}, ${item.volumeName}, ${item.volumeNumber}, ${inferSectionType(item.itemName, sectionStandards)}, ${tx.json({ itemType: item.itemType ?? null, volumeName: item.volumeName ?? null, expertNotes: item.expertNotes ?? null })})
             RETURNING id
+          `;
+          // Compliance matrix: one requirement row per required item, linked to the
+          // section that addresses it. This is what the card's percentComplete + the
+          // workspace compliance tab read; the greenfield portal-launch path previously
+          // skipped it (card stuck at 0%). Rows start 'not_addressed' → 'satisfied' on lock.
+          await tx`
+            INSERT INTO proposal_compliance_matrix
+              (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+            VALUES (${p.id}, ${item.itemName}, ${item.volumeName ?? 'RFP'}, true, 'not_addressed', ${section.id})
           `;
           let templateDoc: CanvasDocument | null = null;
           if (item.templateId) {
@@ -148,10 +157,20 @@ export async function provisionProposalForPortal(opts: {
         const { formatSpec, complianceSpec } = buildArtifactSpecs({ artifactType: 'narrative', items: [], compliance: resolved.compliance });
         const [defArt] = await tx<{ id: string }[]>`
           INSERT INTO proposal_artifacts (proposal_id, volume_number, volume_name, artifact_type, format_spec, compliance_spec)
-          VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${JSON.stringify(formatSpec)}::jsonb, ${JSON.stringify(complianceSpec)}::jsonb)
+          VALUES (${p.id}, 1, 'Technical Volume', 'narrative', ${sql.json((formatSpec) as unknown as Parameters<typeof sql.json>[0])}, ${sql.json((complianceSpec) as unknown as Parameters<typeof sql.json>[0])})
           RETURNING id
         `;
-        await tx`INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, title, content, status, page_allocation) VALUES (${p.id}, ${defArt.id}, '1', 'Technical Volume', ${null}, 'empty', ${null})`;
+        const [defSection] = await tx<{ id: string }[]>`
+          INSERT INTO proposal_sections (proposal_id, artifact_id, section_number, title, content, status, page_allocation)
+          VALUES (${p.id}, ${defArt.id}, '1', 'Technical Volume', ${null}, 'empty', ${null})
+          RETURNING id
+        `;
+        // Matrix: at least one requirement so the card burden isn't an empty 0% shell.
+        await tx`
+          INSERT INTO proposal_compliance_matrix
+            (proposal_id, requirement_text, requirement_source, is_mandatory, status, section_id)
+          VALUES (${p.id}, 'Technical Volume', 'RFP', true, 'not_addressed', ${defSection.id})
+        `;
         count = 1;
       }
       return { proposalId: p.id as string, sectionCount: count };

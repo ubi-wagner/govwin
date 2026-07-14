@@ -1,0 +1,1176 @@
+[
+  {
+    "key": "econdev-onepager",
+    "name": "EconDev Solution Overview — RFP Pipeline",
+    "templateType": "custom",
+    "svgCount": 3,
+    "canvasDocument": {
+      "version": 1,
+      "document_id": "d9f2a7b4-3c61-4e8a-b0d5-6a1c9e274f38",
+      "canvas": {
+        "font_default": {
+          "family": "Helvetica",
+          "size": 11
+        },
+        "line_spacing": 1.15,
+        "margins": {
+          "top": 54,
+          "right": 54,
+          "bottom": 54,
+          "left": 54
+        },
+        "width": 612,
+        "height": 792
+      },
+      "nodes": [
+        {
+          "id": "img-hero-mark",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/econdev-portfolio-mark.svg",
+            "alt_text": "A portfolio of small businesses focused through a ranking lens into upward growth",
+            "width": 150,
+            "height": 150,
+            "caption": "RFP Pipeline: your portfolio's federal-funding force-multiplier"
+          }
+        },
+        {
+          "id": "h-title",
+          "type": "heading",
+          "content": {
+            "level": 1,
+            "text": "Your portfolio's federal-funding force-multiplier"
+          }
+        },
+        {
+          "id": "t-audience",
+          "type": "text_block",
+          "content": {
+            "text": "A solution overview for Economic Development organizations — SBDCs, accelerators, regional EconDev, and defense-innovation hubs."
+          }
+        },
+        {
+          "id": "t-promise",
+          "type": "text_block",
+          "content": {
+            "text": "Give every company you support an expert-curated, AI-accelerated, compliance-safe path to non-dilutive federal funding (SBIR / STTR / OTA / CSO / BAA) — while your team shadow-supports the whole cohort from one ranked view."
+          }
+        },
+        {
+          "id": "h-problem",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "The problem: SBIR money left on the table"
+          }
+        },
+        {
+          "id": "t-problem-lede",
+          "type": "text_block",
+          "content": {
+            "text": "Your portfolio companies have the ideas. What they lack is a proposal team — so non-dilutive federal dollars go unclaimed."
+          }
+        },
+        {
+          "id": "l-problem",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "No proposal team — a Phase I volume runs 15–20 compliance-bound pages, and the founder already wears every hat."
+              },
+              {
+                "text": "The blank page — even strong companies stall at \"where do I start?\" until the deadline passes."
+              },
+              {
+                "text": "Compliance risk — one missed requirement (a page limit, a required section) disqualifies a proposal before it is ever scored."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h-help",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "How RFP Pipeline helps your portfolio: expert skeletons, not DIY search"
+          }
+        },
+        {
+          "id": "t-help-lede",
+          "type": "text_block",
+          "content": {
+            "text": "The moat is what our experts pre-build — and what your companies never have to face alone."
+          }
+        },
+        {
+          "id": "l-help",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Curated skeletons — we pre-build the compliance matrix, section outline, and canvas \"mold\" templates for every required document, so no company faces a blank page."
+              },
+              {
+                "text": "A ranked feed — each company gets up to five Spotlight lenses (agency · technology · program), with one scored opportunity card per solicitation."
+              },
+              {
+                "text": "A learning library — company documents are atomized into tagged, reusable content atoms, and winning drafts return to the library for the next proposal."
+              },
+              {
+                "text": "Compliance baked in — AI drafts each section into the mold from that library plus the live RFP; a compliance matrix tracks completeness; the result exports as a submission-ready Word document."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h-flow",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "How it works: from opportunity to submission in three steps"
+          }
+        },
+        {
+          "id": "img-flow",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/econdev-three-step-flow.svg",
+            "alt_text": "Three-step pipeline: discover and rank, build on the skeleton, review lock and submit",
+            "width": 504,
+            "height": 150,
+            "caption": "The three-step build — discover & rank, build on the expert skeleton, then review, lock, and submit."
+          }
+        },
+        {
+          "id": "tbl-steps",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Step",
+              "What happens"
+            ],
+            "rows": [
+              [
+                "1 · Discover & rank",
+                "Each company gets a personalized, ranked feed of federal opportunities across its agency, technology, and program lenses."
+              ],
+              [
+                "2 · Build on the skeleton",
+                "Experts pre-build the compliance matrix and section molds; AI drafts each section from the company's learning library and the live RFP."
+              ],
+              [
+                "3 · Review · lock · submit",
+                "The team collaborates with stage-scoped roles — including your EconDev shadow — locks sections, and downloads a submission-ready Word document."
+              ]
+            ]
+          }
+        },
+        {
+          "id": "t-example",
+          "type": "text_block",
+          "content": {
+            "text": "For example: a hypothetical portfolio company like Immobileyes (a computer-vision property-intelligence startup) spots a matching agency topic in its feed and turns a daunting Phase I into a review-and-lock exercise instead of a blank page."
+          }
+        },
+        {
+          "id": "h-getyou",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "What you get as an Economic Development partner"
+          }
+        },
+        {
+          "id": "tbl-benefits",
+          "type": "table",
+          "content": {
+            "headers": [
+              "What you get",
+              "Why it matters"
+            ],
+            "rows": [
+              [
+                "Shadow-support across the cohort",
+                "A stage-scoped shadow role lets your advisors view, comment, and edit inside any company's proposal — supporting the work without taking the pen from the founder."
+              ],
+              [
+                "A ranked deal-flow view",
+                "Portfolio-wide visibility into which companies have live opportunities, where each proposal stands, and which deadlines are near."
+              ],
+              [
+                "Cleaner submissions, cohort-wide",
+                "Expert skeletons plus compliance-baked drafting mean more of your companies actually submit — and submit without disqualifying gaps."
+              ],
+              [
+                "Force-multiplier economics",
+                "One advisor can shadow-support many builds at once, so your team's limited hours compound across the entire portfolio."
+              ]
+            ]
+          }
+        },
+        {
+          "id": "img-impact",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/econdev-impact-band.svg",
+            "alt_text": "Impact band showing an upward growth trend beneath four headline figures",
+            "width": 504,
+            "height": 90,
+            "caption": "Impact at a glance — award range and program structure."
+          }
+        },
+        {
+          "id": "tbl-stats",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Figure",
+              "What it means",
+              "Note"
+            ],
+            "rows": [
+              [
+                "$150K–$300K",
+                "Typical SBIR Phase I award — non-dilutive",
+                "Public federal program range; actual awards vary by agency and topic"
+              ],
+              [
+                "0% equity",
+                "Non-dilutive funding — companies keep their cap table",
+                "Program structure"
+              ],
+              [
+                "Up to 5",
+                "Spotlight lenses ranking each company's feed",
+                "Per company"
+              ],
+              [
+                "1 view",
+                "Shadow-support your whole portfolio from one console",
+                "For your EconDev team"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "h-cta",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Bring your portfolio. We'll set up your shadow-admin view."
+          }
+        },
+        {
+          "id": "t-cta",
+          "type": "text_block",
+          "content": {
+            "text": "Start with a founding-cohort pilot: an illustrative model of roughly $299 per month per company for the Spotlight subscription, plus per-proposal build fees. Begin with a small pilot cohort and grow. Contact your RFP Pipeline partner team to set up your shadow-admin view."
+          }
+        },
+        {
+          "id": "t-disclaimer",
+          "type": "text_block",
+          "content": {
+            "text": "All dollar figures other than the public SBIR Phase I award range are illustrative pricing models, not guarantees. RFP Pipeline does not guarantee awards. SBIR and STTR are federal programs administered by participating agencies."
+          }
+        }
+      ],
+      "metadata": {
+        "title": "RFP Pipeline — Solution Overview for Economic Development Organizations"
+      }
+    }
+  },
+  {
+    "key": "smallbiz-onepager",
+    "name": "RFP Pipeline — Founder's One-Page Solution Overview",
+    "templateType": "custom",
+    "svgCount": 6,
+    "canvasDocument": {
+      "version": 1,
+      "document_id": "ee930347-9183-4df7-b304-321c1a7f9486",
+      "canvas": {
+        "font_default": {
+          "family": "Helvetica",
+          "size": 11
+        },
+        "line_spacing": 1.15,
+        "margins": {
+          "top": 54,
+          "right": 54,
+          "bottom": 54,
+          "left": 54
+        },
+        "width": 612,
+        "height": 792
+      },
+      "nodes": [
+        {
+          "id": "mark",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/rfp-pipeline-mark.svg",
+            "alt_text": "RFP Pipeline mark — three coral flow arrows resolving into an award-green marker",
+            "width": 100,
+            "height": 100,
+            "caption": "RFP Pipeline · Solution overview for founders & principal investigators"
+          }
+        },
+        {
+          "id": "eyebrow",
+          "type": "text_block",
+          "content": {
+            "text": "You have the technology. You don't have a proposal team."
+          }
+        },
+        {
+          "id": "hero",
+          "type": "heading",
+          "content": {
+            "level": 1,
+            "text": "From \"I could never write a federal proposal\" to a submission-ready Word document."
+          }
+        },
+        {
+          "id": "lede",
+          "type": "text_block",
+          "content": {
+            "text": "RFP Pipeline is the guided, AI-accelerated, compliance-safe path a technical founder takes to a submitted federal proposal. We rank the opportunities worth your time, turn your own company documents into reusable content, and draft every section into an expert-built, compliance-bound template — so the money becomes reachable and the paperwork stops being the wall."
+          }
+        },
+        {
+          "id": "h-money",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "01 · Federal money is real. The paperwork was the obstacle — not the money."
+          }
+        },
+        {
+          "id": "money-body",
+          "type": "text_block",
+          "content": {
+            "text": "Federal agencies fund early-stage R&D through SBIR, STTR, OTA, CSO, and BAA programs, and the funding is non-dilutive: you keep 100% of your equity and your IP — no investor, no board seat given up. The award is real cash for work you already want to do. The barrier has never been the money; it has been the proposal itself — hundreds of pages of rules, formatting, and volumes. That is the part RFP Pipeline removes."
+          }
+        },
+        {
+          "id": "ranges",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Program stage",
+              "Typical non-dilutive award",
+              "What you give up"
+            ],
+            "rows": [
+              [
+                "SBIR / STTR Phase I",
+                "~$150K–$300K",
+                "No equity. No IP."
+              ],
+              [
+                "SBIR / STTR Phase II",
+                "~$1M+ (agency-dependent)",
+                "No equity. No IP."
+              ]
+            ]
+          }
+        },
+        {
+          "id": "ranges-note",
+          "type": "text_block",
+          "content": {
+            "text": "Award ranges are public program figures and vary by agency and year — confirm the current number in each solicitation. Illustrative, not a quote."
+          }
+        },
+        {
+          "id": "h-steps",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "02 · From opportunity to submission in five steps"
+          }
+        },
+        {
+          "id": "pipeline",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/five-step-pipeline.svg",
+            "alt_text": "Five-step pipeline: ranked feed, your library, expert skeleton, AI draft, then review, lock and download a Word document",
+            "width": 520,
+            "height": 150,
+            "caption": "The value spine: ranked feed → your library → expert skeleton → AI draft into the mold → review, lock, download .docx"
+          }
+        },
+        {
+          "id": "steps",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Step 01 · Ranked feed — Up to five Spotlight buckets score the opportunity river against your agency, technology, and program lenses. One card per opportunity, ranked for fit, so you spend time only on what you can win."
+              },
+              {
+                "text": "Step 02 · Your library — Upload your company documents once. We \"atomize\" them into tagged, reusable content atoms — a bio, a past-performance blurb, a figure — that the system reuses on every future proposal."
+              },
+              {
+                "text": "Step 03 · Expert skeleton — Curators pre-build the hard part: a compliance matrix, a volume-and-section outline, and a canvas template (\"mold\") for each required document. You never face a blank page."
+              },
+              {
+                "text": "Step 04 · AI draft into the mold — AI drafts each section directly into the compliance-bound mold, using your library plus the live RFP context. A first draft in minutes, not weeks."
+              },
+              {
+                "text": "Step 05 · Review, lock, download — Review and collaborate with stage-scoped teammates, lock each section, watch the compliance matrix reach 100%, and download a submission-ready Word (.docx) file."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h-why",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "03 · Why it wins for a first-time applicant"
+          }
+        },
+        {
+          "id": "why",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Expert skeletons, not DIY search — You start from a curator's compliance matrix and document molds: the real structure a winning proposal needs, never a blank page."
+              },
+              {
+                "text": "Your content, reused and learning — Winning drafted sections return to your private library for the next proposal. The more you build, the faster and stronger each proposal gets."
+              },
+              {
+                "text": "Compliance baked in, not bolted on — Every section is drafted inside a compliance-bound template and tracked by a live matrix, so \"submission-ready\" means exactly that."
+              },
+              {
+                "text": "Support that scales — Bring in a teammate, or let an EconDev partner \"shadow-support\" your whole proposal, with stage-scoped view / comment / edit roles."
+              }
+            ]
+          }
+        },
+        {
+          "id": "meter",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/compliance-meter.svg",
+            "alt_text": "Compliance meter filled to 100 percent with a checkmark — submission-ready",
+            "width": 200,
+            "height": 200,
+            "caption": "The live compliance matrix reaches 100% before you download."
+          }
+        },
+        {
+          "id": "h-pricing",
+          "type": "heading",
+          "content": {
+            "level": 3,
+            "text": "Pricing model (illustrative)"
+          }
+        },
+        {
+          "id": "pricing",
+          "type": "text_block",
+          "content": {
+            "text": "Founding-cohort model (illustrative): about $299 per month for your Spotlight subscription — the ranked feed, your library, and access to expert skeletons — plus a per-proposal build fee when you're ready to draft and submit. Final pricing is set per cohort; the figures here are a model, not a quote."
+          }
+        },
+        {
+          "id": "h-cta",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Claim your Spotlight"
+          }
+        },
+        {
+          "id": "cta",
+          "type": "text_block",
+          "content": {
+            "text": "Bring one opportunity you'd love to win. We'll show you the expert skeleton for it and draft your first section from your own library — so you can see the guided path from ranked feed to a submission-ready .docx before you commit. Start with a Spotlight."
+          }
+        }
+      ],
+      "metadata": {
+        "title": "RFP Pipeline — Founder's Solution Overview: from \"I could never write a federal proposal\" to a submitted proposal"
+      }
+    }
+  },
+  {
+    "key": "solution-businesscase-2page",
+    "name": "RFP Pipeline — Two-Page Capture Brief",
+    "templateType": "custom",
+    "svgCount": 4,
+    "canvasDocument": {
+      "version": 1,
+      "document_id": "3f9a2c7e-8b41-4d6a-9e0c-2a7b5d1f4c88",
+      "canvas": {
+        "font_default": {
+          "family": "Helvetica",
+          "size": 11
+        },
+        "line_spacing": 1.15,
+        "margins": {
+          "top": 54,
+          "right": 54,
+          "bottom": 54,
+          "left": 54
+        },
+        "width": 612,
+        "height": 792
+      },
+      "nodes": [
+        {
+          "id": "h-title",
+          "type": "heading",
+          "content": {
+            "level": 1,
+            "text": "RFP Pipeline — Capture Brief"
+          }
+        },
+        {
+          "id": "t-tagline",
+          "type": "text_block",
+          "content": {
+            "text": "Discover, rank, and build winning proposals for federal non-dilutive funding — SBIR, STTR, OTA, CSO, BAA. The expert-curated proposal engine, not another opportunity search box. Built for government-contracting small businesses and the economic-development (EconDev) sponsors that back them."
+          }
+        },
+        {
+          "id": "t-lead",
+          "type": "text_block",
+          "content": {
+            "text": "RFP Pipeline is a multi-tenant platform for the small businesses chasing federal non-dilutive funding — and the economic-development organizations that back them. Expert curators turn raw solicitations into a ranked, personalized feed, pre-build the compliant skeleton for every opportunity, and let AI draft each section into that skeleton from your own reusable content. You review, collaborate, lock sections, and download a submission-ready Word volume — never starting from a blank page."
+          }
+        },
+        {
+          "id": "h-spine",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "The value spine"
+          }
+        },
+        {
+          "id": "t-spine-sub",
+          "type": "text_block",
+          "content": {
+            "text": "One path from the federal opportunity river to a submitted proposal."
+          }
+        },
+        {
+          "id": "img-spine",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/value-spine.svg",
+            "alt_text": "Five-stage value spine: Curate, Rank, Build library, Skeleton, Draft & submit — connected left to right from the opportunity river to submission-ready.",
+            "width": 504,
+            "height": 96,
+            "caption": "The value spine: curate → rank → build library → skeleton → draft & submit."
+          }
+        },
+        {
+          "id": "l-spine",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Curate — Expert RFP admins ingest federal solicitations (SBIR, STTR, OTA, CSO, BAA) into one global opportunity river."
+              },
+              {
+                "text": "Rank — Each customer gets a personalized, scored feed through up to five Spotlight buckets — their agency, technology, and program lenses — one card per opportunity."
+              },
+              {
+                "text": "Build the library — Uploaded company docs are atomized into tagged, reusable content atoms (a bio, a past-performance blurb, a figure). The library learns: winning drafted content returns for the next proposal."
+              },
+              {
+                "text": "Pre-build the skeleton — Curators ship a compliance matrix, a volume/section outline, and canvas \"mold\" templates for every required document. No blank page."
+              },
+              {
+                "text": "Draft & submit — AI drafts each section into the compliance-bound mold from your library and the RFP context. Review, collaborate with stage-scoped roles, lock sections, and download a submission-ready Word document while a compliance matrix tracks completeness."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h-moat",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Why it wins — the moat"
+          }
+        },
+        {
+          "id": "img-icons",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/differentiators.svg",
+            "alt_text": "Icon set for four differentiators: curated skeletons, a learning library, baked-in compliance, and built for sponsors.",
+            "width": 504,
+            "height": 38,
+            "caption": "Four things a generic opportunity search will never do."
+          }
+        },
+        {
+          "id": "l-moat",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Expert-curated skeletons & templates — a curator's compliance matrix and molds per document, not a DIY search box."
+              },
+              {
+                "text": "A library that learns — content atoms compound; every win makes the next proposal faster to build."
+              },
+              {
+                "text": "Compliance baked in — a matrix tracks Section L/M completeness section by section, not bolted on at the end."
+              },
+              {
+                "text": "Built for sponsors — stage-scoped roles let an EconDev org shadow-support a whole portfolio of small businesses."
+              }
+            ]
+          }
+        },
+        {
+          "id": "h-value",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Value propositions"
+          }
+        },
+        {
+          "id": "t-value-sub",
+          "type": "text_block",
+          "content": {
+            "text": "One platform, two beneficiaries — the small business that builds, and the sponsor that backs it."
+          }
+        },
+        {
+          "id": "tbl-value",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Lens",
+              "For the small business",
+              "For the EconDev sponsor"
+            ],
+            "rows": [
+              [
+                "Discovery & ranking",
+                "Stop drowning in the river — a scored feed surfaces only the opportunities that fit your buckets.",
+                "See at a glance which regional firms match which pools of federal money."
+              ],
+              [
+                "Content library",
+                "Upload once, reuse everywhere; winning drafted content returns to the library.",
+                "Portfolio-wide capability that compounds across every client you support."
+              ],
+              [
+                "Skeleton & compliance",
+                "Never a blank page; a live matrix guards Section L/M completeness.",
+                "Fewer disqualified submissions — clients actually finish and submit."
+              ],
+              [
+                "Drafting & output",
+                "AI drafts into the compliant mold; download a submission-ready Word volume.",
+                "Expert-grade output without hiring a proposal expert for every client."
+              ],
+              [
+                "Roles & collaboration",
+                "Invite teammates and partners with stage-scoped view / comment / edit access.",
+                "Shadow-support the whole portfolio from a single seat."
+              ],
+              [
+                "Economics",
+                "Subscription + per-proposal instead of a $10–25k consultant (illustrative).",
+                "Steward scarce non-dilutive capital into your region, at scale."
+              ]
+            ]
+          }
+        },
+        {
+          "id": "h-roi",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Illustrative unit economics & ROI"
+          }
+        },
+        {
+          "id": "t-roi-frame",
+          "type": "text_block",
+          "content": {
+            "text": "Public anchor: SBIR Phase I awards are typically ~$150K–$300K in non-dilutive funding. Everything below is an illustrative model for a firm pursuing four Phase I submissions a year — not a quote and not a guarantee."
+          }
+        },
+        {
+          "id": "img-cost",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/cost-comparison.svg",
+            "alt_text": "Bar chart: a proposal consultant runs $10k–$25k (about $17,500 average) to reach one submission, versus about $3,400 with RFP Pipeline — roughly 5x lower.",
+            "width": 244,
+            "height": 146,
+            "caption": "Cost to reach one submission (per proposal): consultant ≈ $17,500 vs. RFP Pipeline ≈ $3,400 (illustrative)."
+          }
+        },
+        {
+          "id": "img-roi",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/roi-waterfall.svg",
+            "alt_text": "Waterfall chart: cost saved (about $56.4k) plus expected-value lift (about $30.0k) build to a total illustrative annual value of about $86.4k across four submissions.",
+            "width": 244,
+            "height": 146,
+            "caption": "Illustrative annual value (4 submissions): $56.4k cost saved + $30.0k value lift = $86.4k."
+          }
+        },
+        {
+          "id": "tbl-cost",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Line item (per proposal)",
+              "Proposal consultant",
+              "RFP Pipeline"
+            ],
+            "rows": [
+              [
+                "Build fee",
+                "$10,000–$25,000",
+                "$2,500 (illustrative)"
+              ],
+              [
+                "Subscription share",
+                "—",
+                "$897 (one-quarter of $3,588/yr)"
+              ],
+              [
+                "Blank-page rework",
+                "High (bespoke each time)",
+                "Low (expert skeleton + molds)"
+              ],
+              [
+                "Fully-loaded cost",
+                "≈ $17,500",
+                "≈ $3,400"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "tbl-annual",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Driver",
+              "Assumption (illustrative)",
+              "Annual value"
+            ],
+            "rows": [
+              [
+                "Consultant path cost",
+                "4 × $17,500 midpoint",
+                "($70,000)"
+              ],
+              [
+                "RFP Pipeline path cost",
+                "$3,588 subscription + 4 × $2,500",
+                "($13,588)"
+              ],
+              [
+                "Cost saved",
+                "difference of the two paths",
+                "$56,412"
+              ],
+              [
+                "Expected-value lift",
+                "4 × ($150,000 × +5 pts win rate)",
+                "$30,000"
+              ],
+              [
+                "Total illustrative annual value",
+                "cost saved + value lift",
+                "$86,412"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "t-scenario",
+          "type": "text_block",
+          "content": {
+            "text": "Illustrative scenario — Immobileyes (hypothetical, computer-vision property intelligence): a firm like Immobileyes runs a Spotlight bucket for DoD sensing topics, drafts four Phase I proposals a year from its learning library, and reaches submission for ≈ $3,400 each instead of a $10–25k consultant. On this model, a single additional $150K Phase I award — from more competitive, compliant, on-time submissions — returns ≈ 11× the entire $13,588 annual platform + build spend. Illustrative model — not a guarantee."
+          }
+        },
+        {
+          "id": "t-disc",
+          "type": "text_block",
+          "content": {
+            "text": "Basis & disclaimers: SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar amounts — consultant costs, the $2,500 build fee, the four-submission cadence, and the +5-point win-rate lift — are an illustrative model, not a quote and not a guarantee; actual results vary by firm, agency, and solicitation. Founding-cohort pricing: ~$299/mo Spotlight subscription + per-proposal build fees. Immobileyes is used only as a hypothetical example."
+          }
+        }
+      ],
+      "metadata": {
+        "title": "RFP Pipeline — Two-Page Capture Brief"
+      }
+    }
+  },
+  {
+    "key": "investor-deck-5page",
+    "name": "RFP Pipeline — Investor Overview (5-Slide Deck)",
+    "templateType": "slide_deck",
+    "svgCount": 6,
+    "canvasDocument": {
+      "version": 1,
+      "document_id": "b6f3a2c1-9d4e-4f7a-8c21-3e5a7b9d0f42",
+      "canvas": {
+        "font_default": {
+          "family": "Helvetica",
+          "size": 11
+        },
+        "line_spacing": 1.15,
+        "margins": {
+          "top": 54,
+          "right": 54,
+          "bottom": 54,
+          "left": 54
+        },
+        "width": 612,
+        "height": 792
+      },
+      "metadata": {
+        "title": "RFP Pipeline — Investor Overview (5-Slide Investor Deck)"
+      },
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "heading",
+          "content": {
+            "level": 1,
+            "text": "RFP Pipeline — Investor Overview"
+          }
+        },
+        {
+          "id": "n2",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/logo-mark.svg",
+            "alt_text": "RFP Pipeline logo mark: opportunity streams converging into a ranked card",
+            "width": 120,
+            "height": 120,
+            "caption": "Brand mark"
+          }
+        },
+        {
+          "id": "n3",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Non-dilutive capital, on rails."
+          }
+        },
+        {
+          "id": "n4",
+          "type": "text_block",
+          "content": {
+            "text": "The proposal operating system for government-contracting SMBs and the EconDev organizations that back them. We turn the federal non-dilutive funding maze — SBIR, STTR, OTA, CSO, BAA — into a guided path: expert-curated opportunities, ranked to each company, and drafted by AI into compliance-ready proposals you download and submit."
+          }
+        },
+        {
+          "id": "n5",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/title-river.svg",
+            "alt_text": "A global opportunity river scored through a Spotlight lens into ranked opportunity cards",
+            "width": 360,
+            "height": 277,
+            "caption": "Curate then rank: one scored card per opportunity"
+          }
+        },
+        {
+          "id": "n6",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "The problem — a path problem, not a money problem"
+          }
+        },
+        {
+          "id": "n7",
+          "type": "text_block",
+          "content": {
+            "text": "Billions in non-dilutive funding go unclaimed — not for lack of money, but for lack of a path. Program scale is public and defensible; the friction between a capable company and that capital is the opportunity."
+          }
+        },
+        {
+          "id": "n8",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Discovery is noise — thousands of solicitations across dozens of agencies and portals; the right one is a needle in a haystack, and deadlines pass unseen."
+              },
+              {
+                "text": "The blank page — even a strong company stalls at a blank Volume I: 20–50 pages of tightly-specified, compliance-bound technical writing."
+              },
+              {
+                "text": "Compliance is pass / fail — miss a required section, a page limit, or a format rule and a fundable idea is thrown out unread, before the science is ever evaluated."
+              },
+              {
+                "text": "Support doesn't scale — EconDev orgs, accelerators, and PTACs want whole portfolios of SMBs to win, but hand-holding each proposal one-by-one doesn't scale."
+              }
+            ]
+          }
+        },
+        {
+          "id": "n9",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/problem-stats.svg",
+            "alt_text": "Program-scale stat band: ~$4B+/yr, 11 agencies, $150K–$300K+ Phase I, 0% equity",
+            "width": 504,
+            "height": 52,
+            "caption": "Public, defensible program scale"
+          }
+        },
+        {
+          "id": "n10",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Metric",
+              "Value",
+              "Note"
+            ],
+            "rows": [
+              [
+                "Non-dilutive R&D awarded / year",
+                "~$4B+",
+                "SBIR / STTR, public"
+              ],
+              [
+                "Participating agencies",
+                "11",
+                "dozens of portals"
+              ],
+              [
+                "Typical Phase I award",
+                "$150K–$300K+",
+                "public range"
+              ],
+              [
+                "Equity given up",
+                "0%",
+                "it is grant capital"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "n11",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "The solution & product — one spine, end to end"
+          }
+        },
+        {
+          "id": "n12",
+          "type": "text_block",
+          "content": {
+            "text": "Curated → ranked → library → skeleton → AI-draft → download. Experts pre-build the skeleton so the customer never faces a blank page; AI drafts each section into a compliance-bound mold from the company's own learning library."
+          }
+        },
+        {
+          "id": "n13",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/product-spine.svg",
+            "alt_text": "Six-step product spine — Curate, Rank, Library, Skeleton, AI Draft, Review & Download — with a learning loop returning won content to the library",
+            "width": 504,
+            "height": 104,
+            "caption": "The value spine plus the learning loop"
+          }
+        },
+        {
+          "id": "n14",
+          "type": "bulleted_list",
+          "content": {
+            "items": [
+              {
+                "text": "Curate — RFP experts ingest federal solicitations into one live opportunity river."
+              },
+              {
+                "text": "Rank — each company gets a personalized feed via up to 5 Spotlight buckets; one card per opportunity, scored to their agency/tech/program lenses."
+              },
+              {
+                "text": "Library — upload company docs; we 'atomize' them into tagged, reusable content atoms (bios, past-performance blurbs, figures). The library learns."
+              },
+              {
+                "text": "Skeleton — experts pre-build each opportunity: a compliance matrix, a section outline, and canvas 'mold' templates per required document."
+              },
+              {
+                "text": "AI Draft — AI writes each section into the compliance-bound mold from the company's library plus the RFP context."
+              },
+              {
+                "text": "Review & Download — collaborate with stage-scoped roles (including an EconDev 'shadow' supporter), lock sections, and download a submission-ready Word document; a compliance matrix tracks completeness."
+              }
+            ]
+          }
+        },
+        {
+          "id": "n15",
+          "type": "text_block",
+          "content": {
+            "text": "The moat: expert-curated skeletons & molds (not DIY search); a learning atom library that compounds every proposal (winning content returns as new atoms); and compliance baked in — tracked, not bolted on."
+          }
+        },
+        {
+          "id": "n16",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Market, wedge & business model"
+          }
+        },
+        {
+          "id": "n17",
+          "type": "text_block",
+          "content": {
+            "text": "Land through EconDev; expand across every SBIR-seeking SMB. The go-to-market wedge: land one EconDev organization and reach its entire portfolio of small businesses. The stage-scoped 'shadow' role lets that org support every build — a force multiplier, not a single seat."
+          }
+        },
+        {
+          "id": "n18",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/market-funnel.svg",
+            "alt_text": "Bottoms-up market funnel from R&D-active US SMBs down to a founding-cohort beachhead; all counts illustrative",
+            "width": 300,
+            "height": 222,
+            "caption": "Bottoms-up TAM funnel (illustrative model)"
+          }
+        },
+        {
+          "id": "n19",
+          "type": "text_block",
+          "content": {
+            "text": "Bottoms-up funnel (illustrative model): R&D-active US SMBs (100k+) → SBIR/STTR-seeking (~25k) → reachable via EconDev / accelerator / PTAC network (~10k — the wedge) → founding-cohort beachhead. Revenue scales as: SMBs × ( $299/mo + builds × build fee )."
+          }
+        },
+        {
+          "id": "n20",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Component (founding cohort)",
+              "Model"
+            ],
+            "rows": [
+              [
+                "Spotlight subscription (list price)",
+                "$299 / mo"
+              ],
+              [
+                "Per-proposal build fee",
+                "per build (illustrative)"
+              ],
+              [
+                "Reachable SMBs via EconDev network",
+                "~10,000 (illustrative)"
+              ],
+              [
+                "Subscription revenue @ reach",
+                "~$36M / yr (illustrative)"
+              ],
+              [
+                "Per-proposal builds",
+                "additive upside (illustrative)"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "n21",
+          "type": "text_block",
+          "content": {
+            "text": "Illustrative model — not a forecast. Only the $299/mo list price and public SBIR award ranges are actual; every count and roll-up is illustrative."
+          }
+        },
+        {
+          "id": "n22",
+          "type": "heading",
+          "content": {
+            "level": 2,
+            "text": "Why now, roadmap & the ask"
+          }
+        },
+        {
+          "id": "n23",
+          "type": "text_block",
+          "content": {
+            "text": "The tailwinds just turned — and the spine is live. Why now: (1) AI can finally draft to spec — models can draft compliance-bound technical narrative into a fixed mold from a company's own library; (2) non-dilutive capital is in demand — founders wary of dilution favor grant capital that costs no equity; (3) government is digitizing — solicitations, portals, and submission are increasingly structured and can be systematized."
+          }
+        },
+        {
+          "id": "n24",
+          "type": "image",
+          "content": {
+            "storage_key": "rfp-admin/collateral/roadmap.svg",
+            "alt_text": "Three why-now tailwinds above a Now / Next / Then roadmap",
+            "width": 504,
+            "height": 104,
+            "caption": "Why now plus the roadmap"
+          }
+        },
+        {
+          "id": "n25",
+          "type": "table",
+          "content": {
+            "headers": [
+              "Now — live & shipping",
+              "Next — prove the wedge",
+              "Then — scale the network"
+            ],
+            "rows": [
+              [
+                "Spine live end-to-end",
+                "First EconDev partnership",
+                "Multi-partner EconDev network"
+              ],
+              [
+                "Agents drafting + compliance review",
+                "Curated skeletons across more agencies",
+                "OTA / CSO / BAA depth"
+              ],
+              [
+                "Founding cohort onboarding",
+                "Learning library hardened",
+                "Agent workforce scale"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "n26",
+          "type": "text_block",
+          "content": {
+            "text": "The ask: we're raising to expand expert curation, advance the AI drafting & compliance engine, and stand up the founding cohort. Use of funds — Curation: widen expert-built skeletons & molds across agencies and programs. AI: grow the agent workforce and the learning atom library. Cohort: onboard founding SMBs plus a lead EconDev partner."
+          }
+        },
+        {
+          "id": "n27",
+          "type": "text_block",
+          "content": {
+            "text": "RFP Pipeline · Investor Overview · Confidential. Any figures beyond public SBIR award ranges are illustrative model values, not forecasts."
+          }
+        }
+      ]
+    }
+  }
+]

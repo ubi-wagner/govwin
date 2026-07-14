@@ -20,7 +20,7 @@ import { isValidUUID } from '@/lib/validation';
 import type { Role } from '@/lib/rbac';
 import { publishAndFanOut, type BridgeEventType } from '@/lib/opportunity-bridge';
 
-const EVENTS: BridgeEventType[] = ['published', 'updated', 'closed', 'reopened', 'awarded'];
+const EVENTS: BridgeEventType[] = ['published', 'updated', 'closed', 'reopened', 'awarded', 'archived'];
 
 export async function POST(
   request: Request,

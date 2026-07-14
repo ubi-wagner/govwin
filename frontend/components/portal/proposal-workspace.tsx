@@ -81,6 +81,8 @@ interface DropboxFileEntry {
 interface ProposalWorkspaceProps {
   proposalId: string;
   tenantSlug: string;
+  // Opportunity context slugs (agency/program) that boost atom ranking in the drafter.
+  contextSlugs?: string[];
   sections: SectionItem[];
   hasEmptySections: boolean;
   proposalStage: string;
@@ -126,6 +128,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dotColor: st
 export function ProposalWorkspace({
   proposalId,
   tenantSlug,
+  contextSlugs,
   sections: initialSections,
   hasEmptySections,
   proposalStage,
@@ -319,6 +322,8 @@ export function ProposalWorkspace({
       {userRole === 'admin' && showDrafter && emptySectionCount > 0 && !isLocked && (
         <DraftAllSections
           proposalId={proposalId}
+          tenantSlug={tenantSlug}
+          context={contextSlugs}
           sections={sections.map((s) => ({
             id: s.id,
             title: s.title,

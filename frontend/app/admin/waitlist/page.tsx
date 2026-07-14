@@ -12,26 +12,29 @@ export default async function WaitlistPage() {
   const role = (session.user as { role?: string }).role;
   if (role !== 'master_admin' && role !== 'rfp_admin') redirect('/admin');
 
+  // The waitlist is a distinct funnel from applications: a marketing-page email
+  // capture (waitlist table), NOT a reviewed account application. Read the real
+  // `waitlist` table; extract metadata fields in SQL so a legacy string-scalar
+  // metadata value can't break client-side coercion.
   interface WaitlistRow {
     id: string;
-    contactName: string;
-    contactEmail: string;
-    companyName: string;
-    companyWebsite: string | null;
-    techSummary: string;
-    status: string;
+    email: string;
+    companyName: string | null;
+    website: string | null;
+    notes: string | null;
     createdAt: Date;
   }
 
-  let applications: WaitlistRow[] = [];
+  let entries: WaitlistRow[] = [];
   try {
-    applications = await sql<WaitlistRow[]>`
-      SELECT id, contact_name, contact_email, company_name, company_website,
-             tech_summary, status, created_at
-      FROM applications
-      WHERE status = 'pending'
+    entries = await sql<WaitlistRow[]>`
+      SELECT id, email, company_name,
+             metadata->>'website' AS website,
+             metadata->>'notes'   AS notes,
+             created_at
+      FROM waitlist
       ORDER BY created_at DESC
-      LIMIT 50
+      LIMIT 200
     `;
   } catch (e) {
     console.error('[admin/waitlist] query failed:', e);
@@ -44,56 +47,48 @@ export default async function WaitlistPage() {
           <div>
             <h1 className="text-2xl font-bold">Waitlist</h1>
             <p className="text-sm text-gray-500 mt-1">
-              {applications.length} pending application{applications.length !== 1 ? 's' : ''}
+              {entries.length} signup{entries.length !== 1 ? 's' : ''}
             </p>
           </div>
           <Link
             href="/admin/applications"
             className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
           >
-            View All Applications
+            View Applications
           </Link>
         </div>
       </header>
 
-      {applications.length === 0 ? (
+      {entries.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          <h3 className="text-lg font-medium text-gray-600">No pending applications</h3>
+          <h3 className="text-lg font-medium text-gray-600">No waitlist signups yet</h3>
           <p className="text-sm text-gray-500 mt-1">
-            All applications have been reviewed.
+            Emails captured from the marketing site will appear here.
           </p>
-          <Link href="/admin/applications" className="text-sm text-blue-600 hover:underline mt-3 inline-block">
-            View all applications
-          </Link>
         </div>
       ) : (
         <div className="space-y-3">
-          {applications.map((app) => (
-            <Link
-              key={app.id}
-              href="/admin/applications"
-              className="block bg-white border border-gray-200 rounded-lg p-5 hover:border-indigo-300 hover:shadow-sm transition-all"
+          {entries.map((e) => (
+            <div
+              key={e.id}
+              className="block bg-white border border-gray-200 rounded-lg p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-gray-900">{app.companyName}</h3>
+                  <h3 className="font-semibold text-gray-900">{e.companyName || e.email}</h3>
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
-                    <span>{app.contactName}</span>
-                    <span>{app.contactEmail}</span>
-                    {app.companyWebsite && <span>{app.companyWebsite}</span>}
+                    <span>{e.email}</span>
+                    {e.website && <span>{e.website}</span>}
                   </div>
-                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">{app.techSummary}</p>
+                  {e.notes && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{e.notes}</p>}
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700">
-                    Pending
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(app.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  <p className="text-xs text-gray-400">
+                    {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </p>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

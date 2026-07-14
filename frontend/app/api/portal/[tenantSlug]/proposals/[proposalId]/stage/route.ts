@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
-import { randomUUID } from 'crypto';
-import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { coerceJsonb } from '@/lib/jsonb';
+import { advanceProposalStage } from '@/lib/proposal-advance';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string }>;
@@ -134,8 +133,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
 /**
  * PATCH /api/portal/[tenantSlug]/proposals/[proposalId]/stage
  *
- * Advance to the next gate in gate_config. Admin only.
- * Body: { notes?: string }
+ * Advance to the next gate. Delegates to the shared, GATED advanceProposalStage
+ * core — identical to POST /advance (gate checks that every required section is
+ * locked, snapshots, optimistic-lock CAS, stage history, events, AI-review
+ * enqueue). Previously this handler bumped the stage directly and skipped the
+ * lock gate, letting a direct call jump draft→final without accepting sections.
+ * Body: { notes?: string, force?: boolean, targetStage?: string }
  */
 export async function PATCH(request: Request, ctx: RouteContext) {
   try {
@@ -144,18 +147,11 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
 
-    const sessionUser = session.user as {
-      id?: string;
-      email?: string;
-      role?: unknown;
-      tenantId?: string | null;
-    };
-
+    const sessionUser = session.user as { id?: string; email?: string; role?: unknown; tenantId?: string | null };
     const role = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -168,167 +164,41 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     }
-
     const tenantId = tenant.id as string;
     const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    let body: { notes?: unknown } = {};
+    let body: { notes?: unknown; force?: boolean; targetStage?: unknown } = {};
     try {
       body = await request.json();
     } catch {
-      // No body is fine for advance
+      // No body is fine — auto-advance to the next gate.
     }
+    const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null;
 
-    const notes = typeof body.notes === 'string' ? body.notes : null;
-
-    let proposal: {
-      id: string;
-      stage: string;
-      gateConfig: string[];
-      title: string;
-      lockCount: number;
-      version: number;
-    } | undefined;
-    try {
-      [proposal] = await sql<{
-        id: string;
-        stage: string;
-        gateConfig: string[];
-        title: string;
-        lockCount: number;
-        version: number;
-      }[]>`
-        SELECT id, stage, gate_config, title, lock_count, version
-        FROM proposals
-        WHERE id = ${proposalId} AND tenant_id = ${tenantId}
-        LIMIT 1
-      `;
-    } catch (e) {
-      console.error('[portal/proposals/stage] PATCH proposal query failed:', e);
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
-    }
-
-    if (!proposal) {
-      return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
-    }
-
-    const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
-    const currentIndex = gates.indexOf(proposal.stage);
-
-    if (currentIndex === -1 || currentIndex >= gates.length - 1) {
-      return NextResponse.json(
-        { error: 'Already at the final gate, cannot advance further', code: 'VALIDATION_ERROR' },
-        { status: 422 },
-      );
-    }
-
-    const previousStage = proposal.stage;
-    const nextStage = gates[currentIndex + 1];
-    const shouldLock = nextStage === 'final';
-    // When advancing to 'final' AND auto-locking, also advance to 'submitted'
-    const actualStage = shouldLock ? 'submitted' : nextStage;
-
-    // ── Start event for stage advancement ────────────────────────────
-    const startId = await emitEventStart({
-      namespace: 'proposal',
-      type: 'proposal.stage_advanced',
-      actor: userActor(sessionUser.id, sessionUser.email),
+    const result = await advanceProposalStage({
       tenantId,
-      payload: { proposalId, proposalTitle: proposal.title, previousStage, nextStage },
+      tenantSlug,
+      proposalId,
+      actorId: sessionUser.id,
+      actorEmail: sessionUser.email ?? null,
+      actorRole: role,
+      force: !!body.force,
+      notes,
+      targetStage: typeof body.targetStage === 'string' ? body.targetStage : undefined,
+      trigger: 'manual',
     });
 
-    // Update proposal
-    try {
-      if (shouldLock) {
-        const lockResult = await sql`
-          UPDATE proposals
-          SET stage = 'submitted',
-              is_locked = true,
-              lock_count = lock_count + 1,
-              last_locked_at = now(),
-              version = version + 1
-          WHERE id = ${proposalId}
-            AND tenant_id = ${tenantId}::uuid
-            AND version = ${proposal.version}
-        `;
-        if (lockResult.count === 0) {
-          await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
-          return NextResponse.json(
-            { error: 'Proposal was modified by another user', code: 'CONFLICT' },
-            { status: 409 },
-          );
-        }
-      } else {
-        const updateResult = await sql`
-          UPDATE proposals
-          SET stage = ${nextStage},
-              version = version + 1
-          WHERE id = ${proposalId}
-            AND tenant_id = ${tenantId}::uuid
-            AND version = ${proposal.version}
-        `;
-        if (updateResult.count === 0) {
-          await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
-          return NextResponse.json(
-            { error: 'Proposal was modified by another user', code: 'CONFLICT' },
-            { status: 409 },
-          );
-        }
-      }
-    } catch (e) {
-      console.error('[portal/proposals/stage] PATCH stage update failed:', e);
-      await emitEventEnd(startId, { error: { message: String(e), code: 'DB_ERROR' } });
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    if (!result.ok) {
+      const payload: Record<string, unknown> = { error: result.error, code: result.code };
+      if (result.details !== undefined) payload.details = result.details;
+      return NextResponse.json(payload, { status: result.status });
     }
-
-    // Record stage history
-    try {
-      await sql`
-        INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-        VALUES (${proposalId}, ${previousStage}, ${nextStage}, ${sessionUser.id}, ${notes})
-      `;
-      // If auto-locked at final, also record the auto-advance to 'submitted'
-      if (shouldLock) {
-        await sql`
-          INSERT INTO proposal_stage_history (proposal_id, from_stage, to_stage, changed_by, notes)
-          VALUES (${proposalId}, ${nextStage}, 'submitted', ${sessionUser.id}, 'Auto-advanced on lock')
-        `;
-      }
-    } catch (e) {
-      console.error('[portal/proposals/stage] PATCH stage history insert failed:', e);
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
-    }
-
-    await emitEventEnd(startId, {
-      result: {
-        correlationId: randomUUID(),
-        tenantId,
-        tenantSlug,
-        proposalId,
-        proposalTitle: proposal.title,
-        previousStage,
-        nextStage: actualStage,
-        locked: shouldLock,
-        notes: notes ?? undefined,
-      },
-    });
-
-    return NextResponse.json({
-      data: {
-        stage: actualStage,
-        previousStage,
-        locked: shouldLock,
-        lockCount: shouldLock ? proposal.lockCount + 1 : proposal.lockCount,
-      },
-    });
+    return NextResponse.json({ data: result.data });
   } catch (e) {
     console.error('[api/portal/proposals/stage] PATCH error:', e);
-    return NextResponse.json(
-      { error: 'Internal server error', code: 'DB_ERROR' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

@@ -108,8 +108,8 @@ export async function forceAdvanceProcess(opts: {
     updated = await sql<{ id: string }[]>`
       UPDATE process_instances
       SET status = 'retrying',
-          step_status = ${JSON.stringify(stepStatus)}::jsonb,
-          step_results = ${JSON.stringify(stepResults)}::jsonb,
+          step_status = ${sql.json(stepStatus)},
+          step_results = ${sql.json((stepResults) as Parameters<typeof sql.json>[0])},
           last_heartbeat_at = now(),
           updated_at = now()
       WHERE id = ${instanceId}::uuid AND status = 'paused'
@@ -152,7 +152,7 @@ export async function forceAdvanceProcess(opts: {
         (instance_id, from_status, to_status, step_name, actor, reason, metadata)
       VALUES (${instanceId}::uuid, 'paused', 'retrying', ${currentStep},
               ${actor.email ?? actor.id}, 'hitl_forced',
-              ${JSON.stringify({ forcedByRole: actor.role, forcedById: actor.id, note: note ?? null })}::jsonb)
+              ${sql.json({ forcedByRole: actor.role, forcedById: actor.id, note: note ?? null })})
     `;
   } catch (e) {
     console.error('[force-advance] audit insert failed:', e);
