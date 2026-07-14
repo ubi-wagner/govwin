@@ -10,12 +10,15 @@ interface Props {
   params: Promise<{ tenantSlug: string }>;
 }
 
+// Customer-facing version labels: the editable draft is "V0.5", a locked/submitted
+// proposal is the complete "V1" (Eric's V0.5 → V1 model). DB stage values are
+// unchanged (draft/review/final/submitted/archived) — this is display only.
 const STAGE_LABELS: Record<string, { label: string; color: string }> = {
-  draft:      { label: 'Draft',      color: 'bg-gray-100 text-gray-700' },
-  review:     { label: 'Review',     color: 'bg-blue-100 text-blue-700' },
-  final:      { label: 'Final',      color: 'bg-purple-100 text-purple-700' },
-  submitted:  { label: 'Submitted',  color: 'bg-green-100 text-green-700' },
-  archived:   { label: 'Archived',   color: 'bg-amber-100 text-amber-700' },
+  draft:      { label: 'V0.5 · Draft',   color: 'bg-gray-100 text-gray-700' },
+  review:     { label: 'V0.5 · Review',  color: 'bg-blue-100 text-blue-700' },
+  final:      { label: 'V1 · Final',     color: 'bg-purple-100 text-purple-700' },
+  submitted:  { label: 'V1 · Submitted', color: 'bg-green-100 text-green-700' },
+  archived:   { label: 'Archived',       color: 'bg-amber-100 text-amber-700' },
 };
 
 export default async function ProposalsListPage({ params }: Props) {
