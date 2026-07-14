@@ -10,6 +10,17 @@ interface Portal {
   status: string;
   guardrailConfig: Record<string, unknown> | null;
   launchedAt: string | null;
+  paidAt: string | null;
+  curationDueAt: string | null;
+}
+
+/** "2d 3h 41m" until `iso`, or "overdue" once past. */
+function remainingUntil(iso: string, nowMs: number): { text: string; overdue: boolean } {
+  const ms = new Date(iso).getTime() - nowMs;
+  if (ms <= 0) return { text: 'overdue', overdue: true };
+  const m = Math.floor(ms / 60000);
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), min = m % 60;
+  return { text: `${d > 0 ? `${d}d ` : ''}${h}h ${min}m`, overdue: false };
 }
 
 /** A minimal valid guardrail config (within the RFP-admin limits: 3 stages, ≤3 nudges). */
@@ -28,6 +39,13 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
   const [busy, setBusy] = useState<string | null>(null);
   const [newOpp, setNewOpp] = useState('');
   const [label, setLabel] = useState('primary');
+  const [now, setNow] = useState(0); // 0 until mounted (avoids SSR hydration mismatch)
+
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -88,9 +106,30 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
               </div>
               <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-medium ${
                 p.status === 'launched' || p.status === 'executing' ? 'bg-green-100 text-green-700'
-                : p.status === 'guardrails_pending' ? 'bg-amber-100 text-amber-700'
+                : p.status === 'guardrails_pending' || p.status === 'curation_pending' ? 'bg-amber-100 text-amber-700'
                 : p.status === 'closeout' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>{p.status.replace(/_/g, ' ')}</span>
             </div>
+
+            {p.status === 'curation_pending' && (
+              <div className="mb-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-sm font-medium text-amber-900">Waiting for RFP Expert Curation</span>
+                </div>
+                <p className="text-xs text-amber-700 mt-1">
+                  Purchase received. Our RFP expert is building your compliance matrix, volumes, and section
+                  molds. Your editable workspace unlocks the moment it&apos;s released.
+                </p>
+                {p.curationDueAt && now > 0 && (() => {
+                  const r = remainingUntil(p.curationDueAt, now);
+                  return (
+                    <p className={`text-xs mt-1 font-mono ${r.overdue ? 'text-rose-600' : 'text-amber-600'}`}>
+                      Expert SLA: {r.overdue ? 'past 72h target' : `${r.text} remaining`}
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
             {canManage && (
               <div className="flex flex-wrap items-center gap-2">
                 {p.status === 'guardrails_pending' && (
@@ -108,11 +147,13 @@ export default function ProposalPortals({ tenantSlug, canManage }: { tenantSlug:
                 <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'revoke-shadow')} className="text-xs text-rose-600 border border-rose-200 rounded px-2.5 py-1 hover:bg-rose-50 ml-auto">Revoke shadow admin</button>
               </div>
             )}
-            <p className="text-[11px] text-gray-400 mt-2">
-              {p.proposalId
-                ? <>Build ready — <a href={`/portal/${tenantSlug}/proposals/${p.proposalId}`} className="text-blue-600 hover:underline">open the canvas</a> to run V1. ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>.</>
-                : <>ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>. Accept guardrails to provision the build.</>}
-            </p>
+            {p.status !== 'curation_pending' && (
+              <p className="text-[11px] text-gray-400 mt-2">
+                {p.proposalId
+                  ? <>Build ready — <a href={`/portal/${tenantSlug}/proposals/${p.proposalId}`} className="text-blue-600 hover:underline">open the canvas</a> to run V1. ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>.</>
+                  : <>ToDos land in your <a href={`/portal/${tenantSlug}/processes`} className="text-blue-600 hover:underline">task queue</a>. Accept guardrails to provision the build.</>}
+              </p>
+            )}
           </div>
         ))}
         {portals.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No portals yet. Open one from a pinned opportunity.</p>}
