@@ -1,5 +1,4 @@
-import '@/lib/pdf-node-globals'; // MUST precede pdf-parse — stubs the canvas globals pdfjs warns about
-import { PDFParse } from 'pdf-parse';
+import { loadPdfParse } from '@/lib/pdf-parse-quiet'; // memoized pdf-parse loader with pdf.js Node setup warnings silenced
 import {
   createNode,
   type CanvasNode,
@@ -29,6 +28,7 @@ export async function readPdf(
   buffer: Buffer,
   filename: string,
 ): Promise<ImportResult> {
+  const { PDFParse } = await loadPdfParse();
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
 
   let rawText = '';
