@@ -127,6 +127,46 @@ function SourceBadge({ source }: { source: string }) {
   );
 }
 
+interface Transition {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  stepName: string | null;
+  actor: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** The process_instance_transitions timeline for one workflow instance — the
+ *  drill-through that lets an admin watch a workflow's actual step execution. */
+function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'error' }) {
+  if (state === 'loading') return <p className="text-xs text-gray-400">Loading steps…</p>;
+  if (state === 'error') return <p className="text-xs text-red-500">Could not load the step timeline.</p>;
+  if (state.length === 0) return <p className="text-xs text-gray-400">No transitions recorded yet.</p>;
+  return (
+    <ol className="relative border-l border-gray-200 ml-1 space-y-2.5 py-1">
+      {state.map((t) => {
+        const style = getStyle(t.toStatus);
+        return (
+          <li key={t.id} className="ml-4">
+            <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ${style.dot}`} />
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {t.stepName && <span className="font-mono text-gray-700">{formatStepName(t.stepName)}</span>}
+              <span className="text-gray-400">
+                {t.fromStatus ? `${t.fromStatus} → ` : ''}
+                <span className={`font-medium ${style.text}`}>{t.toStatus}</span>
+              </span>
+              {t.actor && <span className="text-gray-400">· {t.actor}</span>}
+              <span className="text-gray-400 ml-auto">{relativeTime(t.createdAt)}</span>
+            </div>
+            {t.reason && <p className="text-[11px] text-gray-500 mt-0.5">{t.reason}</p>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────────────
 
 export function WorkflowMonitorClient({
@@ -249,6 +289,35 @@ export function WorkflowMonitorClient({
     });
   };
 
+  // Lazy-loaded per-instance step timeline (process_instance_transitions) — the
+  // drill-through the API already served but no UI rendered. Re-fetches on open
+  // so the monitor shows the live transition history.
+  const [timelines, setTimelines] = useState<Record<string, Transition[] | 'loading' | 'error'>>({});
+  const [openTimelines, setOpenTimelines] = useState<Set<string>>(new Set());
+
+  const toggleTimeline = useCallback(async (id: string) => {
+    const isOpen = openTimelines.has(id);
+    setOpenTimelines((prev) => {
+      const next = new Set(prev);
+      if (isOpen) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (isOpen) return; // closing — nothing to fetch
+    setTimelines((prev) => ({ ...prev, [id]: 'loading' }));
+    try {
+      const res = await fetch(`/api/admin/workflows/${id}`);
+      const body = await res.json().catch(() => ({}));
+      const transitions = body?.data?.transitions;
+      setTimelines((prev) => ({
+        ...prev,
+        [id]: Array.isArray(transitions) ? (transitions as Transition[]) : 'error',
+      }));
+    } catch {
+      setTimelines((prev) => ({ ...prev, [id]: 'error' }));
+    }
+  }, [openTimelines]);
+
   return (
     <div className="space-y-6">
       {/* ── Stats bar ──────────────────────────────────────────────── */}
@@ -337,6 +406,12 @@ export function WorkflowMonitorClient({
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => toggleTimeline(w.id)}
+                        className="px-2.5 py-1 text-xs font-medium rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100"
+                      >
+                        {openTimelines.has(w.id) ? 'Hide steps' : 'Steps'}
+                      </button>
                       {w.status === 'paused' && (
                         <button
                           onClick={() => handleAdvance(w.id)}
@@ -359,6 +434,12 @@ export function WorkflowMonitorClient({
 
                   {error && (
                     <p className="mt-2 text-xs text-red-600">{error}</p>
+                  )}
+
+                  {openTimelines.has(w.id) && (
+                    <div className="mt-3 pl-1">
+                      <TransitionTimeline state={timelines[w.id] ?? 'loading'} />
+                    </div>
                   )}
                 </div>
               );
@@ -442,6 +523,13 @@ export function WorkflowMonitorClient({
                         {isErrorExpanded ? 'hide' : 'error'}
                       </button>
                     )}
+
+                    <button
+                      onClick={() => toggleTimeline(w.id)}
+                      className="text-xs text-blue-600 hover:underline flex-shrink-0"
+                    >
+                      {openTimelines.has(w.id) ? 'hide steps' : 'steps'}
+                    </button>
                   </div>
 
                   {/* Inline action error */}
@@ -460,6 +548,12 @@ export function WorkflowMonitorClient({
                       <pre className="text-xs text-red-800 font-mono whitespace-pre-wrap overflow-auto max-h-40">
                         {w.lastError}
                       </pre>
+                    </div>
+                  )}
+
+                  {openTimelines.has(w.id) && (
+                    <div className="mt-3 pl-1">
+                      <TransitionTimeline state={timelines[w.id] ?? 'loading'} />
                     </div>
                   )}
                 </div>

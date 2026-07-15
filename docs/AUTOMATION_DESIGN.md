@@ -158,26 +158,47 @@ The heavy side: durable, multi-step, human-in-the-loop `process_instances`.
   `cancel_instance`) is guarded `… WHERE id=$1 AND status='paused'` — a human resume in the
   SELECT→UPDATE window makes it a 0-row no-op, so automation never clobbers finished human work.
 
+### Observability — WIRED (extensive)
+An admin can watch the whole chain in the UI: **`/admin/events`** streams `system_events`
+(namespace/type/phase/actor/payload, filterable, 10s refresh); **`/admin/workflows`** shows active +
+recent `process_instances` with stats and retry/cancel/advance, and now a per-instance **step timeline**
+(`process_instance_transitions`, the "Steps" drill-through); **`/admin/processes`** the cross-tenant
+instance + open-`tasks` view; **`/admin/agents`** agent spend from `agent_task_log` (tokens, `cost_usd`,
+per-archetype/per-tenant); **`/admin/system`** queue depth + event/error rates; **`/admin/dashboard`**
+recent events + the task queue. (Now that `handle_event` is wired, the `tool:agent.dispatch` lens —
+previously always empty — also populates.) ⚠ Not yet surfaced: the `agent_task_queue` per-role/failed
+breakdown (the `/api/admin/agents` route computes it but no page renders it), and a single trigger-event
+→ instance → agent-spend → task **correlation** drill-through (the join keys exist:
+`trigger_event_id`, `correlation_id`).
+
 ---
 
 ## 5. The agent fabric — the AI execution layer
 
 - `AgentFabric` (`fabric.py:137`) registers **10 archetypes** (`_ARCHETYPE_CLASSES:78`,
-  `archetypes/__init__.py`) at pipeline boot. **Two live entry points:** `invoke_agent(...)` (`:261`,
-  direct — called by workflow AI_INVOKE steps and `draft_v0`) and `process_task_queue` (`:697`, the
-  `agent_task_queue` consumer). **`handle_event` (`:183`) has NO caller** (confirmed repo-wide) — so the
-  archetypes' self-declared `handles_event` routing is **inert**, which is *the* reason most archetypes
-  are unreachable.
+  `archetypes/__init__.py`) at pipeline boot. **Three live entry points:** `invoke_agent(...)` (`:261`,
+  direct — workflow AI_INVOKE steps + `draft_v0`), `process_task_queue` (`:697`, the `agent_task_queue`
+  consumer), and — **now wired** — **`handle_event` (`:183`)**, dispatched from the workflow processor
+  as a **workflow-first, terminal-phase fallback** (`processor.py`: `elif fabric.has_handler(type)` after
+  the workflow match, so an event a workflow owns never double-fires an archetype, and `phase != 'start'`
+  so a start/end pair fires once; `invoke_agent`'s rate + budget bound it). It activates any archetype
+  whose `handles_event(type)` equals a **real emitted `type`** — today only **`color_team_reviewer` on
+  `proposal.review_requested`** (the "request review" path). The other archetypes stay dormant because
+  their handler strings are a **stale pre-refactor taxonomy** that embeds the namespace the way the admin
+  UI *renders* it (`namespace.type`) rather than how `system_events.type` is *stored* (bare) — e.g.
+  `capture.purchase.completed` vs the real `purchase.completed`. Reconciling is a per-archetype fix
+  (correct the string + confirm a real producer + vet the agent), tracked in §9.
 
 | Archetype | Producer that actually fires it | Status |
 |---|---|---|
 | **section_drafter** | `draft_v0.py:157` direct-invoke (batch V0) **and** `proposal-draft-section.ts:389` `requestAgentTask` (interactive) → `process_task_queue`; chain `section_drafter → markdown_to_canvas → publish_section_draft` | **WIRED** |
 | **compliance_reviewer** | Primary path runs **inline in the frontend** `ai/compliance/route.ts` (Anthropic SDK direct, billed `:510`); the fabric AI_INVOKE `check_compliance` in OnProposalAdvancedToReview is advisory-only | **PARTIAL** |
-| **color_team_reviewer** | Only via `proposal-advance.ts:439` `requestAgentTask` (gated by `tenant_automation_preferences.ai_review_on_advance`, default-on) → `process_task_queue` → `_post_section_recommendation`; its `proposal.review_requested` handler is dead (needs `handle_event`) | **PARTIAL** |
+| **color_team_reviewer** | Two paths now: `proposal-advance.ts:439` `requestAgentTask` (advance, gated by `tenant_automation_preferences.ai_review_on_advance`) → `process_task_queue`, **and** `proposal.review_requested` → the processor's fabric fallback → `handle_event` (the "request review" path, newly wired) | **WIRED** |
 | capture_strategist · opportunity_analyst · scoring_strategist · packaging_specialist · librarian · partner_coordinator · proposal_architect | Mapped in `TOOL_ACTION_TO_ARCHETYPE` (`processor.py:219`) but **no workflow emits their AI_INVOKE and nothing enqueues them**; handlers depend on the dead `handle_event` | **⚠ DORMANT (×7)** |
 
-**Net: 1 WIRED, 2 PARTIAL, 7 DORMANT** — only one AI_INVOKE step exists (`check_compliance`) and only
-two roles are ever enqueued (`section_drafter`, `color_team_reviewer`).
+**Net: 2 WIRED (`section_drafter`, `color_team_reviewer`), 1 PARTIAL (`compliance_reviewer`, inline),
+7 DORMANT** — the dispatcher is now live; the 7 are dormant on **stale handler strings**, not a missing
+caller (§9).
 
 - **Queue/logs/memory:** `agent_task_queue` (`001:588`) — producer `requestAgentTask`
   (`agent-client.ts:12`), consumer `main.py::run_agent_task_consumer` → `process_task_queue` claims 5
@@ -264,10 +285,15 @@ preview + notify all collaborators.
 
 ## 9. Gap register (⚠ future / systemic)
 
-1. **`fabric.handle_event` has no caller → 8/10 archetypes unreachable.** The single biggest automation
-   gap: the event-routing design that would let archetypes react to events is inert; 7 archetypes are
-   fully dormant and `color_team_reviewer`'s event path is dead (it survives only via the
-   advance→queue side path).
+1. **`fabric.handle_event` is now wired** (workflow-first, terminal-phase fallback in the processor) →
+   `color_team_reviewer` reacts to `proposal.review_requested`. **Remaining:** the other archetypes'
+   handler strings are a **stale namespace-prefixed taxonomy** — they encode `namespace.type` (how the
+   admin UI renders it) instead of the bare `system_events.type` that is stored — e.g.
+   `capture.purchase.completed` / `finder.scoring.completed` / `finder.opportunity.ingested` vs the real
+   `purchase.completed` / `scoring.completed` / `opportunity.ingested`. Each is a per-archetype
+   reconciliation: correct the string, confirm a real producer, and vet the agent **+ its volume** before
+   enabling (e.g. `opportunity_analyst` on `opportunity.ingested` would fire per ingested opp — it needs
+   throttling, not a blind flip). This is no longer a missing dispatcher.
 2. **No autonomous V0→V0.5→V1 driver.** `advanceProposalStage` (frontend) is the **sole** stage
    authority and is **human-driven**; every workflow *reads, never writes* the stage. Automation reacts
    *around* the build (auto-draft V0, park review ToDos, notify, nudge) but does not *drive* it — the
