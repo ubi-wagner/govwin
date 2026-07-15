@@ -1,6 +1,10 @@
 # EVENT_CONTRACT_V3.md — Unified Automation Architecture: Jobs, Process Templates & the Event Ledger
 
-> ⚠️ The HITL-resume-broken description below is STALE — resume is implemented (WorkflowManager.resume_instance); see ARCHITECTURE_V9.md §8/§14.
+> ⚠️ The HITL-resume-broken description below is STALE — resume **is** implemented
+> (`WorkflowManager.match_waiting_instances` / `resume_instance`, entity-correlated + compare-and-swap).
+> **Canonical end-to-end automation design (as-built): `docs/AUTOMATION_DESIGN.md`** — bus → rules →
+> workflows → agents → ToDos, with the wired/partial/dormant map. Read that first; this doc's target
+> architecture is now largely realized there.
 
 **Date:** 2026-05-31
 **Status:** Authoritative target architecture for automation. Supersedes the *design*

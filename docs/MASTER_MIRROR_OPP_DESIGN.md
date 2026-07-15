@@ -216,7 +216,7 @@ Intended: if the master skeleton already exists, open the portal past curation (
   finalizes without locking every section. Lock flips matrix rows toward `satisfied`
   (`…/sections/[sectionId]/lock`). Download is a real `.docx`.
 
-**⚠ future — Workplan automation.** V0→V0.5→V1 is meant to be driven by **Workplan automation**:
+**⚠ future — Workplan automation** (end-to-end design: `docs/AUTOMATION_DESIGN.md`). V0→V0.5→V1 is meant to be driven by **Workplan automation**:
 nudges + actions pushed into the approved (shadow + company admin) accounts, with the goal of a
 **mostly customer-executed** build — the shadow admin is today's bootstrap, not the end state. The
 substrate exists (`ProjectCollaboration` parks gates + nudges; `draft_v0` auto-drafts), but the full

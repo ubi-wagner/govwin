@@ -2,6 +2,10 @@
 
 Complete reference for all automated workflows, pipeline job dispatch, and CMS email automation in the govwin platform.
 
+> For the **end-to-end automation design** (namespaces → events → rules → workflows → agents → ToDos,
+> with the as-built wired/partial/dormant map and the bus/dispatch mechanics), see
+> **`docs/AUTOMATION_DESIGN.md`** — the design of record. This reference is the per-workflow detail.
+
 ---
 
 ## 1. Pipeline Workflows
