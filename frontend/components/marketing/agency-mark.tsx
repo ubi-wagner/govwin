@@ -95,14 +95,15 @@ const P: Record<AgencyName, ReactNode> = {
 };
 
 const ALIASES: Record<string, AgencyName> = {
-  'air force': 'airforce', usaf: 'airforce', af: 'airforce', aerospace: 'airforce',
-  'us navy': 'navy', naval: 'navy', usn: 'navy', maritime: 'navy',
-  'us army': 'army', usa: 'army',
-  'department of defense': 'dod', defense: 'dod', dhs: 'dod',
+  'air force': 'airforce', usaf: 'airforce', af: 'airforce', daf: 'airforce', afwerx: 'airforce', afrl: 'airforce', aerospace: 'airforce',
+  'us navy': 'navy', naval: 'navy', usn: 'navy', onr: 'navy', maritime: 'navy',
+  'us army': 'army', usa: 'army', devcom: 'army',
+  'department of defense': 'dod', defense: 'dod', dhs: 'dod', socom: 'dod',
   'nsf': 'nsf', 'national science foundation': 'nsf',
-  'doe': 'doe', 'department of energy': 'doe', energy: 'doe',
+  'doe': 'doe', 'department of energy': 'doe', energy: 'doe', 'arpa-e': 'doe',
   'sbir': 'sbir', sttr: 'sbir', sba: 'sbir', 'small business': 'sbir',
   darpa: 'darpa',
+  // No bespoke mark → the generic federal shield: DOT, NIH, NASA, USDA, etc.
 };
 
 export function resolveAgency(raw: string): AgencyName {

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingIcon } from '@/components/marketing/icons';
+import { SafeImage } from '@/components/marketing/safe-image';
 
 export interface CmsCardProps {
   image?: string | null;
@@ -17,9 +18,7 @@ export function CmsCard({ image, icon, href, label, title, body, className = '' 
 
   const inner = (
     <>
-      {image && (
-        <img src={image} alt={typeof title === 'string' ? title : ''} className="w-full h-44 object-cover" />
-      )}
+      <SafeImage src={image} alt={typeof title === 'string' ? title : ''} className="w-full h-44 object-cover" />
       <div className="p-8">
         {icon && !image && <MarketingIcon name={icon} className="h-9 w-9 text-brand-600 mb-4" />}
         {label && (

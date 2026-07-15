@@ -15,6 +15,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingIcon } from '@/components/marketing/icons';
+import { SafeImage } from '@/components/marketing/safe-image';
 
 // ─── Hero ────────────────────────────────────────────────────────────
 
@@ -154,9 +155,7 @@ export function FeatureGrid({ columns = 3, items, variant = 'bordered' }: Featur
 
         const inner = (
           <>
-            {item.image && (
-              <img src={item.image} alt={item.title} className="w-full h-40 object-cover" />
-            )}
+            <SafeImage src={item.image} alt={item.title} className="w-full h-40 object-cover" />
             <div className={variant === 'bordered' ? 'p-6' : 'p-6'}>
               {item.icon && !item.image && (
                 <MarketingIcon name={item.icon} className="h-9 w-9 text-brand-600 mb-3" />

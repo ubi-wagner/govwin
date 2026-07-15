@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPublishedContent, getPageBlocks, buildLookup, single, many } from '@/lib/cms';
 import { RichText } from '@/components/marketing/rich-text';
 import { CustomSections } from '@/components/marketing/custom-sections';
+import { AgencyMark } from '@/components/marketing/agency-mark';
 
 export const metadata = {
   title: 'Track Record — RFP Pipeline',
@@ -66,7 +67,10 @@ export default async function TrackRecordPage() {
           <h2 className="font-display text-2xl md:text-3xl font-black text-navy-900">{agencies?.title ?? 'Agencies our expert has won with.'}</h2>
           <div className="mt-8 flex flex-wrap gap-3">
             {agencyList.map((a) => (
-              <span key={a} className="px-5 py-2.5 rounded-lg border border-cream-200 bg-cream-50 font-display font-bold text-navy-700">{a}</span>
+              <span key={a} className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-lg border border-cream-200 bg-cream-50 font-display font-bold text-navy-700">
+                <AgencyMark name={a} title={a} className="h-6 w-6 text-brand-600 shrink-0" />
+                {a}
+              </span>
             ))}
           </div>
         </div>

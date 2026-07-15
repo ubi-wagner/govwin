@@ -12,6 +12,7 @@ import Link from 'next/link';
 import type { ContentRow } from '@/lib/cms';
 import { PAGE_SEEDS } from '@/lib/page-content';
 import { RichText } from '@/components/marketing/rich-text';
+import { SafeImage } from '@/components/marketing/safe-image';
 
 function knownSections(pageKey: string): Set<string> {
   return new Set((PAGE_SEEDS[pageKey]?.blocks ?? []).map((b) => b.section));
@@ -50,10 +51,7 @@ export function CustomSections({ pageKey, blocks }: { pageKey: string; blocks: C
                   <RichText text={b.title} accent={accent} />
                 </h2>
               )}
-              {b.featuredImage && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={b.featuredImage} alt={b.title ?? ''} className="mt-8 w-full rounded-xl object-cover max-h-[28rem]" />
-              )}
+              <SafeImage src={b.featuredImage} alt={b.title ?? ''} className="mt-8 w-full rounded-xl object-cover max-h-[28rem]" />
               {b.body && (
                 <div className={`mt-6 text-lg leading-relaxed space-y-4 max-w-3xl ${dark ? 'text-navy-300' : 'text-navy-600'}`}>
                   {b.body.split('\n\n').map((p, j) => (
