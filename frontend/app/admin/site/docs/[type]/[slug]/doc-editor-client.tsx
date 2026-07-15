@@ -25,12 +25,14 @@ export default function DocEditorClient({
   isNew,
   active,
   draft,
+  canRestore,
 }: {
   type: string;
   slug: string;
   isNew: boolean;
   active: PageVersion | null;
   draft: PageVersion | null;
+  canRestore: boolean;
 }) {
   const router = useRouter();
   const src = draft ?? active;
@@ -120,6 +122,25 @@ export default function DocEditorClient({
     }
   }
 
+  // Retire the live version (reversible via Restore — version history is kept) or
+  // bring the most recent retired version back live.
+  async function onStatus(action: 'archive' | 'restore') {
+    if (action === 'archive' && !window.confirm('Retire this posting? It will be pulled from the public site. You can restore it later.')) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { ok, json } = await post(`/api/admin/site/docs/${type}/${encodeURIComponent(slug)}/status`, { action });
+      if (ok) {
+        setMsg(action === 'archive' ? 'Retired — no longer public.' : 'Restored — live again.');
+        router.refresh();
+      } else {
+        setMsg(String(json.error ?? (action === 'archive' ? 'Retire failed' : 'Restore failed')));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const field = 'w-full border rounded px-2 py-1 text-sm mt-1';
   const lbl = 'text-xs font-medium text-gray-500';
 
@@ -182,6 +203,24 @@ export default function DocEditorClient({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
+        {!isNew && active && (
+          <button
+            disabled={busy}
+            onClick={() => onStatus('archive')}
+            className="px-4 py-2 rounded border border-amber-300 text-amber-700 text-sm disabled:opacity-50 hover:bg-amber-50"
+          >
+            Retire
+          </button>
+        )}
+        {!isNew && !active && canRestore && (
+          <button
+            disabled={busy}
+            onClick={() => onStatus('restore')}
+            className="px-4 py-2 rounded border border-green-300 text-green-700 text-sm disabled:opacity-50 hover:bg-green-50"
+          >
+            Restore
+          </button>
+        )}
         {!isNew && active && (
           <a href={`/resources/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer" className="px-4 py-2 rounded border text-sm">
             View live &#8599;
