@@ -5,6 +5,8 @@
 **Scope**: Patterns identified across 6 audit rounds (200+ bugs) that require design changes, not individual code fixes.
 **Context**: June 1 launch, 20 founding cohort seats, $299/mo + $999-1999/proposal.
 
+> **Dated review (2026-05-22)** — kept as-is for its engineering findings. **Pricing/model updated since:** launch is **August 2026**; **Spotlight $499/mo (3-mo min), Phase I $1,999, Phase II $4,999 / $3,999-linked**; the portal purchase is a **comp-code → curation → release** flow (live Stripe descoped) and the customer surface is **`/cards`**. Current as-built: docs/MASTER_MIRROR_OPP_DESIGN.md.
+
 ---
 
 ## 1. Transaction Strategy
