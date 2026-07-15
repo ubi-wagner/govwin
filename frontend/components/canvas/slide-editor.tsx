@@ -82,7 +82,9 @@ export function SlideEditor({
   }, [slides.length, currentSlide]);
 
   const clampedSlide = Math.min(currentSlide, Math.max(0, slides.length - 1));
-  const currentSlideNodes = slides[clampedSlide] ?? [];
+  // Memoize so the `?? []` fallback doesn't create a new array ref every render
+  // (which would defeat the slideDoc useMemo below).
+  const currentSlideNodes = useMemo(() => slides[clampedSlide] ?? [], [slides, clampedSlide]);
 
   // Build a synthetic CanvasDocument containing only the current slide's nodes
   // so we can reuse CanvasRenderer for full editing capability.

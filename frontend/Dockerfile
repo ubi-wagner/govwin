@@ -32,6 +32,11 @@ COPY --chown=nextjs:nodejs db/migrations/migrate.mjs ./db/migrations/migrate.mjs
 # Dev/test account seed — shipped so entrypoint can run it after migrations when
 # SEED_DEV_ACCOUNTS=true (opt-in; never runs in prod unless explicitly enabled).
 COPY --chown=nextjs:nodejs scripts/seed_dev_accounts.mjs ./scripts/seed_dev_accounts.mjs
+# Marketing page-content seed + its build-time snapshot (PAGE_SEEDS → JSON, produced
+# by the builder's prebuild). Entrypoint runs it after migrations when
+# SEED_PAGE_CONTENT=true to sync content_pages from code.
+COPY --chown=nextjs:nodejs scripts/seed_page_content.mjs ./scripts/seed_page_content.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/lib/page-content/page-seeds.generated.json ./scripts/page-seeds.generated.json
 COPY --chown=nextjs:nodejs frontend/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 

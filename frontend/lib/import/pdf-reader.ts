@@ -1,3 +1,4 @@
+import '@/lib/pdf-node-globals'; // MUST precede pdf-parse — stubs the canvas globals pdfjs warns about
 import { PDFParse } from 'pdf-parse';
 import {
   createNode,

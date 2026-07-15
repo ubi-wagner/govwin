@@ -9,6 +9,7 @@ docs/
 # itself — Docker can't re-include a file whose parent dir is excluded.
 scripts/*
 !scripts/seed_dev_accounts.mjs
+!scripts/seed_page_content.mjs
 .git/
 
 # Sensitive files

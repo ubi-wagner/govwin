@@ -142,6 +142,9 @@ export default async function SiteContentPage() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {d.hasDraft && <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">draft</span>}
+              {!d.activeVersion && !d.hasDraft && (
+                <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">retired</span>
+              )}
               <span className="text-gray-400">&rarr;</span>
             </div>
           </Link>

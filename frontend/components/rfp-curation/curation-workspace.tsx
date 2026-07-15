@@ -194,6 +194,13 @@ export function CurationWorkspace({
   const [extractedPasteText, setExtractedPasteText] = useState('');
   const [extractingTopics, setExtractingTopics] = useState(false);
   const [expandingTopics, setExpandingTopics] = useState(false);
+  // Active document + derived source PDF for the viewer — declared here (above the
+  // annotation callbacks) so those callbacks can list sourcePdf as a dependency.
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const sourcePdf = activeDocId
+    ? documents.find((d) => d.id === activeDocId)
+    : documents.find((d) => d.isPrimary && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')))
+      ?? documents.find((d) => d.documentType === 'source' && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')));
   const [expandStatus, setExpandStatus] = useState<string | null>(null);
   const [topicsList, setTopicsList] = useState(topics);
 
@@ -296,7 +303,7 @@ export function CurationWorkspace({
     } catch {
       // annotation-save failure is non-fatal; the compliance value still saved
     }
-  }, [invoke, sol.id]);
+  }, [invoke, sol.id, sourcePdf]);
 
   // Handle tag action from the popover
   const handleTag = useCallback(async (action: TagAction) => {
@@ -411,14 +418,10 @@ export function CurationWorkspace({
     } catch {
       // error shown via useTool
     }
-  }, [invoke, sol.id, currentUserId, saveAnnotation]);
+  }, [invoke, sol.id, sol.namespace, currentUserId, saveAnnotation]);
 
-  // Find the primary document (or first source PDF) for the viewer
-  const [activeDocId, setActiveDocId] = useState<string | null>(null);
-  const sourcePdf = activeDocId
-    ? documents.find((d) => d.id === activeDocId)
-    : documents.find((d) => d.isPrimary && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')))
-      ?? documents.find((d) => d.documentType === 'source' && (d.contentType?.includes('pdf') || d.originalFilename.endsWith('.pdf')));
+  // (activeDocId + sourcePdf are declared near the top of the component so the
+  // annotation-save callbacks can depend on the current sourcePdf — see above.)
 
   const actions = STATUS_FLOW[sol.status] ?? [];
   const isMyClaimOrUnclaimed =

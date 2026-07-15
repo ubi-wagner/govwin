@@ -138,6 +138,10 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(
         pdfDocRef.current = proxy;
         extractOutline(proxy);
       },
+      // extractOutline is a stable useCallback declared just below — listing it
+      // here would reference it in its TDZ. It's only invoked (identity-independent),
+      // so an empty dep list is correct.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
     );
 

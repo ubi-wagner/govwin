@@ -286,19 +286,68 @@ export async function listDocuments(): Promise<DocSummary[]> {
   }));
 }
 
-/** Active + latest draft for one document. */
+/**
+ * Active + latest draft for one document, plus whether any archived (retired)
+ * version exists — `hasArchived` lets the editor offer Restore only when there is
+ * genuinely something to bring back.
+ */
 export async function getDocument(
   slug: string,
   contentType: string,
-): Promise<{ active: PageVersion | null; draft: PageVersion | null }> {
+): Promise<{ active: PageVersion | null; draft: PageVersion | null; hasArchived: boolean }> {
   const rows = await sql<PageRow[]>`
     SELECT * FROM content_pages
-    WHERE page_key = ${slug} AND content_type = ${contentType} AND status IN ('active', 'draft')
+    WHERE page_key = ${slug} AND content_type = ${contentType}
     ORDER BY version_no DESC
   `;
   const active = rows.find((r) => r.status === 'active') ?? null;
   const draft = rows.find((r) => r.status === 'draft') ?? null;
-  return { active: active ? toVersion(active) : null, draft: draft ? toVersion(draft) : null };
+  const hasArchived = rows.some((r) => r.status === 'archived');
+  return {
+    active: active ? toVersion(active) : null,
+    draft: draft ? toVersion(draft) : null,
+    hasArchived,
+  };
+}
+
+/**
+ * On-demand lifecycle for a document (posting): retire a live one or restore a
+ * retired one — independent of publishing a replacement.
+ *   'archive'  → the active version goes to 'archived' (the posting is no longer live).
+ *   'restore'  → the newest archived version is promoted back to 'active' (any current
+ *                active is archived first, to respect the single-active-per-key index).
+ * Version history is preserved either way. DOC_TYPES only (never a 'page').
+ */
+export async function setDocumentStatus(
+  slug: string,
+  contentType: string,
+  action: 'archive' | 'restore',
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!(DOC_TYPES as readonly string[]).includes(contentType)) return { ok: false, reason: 'invalid_type' };
+  return await sql.begin(async (tx: any) => {
+    if (action === 'archive') {
+      const rows = await tx`
+        UPDATE content_pages SET status = 'archived', archived_at = now()
+        WHERE page_key = ${slug} AND content_type = ${contentType} AND status = 'active'
+        RETURNING id
+      `;
+      return rows.length > 0 ? { ok: true } : { ok: false, reason: 'no_active' };
+    }
+    // restore: newest archived → active (archive any current active first)
+    const targetRows = await tx`
+      SELECT id FROM content_pages
+      WHERE page_key = ${slug} AND content_type = ${contentType} AND status = 'archived'
+      ORDER BY version_no DESC LIMIT 1
+    `;
+    const target = targetRows[0] as { id: string } | undefined;
+    if (!target) return { ok: false, reason: 'no_archived' };
+    await tx`
+      UPDATE content_pages SET status = 'archived', archived_at = now()
+      WHERE page_key = ${slug} AND content_type = ${contentType} AND status = 'active'
+    `;
+    await tx`UPDATE content_pages SET status = 'active', published_at = now() WHERE id = ${target.id}`;
+    return { ok: true };
+  });
 }
 
 /** Save a document draft (single body block + metadata) as a new version. */

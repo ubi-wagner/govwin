@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "seed:gen": "DATABASE_URL=postgresql://gen@localhost/gen tsx scripts/gen-page-seeds.ts",
+    "prebuild": "npm run seed:gen || echo '[prebuild] page-seeds snapshot skipped (using committed JSON)'",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -68,6 +70,7 @@
     "eslint-config-next": "^15.5.14",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.3"
   }
