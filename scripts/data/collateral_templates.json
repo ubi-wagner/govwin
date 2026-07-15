@@ -265,7 +265,7 @@
           "id": "t-cta",
           "type": "text_block",
           "content": {
-            "text": "Start with a founding-cohort pilot: an illustrative model of roughly $299 per month per company for the Spotlight subscription, plus per-proposal build fees. Begin with a small pilot cohort and grow. Contact your RFP Pipeline partner team to set up your shadow-admin view."
+            "text": "Start with a founding-cohort pilot: an illustrative model of roughly $499 per month per company for the Spotlight subscription, plus per-proposal build fees. Begin with a small pilot cohort and grow. Contact your RFP Pipeline partner team to set up your shadow-admin view."
           }
         },
         {
@@ -476,7 +476,7 @@
           "id": "pricing",
           "type": "text_block",
           "content": {
-            "text": "Founding-cohort model (illustrative): about $299 per month for your Spotlight subscription — the ranked feed, your library, and access to expert skeletons — plus a per-proposal build fee when you're ready to draft and submit. Final pricing is set per cohort; the figures here are a model, not a quote."
+            "text": "Founding-cohort model (illustrative): about $499 per month for your Spotlight subscription — the ranked feed, your library, and access to expert skeletons — plus a per-proposal build fee when you're ready to draft and submit. Final pricing is set per cohort; the figures here are a model, not a quote."
           }
         },
         {
@@ -811,7 +811,7 @@
           "id": "t-disc",
           "type": "text_block",
           "content": {
-            "text": "Basis & disclaimers: SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar amounts — consultant costs, the $2,500 build fee, the four-submission cadence, and the +5-point win-rate lift — are an illustrative model, not a quote and not a guarantee; actual results vary by firm, agency, and solicitation. Founding-cohort pricing: ~$299/mo Spotlight subscription + per-proposal build fees. Immobileyes is used only as a hypothetical example."
+            "text": "Basis & disclaimers: SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar amounts — consultant costs, the $2,500 build fee, the four-submission cadence, and the +5-point win-rate lift — are an illustrative model, not a quote and not a guarantee; actual results vary by firm, agency, and solicitation. Founding-cohort pricing: ~$499/mo Spotlight subscription + per-proposal build fees. Immobileyes is used only as a hypothetical example."
           }
         }
       ],
@@ -1060,7 +1060,7 @@
           "id": "n19",
           "type": "text_block",
           "content": {
-            "text": "Bottoms-up funnel (illustrative model): R&D-active US SMBs (100k+) → SBIR/STTR-seeking (~25k) → reachable via EconDev / accelerator / PTAC network (~10k — the wedge) → founding-cohort beachhead. Revenue scales as: SMBs × ( $299/mo + builds × build fee )."
+            "text": "Bottoms-up funnel (illustrative model): R&D-active US SMBs (100k+) → SBIR/STTR-seeking (~25k) → reachable via EconDev / accelerator / PTAC network (~10k — the wedge) → founding-cohort beachhead. Revenue scales as: SMBs × ( $499/mo + builds × build fee )."
           }
         },
         {
@@ -1074,7 +1074,7 @@
             "rows": [
               [
                 "Spotlight subscription (list price)",
-                "$299 / mo"
+                "$499 / mo"
               ],
               [
                 "Per-proposal build fee",
@@ -1099,7 +1099,7 @@
           "id": "n21",
           "type": "text_block",
           "content": {
-            "text": "Illustrative model — not a forecast. Only the $299/mo list price and public SBIR award ranges are actual; every count and roll-up is illustrative."
+            "text": "Illustrative model — not a forecast. Only the $499/mo list price and public SBIR award ranges are actual; every count and roll-up is illustrative."
           }
         },
         {

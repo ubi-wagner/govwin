@@ -29,7 +29,7 @@ export const pricing: SeedPage = {
       metadata: {
         primary_cta: { label: 'Apply Now', href: '/apply' },
         secondary_cta: { label: 'See How It Works', href: '/how-it-works' },
-        note: '$299/month after acceptance. No free trial — serious applicants only. Cancel anytime.',
+        note: '$499/month, 3-month minimum, then month-to-month. No free trial — serious applicants only, no tire-kickers.',
       },
     },
 
@@ -50,7 +50,7 @@ export const pricing: SeedPage = {
       body: 'Your ongoing federal R&D opportunity intelligence. Required for access to Proposal Portal purchases.',
       metadata: {
         label: 'Monthly Subscription',
-        price: '$299',
+        price: '$499',
         period: '/ month',
         highlighted: true,
         features: [
@@ -60,7 +60,7 @@ export const pricing: SeedPage = {
           'Notifications for new matches and upcoming deadlines',
           '15 minutes of Ask-the-Expert time each month (rolls over unused)',
           'Unlimited access to your company\'s isolated AI team',
-          'Cancel anytime. No annual commitment.',
+          '3-month minimum, then cancel anytime. No annual commitment.',
         ],
         cta: { label: 'Apply for Access', href: '/apply' },
       },
@@ -82,7 +82,7 @@ export const pricing: SeedPage = {
       title: 'Proposal Portal — Phase I',
       body: 'Phase I-equivalent effort. Includes SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form proposals.',
       metadata: {
-        price: '$999',
+        price: '$1,999',
         period: 'per proposal',
         highlighted: false,
         features: [
@@ -102,9 +102,9 @@ export const pricing: SeedPage = {
       section: 'proposals',
       displayOrder: 5,
       title: 'Proposal Portal — Phase II',
-      body: 'An exponentially bigger proposal for only $1,000 more — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
+      body: 'An exponentially bigger proposal — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs. $4,999, or $3,999 when you already have a linked Phase I in your library.',
       metadata: {
-        price: '$1,999',
+        price: '$4,999',
         period: 'per proposal',
         highlighted: false,
         features: [
@@ -127,7 +127,7 @@ export const pricing: SeedPage = {
       displayOrder: 6,
       excerpt: 'Expert Access',
       title: 'Eric is available when you need him',
-      metadata: { subtitle: 'The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand.' },
+      metadata: { subtitle: 'The expert who commands $500/hour reviews your pipeline as part of your $499/mo. Monthly minutes included; additional time on demand.' },
     },
 
     // Expert-access tiers (2): Ask the Expert + Expert Consulting.
@@ -205,8 +205,8 @@ export const pricing: SeedPage = {
     {
       section: 'faqs',
       displayOrder: 13,
-      title: 'Phase II costs only $1,000 more than Phase I — what makes it worth it?',
-      body: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal (there is no upgrade credit between them) — so you get a large step up in scope for a small step up in price, and never a success fee taking a cut of your win.',
+      title: 'Why is Phase II $4,999 (or $3,999 with a linked Phase I)?',
+      body: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal — and when you already have a linked Phase I with us, your Phase II is $3,999 instead of $4,999 because we reuse that prior work. Never a success fee taking a cut of your win.',
     },
     {
       section: 'faqs',

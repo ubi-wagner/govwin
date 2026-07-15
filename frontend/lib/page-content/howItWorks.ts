@@ -79,7 +79,7 @@ export const howItWorks: SeedPage = {
         details: [
           'Admin creates account, verifies email',
           'Upload foundational company docs (become your AI team\'s library)',
-          'Activate $299/month subscription',
+          'Activate $499/month subscription',
           'Your isolated AI agents are provisioned',
         ],
       },
@@ -103,7 +103,7 @@ export const howItWorks: SeedPage = {
       section: 'steps',
       displayOrder: 6,
       title: 'Purchase a Proposal Portal',
-      body: 'When you find an opportunity worth pursuing, purchase a proposal portal ($999 Phase I, $1,999 Phase II). Eric builds your curated compliance matrix within 72 hours. Your custom AI team drafts sections against your uploaded library.',
+      body: 'When you find an opportunity worth pursuing, purchase a proposal portal ($1,999 Phase I, $4,999 Phase II). Eric builds your curated compliance matrix within 72 hours. Your custom AI team drafts sections against your uploaded library.',
       metadata: {
         number: '05',
         details: [
@@ -168,7 +168,7 @@ export const howItWorks: SeedPage = {
       displayOrder: 12,
       excerpt: 'Ready to apply?',
       title: 'Founding cohort is limited to 20 small businesses',
-      body: 'Applications reviewed weekly. $299/month after acceptance. Cancel anytime.',
+      body: 'Applications reviewed weekly. $499/month after acceptance. Cancel anytime.',
       metadata: { cta: { label: 'Start Your Application', href: '/apply' } },
     },
   ],

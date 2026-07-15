@@ -71,7 +71,7 @@ export default function PurchaseModal({ tenantSlug, opportunityId, title, onClos
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-800">RFP-expert-curated proposal build</span>
-            <span className="text-gray-500">$999</span>
+            <span className="text-gray-500">$1,999</span>
           </div>
           <p className="mt-1 text-xs text-gray-500">
             One-time. Includes expert curation of your compliance matrix, volumes, and section molds,

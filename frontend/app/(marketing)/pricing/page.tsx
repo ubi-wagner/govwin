@@ -16,13 +16,13 @@ export const revalidate = 60;
 export const metadata = {
   title: 'Pricing — RFP Pipeline',
   description:
-    'Simple, transparent pricing. $299/month Spotlight subscription. $999 Phase I / $1,999 Phase II per-proposal portals. Cancel anytime. No free trial — serious applicants only.',
+    'Simple, transparent pricing. $499/month Spotlight subscription. $1,999 Phase I / $4,999 Phase II per-proposal portals. Cancel anytime. No free trial — serious applicants only.',
 };
 
 const subscriptionTier: PricingTierProps = {
   label: 'Monthly Subscription',
   name: 'Spotlight',
-  price: '$299',
+  price: '$499',
   period: '/ month',
   description: 'Your ongoing federal R&D opportunity intelligence. Required for access to Proposal Portal purchases.',
   features: [
@@ -41,7 +41,7 @@ const subscriptionTier: PricingTierProps = {
 const proposalTiers: PricingTierProps[] = [
   {
     name: 'Proposal Portal — Phase I',
-    price: '$999',
+    price: '$1,999',
     period: 'per proposal',
     description: 'Phase I-equivalent effort. Includes SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form proposals.',
     features: [
@@ -59,7 +59,7 @@ const proposalTiers: PricingTierProps[] = [
   },
   {
     name: 'Proposal Portal — Phase II',
-    price: '$1,999',
+    price: '$4,999',
     period: 'per proposal',
     description: 'An exponentially bigger proposal for only $1,000 more — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
     features: [
@@ -177,7 +177,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         subheadline={hero?.body ?? "We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you."}
         primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
         secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See How It Works', href: '/how-it-works' }}
-        note={(hero?.metadata as { note?: string })?.note ?? "$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
+        note={(hero?.metadata as { note?: string })?.note ?? "$499/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
       />
 
       <ValueComparison
@@ -216,7 +216,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         <SectionHeader
           eyebrow={expertHeader?.excerpt ?? "Expert Access"}
           title={expertHeader?.title ?? "Eric is available when you need him"}
-          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand."}
+          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $499/mo. Monthly minutes included; additional time on demand."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {resolvedExpertTiers.map((tier) => (

@@ -128,7 +128,7 @@ export function ApplicationForm() {
           Thanks for applying. Eric will personally review your application within 72 hours and
           reach out directly at the email you provided with next steps. If you&rsquo;re accepted,
           you&rsquo;ll be invited to onboard, register your admin, upload foundational company
-          documents, and activate your $299/month Spotlight subscription.
+          documents, and activate your $499/month Spotlight subscription.
         </p>
         <p className="mt-4 text-gray-700">
           If you have any urgent questions in the meantime, email{' '}

@@ -32,9 +32,9 @@ vi.mock('@/lib/stripe', () => ({
   },
   getAmountCents: (productType: string) => {
     const amounts: Record<string, number> = {
-      proposal_phase1: 99900,
-      proposal_phase2: 199900,
-      finder_subscription: 29900,
+      proposal_phase1: 199900,
+      proposal_phase2: 499900,
+      finder_subscription: 49900,
       expert_consulting: 50000,
     };
     return amounts[productType] ?? 0;

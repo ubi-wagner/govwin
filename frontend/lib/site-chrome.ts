@@ -43,7 +43,7 @@ export interface SiteChrome {
 export const DEFAULT_CHROME: SiteChrome = {
   banner: {
     tag: 'Now Accepting Applications',
-    text: 'Founding Cohort · Platform launches July 2026',
+    text: 'Founding Cohort · Platform launches August 2026',
     ctaLabel: 'Apply',
     ctaHref: '/apply',
   },
