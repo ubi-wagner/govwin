@@ -184,7 +184,10 @@ export default function BulkUpload({ tenantSlug, onComplete }: BulkUploadProps) 
     } finally {
       setIsAtomizing(false);
     }
-  }, [tenantSlug, onComplete]);
+    // `files` MUST be a dep: the callback reads the current uploaded-file list to
+    // build fileIds. Without it the closure kept the initial (empty) files, so
+    // "Atomize All" found nothing to atomize.
+  }, [files, tenantSlug, onComplete]);
 
   const hasPending = files.some((f) => f.status === 'pending');
   const isUploading = files.some((f) => f.status === 'uploading');
