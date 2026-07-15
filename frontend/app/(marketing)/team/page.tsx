@@ -37,9 +37,9 @@ export default async function TeamPage() {
         <div className="max-w-6xl mx-auto px-6 py-16">
           {teamMembers.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-navy-500 text-lg">{empty?.title ?? 'Team page coming soon.'}</p>
+              <p className="text-navy-500 text-lg">{empty?.title ?? 'Built around the expert.'}</p>
               <p className="mt-2 text-sm text-navy-400">
-                {empty?.body ?? 'We are finalizing our team profiles.'}
+                {empty?.body ?? 'Today, Eric Wagner personally reviews every application and curates every opportunity. As the founding cohort grows, additional vetted experts join the roster — and you’ll always know who curated your pipeline.'}
               </p>
             </div>
           ) : (
