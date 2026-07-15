@@ -1,5 +1,9 @@
 # Customer Purchase → Curation → Release → V1 (as-built, this cycle)
 
+> **Superseded by `docs/MASTER_MIRROR_OPP_DESIGN.md`** (the full master/mirror architecture + the
+> corrected two-release model + gap register) and its Monday spine `docs/HITL_IMMOBILEYES_CLICKPLAN.md`.
+> Kept for the file-level "what shipped" list below; read the design doc for the model.
+
 The founding-cohort single-operator loop, made concrete for the first real customer
 (Immobileyes → Navy). Everything below shipped this merge cycle on branch
 `claude/nice-hamilton-kBqtD` and is verified on a throwaway PG16 (full chain 001→106 clean).
