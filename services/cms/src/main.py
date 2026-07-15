@@ -64,7 +64,10 @@ async def _run_worker(name: str, coro):
 async def lifespan(app: FastAPI):
     env = os.getenv('RAILWAY_ENVIRONMENT_NAME', 'local')
     sha = os.getenv('RAILWAY_GIT_COMMIT_SHA', 'dev')[:7]
-    logger.info('CMS-CRM service starting... (env=%s, version=%s)', env, sha)
+    # Coordinated cross-service release tag — bumped to force + verify a deploy of
+    # every service (frontend/pipeline/CMS) in the same merge cycle.
+    release = 'alpha-e2e-2026-07-14'
+    logger.info('CMS-CRM service starting... (release=%s, env=%s, version=%s)', release, env, sha)
     await init_db()
     await init_event_bridge()
     await start_event_listener()

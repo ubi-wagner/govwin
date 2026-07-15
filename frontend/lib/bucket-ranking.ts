@@ -28,6 +28,7 @@ export interface BucketCriteria {
 export interface CardFields {
   title?: string | null;
   description?: string | null;
+  spotlightSummary?: string | null;   // admin's first-pass matching context (mig 107)
   office?: string | null;
   agency?: string | null;
   naicsCodes?: string[] | null;
@@ -40,7 +41,9 @@ export interface CardFields {
 export function scoreCard(card: CardFields, criteria: BucketCriteria, nowMs: number): { score: number; factors: Record<string, number> } {
   const w = criteria.weights ?? {};
   const parts: Array<{ key: string; v: number; weight: number }> = [];
-  const text = [card.title, card.description, card.office].filter(Boolean).join(' ').toLowerCase();
+  // The admin's spotlight summary is authoritative matching context — it's the
+  // curated first-pass blurb built for exactly this ranking (mig 107).
+  const text = [card.title, card.spotlightSummary, card.description, card.office].filter(Boolean).join(' ').toLowerCase();
 
   if (criteria.keywords?.length) {
     const hits = criteria.keywords.filter((k) => k && text.includes(k.toLowerCase())).length;

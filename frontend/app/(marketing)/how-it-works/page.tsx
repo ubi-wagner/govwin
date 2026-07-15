@@ -48,7 +48,7 @@ const steps = [
     details: [
       'Admin creates account, verifies email',
       'Upload foundational company docs (become your AI team\'s library)',
-      'Activate $299/month subscription',
+      'Activate $499/month subscription',
       'Your isolated AI agents are provisioned',
     ],
   },
@@ -66,7 +66,7 @@ const steps = [
   {
     number: '05',
     title: 'Purchase a Proposal Portal',
-    body: 'When you find an opportunity worth pursuing, purchase a proposal portal ($999 Phase I, $1,999 Phase II). Eric builds your curated compliance matrix within 72 hours. Your custom AI team drafts sections against your uploaded library.',
+    body: 'When you find an opportunity worth pursuing, purchase a proposal portal ($1,999 Phase I, $4,999 Phase II). Eric builds your curated compliance matrix within 72 hours. Your custom AI team drafts sections against your uploaded library.',
     details: [
       'Per-proposal purchase — no annual commitment',
       '72-hour expert curation by Eric',
@@ -168,7 +168,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ [
       <CtaSection
         eyebrow={ctaBlock?.excerpt ?? 'Ready to apply?'}
         headline={ctaBlock?.title ?? 'Founding cohort is limited to 20 small businesses'}
-        subheadline={ctaBlock?.body ?? 'Applications reviewed weekly. $299/month after acceptance. Cancel anytime.'}
+        subheadline={ctaBlock?.body ?? 'Applications reviewed weekly. $499/month after acceptance. Cancel anytime.'}
         cta={(ctaBlock?.metadata as { cta?: { label: string; href: string } })?.cta ?? { label: 'Start Your Application', href: '/apply' }}
       />
 

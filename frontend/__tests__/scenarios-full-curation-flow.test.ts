@@ -189,6 +189,7 @@ describe('Phase 1 §E24 — full curation flow', () => {
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15, customVariables: {},
         hasSubmissionFormat: true,
+        spotlightSummary: 'Navy CV property-intelligence SBIR — agencies: Navy/DoD; tech: computer vision, edge inference.',
       }])
       .mockResolvedValueOnce([{ pushedAt: new Date() }]) // UPDATE sol
       .mockResolvedValueOnce(undefined)                   // UPDATE opp is_active

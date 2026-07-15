@@ -17,8 +17,8 @@ export const team: SeedPage = {
     {
       section: 'empty',
       displayOrder: 1,
-      title: 'Team page coming soon.',
-      body: 'We are finalizing our team profiles.',
+      title: 'Built around the expert.',
+      body: 'Today, Eric Wagner personally reviews every application and curates every opportunity. As the founding cohort grows, additional vetted experts join the roster — and you’ll always know who curated your pipeline.',
       metadata: {},
     },
     {

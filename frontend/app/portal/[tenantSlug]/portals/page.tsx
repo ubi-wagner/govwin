@@ -25,7 +25,7 @@ export default async function PortalsPage({ params }: { params: Promise<{ tenant
         <h1 className="text-2xl font-bold">Proposal Portals</h1>
         <p className="text-gray-500 mt-1 text-sm">Each portal is a build for an opportunity — accept guardrails to launch, then run the stages to closeout.</p>
       </div>
-      <ProposalPortals tenantSlug={tenantSlug} canManage={hasRoleAtLeast(role, 'tenant_admin')} />
+      <ProposalPortals tenantSlug={tenantSlug} canManage={hasRoleAtLeast(role, 'tenant_admin')} isExpert={hasRoleAtLeast(role, 'rfp_admin')} />
     </div>
   );
 }

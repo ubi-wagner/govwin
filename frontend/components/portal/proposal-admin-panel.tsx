@@ -138,6 +138,7 @@ export function ProposalAdminPanel({
 }: ProposalAdminPanelProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'artifacts' | 'team' | 'compliance' | 'ai'>('artifacts');
+  const [advancing, setAdvancing] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [complianceLoading, setComplianceLoading] = useState(false);
@@ -374,6 +375,25 @@ export function ProposalAdminPanel({
     }
   }, [sections, lockOverrides, lockingAll, tenantSlug, proposalId, router]);
 
+  // Force-advance V0.5 → complete V1 without locking every section (Eric's "lock all
+  // OR force advance"). Hits the advance core with force=true (records the still-open
+  // sections as the audit trail); advancing to 'final' auto-locks → 'submitted'.
+  const handleForceAdvance = useCallback(async () => {
+    if (advancing) return;
+    if (!window.confirm('Force-advance this proposal to V1 (complete)? Sections that are not locked will be advanced as-is and recorded.')) return;
+    setAdvancing(true);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/advance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetStage: 'final', force: true }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setAdvancing(false);
+    }
+  }, [advancing, tenantSlug, proposalId, router]);
+
   const isSectionLocked = (s: SectionItem) => lockOverrides[s.id] ?? !!s.isLocked;
 
   // Group sections by document/volume (real matrix identity, prefix fallback).
@@ -419,13 +439,23 @@ export function ProposalAdminPanel({
               <p className="text-xs text-indigo-800">
                 {unlockedLockable.length} section{unlockedLockable.length > 1 ? 's' : ''} drafted and ready to accept &amp; lock for this stage.
               </p>
-              <button
-                onClick={handleLockAll}
-                disabled={lockingAll}
-                className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-              >
-                {lockingAll ? 'Locking…' : `Accept & Lock All (${unlockedLockable.length})`}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLockAll}
+                  disabled={lockingAll || advancing}
+                  className="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {lockingAll ? 'Locking…' : `Accept & Lock All (${unlockedLockable.length})`}
+                </button>
+                <button
+                  onClick={handleForceAdvance}
+                  disabled={advancing || lockingAll}
+                  title="Skip locking and advance straight to complete V1"
+                  className="px-3 py-1.5 text-xs font-semibold text-indigo-700 border border-indigo-300 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                >
+                  {advancing ? 'Advancing…' : 'Force advance to V1 →'}
+                </button>
+              </div>
             </div>
           )}
           {volumes.map((volume) => (

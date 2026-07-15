@@ -139,3 +139,50 @@ export async function GET(
     );
   }
 }
+
+/**
+ * PATCH /api/admin/rfp-curation/[solId]
+ *
+ * Update solicitation-level curation fields. Currently the RFP admin's manual
+ * first-pass "spotlight-match summary" (mig 107) — the matching context that the
+ * push gate requires and that fan-out folds into the card for ranking.
+ * Body: { spotlightSummary: string }
+ */
+export async function PATCH(request: Request, routeCtx: RouteContext) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
+    }
+    const role = (session.user as { role?: Role }).role;
+    if (role !== 'master_admin' && role !== 'rfp_admin') {
+      return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const { solId } = await routeCtx.params;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(solId)) {
+      return NextResponse.json({ error: 'Invalid solicitation ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    let body: { spotlightSummary?: unknown };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+    if (typeof body.spotlightSummary !== 'string') {
+      return NextResponse.json({ error: 'spotlightSummary (string) is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    const summary = body.spotlightSummary.slice(0, 5000);
+    try {
+      const rows = await sql<{ id: string }[]>`
+        UPDATE curated_solicitations SET spotlight_summary = ${summary}, updated_at = now()
+        WHERE id = ${solId}::uuid RETURNING id`;
+      if (rows.length === 0) {
+        return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
+      }
+    } catch (err) {
+      console.error('[rfp-curation] PATCH spotlight_summary failed:', err);
+      return NextResponse.json({ error: 'Failed to update summary', code: 'DB_ERROR' }, { status: 500 });
+    }
+    return NextResponse.json({ data: { spotlightSummary: summary } });
+  } catch (error) {
+    console.error('[rfp-curation] PATCH failed:', error);
+    return NextResponse.json({ error: 'Failed to update solicitation', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}

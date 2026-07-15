@@ -83,7 +83,7 @@ export default async function ResourcesPage() {
           </div>
 
           {allContent.length === 0 ? (
-            <p className="text-navy-500 text-center py-12">Resources coming soon.</p>
+            <p className="text-navy-500 text-center py-12">Fresh guides, playbooks, and federal R&D deep-dives are published here regularly.</p>
           ) : (
             <ResourcesFilter content={JSON.parse(JSON.stringify(allContent))} />
           )}

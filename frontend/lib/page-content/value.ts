@@ -33,9 +33,9 @@ export const value: SeedPage = {
     // Cost-comparison rows — the single editable source for the money moment
     // (also rendered on /pricing). title = what it replaces, excerpt = status-quo
     // cost, body = payoff; metadata = { statusQuoNote, ours }.
-    { section: 'comparison-row', displayOrder: 0, title: 'Active opportunity monitoring', excerpt: '$5,000 / mo', body: 'Expert-curated monitoring for about 6% of the price — a human reads every solicitation, not just a keyword feed.', metadata: { statusQuoNote: 'what our founder paid for a monitoring service', ours: '$299 / mo' } },
-    { section: 'comparison-row', displayOrder: 1, title: 'A proposal consultant', excerpt: '10% of award', body: 'Keep the $100K. Pay for the build, never a cut of your win.', metadata: { statusQuoNote: 'a $1M Phase II is $100,000 — or a heavy monthly retainer', ours: '$999 / $1,999 flat' } },
-    { section: 'comparison-row', displayOrder: 2, title: 'An in-house BD hire', excerpt: '$90–150K / yr', body: 'Your business-development department, without the headcount.', metadata: { statusQuoNote: 'loaded salary, plus the months to find and ramp them', ours: '$299/mo + per-proposal' } },
+    { section: 'comparison-row', displayOrder: 0, title: 'Active opportunity monitoring', excerpt: '$5,000 / mo', body: 'Expert-curated monitoring for about a tenth of the price — a human reads every solicitation, not just a keyword feed.', metadata: { statusQuoNote: 'what our founder paid for a monitoring service', ours: '$499 / mo' } },
+    { section: 'comparison-row', displayOrder: 1, title: 'A proposal consultant', excerpt: '10% of award', body: 'Keep the $100K. Pay for the build, never a cut of your win.', metadata: { statusQuoNote: 'a $1M Phase II is $100,000 — or a heavy monthly retainer', ours: '$1,999 / $4,999 flat' } },
+    { section: 'comparison-row', displayOrder: 2, title: 'An in-house BD hire', excerpt: '$90–150K / yr', body: 'Your business-development department, without the headcount.', metadata: { statusQuoNote: 'loaded salary, plus the months to find and ramp them', ours: '$499/mo + per-proposal' } },
     { section: 'comparison-row', displayOrder: 3, title: "Your founder's nights & weekends", excerpt: 'Your scarcest hours', body: 'Stop trading product velocity for proposal paperwork.', metadata: { statusQuoNote: 'your best engineer pulled off the product to chase RFPs', ours: 'Hours back' } },
 
     {

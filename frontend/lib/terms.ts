@@ -45,7 +45,7 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW, RFP PIPELINE SHALL NOT BE LIABLE FOR ANY
 (d) In the event of a data breach affecting Your Content, RFP Pipeline will notify you within 72 hours of discovery.
 
 8. PRICING AND PAYMENT
-(a) Founding Cohort Spotlight subscription: $299/month.
+(a) Founding Cohort Spotlight subscription: $499/month.
 (b) Proposal Portal purchases: priced per portal at the rates in effect at time of purchase.
 (c) Payment is due on the day of onboarding for the first month and on the same day of each subsequent month.
 (d) Pricing may change at any time, but customers will be given at least 30 days' written notice prior to any price change.

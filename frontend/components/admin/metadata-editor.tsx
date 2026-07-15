@@ -94,7 +94,7 @@ function HeroMetadataEditor({
           value={note}
           onChange={(e) => onChange({ ...metadata, note: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          placeholder="Platform launches July 2026..."
+          placeholder="Platform launches August 2026..."
         />
       </div>
 
@@ -200,7 +200,7 @@ function PricingMetadataEditor({
             value={price}
             onChange={(e) => onChange({ ...metadata, price: e.target.value })}
             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            placeholder="$299"
+            placeholder="$499"
           />
         </div>
         <div>
@@ -221,7 +221,7 @@ function PricingMetadataEditor({
           value={priceLabel}
           onChange={(e) => onChange({ ...metadata, price_label: e.target.value })}
           className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          placeholder="$299/mo - Cancel Anytime"
+          placeholder="$499/mo - Cancel Anytime"
         />
       </div>
       <div>
@@ -583,7 +583,7 @@ function SlaMetadataEditor({
             value={priceLabel}
             onChange={(e) => onChange({ ...metadata, price_label: e.target.value })}
             className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            placeholder="$299/mo"
+            placeholder="$499/mo"
           />
         </div>
       </div>

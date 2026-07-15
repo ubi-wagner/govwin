@@ -11,7 +11,7 @@ export const revalidate = 60;
 export const metadata = {
   title: 'Why RFP Pipeline — The fastest, cheapest way to win federal R&D funding',
   description:
-    'Federal R&D funding is non-dilutive — you keep your equity. RFP Pipeline replaces a $5,000/mo monitoring service and a 10%-of-award consultant with $299/mo and a flat per-proposal fee. Expert + AI + Process.',
+    'Federal R&D funding is non-dilutive — you keep your equity. RFP Pipeline replaces a $5,000/mo monitoring service and a 10%-of-award consultant with $499/mo and a flat per-proposal fee. Expert + AI + Process.',
 };
 
 const DEFAULT_PAINS = [

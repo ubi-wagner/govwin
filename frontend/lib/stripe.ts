@@ -35,13 +35,18 @@ const PRICE_IDS: Record<ProductType, string | undefined> = {
 };
 
 const AMOUNTS_CENTS: Record<ProductType, number> = {
-  finder_subscription: 29900,
-  proposal_phase1: 99900,
-  proposal_phase2: 199900,
-  expert_consulting: 50000,
+  finder_subscription: 49900,   // $499/mo Spotlight (3-month minimum — serious operators only)
+  proposal_phase1: 199900,      // $1,999 Phase I ("like" effort)
+  proposal_phase2: 499900,      // $4,999 Phase II ("like" effort) — no linked Phase I
+  expert_consulting: 50000,     // $500/hr Ask-the-Expert (unchanged)
 };
 
-export function getAmountCents(productType: ProductType): number {
+// Phase II is discounted to $3,999 when a linked Phase I proposal is already in
+// the system + library (we reuse that prior work) instead of the $4,999 default.
+export const PROPOSAL_P2_LINKED_CENTS = 399900;
+
+export function getAmountCents(productType: ProductType, opts?: { hasLinkedPhase1?: boolean }): number {
+  if (productType === 'proposal_phase2' && opts?.hasLinkedPhase1) return PROPOSAL_P2_LINKED_CENTS;
   return AMOUNTS_CENTS[productType];
 }
 

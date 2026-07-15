@@ -20,6 +20,8 @@ function entityHref(t: TaskRow): string {
   if ((t.entityType === 'solicitation' || t.entityType === 'curated_solicitation') && t.entityId) {
     return `/admin/rfp-curation/${t.entityId}`;
   }
+  // A purchase-curation gate points at the opportunity; the admin curates its
+  // solicitation then releases the workspace. Land on the curation queue.
   return '/admin/rfp-curation';
 }
 
@@ -27,6 +29,7 @@ function entityHref(t: TaskRow): string {
 function entityLabel(t: TaskRow): string {
   if (t.entityType === 'source') return 'Source';
   if (t.entityType === 'solicitation' || t.entityType === 'curated_solicitation') return 'Solicitation';
+  if (t.entityType === 'opportunity') return 'Purchase — needs curation';
   return t.entityType ?? 'Task';
 }
 

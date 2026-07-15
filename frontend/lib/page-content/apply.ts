@@ -14,7 +14,7 @@ export const apply: SeedPage = {
       metadata: {
         before_you_apply_label: 'Before you apply:',
         before_you_apply:
-          ' This is a paid service ($299/month after acceptance). There is no free trial. If accepted, you’ll be invited to onboard, register your admin, upload foundational company documents, and activate your subscription via Stripe.',
+          ' This is a paid service ($499/month after acceptance). There is no free trial. If accepted, you’ll be invited to onboard, register your admin, upload foundational company documents, and activate your subscription via Stripe.',
       },
     },
   ],

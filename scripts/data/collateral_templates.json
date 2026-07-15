@@ -265,7 +265,7 @@
           "id": "t-cta",
           "type": "text_block",
           "content": {
-            "text": "Start with a founding-cohort pilot: an illustrative model of roughly $299 per month per company for the Spotlight subscription, plus per-proposal build fees. Begin with a small pilot cohort and grow. Contact your RFP Pipeline partner team to set up your shadow-admin view."
+            "text": "Start with a founding-cohort pilot: an illustrative model of roughly $499 per month per company for the Spotlight subscription, plus per-proposal build fees. Begin with a small pilot cohort and grow. Contact your RFP Pipeline partner team to set up your shadow-admin view."
           }
         },
         {
@@ -476,7 +476,7 @@
           "id": "pricing",
           "type": "text_block",
           "content": {
-            "text": "Founding-cohort model (illustrative): about $299 per month for your Spotlight subscription — the ranked feed, your library, and access to expert skeletons — plus a per-proposal build fee when you're ready to draft and submit. Final pricing is set per cohort; the figures here are a model, not a quote."
+            "text": "Founding-cohort model (illustrative): about $499 per month for your Spotlight subscription — the ranked feed, your library, and access to expert skeletons — plus a per-proposal build fee when you're ready to draft and submit. Final pricing is set per cohort; the figures here are a model, not a quote."
           }
         },
         {
@@ -712,10 +712,10 @@
           "type": "image",
           "content": {
             "storage_key": "rfp-admin/collateral/cost-comparison.svg",
-            "alt_text": "Bar chart: a proposal consultant runs $10k–$25k (about $17,500 average) to reach one submission, versus about $3,400 with RFP Pipeline — roughly 5x lower.",
+            "alt_text": "Bar chart: a proposal consultant runs $10k–$25k (about $17,500 average) to reach one submission, versus about $3,500 with RFP Pipeline — roughly 5x lower.",
             "width": 244,
             "height": 146,
-            "caption": "Cost to reach one submission (per proposal): consultant ≈ $17,500 vs. RFP Pipeline ≈ $3,400 (illustrative)."
+            "caption": "Cost to reach one submission (per proposal): consultant ≈ $17,500 vs. RFP Pipeline ≈ $3,500 (illustrative)."
           }
         },
         {
@@ -723,10 +723,10 @@
           "type": "image",
           "content": {
             "storage_key": "rfp-admin/collateral/roi-waterfall.svg",
-            "alt_text": "Waterfall chart: cost saved (about $56.4k) plus expected-value lift (about $30.0k) build to a total illustrative annual value of about $86.4k across four submissions.",
+            "alt_text": "Waterfall chart: cost saved (about $56.0k) plus expected-value lift (about $30.0k) build to a total illustrative annual value of about $86.0k across four submissions.",
             "width": 244,
             "height": 146,
-            "caption": "Illustrative annual value (4 submissions): $56.4k cost saved + $30.0k value lift = $86.4k."
+            "caption": "Illustrative annual value (4 submissions): $56.0k cost saved + $30.0k value lift = $86.0k."
           }
         },
         {
@@ -742,12 +742,12 @@
               [
                 "Build fee",
                 "$10,000–$25,000",
-                "$2,500 (illustrative)"
+                "$1,999 (illustrative)"
               ],
               [
                 "Subscription share",
                 "—",
-                "$897 (one-quarter of $3,588/yr)"
+                "$1,497 (one-quarter of $5,988/yr)"
               ],
               [
                 "Blank-page rework",
@@ -757,7 +757,7 @@
               [
                 "Fully-loaded cost",
                 "≈ $17,500",
-                "≈ $3,400"
+                "≈ $3,500"
               ]
             ]
           }
@@ -779,13 +779,13 @@
               ],
               [
                 "RFP Pipeline path cost",
-                "$3,588 subscription + 4 × $2,500",
-                "($13,588)"
+                "$5,988 subscription + 4 × $1,999",
+                "($13,984)"
               ],
               [
                 "Cost saved",
                 "difference of the two paths",
-                "$56,412"
+                "$56,016"
               ],
               [
                 "Expected-value lift",
@@ -795,7 +795,7 @@
               [
                 "Total illustrative annual value",
                 "cost saved + value lift",
-                "$86,412"
+                "$86,016"
               ]
             ]
           }
@@ -804,14 +804,14 @@
           "id": "t-scenario",
           "type": "text_block",
           "content": {
-            "text": "Illustrative scenario — Immobileyes (hypothetical, computer-vision property intelligence): a firm like Immobileyes runs a Spotlight bucket for DoD sensing topics, drafts four Phase I proposals a year from its learning library, and reaches submission for ≈ $3,400 each instead of a $10–25k consultant. On this model, a single additional $150K Phase I award — from more competitive, compliant, on-time submissions — returns ≈ 11× the entire $13,588 annual platform + build spend. Illustrative model — not a guarantee."
+            "text": "Illustrative scenario — Immobileyes (hypothetical, computer-vision property intelligence): a firm like Immobileyes runs a Spotlight bucket for DoD sensing topics, drafts four Phase I proposals a year from its learning library, and reaches submission for ≈ $3,500 each instead of a $10–25k consultant. On this model, a single additional $150K Phase I award — from more competitive, compliant, on-time submissions — returns ≈ 11× the entire $13,984 annual platform + build spend. Illustrative model — not a guarantee."
           }
         },
         {
           "id": "t-disc",
           "type": "text_block",
           "content": {
-            "text": "Basis & disclaimers: SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar amounts — consultant costs, the $2,500 build fee, the four-submission cadence, and the +5-point win-rate lift — are an illustrative model, not a quote and not a guarantee; actual results vary by firm, agency, and solicitation. Founding-cohort pricing: ~$299/mo Spotlight subscription + per-proposal build fees. Immobileyes is used only as a hypothetical example."
+            "text": "Basis & disclaimers: SBIR Phase I award ranges (~$150K–$300K) are public figures. All other dollar amounts — consultant costs, the $1,999 build fee, the four-submission cadence, and the +5-point win-rate lift — are an illustrative model, not a quote and not a guarantee; actual results vary by firm, agency, and solicitation. Founding-cohort pricing: ~$499/mo Spotlight subscription + per-proposal build fees. Immobileyes is used only as a hypothetical example."
           }
         }
       ],
@@ -1060,7 +1060,7 @@
           "id": "n19",
           "type": "text_block",
           "content": {
-            "text": "Bottoms-up funnel (illustrative model): R&D-active US SMBs (100k+) → SBIR/STTR-seeking (~25k) → reachable via EconDev / accelerator / PTAC network (~10k — the wedge) → founding-cohort beachhead. Revenue scales as: SMBs × ( $299/mo + builds × build fee )."
+            "text": "Bottoms-up funnel (illustrative model): R&D-active US SMBs (100k+) → SBIR/STTR-seeking (~25k) → reachable via EconDev / accelerator / PTAC network (~10k — the wedge) → founding-cohort beachhead. Revenue scales as: SMBs × ( $499/mo + builds × build fee )."
           }
         },
         {
@@ -1074,7 +1074,7 @@
             "rows": [
               [
                 "Spotlight subscription (list price)",
-                "$299 / mo"
+                "$499 / mo"
               ],
               [
                 "Per-proposal build fee",
@@ -1086,7 +1086,7 @@
               ],
               [
                 "Subscription revenue @ reach",
-                "~$36M / yr (illustrative)"
+                "~$60M / yr (illustrative)"
               ],
               [
                 "Per-proposal builds",
@@ -1099,7 +1099,7 @@
           "id": "n21",
           "type": "text_block",
           "content": {
-            "text": "Illustrative model — not a forecast. Only the $299/mo list price and public SBIR award ranges are actual; every count and roll-up is illustrative."
+            "text": "Illustrative model — not a forecast. Only the $499/mo list price and public SBIR award ranges are actual; every count and roll-up is illustrative."
           }
         },
         {

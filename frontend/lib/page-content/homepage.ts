@@ -18,12 +18,12 @@ export const homepage: SeedPage = {
       section: 'hero',
       displayOrder: 0,
       excerpt: 'AI + Expert · From Application to Submission',
-      title: 'A proposal\nengine, *not* a\nproposal\ngamble.',
+      title: 'A proposal engine,\n*not* a proposal gamble.',
       body: 'Win non-dilutive federal R&D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. (SBIR, STTR, BAA, OTA.)',
       metadata: {
         primary_cta: { label: 'Apply for Founding Cohort', href: '/apply' },
         secondary_cta: { label: 'See why it works', href: '/value' },
-        note: 'Platform launches July 2026. 20 founding-cohort seats. Applications reviewed weekly.',
+        note: 'Platform launches August 2026. 20 founding-cohort seats. Applications reviewed weekly.',
       },
     },
 
@@ -41,7 +41,7 @@ export const homepage: SeedPage = {
       body: 'There are billions a year in non-dilutive federal R&D funding — grant-like money you keep your equity and IP on. Most qualifying small businesses never apply. We make it accessible.',
       metadata: {
         roiLabel: 'The math',
-        roi: 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $299/mo and a flat $999 / $1,999 per proposal. No success fee.',
+        roi: 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $499/mo and a flat $1,999 / $4,999 per proposal. No success fee.',
       },
     },
 
@@ -64,13 +64,13 @@ export const homepage: SeedPage = {
       displayOrder: 12,
       excerpt: 'How We Charge',
       title: 'One subscription.\nPer-proposal *portals*.',
-      body: 'Priced and built specifically for small businesses, not enterprise. Low cost subscription provides find and remind capabilities. Per proposal pricing ensures you only pay for builds you choose.',
+      body: 'Built for small businesses, not enterprise — a low-cost subscription to find and track opportunities, plus per-proposal pricing so you only pay for the builds you choose.',
     },
 
     // Pricing cards (3).
-    { section: 'pricing', displayOrder: 13, excerpt: 'Required · Monthly', title: 'Spotlight Subscription', body: 'Daily ingestion. AI-powered ranking against your profile. Expert-curated compliance matrix. Deadline alerts. 15 min of Ask-the-Expert each month (rolls over).', metadata: { price: '$299', period: '/mo', note: 'Required to purchase any portal' } },
-    { section: 'pricing', displayOrder: 14, excerpt: 'Per-Proposal', title: 'Phase I — Like Effort', body: 'SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour curation by Expert. Stage-gated workspace. Custom AI drafting.', metadata: { price: '$999', period: 'per proposal' } },
-    { section: 'pricing', displayOrder: 15, excerpt: 'Per-Proposal', title: 'Phase II — Like Effort', body: 'SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20-50+ page tech volumes. Commercialization plans included.', metadata: { price: '$1,999', period: 'per proposal' } },
+    { section: 'pricing', displayOrder: 13, excerpt: 'Required · Monthly', title: 'Spotlight Subscription', body: 'Daily ingestion. AI-powered ranking against your profile. Expert-curated compliance matrix. Deadline alerts. 15 min of Ask-the-Expert each month (rolls over).', metadata: { price: '$499', period: '/mo', note: 'Required to purchase any portal · 3-month minimum' } },
+    { section: 'pricing', displayOrder: 14, excerpt: 'Per-Proposal', title: 'Phase I — Like Effort', body: 'SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour curation by Expert. Stage-gated workspace. Custom AI drafting.', metadata: { price: '$1,999', period: 'per proposal' } },
+    { section: 'pricing', displayOrder: 15, excerpt: 'Per-Proposal', title: 'Phase II — Like Effort', body: 'SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20-50+ page tech volumes. Commercialization plans included. $3,999 with a linked Phase I in your library.', metadata: { price: '$4,999', period: 'per proposal' } },
 
     // Expert gate. Title accent: brand-500 ("verifies").
     {
@@ -110,7 +110,7 @@ export const homepage: SeedPage = {
     {
       section: 'cta',
       displayOrder: 19,
-      excerpt: 'Applications Open · Launch July 2026',
+      excerpt: 'Applications Open · Launch August 2026',
       title: 'Apply today. Draft your *first*\nproposal on launch day.',
       metadata: {
         cta: { label: 'Apply Now', href: '/apply' },

@@ -34,7 +34,7 @@ export const customers: SeedPage = {
     {
       section: 'empty',
       displayOrder: 7,
-      title: 'Founding-cohort stories are on the way.',
+      title: 'New platform, proven expertise.',
       body: 'Our first customers are onboarding now. Their results will appear here as they win.',
       metadata: {},
     },

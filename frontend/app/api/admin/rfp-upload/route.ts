@@ -313,7 +313,13 @@ export async function POST(request: Request) {
              ${meta.programType}, ${solNumParam},
              ${closeParam}, ${postedParam},
              ${descParam},
-             md5(${meta.title} || ${descParam ?? ''}),
+             -- content_hash carries a UNIQUE constraint (009, for the automated
+             -- ingester's content dedup). A MANUAL upload is a deliberate, distinct
+             -- creation, so mix in the fresh oppId → each manual upload is unique and
+             -- a duplicate title (even with an empty description) no longer 500s.
+             -- True duplicate FILES are still caught by the solicitation_documents
+             -- content_hash dedup (the 409 above).
+             md5(${meta.title} || ${descParam ?? ''} || ${oppId}),
              true)
           RETURNING id
         `;
@@ -386,6 +392,19 @@ export async function POST(request: Request) {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error('[rfp-upload] S3 put failed', { key: storageKey, err: errMsg, stack: err instanceof Error ? err.stack : undefined });
+      // B2: the opp + solicitation were committed BEFORE this upload. On a storage
+      // failure for a NEW solicitation, roll them back (+ any doc rows already
+      // written for earlier files in this batch) so we don't orphan a zero-document
+      // solicitation. Attach-to-existing (existingSolId) must NOT delete the opp.
+      if (!existingSolId) {
+        try {
+          await sql`DELETE FROM solicitation_documents WHERE solicitation_id = ${solId}::uuid`;
+          await sql`DELETE FROM curated_solicitations WHERE id = ${solId}::uuid`;
+          await sql`DELETE FROM opportunities WHERE id = ${oppRowId}::uuid`;
+        } catch (cleanupErr) {
+          console.error('[rfp-upload] orphan cleanup after S3 failure failed', cleanupErr);
+        }
+      }
       await emitEventEnd(eventId, { error: { message: `S3 put failed: ${errMsg}`, code: 'STORAGE_ERROR' } });
       return NextResponse.json(
         { error: 'Storage upload failed', code: 'STORAGE_ERROR' },

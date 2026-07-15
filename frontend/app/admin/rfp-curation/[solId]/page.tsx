@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
 import { sql } from '@/lib/db';
 import { CurationWorkspace } from '@/components/rfp-curation/curation-workspace';
+import SpotlightSummaryEditor from './spotlight-summary-editor';
 
 export const dynamic = 'force-dynamic';
 
@@ -380,7 +381,9 @@ export default async function CurationWorkspacePage({ params }: Props) {
     .filter((a) => a.sourceExcerpt);
 
   return (
-    <CurationWorkspace
+    <>
+      <SpotlightSummaryEditor solId={solId} />
+      <CurationWorkspace
       solicitation={solicitation}
       compliance={compliance}
       triageHistory={triageHistory}
@@ -392,6 +395,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
       customerInterest={customerInterest}
       currentUserId={session.user.id ?? ''}
       userLookup={userLookup}
-    />
+      />
+    </>
   );
 }

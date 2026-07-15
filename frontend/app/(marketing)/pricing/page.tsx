@@ -16,13 +16,13 @@ export const revalidate = 60;
 export const metadata = {
   title: 'Pricing — RFP Pipeline',
   description:
-    'Simple, transparent pricing. $299/month Spotlight subscription. $999 Phase I / $1,999 Phase II per-proposal portals. Cancel anytime. No free trial — serious applicants only.',
+    'Simple, transparent pricing. $499/month Spotlight subscription. $1,999 Phase I / $4,999 Phase II per-proposal portals. Cancel anytime. No free trial — serious applicants only.',
 };
 
 const subscriptionTier: PricingTierProps = {
   label: 'Monthly Subscription',
   name: 'Spotlight',
-  price: '$299',
+  price: '$499',
   period: '/ month',
   description: 'Your ongoing federal R&D opportunity intelligence. Required for access to Proposal Portal purchases.',
   features: [
@@ -32,7 +32,7 @@ const subscriptionTier: PricingTierProps = {
     'Notifications for new matches and upcoming deadlines',
     '15 minutes of Ask-the-Expert time each month (rolls over unused)',
     'Unlimited access to your company\'s isolated AI team',
-    'Cancel anytime. No annual commitment.',
+    '3-month minimum, then cancel anytime. No annual commitment.',
   ],
   cta: { label: 'Apply for Access', href: '/apply' },
   highlighted: true,
@@ -41,7 +41,7 @@ const subscriptionTier: PricingTierProps = {
 const proposalTiers: PricingTierProps[] = [
   {
     name: 'Proposal Portal — Phase I',
-    price: '$999',
+    price: '$1,999',
     period: 'per proposal',
     description: 'Phase I-equivalent effort. Includes SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form proposals.',
     features: [
@@ -54,25 +54,25 @@ const proposalTiers: PricingTierProps[] = [
       'Export-ready submission package (PDFs, SF-424, attachments)',
       'Post-submission debrief added to your library',
     ],
-    cta: { label: 'Requires Spotlight subscription', href: '/apply' },
+    cta: { label: 'Apply for Access', href: '/apply' },
     highlighted: false,
   },
   {
     name: 'Proposal Portal — Phase II',
-    price: '$1,999',
+    price: '$4,999',
     period: 'per proposal',
-    description: 'An exponentially bigger proposal for only $1,000 more — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs.',
+    description: 'An exponentially bigger proposal — SBIR/STTR Phase II, larger BAA topics, OTA prototypes, complex Grants.gov NOFOs. $4,999, or $3,999 when you already have a linked Phase I in your library.',
     features: [
       'Everything in Phase I tier',
       'Extended compliance matrix for longer-form proposals',
-      'Larger page-limit technical volumes (20-50+ pages)',
+      'Larger page-limit technical volumes (20–50+ pages)',
       'Commercialization plan auto-drafting with market analysis',
       'Subcontractor coordination across multiple collaborators',
       'Progress milestone planning with cost-basis breakdown',
       'Multi-round review with pink/red/gold team stages',
       'Extended post-submission analytics',
     ],
-    cta: { label: 'Requires Spotlight subscription', href: '/apply' },
+    cta: { label: 'Apply for Access', href: '/apply' },
     highlighted: false,
   },
 ];
@@ -93,7 +93,7 @@ const expertTiers: PricingTierProps[] = [
       'Additional time available at $500/hour based on availability',
       'Scheduled via your dashboard after acceptance',
     ],
-    cta: { label: 'Included with Spotlight', href: '/apply' },
+    cta: { label: 'Apply for Access', href: '/apply' },
     highlighted: false,
   },
   {
@@ -111,7 +111,7 @@ const expertTiers: PricingTierProps[] = [
       'Post-debrief win/loss analysis',
       'Purchase 1–10 hours per transaction',
     ],
-    cta: { label: 'Purchase Hours', href: '/apply' },
+    cta: { label: 'Apply for Access', href: '/apply' },
     highlighted: false,
   },
 ];
@@ -177,7 +177,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         subheadline={hero?.body ?? "We priced for small businesses, not enterprise. Every line item is a real cost tied to real expert time and real AI compute dedicated to you."}
         primaryCta={(hero?.metadata as { primary_cta?: { label: string; href: string } })?.primary_cta ?? { label: 'Apply Now', href: '/apply' }}
         secondaryCta={(hero?.metadata as { secondary_cta?: { label: string; href: string } })?.secondary_cta ?? { label: 'See How It Works', href: '/how-it-works' }}
-        note={(hero?.metadata as { note?: string })?.note ?? "$299/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
+        note={(hero?.metadata as { note?: string })?.note ?? "$499/month after acceptance. No free trial — serious applicants only. Cancel anytime."}
       />
 
       <ValueComparison
@@ -216,7 +216,7 @@ export default async function Page(props: { searchParams: Promise<Record<string,
         <SectionHeader
           eyebrow={expertHeader?.excerpt ?? "Expert Access"}
           title={expertHeader?.title ?? "Eric is available when you need him"}
-          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $299/mo. Monthly minutes included; additional time on demand."}
+          subtitle={(expertHeader?.metadata as { subtitle?: string })?.subtitle ?? "The expert who commands $500/hour reviews your pipeline as part of your $499/mo. Monthly minutes included; additional time on demand."}
         />
         <div className="mt-12 grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
           {resolvedExpertTiers.map((tier) => (
@@ -267,8 +267,8 @@ const faqs = [
     a: 'Phase I is for shorter-form proposals (typically 10-20 pages technical volume, <$250K funding). Phase II is for longer-form proposals (20-50+ pages, $1M+ funding, commercialization plans). If you\'re unsure which tier fits your opportunity, use your monthly Ask-the-Expert time to check.',
   },
   {
-    q: 'Phase II costs only $1,000 more than Phase I — what makes it worth it?',
-    a: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal (there is no upgrade credit between them) — so you get a large step up in scope for a small step up in price, and never a success fee taking a cut of your win.',
+    q: 'Why is Phase II $4,999 (or $3,999 with a linked Phase I)?',
+    a: 'A Phase II proposal is an exponentially bigger effort than Phase I — 20–50+ page technical volumes, a full commercialization plan, subcontractor coordination, and multi-round (pink/red/gold team) reviews, often for $1M+ in funding. We price the portal to the work we do, not to your award size. Phase I and Phase II are each purchased per proposal — and when you already have a linked Phase I with us, your Phase II is $3,999 instead of $4,999 because we reuse that prior work. Never a success fee taking a cut of your win.',
   },
   {
     q: 'What happens to my data if I cancel?',

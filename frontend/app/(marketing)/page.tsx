@@ -9,7 +9,7 @@ export const revalidate = 60;
 export const metadata = {
   title: 'RFP Pipeline — A Proposal Engine, Not a Proposal Gamble',
   description:
-    'Win non-dilutive federal R&D funding without burning a month of payroll on every submission. 25 years of hands-on expertise plus isolated, company-specific AI — replacing a $5,000/mo monitoring service and a 10%-of-award consultant for $299/mo and flat per-proposal fees.',
+    'Win non-dilutive federal R&D funding without burning a month of payroll on every submission. 25 years of hands-on expertise plus isolated, company-specific AI — replacing a $5,000/mo monitoring service and a 10%-of-award consultant for $499/mo and flat per-proposal fees.',
 };
 
 export default async function LandingPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -44,9 +44,9 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
   ];
 
   const DEFAULT_PRICING = [
-    { excerpt: 'Required · Monthly', title: 'Spotlight Subscription', body: 'Daily ingestion. AI-powered ranking against your profile. Expert-curated compliance matrix. Deadline alerts. 15 min of Ask-the-Expert each month (rolls over).', metadata: { price: '$299', period: '/mo', note: 'Required to purchase any portal' } },
-    { excerpt: 'Per-Proposal', title: 'Phase I — Like Effort', body: 'SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour curation by Expert. Stage-gated workspace. Custom AI drafting.', metadata: { price: '$999', period: 'per proposal' } },
-    { excerpt: 'Per-Proposal', title: 'Phase II — Like Effort', body: 'SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20-50+ page tech volumes. Commercialization plans included.', metadata: { price: '$1,999', period: 'per proposal' } },
+    { excerpt: 'Required · Monthly', title: 'Spotlight Subscription', body: 'Daily ingestion. AI-powered ranking against your profile. Expert-curated compliance matrix. Deadline alerts. 15 min of Ask-the-Expert each month (rolls over).', metadata: { price: '$499', period: '/mo', note: 'Required to purchase any portal · 3-month minimum' } },
+    { excerpt: 'Per-Proposal', title: 'Phase I — Like Effort', body: 'SBIR/STTR Phase I, smaller BAA topics, OTA/CSO short-form. 72-hour curation by Expert. Stage-gated workspace. Custom AI drafting.', metadata: { price: '$1,999', period: 'per proposal' } },
+    { excerpt: 'Per-Proposal', title: 'Phase II — Like Effort', body: 'SBIR/STTR Phase II, larger BAA, OTA prototypes, complex NOFOs. 20-50+ page tech volumes. Commercialization plans included. $3,999 with a linked Phase I in your library.', metadata: { price: '$4,999', period: 'per proposal' } },
   ];
 
   const resolvedStats = stats.length > 0 ? stats.map((s: ContentRow) => ({ title: s.title, body: s.body })) : DEFAULT_STATS;
@@ -62,7 +62,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             {hero?.excerpt ?? 'AI + Expert · From Application to Submission'}
           </p>
           <h1 className="font-display text-5xl md:text-7xl font-black text-navy-900 leading-[1.05]">
-            <RichText text={hero?.title ?? 'A proposal\nengine, *not* a\nproposal\ngamble.'} accent="brand-500" />
+            <RichText text={hero?.title ?? 'A proposal engine,\n*not* a proposal gamble.'} accent="brand-500" />
           </h1>
           <p className="mt-8 text-xl md:text-2xl text-navy-600 font-prose italic leading-relaxed max-w-2xl">
             {hero?.body ?? 'Win non-dilutive federal R&D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. (SBIR, STTR, BAA, OTA.)'}
@@ -82,7 +82,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             </Link>
           </div>
           <p className="mt-5 text-sm text-navy-400">
-            {(hero?.metadata as { note?: string })?.note ?? 'Platform launches July 2026. 20 founding-cohort seats. Applications reviewed weekly.'}
+            {(hero?.metadata as { note?: string })?.note ?? 'Platform launches August 2026. 20 founding-cohort seats. Applications reviewed weekly.'}
           </p>
         </div>
       </section>
@@ -117,7 +117,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
           <div className="md:pl-6">
             <p className="text-xs font-semibold text-brand-600 uppercase tracking-[0.3em] mb-2">{(valueBand?.metadata as { roiLabel?: string })?.roiLabel ?? 'The math'}</p>
             <p className="text-lg text-navy-700 leading-relaxed">
-              {(valueBand?.metadata as { roi?: string })?.roi ?? 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $299/mo and a flat $999 / $1,999 per proposal. No success fee.'}
+              {(valueBand?.metadata as { roi?: string })?.roi ?? 'Replaces a $5,000/mo monitoring service and a 10%-of-award consultant — for $499/mo and a flat $1,999 / $4,999 per proposal. No success fee.'}
             </p>
             <Link href="/pricing" className="inline-flex mt-3 text-sm font-semibold text-brand-600 hover:text-brand-800 transition-colors">See pricing &rarr;</Link>
           </div>
@@ -156,7 +156,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
             <RichText text={pricingHero?.title ?? 'One subscription.\nPer-proposal *portals*.'} accent="citrus" />
           </h2>
           <p className="mt-4 text-lg text-navy-300 font-prose italic max-w-2xl leading-relaxed">
-            {pricingHero?.body ?? 'Priced and built specifically for small businesses, not enterprise. Low cost subscription provides find and remind capabilities. Per proposal pricing ensures you only pay for builds you choose.'}
+            {pricingHero?.body ?? 'Built for small businesses, not enterprise — a low-cost subscription to find and track opportunities, plus per-proposal pricing so you only pay for the builds you choose.'}
           </p>
 
           <div className="mt-14 grid md:grid-cols-3 gap-6">
@@ -294,7 +294,7 @@ export default async function LandingPage(props: { searchParams: Promise<Record<
       <section className="bg-navy-900">
         <div className="max-w-4xl mx-auto px-6 py-24 text-center">
           <p className="text-xs font-semibold text-citrus uppercase tracking-[0.3em] mb-4">
-            {cta?.excerpt ?? 'Applications Open · Launch July 2026'}
+            {cta?.excerpt ?? 'Applications Open · Launch August 2026'}
           </p>
           <h2 className="font-display text-3xl md:text-5xl font-black text-white leading-tight">
             <RichText text={cta?.title ?? 'Apply today. Draft your *first*\nproposal on launch day.'} accent="citrus" />

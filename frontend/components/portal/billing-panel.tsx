@@ -194,7 +194,7 @@ export default function BillingPanel({
 
         {isActive && (
           <p className="text-sm text-gray-600 mb-4">
-            You have access to the curated RFP pipeline and AI scoring. $299/month.
+            You have access to the curated RFP pipeline and AI scoring. $499/month.
           </p>
         )}
 
@@ -206,7 +206,7 @@ export default function BillingPanel({
               disabled={isCheckoutPending}
               className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {isCheckoutPending ? 'Redirecting...' : 'Subscribe to Spotlight ($299/mo)'}
+              {isCheckoutPending ? 'Redirecting...' : 'Subscribe to Spotlight ($499/mo)'}
             </button>
           )}
 

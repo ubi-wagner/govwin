@@ -35,7 +35,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const g = await gate(tenantSlug, 'tenant_user');
     if ('error' in g) return g.error;
     const portals = await withTenant(g.tenantId, async (tx) =>
-      tx`SELECT id, opportunity_id, proposal_id, label, status, guardrail_config, launched_at, created_at
+      tx`SELECT id, opportunity_id, proposal_id, label, status, guardrail_config, launched_at,
+                paid_at, curation_due_at, created_at
          FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid ORDER BY created_at DESC`,
     );
     return NextResponse.json({ data: { portals } });

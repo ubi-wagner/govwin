@@ -43,7 +43,7 @@ export interface SiteChrome {
 export const DEFAULT_CHROME: SiteChrome = {
   banner: {
     tag: 'Now Accepting Applications',
-    text: 'Founding Cohort · Platform launches July 2026',
+    text: 'Founding Cohort · Platform launches August 2026',
     ctaLabel: 'Apply',
     ctaHref: '/apply',
   },
@@ -88,7 +88,7 @@ export const DEFAULT_CHROME: SiteChrome = {
           { label: 'About', href: '/about' },
           { label: 'Team', href: '/team' },
           { label: 'Track Record', href: '/customers' },
-          { label: 'Why RFP Pipeline', href: '/value' },
+          { label: 'Apply', href: '/apply' },
         ],
       },
       {

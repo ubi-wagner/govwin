@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Role } from '@/lib/rbac';
+import PurchaseModal from './purchase-modal';
 
 interface Card {
   id: string;
@@ -28,6 +29,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
+  const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                 <>
                   <span className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 font-medium">Pinned</span>
                   <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'DELETE')} className="text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded px-2 py-1">Unpin</button>
+                  <button onClick={() => setPurchaseCard(c)} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1">Purchase</button>
                 </>
               ) : (
                 <button disabled={busy === c.opportunityId} onClick={() => act(c.opportunityId, 'POST')} className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-3 py-1 disabled:opacity-50">
@@ -100,6 +103,20 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
           </div>
         ))}
       </div>
+
+      {purchaseCard && (
+        <PurchaseModal
+          tenantSlug={tenantSlug}
+          opportunityId={purchaseCard.opportunityId}
+          title={str(purchaseCard, 'title') ?? 'Untitled opportunity'}
+          onClose={() => setPurchaseCard(null)}
+          onPurchased={() => {
+            const opp = purchaseCard.opportunityId;
+            setPurchaseCard(null);
+            window.location.assign(`/portal/${tenantSlug}/portals?opp=${opp}`);
+          }}
+        />
+      )}
     </div>
   );
 }

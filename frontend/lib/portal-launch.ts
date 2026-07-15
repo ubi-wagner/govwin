@@ -102,6 +102,30 @@ export async function acceptGuardrails(
   });
 }
 
+/**
+ * RFP expert RELEASES a purchased workspace: curation_pending → launched.
+ * The customer bought the workspace (it opened in curation_pending with the 72h
+ * SLA); after the admin finishes the skeleton curation this flips it live so the
+ * caller can provision the proposal + unlock it for the customer to build. CAS on
+ * status='curation_pending' so a double-release / wrong-state is a no-op.
+ */
+export async function releaseFromCuration(
+  tenantId: string,
+  portalId: string,
+  guardrailConfig: unknown,
+  opts: { releasedBy?: string | null } = {},
+): Promise<{ released: boolean }> {
+  return withTenant(tenantId, async (tx) => {
+    const updated = await tx<Array<{ id: string }>>`
+      UPDATE proposal_portals
+      SET guardrail_config = ${jsonParam(guardrailConfig)}, status = 'launched', launched_at = now()
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid AND status = 'curation_pending'
+      RETURNING id
+    `;
+    return { released: updated.length > 0 };
+  });
+}
+
 /** Customer revokes shadow-admin access (stop us seeing their material). Reversible via re-invite. */
 export async function revokeShadowAdmin(tenantId: string, portalId: string, revokedBy: string | null): Promise<{ revoked: number }> {
   return withTenant(tenantId, async (tx) => {
