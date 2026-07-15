@@ -180,6 +180,12 @@ class AgentFabric:
     # Event routing
     # ------------------------------------------------------------------
 
+    def has_handler(self, event_type: str) -> bool:
+        """True if any registered archetype declares it handles this event type.
+        Lets the workflow processor cheaply skip fabric dispatch (and its
+        observability events) for the events no archetype wants."""
+        return any(a.handles_event(event_type) for a in self._archetypes.values())
+
     async def handle_event(self, conn, event: dict) -> dict:
         """Route an event to the appropriate agent archetype.
 
