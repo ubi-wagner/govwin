@@ -3,6 +3,16 @@
 **Generated:** 2026-05-21
 **Source:** All migrations in `db/migrations/` and `services/cms/db/`
 
+> **⚠ PARTIAL / STALE — this table dump was generated around migration ~050 (2026-05-21); high-water is now `108`.**
+> It is surgically maintained for the customer purchase + portal spine: `promo_codes`, `proposal_portals`,
+> `shadow_admin_grants`, and the `curated_solicitations.spotlight_summary` / `purchases.promo_code` columns are
+> current below. It does **NOT** yet include the many tables added by migrations 043+/086+ — the opportunity-card
+> spine (`opportunity_bridge`, `tenant_opportunity_cards`, `tenant_spotlight_buckets`, `tenant_bucket_scores`),
+> the unified library (`library_atoms`, `atom_tags`/`atom_members`/`atom_lineage`, `taxonomy_terms`,
+> `document_cocoons`), plus `contracts`, `tasks`, `content_pages`, `process_instances`, `proposal_artifacts`, etc.
+> For those, see `CLAUDE_CLIFFNOTES.md` §1b/§1c + its 2026-07-15 delta, and `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+> **This doc needs a full regeneration** (flagged in the maintenance changelog).
+
 ---
 
 ## Main Postgres Database (govtech_intel)
@@ -321,6 +331,7 @@ RLS enabled.
 | solicitation_number | TEXT | |
 | round_number | INTEGER | |
 | round_label | TEXT | |
+| spotlight_summary | TEXT | (mig 107 — admin first-pass matching blurb; required before push, folded into the fan-out card) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
@@ -579,6 +590,22 @@ RLS enabled.
 
 RLS enabled.
 
+### promo_codes
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK, DEFAULT gen_random_uuid() |
+| code | TEXT | NOT NULL, UNIQUE (+ UNIQUE INDEX on lower(code) for case-insensitive lookup) |
+| kind | TEXT | NOT NULL, DEFAULT 'comp', CHECK IN ('comp','percent','amount') |
+| value | INTEGER | NOT NULL, DEFAULT 0 (percent 0-100 or amount_cents; ignored when kind='comp') |
+| active | BOOLEAN | NOT NULL, DEFAULT true |
+| max_uses | INTEGER | (NULL = unlimited) |
+| used_count | INTEGER | NOT NULL, DEFAULT 0 |
+| expires_at | TIMESTAMPTZ | |
+| note | TEXT | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+Added in migration 105. Seeded with comp code `rfppipelinetest` (kind=comp → 100% off, bypasses Stripe, marks the purchase paid).
+
 ### proposal_collaborators
 | Column | Type | Constraints |
 |--------|------|-------------|
@@ -619,6 +646,27 @@ RLS enabled.
 | notes | TEXT | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+
+### proposal_portals
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK, DEFAULT gen_random_uuid() |
+| tenant_id | UUID | NOT NULL, FK tenants(id) |
+| opportunity_id | UUID | NOT NULL (card link — SOFT ref, shard-safe; no FK) |
+| proposal_id | UUID | FK proposals(id) |
+| label | TEXT | NOT NULL, DEFAULT 'primary' (disambiguates multi-proposal per opp) |
+| status | TEXT | NOT NULL, DEFAULT 'guardrails_pending', CHECK IN ('guardrails_pending','curation_pending','launched','executing','closeout','archived','abandoned') |
+| guardrail_config | JSONB | NOT NULL, DEFAULT '{}' (frozen at accept-launch) |
+| current_stage_index | INT | NOT NULL, DEFAULT 0 (mig 098) |
+| paid_at | TIMESTAMPTZ | (mig 105) |
+| curation_due_at | TIMESTAMPTZ | (mig 105 — 72h curation SLA timer) |
+| launched_at | TIMESTAMPTZ | |
+| created_by | UUID | FK users(id) |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| | | UNIQUE(tenant_id, opportunity_id, label) |
+
+Added in migration 097 (`curation_pending` status + `paid_at`/`curation_due_at` added in 105; `current_stage_index` in 098). RLS ENABLE + FORCE (`tenant_isolation` policy on the `app.tenant_id` GUC).
 
 ### proposal_reviews
 | Column | Type | Constraints |
@@ -696,6 +744,7 @@ RLS enabled.
 | amount_cents | INT | NOT NULL |
 | status | TEXT | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','completed','failed','refunded') |
 | metadata | JSONB | DEFAULT '{}' |
+| promo_code | TEXT | (mig 105 — provenance for a comp/discount purchase; FK-free ref to promo_codes.code) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
 ### rate_limit_state
@@ -825,6 +874,23 @@ RLS enabled.
 | session_token | TEXT | UNIQUE, NOT NULL |
 | user_id | UUID | NOT NULL, FK users(id) ON DELETE CASCADE |
 | expires | TIMESTAMPTZ | NOT NULL |
+
+### shadow_admin_grants
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | UUID | PK, DEFAULT gen_random_uuid() |
+| tenant_id | UUID | NOT NULL, FK tenants(id) |
+| portal_id | UUID | NOT NULL, FK proposal_portals(id) ON DELETE CASCADE |
+| admin_user_id | UUID | FK users(id) (NULL = role-based grant) |
+| admin_email | TEXT | |
+| source | TEXT | NOT NULL, CHECK IN ('t_and_c','invite') |
+| active | BOOLEAN | NOT NULL, DEFAULT true |
+| granted_by | UUID | FK users(id) |
+| granted_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
+| revoked_by | UUID | FK users(id) |
+| revoked_at | TIMESTAMPTZ | |
+
+Added in migration 097 — portal-scoped, T&C-at-purchase, customer-revocable admin access; the scoped replacement for `verifyTenantAccess`'s admin god-view (⚠ not yet enforced — the god-view still stands; see `CLAUDE_CLIFFNOTES.md` 2026-07-15 delta). RLS ENABLE + FORCE.
 
 ### solicitation_annotations
 | Column | Type | Constraints |

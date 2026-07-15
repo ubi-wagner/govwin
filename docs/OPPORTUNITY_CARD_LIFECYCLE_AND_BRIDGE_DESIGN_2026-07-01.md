@@ -1,5 +1,17 @@
 # Opportunity Card — Lifecycle, Forward-Only Bridge, and Per-Tenant Pipeline (2026-07-01)
 
+> **Status (updated 2026-07-15): this design is now largely AS-BUILT — read it as the origin design,
+> not current truth.** Shipped: **`opportunity_bridge`** + **`tenant_opportunity_cards`** +
+> `tenant_bridge_cursor` (mig 094), `pinned_docs` (095), **`tenant_spotlight_buckets`** +
+> **`tenant_bucket_scores`** (096, replacing the fixed-5), and the `submission_stage` lifecycle (100).
+> **Open-decision #1 was resolved toward the *new sibling table*:** the as-built chose a fresh
+> **`tenant_opportunity_cards`** (NOT evolving `tenant_pipeline_items` in place) — `tenant_pipeline_items`
+> is now **RETIRED** off the customer path. The **canonical design of record** that folds this doc in and
+> tracks it to the as-built (migrations 001→108) is **[`MASTER_MIRROR_OPP_DESIGN.md`](MASTER_MIRROR_OPP_DESIGN.md)**;
+> see also `ARCHITECTURE_V10.md` §2–3. Where this doc says "the design will…" for the items above, read
+> "shipped." The still-⚠-future items (buyer/outcome ledger, sbir.gov outcome scrape, proposal-ready
+> nudge) are tracked in MASTER_MIRROR §7 / its gap register.
+
 Runs the "opportunity card carries all information (visible or not)" concept through the
 entire process: admin ingest → review gate → matrix → **approve** → **forward-only bridge
 post** → per-tenant **thin-copy** replication → **on-demand bucket ranking** → new-customer
@@ -181,6 +193,13 @@ outside tenant RLS (admin-owned, forward-only).
 ---
 
 ## Open decisions (yours)
+
+> **Resolved as-built (2026-07-15):** #1 → **new `tenant_opportunity_cards`** (tpi retired, not evolved).
+> #4 → **structured facets shipped** (`tenant_spotlight_buckets.criteria` jsonb); embedding-similarity is a
+> default-off later increment (the `embedding vector(1536)` column exists on `library_atoms`). #5 →
+> shipped in that order (bridge + cards + fan-out in mig 094; per-tenant buckets in 096; `backfillTenant`
+> is a manual admin route). #2/#3 remain product calls. Full as-built map: `MASTER_MIRROR_OPP_DESIGN.md`.
+
 1. **Evolve `tenant_pipeline_items` in place** (add snapshot + cursor) **or** new
    `tenant_opportunity_cards` beside it (keep tpi as the pursuit/pin overlay)?
 2. **Backfill scale:** replay-the-bridge per new tenant is O(cards). Fine at hundreds–thousands;

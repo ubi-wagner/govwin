@@ -142,6 +142,12 @@ All admin routes require `master_admin` or `rfp_admin` role unless noted otherwi
 | DELETE | `/api/admin/content` | rfp_admin+ | Delete content by slug | 200, 401, 403, 404, 500 |
 | POST | `/api/admin/content/generate` | rfp_admin+ | Auto-generate content metadata from URL (uses Claude) | 200, 401, 403, 422, 500 |
 
+#### Site Postings
+
+| Method | Path | Auth | Description | Status Codes |
+|--------|------|------|-------------|--------------|
+| POST | `/api/admin/site/docs/[type]/[slug]/status` | rfp_admin+ | Archive (retire) or restore a published posting (`type` in `blog_post`, `resource`, `guide`, `testimonial`, `team_member`). Body: `{ action: 'archive' \| 'restore' }`. Revalidates the public list path and emits `system:content.document_archived` / `content.document_restored`. | 200, 400, 401, 403, 409, 500 |
+
 #### Storage
 
 | Method | Path | Auth | Description | Status Codes |
@@ -159,6 +165,8 @@ All admin routes require `master_admin` or `rfp_admin` role unless noted otherwi
 ### Portal Routes
 
 All portal routes are under `/api/portal/[tenantSlug]/`. They require authentication and verify tenant access (actor's tenantSlug must match URL param; master_admin and rfp_admin bypass this).
+
+> **Card-spine note (2026-07-15):** the canonical customer surface is now the opportunity-card spine — the workspace **Purchase -> curation -> release** flow (`/purchase`, `/portals/[portalId]`, documented under "Purchase & Workspace Portals" below) drafted from `/cards`. The **Opportunities** and **Spotlights** sections further down predate it and read the **retired** `tenant_pipeline_items` surface (see CLAUDE.md / ARCHITECTURE_V10.md); treat them as legacy pending a fuller rewrite.
 
 #### Dashboard
 
@@ -269,6 +277,18 @@ All portal routes are under `/api/portal/[tenantSlug]/`. They require authentica
 | GET | `/api/portal/[tenantSlug]/profile` | tenant_user+ | Get tenant profile | 200, 401, 403, 404, 500 |
 | PATCH | `/api/portal/[tenantSlug]/profile` | tenant_admin+ | Update tenant profile | 200, 401, 403, 404, 422, 500 |
 | GET | `/api/portal/[tenantSlug]/purchases` | tenant_admin+ | Tenant purchase history | 200, 401, 403, 404, 500 |
+
+#### Purchase & Workspace Portals
+
+| Method | Path | Auth | Description | Status Codes |
+|--------|------|------|-------------|--------------|
+| POST | `/api/portal/[tenantSlug]/purchase` | tenant_admin+ | Buy a proposal workspace for a pinned opportunity. Body: `{ opportunityId, promoCode, label? }`. A `comp` promo code records a completed $0 purchase, opens the portal in `curation_pending` with a 72h SLA, grants the T&C shadow-admin, and emits `capture:purchase.completed`. Percent/amount codes + real Stripe checkout are out of scope here (the modal still offers the Stripe redirect). | 200, 400, 401, 403, 404, 409, 500 |
+| GET | `/api/portal/[tenantSlug]/portals/[portalId]` | tenant_user+ | Portal detail + shadow-admin grants | 200, 401, 403, 404, 500 |
+| POST | `/api/portal/[tenantSlug]/portals/[portalId]?action=accept` | tenant_admin+ | Accept guardrail config -> launch the workspace (provision build + instantiate ToDos). Body: `{ guardrailConfig, revokeShadow? }` | 200, 400, 401, 403, 409, 422, 500 |
+| POST | `/api/portal/[tenantSlug]/portals/[portalId]?action=release` | rfp_admin (expert, via global tenant access) | Release a purchased workspace from curation (`curation_pending -> launched`): `releaseFromCuration` + provision the build unlocked + instantiate ToDos, then emit `capture:workspace.released`. Body: `{ guardrailConfig? }` | 200, 400, 401, 403, 409, 422, 500 |
+| POST | `/api/portal/[tenantSlug]/portals/[portalId]?action=advance-stage` | tenant_admin+ | Advance the portal workflow stage. Body: `{ force? }` | 200, 401, 403, 404, 409, 500 |
+| POST | `/api/portal/[tenantSlug]/portals/[portalId]?action=revoke-shadow` | tenant_admin+ | Revoke the shadow-admin (expert) grant | 200, 401, 403, 500 |
+| PATCH | `/api/portal/[tenantSlug]/portals/[portalId]` | tenant_admin+ | Set portal status (`executing`, `closeout`, `archived`, ...) | 200, 400, 401, 403, 500 |
 
 #### Notifications
 

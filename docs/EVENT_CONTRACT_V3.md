@@ -316,6 +316,14 @@ event namespaces — keep that distinction; do not emit events under them.)
 
 The full as-built **event** catalog is EVENT_CONTRACT_V2.md §2.
 
+**New event types this cycle (2026-07-15), catalogued in EVENT_CONTRACT_V2.md §2:**
+`capture:purchase.completed` (comp-code purchase — now consumed via mig 106 `notify_admin`),
+`capture:workspace.released` (RFP-expert release-from-curation), `capture:tenant.cards_backfilled`
+(signup card mirror), `proposal:proposal.ready_for_customer` (proposal handed back for customer
+input), `finder:solicitation.pushed` (curation push fan-out), and
+`system:content.document_archived` / `system:content.document_restored` (postings retire/restore,
+start/end). All obey the binding namespace list above.
+
 ---
 
 ## 10. As-Built Reality (VERIFIED 2026-05-31 — five-track audit)

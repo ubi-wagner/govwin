@@ -9,6 +9,8 @@ scoped, and controlled across the RFP Pipeline platform. It covers
 cost optimization, security guardrails, the prompt architecture,
 and the specific agent archetypes at each layer.
 
+> **⚠ Superseded in part (as-built 2026-07-15).** This is the original pre-implementation design. The as-built agent system is documented in `docs/AGENT_FRAMEWORK.md` (source of truth: `pipeline/src/agents/`) — 10 archetypes are registered in `fabric.py` under the names Section Drafter / Compliance Reviewer / Color Team Reviewer / Opportunity Analyst / Scoring Strategist / Capture Strategist / Proposal Architect / Librarian / Partner Coordinator / Packaging Specialist (not the "Review Agent / Compliance Checker / Color Team Simulator" names used below). Current wiring: **Section Drafter is wired** (the V0-strawman `draft_v0` on proposal creation + the `ai/draft` route); **Compliance Reviewer is partial** (runs inline in the Next `ai/compliance` route, not the fabric archetype); **Color Team Reviewer** runs only via the advance-path `agent_task_queue`; the rest are ⚠ future (registered-but-dormant or unbuilt). The cost/status tables below are design estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+
 ---
 
 ## 1. Agent Layers
@@ -61,7 +63,7 @@ graph TB
 - **Data access:** `customers/{tenant}/proposals/{propId}/rfp-snapshot/` + customer library
 - **Cost model:** per-action, tracked per proposal in `agent_task_log`
 - **Who pays:** included in portal fee ($999/$1,999)
-- **Current status:** ALL PLANNED
+- **Current status:** Section Drafter WIRED (`section_drafter`); Compliance Reviewer PARTIAL (inline in the Next `ai/compliance` route); Color Team Reviewer runs via the advance `agent_task_queue`; others ⚠ future (dormant)
 
 ---
 

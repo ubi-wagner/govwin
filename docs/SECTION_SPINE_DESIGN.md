@@ -6,6 +6,17 @@ spine** — one keyed record (`proposal_id, section_id`) that carries all its me
 template → placement → fill → accept → lock, visible-or-not, and every stage reads that same
 self-describing record instead of re-deriving it.
 
+> **Status (updated 2026-07-15) — the atom substrate has since shipped; section-meta / canvas / multi-accept
+> remain ⚠ future.** Two grounding points moved since this doc was written: (1) the **unified library
+> shipped as `library_atoms`** (migs 101/102 — primitive/group/reference grains, one `taxonomy_terms`
+> taxonomy, visibility/provenance/lineage), so §3's `library_units`/`library_unit_shares` framing is
+> **superseded** and the pre-vector **`selectForSection`** selector now lives in
+> **`frontend/lib/atoms.ts`** (see `ARCHITECTURE_V10.md` §5). (2) The "section is a spine like the
+> opportunity card" analogy now points at the **as-built** opp card — the **master + mirror one-way
+> bridge** → `tenant_opportunity_cards` (`ARCHITECTURE_V10.md` §2; canonical flow in
+> `docs/MASTER_MIRROR_OPP_DESIGN.md`). The **section**-meta record (S1–S3), canvas dual-mode (T-C), and
+> multi-accept (T-D) described below remain **forward-looking design**, not yet built.
+
 ```
  TEMPLATE            SECTION INSTANCE            CANVAS                ATOMS                COLLAB
  (mold blueprint) →  (self-contained meta)  →   (WYSIWYG surface) ←   (meta-tagged fill) → (edit→accept→lock)

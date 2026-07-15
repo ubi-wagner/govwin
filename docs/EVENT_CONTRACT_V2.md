@@ -2,6 +2,7 @@
 
 **Generated:** 2026-05-21
 **Source:** Actual codebase analysis of all emitEvent* calls, automation_rules seeds, and the CMS event_listener
+**Updated:** 2026-07-15 — added the purchase→curation/release + postings-lifecycle event types and the migration 106 automation rule (marked rows below). **Not superseded by EVENT_CONTRACT_V3.md:** V3 governs how work is composed/executed; this doc remains the authoritative as-built event **catalog** (what is emitted).
 
 ---
 
@@ -33,6 +34,7 @@ All event types discovered from actual `emitEventSingle`, `emitEventStart`, `emi
 |------------|-------|------------|----------------|
 | `rfp.uploaded` | start/end | `frontend/app/api/admin/rfp-upload/route.ts` | solicitationId, fileCount -> documentIds, topicsExtracted |
 | `solicitation.triaged` | single | `frontend/app/api/admin/rfp-curation/[solId]/triage/route.ts` | solicitationId, action, fromStatus, toStatus |
+| `solicitation.pushed` | single | `frontend/lib/tools/solicitation-push.ts` (the `solicitation.push` tool) | correlationId, solicitationId, opportunityId, namespace, topicCount |
 | `annotation.saved` | single | `frontend/app/api/admin/rfp-curation/[solId]/annotations/route.ts` | solicitationId, annotationId, kind |
 | `compliance_value.saved` | single | `frontend/app/api/admin/rfp-curation/[solId]/compliance/route.ts` | solicitationId, variableName |
 | `compliance.topic_override_saved` | single | `frontend/app/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance/route.ts` | solicitationId, topicId |
@@ -63,12 +65,14 @@ All event types discovered from actual `emitEventSingle`, `emitEventStart`, `emi
 |------------|-------|------------|----------------|
 | `application.submitted` | single | `frontend/app/api/applications/route.ts` | email, companyName |
 | `application.accepted` | start/end | `frontend/app/api/admin/applications/[id]/accept/route.ts` | applicationId -> tenantId, userId |
+| `tenant.cards_backfilled` | single | `frontend/app/api/admin/applications/[id]/accept/route.ts` | tenantId, tenantSlug, cardsBackfilled — signup opportunity-card mirror (backfills `/cards`) |
 | `application.rejected` | single | `frontend/app/api/admin/applications/[id]/reject/route.ts` | applicationId, reason |
 | `application.status_changed` | single | `frontend/app/api/admin/applications/[id]/status/route.ts` | applicationId, status |
 | `subscription.started` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId, productType |
 | `subscription.renewed` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId |
 | `subscription.canceled` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId |
-| `purchase.completed` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId, proposalId, productType |
+| `purchase.completed` | single | `frontend/app/api/stripe/webhook/route.ts` (Stripe), `frontend/app/api/portal/[tenantSlug]/purchase/route.ts` (comp-code) | correlationId, productType, opportunityId, portalId?, promoCode?, comp? — **now has a consumer (mig 106 notify_admin)** |
+| `workspace.released` | single | `frontend/app/api/portal/[tenantSlug]/portals/[portalId]/route.ts` (`?action=release`) | correlationId, portalId, proposalId — RFP expert released a purchased workspace from curation |
 | `checkout.started` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId |
 | `consulting.purchased` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId, amount |
 | `billing.portal_opened` | single | `frontend/app/api/stripe/webhook/route.ts` | tenantId |
@@ -96,6 +100,7 @@ All event types discovered from actual `emitEventSingle`, `emitEventStart`, `emi
 | `proposal.stage_advanced` | single | Portal routes | proposalId, fromStage, toStage |
 | `proposal.locked` | single | Portal routes | proposalId |
 | `proposal.unlocked` | single | Portal routes | proposalId |
+| `proposal.ready_for_customer` | single | `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts` (proposal handed back for customer input) | proposalId, tenantSlug |
 | `proposal.review_requested` | single | Portal routes | proposalId |
 | `proposal.draft_requested` | single | Portal routes | proposalId |
 | `proposal.collaborator_invited` | single | Portal routes | proposalId, email |
@@ -125,6 +130,8 @@ All event types discovered from actual `emitEventSingle`, `emitEventStart`, `emi
 | `content.published` | single | `frontend/app/api/admin/content/route.ts` | contentId |
 | `content.updated` | single | `frontend/app/api/admin/content/route.ts` | contentId |
 | `content.deleted` | single | `frontend/app/api/admin/content/route.ts` | contentId |
+| `content.document_archived` | start/end | `frontend/app/api/admin/site/docs/[type]/[slug]/status/route.ts` (`{action:'archive'}`) | slug, contentType, action — posting retired |
+| `content.document_restored` | start/end | `frontend/app/api/admin/site/docs/[type]/[slug]/status/route.ts` (`{action:'restore'}`) | slug, contentType, action — posting restored |
 | `sbir_data.ingested` | single | `frontend/app/api/admin/storage/route.ts` (auto-ingest on S3 upload) | key, companiesInserted |
 | `notification.requested` | single | Pipeline workflow processor (NOTIFY step) | template, channel, to_role, tenant_id, user_id |
 | `workflow.step_completed` | single | `pipeline/src/workflows/processor.py` | workflow_name, step_name |
@@ -365,6 +372,12 @@ The CMS event_listener (`services/cms/src/event_listener.py`) polls `system_even
       status: 'success' | 'failed' | 'skipped'
 ```
 
+> **Transport correction (2026-07-15):** the `pg_notify(...)` calls shown in step 1 are **not
+> consumed by any code** — a NOTIFY trigger is defined in schema but there is no
+> `add_listener`/LISTEN anywhere in the platform. Every consumer **polls** `system_events`
+> (CMS listener + pipeline processor, ~10s). The emission side (INSERT into `system_events`)
+> is accurate; the pg_notify propagation is not. See EVENT_CONTRACT_V3.md §2.3.
+
 ### Error handling at each step
 
 | Step | Error Behavior |
@@ -422,6 +435,14 @@ No new automation_rules seeds (schema reconciliation only).
 | Auto-todo on source change | `finder` | `source.change_detected` | `create_todo` | `{"title_template": "Review scout changes: {source_name}", "todo_type": "curation", "priority": "medium"}` |
 | Publish CMS content to site | `system` | `content_pipeline.post.publish` | `publish_content` | `{"content_type": "blog_post"}` |
 
+### From migration 106 (purchase_curation_notification)
+
+| Name | Trigger Namespace | Trigger Type | Action Type | Config |
+|------|-------------------|--------------|-------------|--------|
+| Purchase needs curation | `capture` | `purchase.completed` | `notify_admin` | `{"subject": "New purchase -- proposal workspace needs curation", "template": "admin_notification", "include_payload": true}` |
+
+Closes the "silent purchase" gap: a comp-code (or Stripe) purchase now alerts the RFP admin that a workspace needs expert curation + release. Idempotent via `ON CONFLICT (name)`. Consumed by the CMS `event_listener.py` (`notify_admin` -> email to `ADMIN_NOTIFICATION_EMAIL`). The customer-side "workspace ready" email is already covered by the mig 028 `proposal:proposal.created` rule that fires when release provisions the proposal.
+
 ### Complete active rules summary
 
 | # | Name | Trigger | Action | Purpose |
@@ -439,5 +460,6 @@ No new automation_rules seeds (schema reconciliation only).
 | 11 | Social distribute on publish | system:content.published | distribute_social | Post to LinkedIn on CMS publish |
 | 12 | Auto-todo on source change | finder:source.change_detected | create_todo | Create curation task on scout changes |
 | 13 | Publish CMS content to site | system:content_pipeline.post.publish | publish_content | Push CMS posts to main DB cms_content |
+| 14 | Purchase needs curation | capture:purchase.completed | notify_admin | Alert admin a purchased workspace needs curation + release (mig 106) |
 
 **Note:** Rules from 019 use `identity` namespace for application events while rules from 028/040 use `capture` namespace. Both sets are active (ON CONFLICT name DO NOTHING prevents duplicates). The event_listener matches against actual events emitted, so the effective trigger depends on which namespace the frontend actually uses when emitting. Currently, `application.submitted` is emitted under `capture` namespace, making the 019 rule (identity:application.submitted) a no-op while the 040 rule (capture:application.submitted) fires.

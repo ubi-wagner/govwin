@@ -21,8 +21,9 @@ Workflows are declarative job templates defined as Python classes in `pipeline/s
 | Type | Behavior |
 |---|---|
 | `ACTION` | Calls a Python function via dotted import path |
-| `AI_INVOKE` | Calls an AI tool action (falls back to ACTION resolution in V1) |
-| `HITL_WAIT` | Logs and skips in V1 (no process_instances table yet) |
+| `AI_INVOKE` | Calls an AI tool action via `AgentFabric.invoke_agent` (falls back to ACTION resolution) |
+| `HITL_WAIT` | Parks the instance on a human gate, persisted in `process_instances` (mig 088); resumes on the `wait_for` event |
+| `TODO` | A HITL_WAIT that also writes a row to the unified `tasks` ledger (assignee, nudge cadence, entity ref); resumes on task completion or the `wait_for` event |
 | `NOTIFY` | Emits a `system:notification.requested` event for CRM delivery |
 | `CONDITION` | Evaluates a callable; skips downstream if false |
 | `API_CALL` | Not implemented in V1; skips |
@@ -36,6 +37,7 @@ Workflows are declarative job templates defined as Python classes in `pipeline/s
 - On step failure: logs error, continues to next step (does not abort the workflow)
 - On DB connection loss: attempts reconnect
 - Emits `system:workflow.step_completed`, `system:workflow.step_failed`, and `system:workflow.completed` events
+- **Durable instances (mig 088):** HITL_WAIT/TODO gates are no longer skipped — they persist as `process_instances` rows (which carry `opportunity_id` + `scope` ∈ opp/spotlight/project/contract, the spine discriminator) and are parked/resumed by the managed-instance layer (`manager.py`). A separate consumer (`AgentFabric.process_task_queue`, ~20s poll) drives `agent_task_queue` rows keyed on `agent_role`.
 
 **Input resolution** supports dot-notation paths:
 
@@ -77,6 +79,8 @@ Workflows are declarative job templates defined as Python classes in `pipeline/s
 **File:** `pipeline/src/workflows/on_solicitation_pushed.py`
 **Trigger:** `finder:solicitation.pushed:single` (no condition)
 **Description:** Notify subscribed customers when new RFP hits Spotlight
+
+> ⚠ Legacy surface: `find_matching_tenants` still upserts `tenant_pipeline_items` (see step 1), but that Spotlight/Pipeline surface is retired in favor of the opportunity-card spine (`opportunity_bridge` → `tenant_opportunity_cards`, auto-scored on arrival). The scoring→cards migration of this workflow is tracked separately — see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
 
 | # | Step | Type | Action | Timeout | Retry | Depends On |
 |---|---|---|---|---|---|---|
@@ -159,56 +163,75 @@ Workflows are declarative job templates defined as Python classes in `pipeline/s
 ### Workflow: OnProposalCreated
 
 **File:** `pipeline/src/workflows/on_proposal_created.py`
-**Trigger:** `proposal:proposal.created:end` (condition: `payload.error is None`)
-**Description:** AI-draft proposal sections and notify customer
+**Trigger:** `proposal:proposal.created:end` (condition: `payload.proposalId` present)
+**Description:** AI-draft the V0 strawman for every empty section, then notify the RFP admin for review
+
+> Part of the opportunity→purchase→proposal flow — see `docs/MASTER_MIRROR_OPP_DESIGN.md` for the canonical spine (purchase → 72h curation gate → release → provision → this workflow).
 
 | # | Step | Type | Action | Timeout | Retry | Depends On |
 |---|---|---|---|---|---|---|
-| 1 | `draft_sections` | AI_INVOKE | `tool.proposal.draft_all_sections` | 15 min | 1x | -- |
-| 2 | `notify_customer` | NOTIFY | `system.notify` | 30 min | 0 | draft_sections |
+| 1 | `draft_sections` | ACTION | `workflows.actions.draft_v0.draft_v0` | 15 min | 0 | -- |
+| 2 | `notify_admin_review` | NOTIFY | `system.notify` | 30 min | 0 | draft_sections |
 
 **Step details:**
 
-1. **draft_sections** -- Invokes the AI tool to draft all empty proposal sections using library content and RFP context. In V1, AI_INVOKE attempts to resolve the action as a Python callable; if not found locally, the step is skipped with reason `"ai_invoke_v1"`.
+1. **draft_sections** -- Runs the 3-source V0 strawman (`draft_v0`). For every section still `empty`/`ai_drafted`, it drafts from the RFP excerpt + tenant library atoms + tenant profile via the `section_drafter` archetype, converts markdown→canvas, and lands each through `publish_section_draft` (whose empty/ai_drafted gate is the safe way to cross the advisory boundary — human-owned sections are never clobbered). Per-section try/except (one bad section never aborts the rest); idempotent (re-drafts only still-empty sections); **safe-skips with no DB write if the fabric / `ANTHROPIC_API_KEY` is unavailable**. Emits `proposal:v0_completed`.
 
-2. **notify_customer** -- Emits notification with template `proposal_workspace_ready`.
+2. **notify_admin_review** -- Emits notification with template `admin_proposal_review_required`. The proposal is created locked for admin review; the customer sees it only after release.
 
 ---
 
-### Workflow: OnProposalAdvancedToPinkTeam
+### Workflow: ProjectCollaboration (canonical HITL reaction)
+
+**File:** `pipeline/src/workflows/project_collaboration.py`
+**Trigger:** `proposal:project.collaboration_requested:single` (condition: overlay names a `proposalId` or `opportunityId`)
+**Description:** The ONE generic, overlay-parameterized human-gate template — reuse it instead of writing another bespoke `On<Event>` class
+
+> Part of the opportunity→purchase→proposal flow — see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+
+Launched on demand via `launchProjectCollaboration` (`frontend/lib/process/project-collaboration.ts`); the comp-code purchase route fires it to open the 72h `proposal_setup` curation ToDo (`assignee_role='rfp_admin'`, `nudgeDays=[1,3]`, `dueMinutes=CURATION_SLA_HOURS*60`). It reads `scope` (opp/spotlight/project/contract) from the overlay and writes `process_instances.opportunity_id`/`scope` (mig 088), parks **one** `tasks` gate, then notifies on completion. It READS `proposals.stage` for context but NEVER writes it (`advanceProposalStage` stays the sole authority).
+
+| # | Step | Type | Action | Notes |
+|---|---|---|---|---|
+| 1 | `collaborate` | TODO | `todo` | Parks one payload-parameterized `tasks` row (assignee_role, task_type, entity_ref, nudge cadence, due); resumes on task completion |
+| 2 | `notify_done` | NOTIFY | `system.notify` | Emits the completion email if `completeTemplate` is set (degrades to a no-op otherwise) |
+
+---
+
+### Workflow: OnProposalAdvancedToReview
 
 **File:** `pipeline/src/workflows/on_proposal_advanced.py`
-**Trigger:** `proposal:proposal.advanced:single` (condition: `payload.toStage == 'pink_team'`)
-**Description:** Run AI compliance review when proposal enters pink team
+**Trigger:** `proposal:proposal.advanced:end` (condition: `payload.targetStage == 'review'`)
+**Description:** Run AI compliance review and park a customer review gate when a proposal enters the review stage
 
 | # | Step | Type | Action | Timeout | Retry | Depends On |
 |---|---|---|---|---|---|---|
 | 1 | `ai_compliance_review` | AI_INVOKE | `tool.proposal.check_compliance` | 10 min | 0 | -- |
 | 2 | `notify_reviewers` | NOTIFY | `system.notify` | 30 min | 0 | ai_compliance_review |
-| 3 | `wait_for_review` | HITL_WAIT | `hitl_wait` | 4320 min (72h) | 0 | notify_reviewers |
+| 3 | `wait_for_review` | TODO | `todo` | 4320 min (72h) | 0 | notify_reviewers |
 
 **Step details:**
 
-1. **ai_compliance_review** -- Invokes AI compliance check tool. Skipped in V1 if tool not resolvable locally.
-2. **notify_reviewers** -- Emits notification with template `pink_team_review_ready`.
-3. **wait_for_review** -- Waits for `proposal:proposal.advanced:single` where `fromStage == 'pink_team'`. On timeout (72h), would send review reminder. Skipped in V1.
+1. **ai_compliance_review** -- Invokes the AI compliance-check tool (`tool.proposal.check_compliance`). Skipped if the tool is not resolvable locally.
+2. **notify_reviewers** -- Emits notification with template `review_ready`.
+3. **wait_for_review** -- TODO gate: writes a `proposal_review` task into the `tenant_admin` queue (the reviewer is the customer). Resumes when the task is completed OR the reviewer advances the proposal (`wait_for`: `proposal:proposal.advanced:end` where `previousStage == 'review'`), whichever fires first. On timeout (72h) the engine emits `system:workflow.wait_timed_out` (reminder escalation is ⚠ future — no `send_review_reminder` step exists).
 
 ---
 
 ### Workflow: OnProposalAdvancedToFinal
 
 **File:** `pipeline/src/workflows/on_proposal_advanced.py`
-**Trigger:** `proposal:proposal.advanced:single` (condition: `payload.toStage == 'final'`)
+**Trigger:** `proposal:proposal.advanced:end` (condition: `payload.targetStage == 'final'`)
 **Description:** Lock workspace and generate export preview at final stage
 
 | # | Step | Type | Action | Timeout | Retry | Depends On |
 |---|---|---|---|---|---|---|
-| 1 | `generate_export_preview` | ACTION | `pipeline.export.generate_preview` | 15 min | 0 | -- |
+| 1 | `generate_export_preview` | ACTION | `workflows.actions.generate_preview.generate_preview` | 15 min | 0 | -- |
 | 2 | `notify_all_collaborators` | NOTIFY | `system.notify` | 30 min | 0 | generate_export_preview |
 
 **Step details:**
 
-1. **generate_export_preview** -- Fetches all proposal sections, extracts readable markdown from canvas JSON, bundles into a ZIP, uploads to S3 at `customers/{slug}/proposal-export/{proposalId}/preview.zip`. Returns `previewUrl`, `sectionsExported`, `totalBytes`. In V1, exports as markdown; full DOCX export deferred.
+1. **generate_export_preview** -- Fetches all proposal sections, extracts readable markdown from canvas JSON, bundles into a ZIP, uploads to S3/R2 at `customers/{slug}/proposal-export/{proposalId}/preview.zip`. Returns `previewUrl`, `sectionsExported`, `totalBytes`. Exports as markdown; full DOCX export is ⚠ future.
 
 2. **notify_all_collaborators** -- Emits notification with template `proposal_final_ready`.
 
@@ -580,6 +603,6 @@ The CMS `event_listener.py` polls `system_events` and matches against active aut
 - **Step-level retry:** Configure `retry_count` and `retry_delay_seconds` on the Step. Note: V1 processor does not execute retries -- this is a declaration for future implementation.
 - **Step-level timeout:** Configure `timeout_minutes`. V1 processor does not enforce timeouts -- steps run to completion or failure.
 - **Step failure:** Logged, `workflow.step_failed` event emitted, workflow continues to next step. Dependent steps still run but receive None for inputs from the failed step.
-- **HITL_WAIT steps:** Skipped in V1 (no process_instances persistence). Steps depending on a HITL_WAIT are also skipped with reason `dependency_hitl_wait`.
+- **HITL_WAIT / TODO steps:** Park the instance on a durable human gate persisted in `process_instances` (mig 088); the managed-instance layer (`manager.py`) resumes them on the `wait_for` event or (TODO) on `tasks`-ledger completion. (The older "skipped in V1 — no process_instances table yet" behavior is superseded.)
 - **Workflow-level failure:** If the entire `_run_workflow` call throws, `workflow.failed` event is emitted with the error. The event is still marked as processed (high-water mark advances).
 - **Idempotency:** Workflows are not idempotent by default. The processor advances a timestamp-based high-water mark, so each event is processed at most once per processor lifetime. On restart, the mark is re-seeded to `MAX(created_at)`, so events emitted during downtime are skipped.

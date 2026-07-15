@@ -100,9 +100,11 @@ RATE_LIMIT_PER_HOUR = 50
 DEFAULT_MONTHLY_BUDGET_USD = 50.00
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
-INPUT_COST_PER_TOKEN = 3.0 / 1_000_000   # $3/1M input
-OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000  # $15/1M output
+INPUT_COST_PER_TOKEN = 3.0 / 1_000_000   # $3/1M input (kept for backwards-compat)
+OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000  # $15/1M output (kept for backwards-compat)
 ```
+
+> Costing is now **per model** via `MODEL_PRICING` (Haiku $1/$5, Sonnet $3/$15 per 1M) with a `_cost_for(model, …)` helper, plus a `PER_CALL_CEILING_USD = 0.50` mid-loop ceiling. Effective rate/budget/ceiling limits resolve tenant override → `platform_agent_config` default → hardcoded constant, gated by a platform-wide AI master switch (`platform_agent_config.ai_enabled`).
 
 **Exception classes:**
 - `RateLimitExceeded` -- tenant exceeded 50 calls/hour
@@ -239,6 +241,15 @@ PostgreSQL-backed memory with tenant isolation using the `episodic_memories`, `s
 | 10 | Packaging Specialist | Proposal | Haiku | Yes | $0.11 | 1x |
 
 \* Implicit gate: new library units are created in DRAFT status; tenant admin must approve.
+
+> **As-built wiring status (2026-07-15).** All 10 archetypes are registered in `fabric.py`, but only a subset has a live producer driving it. The per-archetype "Trigger events" listed below are the *declared* `handles_event` triggers — not proof of an active caller. The fabric's event dispatcher (`handle_event`) is not called anywhere in the pipeline; archetypes are invoked either by explicit `invoke_agent(role, …)` calls or by `agent_task_queue` rows keyed on `agent_role`.
+>
+> | Archetype | As-built status |
+> |---|---|
+> | Section Drafter | **WIRED end-to-end** — driven by the `draft_v0` V0-strawman action on `OnProposalCreated` and by the synchronous `ai/draft` route (registered `proposal.draft_section` tool) |
+> | Compliance Reviewer | **PARTIAL** — the live compliance check runs INLINE in the Next `ai/compliance` route (Anthropic SDK directly, Haiku), billed to the ledger as `compliance_reviewer` but NOT executed through the fabric archetype |
+> | Color Team Reviewer | **DEFINED, one live path** — the `ai/review` button route is event-only (emits `proposal:proposal.review_requested`; nothing consumes that event). Its live invocation is the advance-path enqueue (`ai_review_on_advance`, default-on) → `agent_task_queue` → `fabric.process_task_queue` → `proposal_comments` write-back, gated on the pipeline `ANTHROPIC_API_KEY` |
+> | Other 7 | ⚠ **Dormant** — registered, no producer |
 
 ---
 
@@ -807,7 +818,7 @@ DAY 1000+
 | Database RLS | Row-Level Security on all agent memory tables |
 | Query enforcement | Every tool query includes `WHERE tenant_id = $1` |
 | Context assembly | ContextAssembler only loads data for the invoking tenant |
-| S3/storage paths | File paths scoped to `/data/{tenant_id}/` |
+| S3/storage paths | Object keys scoped to the R2 `customers/{tenant_slug}/` prefix (there is no `/data` business-data volume — the `STORAGE_ROOT=/data` constant is dead) |
 
 **Critical invariant:** `tenant_id` is NEVER accepted from tool input parameters. It always comes from the invocation context set by the fabric. Even if an agent's prompt is compromised via injection, tools will only return data belonging to the authenticated tenant.
 
@@ -822,11 +833,14 @@ DAY 1000+
 
 | Control | Default | Configurable |
 |---------|---------|:---:|
-| Rate limit | 50 calls/hour/tenant | No (hardcoded) |
-| Monthly budget | $50/month/tenant | Yes (via `tenant_agent_config`) |
+| Rate limit | 50 calls/hour/tenant | Yes (tenant → platform default → constant) |
+| Monthly budget | $50/month/tenant | Yes (via `tenant_agent_config` → `platform_agent_config`) |
+| Per-call cost ceiling | $0.50/invocation (mid-loop) | Yes (tenant → platform default) |
+| Platform master switch + monthly cap | via `platform_agent_config` | Yes (admin) |
+| Per-model pricing | Haiku $1/$5, Sonnet $3/$15 per 1M | costed per model (`MODEL_PRICING`) |
 | Max tool rounds | 20 per invocation | No (hardcoded) |
 | Max output tokens | 4096-8192 per archetype | Per archetype |
-| Budget check failure | Fail open (allow call, log error) | N/A |
+| Budget/rate check failure | **Fail closed** (deny the call if it can't be verified) | N/A |
 
 ---
 
