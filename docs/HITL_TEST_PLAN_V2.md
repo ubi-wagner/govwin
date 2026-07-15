@@ -1,10 +1,20 @@
 # V1 HITL Test Plan -- Pre-Launch Validation
 
-**Version:** 2.1
-**Date:** 2026-05-24
-**Launch Target:** June 1, 2026
+**Version:** 2.2
+**Date:** 2026-07-15
+**Launch Target:** August 2026
 **Scope:** All 15 user journeys + CMS content pipeline + content review HITL + email automation HITL across 7 structured test sessions
 **Estimated Total Time:** ~7 hours (one tester) or 4 hours (two testers in parallel)
+
+> **Current canonical end-to-end (read first).** This plan predates the **opportunity-card spine**
+> and the **comp-code purchase** model. The up-to-date single-operator script is
+> [`ALPHA_HITL_RUNBOOK.md`](./ALPHA_HITL_RUNBOOK.md) + [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md)
+> (design: [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md)). Where sessions below say
+> `/spotlights`, `/pipeline`, `tenant_pipeline_items`, or Stripe/`FOUNDING_COHORT_BYPASS`, the current
+> reality is: the customer surface is `/portal/[slug]/cards` (+ `/buckets`, `/portals`) -- `/spotlights`
+> and `/pipeline` **redirect** to `/cards` -- and portals are bought with the comp code
+> `rfppipelinetest` (→ `curation_pending` → admin release → V0→V1). Treat the runbook + click-plan as
+> authoritative for the purchase→build path.
 
 ---
 
@@ -26,14 +36,17 @@ The following must be set in `frontend/.env.local` (or Railway environment):
 
 ```
 DATABASE_URL=postgresql://...
-NEXTAUTH_SECRET=...
-NEXTAUTH_URL=http://localhost:3000  (or production URL)
+AUTH_SECRET=...
+NEXTAUTH_SECRET=...                (= AUTH_SECRET)
+AUTH_URL=http://localhost:3000     (or production URL)
+NEXTAUTH_URL=http://localhost:3000 (= AUTH_URL)
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=us-east-1
-S3_BUCKET=rfp-pipeline-prod-r8t7tr6
+AWS_S3_BUCKET_NAME=rfp-pipeline-prod-r8t7tr6   (absence 500s any storage route at import)
 ANTHROPIC_API_KEY=...              (for AI features in Session 4)
-FOUNDING_COHORT_BYPASS=true        (skips Stripe for proposal creation)
+FOUNDING_COHORT_BYPASS=true        (legacy direct proposals/create path only; the canonical
+                                    purchase is the comp code rfppipelinetest → curation → release)
 RESEND_API_KEY=...                 (or Gmail OAuth2 credentials for email)
 ```
 
@@ -41,10 +54,11 @@ RESEND_API_KEY=...                 (or Gmail OAuth2 credentials for email)
 
 Before starting tests, verify:
 
-1. **master_admin account exists** in `users` table with `role='master_admin'`, known password, `temp_password=false`
-2. **Database migrations applied** through 047: `SELECT MAX(version) FROM schema_migrations` or count migration files
-3. **S3 bucket accessible**: `aws s3 ls s3://rfp-pipeline-prod-r8t7tr6/ --max-items 1`
-4. **At least one test PDF** available locally (real SBIR solicitation preferred, or any multi-page PDF)
+1. **master_admin account exists** in `users` table with `role='master_admin'` and a known password
+2. **Database migrations applied** through **108**: `SELECT max(filename) FROM _migration_history` (expect `108_patch_live_marketing_content.sql` or later)
+3. **Dev accounts seeded**: `SEED_DEV_ACCOUNTS=true node scripts/seed_dev_accounts.mjs` (creates the `ubihere` + `lighthouse` tenants + `eric@rfppipeline.com` admin; the `rfppipelinetest` comp code is seeded by migration 105)
+4. **S3 bucket accessible**: `aws s3 ls s3://rfp-pipeline-prod-r8t7tr6/ --max-items 1`
+5. **At least one test PDF** available locally (real SBIR solicitation preferred, or any multi-page PDF)
 
 ### Test Accounts
 
@@ -66,6 +80,8 @@ Before starting tests, verify:
 **Tenant Profile:** NAICS 541330/541511/541512/541519/334111, keywords: AI/ML/cyber/cloud/autonomy/ISR/C4ISR, agencies: DoD/AF/Navy/DARPA/NSA
 
 > **Note:** The `rfp_admin` account is created during Test 1.4 (Accept Application) when a new tenant is provisioned. The `master_admin` and all `.test` domain accounts are seeded by migration 041 with `temp_password=false` (no password change required). The bootstrap `master_admin` from `pipeline/src/seeds/master_admin.py` uses `temp_password=true` but migration 041 overrides this with a known password.
+>
+> **Current dev seeding:** `scripts/seed_dev_accounts.mjs` (`SEED_DEV_ACCOUNTS=true`) is the canonical dev seed -- it creates `eric@rfppipeline.com` (master_admin) plus the `ubihere` and `lighthouse` tenants (grinder tier). The `apex-defense`/`techalliance` accounts in the box are migration-seeded demo fixtures (removable with `PURGE_DEMO=1`); either set works for these tests.
 
 ### Browser Setup
 
@@ -382,6 +398,12 @@ new -> claimed -> released_for_analysis -> ai_analyzed -> curation_in_progress
 
 **Prerequisite:** Session 1 completed (tenant + user created via application acceptance).
 
+> **⚠ Superseded surface.** `/spotlights` and `/pipeline` now **redirect** to `/portal/[slug]/cards`
+> (the opportunity-card spine), ranked via **Spotlight buckets** (`/portal/[slug]/buckets`,
+> `tenant_spotlight_buckets`/`tenant_bucket_scores`); the legacy `tenant_pipeline_items` table is
+> retired. Run the card-spine flow per [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md);
+> the tests below still exercise scoring/pin logic but against the old routes.
+
 ---
 
 #### Test 3.1: Customer First Login + Password Change
@@ -505,6 +527,15 @@ new -> claimed -> released_for_analysis -> ai_analyzed -> curation_in_progress
 #### Test 4.1: Proposal Creation (Founding Cohort Bypass)
 
 **Route:** `/portal/[slug]/pipeline` -> proposal creation
+
+> **⚠ Canonical path is now the comp-code purchase.** The founding cohort buys a portal by pinning a
+> card and entering the comp code `rfppipelinetest` → the portal opens `curation_pending` (72h SLA) →
+> an admin resolves the "Purchase -- needs curation" ToDo and **releases** → the workspace provisions
+> **unlocked** (V0), then V0 → V0.5 → V1. See
+> [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) and
+> [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md) §5-6. The steps below exercise the
+> **legacy direct-create** path gated by `FOUNDING_COHORT_BYPASS` -- still wired, but not the
+> customer-facing flow.
 
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -1655,8 +1686,15 @@ After completing all 7 sessions:
 
 ## Appendix C: Portal Page Map
 
+> **⚠ Current surface.** The canonical opportunity routes are `/portal/[slug]/cards` (feed),
+> `/portal/[slug]/buckets` (ranking filters), and `/portal/[slug]/portals` (purchased proposal
+> portals). `/spotlights` and `/pipeline` below **redirect** to `/cards`; `tenant_pipeline_items` is retired.
+
 | Route | Purpose | Key Elements |
 |-------|---------|-------------|
+| `/portal/[slug]/cards` | Opportunity-card feed (canonical) | Mirrored cards, bucket ranks, pin, Purchase |
+| `/portal/[slug]/buckets` | Spotlight buckets | Saved filters ranking cards |
+| `/portal/[slug]/portals` | Proposal portals | Purchase, curation wait UI, release → provision |
 | `/portal/[slug]/dashboard` | Customer dashboard | Welcome message, quick stats, onboarding checklist |
 | `/portal/[slug]/profile` | Company profile | ProfileEditor: NAICS, keywords, agency priorities, tech focus |
 | `/portal/[slug]/team` | Team management | Member list, invite form, role assignment |

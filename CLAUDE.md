@@ -16,12 +16,21 @@ The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED — `
 at provision and advances on section lock. Verified end-to-end (Playwright 17/17 + the live Python
 workflow engine creating `process_instances` that carry `opportunity_id`).
 
-The pipeline agent workforce (`AgentFabric`, 10 archetypes) is wired to the workflow engine:
-`color_team_reviewer` runs on advance; `section_drafter` + `compliance_reviewer` run on portal
-launch / review advance (gated on the pipeline `ANTHROPIC_API_KEY`) — the "strawman is callerless"
-note in older docs is STALE (`draft_v0` → `publish_section_draft`, wired 2026-06-30). The remaining
-~7 archetypes are dormant (registered, no producer). `opportunity_id` keys the spine (mig 088);
-docs/V1_REFACTOR_DESIGN.md has the orchestration pattern.
+Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
+`curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
+the build UNLOCKED and instantiating the compliance matrix + molds from the master solicitation. The
+OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
+proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
+into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md** (migrations
+at 108). Self-serve Stripe checkout is still descoped — the comp code stands in.
+
+The pipeline agent workforce (`AgentFabric`, 10 archetypes) is only PARTLY wired: `section_drafter`
+is live end-to-end (`draft_v0` → `markdown_to_canvas` → `publish_section_draft`, run on
+release/provision, gated on the pipeline `ANTHROPIC_API_KEY`); `compliance_reviewer` runs INLINE in
+the `ai/compliance` Next route (not through the fabric loop); `color_team_reviewer` is reachable only
+via the advance `agent_task_queue` path (its `proposal.review_requested` event otherwise has no
+consumer). The remaining ~7 archetypes are dormant (registered, no producer). `opportunity_id` keys
+the spine (mig 088); docs/V1_REFACTOR_DESIGN.md has the orchestration pattern.
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
@@ -96,4 +105,5 @@ See CLAUDE_CLIFFNOTES.md for:
 - User content clearly delimited in agent prompts (prompt injection defense)
 
 ## Project Structure
-See ARCHITECTURE_V9.md for the full as-built system design and file tree.
+See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
+docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow.
