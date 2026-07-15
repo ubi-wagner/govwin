@@ -70,13 +70,14 @@ export const solicitationPushTool = defineTool<Input, Output>({
         status: string;
         namespace: string | null;
         opportunityId: string;
+        spotlightSummary: string | null;
         submissionFormat: string | null;
         pageLimitTechnical: number | null;
         customVariables: Record<string, unknown> | null;
         hasSubmissionFormat: boolean;
       }[]
     >`
-      SELECT cs.status, cs.namespace, cs.opportunity_id,
+      SELECT cs.status, cs.namespace, cs.opportunity_id, cs.spotlight_summary,
              sc.submission_format, sc.page_limit_technical,
              sc.custom_variables,
              -- Gate satisfiability: submission_format populated ANYWHERE for this
@@ -129,6 +130,17 @@ export const solicitationPushTool = defineTool<Input, Output>({
       throw new ValidationError(
         `cannot push: required compliance variables missing`,
         { solicitationId, missingVariables: missing },
+      );
+    }
+
+    // 2b. Gate the release into the Opportunity Pipeline on the RFP admin's manual
+    //     first-pass "spotlight-match summary" — it's the matching context ranked
+    //     against tenant spotlights (folded into the fan-out card). No summary → no
+    //     release. The full skeleton stays a separate, later step (build/purchase).
+    if (!r.spotlightSummary || !r.spotlightSummary.trim()) {
+      throw new ValidationError(
+        `cannot push: a spotlight-match summary is required before releasing into the Opportunity Pipeline — build the first-pass summary in curation`,
+        { solicitationId, missing: 'spotlight_summary' },
       );
     }
 

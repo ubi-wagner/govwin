@@ -40,6 +40,7 @@ export interface OppCard {
   estimatedValueMin: number | null;
   estimatedValueMax: number | null;
   description: string | null;
+  spotlightSummary: string | null;
   expertNotes: string | null;
   lifecycleStatus: string | null;
   submissionStage: SubmissionStage;
@@ -71,7 +72,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.lifecycle_status, o.submission_stage,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
-             cs.namespace,
+             cs.namespace, cs.spotlight_summary,
              sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
              (SELECT count(*)::int FROM solicitation_volumes sv
                 WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
@@ -112,6 +113,7 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       estimatedValueMin: num(o.estimatedValueMin),
       estimatedValueMax: num(o.estimatedValueMax),
       description: (o.description as string) ?? null,
+      spotlightSummary: (o.spotlightSummary as string) ?? null,
       expertNotes: (o.expertNotes as string) ?? null,
       lifecycleStatus: (o.lifecycleStatus as string) ?? null,
       submissionStage: isSubmissionStage(o.submissionStage) ? o.submissionStage : 'open',
