@@ -254,6 +254,7 @@ describe('solicitation.push', () => {
         status: 'approved', namespace: NAMESPACE, opportunityId: OPP_ID,
         submissionFormat: 'DSIP', pageLimitTechnical: 15,
         customVariables: {}, hasSubmissionFormat: true,
+        spotlightSummary: 'Navy CV property-intelligence SBIR — agencies: Navy/DoD; tech: computer vision, edge inference.',
       }])
       .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
       .mockResolvedValueOnce(undefined) // opportunities UPDATE
