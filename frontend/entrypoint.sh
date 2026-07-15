@@ -20,5 +20,16 @@ if [ "$SEED_DEV_ACCOUNTS" = "true" ] && [ -f /app/scripts/seed_dev_accounts.mjs 
   echo "[entrypoint] Seed step complete."
 fi
 
+# Marketing pages: CODE is the source of truth (we've backed off CMS editing for
+# these — only genuinely dynamic content stays CMS-managed). When
+# SEED_PAGE_CONTENT=true, push the build-time PAGE_SEEDS snapshot into content_pages
+# so the public site matches the deployed code. Only touches the marketing pages in
+# PAGE_SEEDS; dynamic content (blog/resource articles) is never touched. Non-fatal.
+if [ "$SEED_PAGE_CONTENT" = "true" ] && [ -f /app/scripts/seed_page_content.mjs ]; then
+  echo "[entrypoint] SEED_PAGE_CONTENT=true — syncing marketing pages from code..."
+  node /app/scripts/seed_page_content.mjs || echo "[entrypoint] page-content seed failed (non-fatal, continuing)"
+  echo "[entrypoint] Page-content sync complete."
+fi
+
 # Start Next.js
 exec node server.js
