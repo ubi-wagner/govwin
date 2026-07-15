@@ -52,7 +52,7 @@ export const theExpert: SeedPage = {
       section: 'credentials',
       displayOrder: 3,
       title: 'Funding Secured',
-      body: 'Personally secured hundreds of millions of dollars in SBIR, STTR, OTA, BAA, and related federal R&D funding across two decades — both for companies Eric led and for small businesses he advised. Phase I through Phase III, across DoD, NSF, DOE, DARPA, and more.',
+      body: 'Personally secured hundreds of millions of dollars in SBIR, STTR, OTA, BAA, and related federal R&D funding across 25 years — both for companies Eric led and for small businesses he advised. Phase I through Phase III, across DoD, NSF, DOE, DARPA, and more.',
       metadata: { icon: 'funding' },
     },
     {

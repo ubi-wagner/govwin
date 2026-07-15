@@ -168,7 +168,7 @@ export const howItWorks: SeedPage = {
       displayOrder: 12,
       excerpt: 'Ready to apply?',
       title: 'Founding cohort is limited to 20 small businesses',
-      body: 'Applications reviewed weekly. $499/month after acceptance. Cancel anytime.',
+      body: 'Applications reviewed weekly. $499/month after acceptance. 3-month minimum, then cancel anytime.',
       metadata: { cta: { label: 'Start Your Application', href: '/apply' } },
     },
   ],

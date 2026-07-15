@@ -18,7 +18,7 @@ export const homepage: SeedPage = {
       section: 'hero',
       displayOrder: 0,
       excerpt: 'AI + Expert · From Application to Submission',
-      title: 'A proposal\nengine, *not* a\nproposal\ngamble.',
+      title: 'A proposal engine,\n*not* a proposal gamble.',
       body: 'Win non-dilutive federal R&D funding — without burning a month of payroll on every submission. We pair 25 years of hands-on expertise with isolated, company-specific AI, so you pursue more opportunities and submit better proposals. (SBIR, STTR, BAA, OTA.)',
       metadata: {
         primary_cta: { label: 'Apply for Founding Cohort', href: '/apply' },
@@ -64,7 +64,7 @@ export const homepage: SeedPage = {
       displayOrder: 12,
       excerpt: 'How We Charge',
       title: 'One subscription.\nPer-proposal *portals*.',
-      body: 'Priced and built specifically for small businesses, not enterprise. Low cost subscription provides find and remind capabilities. Per proposal pricing ensures you only pay for builds you choose.',
+      body: 'Built for small businesses, not enterprise — a low-cost subscription to find and track opportunities, plus per-proposal pricing so you only pay for the builds you choose.',
     },
 
     // Pricing cards (3).

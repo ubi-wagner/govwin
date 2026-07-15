@@ -95,7 +95,7 @@ export const pricing: SeedPage = {
           'Export-ready submission package (PDFs, SF-424, attachments)',
           'Post-submission debrief added to your library',
         ],
-        cta: { label: 'Requires Spotlight subscription', href: '/apply' },
+        cta: { label: 'Apply for Access', href: '/apply' },
       },
     },
     {
@@ -110,14 +110,14 @@ export const pricing: SeedPage = {
         features: [
           'Everything in Phase I tier',
           'Extended compliance matrix for longer-form proposals',
-          'Larger page-limit technical volumes (20-50+ pages)',
+          'Larger page-limit technical volumes (20–50+ pages)',
           'Commercialization plan auto-drafting with market analysis',
           'Subcontractor coordination across multiple collaborators',
           'Progress milestone planning with cost-basis breakdown',
           'Multi-round review with pink/red/gold team stages',
           'Extended post-submission analytics',
         ],
-        cta: { label: 'Requires Spotlight subscription', href: '/apply' },
+        cta: { label: 'Apply for Access', href: '/apply' },
       },
     },
 
@@ -150,7 +150,7 @@ export const pricing: SeedPage = {
           'Additional time available at $500/hour based on availability',
           'Scheduled via your dashboard after acceptance',
         ],
-        cta: { label: 'Included with Spotlight', href: '/apply' },
+        cta: { label: 'Apply for Access', href: '/apply' },
       },
     },
     {
@@ -172,7 +172,7 @@ export const pricing: SeedPage = {
           'Post-debrief win/loss analysis',
           'Purchase 1–10 hours per transaction',
         ],
-        cta: { label: 'Purchase Hours', href: '/apply' },
+        cta: { label: 'Apply for Access', href: '/apply' },
       },
     },
 
@@ -200,7 +200,7 @@ export const pricing: SeedPage = {
       section: 'faqs',
       displayOrder: 12,
       title: 'What counts as "Phase I-equivalent" vs "Phase II-equivalent"?',
-      body: 'Phase I is for shorter-form proposals (typically 10-20 pages technical volume, <$250K funding). Phase II is for longer-form proposals (20-50+ pages, $1M+ funding, commercialization plans). If you\'re unsure which tier fits your opportunity, use your monthly Ask-the-Expert time to check.',
+      body: 'Phase I is for shorter-form proposals (typically 10-20 pages technical volume, <$250K funding). Phase II is for longer-form proposals (20–50+ pages, $1M+ funding, commercialization plans). If you\'re unsure which tier fits your opportunity, use your monthly Ask-the-Expert time to check.',
     },
     {
       section: 'faqs',
