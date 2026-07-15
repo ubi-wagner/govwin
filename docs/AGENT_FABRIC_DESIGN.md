@@ -62,7 +62,7 @@ graph TB
 - **Scope:** ONE proposal's data only (proposal-isolated)
 - **Data access:** `customers/{tenant}/proposals/{propId}/rfp-snapshot/` + customer library
 - **Cost model:** per-action, tracked per proposal in `agent_task_log`
-- **Who pays:** included in portal fee ($999/$1,999)
+- **Who pays:** included in portal fee (Phase I $1,999 / Phase II $4,999–$3,999)
 - **Current status:** Section Drafter WIRED (`section_drafter`); Compliance Reviewer PARTIAL (inline in the Next `ai/compliance` route); Color Team Reviewer runs via the advance `agent_task_queue`; others ⚠ future (dormant)
 
 ---
@@ -167,7 +167,7 @@ processes the output, and writes results back to the sandbox.
 | Compliance checks | ~20/mo | $0.003 | $0.06 |
 | **Total AI cost per customer** | | | **~$3.26/mo** |
 
-At $299/mo subscription, AI costs are ~1% of revenue. Healthy margin.
+At $499/mo Spotlight subscription, AI costs are <1% of revenue. Healthy margin.
 
 
 ---

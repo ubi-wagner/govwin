@@ -1129,22 +1129,22 @@ TOTAL           ~42 calls      ~$5.03
 
 ### Break-Even Analysis
 
-**Finder Subscription ($199/month):**
+**Spotlight Subscription ($499/month, 3-month minimum):**
 
 ```
-Revenue:           $199.00
+Revenue:           $499.00
 AI cost (active):   $9.95
 Infrastructure:     $2.60
-Gross margin:      $186.45 (94%)
+Gross margin:      $486.45 (97%)
 ```
 
-**Proposal Portal Purchase ($999 one-time):**
+**Proposal Portal Purchase (Phase I $1,999 · Phase II $4,999, or $3,999 linked):**
 
 ```
-Revenue:           $999.00
+Revenue:           $1,999.00 (Phase I) · $4,999 / $3,999-linked (Phase II)
 AI cost:            $4.50 - $12.50
 Infrastructure:     ~$1.00
-Gross margin:      $985 - $993 (98-99%)
+Gross margin:      $1,985 - $1,993 (99%) at Phase I; higher at Phase II
 ```
 
 AI is <2% COGS at any usage level. Even at 10x estimated cost, margins remain above 85%.

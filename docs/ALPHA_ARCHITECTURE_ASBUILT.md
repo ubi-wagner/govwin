@@ -25,7 +25,7 @@ The current, verified system as it stands for the founding-cohort Alpha. Full de
 ```
 
 Frontend + pipeline share the DB; CMS has its own DB and bridges via the shared `system_events` table.
-Migrations (000→**104**) auto-apply on frontend deploy (`entrypoint.sh → db/migrations/migrate.mjs`).
+Migrations (000→**108**) auto-apply on frontend deploy (`entrypoint.sh → db/migrations/migrate.mjs`).
 
 ---
 
@@ -43,12 +43,12 @@ ADMIN                                           CUSTOMER
      ▼                                      │          opportunity_bridge (L0, forward-only)
   solicitation.push ──► publishAndFanOut ───┴───────────────┘                          │
                                                                                        ▼
-  provision (portal accept / proposals.create)  ◄──── admin-provisioned (founding cohort)
+  provision (via portal release)  ◄──── comp-code purchase → curation_pending (72h SLA) → admin resolves "needs curation" ToDo (migs 105–108)
      · proposal_artifacts (volume tree)     resolveTopicCompliance ─► buildArtifactSpecs
      · proposal_sections (molds)            template canvas_document ─► interpolate {company_name} ─► section.content
      · proposal_compliance_matrix (not_addressed)
      ▼
-  RELEASE (admin unlock at lock_count=0)  ──►  CUSTOMER BUILD
+  RELEASE (admin "release" provisions the build UNLOCKED)  ──►  CUSTOMER BUILD
                                                 · sections/[id]/save (OCC)  · ai/draft (Sonnet-4)  · ai/compliance (Haiku)
                                                 · Accept & Lock All ─► matrix→satisfied + harvest→library_atoms
                                                 · advance draft→final ─► auto-lock→submitted (downloads on)
@@ -57,6 +57,8 @@ ADMIN                                           CUSTOMER
 
 Everything above is **driven-verified this cycle** except the descoped items (self-serve Stripe;
 automated amendment re-propagation) — see the HITL runbook §4.
+The master→mirror opportunity architecture and the two-release (Spotlight vs proposal-portal) model behind this
+spine are specified in **`docs/MASTER_MIRROR_OPP_DESIGN.md`** (canonical OPP→proposal design).
 
 ## 3. The unified library / atom loop (greenfield canonical)
 
@@ -103,4 +105,5 @@ Legacy `library_units` is the retired parallel (deprecate-in-phases; see `LIBRAR
 092 sweep_hardening · 093 collaborator_library_scope · 094 oppcard_bridge_spine · 095 oppcard_pin_docs ·
 096 tenant_spotlight_buckets · 097 portals_shadow_guardrails · 098 portal_workflow_guardrails ·
 099 intake_meta · 100 submission_stage_lifecycle · 101 unified_library_taxonomy · 102 atomizer_support ·
-103 event_payload_jsonb_fix · **104 jsonb_string_scalar_backfill + sbir dedup**.
+103 event_payload_jsonb_fix · 104 jsonb_string_scalar_backfill + sbir dedup ·
+**105 curation_pending/promo_codes · 106 purchase→notify_admin · 107 spotlight_summary · 108 marketing content**.

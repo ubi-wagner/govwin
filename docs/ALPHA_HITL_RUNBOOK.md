@@ -41,7 +41,7 @@ is descoped). Two ways to run:
 # 1. Postgres (pgvector image) up; create a fresh DB
 createdb govtech_alpha   # or reuse the scratch DB
 
-# 2. Apply ALL migrations (000 → 104) — order matters
+# 2. Apply ALL migrations (000 → 108) — order matters
 node db/migrations/migrate.mjs         # reads DATABASE_URL; tracked in _migration_history
 
 # 3. Seed dev accounts + fixtures

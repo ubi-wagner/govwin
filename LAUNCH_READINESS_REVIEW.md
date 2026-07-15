@@ -1,5 +1,11 @@
 # RFP Pipeline — Public Site Launch‑Readiness Review
 
+> ## ⚠ PRICING SUPERSEDED (updated 2026-07-15)
+> **Every dollar figure and the "$1,000 more" line below is OUTDATED.** Current pricing (launch **August 2026**):
+> **Spotlight $499/mo** (3-month minimum) · **Phase I $1,999** · **Phase II $4,999** ($3,999 if linked to a Phase I
+> already in the system + library). The Phase I → II value story is now **"only $3,000 more"** (not "$1,000 more").
+> The ROI / marketing / IA structure below remains useful — treat the *numbers* as historical.
+
 **Prepared as an outside strategy + creative review (Bain‑style diagnosis, NYC‑ad‑house creative lens).**
 **Status: ANALYSIS ONLY — no page/route changes have been made.** This is a recommendations + TODO document for your review.
 

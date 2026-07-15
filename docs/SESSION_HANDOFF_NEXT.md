@@ -74,7 +74,7 @@ If any of these resurfaces, it's known; apply the resolution, don't re-derive it
 ## 5. Fast-boot crib (only if we run a fresh sandbox stack — else skip to the deploy)
 ```
 # Postgres (pgvector) up, fresh DB, then from repo root with DATABASE_URL exported:
-node db/migrations/migrate.mjs                       # applies 000→104, tracked in _migration_history
+node db/migrations/migrate.mjs                       # applies 000→108, tracked in _migration_history
 node scripts/seed_dev_accounts.mjs                   # 2 tenants + admins (idempotent)
 psql "$DATABASE_URL" -f scripts/e2e_fixtures.sql     # optional demo opps/atoms
 node scripts/seed_collateral_templates.mjs           # 4 marketing canvas templates into the admin library
