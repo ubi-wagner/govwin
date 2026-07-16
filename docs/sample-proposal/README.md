@@ -25,7 +25,7 @@ what a finished proposal looks like across formats, and reuse the canvas JSON in
 | `Aerivio_Technical_Volume.pdf` | PDF | `lib/export/pdf-exporter` (Chromium) | Full-fidelity **16-page** view incl. the inline **SVG architecture + pipeline figures** + page numbers |
 | `Aerivio_Commercialization.pptx` | PowerPoint | `lib/export/pptx-exporter` | **5 complete slides** (title, market + **SVG bar chart**, competition, go-to-market, financials) |
 | `Aerivio_Cost_Volume.xlsx` | Excel | `lib/export/xlsx-exporter` | **2 tabs** — Direct-Labor detail (roles/rate/hours) + Budget Summary; currency cells, subtotals, highlighted **$150,000** total |
-| `Aerivio_Key_Personnel_Bios.pdf` | PDF | `lib/export/pdf-exporter` | 3 bios with **generated SVG headshot** placeholders |
+| `Aerivio_Key_Personnel.pdf` | PDF | `lib/export/pdf-exporter` | 3 bios with **generated SVG headshot** placeholders |
 | `Aerivio_Facilities.pdf` | PDF | `lib/export/pdf-exporter` | Facilities write-up with a **generated SVG facility** illustration |
 
 **Styling exercised throughout:** bold / italic / colored text, section headings,
