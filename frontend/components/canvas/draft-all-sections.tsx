@@ -17,7 +17,7 @@
 
 import { useState } from 'react';
 import { useTool } from '@/lib/hooks/use-tool';
-import type { CanvasNode } from '@/lib/types/canvas-document';
+import { createEmptyCanvas, CANVAS_PRESETS, type CanvasNode } from '@/lib/types/canvas-document';
 
 // ─── Section title → unified-taxonomy vol (mig 101/102) ──────────────
 // Map common RFP section titles to a canonical `vol` so the scored atom
@@ -146,8 +146,45 @@ export function DraftAllSections({
         });
 
         if (result.nodes && result.nodes.length > 0) {
-          onSectionDrafted(sec.id, result.nodes);
-          setProgress((prev) => ({ ...prev, [sec.id]: 'done' }));
+          // PERSIST the drafted nodes. The draft tool is pure (returns nodes, writes
+          // no SQL), so without this PUT the content is discarded on the next
+          // router.refresh() and the section reopens empty. Wrap the nodes in a valid
+          // CanvasDocument (the section editor requires a `version` field) and save
+          // through the same route the canvas editor uses — which archives a version,
+          // sets status='ai_drafted', and emits section.saved. Draft-All only targets
+          // genuinely-empty sections, so there is no prior canvas content to preserve.
+          const now = new Date().toISOString();
+          const doc = createEmptyCanvas({
+            documentId: sec.id,
+            canvas: CANVAS_PRESETS.letter_sbir_phase1,
+            metadata: {
+              title: sec.title,
+              volume_id: '',
+              required_item_id: '',
+              proposal_id: proposalId,
+              solicitation_id: '',
+              created_at: now,
+              last_modified_at: now,
+              last_modified_by: '',
+              version_number: 1,
+              status: 'ai_drafted',
+            },
+          });
+          doc.nodes = result.nodes;
+          const saveRes = await fetch(
+            `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sec.id}/save`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: doc, status: 'ai_drafted', source: 'ai_draft' }),
+            },
+          );
+          if (saveRes.ok) {
+            onSectionDrafted(sec.id, result.nodes);
+            setProgress((prev) => ({ ...prev, [sec.id]: 'done' }));
+          } else {
+            setProgress((prev) => ({ ...prev, [sec.id]: 'failed' }));
+          }
         } else {
           setProgress((prev) => ({ ...prev, [sec.id]: 'failed' }));
         }

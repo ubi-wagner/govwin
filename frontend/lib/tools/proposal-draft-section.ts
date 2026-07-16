@@ -400,13 +400,13 @@ export const proposalDraftSectionTool = defineTool<Input, Output>({
       }
     }
 
-    ctx.log.warn({ proposalId: input.proposalId, section: input.sectionTitle }, 'No ANTHROPIC_API_KEY — returning error');
-    return {
-      nodes: [],
-      model: 'none',
-      inputTokens: 0,
-      outputTokens: 0,
-      error: 'AI drafting unavailable — ANTHROPIC_API_KEY not configured. Please contact your administrator.',
-    };
+    // No API key → graceful placeholder mode (documented in MASTER_MIRROR §6 and in
+    // this tool's own description). draftPlaceholder builds a real mold-shaped
+    // CanvasNode[] from the section title + required subsections, so the HITL canvas
+    // fills with editable scaffolding instead of silently no-opping. The prior code
+    // returned {nodes:[], error} here, which left draftPlaceholder as dead code and
+    // made "Draft All Sections" fail on every install without the key.
+    ctx.log.info({ proposalId: input.proposalId, section: input.sectionTitle }, 'No ANTHROPIC_API_KEY — placeholder draft');
+    return draftPlaceholder(input, actorId, actorName);
   },
 });
