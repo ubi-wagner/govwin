@@ -171,6 +171,16 @@ breakdown (the `/api/admin/agents` route computes it but no page renders it), an
 → instance → agent-spend → task **correlation** drill-through (the join keys exist:
 `trigger_event_id`, `correlation_id`).
 
+**Customer / shadow-admin observability (their own spine).** Each customer monitors **their** spine in
+the portal, tenant-scoped (`verifyTenantAccess` + `WHERE tenant_id`): **`/portal/<slug>/processes`**
+(their `process_instances` with failing/stalled/waiting health chips, current step, an admin
+"move to next gate" override, and now the per-instance **step timeline** — the `Steps` drill-through,
+mirror of the admin monitor, served by the tenant-scoped `GET …/processes/[instanceId]`),
+**`/portal/<slug>/activity`** (their `system_events` stream), plus **`/portals`** (build state) and
+**`/proposals`**. Visible to customer staff (`tenant_user`+) and to shadow admins (`rfp_admin` ≥
+`tenant_admin`); partners are excluded. The admin `/admin/*` views read across spines; a customer reads
+only their own copy spine (§1 two-spine model).
+
 ---
 
 ## 5. The agent fabric — the AI execution layer

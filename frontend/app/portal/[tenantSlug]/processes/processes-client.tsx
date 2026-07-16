@@ -47,6 +47,48 @@ function relativeTime(iso: string | null): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+interface Transition {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  stepName: string | null;
+  actor: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+const STATUS_DOT: Record<string, string> = {
+  completed: 'bg-green-500', failed: 'bg-red-500', paused: 'bg-yellow-500',
+  running: 'bg-blue-500', retrying: 'bg-blue-500', cancelled: 'bg-gray-400', pending: 'bg-gray-400',
+};
+
+/** The process_instance_transitions timeline — lets a customer/shadow admin watch
+ *  their own workflow's steps execute (tenant-scoped detail route). */
+function TransitionTimeline({ state }: { state: Transition[] | 'loading' | 'error' }) {
+  if (state === 'loading') return <p className="mt-3 text-xs text-gray-400">Loading steps…</p>;
+  if (state === 'error') return <p className="mt-3 text-xs text-red-500">Couldn&apos;t load the step timeline.</p>;
+  if (state.length === 0) return <p className="mt-3 text-xs text-gray-400">No steps recorded yet.</p>;
+  return (
+    <ol className="relative mt-3 ml-1 space-y-2.5 border-l border-gray-200 py-1">
+      {state.map((t) => (
+        <li key={t.id} className="ml-4">
+          <span className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full ${STATUS_DOT[t.toStatus] ?? 'bg-gray-400'}`} />
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {t.stepName && <span className="font-mono text-gray-700">{formatStepName(t.stepName)}</span>}
+            <span className="text-gray-400">
+              {t.fromStatus ? `${t.fromStatus} → ` : ''}
+              <span className="font-medium text-gray-600">{t.toStatus}</span>
+            </span>
+            {t.actor && <span className="text-gray-400">· {t.actor}</span>}
+            <span className="ml-auto text-gray-400">{relativeTime(t.createdAt)}</span>
+          </div>
+          {t.reason && <p className="mt-0.5 text-[11px] text-gray-500">{t.reason}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function ProcessesClient({
   rows,
   loadError,
@@ -62,6 +104,8 @@ export function ProcessesClient({
   const [sortBy, setSortBy] = useState<'health' | 'recent'>('health');
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [timelines, setTimelines] = useState<Record<string, Transition[] | 'loading' | 'error'>>({});
+  const [openTimelines, setOpenTimelines] = useState<Set<string>>(new Set());
 
   // Live-ish: refresh every 10s so stall/fail badges stay current.
   useEffect(() => {
@@ -123,6 +167,35 @@ export function ProcessesClient({
       }
     },
     [router, tenantSlug],
+  );
+
+  // Lazy-load a process's step timeline (process_instance_transitions) from the
+  // tenant-scoped detail route, so a customer/shadow admin can watch their own
+  // workflow execute. Re-fetches on open to stay live.
+  const toggleTimeline = useCallback(
+    async (id: string) => {
+      const isOpen = openTimelines.has(id);
+      setOpenTimelines((prev) => {
+        const next = new Set(prev);
+        if (isOpen) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      if (isOpen) return;
+      setTimelines((prev) => ({ ...prev, [id]: 'loading' }));
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/processes/${id}`);
+        const body = await res.json().catch(() => ({}));
+        const transitions = body?.data?.transitions;
+        setTimelines((prev) => ({
+          ...prev,
+          [id]: Array.isArray(transitions) ? (transitions as Transition[]) : 'error',
+        }));
+      } catch {
+        setTimelines((prev) => ({ ...prev, [id]: 'error' }));
+      }
+    },
+    [openTimelines, tenantSlug],
   );
 
   if (loadError) {
@@ -206,6 +279,12 @@ export function ProcessesClient({
                     {busy[row.id] ? '...' : 'Move to next gate'}
                   </button>
                 )}
+                <button
+                  onClick={() => toggleTimeline(row.id)}
+                  className="rounded border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                >
+                  {openTimelines.has(row.id) ? 'Hide steps' : 'Steps'}
+                </button>
               </div>
 
               {health === 'failing' && row.lastError && (
@@ -221,6 +300,9 @@ export function ProcessesClient({
               )}
               {errors[row.id] && (
                 <p className="mt-2 text-xs text-red-600">{errors[row.id]}</p>
+              )}
+              {openTimelines.has(row.id) && (
+                <TransitionTimeline state={timelines[row.id] ?? 'loading'} />
               )}
             </div>
           );
