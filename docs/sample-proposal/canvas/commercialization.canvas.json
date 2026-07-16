@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "aecd0da6-184a-4d56-9ee6-c2a2858231c6",
+  "document_id": "fa7281dc-d513-462a-8812-f05524c70040",
   "canvas": {
     "format": "slide_16_9",
     "width": 960,
@@ -23,7 +23,7 @@
   },
   "nodes": [
     {
-      "id": "0dbfc48c-d868-45b8-b0f6-ea7c66e5189b",
+      "id": "81c73205-82ea-4fdb-8dab-27c9bac5483f",
       "type": "heading",
       "content": {
         "level": 1,
@@ -39,7 +39,7 @@
       "library_eligible": false
     },
     {
-      "id": "20276edb-9d82-472a-a613-2acc774cf7ba",
+      "id": "2d0b1911-426b-418a-b260-6ccd56707d54",
       "type": "text_block",
       "content": {
         "text": "Commercialization Plan — SBIR Phase I",
@@ -55,7 +55,7 @@
       "library_eligible": false
     },
     {
-      "id": "245a9298-2aee-4afa-9269-139d8c7f6d1e",
+      "id": "efbb2f70-0032-46a2-98c9-12f0181c82c4",
       "type": "text_block",
       "content": {
         "text": "Edge-AI acoustic threat classification for unmanned surface vessels",
@@ -69,7 +69,7 @@
       "library_eligible": false
     },
     {
-      "id": "fa2bc34a-7196-40be-8517-07e3c1e9642d",
+      "id": "f0968f7f-a833-4373-b6af-684f371f04d6",
       "type": "text_block",
       "content": {
         "text": "Topic N251-042 · US Navy · $150,000 / 6 months",
@@ -85,7 +85,7 @@
       "library_eligible": false
     },
     {
-      "id": "4c1f7063-c29b-49d7-b22a-00f64493fade",
+      "id": "83c24f3e-23b0-44dd-b2e6-5442df4a6c88",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -96,7 +96,7 @@
       "library_eligible": false
     },
     {
-      "id": "d1751ac0-2914-44f8-99bb-a12784fae6e8",
+      "id": "1e223a7a-f7a4-4b1c-b478-40918e308b4c",
       "type": "heading",
       "content": {
         "level": 1,
@@ -110,7 +110,7 @@
       "library_eligible": false
     },
     {
-      "id": "37a43827-84e8-4eb0-a473-09074e5352cf",
+      "id": "752f95e2-670e-4c71-8875-0feb4978fd0c",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -136,7 +136,7 @@
       "library_eligible": false
     },
     {
-      "id": "c795540a-5b65-47dc-9f28-81f276b23457",
+      "id": "4675a089-7439-4a33-8a00-8e8e8cb43ee8",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iNDQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjIwIiB5PSIyNCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzFlMjkzYiI+U2VydmljZWFibGUgbWFya2V0ICgkTS95cik8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjE1NCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjOTNjNWZkIi8+PHRleHQgeD0iNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI2PC90ZXh0Pjx0ZXh0IHg9Ijc1IiB5PSIxNDkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzMzNDE1NSI+JDhNPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iMTIzIiB3aWR0aD0iNzAiIGhlaWdodD0iNDciIGZpbGw9IiMzYjgyZjYiLz48dGV4dCB4PSIxNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI4PC90ZXh0Pjx0ZXh0IHg9IjE3NSIgeT0iMTE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPiQyNE08L3RleHQ+PHJlY3QgeD0iMjQwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzFkNGVkOCIvPjx0ZXh0IHg9IjI3NSIgeT0iMTg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPjIwMzA8L3RleHQ+PHRleHQgeD0iMjc1IiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4kNjFNPC90ZXh0Pjwvc3ZnPg==",
@@ -152,7 +152,7 @@
       "library_eligible": false
     },
     {
-      "id": "faea40e2-d32f-4641-b595-7f491a7cca2b",
+      "id": "62f1834d-f3ba-46fd-be1a-4d545a79f9de",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -163,7 +163,7 @@
       "library_eligible": false
     },
     {
-      "id": "7ab3792e-4102-40b7-98ee-3e7759f4434c",
+      "id": "0b5724f3-d2b5-4d94-99da-8eb2dfaff523",
       "type": "heading",
       "content": {
         "level": 1,
@@ -177,7 +177,7 @@
       "library_eligible": false
     },
     {
-      "id": "7d8fe381-d93b-49a0-a5e8-9840bbd0c2ff",
+      "id": "7a086e89-3076-4984-a668-b88ae21b5e5d",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -203,7 +203,7 @@
       "library_eligible": false
     },
     {
-      "id": "0327a35d-0d73-45c5-a3ec-15713af34a31",
+      "id": "e7b1a6d7-bf82-4c0d-aa2a-db21e2f8673d",
       "type": "text_block",
       "content": {
         "text": "Bottom line: we win where connectivity fails — exactly the contested environment that matters.",
@@ -223,7 +223,7 @@
       "library_eligible": false
     },
     {
-      "id": "81663751-f441-4f22-b657-7b50c5eb265b",
+      "id": "4449d845-b581-413d-85fb-a75f6b24f21e",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -234,7 +234,7 @@
       "library_eligible": false
     },
     {
-      "id": "0c95e2b8-93b2-484b-8af3-d91f6eb2a219",
+      "id": "c1785ae9-6812-4203-816a-494f0bd3eda6",
       "type": "heading",
       "content": {
         "level": 1,
@@ -248,7 +248,7 @@
       "library_eligible": false
     },
     {
-      "id": "00096ab7-b072-4959-9f1c-35db8cff715f",
+      "id": "15479826-e14b-4f09-a46c-bc8e2b97d657",
       "type": "numbered_list",
       "content": {
         "items": [
@@ -274,7 +274,7 @@
       "library_eligible": false
     },
     {
-      "id": "104b68ca-b54c-4f38-ab88-8205fb5738be",
+      "id": "dd20d30a-d3f0-48dd-a410-8583fbcb7156",
       "type": "text_block",
       "content": {
         "text": "Transition is a software integration, not a hardware program — a low-barrier path to a funded home.",
@@ -288,7 +288,7 @@
       "library_eligible": false
     },
     {
-      "id": "d21e56d0-9921-4c14-8ebd-665a96ff52fd",
+      "id": "c60e72dc-b2b8-4c7d-9020-b4fc130d420a",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -299,7 +299,7 @@
       "library_eligible": false
     },
     {
-      "id": "214df022-56dd-48dc-bef3-a3a41a082de9",
+      "id": "b3ee4a10-8806-476b-951c-16b4a1a55e24",
       "type": "heading",
       "content": {
         "level": 1,
@@ -313,7 +313,7 @@
       "library_eligible": false
     },
     {
-      "id": "fd6917a4-8885-4b69-ac0c-d81f98bd8a9c",
+      "id": "2c58c92d-e059-4e30-b6c8-ff14504f5fba",
       "type": "text_block",
       "content": {
         "text": "Phase I budget: $150,000 over 6 months.",
@@ -333,7 +333,7 @@
       "library_eligible": false
     },
     {
-      "id": "fd51129a-ed3a-4145-bda3-9214e4dd10bc",
+      "id": "f46a8a9b-effb-49e3-9e19-24fd634a0a95",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -359,7 +359,7 @@
       "library_eligible": false
     },
     {
-      "id": "a7d94c55-d129-4c9c-88eb-8091779f2b7d",
+      "id": "91a40961-3a9f-488e-8bd9-ec8f27bbc0ab",
       "type": "text_block",
       "content": {
         "text": "Ask: fund Phase I to de-risk the edge classifier and unlock the transition path.",
