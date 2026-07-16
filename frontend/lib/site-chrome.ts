@@ -35,7 +35,10 @@ export interface SiteChrome {
   footer: {
     columns: FooterColumn[];
     ctaPrimary: NavLink;
-    ctaSecondary: NavLink;
+    // Optional: there is a SINGLE login entry point (the nav "Login", desktop +
+    // mobile). The footer no longer carries a second, differently-labeled login
+    // CTA. Kept optional so the CMS can add a non-login secondary action later.
+    ctaSecondary?: NavLink;
     copyright: string;
   };
 }
@@ -110,7 +113,7 @@ export const DEFAULT_CHROME: SiteChrome = {
       },
     ],
     ctaPrimary: { label: 'Apply for Founding Cohort', href: '/apply' },
-    ctaSecondary: { label: 'Subscriber Login', href: '/login' },
+    // No footer login link — the single canonical login lives in the nav.
     copyright: '© 2026 RFP Pipeline. All rights reserved.',
   },
 };

@@ -176,10 +176,10 @@ export default function AcceptInvitePage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder="At least 12 characters"
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400"
               required
-              minLength={8}
+              minLength={12}
             />
           </div>
 
@@ -195,7 +195,7 @@ export default function AcceptInvitePage() {
               placeholder="Re-enter password"
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400"
               required
-              minLength={8}
+              minLength={12}
             />
           </div>
 
