@@ -108,8 +108,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           await sql`
             INSERT INTO system_events (namespace, type, phase, actor_type, actor_id, actor_email, payload)
             VALUES ('identity', 'user.logged_in', 'single', 'user', ${user.id}, ${user.email},
-                    ${sql.json({ correlationId: crypto.randomUUID() })})
+                    ${sql.json({ userId: user.id, correlationId: crypto.randomUUID() })})
           `;
+          // ^ userId in the PAYLOAD (not just actor_id) is load-bearing: the
+          // OnApplicationAccepted HITL gate waits for user.logged_in and resumes
+          // via manager._event_correlates, which keys on payload.userId. Without it
+          // the login shares no correlation key with the parked onboarding instance
+          // and ANY user's login would resume ANY waiting gate (fail-open).
         } catch { /* non-critical */ }
 
         return {
