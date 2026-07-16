@@ -67,6 +67,18 @@ re-fans; on re-apply, `pin_update_available` flips to true only for **pinned** c
 > event** (§4) — it moves no customer content to the master; it exists purely to navigate an actor
 > into a tenant. This keeps tenant content sharded and private while still letting the RFP side act.
 
+> **Two spine systems — copies, not one shared spine.** The master side is one spine
+> (`opportunities → curated_solicitations → opportunity_bridge`, global / admin-written). Each
+> customer's mirror card is the **head of a SEPARATE, tenant-scoped spine** —
+> `tenant_opportunity_cards` (a **copy** at `bridge_version`) → `proposal_portals` → `proposals` →
+> `process_instances` → `tasks` → `system_events`, all RLS / `tenant_id`-scoped. The two connect ONLY
+> via the forward-only bridge (master pushes card updates down — on change, and within 72h of purchase
+> for the skeleton) and the **soft `opportunity_id` reference** (no cross-shard FK). A customer's
+> workflow runs + audit live entirely on **their** spine; the portal reads only their own
+> (`/processes`, `/activity` — `verifyTenantAccess` + `WHERE tenant_id`, verified). The mirror card also
+> lives its own per-customer, per-bucket life as a **Spotlight** informer (`tenant_bucket_scores` vs
+> `tenant_spotlight_buckets`). So `opportunity_id` is the *link between* two spines, not a shared one.
+
 ---
 
 ## 2. Two releases per OPP
