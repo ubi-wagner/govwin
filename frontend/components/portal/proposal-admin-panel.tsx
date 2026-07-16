@@ -25,6 +25,7 @@ interface SectionItem {
   isLocked?: boolean;
   volumeName?: string | null;
   volumeNumber?: number | null;
+  artifactId?: string | null;
 }
 
 interface Collaborator {
@@ -498,7 +499,25 @@ export function ProposalAdminPanel({
                     const vnum = volume.sections[0]?.volumeNumber ?? null;
                     const allLocked = volume.sections.length > 0 && volume.sections.every((s) => isSectionLocked(s));
                     if (allLocked) {
-                      return <span className="text-xs font-semibold text-green-700">✓ Volume locked</span>;
+                      // Locked → offer download in the artifact's native format (auto)
+                      // + PDF. The export route resolves narrative→docx, slides→pptx,
+                      // cost→xlsx; PDF needs Chromium.
+                      const artifactId = volume.sections.find((s) => s.artifactId)?.artifactId;
+                      const base = artifactId
+                        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/artifacts/${artifactId}/export`
+                        : null;
+                      return (
+                        <span className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-green-700">✓ Volume locked</span>
+                          {base && (
+                            <span className="flex items-center gap-1.5 text-gray-400">
+                              <span>·</span>
+                              <a href={`${base}?format=auto`} className="font-medium text-blue-600 hover:underline" title="Download this volume in its native format">Download</a>
+                              <a href={`${base}?format=pdf`} className="text-blue-600 hover:underline" title="Download as PDF (requires Chromium)">PDF</a>
+                            </span>
+                          )}
+                        </span>
+                      );
                     }
                     const lockableCount = volume.sections.filter(
                       (s) => !isSectionLocked(s) && s.status !== 'empty' && s.nodeCount > 0,

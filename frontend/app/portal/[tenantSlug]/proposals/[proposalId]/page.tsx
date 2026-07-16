@@ -173,6 +173,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     isLocked: boolean;
     volumeName: string | null;
     volumeNumber: number | null;
+    artifactId: string | null;
     expertNotes: string | null;
   }[] = [];
 
@@ -192,6 +193,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.is_locked,
         ps.volume_name,
         ps.volume_number,
+        ps.artifact_id,
         ps.meta->>'expertNotes' AS expert_notes,
         u.name AS accepted_by_name,
         CASE
@@ -439,6 +441,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       isLocked: s.isLocked,
       volumeName: s.volumeName ?? null,
       volumeNumber: s.volumeNumber ?? null,
+      artifactId: s.artifactId ?? null,
       expertNotes: s.expertNotes ?? null,
       isEditable: !s.isLocked && (s.completedStage === null || s.completedStage === proposal.stage),
     };
