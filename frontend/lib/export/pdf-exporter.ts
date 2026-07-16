@@ -15,7 +15,7 @@
 import { renderCanvasToHtml } from './canvas-html';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
-type RunningSpec = { text?: string } | null | undefined;
+type RunningSpec = { template?: string } | null | undefined;
 
 function esc(s: unknown): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -24,16 +24,16 @@ function subst(t: unknown, vars: Record<string, string>): string {
   return String(t ?? '').replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`);
 }
 
-function headerTemplate(spec: RunningSpec, vars: Record<string, string>): string {
-  const text = spec?.text ? esc(subst(spec.text, vars)) : '';
-  return `<div style="font-size:9px;width:100%;padding:0 0.6in;color:#475569;border-bottom:0.5px solid #e2e8f0">${text}</div>`;
-}
-function footerTemplate(spec: RunningSpec, vars: Record<string, string>): string {
-  const text = spec?.text ? esc(subst(spec.text, vars)) : '';
-  return `<div style="font-size:9px;width:100%;padding:0 0.6in;color:#475569;display:flex;justify-content:space-between;border-top:0.5px solid #e2e8f0">
-    <span>${text}</span>
-    <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-  </div>`;
+/** Render a canvas running-header/footer `template` to a Playwright template.
+ *  {n}/{N} map to Chromium's live pageNumber/totalPages spans. */
+function runningHtml(spec: RunningSpec, vars: Record<string, string>, isFooter: boolean): string {
+  const raw = spec?.template ? subst(spec.template, vars) : '';
+  let inner = esc(raw)
+    .replace(/\{n\}/g, '<span class="pageNumber"></span>')
+    .replace(/\{N\}/g, '<span class="totalPages"></span>');
+  if (isFooter && !raw) inner = 'Page <span class="pageNumber"></span> of <span class="totalPages"></span>';
+  const border = isFooter ? 'border-top' : 'border-bottom';
+  return `<div style="font-size:9px;width:100%;padding:0 0.6in;color:#475569;${border}:0.5px solid #e2e8f0">${inner}</div>`;
 }
 
 /**
@@ -83,8 +83,8 @@ export async function exportToPdf(doc: CanvasDocument, variables: Record<string,
       height: inch(canvas?.height ?? 792),
       margin: { top: inch(m.top), right: inch(m.right), bottom: inch(m.bottom), left: inch(m.left) },
       displayHeaderFooter: hasHF,
-      headerTemplate: headerTemplate(header, variables),
-      footerTemplate: footerTemplate(footer, variables),
+      headerTemplate: runningHtml(header, variables, false),
+      footerTemplate: runningHtml(footer, variables, true),
     });
     return Buffer.from(buf);
   } finally {
