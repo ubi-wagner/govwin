@@ -337,3 +337,41 @@ notify rules, needs the mail creds). The **frontend alone runs no automation** �
 and reads the `tasks` table. So in a frontend-only stack, events post and ToDos are readable, but
 workflows don't instantiate, agents don't draft, and nudges don't fire. This is the same
 "boot the pipeline worker + CMS listener" prerequisite the HITL runbooks call out.
+
+---
+
+## 12. Hardening + test pass (2026-07-16)
+
+The "user-prompt + base-cron + phase-gated, rock solid" pass. Agents/automation-with-agents stay
+parked (deferred) — this hardened the **HITL-driven** surfaces around them.
+
+- **HITL draft (user-prompt → regen → mold).** Confirmed present + HITL-driven in the canvas —
+  `proposal.draft_section` (mold + RFP context + picked atoms + instruction), triggered from
+  `AIRevisionPanel` / `draft-all-sections` / the `ai/draft` batch route (see
+  `MASTER_MIRROR_OPP_DESIGN.md §6`). Mold-fit (`section-budget`) + budget guards (`agent-guard`) are
+  unit-tested.
+- **Base cron — the dispatcher now honours `cron_expression`.** `tick_schedules` advanced
+  `next_run_at` by a flat 24h/168h keyed only on `run_type`, **ignoring `cron_expression` entirely** —
+  a silent mis-schedule for any non-daily/weekly cron. New `compute_next_run` (`ingest/dispatcher.py`)
+  parses the seeded fixed-time patterns (daily / weekly / every-N-hours) and **warns + falls back** for
+  the rest. 10 tests (`test_cron_next_run.py`).
+- **HITL gate correlation — no cross-user resume (real bug).** `OnApplicationAccepted` waits for
+  `identity:user.logged_in` and resumes via `_event_correlates(payload.userId)`. The login event
+  emitted only `{correlationId}`, so it shared no key with the parked instance and **fell open** — any
+  login resumed any waiting onboarding gate. Fixed: `auth.ts` emits `userId` in the login payload.
+  4 tests (`test_onboarding_correlation.py`).
+- **Force-advance.** `forceAdvanceProcess` (admin + portal HITL force-advance) now has a frontend test:
+  RBAC own-tenant scope, paused-only, the paused→retrying CAS race, the Python-JSONB coerce. 6 tests
+  (`force-advance.test.ts`).
+- **Already rock-solid (heavily tested, no change):** `advanceProposalStage` — the V0→V1 stage machine,
+  single-step gates + OCC compare-and-swap (`advance.test.ts`); the HITL `wait_for` match + resume CAS
+  + entity correlation (`test_hitl_lifecycle`, `test_hitl_wait_alignment`); `on_timeout` escalation
+  (`test_on_timeout_escalation`); the `ProjectCollaboration` generic gate (`test_project_collaboration`);
+  nudge-sweep idempotency (`test_tasks_ledger`).
+- **⚠ Deferred (test only; code map-verified correct):** a *behavioral* test of the paused-deadline
+  reaper CAS + the stale-pending/heartbeat sweeps needs extracting them from the critical
+  `_stuck_detection_loop` — deliberately not refactored right before onboarding Immobileyes; the CAS
+  (`WHERE … status='paused'`) is guarded and grep-locked. The daily source-scout scheduler stays
+  descoped (manual scout only).
+
+Suites after this pass: **frontend 572 · pipeline 581 (+29 skipped DB-integration) · tsc 0.**

@@ -212,6 +212,14 @@ Intended: if the master skeleton already exists, open the portal past curation (
 - **Draft grounding.** A section with no atoms falls back to **all** tenant atoms
   (`lib/atoms.ts selectForSection`); the item's `expert_notes` become the drafter's instruction (the
   blank-mold prompt).
+- **HITL draft (the canvas tools) — pick → regen → mold + RFP-prompt.** V0→V0.5 is customer/shadow
+  driven **in the canvas**, not the autonomous agent loop. The `proposal.draft_section` tool
+  (`lib/tools/proposal-draft-section.ts`) takes the **mold** constraints (page/font/spacing/
+  subsections), the **RFP context** (`rfpExcerpt`), the **picked atoms**, and an **instruction** →
+  regenerates canvas nodes. It's triggered from `AIRevisionPanel` (per node: quick actions **or** a
+  custom prompt — the "easy-bake-oven"), `draft-all-sections`, and the `ai/draft` batch route (carrying
+  the user `instructions`); it runs with or without an API key (placeholder mode). The agent workforce
+  stays parked (see `docs/AUTOMATION_DESIGN.md`).
 - **Advance.** `draft → final` (relabeled **V0.5 → V1**); **Force advance to V1** (`force=true`)
   finalizes without locking every section. Lock flips matrix rows toward `satisfied`
   (`…/sections/[sectionId]/lock`). Download is a real `.docx`.
