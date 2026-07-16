@@ -87,7 +87,16 @@
   - Admin panel: per-volume **"Lock Volume (N)"** push + **"✓ Volume locked"** roll-up chip.
   - Proven: `scratchpad/verify_lock_rollup.mjs` **11/11** (section→artifact→volume→proposal cascade,
     per-canvas matrix audit, hierarchical push, idempotent). tsc 0 · frontend 613 tests.
-  **NEXT (Phase 2, task #48):** the E2E build. Start with the two blockers: (D) `lib/export/pdf-exporter.ts`
-  (canvas → PDF for supporting docs), (E) per-artifact/per-format export routing. Then provision a fake
-  multi-volume proposal (edge-AI co) with the 4 canvas types, draft+style each (SVG/headers/footers/color),
-  lock canvas-by-canvas → hierarchical push, generate + commit docx/pptx/xlsx/pdf deliverables.
+- 2026-07-16 (**Phase 2/3 COMPLETE** — commits `502ac87` PDF exporter, `aa5efaa` deliverables):
+  - Blocker D fixed: `lib/export/canvas-html.ts` (pure) + `lib/export/pdf-exporter.ts` (Chromium via
+    dynamic import; header/footer `template` + {n}/{N} page spans; executable auto-detect).
+  - `frontend/scripts/gen-sample-proposal.mts` — authors the fictional **Aerivio Systems → Navy SBIR**
+    proposal and runs the real docx/pptx/xlsx/pdf exporters. 6 deliverables in `docs/sample-proposal/`
+    (Technical Volume docx+pdf, Commercialization pptx, Cost xlsx, Bios pdf, Facilities pdf) + README.
+    Styling: bold/italic/color, headers/footers+page numbers, tables (currency), generated SVGs.
+  - Process driven through the live schema (RFP admin provision + shadow lock/push): 4 vol · 5 art ·
+    7 canvases → canvas-by-canvas lock (V1) + hierarchical "Lock Volume" push (V2–V4) → 7/7 canvases,
+    5/5 artifacts, 7/7 matrix satisfied → ADVANCE-READY; audited (section×7/artifact×5/document×4/advance×1).
+  **Open follow-ups:** blocker E (per-artifact/per-format export ROUTE in the app — the offline generator
+  proves the exporters; the app still packages whole-proposal-docx only). Technical Volume renders ~5pp of
+  dense content (not literally 15) — expand prose per section if the literal page target is required.
