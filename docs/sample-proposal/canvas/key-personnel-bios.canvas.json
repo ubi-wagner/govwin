@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "document_id": "f179b295-8d11-4c19-bfb7-4ce5e4b67403",
+  "canvas": {
+    "format": "letter",
+    "width": 612,
+    "height": 792,
+    "margins": {
+      "top": 72,
+      "right": 72,
+      "bottom": 72,
+      "left": 72
+    },
+    "header": {
+      "template": "{company_name} — Key Personnel",
+      "font": {
+        "family": "Arial",
+        "size": 9
+      },
+      "height": 22
+    },
+    "footer": {
+      "template": "SBIR Phase I · Supporting Documents · Proprietary · Page {n} of {N}",
+      "font": {
+        "family": "Arial",
+        "size": 9
+      },
+      "height": 22
+    },
+    "font_default": {
+      "family": "Georgia",
+      "size": 11,
+      "color": "#111827"
+    },
+    "line_spacing": 1.35,
+    "max_pages": 15,
+    "max_slides": null
+  },
+  "nodes": [
+    {
+      "id": "9fe3d2b5-38a3-49cc-b608-7ee4569a3448",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Key Personnel"
+      },
+      "style": {
+        "color": "#3730a3"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "890e1e7e-40ee-48a2-96b2-b9b78a0ce375",
+      "type": "heading",
+      "content": {
+        "level": 2,
+        "text": "Dr. Mara Ellison — Principal Investigator"
+      },
+      "style": {
+        "color": "#1e3a8a"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "78becbba-c754-4392-8257-bdef94d2a28a",
+      "type": "image",
+      "content": {
+        "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjNjM2NmYxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiM2MzY2ZjEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPk1FPC90ZXh0Pjwvc3ZnPg==",
+        "alt_text": "Headshot placeholder for Dr. Mara Ellison",
+        "width": 150,
+        "height": 150
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a36cdba0-8423-4fbb-a077-01b5e1c0e76c",
+      "type": "text_block",
+      "content": {
+        "text": "Dr. Ellison holds a Ph.D. in Electrical Engineering and has 12 years of experience in low-power machine learning for sensing. She led the quantization research that underpins Aerivio’s core IP and will devote 0.30 FTE to this effort as Principal Investigator.",
+        "inline_formats": [
+          {
+            "start": 209,
+            "length": 8,
+            "format": "bold"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "0267b474-20ee-4f07-aa8e-b1a3acdc775b",
+      "type": "heading",
+      "content": {
+        "level": 2,
+        "text": "Tomas Reyes — Senior Systems Engineer"
+      },
+      "style": {
+        "color": "#1e3a8a"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "4442dfac-67c4-4c11-ac5d-192bb950cfb4",
+      "type": "image",
+      "content": {
+        "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMGVhNWU5Ii8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMwZWE1ZTkiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlRSPC90ZXh0Pjwvc3ZnPg==",
+        "alt_text": "Headshot placeholder for Tomas Reyes",
+        "width": 150,
+        "height": 150
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a1cb6dd5-98b6-47cf-aaf5-83d061a2cf29",
+      "type": "text_block",
+      "content": {
+        "text": "Mr. Reyes brings 9 years of embedded real-time systems experience, including two fielded maritime autonomy stacks. He owns the edge-port and latency-benchmark tasks and the deterministic scheduler design.",
+        "inline_formats": []
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "81f9ecc7-8dc8-4804-b399-417eed4ddf81",
+      "type": "heading",
+      "content": {
+        "level": 2,
+        "text": "Priya Nandakumar — ML Engineer"
+      },
+      "style": {
+        "color": "#1e3a8a"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "f00b40e6-440b-4bc5-8fab-df7123227564",
+      "type": "image",
+      "content": {
+        "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMTBiOTgxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMxMGI5ODEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBOPC90ZXh0Pjwvc3ZnPg==",
+        "alt_text": "Headshot placeholder for Priya Nandakumar",
+        "width": 150,
+        "height": 150
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "8a5d3ca0-c564-42b9-a461-a5f5b4c79dc4",
+      "type": "text_block",
+      "content": {
+        "text": "Ms. Nandakumar specializes in model compression and data augmentation. She will lead corpus curation and quantization-aware training, and maintain the data card and evaluation protocol.",
+        "inline_formats": []
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    }
+  ],
+  "metadata": {
+    "title": "Aerivio Key Personnel Bios",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  }
+}

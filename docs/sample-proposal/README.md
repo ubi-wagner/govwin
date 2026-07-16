@@ -5,6 +5,10 @@ proposal engine end-to-end: multiple volumes, multiple artifacts per volume,
 multiple canvas types, per-canvas draft→save→lock, the hierarchical lock/push
 (section → artifact → volume → proposal), and export to every deliverable format.
 
+**These are our canonical example outputs / templates** — point to them to show
+what a finished proposal looks like across formats, and reuse the canvas JSON in
+`canvas/` (see below) as starting templates.
+
 - **Company (made up):** Aerivio Systems
 - **Technology (made up):** quantized edge-AI acoustic threat classification for
   unmanned surface vessels
@@ -17,10 +21,10 @@ multiple canvas types, per-canvas draft→save→lock, the hierarchical lock/pus
 
 | File | Format | Exporter | Demonstrates |
 |---|---|---|---|
-| `Aerivio_Technical_Volume.docx` | Word | `lib/export/docx-exporter` | 15-page-style narrative: headings, **bold**/*italic*, colored section heads, a figure, work-plan + risk + results tables, running header/footer |
-| `Aerivio_Technical_Volume.pdf` | PDF | `lib/export/pdf-exporter` (Chromium) | Full-fidelity view of the same volume incl. the inline **SVG architecture figure** + page numbers |
-| `Aerivio_Commercialization.pptx` | PowerPoint | `lib/export/pptx-exporter` | 5-slide deck (title, market + **SVG bar chart**, competition, go-to-market, financials) |
-| `Aerivio_Cost_Volume.xlsx` | Excel | `lib/export/xlsx-exporter` | 1-year **$150,000** budget worksheet: line items, currency cells, highlighted total row |
+| `Aerivio_Technical_Volume.docx` | Word | `lib/export/docx-exporter` | **Full ~16-page** narrative (15 numbered sections + 2 appendices): headings, **bold**/*italic*, colored section heads, 2 figures, 6 tables, running header/footer, 12pt/1.5 SBIR formatting |
+| `Aerivio_Technical_Volume.pdf` | PDF | `lib/export/pdf-exporter` (Chromium) | Full-fidelity **16-page** view incl. the inline **SVG architecture + pipeline figures** + page numbers |
+| `Aerivio_Commercialization.pptx` | PowerPoint | `lib/export/pptx-exporter` | **5 complete slides** (title, market + **SVG bar chart**, competition, go-to-market, financials) |
+| `Aerivio_Cost_Volume.xlsx` | Excel | `lib/export/xlsx-exporter` | **2 tabs** — Direct-Labor detail (roles/rate/hours) + Budget Summary; currency cells, subtotals, highlighted **$150,000** total |
 | `Aerivio_Key_Personnel_Bios.pdf` | PDF | `lib/export/pdf-exporter` | 3 bios with **generated SVG headshot** placeholders |
 | `Aerivio_Facilities.pdf` | PDF | `lib/export/pdf-exporter` | Facilities write-up with a **generated SVG facility** illustration |
 
@@ -28,6 +32,18 @@ multiple canvas types, per-canvas draft→save→lock, the hierarchical lock/pus
 running headers + footers with page numbers, bulleted + numbered lists, tables
 with currency formatting and highlighted cells, and generated SVGs used as image
 placeholders (architecture diagram, market chart, headshots, facility).
+
+## Reusable canvas templates
+
+Each deliverable's source **CanvasDocument JSON** is saved under `canvas/` — reuse
+these as starting templates (drop into a section's content, or feed the exporters
+directly):
+
+- `canvas/technical-volume.canvas.json`  (letter, 12pt/1.5, 15 sections + 2 appendices)
+- `canvas/commercialization.canvas.json`  (slide_16_9, 5 slides)
+- `canvas/cost-volume.canvas.json`  (spreadsheet, 2 tabs, $150k)
+- `canvas/key-personnel-bios.canvas.json`  (letter, SVG headshots)
+- `canvas/facilities.canvas.json`  (letter, SVG facility)
 
 ## The process that was run (RFP admin + shadow support)
 

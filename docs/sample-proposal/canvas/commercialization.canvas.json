@@ -1,0 +1,390 @@
+{
+  "version": 1,
+  "document_id": "aecd0da6-184a-4d56-9ee6-c2a2858231c6",
+  "canvas": {
+    "format": "slide_16_9",
+    "width": 960,
+    "height": 540,
+    "margins": {
+      "top": 40,
+      "right": 40,
+      "bottom": 40,
+      "left": 40
+    },
+    "header": null,
+    "footer": null,
+    "font_default": {
+      "family": "Arial",
+      "size": 18
+    },
+    "line_spacing": 1.2,
+    "max_pages": null,
+    "max_slides": 25
+  },
+  "nodes": [
+    {
+      "id": "0dbfc48c-d868-45b8-b0f6-ea7c66e5189b",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Aerivio Systems"
+      },
+      "style": {
+        "color": "#3730a3"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "20276edb-9d82-472a-a613-2acc774cf7ba",
+      "type": "text_block",
+      "content": {
+        "text": "Commercialization Plan — SBIR Phase I",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#475569"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "245a9298-2aee-4afa-9269-139d8c7f6d1e",
+      "type": "text_block",
+      "content": {
+        "text": "Edge-AI acoustic threat classification for unmanned surface vessels",
+        "inline_formats": []
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "fa2bc34a-7196-40be-8517-07e3c1e9642d",
+      "type": "text_block",
+      "content": {
+        "text": "Topic N251-042 · US Navy · $150,000 / 6 months",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#64748b"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "4c1f7063-c29b-49d7-b22a-00f64493fade",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "d1751ac0-2914-44f8-99bb-a12784fae6e8",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Market Opportunity"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "37a43827-84e8-4eb0-a473-09074e5352cf",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Navy USV fleet projected to exceed 300 hulls by 2030 — each needs edge acoustic sensing"
+          },
+          {
+            "text": "Beachhead: US Navy programs of record"
+          },
+          {
+            "text": "Expansion: allied navies + commercial maritime security (ports, offshore energy)"
+          },
+          {
+            "text": "Serviceable market growing ~$8M → $60M+ per year by 2030"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "c795540a-5b65-47dc-9f28-81f276b23457",
+      "type": "image",
+      "content": {
+        "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iNDQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjIwIiB5PSIyNCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzFlMjkzYiI+U2VydmljZWFibGUgbWFya2V0ICgkTS95cik8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjE1NCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjOTNjNWZkIi8+PHRleHQgeD0iNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI2PC90ZXh0Pjx0ZXh0IHg9Ijc1IiB5PSIxNDkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzMzNDE1NSI+JDhNPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iMTIzIiB3aWR0aD0iNzAiIGhlaWdodD0iNDciIGZpbGw9IiMzYjgyZjYiLz48dGV4dCB4PSIxNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI4PC90ZXh0Pjx0ZXh0IHg9IjE3NSIgeT0iMTE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPiQyNE08L3RleHQ+PHJlY3QgeD0iMjQwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzFkNGVkOCIvPjx0ZXh0IHg9IjI3NSIgeT0iMTg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPjIwMzA8L3RleHQ+PHRleHQgeD0iMjc1IiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4kNjFNPC90ZXh0Pjwvc3ZnPg==",
+        "alt_text": "Market growth chart",
+        "width": 440,
+        "height": 200
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "faea40e2-d32f-4641-b595-7f491a7cca2b",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "7ab3792e-4102-40b7-98ee-3e7759f4434c",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Competition & Differentiation"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "7d8fe381-d93b-49a0-a5e8-9840bbd0c2ff",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Incumbents process acoustics shore-side → latency + comms dependence"
+          },
+          {
+            "text": "Aerivio runs fully on-vessel at 2 watts, <100 ms"
+          },
+          {
+            "text": "Defensible IP: saliency-guided quantization pipeline (patent pending)"
+          },
+          {
+            "text": "Retrofits deployed hulls — no new hardware program required"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "0327a35d-0d73-45c5-a3ec-15713af34a31",
+      "type": "text_block",
+      "content": {
+        "text": "Bottom line: we win where connectivity fails — exactly the contested environment that matters.",
+        "inline_formats": [
+          {
+            "start": 16,
+            "length": 28,
+            "format": "bold"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "81663751-f441-4f22-b657-7b50c5eb265b",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "0c95e2b8-93b2-484b-8af3-d91f6eb2a219",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Go-to-Market & Milestones"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "00096ab7-b072-4959-9f1c-35db8cff715f",
+      "type": "numbered_list",
+      "content": {
+        "items": [
+          {
+            "text": "Phase I (now): feasibility on the Navy corpus, months 1–6"
+          },
+          {
+            "text": "Phase II: hardened module + at-sea demonstration (~$1.1M / 24 mo)"
+          },
+          {
+            "text": "Phase III: transition to a Navy USV program of record"
+          },
+          {
+            "text": "Commercial: port-security & offshore-energy monitoring (dual-use)"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "104b68ca-b54c-4f38-ab88-8205fb5738be",
+      "type": "text_block",
+      "content": {
+        "text": "Transition is a software integration, not a hardware program — a low-barrier path to a funded home.",
+        "inline_formats": []
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "d21e56d0-9921-4c14-8ebd-665a96ff52fd",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "214df022-56dd-48dc-bef3-a3a41a082de9",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Financials & The Ask"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "fd6917a4-8885-4b69-ac0c-d81f98bd8a9c",
+      "type": "text_block",
+      "content": {
+        "text": "Phase I budget: $150,000 over 6 months.",
+        "inline_formats": [
+          {
+            "start": 16,
+            "length": 8,
+            "format": "bold"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "fd51129a-ed3a-4145-bda3-9214e4dd10bc",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Team of 3 (PI + systems + ML engineer)"
+          },
+          {
+            "text": "Deliverable: validated 4-bit edge classifier meeting all three gates"
+          },
+          {
+            "text": "Phase II target: $1.1M for an at-sea demonstration"
+          },
+          {
+            "text": "Commercial revenue path reduces single-program reliance"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a7d94c55-d129-4c9c-88eb-8091779f2b7d",
+      "type": "text_block",
+      "content": {
+        "text": "Ask: fund Phase I to de-risk the edge classifier and unlock the transition path.",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#3730a3"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    }
+  ],
+  "metadata": {
+    "title": "Aerivio Commercialization",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  }
+}
