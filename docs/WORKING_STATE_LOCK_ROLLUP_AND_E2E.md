@@ -97,6 +97,15 @@
   - Process driven through the live schema (RFP admin provision + shadow lock/push): 4 vol · 5 art ·
     7 canvases → canvas-by-canvas lock (V1) + hierarchical "Lock Volume" push (V2–V4) → 7/7 canvases,
     5/5 artifacts, 7/7 matrix satisfied → ADVANCE-READY; audited (section×7/artifact×5/document×4/advance×1).
-  **Open follow-ups:** blocker E (per-artifact/per-format export ROUTE in the app — the offline generator
-  proves the exporters; the app still packages whole-proposal-docx only). Technical Volume renders ~5pp of
-  dense content (not literally 15) — expand prose per section if the literal page target is required.
+- 2026-07-16 (**follow-ups COMPLETE** — commits `e50186d`, `065aa83`):
+  - Technical Volume expanded to a genuine **16 pages** (15 sections + 2 appendices, 12pt/1.5;
+    authoritative count via pdfjs-dist). Deck = 5 complete slides. Cost = 2 tabs ($150k). Canvas
+    JSON saved under `docs/sample-proposal/canvas/` as reusable example templates; README reframed
+    as canonical example outputs.
+  - **Blocker E DONE:** `lib/export/artifact-export.ts` (resolveArtifactFormat + assembleArtifactCanvas
+    + renderCanvas) + `GET .../artifacts/[artifactId]/export?format=…` (server-authoritative, native
+    format by type, PDF via Chromium with a clean 503 fallback) + admin-panel per-volume Download/PDF
+    links (artifactId threaded through the read-model). 9 unit tests + integration proof (docx/pptx/
+    xlsx/pdf from real content). Frontend 622 tests · tsc 0.
+  **Remaining (optional):** trim TV to a hard 15-page cap if a solicitation limit requires it (drop one
+  appendix); a per-volume format dropdown (currently native + PDF links).
