@@ -57,16 +57,33 @@ stack up per `ALPHA_HITL_RUNBOOK.md §1`, migrations **001→108**, seed + fixtu
 
 | # | Click | Perform | Expect | Status |
 |---|---|---|---|---|
-| 16 | a section with no atoms | **Draft** | Drafts from the **expert note + all proposal atoms** fallback | ✅ this cycle |
+| 16 | a section in the canvas | **Draft / regenerate** — pick atoms, then a quick action **or** a custom prompt in the **AI Revision Panel** (or **Draft all sections**) | `proposal.draft_section` fills the mold from the **RFP context + picked atoms + your instruction**; empty sections fall back to the **expert note + all proposal atoms**. HITL — the agent workforce stays parked | ✅ this cycle |
 | 17 | each section | **Accept & Lock** (library plug-and-play) | Sections `approved`; matrix rows → `satisfied` — **V0 → V0.5** (~15 min) | ✅ ×2 satisfied |
 | 18 | stage control | **Lock all** *or* **Force advance to V1** | Advances to **V1**/`submitted` (force skips locking every section); downloads enabled | ✅ this cycle |
 | 19 | proposal panel | **Download Proposal (.docx)** | A real Word doc (V1) | ✅ valid .docx |
-| 20 | `/admin/activity` + `/admin/workflows` | Audit | Events post as **objects**; `process_instances` carry `opportunity_id` | ✅ 33/33 objects; ⚠ boot the **pipeline worker** for instances |
-
 **Next buyer of the same OPP:** their own portal + skeleton instance — molds already exist → skip
 steps 6–7/14, straight to step 16. (⚠ today they still open `curation_pending`; auto-skip is §5 future.)
 
+## Pass E — Monitor the spine (customer + shadow + admin)
+
+**Two spine systems** (`MASTER_MIRROR_OPP_DESIGN.md §1`): the customer reads **only their own** copy
+spine; the admin reads across spines. All tenant-scoped (`verifyTenantAccess` + `WHERE tenant_id`).
+
+| # | Click | Perform | Expect | Status |
+|---|---|---|---|---|
+| 20 | `/portal/immobileyes/processes` (customer **or** shadow) | Watch the workflow ledger → click **Steps** on an instance | Health chips (running/waiting/stalled/failing) + current step + the **step timeline** (`process_instance_transitions`) — **their own spine only** | ✅ this cycle |
+| 21 | `/portal/immobileyes/activity` | View the audit stream | Their `system_events` (ns/type/phase/actor/payload), filterable, 10s refresh — tenant-scoped | ✅ this cycle |
+| 22 | `/admin/workflows` + `/admin/events` (rfp_admin) | **Cross-spine** audit → **Steps** on any instance | `process_instances` carry `opportunity_id`; the step timeline; events post as **objects** | ✅ 33/33 objects; ⚠ boot the **pipeline worker** for live instances |
+
 ---
+
+## Hardened + tested this cycle (rock-solid)
+The **phase-gated** stage machine (`advanceProposalStage` — single-step gates + OCC compare-and-swap),
+the **HITL gates** (wait/park/resume by entity correlation + CAS, force-advance), the **base cron**
+(the dispatcher now honours `cron_expression`), and the **HITL draft** (mold-fit + budget guards) are
+guarded and unit-tested. Two fixes landed: the onboarding gate correlates login by `userId` (no
+cross-user resume), and the cron dispatcher no longer silently mis-schedules. Suites: **frontend 572 ·
+pipeline 581 · tsc 0**. Agents/automation-with-agents stay parked (`AUTOMATION_DESIGN.md`).
 
 ## ⚠ On the roadmap (shown so the runbook carries the trajectory — not clicked Monday)
 Per `MASTER_MIRROR_OPP_DESIGN.md §9`: the **buyer/outcome ledger** on the master OPP + **sbir.gov
@@ -78,6 +95,6 @@ company admin accounts — the customer-executed target); the **EconDev appointe
 shadow grant and retire the `verifyTenantAccess` god-view.
 
 ## Infra prerequisites for a full green run
-**Real S3** (steps 3, 10 doc storage) · the **Python pipeline worker** (steps 15–16 auto-draft +
-step 20 workflow instances) · **CMS event listener + creds** (step 13 admin email — graceful without;
-the in-app ToDo still shows).
+**Real S3** (steps 3, 10 doc storage) · the **Python pipeline worker** (steps 15–16 auto-draft + the
+Pass E workflow/spine views, steps 20–22) · **CMS event listener + creds** (step 13 admin email —
+graceful without; the in-app ToDo still shows).
