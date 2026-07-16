@@ -350,6 +350,32 @@ export function ProposalAdminPanel({
     }
   }, [tenantSlug, proposalId, router]);
 
+  // Hierarchical push — lock every lockable canvas in a scope (volume / artifact /
+  // whole proposal) via the lock-scope route. Each canvas STILL locks + audits per
+  // the per-section stricture (server loops lockSectionCore); the artifact/volume/
+  // proposal roll-ups fire as the last canvas in each scope locks.
+  const [scopeBusy, setScopeBusy] = useState<string | null>(null);
+  const lockScope = useCallback(
+    async (scope: 'volume' | 'artifact' | 'proposal', key?: number | string) => {
+      if (scopeBusy) return;
+      setScopeBusy(`${scope}:${key ?? 'all'}`);
+      try {
+        const body: Record<string, unknown> = { scope };
+        if (scope === 'volume') body.volumeNumber = key;
+        if (scope === 'artifact') body.artifactId = key;
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/lock-scope`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) router.refresh();
+      } finally {
+        setScopeBusy(null);
+      }
+    },
+    [scopeBusy, tenantSlug, proposalId, router],
+  );
+
   // Bulk "Accept & Lock All" — locks every unlocked, draftable section so the
   // whole document can advance in one click. Reuses the per-section lock route,
   // so each lock emits section.locked + harvests + (on the last) document.locked
@@ -462,11 +488,34 @@ export function ProposalAdminPanel({
             <div key={volume.label} className="mb-5">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg">
                 <h3 className="text-sm font-semibold text-gray-700">{volume.label}</h3>
-                <span className="text-xs text-gray-500">
-                  {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
-                  {volume.sections.length} locked
-                  {volume.totalPages > 0 && ` • ${volume.usedPages}/${volume.totalPages} pages`}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">
+                    {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
+                    {volume.sections.length} locked
+                    {volume.totalPages > 0 && ` • ${volume.usedPages}/${volume.totalPages} pages`}
+                  </span>
+                  {(() => {
+                    const vnum = volume.sections[0]?.volumeNumber ?? null;
+                    const allLocked = volume.sections.length > 0 && volume.sections.every((s) => isSectionLocked(s));
+                    if (allLocked) {
+                      return <span className="text-xs font-semibold text-green-700">✓ Volume locked</span>;
+                    }
+                    const lockableCount = volume.sections.filter(
+                      (s) => !isSectionLocked(s) && s.status !== 'empty' && s.nodeCount > 0,
+                    ).length;
+                    if (lockableCount === 0 || vnum == null) return null;
+                    return (
+                      <button
+                        onClick={() => lockScope('volume', vnum)}
+                        disabled={scopeBusy != null || lockingAll || advancing}
+                        title="Lock every drafted canvas in this volume — each still locks + audits per canvas, then rolls up to the volume"
+                        className="px-2.5 py-1 text-xs font-semibold bg-gray-700 text-white rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                      >
+                        {scopeBusy === `volume:${vnum}` ? 'Locking…' : `Lock Volume (${lockableCount})`}
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
               <div className="border border-gray-200 border-t-0 rounded-b-lg">
                 {volume.sections.map((section) => {
