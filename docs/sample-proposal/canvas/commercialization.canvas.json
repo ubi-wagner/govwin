@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "fa7281dc-d513-462a-8812-f05524c70040",
+  "document_id": "64d9baab-2ce1-40f1-b3b6-97cb243b11a3",
   "canvas": {
     "format": "slide_16_9",
     "width": 960,
@@ -23,7 +23,7 @@
   },
   "nodes": [
     {
-      "id": "81c73205-82ea-4fdb-8dab-27c9bac5483f",
+      "id": "19f1c448-adbb-4f05-9b8f-cc2b7f7f6287",
       "type": "heading",
       "content": {
         "level": 1,
@@ -39,7 +39,7 @@
       "library_eligible": false
     },
     {
-      "id": "2d0b1911-426b-418a-b260-6ccd56707d54",
+      "id": "35bd3fe3-34c2-41a2-817e-80d8afd3d1d3",
       "type": "text_block",
       "content": {
         "text": "Commercialization Plan — SBIR Phase I",
@@ -55,7 +55,7 @@
       "library_eligible": false
     },
     {
-      "id": "efbb2f70-0032-46a2-98c9-12f0181c82c4",
+      "id": "d6cab1fb-1340-40e9-87bb-63e49e101ac7",
       "type": "text_block",
       "content": {
         "text": "Edge-AI acoustic threat classification for unmanned surface vessels",
@@ -69,10 +69,10 @@
       "library_eligible": false
     },
     {
-      "id": "f0968f7f-a833-4373-b6af-684f371f04d6",
+      "id": "1dd9ce1e-bc73-4b56-bfdd-24c75514cb76",
       "type": "text_block",
       "content": {
-        "text": "Topic N251-042 · US Navy · $150,000 / 6 months",
+        "text": "Topic N251-042 · AFWERX SBIR Phase I (CSO) · $150,000 / 6 months",
         "inline_formats": []
       },
       "style": {
@@ -85,7 +85,7 @@
       "library_eligible": false
     },
     {
-      "id": "83c24f3e-23b0-44dd-b2e6-5442df4a6c88",
+      "id": "5fa85cb6-7c06-47a3-93cc-44422cafb929",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -96,7 +96,7 @@
       "library_eligible": false
     },
     {
-      "id": "1e223a7a-f7a4-4b1c-b478-40918e308b4c",
+      "id": "5e72da3f-7493-424b-b51d-b4616d97a4d4",
       "type": "heading",
       "content": {
         "level": 1,
@@ -110,15 +110,15 @@
       "library_eligible": false
     },
     {
-      "id": "752f95e2-670e-4c71-8875-0feb4978fd0c",
+      "id": "bc368a32-a554-4c07-ab80-e71ce32a3eb8",
       "type": "bulleted_list",
       "content": {
         "items": [
           {
-            "text": "Navy USV fleet projected to exceed 300 hulls by 2030 — each needs edge acoustic sensing"
+            "text": "DoD USV fleet (Air Force & Navy) projected to exceed 300 hulls by 2030 — each needs edge acoustic sensing"
           },
           {
-            "text": "Beachhead: US Navy programs of record"
+            "text": "Beachhead: DoD USV programs of record"
           },
           {
             "text": "Expansion: allied navies + commercial maritime security (ports, offshore energy)"
@@ -136,7 +136,7 @@
       "library_eligible": false
     },
     {
-      "id": "4675a089-7439-4a33-8a00-8e8e8cb43ee8",
+      "id": "c33c977b-e6b8-4275-84e5-0c889f74a0bd",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iNDQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjIwIiB5PSIyNCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzFlMjkzYiI+U2VydmljZWFibGUgbWFya2V0ICgkTS95cik8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjE1NCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjOTNjNWZkIi8+PHRleHQgeD0iNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI2PC90ZXh0Pjx0ZXh0IHg9Ijc1IiB5PSIxNDkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzMzNDE1NSI+JDhNPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iMTIzIiB3aWR0aD0iNzAiIGhlaWdodD0iNDciIGZpbGw9IiMzYjgyZjYiLz48dGV4dCB4PSIxNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI4PC90ZXh0Pjx0ZXh0IHg9IjE3NSIgeT0iMTE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPiQyNE08L3RleHQ+PHJlY3QgeD0iMjQwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzFkNGVkOCIvPjx0ZXh0IHg9IjI3NSIgeT0iMTg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPjIwMzA8L3RleHQ+PHRleHQgeD0iMjc1IiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4kNjFNPC90ZXh0Pjwvc3ZnPg==",
@@ -152,7 +152,7 @@
       "library_eligible": false
     },
     {
-      "id": "62f1834d-f3ba-46fd-be1a-4d545a79f9de",
+      "id": "0ea4f773-7e3a-4f71-af5e-0bdb79bb33d6",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -163,7 +163,7 @@
       "library_eligible": false
     },
     {
-      "id": "0b5724f3-d2b5-4d94-99da-8eb2dfaff523",
+      "id": "7691792e-8e85-4c0d-9c97-2ce8d83071af",
       "type": "heading",
       "content": {
         "level": 1,
@@ -177,7 +177,7 @@
       "library_eligible": false
     },
     {
-      "id": "7a086e89-3076-4984-a668-b88ae21b5e5d",
+      "id": "4f1f0f56-bc50-4c4d-960e-f2ce37b57690",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -203,7 +203,7 @@
       "library_eligible": false
     },
     {
-      "id": "e7b1a6d7-bf82-4c0d-aa2a-db21e2f8673d",
+      "id": "a22121bf-b571-47c1-836c-0d69a3e20785",
       "type": "text_block",
       "content": {
         "text": "Bottom line: we win where connectivity fails — exactly the contested environment that matters.",
@@ -223,7 +223,7 @@
       "library_eligible": false
     },
     {
-      "id": "4449d845-b581-413d-85fb-a75f6b24f21e",
+      "id": "e8e01aad-531d-4377-b848-f26ea966acfd",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -234,7 +234,7 @@
       "library_eligible": false
     },
     {
-      "id": "c1785ae9-6812-4203-816a-494f0bd3eda6",
+      "id": "d8d39af4-664c-4c0a-b4e3-f55f94f0ce36",
       "type": "heading",
       "content": {
         "level": 1,
@@ -248,18 +248,18 @@
       "library_eligible": false
     },
     {
-      "id": "15479826-e14b-4f09-a46c-bc8e2b97d657",
+      "id": "f426244e-4d4a-4ef2-b100-eeb9c314110f",
       "type": "numbered_list",
       "content": {
         "items": [
           {
-            "text": "Phase I (now): feasibility on the Navy corpus, months 1–6"
+            "text": "Phase I (now): feasibility on the maritime corpus, months 1–6"
           },
           {
             "text": "Phase II: hardened module + at-sea demonstration (~$1.1M / 24 mo)"
           },
           {
-            "text": "Phase III: transition to a Navy USV program of record"
+            "text": "Phase III: transition to a DoD USV program of record"
           },
           {
             "text": "Commercial: port-security & offshore-energy monitoring (dual-use)"
@@ -274,7 +274,7 @@
       "library_eligible": false
     },
     {
-      "id": "dd20d30a-d3f0-48dd-a410-8583fbcb7156",
+      "id": "16d6e30f-43f9-4a1f-8020-bd4ccd951119",
       "type": "text_block",
       "content": {
         "text": "Transition is a software integration, not a hardware program — a low-barrier path to a funded home.",
@@ -288,7 +288,7 @@
       "library_eligible": false
     },
     {
-      "id": "c60e72dc-b2b8-4c7d-9020-b4fc130d420a",
+      "id": "04a69811-5890-49bf-9c3c-0a00d0472764",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -299,7 +299,7 @@
       "library_eligible": false
     },
     {
-      "id": "b3ee4a10-8806-476b-951c-16b4a1a55e24",
+      "id": "748e452e-f532-4c9d-96c6-d835f0a0383c",
       "type": "heading",
       "content": {
         "level": 1,
@@ -313,7 +313,7 @@
       "library_eligible": false
     },
     {
-      "id": "2c58c92d-e059-4e30-b6c8-ff14504f5fba",
+      "id": "772396a9-26de-449c-b133-3b7966299c2c",
       "type": "text_block",
       "content": {
         "text": "Phase I budget: $150,000 over 6 months.",
@@ -333,7 +333,7 @@
       "library_eligible": false
     },
     {
-      "id": "f46a8a9b-effb-49e3-9e19-24fd634a0a95",
+      "id": "60701da4-c919-45d3-83fa-c3580ccada8b",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -359,7 +359,7 @@
       "library_eligible": false
     },
     {
-      "id": "91a40961-3a9f-488e-8bd9-ec8f27bbc0ab",
+      "id": "54851059-f0ce-4fdb-9d02-3dec1f6e48bc",
       "type": "text_block",
       "content": {
         "text": "Ask: fund Phase I to de-risk the edge classifier and unlock the transition path.",

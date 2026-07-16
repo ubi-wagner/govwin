@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "9170122f-9e33-4947-927b-bbd92bfe737d",
+  "document_id": "eb8acf8e-509f-4506-882a-7f2932ee051d",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "7b3e7ca1-8bbf-44db-a515-c407651f682b",
+      "id": "b5fb2665-dd32-4f70-8693-a48fefc3f66d",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "15818bc3-1901-4b33-bfb3-5bc215a610b7",
+      "id": "ab67421f-df91-4f45-aefa-70b6acecf3ba",
       "type": "heading",
       "content": {
         "level": 2,
@@ -70,7 +70,7 @@
       "library_eligible": false
     },
     {
-      "id": "76db6eae-c458-4b5e-a1da-ebead31246b0",
+      "id": "4a5582b6-5b8a-41b9-a3b0-9c898df43d05",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjNjM2NmYxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiM2MzY2ZjEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPk1FPC90ZXh0Pjwvc3ZnPg==",
@@ -86,7 +86,7 @@
       "library_eligible": false
     },
     {
-      "id": "9c5288a9-7854-49d1-85ac-8670467b10b1",
+      "id": "db8352fa-309a-49f4-bb71-5162e038c603",
       "type": "text_block",
       "content": {
         "text": "Dr. Ellison holds a Ph.D. in Electrical Engineering and has 12 years of experience in low-power machine learning for sensing. She led the quantization research that underpins Aerivio’s core IP and will devote 0.30 FTE to this effort as Principal Investigator.",
@@ -106,7 +106,7 @@
       "library_eligible": false
     },
     {
-      "id": "cc894f0f-8e5f-41db-a6ca-5c1534f9e0c5",
+      "id": "c0ec6b3d-93b2-42b3-9ec4-4372478489e7",
       "type": "heading",
       "content": {
         "level": 2,
@@ -122,7 +122,7 @@
       "library_eligible": false
     },
     {
-      "id": "29ef636f-b8f3-4411-9cd0-5c82caa31e1a",
+      "id": "90f8fa00-d410-4760-892f-aaa456838eee",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMGVhNWU5Ii8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMwZWE1ZTkiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlRSPC90ZXh0Pjwvc3ZnPg==",
@@ -138,7 +138,7 @@
       "library_eligible": false
     },
     {
-      "id": "86a0313e-ee39-495f-90cb-d9e40a85e45a",
+      "id": "6798585d-b2e3-4797-9316-4ba8ac95d608",
       "type": "text_block",
       "content": {
         "text": "Mr. Reyes brings 9 years of embedded real-time systems experience, including two fielded maritime autonomy stacks. He owns the edge-port and latency-benchmark tasks and the deterministic scheduler design.",
@@ -152,7 +152,7 @@
       "library_eligible": false
     },
     {
-      "id": "dacb9be8-e2e6-429f-b5cc-e35b1d77f100",
+      "id": "b56e2fec-f071-47ad-8611-75d92dbc31f1",
       "type": "heading",
       "content": {
         "level": 2,
@@ -168,7 +168,7 @@
       "library_eligible": false
     },
     {
-      "id": "7807cfca-9d0b-43c7-aa8b-2929e71a1e56",
+      "id": "4ba17a04-12b1-47c7-af43-d543f3b57fdc",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMTBiOTgxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMxMGI5ODEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBOPC90ZXh0Pjwvc3ZnPg==",
@@ -184,7 +184,7 @@
       "library_eligible": false
     },
     {
-      "id": "3ddb3c68-f8c9-4362-b479-d0d67d8c34d8",
+      "id": "413ba6fc-ebcf-4a30-a0b9-c4967ddd1a73",
       "type": "text_block",
       "content": {
         "text": "Ms. Nandakumar specializes in model compression and data augmentation. She will lead corpus curation and quantization-aware training, and maintain the data card and evaluation protocol.",

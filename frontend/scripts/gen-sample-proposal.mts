@@ -148,7 +148,7 @@ const white = doc(letter('Technical Volume', 'AFWERX SBIR Phase I · Topic N251-
 
   brk(),
   h(2, '5. Relationship with Future Research or Development', '#1e3a8a'),
-  P('Phase I establishes feasibility on the target module. Phase II hardens the module, extends the corpus to fielded recordings, and conducts an at-sea demonstration on a Navy USV against the same gates plus a robustness gate across sea states; we will pursue approximately $1.1M over 24 months. In Phase III we target integration with a USV program of record through the relevant program office. Because the classifier fits the existing compute budget, transition requires only a software integration and accreditation effort — not a hardware program — which materially lowers the transition barrier. Background IP (the saliency-pruning method) is protected under standard SBIR data rights; foreground results are delivered to the Government with rights clearly marked, so transition is not encumbered by ambiguous IP claims.'),
+  P('Phase I establishes feasibility on the target module. Phase II hardens the module, extends the corpus to fielded recordings, and conducts an at-sea demonstration on a DoD USV against the same gates plus a robustness gate across sea states; we will pursue approximately $1.1M over 24 months. In Phase III we target integration with a USV program of record through the relevant program office. Because the classifier fits the existing compute budget, transition requires only a software integration and accreditation effort — not a hardware program — which materially lowers the transition barrier. Background IP (the saliency-pruning method) is protected under standard SBIR data rights; foreground results are delivered to the Government with rights clearly marked, so transition is not encumbered by ambiguous IP claims.'),
 
   brk(),
   h(2, '6. Commercialization Strategy', '#1e3a8a'),
@@ -210,10 +210,10 @@ const deck = doc(slide, [
   h(1, 'Aerivio Systems', '#3730a3'),
   p('Commercialization Plan — SBIR Phase I', [], { color: '#475569' }),
   p('Edge-AI acoustic threat classification for unmanned surface vessels'),
-  p('Topic N251-042 · US Navy · $150,000 / 6 months', [], { color: '#64748b' }),
+  p('Topic N251-042 · AFWERX SBIR Phase I (CSO) · $150,000 / 6 months', [], { color: '#64748b' }),
   brk(),
   h(1, 'Market Opportunity'),
-  ul(['Navy USV fleet projected to exceed 300 hulls by 2030 — each needs edge acoustic sensing', 'Beachhead: US Navy programs of record', 'Expansion: allied navies + commercial maritime security (ports, offshore energy)', 'Serviceable market growing ~$8M → $60M+ per year by 2030']),
+  ul(['DoD USV fleet (Air Force & Navy) projected to exceed 300 hulls by 2030 — each needs edge acoustic sensing', 'Beachhead: DoD USV programs of record', 'Expansion: allied navies + commercial maritime security (ports, offshore energy)', 'Serviceable market growing ~$8M → $60M+ per year by 2030']),
   img(svgChart('Serviceable market ($M/yr)', [['2026', 8, '#93c5fd'], ['2028', 24, '#3b82f6'], ['2030', 61, '#1d4ed8']]), 'Market growth chart', 440, 200),
   brk(),
   h(1, 'Competition & Differentiation'),
@@ -221,7 +221,7 @@ const deck = doc(slide, [
   p('Bottom line: we win where connectivity fails — exactly the contested environment that matters.', fmt('Bottom line: we win where connectivity fails — exactly the contested environment that matters.', 'win where connectivity fails', 'bold')),
   brk(),
   h(1, 'Go-to-Market & Milestones'),
-  ol(['Phase I (now): feasibility on the Navy corpus, months 1–6', 'Phase II: hardened module + at-sea demonstration (~$1.1M / 24 mo)', 'Phase III: transition to a Navy USV program of record', 'Commercial: port-security & offshore-energy monitoring (dual-use)']),
+  ol(['Phase I (now): feasibility on the maritime corpus, months 1–6', 'Phase II: hardened module + at-sea demonstration (~$1.1M / 24 mo)', 'Phase III: transition to a DoD USV program of record', 'Commercial: port-security & offshore-energy monitoring (dual-use)']),
   p('Transition is a software integration, not a hardware program — a low-barrier path to a funded home.'),
   brk(),
   h(1, 'Financials & The Ask'),
@@ -311,7 +311,7 @@ await emit('Aerivio_Technical_Volume.docx', await exportToDocx(white, VARS));
 await emit('Aerivio_Technical_Volume.pdf', await exportToPdf(white, VARS));
 await emit('Aerivio_Commercialization.pptx', await exportToPptx(deck, VARS));
 await emit('Aerivio_Cost_Volume.xlsx', await exportToXlsx(budget, VARS));
-await emit('Aerivio_Key_Personnel_Bios.pdf', await exportToPdf(bios, VARS));
+await emit('Aerivio_Key_Personnel.pdf', await exportToPdf(bios, VARS));
 await emit('Aerivio_Facilities.pdf', await exportToPdf(facilities, VARS));
 
 console.log('\n── Deliverables generated ──');
