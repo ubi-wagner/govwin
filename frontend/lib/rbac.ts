@@ -82,6 +82,38 @@ export function canForceAdvanceInstance(
 }
 
 /**
+ * Tenant-WIDE access predicate — does this actor get access to everything in
+ * `tenantId` by virtue of being a platform admin or a HOME member of that tenant?
+ *
+ *   master_admin / rfp_admin     → yes (platform operators / god-view)
+ *   tenant_admin / tenant_user   → yes ONLY for their own tenant
+ *   partner_user                 → never (always section-scoped)
+ *   home tenant ≠ this tenant    → never (cross-company collaborator → scoped)
+ *
+ * This is the discriminator between "sees the whole tenant" and "must be scoped to
+ * explicit proposal_collaborators grants." The scoped side covers BOTH partner_user
+ * AND a cross-company collaborator — e.g. an admin at their own company invited onto
+ * another company's proposal. Proposal routes use this instead of a bare global-role
+ * check so that a `tenant_admin` of company B does NOT inherit admin power over
+ * company A's proposal. See docs/IDENTITY_AUTHZ_MODEL.md §4.
+ */
+export function isTenantWideMember(
+  role: string,
+  actorTenantId: string | null | undefined,
+  tenantId: string,
+): boolean {
+  if (role === 'master_admin' || role === 'rfp_admin') return true;
+  if (
+    (role === 'tenant_admin' || role === 'tenant_user') &&
+    actorTenantId != null &&
+    actorTenantId === tenantId
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Path-based permission lookup — maps top-level URL segments to the
  * minimum role required. Used by middleware.ts to short-circuit
  * obviously-privileged paths before hitting layout server components.

@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
@@ -34,7 +34,8 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   if (!tenant) redirect('/portal');
 
   const tenantId = tenant.id as string;
-  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+  // Proposal-scoped gate: tenant member OR accepted collaborator on THIS proposal.
+  const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
   if (!hasAccess) redirect('/portal');
 
   const userId = sessionUser.id;
@@ -82,12 +83,13 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];
 
-  // ── Partner scoping ────────────────────────────────────────────────
-  // Tenant staff (tenant_user+) have tenant-wide proposal access by design.
-  // partner_user is collaborator-scoped: only sections granted on THIS
-  // proposal are viewable, and only 'edit'-granted sections are writable.
+  // ── Collaborator scoping ───────────────────────────────────────────
+  // Home tenant staff (tenant_user+) have tenant-wide proposal access by design.
+  // Anyone WITHOUT tenant-wide access (a partner_user, OR a cross-company
+  // collaborator) is collaborator-scoped: only sections granted on THIS proposal
+  // are viewable, and only 'edit'-granted sections are writable.
   let partnerReadOnly = false;
-  if (role === 'partner_user') {
+  if (!isTenantWideMember(role, sessionUser.tenantId, tenantId)) {
     const access = await resolveUserAccess(userId, proposalId, tenantId);
     const canView =
       access.editableSections.includes(sectionId) ||

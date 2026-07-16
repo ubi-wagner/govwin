@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { isTenantWideMember } from './rbac';
 
 // Next.js "Collecting page data" step at build time loads every
 // route module with NODE_ENV=production but without runtime secrets
@@ -54,6 +55,41 @@ export async function verifyTenantAccess(userId: string, role: string, tenantId:
     return !!row;
   } catch (e) {
     console.error('[verifyTenantAccess] Error:', e);
+    return false;
+  }
+}
+
+/**
+ * Proposal-scoped access gate — the collaborator-aware widening of
+ * verifyTenantAccess. Returns true if the actor has tenant-wide access to the
+ * proposal's tenant (isTenantWideMember) OR is an ACCEPTED collaborator on THIS
+ * specific proposal.
+ *
+ * Cross-company collaborators (home tenant ≠ proposal tenant) and partner_users
+ * pass ONLY through the collaborator branch — so this is the coarse "may this user
+ * touch this proposal at all" gate. Callers MUST still enforce the fine-grained
+ * per-section scope (edit/comment/view) via resolveUserAccess, gated on
+ * `!isTenantWideMember(...)`. See docs/IDENTITY_AUTHZ_MODEL.md §4.
+ */
+export async function verifyProposalAccess(
+  userId: string,
+  role: string,
+  actorTenantId: string | null | undefined,
+  tenantId: string,
+  proposalId: string,
+): Promise<boolean> {
+  try {
+    if (isTenantWideMember(role, actorTenantId, tenantId)) return true;
+    const [row] = await sql`
+      SELECT 1 FROM proposal_collaborators
+      WHERE proposal_id = ${proposalId}
+        AND user_id = ${userId}
+        AND accepted_at IS NOT NULL
+      LIMIT 1
+    `;
+    return !!row;
+  } catch (e) {
+    console.error('[verifyProposalAccess] Error:', e);
     return false;
   }
 }

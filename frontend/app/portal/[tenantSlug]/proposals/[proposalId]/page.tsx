@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import { getProposalCard } from '@/lib/cards/card';
@@ -34,7 +34,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   if (!tenant) redirect('/portal');
 
   const tenantId = tenant.id as string;
-  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+  // Proposal-scoped gate: a tenant member OR an accepted collaborator on THIS
+  // proposal (cross-company collaborators pass here). resolveUserAccess below
+  // scopes what they can actually see/edit.
+  const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
   if (!hasAccess) redirect('/portal');
 
   // ── Load proposal with opportunity + solicitation context ───────────
@@ -140,11 +143,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   }
 
-  // Partner scoping: a partner_user with no grant on THIS proposal must not see
-  // the workspace shell (title, collaborator roster + emails, compliance,
-  // stage history). Tenant staff (tenant_user+) retain tenant-wide access.
+  // Scoped-collaborator guard: a user WITHOUT tenant-wide access (a partner_user,
+  // OR a cross-company collaborator) who has no section grant on THIS proposal must
+  // not see the workspace shell (title, collaborator roster + emails, compliance,
+  // stage history). Home tenant staff (tenant_user+) retain tenant-wide access.
   if (
-    role === 'partner_user' &&
+    !isTenantWideMember(role, sessionUser.tenantId, tenantId) &&
     access.editableSections.length === 0 &&
     access.commentableSections.length === 0 &&
     access.viewableSections.length === 0
