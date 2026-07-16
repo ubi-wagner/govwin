@@ -1,5 +1,15 @@
 # ARCHITECTURE_V9.md — RFP Pipeline Portal: As-Built Baseline
 
+> **⚠ Superseded for the customer opportunity surface by [`ARCHITECTURE_V10.md`](ARCHITECTURE_V10.md)
+> (as of 2026-07-15, schema at migration 108).** V9 remains canonical for the retained core (proposal
+> workspace/canvas, stages/gates, auth, provisioning, admin curation, CMS, pipeline ingest/shred/score,
+> memory). Where V9 and V10 conflict on the opportunity→purchase→proposal path, **V10 wins**. Specifically
+> stale below: the Stage-4/5 **Spotlight/Pipeline + `tenant_pipeline_items`** surface is **RETIRED**
+> (replaced by the **master + mirror one-way bridge** → `tenant_opportunity_cards`, ranked by
+> `tenant_spotlight_buckets`); Stage-6 "Purchase" is now a **comp-code purchase → curation → release →
+> provision** flow (live Stripe checkout descoped); the content library is re-founded on `library_atoms`.
+> **Canonical design of record for that whole flow: [`docs/MASTER_MIRROR_OPP_DESIGN.md`](docs/MASTER_MIRROR_OPP_DESIGN.md).**
+
 **Date:** 2026-06-23
 **Status:** As-built baseline; supersedes ARCHITECTURE_V7.md (master) and ARCHITECTURE_V8.md (content-subsystem delta).
 **Verification method:** File-by-file analysis of all 908 tracked files.  
@@ -55,6 +65,7 @@ ARCHITECTURE_V6 (2026-05-20) — 3-service V1 launch baseline; SUPERSEDED by V7
 ARCHITECTURE_V7 (2026-05-21) — Master system index; SUPERSEDED by V9 (this file)
 ARCHITECTURE_V8 (2026-06-02) — Content-subsystem delta only; FOLDED INTO V9
 ARCHITECTURE_V9 (2026-06-23) — THIS DOCUMENT — verified by file-by-file analysis
+ARCHITECTURE_V10 (2026-07-03) — Greenfield-canonical customer surface (bridge/cards/atoms); SUPERSEDES V9 for that surface
 ```
 
 ---

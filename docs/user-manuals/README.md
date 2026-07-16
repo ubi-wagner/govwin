@@ -7,14 +7,16 @@ so it isn't mistaken for a failure). Use them to walk the system end-to-end.
 | Manual | Persona | Role | Covers |
 |---|---|---|---|
 | [RFP_ENGINE_ADMIN_TEST_MANUAL.md](./RFP_ENGINE_ADMIN_TEST_MANUAL.md) | RFP Pipeline staff | `master_admin` / `rfp_admin` | Scouts (sources/ingest) · RFP Curation triage→push · Portal oversight (opportunities, proposals, tenants) · Applications→provisioning · Workflows/Tasks |
-| [CUSTOMER_ADMIN_TEST_MANUAL.md](./CUSTOMER_ADMIN_TEST_MANUAL.md) | Small-business owner (customer) | `tenant_admin` | Profile → Spotlight/pin → Pipeline → build proposal → AI draft / edit / compliance / lock / advance → team & partners → record the win |
+| [CUSTOMER_ADMIN_TEST_MANUAL.md](./CUSTOMER_ADMIN_TEST_MANUAL.md) | Small-business owner (customer) | `tenant_admin` | Profile → Opportunities (`/cards`) / Buckets / pin → **purchase** (comp code) → wait for curation (72h) → **V0→V0.5→V1** (draft / library / lock / advance) → team & partners → record the win |
 | [UNIVERSITY_PARTNER_TEST_MANUAL.md](./UNIVERSITY_PARTNER_TEST_MANUAL.md) | External university collaborator | `partner_user` | Invite/accept → scoped section edit/comment/view → upload → the explicit list of what's blocked |
 
 ### How the personas connect (one end-to-end pass)
-1. **Admin** ingests a solicitation (Scouts), curates it, and **pushes** it → it becomes visible to customers.
-2. **Customer Admin** sees it in **Spotlight**, **pins** it, **builds a proposal**, AI-drafts, and invites a **University Partner** to a section.
-3. **Partner** accepts via `/invite/<token>`, edits/comments their granted section.
-4. **Admin** clears the **72h admin-review** task (Dashboard Task Queue); the customer locks → **advances** → submits → **records the win** (seeds a V2 contract).
+> Canonical flow + gap register: docs/MASTER_MIRROR_OPP_DESIGN.md; HITL scripts: docs/ALPHA_HITL_RUNBOOK.md + docs/HITL_IMMOBILEYES_CLICKPLAN.md.
+1. **Admin** ingests a solicitation (Scouts), curates it + writes the **`spotlight_summary`**, and **pushes** it (Release 1) → mirror cards fan out to every tenant's `/cards`, auto-ranked.
+2. **Customer Admin** sees it in **Opportunities** (`/cards`), ranks with **Buckets**, **pins** it (copies the docs), then **Purchases** with the comp code `rfppipelinetest` → the build waits in **"Waiting for RFP Expert Curation"** (72h SLA).
+3. **Admin** resolves the **"Curate + release"** ToDo at `/admin/rfp-curation` (routed shadow-admin into the tenant), builds/reuses the **master skeleton** (Release 2), and **Releases** → provisioned **unlocked**, `draft_v0` auto-drafts → **V0**.
+4. **Customer** does **library plug-and-play** (→ V0.5) and invites a **University Partner** to a section; the **Partner** accepts via `/invite/<token>` and edits/comments their granted section.
+5. **Customer** locks → **advances** (or **force-advances**) to **V1** → downloads the `.docx` → **records the win** (seeds a V2 contract).
 
 ### HITL launch readiness
 A dedicated sweep confirmed **every human-in-the-loop interaction has a real, mounted, wired UI** —
@@ -34,7 +36,8 @@ task" form picks Review / Upload / Form, setting `params.kind`), and ops can **l
   tasks (incl. the 72h review) in the dashboard queue.
 
 ### Stubs/disabled (not failures — don't log these)
-"AI Review (coming soon)", section "Export .pdf" (package export is JSON), Library "Split", admin
-"CRM Console" + "Templates" viewer, Stripe billing (founding-cohort bypass).
+"AI Review (coming soon)", section "Export .pdf" (the whole-proposal package download is now `.docx`),
+Library "Split", admin "CRM Console" + "Templates" viewer. **Live self-serve Stripe checkout is
+descoped** — the founding cohort buys with the comp code `rfppipelinetest` (purchase → curation → release).
 
 Full engineering finding list: `../V1_SWEEP_FINDINGS_2026-06-29.md`.

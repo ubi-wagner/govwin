@@ -12,17 +12,24 @@ single-bucket-three-folder layout.
 
 ## Bucket
 
-Single S3-compatible bucket on Railway:
+Single S3-compatible bucket — **Cloudflare R2** (per CLAUDE.md / `CLAUDE_CLIFFNOTES.md`). The S3
+client sets `forcePathStyle: true` for R2 compatibility (`frontend/lib/storage/s3-client.ts`,
+`pipeline/src/storage/s3_client.py`):
 
 - **Bucket name (prod):** `rfp-pipeline-prod-r8t7tr6`
-- **Endpoint:** `https://t3.storageapi.dev`
-- **Region:** `auto`
+- **Endpoint / region / credentials:** read from `AWS_ENDPOINT_URL`, `AWS_DEFAULT_REGION`,
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` env — there is **no endpoint literal in code**.
+  ⚠ this doc previously hard-coded `https://t3.storageapi.dev` (Railway object storage); the store
+  is now Cloudflare R2, so **trust `AWS_ENDPOINT_URL`, not a literal here.**
 - **Code reads bucket via:** `process.env.AWS_S3_BUCKET_NAME` (TS) or
   `os.environ['AWS_S3_BUCKET_NAME']` (Python)
 
 The AWS SDK (both `@aws-sdk/client-s3` v3+ and `boto3`) auto-reads
 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and
-`AWS_ENDPOINT_URL` from the environment with zero configuration code.
+`AWS_ENDPOINT_URL` from the environment; `forcePathStyle: true` is the only explicit config.
+
+> The only local disk volume is CMS media; there is **no `/data` business-data volume** — the
+> pipeline `STORAGE_ROOT=/data` constant is dead. All business objects live in R2.
 
 ---
 
@@ -74,11 +81,19 @@ customers/{tenant_slug}/proposals/{proposal_id}/attachments/{uuid}.{ext}
 customers/{tenant_slug}/proposals/{proposal_id}/exports/{version}.{ext}
 customers/{tenant_slug}/library/units/{unit_id}.md
 customers/{tenant_slug}/library/assets/{uuid}.{ext}
+customers/{tenant_slug}/pinned/{opportunity_id}/{filename}
 ```
 
 - `tenant_slug`: The `tenants.slug` column (URL-safe, unique)
 - `proposal_id`: UUID from `proposals.id`
 - `unit_id`: UUID from `library_units.id`
+- `opportunity_id`: UUID from `opportunities.id`
+
+**Copy-on-pin (mig 095).** Pinning a card is a **full copy**: the global read-only opportunity
+docs under `rfp-pipeline/{opportunity_id}/…` are copied into `customers/{slug}/pinned/{opportunity_id}/`
+so the tenant owns a local, shard-safe copy. The manifest of copied files is recorded on
+`tenant_opportunity_cards.pinned_docs` (JSONB). See `docs/MASTER_MIRROR_OPP_DESIGN.md` for the
+opportunity→pin→purchase→proposal flow.
 
 ---
 
@@ -111,6 +126,14 @@ export function customerPath(p: {
   name?: string;
   ext?: string;
 }): string;
+
+// Copy-on-pin destination (mig 095). Standalone helper — validates the slug,
+// asserts a UUID opportunityId, and rejects filenames containing '..'.
+export function customerPinnedPath(
+  tenantSlug: string,
+  opportunityId: string,
+  filename: string,
+): string;
 ```
 
 ### Python (`pipeline/src/storage/paths.py`)
@@ -143,6 +166,7 @@ Mirror of the TS helpers using keyword arguments. Same output strings.
 | Read proposal section | Direct (customers/{slug}/...) | Direct (customers/{slug}/...) |
 | Write shredded RFP output | — | Direct (rfp-pipeline/{id}/shredded/) |
 | Admin move inbox → published | Direct (copy + delete, admin only) | — |
+| Pin opp folder into tenant | Direct (copy rfp-pipeline/{id}/ → customers/{slug}/pinned/{id}/) | — |
 
 "Signed URL" means the frontend generates a presigned GET URL using
 the S3 client and returns it to the browser so the browser fetches

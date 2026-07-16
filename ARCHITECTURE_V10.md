@@ -13,6 +13,19 @@ carrying `opportunity_id`). Not a code-read.
 **Evidence location:** `docs/HITL_WIRING_AUDIT_2026-07-03.md` (finish-out + live-verification block),
 `docs/HITL_WIRING_AUDIT_RUNBOOK.md` (method), `frontend/e2e/` (the suite).
 
+> **Update (2026-07-15) — schema now at migration 108; the purchase→curation→release flow landed.**
+> Since this doc's 2026-07-03 drive-verify (mig 103), the customer **comp-code purchase → curation →
+> release → provision** path shipped (migs **104–108**): a comp-code purchase (`rfppipelinetest`) opens a
+> `proposal_portals` row at `curation_pending` (72h SLA), a shadow admin **releases** it, and provisioning
+> instantiates the proposal at **V0**. The bridge/cards model below is unchanged and is now framed as the
+> **master + mirror, one-way bridge** with **two releases per OPP** — (1) *Spotlight* (basic ingest +
+> `spotlight_summary` → push → rank → mirror; pin copies the OPP's files to the tenant) and (2)
+> *Proposal-portal* (the full compliance matrix + blank templated molds built ONCE on the master, reused
+> per tenant at provision). The only signal that ever flows admin-ward is a navigational **ToDo event
+> (no customer data)**. **Canonical design of record for the opportunity→purchase→proposal flow:
+> `docs/MASTER_MIRROR_OPP_DESIGN.md`.** §4 and §7 are updated inline; the rest of the drive-verify stands
+> as verified at mig 103.
+
 ## Status Legend
 
 | Symbol | Meaning |
@@ -127,6 +140,16 @@ every opportunity onto a new tenant.
 | Lifecycle propagation | `republishIfReleased()` re-publishes + re-fans a released opp on stage/content edits |
 | New-customer backfill | `backfillTenant()` applies the head version of every opportunity (currently a manual admin route) |
 
+**The one backflow is a ToDo, not data.** The bridge moves card data admin→customer only. The *sole*
+"upward" signal is a navigational **ToDo event** (carries **no** customer content) that routes a
+privileged actor down into a tenant's RLS-scoped **shadow account** to build/release there —
+`tasks` row `task_type='proposal_setup'` via `launchProjectCollaboration`, surfaced by
+`listOpenAdminTriageTasks`. Shadow grants are recorded in `shadow_admin_grants` (mig 097, portal-scoped,
+`source ∈ {t_and_c, invite}`, revocable). This keeps tenant content sharded/private while still letting
+the RFP side act. Full contract: `docs/MASTER_MIRROR_OPP_DESIGN.md` §3–4. (⚠ Security gap: mig 097 meant
+the grant to *replace* the admin god-view, but `verifyTenantAccess` — `frontend/lib/db.ts:52` — still
+grants any admin global access; enforcing the grant + retiring the god-view is a tracked ToDo.)
+
 ### 2.3 Convergence — what was retired
 
 | Legacy | Fate | Replacement |
@@ -204,9 +227,11 @@ from `eventTypeForStage()`.
 The build loop is V9-retained; V10 makes the **compliance matrix real** and **hardens lock**.
 
 ```
-Purchase / admin grant → provision (two entry points):
+Comp-code purchase → curation → release → provision  (canonical: docs/MASTER_MIRROR_OPP_DESIGN.md §5–6):
+  POST /api/portal/[t]/purchase (code 'rfppipelinetest') → proposal_portals curation_pending (72h SLA)
+    → action=release → releaseFromCuration (CAS, curation_pending→launched) → provision (two entry points):
     • create route:  app/api/portal/[t]/proposals/create/route.ts   (legacy + matrix)
-    • portal launch: lib/provision-proposal.ts                       (greenfield, UNLOCKED)
+    • portal launch: lib/provision-proposal.ts                       (greenfield, UNLOCKED, + matrix)
         resolveTopicCompliance → proposal_artifacts (per volume) → proposal_sections (per required item)
         + proposal_compliance_matrix rows (one per required item / required-section), status='not_addressed'
         + origin_card frozen onto proposals.origin_card
@@ -233,9 +258,10 @@ linked to the section that addresses it, starting `not_addressed`. The lock rout
 not_applicable`. This is what the proposal card's `percentComplete` and the workspace compliance tab
 read — previously always 0%.
 
-> **Known gap (V10):** `provisionProposalForPortal` (the portal launch path) does **not yet** populate
-> the matrix — a portal-launched proposal still shows an empty matrix until a shared helper is extracted.
-> The legacy create route does populate it. (`docs/HITL_WIRING_AUDIT_2026-07-03.md` remaining #2.)
+> **Resolved (2026-07-15):** the mig-103 gap is closed. `provisionProposalForPortal` now **populates the
+> matrix at provision** (`frontend/lib/provision-proposal.ts:134,170` — one `proposal_compliance_matrix`
+> row per required item, `status='not_addressed'`), matching the legacy create route. A portal-launched
+> proposal ships with a real matrix.
 
 ---
 
@@ -356,9 +382,10 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 103)
+## 7. New / Changed Schema (migrations 093 → 108)
 
-Highest migration on the branch: **103**. Domains added to V9's 72-table / 14-domain map:
+Highest migration on the branch: **108** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added
+the purchase→curation→release flow). Domains added to V9's 72-table / 14-domain map:
 
 | Migration | Adds |
 |-----------|------|
@@ -373,6 +400,11 @@ Highest migration on the branch: **103**. Domains added to V9's 72-table / 14-do
 | `101_unified_library_taxonomy` | **`taxonomy_terms`, `document_cocoons`, `library_atoms`** (RLS), **`atom_tags`, `atom_lineage`, `atom_members`**; enables `vector` |
 | `102_atomizer_support` | `library_atoms.{creator_kind, created_by, source_anchor}` |
 | `103_event_payload_jsonb_fix` | back-fills `system_events.payload`/`.error` from string scalars → objects |
+| `104_jsonb_string_scalar_backfill` | second-pass back-fill of remaining jsonb string-scalar rows (companion to 103) |
+| `105_customer_purchase_curation_flow` | **`proposal_portals.curation_pending`** + `paid_at`/`curation_due_at`; **`promo_codes`** (kind `comp`/`percent`/`amount`; seeds `'rfppipelinetest'`); `purchases.promo_code` |
+| `106_purchase_curation_notification` | seeds the `automation_rule` `capture:purchase.completed → notify_admin` |
+| `107_spotlight_summary` | **`curated_solicitations.spotlight_summary`** (the Release-1 push gate; skeleton build stays off the bridge) |
+| `108_patch_live_marketing_content` | marketing-content patch |
 
 Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in `CLAUDE_CLIFFNOTES.md`):
 
@@ -494,7 +526,9 @@ core-spine breaks:
 
 | Item | Status | Note |
 |------|--------|------|
-| Portal-launch matrix | 🟡 | `provisionProposalForPortal` doesn't populate `proposal_compliance_matrix` yet (create route does) — extract a shared helper |
+| Portal-launch matrix | ✅ | Resolved (2026-07-15) — `provisionProposalForPortal` now populates `proposal_compliance_matrix` at provision, matching the create route |
+| Shadow-admin god-view | ⚠ future | mig 097 meant `shadow_admin_grants` to replace the admin god-view, but `verifyTenantAccess` (`lib/db.ts:52`) still grants any admin global access — enforce the grant + retire the god-view |
+| Buyer/outcome ledger · proposal-ready nudge · curation auto-skip | ⚠ future | master-OPP buyer ledger, sbir.gov outcome scrape, skeleton-ready nudge to mirror cards, and curation auto-skip for pre-built OPPs — see `docs/MASTER_MIRROR_OPP_DESIGN.md` §7, §2, §5 |
 | Volume-doc tree grouping | 🟡 | data is real (volumes→artifacts→sections + page allocations); workspace still renders flat |
 | Templates → skeleton | 🟡 | nothing sets `volume_required_items.template_id`, so authored templates don't reach provisioning; fix the admin template-list fetch shape |
 | New-customer backfill | 🟡 | `backfillTenant()` runs only via a manual admin route → fresh tenants miss historical opportunities |

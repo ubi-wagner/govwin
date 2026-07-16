@@ -1,5 +1,12 @@
 # V1 MVP Baseline — Definitive Capability Assessment
 
+> ## ⚠ SUPERSEDED — pricing + purchase model (updated 2026-07-15)
+> This 2026-05-23 baseline predates the current model. **Pricing** is now **Spotlight $499/mo** (3-month minimum),
+> **Phase I $1,999**, **Phase II $4,999** ($3,999 linked); launch **August 2026** — the "$299/mo + $999-1999/proposal"
+> line below is outdated. **Purchase model** is now the **comp-code purchase → curation_pending (72h SLA) → admin
+> release → provision** flow (self-serve Stripe still descoped). Opportunity architecture: master + one-way-bridge
+> mirror — see **`docs/MASTER_MIRROR_OPP_DESIGN.md`**.
+
 **Date**: 2026-05-23
 **Launch Target**: June 1, 2026
 **Founding Cohort**: 20 seats, $299/mo + $999-1999/proposal

@@ -21,8 +21,9 @@ pin→S3 copy, and the compliance matrix. Bug classes squashed pre-test: the jso
 create/curate/skeleton/push; signup card-mirror; customer library (upload/atomize/buckets/pin);
 admin-provision → release → customer build → lock → download; event audit + workflow instances.
 
-**Descoped for Alpha (do NOT test — tracked as ToDos):** self-serve **Stripe checkout** (founding
-cohort is **admin-provisioned** — see T5); **web-search new-source discovery**; the **daily scout
+**Descoped for Alpha (do NOT test — tracked as ToDos):** self-serve **live Stripe checkout** (the
+founding cohort buys via the **comp-code purchase → curation → release** loop — see T5 and
+`HITL_IMMOBILEYES_CLICKPLAN.md`); **web-search new-source discovery**; the **daily scout
 scheduler** + **email digests** (require prod cron + a verified email provider); automated **amendment /
 post-push-topic re-propagation** (admin updates propagate; the *automated ingester* path does not yet);
 atoms→bucket **context**; pinned-opp **push nudges**; PDF export. See §4 watchlist.
@@ -40,7 +41,7 @@ is descoped). Two ways to run:
 # 1. Postgres (pgvector image) up; create a fresh DB
 createdb govtech_alpha   # or reuse the scratch DB
 
-# 2. Apply ALL migrations (000 → 104) — order matters
+# 2. Apply ALL migrations (000 → 108) — order matters
 node db/migrations/migrate.mjs         # reads DATABASE_URL; tracked in _migration_history
 
 # 3. Seed dev accounts + fixtures
@@ -137,8 +138,13 @@ reachable; pipeline `GET :8080/health` returns ok; `SELECT max(filename) FROM _m
     ⚠ *Pinned-opp push **nudges** to the user are a ToDo (the amber "Update available" badge works).*
 
 ### T5 — Provision → release → build → lock → download  *(role: rfp_admin → tenant_admin)*
-> **Alpha purchase model:** founding cohort is **admin-provisioned** (no Stripe). The admin provisions the
-> workspace on the customer's behalf; self-serve checkout is a ToDo.
+> **Purchase model (updated this cycle).** The founding cohort now buys via the **comp-code purchase →
+> `curation_pending` (72h SLA) → shadow release** loop — not silent admin-provision. The authoritative
+> end-to-end sequence (customer pin → purchase `rfppipelinetest` → wait UI → admin ToDo → release →
+> V0→V1) is `docs/HITL_IMMOBILEYES_CLICKPLAN.md`, designed in `docs/MASTER_MIRROR_OPP_DESIGN.md`. Live
+> Stripe checkout is still descoped; the comp code stands in. Steps 15–20 below are what happens
+> **after** release (provision→build→lock→download); the purchase + wait + ToDo that precede them are
+> in the click-plan.
 15. **(rfp_admin)** Provision a proposal for the customer against the curated opp — via the portal-launch
     accept flow (`/portal/<slug>/portals/<id>?action=accept`) **or** `POST /api/portal/<slug>/proposals/create`.
     → **Expect:** a `proposals` row, `proposal_artifacts` per volume, `proposal_sections` per required item, a
@@ -171,7 +177,7 @@ reachable; pipeline `GET :8080/health` returns ok; `SELECT max(filename) FROM _m
 ---
 
 ## §4. Known-issue watchlist (expected "not working" — not regressions)
-- Self-serve Stripe checkout (founding cohort = admin-provisioned).
+- Self-serve **live** Stripe checkout (founding cohort uses the comp-code purchase→curation→release loop — see `MASTER_MIRROR_OPP_DESIGN.md`).
 - Daily scout scheduler + email digests + web-search new-source discovery.
 - Automated-ingester amendment / post-push-topic re-propagation (admin edits DO propagate).
 - `/cards` inline numeric rank; atoms→bucket context; pinned-opp push nudges.

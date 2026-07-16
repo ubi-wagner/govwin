@@ -134,6 +134,11 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 - `finder:solicitation.approved:single`
 - `finder:solicitation.pushed:single` (triggers `OnSolicitationPushed` workflow)
 
+> **Release 1 of two.** "Push to Spotlight" is **Release 1** -- it makes the opportunity discoverable
+> and ranked on every tenant's card feed (`/portal/[slug]/cards`), and the push gate now requires a
+> non-empty **`spotlight_summary`** in addition to `submission_format`. The proposal-portal skeleton
+> is **Release 2** (see Step 4b).
+
 **Placeholder values:**
 - `{solId}` -- UUID from Step 3
 - `{topicId}` -- UUID of any topic (visible in URL when clicking into a topic)
@@ -141,6 +146,42 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 **Clickable links:**
 - Curation workspace: `{BASE_URL}/admin/rfp-curation/{solId}`
 - Topic detail: `{BASE_URL}/admin/rfp-curation/{solId}/topic/{topicId}`
+
+---
+
+## 4b. Purchase Curation & Release (Release 2 -- Shadow Curation)
+
+**Goal:** Resolve a customer's "purchase needs curation" ToDo, build/review the proposal-portal
+skeleton, and release the workspace (provisioned unlocked → V0).
+
+> :warning: **Prerequisite:** A customer has pinned an opportunity and purchased a portal with the
+> comp code `rfppipelinetest` (see Customer E2E Guide, Step 8). Step 4's push is **Release 1
+> (Spotlight)**; this is **Release 2 (Proposal portal)**. Design:
+> [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md); click spine:
+> [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md); full script:
+> [`ALPHA_HITL_RUNBOOK.md`](./ALPHA_HITL_RUNBOOK.md).
+
+| # | Action | Expected Result |
+|---|--------|-----------------|
+| 1 | Navigate to `{BASE_URL}/admin/rfp-curation` | Triage view loads; the **"Purchase -- needs curation"** ToDo is surfaced (the one tenant-scoped `proposal_setup` task) |
+| 2 | Verify the purchase is recorded | `{BASE_URL}/admin/purchases` shows a `$0` completed purchase with the comp code |
+| 3 | Click the ToDo | Routes you (shadow admin) into the buyer's RLS-scoped tenant |
+| 4 | Build or review the master skeleton | If built in advance (Step 4 volumes/compliance + molds): ~15-min review. Else build now -- the **72h SLA covers skeletoning only** |
+| 5 | **Release** the portal (`?action=release`) | Portal `curation_pending → launched`; `provisionProposalForPortal` provisions **UNLOCKED** |
+| 6 | Verify provisioning | `proposals` + `proposal_artifacts` per volume + `proposal_sections` per required item + per-tenant `proposal_compliance_matrix` (rows `not_addressed`); molds interpolated |
+| 7 | Verify auto-draft | `OnProposalCreated → draft_v0` drafts empty/`ai_drafted` sections via `section_drafter` (needs the pipeline worker + `ANTHROPIC_API_KEY`) |
+
+**Events emitted:**
+- `capture:purchase.completed:single` -- at purchase (portal → `curation_pending`)
+- `capture:workspace.released:single` -- on release → provisioning
+
+> **⚠ Security gap.** `shadow_admin_grants` (mig 097) was meant to be the enforced gate, but
+> `verifyTenantAccess` (`lib/db.ts:52`) still grants any admin a global god-view -- so today the grant
+> is auditable/revocable metadata, not the enforcement. Retiring the god-view is a tracked ToDo.
+
+**Clickable links:**
+- `{BASE_URL}/admin/rfp-curation`
+- `{BASE_URL}/admin/purchases`
 
 ---
 

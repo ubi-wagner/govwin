@@ -21,7 +21,8 @@ PSQL="psql -h /tmp/pgtest -p 55432 -U postgres -d postgres -v ON_ERROR_STOP=1"
 $PSQL -f db/migrations/007_system_events.sql
 
 # Apply the whole sequence
-for f in db/migrations/0*.sql; do $PSQL -f "$f"; done
+# NOTE: glob must be [0-9]*.sql — high-water is now 108, so the old `0*.sql` SILENTLY SKIPS 100–108.
+for f in db/migrations/[0-9]*.sql; do $PSQL -f "$f"; done
 
 # Verify a table
 $PSQL -c "\d system_events"
@@ -143,7 +144,7 @@ psql "$DATABASE_URL" -c "SELECT current_database();"
 
 ## Conventions for new migrations
 
-1. Name: `NNN_snake_case_description.sql` with a new, incremental number (latest: 008 at time of writing)
+1. Name: `NNN_snake_case_description.sql` with a new, incremental number (latest: **108**; numbering has crossed into 1xx, so any `ls`/glob over migrations must use `[0-9]*.sql`, never `0*.sql`)
 2. Top of file: comment block explaining what the migration does and why
 3. Every `CREATE TABLE`: `IF NOT EXISTS`
 4. Every `CREATE INDEX`: `IF NOT EXISTS`

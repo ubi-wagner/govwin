@@ -35,7 +35,18 @@ draft/regen, per-tenant budget/rate/per-call guardrails are a prerequisite (§8)
 Stages (DB enum): `draft → review → final → submitted → archived`. Per-proposal `gate_config`
 (JSONB, default `["draft","final"]`) selects which gates apply; the canonical V1 config is
 `["draft","review","final"]` ("the 3 stages"). "V0 / V1" are the **operational** names for the
-first two passes: V0 = our RFP admin's initial build; V1 = released to the customer.
+first two passes: V0 = our RFP admin's initial build; V1 = released to the customer. The as-built
+version model is **V0** (skeleton instantiated at provision) → **V0.5** (library plug-and-play) →
+**V1** (draft/finalize; Force-advance available); the 72h curation SLA (`CURATION_SLA_HOURS=72`)
+covers skeletoning only.
+
+> The purchase→provision→V0 spine that precedes this lifecycle is canonical in
+> `docs/MASTER_MIRROR_OPP_DESIGN.md`: comp-code purchase (`POST /api/portal/[slug]/purchase`) →
+> `proposal_portals` `curation_pending` (72h) → shadow release → `provisionProposalForPortal` →
+> `OnProposalCreated`→`draft_v0` auto-draft → V0. This supersedes any "admin-provisioned / no Stripe"
+> language. The only backflow across the one-way opportunity bridge is a `proposal_setup` ToDo event
+> (`assignee_role='rfp_admin'`, 72h, nudge [1,3]) routing a privileged actor into the tenant's RLS
+> shadow account (`shadow_admin_grants`, mig 097).
 
 ```
  INGEST                 V0 (RFP admin)            HANDOFF        V1+ (customer tenant_admin)         CLOSE
@@ -163,10 +174,11 @@ new-priority-opp → customer notifications.
   button yet (ToDo Track B).
 - **Compliance check** — `ai/compliance` route (Claude **Haiku**), prompt-injection delimited,
   budget/rate guarded; returns score + issues inline.
-- **AI review** — `ai/review` route emits `proposal.review_requested` for the (built-but-unwired)
-  color-team agent. The UI button is **deliberately disabled** ("coming soon") so it doesn't
-  report success over a no-op. Future: Compliance Agent reviews writer-agent output → marks the
-  document ready for admin review.
+- **AI review** — `ai/review` route emits `proposal.review_requested`, but **that event has no
+  consumer**; the UI button is **deliberately disabled** ("coming soon") so it doesn't report
+  success over a no-op. The `color_team_reviewer` archetype's actual live path is instead the
+  advance-triggered `agent_task_queue` enqueue (§C3 Increment 2) → `fabric.process_task_queue`
+  write-back into section context boxes.
 - Surfaced in the **admin panel** (`proposal-ai-actions.tsx`, `role==='admin'`), which the
   customer `tenant_admin` sees (they resolve to `admin`). Contributors get per-node revise only.
 
@@ -283,10 +295,11 @@ tenant-scoping, and one cross-stack write-back.
 setup. This is the "set it up at portal purchase" surface (a dashboard "get started" nudge +
 post-purchase redirect is a small follow-on).
 
-**Increment 2 — AI review on (force-)advance → section context boxes · 🔴 designed, infra-ready.**
+**Increment 2 — AI review on (force-)advance → section context boxes · 🟢 SHIPPED (trigger + run + write-back); display badge ⚠ verify.**
 The agent infra is production-ready: `agent_task_queue` + `fabric.process_task_queue` (running
-every 20s, cost-guarded by the settable limits) + the wired `ColorTeamReviewer`/`ComplianceReviewer`
-archetypes + `requestAgentTask()` enqueue. The only missing link is the trigger + the write-back:
+every ~20s, cost-guarded by the settable limits) + the `color_team_reviewer` archetype (invoked by
+`agent_role`) + `requestAgentTask()` enqueue. The trigger and write-back are now wired (as-built in
+`lib/proposal-advance.ts::advanceProposalStage()` + `fabric.py::_post_section_recommendation()`):
   1. **Trigger** — in the advance route, after a successful advance, if the tenant's
      `ai_review_on_advance` pref is on, enqueue one `review_section` task per locked section via
      `requestAgentTask({ agentRole:'color_team_reviewer', taskType:'review_section', proposalId,

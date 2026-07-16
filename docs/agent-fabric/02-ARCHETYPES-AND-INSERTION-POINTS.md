@@ -7,6 +7,8 @@ journey. This chapter maps each agent archetype to its exact trigger points, inp
 outputs, and human gates. Nothing is vague — if an agent activates, you can trace
 exactly when, why, what it receives, and what it produces.
 
+> **As-built wiring status (2026-07-15).** This chapter is the *design/target* map of where agents plug in. In the shipped system only a subset is driven by a live caller: **Section Drafter is WIRED** (the `draft_v0` V0-strawman action on proposal creation + the synchronous `ai/draft` route); **Compliance Reviewer is PARTIAL** (the live check runs inline in the Next `ai/compliance` route, not through the fabric archetype); **Color Team Reviewer** runs only via the advance-path `agent_task_queue` enqueue (`ai_review_on_advance`, default-on) → `fabric.process_task_queue` write-back — the "AI Pre-Review" button path only emits `proposal:proposal.review_requested`, which nothing consumes. The remaining archetypes — and the **Research Analyst** shown below, which is not a registered archetype — are ⚠ future (registered-but-dormant or not yet built). All 10 registered archetypes are enumerated in `docs/AGENT_FRAMEWORK.md` §3; for the canonical purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+
 ---
 
 ## The Proposal Lifecycle with Agent Insertion Points

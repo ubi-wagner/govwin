@@ -916,6 +916,28 @@ async def run_workflow_processor(
                                     "failed to emit workflow.failed event: %s",
                                     emit_exc,
                                 )
+                    elif (
+                        fabric is not None
+                        and event_dict.get("phase") != "start"
+                        and fabric.has_handler(event_dict["type"])
+                    ):
+                        # No workflow claimed this event — offer it to the agent fabric
+                        # (workflow-first, archetype-fallback: an event a workflow owns,
+                        # e.g. proposal.created → OnProposalCreated, never double-fires an
+                        # archetype). Archetypes that declare handles_event(type) react
+                        # here — e.g. a manual proposal.review_requested →
+                        # color_team_reviewer. Terminal phase only (end/single): handle_event
+                        # ignores phase, so a start/end pair must not double-fire — this
+                        # matches the CMS listener's terminal-phase rule. invoke_agent
+                        # enforces per-tenant rate + monthly budget, so this is bounded;
+                        # handle_event returns a status dict (never raises), guard anyway.
+                        try:
+                            await fabric.handle_event(conn, event_dict)
+                        except Exception as exc:
+                            log.error(
+                                "agent dispatch failed for event %s: %s",
+                                event_dict["id"], exc,
+                            )
 
                     # Resume any paused HITL instance waiting for THIS event.
                     # (The missing link that made HITL a dead end — see

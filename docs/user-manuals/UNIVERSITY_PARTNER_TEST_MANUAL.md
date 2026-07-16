@@ -2,6 +2,8 @@
 
 **Audience:** an **external university collaborator** invited to help on **one** proposal — role **`partner_user`**.
 **You are a guest, scoped to the sections you were granted** (view / comment / edit) on a single proposal. You do **not** see the rest of the customer's portal. This manual tests exactly what a partner can and cannot do.
+
+> **Where you fit:** `partner_user` is the lowest portal tier — a per-proposal, **stage-scoped** collaborator on the customer's **V0 → V1** build (design: docs/MASTER_MIRROR_OPP_DESIGN.md). It is also today's stand-in for an appointed **reviewer / EconDev "manager" gate**; a dedicated manager role is **⚠ future**.
 **Conventions:** **✅ Verify** = expected result · ⚠️ = quirk/known issue · 🚫 = blocked/not available to partners.
 
 ### Prerequisites (set up by the customer admin)
@@ -26,7 +28,7 @@ You receive an **invite email** ("You've been invited to collaborate on …").
 
 ## 1. What you can SEE (the restricted view)
 
-1. ✅ **Verify the nav is restricted:** the only sidebar item you see is **Proposals**. (Dashboard, Spotlight, Pipeline, Library, Team, Billing, etc. are hidden; typing those URLs bounces you back to Proposals.)
+1. ✅ **Verify the nav is restricted:** the only sidebar item you see is **Proposals**. (The customer's **Opportunities** (`/cards`), **Buckets**, **Atoms**, **Library**, **Builds**, **Team**, **Billing**, etc. are hidden; typing those URLs bounces you back to Proposals.)
 2. Nav **Proposals** → you see **only the proposal(s) you collaborate on** (not the company's other proposals).
 3. Open your proposal. ✅ Verify it opens to the **"My Sections"** view by default, showing only your granted sections.
    - 🚫 Opening a proposal or section you were **not** granted shows a **"Not found" (404)** page — you never see its title, team, or compliance.
@@ -75,7 +77,7 @@ Your granted sections are grouped by permission:
 | Manage the team / invite others / **Assign a task** | 🚫 Hidden (manager-only). |
 | **Export** the proposal / download the package | 🚫 Not available. |
 | Open a **non-granted** proposal or section | 🚫 "Not found" (404). |
-| Reach Dashboard / Spotlight / Pipeline / Library / Team / Billing | 🚫 Hidden in nav; direct URLs bounce you back to Proposals. |
+| Reach Dashboard / Opportunities (`/cards`) / Buckets / Library / Team / Billing | 🚫 Hidden in nav; direct URLs bounce you back to Proposals. |
 
 ⚠️ **Access changes over stages:** there's no automatic revocation when a stage completes — you keep your grants, but a section that was **completed in a prior stage becomes read-only** (an Edit grant effectively becomes comment/view on it). The admin can remove you entirely (then your access is revoked immediately and the proposal 404s for you).
 

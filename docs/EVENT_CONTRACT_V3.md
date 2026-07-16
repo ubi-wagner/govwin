@@ -1,6 +1,10 @@
 # EVENT_CONTRACT_V3.md — Unified Automation Architecture: Jobs, Process Templates & the Event Ledger
 
-> ⚠️ The HITL-resume-broken description below is STALE — resume is implemented (WorkflowManager.resume_instance); see ARCHITECTURE_V9.md §8/§14.
+> ⚠️ The HITL-resume-broken description below is STALE — resume **is** implemented
+> (`WorkflowManager.match_waiting_instances` / `resume_instance`, entity-correlated + compare-and-swap).
+> **Canonical end-to-end automation design (as-built): `docs/AUTOMATION_DESIGN.md`** — bus → rules →
+> workflows → agents → ToDos, with the wired/partial/dormant map. Read that first; this doc's target
+> architecture is now largely realized there.
 
 **Date:** 2026-05-31
 **Status:** Authoritative target architecture for automation. Supersedes the *design*
@@ -315,6 +319,14 @@ Namespaces (binding): `finder, capture, identity, proposal, library, system, too
 event namespaces — keep that distinction; do not emit events under them.)
 
 The full as-built **event** catalog is EVENT_CONTRACT_V2.md §2.
+
+**New event types this cycle (2026-07-15), catalogued in EVENT_CONTRACT_V2.md §2:**
+`capture:purchase.completed` (comp-code purchase — now consumed via mig 106 `notify_admin`),
+`capture:workspace.released` (RFP-expert release-from-curation), `capture:tenant.cards_backfilled`
+(signup card mirror), `proposal:proposal.ready_for_customer` (proposal handed back for customer
+input), `finder:solicitation.pushed` (curation push fan-out), and
+`system:content.document_archived` / `system:content.document_restored` (postings retire/restore,
+start/end). All obey the binding namespace list above.
 
 ---
 

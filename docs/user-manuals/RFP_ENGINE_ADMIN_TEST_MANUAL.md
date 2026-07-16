@@ -12,6 +12,7 @@
 - **Two admin accounts** for the curation flow (an "Approve" requires a *different* admin than the curator — segregation of duties is enforced in SQL). At least one `master_admin` for the master-only checks (§6).
 - A real solicitation PDF (or a public source URL) to ingest.
 - Email delivery configured if you want to verify outbound emails; otherwise verify the in-app result panels.
+- **Platform:** migrations high-water **108** (`node db/migrations/migrate.mjs`, tracked in `_migration_history`); migs **105–108** shipped the comp-code purchase → curation → release flow + promo codes (105), the purchase→notify-admin rule (106), `spotlight_summary` (107), and marketing content (108). Seed via `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true`.
 
 ---
 
@@ -62,6 +63,8 @@ Overview: **Dashboard** · Opportunities: **RFP Curation · Sources · Pipeline 
 This is the expert workflow that takes a detected/uploaded solicitation through curation and **pushes it so it becomes visible to customers**. State machine:
 `new → claimed → released_for_analysis → ai_analyzed → curation_in_progress → review_requested → approved → pushed_to_pipeline` (+ `dismissed` / `rejected_review`).
 
+> **Two releases per OPP** (design: docs/MASTER_MIRROR_OPP_DESIGN.md). **Release 1 — Spotlight:** basic ingest minimums + a **`spotlight_summary`** ("why this matches"); the **push** (§2.3) fans a bridge version to every tenant, auto-ranked — this is what makes the OPP discoverable on the customer's `/cards`. **Release 2 — Proposal portal:** the robust **skeleton** (full compliance + volumes + required items + blank templated **molds**), built **once on the master solicitation** (§2.2) and **reused per tenant** at provision (§3.3). The two are decoupled — Release 2 can precede or follow any purchase; if it isn't done when the **first** portal for an OPP is purchased, the **72h SLA** fires.
+
 ### 2.1 Claim & start curation
 1. Nav **RFP Curation** → `/admin/rfp-curation`. You see **"Open triage ToDos"**, the **"RFP Triage Queue"** with a status **Filter** dropdown + **"Refresh"**, and a table.
 2. On a `new` row click **"Claim"**. ✅ Verify status → **claimed** (and the row is now "yours").
@@ -76,14 +79,16 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 4. **Apply a preset:** select topics → **"Apply Preset"** dropdown → choose a preset. ✅ Verify the topics' compliance is populated (the saved-preset path was a known bug — confirm values are non-empty, not all blank).
 5. **Volumes:** **"+ Add Volume"** (number, format, name, phase) → **"+ Add required item"**. ✅ Verify volumes/items list.
 
+> **This is the master skeleton (Release 2).** The full compliance matrix, volumes, required items, and their linked **blank molds** — `document_templates` authored in the **Document Builder** / template studio and linked to an item via `template_id` + an **expert note** — are built **once on the master solicitation** and **reused by every tenant** that provisions (§3.3). A mold is blank but carries the guardrails: e.g. a "1-page technical summary" that is a 15-page Word doc with the required font, margins, and page limit. Build it any time in advance; the **first** purchase for an un-skeletoned OPP starts the 72h clock. ⚠️ The in-app template **picker** in the curation modal is **⚠ future** — link via the volume tool or verify at provision that the mold pre-fills.
+
 ### 2.3 Request review → Approve (needs a 2nd admin) → Push
 1. As the curator, click **"Request Review"**. ✅ Verify status → **review_requested**.
 2. **Sign in as a second admin** (the approver). Open the same solicitation. Click **"Approve"**.
    - ⚠️ **Segregation of duties:** Approve is rejected if the approver is the *same* account that curated it (enforced in SQL). Use the 2nd account. (Or **"Reject Review"** with notes → back to curation_in_progress.)
    - ✅ Verify status → **approved**.
-3. As an admin click **"Push to Pipeline"**.
-   - It validates the required **`submission_format`** compliance var (blocks with a missing-list if empty — set it, then retry).
-   - ✅ **Verify:** status → **pushed_to_pipeline**, and the opportunity + its topics now have `is_active=true` (i.e. they become visible to customers in their Spotlight feed and tenants get scored). Cross-check in §3 / by signing into a customer portal.
+3. As an admin click **"Push to Pipeline"** (**Release 1**).
+   - It validates **both** the required **`submission_format`** compliance var **and** a non-empty **`spotlight_summary`** (blocks with a missing-list if either is empty — set them, then retry).
+   - ✅ **Verify:** status → **pushed_to_pipeline**; the opportunity + all topics flip `is_active=true` and a **bridge version fans out** — one `tenant_opportunity_cards` row per active/trial tenant, **auto-ranked** against each tenant's buckets. Cross-check on **`/admin/cards`** (bridge version + replicant count) or by signing into a customer portal's `/cards`.
 4. ⚠️ Stale claims (>24h) show a "stale" badge; **"Force Release"** is **master_admin-only** (a non-master gets 401).
 
 ### 2.4 Customer interest
@@ -100,13 +105,19 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 1. Nav **Proposals** → `/admin/proposals`. Click a proposal Title → it opens the **customer portal** proposal at `/portal/{slug}/proposals/{id}` (you have cross-tenant access).
 2. To co-draft a section as admin: open `/admin/proposals/{proposalId}/section/{sectionId}`. ✅ Verify the canvas editor loads; edits **auto-save**; you can **Export** (DOCX/PPTX/XLSX).
 
-### 3.3 The 72-hour admin-review / unlock gate ⭐
-> There is **no literal "Unlock" or "72h" button under `/admin`.** The 72h gate is a **`ProjectCollaboration` HITL task** (`admin_review`, due 72h) launched when a proposal is created. You resolve it in the **Task Queue**, and the workspace lock/unlock itself happens on the **portal** side.
-1. Go to **`/admin/dashboard`** → the **Task Queue** (titled "Your To-Dos"). Find the **"Review & unlock: …"** task (an overdue/red or due-soon item).
-2. Click **"Approve / Done"**. ✅ Verify the task disappears (the review gate is resolved).
-3. To actually **unlock the workspace for the customer**, act as a tenant admin in the customer portal: open the proposal → at the **final** stage use **"Unlock for Edit"** (the portal lock route). ⚠️ First unlock grants the customer a **7-day** edit window; after the RFP close date or ≥2 locks, **only rfp_admin/master_admin** can unlock.
+### 3.3 Purchase → curation ToDo → shadow release ⭐
+> **Current model** (migs 105–108; design docs/MASTER_MIRROR_OPP_DESIGN.md, click-plan docs/HITL_IMMOBILEYES_CLICKPLAN.md). A customer **pins → Purchases** with the comp code `rfppipelinetest` → `POST /api/portal/[slug]/purchase` opens a `proposal_portals` row in **`curation_pending`** (72h `curation_due_at`, `CURATION_SLA_HOURS=72`), writes a $0 completed purchase + a **`shadow_admin_grants`** row, emits `capture:purchase.completed`, and parks a **`proposal_setup`** ToDo — **"Curate + release the purchased proposal workspace"** (`assignee_role=rfp_admin`, due 72h). Live self-serve Stripe is descoped; the comp code stands in.
+1. Nav **RFP Curation** → **`/admin/rfp-curation`**. The `proposal_setup` ToDo appears under **"Open triage ToDos"** — it is the one **tenant-scoped** task surfaced here (`listOpenAdminTriageTasks`) so the buyer's tenant is reachable. Resolving it routes you **down into that tenant** as a shadow admin.
+2. **In-tenant:** if the master skeleton (§2.2, Release 2) exists → a **~15-minute review**; else **build it now** (within 72h). Then open the customer's **Builds** page (`/portal/{slug}/portals`) and click **"Release to customer"** (`action=release`).
+   - ✅ **Verify:** the portal flips `curation_pending → launched`, the proposal is **provisioned unlocked** (`proposal_compliance_matrix` instantiated, molds interpolated), and `OnProposalCreated → draft_v0` auto-drafts the sections (needs the pipeline worker). The customer now has an **editable V0** workspace (+ a "your proposal is ready" email if configured).
+   - ⚠️ **Legacy admin-create path:** a proposal provisioned via `proposals/create` can arrive **locked at `lock_count=0`**; an rfp_admin/master_admin clears that first lock (the "release" action now permits `lock_count=0`). The live purchase→release path provisions already-unlocked.
+3. **Later stages:** at the **final** stage the customer's **"Unlock for Edit"** grants a **7-day** edit window; after the RFP close date or ≥2 locks, **only rfp_admin/master_admin** can unlock.
 
-> 💡 This gate is launched **automatically** on proposal creation. To start the **same** kind of review gate **by hand** (a one-off review on any proposal/opportunity no bridge covers), use **§4.3's "Launch Review Gate"** form — it lands an identical task in the assignee's queue.
+> **Shadow admins & the ToDo backflow.** The bridge is one-way (card data flows **down** to tenants); the **only** thing that flows "up" is a **ToDo event** that routes a privileged actor **down** into a tenant's RLS-scoped shadow account to act — no customer content ever crosses to the master. Grants live in `shadow_admin_grants` (`source ∈ {t_and_c, invite}`, revocable via **"Revoke shadow admin"** on the Builds page). The same hook is meant to carry appointed **EconDev** shadows (`source='invite'`) — **⚠ future** (no role/invite UI yet). See docs/ALPHA_HITL_RUNBOOK.md.
+>
+> ⚠️ **Security gap (tracked).** `shadow_admin_grants` (mig 097) was meant to *replace* the admin god-view, but `verifyTenantAccess` (`frontend/lib/db.ts:52`) still returns `true` for **any** `rfp_admin`/`master_admin` — so today the grant is **auditable + revocable metadata**, not the enforced gate. Enforcing the grant and retiring the god-view is **⚠ future**.
+
+> 💡 To start a **`ProjectCollaboration` review gate by hand** (a one-off review no purchase/bridge covers), use **§4.3's "Launch Review Gate"** form — it lands an identical HITL task in the assignee's queue.
 
 ### 3.4 Manage a tenant + AI budget
 1. Nav **Tenants** → `/admin/tenants` → click a Company → `/admin/tenants/{tenantId}`.
@@ -148,8 +159,10 @@ In the Curation Workspace (tabs: Documents / Topics / Compliance / Customer Inte
 - [ ] Sign in → land on `/admin/dashboard`.
 - [ ] Sources → **Scout Now** updates Recent Activity.
 - [ ] Upload RFP → routed to its curation workspace.
-- [ ] Curation: Claim → Release for AI → Start Curation → edit a compliance field → **Request Review**.
-- [ ] 2nd admin: **Approve** → **Push to Pipeline** → status `pushed_to_pipeline` (+ topics become customer-visible).
+- [ ] Curation: Claim → Release for AI → Start Curation → edit a compliance field → set **`submission_format`** + **`spotlight_summary`** → **Request Review**.
+- [ ] 2nd admin: **Approve** → **Push to Pipeline** (Release 1) → status `pushed_to_pipeline` (+ cards fan out to tenants on `/admin/cards`).
+- [ ] (Optional) Build the master **skeleton** (volumes + full compliance + molds) — Release 2, reused per tenant.
+- [ ] Customer purchases (comp code `rfppipelinetest`) → **RFP Curation** shows the "Curate + release" ToDo → **Release to customer** → portal `launched`, build provisioned unlocked.
 - [ ] Applications → **Accept** → tenant + temp password provisioned.
 - [ ] Dashboard Task Queue → **Approve / Done** clears a review task.
 - [ ] Workflows → **Launch Review Gate** (e.g. an `admin_review` on a proposal) → the task lands in the queue within ~10s.

@@ -2,7 +2,7 @@
 
 **Status: BINDING.** Every new feature must have tests at the appropriate level. "No tests" is not an acceptable state for a PR to land.
 
-See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md).
+See also: [CLAUDE.md](../CLAUDE.md), [FOLDER_STRUCTURE.md](./FOLDER_STRUCTURE.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md), [MASTER_MIRROR_OPP_DESIGN.md](./MASTER_MIRROR_OPP_DESIGN.md) (opportunity→purchase→proposal design), [HITL_IMMOBILEYES_CLICKPLAN.md](./HITL_IMMOBILEYES_CLICKPLAN.md) (the comp-code purchase→curation→release click spine).
 
 ---
 
@@ -81,7 +81,7 @@ export default defineConfig({
    - `createdb -p <port> govtech_intel_test`.
    - Set `process.env.DATABASE_URL = 'postgresql://localhost:<port>/govtech_intel_test'`.
    - Run all migrations via `bash db/migrations/run.sh` (with the temp `DATABASE_URL`).
-3. **`beforeEach` in each suite**: `TRUNCATE` all tenant-scoped tables, cascade. Keep seed data in `system_config`, `compliance_variables`, `agent_archetypes`, and the `master_admin` user row.
+3. **`beforeEach` in each suite**: `TRUNCATE` all tenant-scoped tables, cascade. Keep seed data in `system_config`, `compliance_variables`, `agent_archetypes`, `promo_codes` (the `rfppipelinetest` comp code, migration 105), and the `master_admin` user row.
 4. **`afterAll`**: stop PG via `pg_ctl stop`, remove the temp data directory.
 
 The helper exports:
@@ -195,6 +195,7 @@ __tests__/scenarios/
   login-and-change-password.test.ts
   invite-colleague-full-flow.test.ts
   curate-and-push-rfp.test.ts
+  purchase-curation-release.test.ts
 ```
 
 Example skeleton:
@@ -223,6 +224,13 @@ describe('invite-colleague-full-flow', () => {
 ```
 
 Scenarios are the closest thing we have to production-like tests without full E2E overhead. Prefer them over bespoke integration tests when a feature spans multiple actors.
+
+> **Purchase → curation → release scenario.** `purchase-curation-release.test.ts` exercises the
+> founding-cohort spine: pin an opportunity card → `POST /api/portal/[slug]/purchase` with comp code
+> `rfppipelinetest` → assert the portal is `curation_pending` with a ~72h `curation_due_at` and a
+> `$0` `purchases` row → admin `action=release` → assert the proposal + `proposal_compliance_matrix`
+> provision **unlocked** (V0). Design: [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md);
+> click spine: [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md).
 
 ---
 
@@ -281,6 +289,8 @@ Avoid:
 ## Mocking rules
 
 **Mock external services only.** Anthropic, Stripe, Resend, SAM.gov API — use `vi.mock()` to stub these out. Provide a test double that returns canned responses.
+
+The founding-cohort **purchase path uses a comp code** (`rfppipelinetest`), so it records a `$0` purchase with no live Stripe call — test it as a normal integration path, not a Stripe mock. Mock Stripe only for the (⚠ future) live self-serve checkout.
 
 **Do NOT mock our own code.** Use the real `lib/db` (against the throwaway PG), the real `lib/logger`, the real `lib/tools/registry`. Mocking internal code hides integration bugs and makes refactors painful.
 
@@ -458,6 +468,12 @@ The CMS SPA visual page editor (`/pages`) exposes 13 API endpoints for page/bloc
 ---
 
 ## Scoring Unification Test Scenarios
+
+> **Surface note (⚠ superseded routes).** The canonical opportunity surface is now the
+> **opportunity-card spine** (`/portal/[slug]/cards`, ranked via `tenant_spotlight_buckets` /
+> `tenant_bucket_scores`); `/spotlights` and `/pipeline` **redirect** to `/cards`. The scenarios
+> below predate that rename — the scoring assertions still hold, but new tests should target the card
+> feed and bucket ranking. See [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md).
 
 Spotlights scoring is now unified: pipeline pre-computed scores are used when available, with estimation as fallback. Dead `pipeline_jobs` references have been removed from AI draft/review routes. Three API routes have been fixed with proper try/catch on SQL calls.
 

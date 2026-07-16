@@ -20,6 +20,17 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 
 ---
 
+> **Canonical surface + purchase model (read first).** The customer opportunity surface is now the
+> **opportunity-card spine** at `{BASE_URL}/portal/{slug}/cards` (ranked via Spotlight **buckets**);
+> `/spotlights` and `/pipeline` **redirect** there. Proposal portals are bought with a **comp code**
+> (`rfppipelinetest`) -- a $0 recorded purchase that opens the portal in `curation_pending` with a 72h
+> SLA -- **not** live Stripe (descoped, ⚠ future). Sections below that still say "Spotlight" or
+> "Stripe" are being migrated; the authoritative end-to-end is
+> [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) (design:
+> [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md)).
+
+---
+
 ## 1. Apply for Access
 
 **Goal:** Submit a customer application through the public form.
@@ -195,7 +206,7 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 |   | - Evaluation criteria | If extracted during curation |
 |   | - Score breakdown with source | Factor breakdown visible, source labeled as "pipeline" or "estimated" |
 |   | - "Pin" button | Visible and clickable |
-|   | - "Build Proposal" button | Visible and clickable |
+|   | - "Purchase" button (formerly "Build Proposal") | Visible and clickable -- leads to the comp-code purchase (Section 8) |
 
 **Clickable links:**
 - `{BASE_URL}/portal/{slug}/spotlights`
@@ -241,38 +252,42 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 
 ---
 
-## 8. Purchase Proposal Portal
+## 8. Purchase Proposal Portal (Comp Code)
 
-> :warning: **Prerequisite:** Step 6 must be completed (topic pinned). Stripe must be configured in the environment (`STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` env vars).
+> :warning: **Prerequisite:** Step 6 completed (topic pinned). The `rfppipelinetest` comp code must be
+> seeded (migration 105 → `promo_codes`). Live self-serve Stripe checkout is **⚠ future** -- the comp
+> code stands in for the founding cohort.
 
-**Goal:** Purchase a proposal workspace for a pinned topic.
+**Goal:** Purchase a proposal portal for a pinned opportunity via the comp-code loop, then have the
+admin release it into a provisioned workspace (V0).
 
 | # | Action | Expected Result |
 |---|--------|-----------------|
-| 1 | Navigate to the pinned topic's Spotlight detail page | Detail page loads |
-| 2 | Click "Build Proposal" button | Redirect to Stripe checkout (or direct creation for founding cohort) |
-| **Stripe Checkout Path** | | |
-| 3 | Stripe checkout page loads | Product: Proposal Portal, price visible ($999 or $1999) |
-| 4 | Enter test card number: `4242 4242 4242 4242` | Card accepted |
-| 5 | Enter any future expiry (e.g., `12/28`), any CVC (e.g., `123`), any ZIP | Fields accepted |
-| 6 | Click "Pay" / "Subscribe" | Payment processes |
-| 7 | Verify redirect back to platform | Redirect to proposal workspace or confirmation page |
-| **Direct Creation Path (Founding Cohort)** | | |
-| 3a | If founding cohort: proposal created without Stripe | Redirect directly to proposal workspace |
-| **Verification** | | |
-| 8 | Verify proposal created | Proposal visible at `{BASE_URL}/portal/{slug}/proposals/{proposalId}` |
-| 9 | Verify sections pre-populated | Sections created from `volume_required_items` (from admin curation Step 4) |
-| 10 | Verify section titles match volumes | e.g., "Technical Approach", "Key Personnel", "Past Performance", "Cost Breakdown" |
-| 11 | Verify all sections start with status `empty` | Status badges show "empty" for each section |
+| 1 | Navigate to the pinned card at `{BASE_URL}/portal/{slug}/cards` | Card detail loads with a **Purchase** control |
+| 2 | Click **Purchase**, enter comp code `rfppipelinetest`, confirm | `POST /api/portal/{slug}/purchase` returns `{ ok: true, portalId, curationDueAt, comp: true }` |
+| 3 | Verify a `$0` `purchases` row (status `completed`, promo code stamped) | Purchase recorded without a charge |
+| 4 | Verify the portal opens `curation_pending` with a 72h SLA | `proposal_portals.curation_due_at` ≈ `now()+72h` |
+| 5 | Verify the wait UI | `{BASE_URL}/portal/{slug}/portals` shows **"Waiting for RFP Expert Curation"** + live countdown |
+| 6 | (Admin) Resolve the **"Purchase -- needs curation"** ToDo at `{BASE_URL}/admin/rfp-curation` | Routes the admin (shadow) into the tenant; the skeleton is built/reviewed |
+| 7 | (Admin) **Release** (`?action=release`) | `curation_pending → launched`; workspace provisions **UNLOCKED** |
+| 8 | Verify proposal + sections provisioned | `proposals` row + `proposal_sections` per required item + `proposal_compliance_matrix` (rows `not_addressed`) |
+| 9 | Verify molds interpolated + auto-draft | Sections come up `ai_drafted` (`draft_v0` via `section_drafter`); `{company_name}` → tenant name |
+| 10 | Verify V0 | Section list renders; this is **V0** (skeleton instantiated) |
 
 **Events emitted:**
-- `proposal:proposal.created:start` and `proposal:proposal.created:end` -- payload includes `proposalId`, `sectionCount`
-- `capture:purchase.completed:single` -- if Stripe is wired, payload includes `tenantId`, `proposalId`, `productType`
+- `capture:purchase.completed:single` -- payload includes `tenantId`, `opportunityId`, `promoCode`
+- `capture:workspace.released:single` -- on release, payload includes `tenantId`, `portalId`, `proposalId`
+- `proposal:proposal.created:start` / `:end` -- provisioning, payload includes `proposalId`, `sectionCount`
+
+**Version model:** V0 (skeleton instantiated) → V0.5 (library plug-and-play, ~15 min) → V1
+(draft/finalize; Force-advance available). The 72h SLA covers **skeletoning only**, not V0.5→V1. See
+[`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md) §5-6 and
+[`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md).
 
 **Placeholder values:**
-- `{proposalId}` -- UUID of the created proposal (visible in URL after creation)
+- `{proposalId}` -- UUID of the provisioned proposal (visible in URL after release)
 
-**Clickable link:** `{BASE_URL}/portal/{slug}/proposals/{proposalId}`
+**Clickable link:** `{BASE_URL}/portal/{slug}/portals`
 
 ---
 
@@ -439,6 +454,12 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 
 **Expected event chain:**
 
+> **Ordering in the comp-code flow.** In practice `capture:purchase.completed` fires at purchase
+> (portal → `curation_pending`), then `capture:workspace.released` fires when the admin releases from
+> curation -- which is what triggers provisioning (`proposal.created`). So the real order is
+> purchase.completed → workspace.released → proposal.created. The legacy numbering below is kept for
+> continuity.
+
 | Order | Namespace | Event Type | Phase | Key Payload |
 |-------|-----------|-----------|-------|-------------|
 | 1 | `capture` | `application.submitted` | `single` | email, companyName |
@@ -452,7 +473,8 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 | 9 | `capture` | `topic.pinned` | `single` | tenantId, opportunityId |
 | 10 | `proposal` | `proposal.created` | `start` | tenantId, opportunityId |
 | 11 | `proposal` | `proposal.created` | `end` | proposalId, sectionCount |
-| 12 | `capture` | `purchase.completed` | `single` | tenantId, proposalId (if Stripe) |
+| 12 | `capture` | `purchase.completed` | `single` | tenantId, opportunityId, promoCode |
+| 12b | `capture` | `workspace.released` | `single` | tenantId, portalId, proposalId (on admin release) |
 | 13 | `proposal` | `section.saved` | `single` | proposalId, sectionId, version (multiple) |
 | 14 | `proposal` | `comment.created` | `single` | proposalId, nodeId |
 | 15 | `proposal` | `comment.resolved` | `single` | commentId |
@@ -478,7 +500,10 @@ Throughout this guide, `{BASE_URL}` is a placeholder for whichever environment y
 | Page | URL | Nav Item |
 |------|-----|----------|
 | Dashboard | `{BASE_URL}/portal/{slug}/dashboard` | Dashboard |
-| Spotlights | `{BASE_URL}/portal/{slug}/spotlights` | Spotlight |
+| Opportunity Cards (canonical) | `{BASE_URL}/portal/{slug}/cards` | Opportunities |
+| Spotlight Buckets | `{BASE_URL}/portal/{slug}/buckets` | (ranking filters) |
+| Proposal Portals | `{BASE_URL}/portal/{slug}/portals` | Portals |
+| Spotlights (redirects to /cards) | `{BASE_URL}/portal/{slug}/spotlights` | Spotlight |
 | Spotlight Detail | `{BASE_URL}/portal/{slug}/spotlights/{spotlightId}` | (from Spotlight) |
 | Library | `{BASE_URL}/portal/{slug}/library` | Library |
 | Library Upload | `{BASE_URL}/portal/{slug}/library/upload` | (from Library) |
@@ -540,7 +565,8 @@ Admin Guide Step 7  (System Health)
 | Temp password not visible after acceptance | Password may be emailed, not shown in UI | Check CRM email logs or ask admin for the temp password |
 | Change-password redirect not happening | `temp_password` flag not set on user | Admin should verify the user record has `temp_password=true` |
 | Spotlights page empty | No solicitations pushed to Spotlight | Complete Admin E2E Guide Steps 3-4 first |
-| "Build Proposal" fails | Stripe not configured or `STRIPE_SECRET_KEY` missing | Check Railway env vars; for founding cohort, direct creation may be used instead |
+| "Purchase" fails | Comp code not seeded or wrong code | Verify `promo_codes` has `rfppipelinetest` (migration 105); the founding-cohort purchase uses the comp code, not live Stripe |
+| Portal stuck at "Waiting for RFP Expert Curation" | Admin has not resolved the curation ToDo | Admin resolves the "Purchase -- needs curation" ToDo at `/admin/rfp-curation`, then Release (72h SLA) |
 | AI drafting fails or returns empty content | `ANTHROPIC_API_KEY` missing or invalid | Verify env var on Railway; check pipeline service logs |
 | Canvas editor blank | `proposal_sections.content` is NULL | Verify proposal provisioning created sections correctly |
 | Export .docx fails | docx generation library error | Check browser console for JS errors; verify canvas content is valid JSON |
@@ -549,7 +575,10 @@ Admin Guide Step 7  (System Health)
 
 ---
 
-## Stripe Test Cards Quick Reference
+## Stripe Test Cards Quick Reference (⚠ future -- live checkout)
+
+> Live self-serve Stripe checkout is **descoped**; the founding cohort buys with the comp code
+> `rfppipelinetest` (Section 8). Keep these cards for when live checkout ships.
 
 | Scenario | Card Number | Expiry | CVC |
 |----------|-------------|--------|-----|

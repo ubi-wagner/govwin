@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import asyncpg
@@ -29,6 +29,54 @@ INGESTERS = {
     "grants_gov": GrantsGovIngester,
     "dsip": DsipIngester,
 }
+
+
+def compute_next_run(
+    cron_expression: Optional[str], run_type: Optional[str], now: datetime
+) -> datetime:
+    """Next scheduled time from a standard 5-field cron (min hour dom month dow),
+    for the fixed-time patterns we actually schedule: daily ``M H * * *``, weekly
+    ``M H * * D`` (cron dow, Sunday=0), and every-N-hours ``M */N * * *``. Any other
+    expression (including day-of-month) falls back to a run_type step (weekly=168h
+    else 24h) **with a warning** — so an unsupported cron is never SILENTLY
+    mis-scheduled (the previous behaviour ignored cron_expression entirely).
+    """
+    step = timedelta(hours=168 if run_type == "weekly" else 24)
+    if not cron_expression:
+        return now + step
+    parts = cron_expression.split()
+    if len(parts) != 5:
+        log.warning("cron_expression %r is not 5 fields — using %s step",
+                    cron_expression, run_type or "daily")
+        return now + step
+    minute, hour, dom, month, dow = parts
+    try:
+        # every-N-hours: "<m> */<n> * * *"
+        if hour.startswith("*/") and dom == "*" and month == "*" and dow == "*":
+            n = int(hour[2:])
+            if n >= 1:
+                return now + timedelta(hours=n)
+        if minute.isdigit() and hour.isdigit() and month == "*":
+            mm, hh = int(minute), int(hour)
+            # daily "<m> <h> * * *"
+            if dom == "*" and dow == "*":
+                nxt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                return nxt if nxt > now else nxt + timedelta(days=1)
+            # weekly "<m> <h> * * <d>" (cron Sunday=0/7 → python weekday Mon=0..Sun=6)
+            if dom == "*" and dow.isdigit():
+                py_target = (int(dow) + 6) % 7
+                nxt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                days_ahead = (py_target - nxt.weekday()) % 7
+                if days_ahead == 0 and nxt <= now:
+                    days_ahead = 7
+                return nxt + timedelta(days=days_ahead)
+    except (ValueError, TypeError) as e:
+        log.warning("cron_expression %r parse error (%s) — using %s step",
+                    cron_expression, e, run_type or "daily")
+        return now + step
+    log.warning("cron_expression %r unsupported — using %s step",
+                cron_expression, run_type or "daily")
+    return now + step
 
 
 async def tick_schedules(conn: asyncpg.Connection) -> int:
@@ -86,16 +134,17 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
             )
             inserted += 1
 
-            # Advance next_run_at based on run_type
-            run_type = sched["run_type"] or "incremental"
-            interval_hours = 168 if run_type == "weekly" else 24
+            # Advance next_run_at from the cron_expression (honours the schedule's
+            # actual cadence + time-of-day; warns + falls back to a run_type step for
+            # anything it can't parse, so a cron is never silently mis-scheduled).
+            next_run = compute_next_run(sched["cron_expression"], sched["run_type"], now)
             await conn.execute(
                 """
                 UPDATE pipeline_schedules
                 SET next_run_at = $1, last_run_at = now()
                 WHERE id = $2
                 """,
-                now + __import__("datetime").timedelta(hours=interval_hours),
+                next_run,
                 sched["id"],
             )
 

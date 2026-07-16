@@ -470,8 +470,8 @@ export async function POST(request: Request) {
   );
   if (shouldExtract && firstPdfFb && documentIds.length > 0) {
     try {
-      await import('@/lib/pdf-node-globals'); // stub canvas globals before pdfjs loads (silences its polyfill warnings)
-      const { PDFParse } = await import('pdf-parse');
+      const { loadPdfParse } = await import('@/lib/pdf-parse-quiet'); // pdf-parse loader with pdf.js Node setup warnings silenced
+      const { PDFParse } = await loadPdfParse();
       const parser = new PDFParse({ data: new Uint8Array(firstPdfFb.buffer) });
       const textResult = await parser.getText();
       const rawText = textResult.text?.slice(0, 500000) || '';

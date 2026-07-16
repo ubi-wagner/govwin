@@ -28,6 +28,10 @@ The schema is defined across **69 migrations (000–067, plus the interleaved
 produces **72 live tables across 14 domains**. Full per-table detail:
 `docs/baseline/inventory/DB_SCHEMA_CURRENT.md`.
 (Prior docs said "53 / 051" or "40 / 039" — both stale/wrong.)
+> **⚠ high-water is now `108`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
+> dated deltas below: §1b (migs 088–092), §1c (migs 094–103), and **As-built delta — 2026-07-15**
+> (migs 105–108). The opportunity→purchase→proposal spine is specified in
+> `docs/MASTER_MIRROR_OPP_DESIGN.md` (master + one-way bridge + per-tenant mirror).
 These are the tables most frequently queried and the exact column names.
 **Do NOT guess column names. Look them up here.**
 
@@ -987,6 +991,10 @@ draft → review → final → submitted → archived
 Workspace auto-locks on `final` and `submitted`.
 Gate config is stored as JSONB array in `proposals.gate_config`.
 Proposals created locked (`is_locked=true`) for 72-hour admin review.
+> **⚠ updated (migs 097/105) — customer purchase→build flow:** the proposal is now provisioned at
+> **release UNLOCKED**, and the 72h SLA lives on `proposal_portals` (`curation_pending` +
+> `paid_at`/`curation_due_at`), not on the proposal. Full contract: `docs/MASTER_MIRROR_OPP_DESIGN.md`;
+> schema/wiring in the 2026-07-15 delta below.
 
 ### CMS Architecture
 - CMS SPA: Separate Vite/React app at its own Railway URL
@@ -1396,7 +1404,8 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
 
 ## As-built delta — 2026-07-05 (Alpha hardening + Immobileyes rehearsal)
 
-**Latest migration: 104** (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
+**Latest migration (this 2026-07-05 delta): 104** — *superseded; high-water is now `108`, see the
+2026-07-15 delta at the end of this file.* (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
 index). The greenfield spine (ingest → skeleton → push → signup-mirror → provision-with-template → release →
 build → lock → download) is **driven-green end-to-end** — verified as RFP-admin→shadow→**Immobileyes**
 (`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/ALPHA_ARCHITECTURE_ASBUILT.md`,
@@ -1416,3 +1425,76 @@ build → lock → download) is **driven-green end-to-end** — verified as RFP-
 Dispatched verifier agents contradicted each other on identical code; the main loop reproduced in the sandbox
 to settle it. Standard: a finding is trusted only after (a) an adversarial verifier that reproduces AND
 (b) a sandbox reproduction. Encoded in the bug-hunt workflow + `docs/ALPHA_TODO_BACKLOG.md` Tier 3.5.
+
+---
+
+## As-built delta — 2026-07-15 (customer purchase + curation-release flow, migs 105–108; branch `claude/nice-hamilton-kBqtD`)
+
+**High-water migration: 108.** The opportunity→purchase→proposal spine is now specified end-to-end in
+**`docs/MASTER_MIRROR_OPP_DESIGN.md`** (master + a ONE-WAY bridge + per-tenant mirror) — read that for the
+data-flow contract; this delta records the schema + wiring truths. Verify column names here before writing SQL.
+
+### Migrations 105–108
+- **105** `customer_purchase_curation_flow` — `proposal_portals` gains status `curation_pending` (full set:
+  `guardrails_pending|curation_pending|launched|executing|closeout|archived|abandoned`) + `paid_at`
+  / `curation_due_at` (72h SLA timer). New table **`promo_codes`** (`code` UNIQUE + a `lower(code)` unique
+  index for case-insensitive lookup; `kind` CHECK `comp|percent|amount`; `value`, `active`, `max_uses`,
+  `used_count`, `expires_at`, `note`) seeded with comp code **`rfppipelinetest`** (kind=comp → 100% off,
+  bypasses Stripe, marks the purchase paid). New column **`purchases.promo_code TEXT`** (provenance).
+- **106** `purchase_curation_notification` — seeds an `automation_rules` row
+  (`capture` / `purchase.completed` / `notify_admin`) so a customer purchase alerts the RFP admin (was silent).
+- **107** `spotlight_summary` — **`curated_solicitations.spotlight_summary TEXT`**: the admin's manual
+  first-pass matching blurb, **REQUIRED before the push**, folded into the fan-out card so `scoreCard`'s
+  keyword match sees it. (The full skeleton — volumes/molds/templates — stays a separate, later step.)
+- **108** `patch_live_marketing_content` — direct string-swaps of live `content_pages.blocks` + `cms_content`
+  to the new pricing/copy. **One-shot (NOT re-run-safe)** — for further copy changes use the admin
+  editor's Publish or write a NEW migration (Mistake 23).
+
+### Purchase → build flow (supersedes any "admin-provisioned / no Stripe" language)
+Comp-code purchase `POST /api/portal/[slug]/purchase` (code `rfppipelinetest`) → `proposal_portals`
+`curation_pending` (72h SLA, `CURATION_SLA_HOURS=72`) → admin shadow **"Release"**
+(`action=release` → `releaseFromCuration` CAS + `provisionProposalForPortal`, **UNLOCKED**) →
+`OnProposalCreated` → `draft_v0` auto-draft → **V0**. Live self-serve Stripe checkout is **⚠ future**
+(descoped); the comp code stands in. Full contract: `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+- **Version model:** V0 (skeleton instantiated) → V0.5 (library plug-and-play, ~15 min) → V1
+  (draft/finalize; Force-advance available). The 72h SLA covers **skeletoning only**, NOT V0.5→V1.
+- **Two releases of the spine:** (a) **Spotlight** = basic ingest minimums + `spotlight_summary` →
+  push→rank→mirror; a customer pin **copies the OPP's files into the tenant** (`tenant_opportunity_cards.pinned_docs`,
+  mig 095 — see STORAGE_LAYOUT). (b) **Proposal-portal** = full compliance matrix + blank templated molds
+  built ONCE on the master solicitation (`solicitation_volumes` / `volume_required_items` /
+  `solicitation_compliance` / `document_templates`), reused per tenant at provision.
+  `proposal_compliance_matrix` is written **AT PROVISION** (per tenant), not at ingest.
+- **Pricing (launch = August 2026):** Spotlight $499/mo (3-month minimum); Phase I → $1,999;
+  Phase II → $4,999 (no linked Phase I) or $3,999 (linked Phase I in system+library).
+  OLD/now-wrong: $299 / $999 / "$1,999 as Phase II" / "July 2026".
+
+### Shadow admin + the ONE-WAY ToDo backflow (migs 097–098)
+- **`shadow_admin_grants`** (mig 097): portal-scoped (`portal_id` FK → `proposal_portals` ON DELETE CASCADE);
+  `source` CHECK `t_and_c|invite`; revocable (`revoked_by`/`revoked_at`); RLS ENABLE+FORCE, `govtech_app` grants.
+- **`proposal_portals`** (mig 097) + `current_stage_index` (098); **`guardrail_templates`** (097; `tenant_id NULL`
+  = global default, seeded "System Defaults" in 098 with hard limits maxStages 3 / maxCollaborators 10 /
+  maxManagers 1 / maxNudges 3, default nudgeDays [2,5,9]).
+- The bridge is one-way for **DATA**; the ONLY backflow is a **ToDo EVENT** (carries no customer data) that
+  routes a privileged actor down into a tenant's RLS shadow account — the `tasks` row
+  `task_type='proposal_setup'` (tenant=buyer, `assignee_role='rfp_admin'`, 72h, nudgeDays [1,3]) created by
+  `launchProjectCollaboration`, surfaced by `listOpenAdminTriageTasks` at `/admin/rfp-curation`.
+- **⚠ SECURITY GAP (not yet closed):** `verifyTenantAccess` (`frontend/lib/db.ts:52`) still grants
+  `rfp_admin`/`master_admin` GLOBAL tenant access (god-view). Mig 097's scoped grant was meant to replace it
+  but does NOT yet. Retiring the god-view is on the gap register below.
+
+### Events — new types this cycle
+Namespaces unchanged (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`; still NEVER
+`admin`/`cms`/`spotlight`). New: `capture:purchase.completed`, `capture:workspace.released`,
+`content.document_archived`, `content.document_restored`, `proposal:proposal.ready_for_customer`.
+
+### Content/build wiring
+Marketing pages render from `content_pages` (`getPageBlocks`). Re-seed chain: `frontend/scripts/gen-page-seeds.ts`
+→ `lib/page-content/page-seeds.generated.json` → `scripts/seed_page_content.mjs`, gated by `SEED_PAGE_CONTENT=true`
+in `entrypoint.sh`. Postings archive/restore: `lib/content-admin.ts` `setDocumentStatus` →
+`content.document_archived|restored` events + `/api/admin/site/docs/[type]/[slug]/status`. pdf.js Node setup
+warnings silenced via `frontend/lib/pdf-parse-quiet.ts` (memoized pdf-parse loader + `console.warn` filter).
+
+### Gap register (⚠ future — registered, NOT built)
+buyer/outcome ledger on the master OPP; sbir.gov outcome scrape; "proposal-ready" nudge to mirror cards;
+T&C shadow opt-out toggle; curation auto-skip for pre-built OPPs; full V0→V1 workplan automation; EconDev
+appointed-shadow role (`source='invite'` hook); security hardening (retire the `verifyTenantAccess` god-view).

@@ -1,5 +1,7 @@
 # Zero-Day Launch Readiness — RFP Pipeline (2026-07-13)
 
+> **Update since this 2026-07-13 snapshot:** the purchase model shipped as the **comp-code purchase → curation_pending → admin release → provision** flow (migs 105–108), superseding the "admin-provisioned / self-serve-Stripe-backlog" framing below; see **`docs/MASTER_MIRROR_OPP_DESIGN.md`**.
+
 **Verdict: the founding-cohort core loop is GREEN end-to-end and Alpha-ready to test Monday,
 gated on two operator/infra prerequisites (real S3 creds + the Python pipeline worker).**
 Everything below is what a sandbox dress rehearsal actually exercised — not aspiration.

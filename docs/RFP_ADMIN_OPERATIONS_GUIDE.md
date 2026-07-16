@@ -13,8 +13,31 @@ As an RFP Pipeline admin, you are the expert human in the loop. The AI assists w
 - Upload and curate RFP documents (solicitations, BAAs, CSOs)
 - Build compliance matrices linking RFP requirements to their source
 - Define topics, volumes, and required sections for each solicitation
-- Push approved opportunities to customer Spotlight feeds
+- **Release 1 — Spotlight:** push approved opportunities to customer opportunity-card feeds
+- **Release 2 — Proposal portal:** build the reusable master skeleton (compliance matrix + volumes + blank molds) so a purchased portal provisions per tenant
+- Resolve **"purchase needs curation" ToDos** — the shadow-admin curation that provisions a buyer's workspace
 - Monitor system activity and respond to customer needs
+
+> **How this maps to the current architecture.** There is **one master opportunity** on the RFP
+> side, mirrored to every customer as a denormalized card over a **forward-only bridge**; the only
+> thing that flows back "up" is a **ToDo** that routes you (a shadow admin) down into a specific
+> tenant to do work there. Each opportunity is released **twice** — once to **Spotlight** (discovery)
+> and once as a **proposal portal** (build). Read
+> [`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md) for the architecture,
+> [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) for the exact Monday
+> click-spine, and [`ALPHA_HITL_RUNBOOK.md`](./ALPHA_HITL_RUNBOOK.md) for the full test script.
+
+### Pricing (launch target: August 2026)
+
+| Product | Price | Notes |
+|---|---|---|
+| Spotlight | **$499/mo** | 3-month minimum (no month-to-month) |
+| Proposal portal — Phase I | **$1,999** | per portal |
+| Proposal portal — Phase II | **$4,999** | standalone (no linked Phase I) |
+| Proposal portal — Phase II (linked) | **$3,999** | when a linked Phase I is already in the system + library |
+
+Founding-cohort buyers currently purchase with the **comp code `rfppipelinetest`** (a $0 recorded
+purchase); live self-serve Stripe checkout is **⚠ future** (descoped for now).
 
 ---
 
@@ -260,6 +283,13 @@ Volumes define the structure of the proposal a customer will write.
    - Format instructions (e.g., "Times New Roman 12pt, single-spaced")
 5. These become the proposal sections when a customer creates a proposal
 
+> **This is the master skeleton (Release 2).** It is built **once on the master solicitation** and
+> **reused by every buyer** — the blank **molds** carry the guardrails (font, margins, page limit,
+> type) so a "1-page technical summary" mold is really a formatted Word doc the customer fills. Link
+> a `document_template` to a required item via `template_id` and attach an `expert_note`; at provision
+> the mold interpolates (`{company_name}` → tenant name) into each tenant's sections. Build it any
+> time in advance; if it is not done when the **first** portal is purchased, the 72h SLA (§8) fires.
+
 ---
 
 ## 6. Approve and Push to Spotlight
@@ -282,6 +312,12 @@ After curation is complete:
 - Customers with high match scores see the topics ranked near the top
 - The compliance matrix and volume structure are frozen at this point (changes need a new push)
 
+> **This is Release 1 (Spotlight) of two.** Push makes the opportunity **discoverable and ranked** on
+> every customer's card feed (`/portal/[slug]/cards`). It does **not** build the proposal skeleton —
+> that is **Release 2** (§5c and §8), built once on the master and reused per buyer. The push gate now
+> also requires a non-empty **`spotlight_summary`** (the plain-language "why this matches") in addition
+> to `submission_format`.
+
 ---
 
 ## 7. Monitor Customer Activity
@@ -292,41 +328,78 @@ The event stream shows all system activity:
 
 | Event | What it means |
 |---|---|
-| `identity.application.submitted` | New customer applied |
-| `identity.tenant.created` | Customer accepted into system |
-| `capture.library.files_uploaded` | Customer uploaded documents |
-| `capture.library.batch_atomized` | Documents atomized into library |
-| `capture.spotlight.topic_pinned` | Customer pinned an opportunity |
-| `capture.proposal.purchased` | Customer created a proposal |
-| `proposal.section.saved` | Customer saved canvas content |
-| `finder.solicitation.claimed` | Admin claimed an RFP |
-| `finder.solicitation.pushed` | Admin pushed to Spotlight |
-| `finder.compliance_value.saved` | Admin verified a compliance variable |
+| `capture:application.submitted` | New customer applied |
+| `capture:application.accepted` | Application accepted → tenant + user created, card river mirrored |
+| `library:file.uploaded` | Customer uploaded documents |
+| `library:document.atomized` | Documents atomized into the library |
+| `capture:topic.pinned` | Customer pinned an opportunity card (copies the OPP's files into their space) |
+| `capture:purchase.completed` | Customer purchased a proposal portal (comp code) |
+| `capture:workspace.released` | Admin released the portal from curation → workspace provisioned (V0) |
+| `proposal:section.saved` | Customer saved canvas content |
+| `finder:solicitation.claimed` | Admin claimed an RFP |
+| `finder:solicitation.pushed` | Admin pushed to Spotlight (Release 1) |
+| `finder:annotation.saved` | Admin saved a compliance variable / annotation |
+
+> **Namespace note.** Events use the namespaces `finder` (admin), `capture` (customer),
+> `identity` (auth), `proposal`, `library`, `system`, `tool` — never `admin`, `cms`, or `spotlight`.
 
 ---
 
-## 8. Portal Build Flow (When Customer Requests a Proposal)
+## 8. Portal Build Flow — Purchase → Curation → Release → V0→V1
 
-When a customer pins a topic and wants to build a proposal:
+This is the **Release 2** path. It runs on the **comp-code purchase loop**, not silent
+admin-provision. The authoritative click-by-click sequence is
+[`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md); the design is
+[`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md).
 
-1. **Verify curation is complete** for that topic's solicitation:
-   - Compliance matrix fully built?
-   - Volumes and required items defined?
-   - If not, finish curation first
-2. The customer navigates to their **Proposals** page and creates a proposal from the pinned topic
-3. The system automatically:
-   - Creates a `proposals` row with `stage = 'outline'`
-   - Creates `proposal_sections` rows from the volume's required items
-   - Each section gets: title, section number, page allocation, empty status
-4. The customer can then:
-   - Click **"Draft All Sections"** for AI-powered first drafts
-   - The AI searches their library for relevant atoms
-   - Content is generated using library atoms + RFP compliance constraints
-5. Customer reviews and revises in the canvas editor
+### The flow
 
-### Your role during proposal build:
+1. **Customer pins** the opportunity card, then clicks **Purchase** and enters the comp code
+   `rfppipelinetest`. `POST /api/portal/[slug]/purchase`:
+   - opens a `proposal_portals` row at **`curation_pending`** with a **72-hour SLA**
+     (`curation_due_at = now()+72h`),
+   - writes a **$0 completed `purchases`** row (promo code stamped),
+   - grants a **shadow-admin** row (`shadow_admin_grants`, `source='t_and_c'`),
+   - emits **`capture:purchase.completed`**, and
+   - parks a **72h `proposal_setup` ToDo** for `rfp_admin`.
+   The customer's portal shows **"Waiting for RFP Expert Curation" + a live 72h countdown.**
+2. **Resolve the ToDo.** Go to `/admin/rfp-curation` — the **"Purchase — needs curation"** task is
+   surfaced there (the one tenant-scoped task an admin sees). Clicking it routes you, as the
+   **shadow admin**, down into the buyer's RLS-scoped tenant. *(⚠ security: today
+   `verifyTenantAccess` still grants admins a global god-view that `shadow_admin_grants` was meant to
+   replace — the grant is auditable/revocable metadata, not yet the enforced gate.)*
+3. **Finish or reuse the master skeleton (Release 2).** If you built the skeleton in advance
+   (§5c), this is a **~15-minute review**. If not, build it now — the **72h clock covers
+   skeletoning only**, not the draft.
+4. **Release** to the customer (`action=release`): `curation_pending → launched` →
+   `provisionProposalForPortal` provisions the workspace **UNLOCKED** — `proposals` +
+   `proposal_artifacts` per volume + `proposal_sections` per required item + a per-tenant
+   `proposal_compliance_matrix` (rows `not_addressed`), with molds interpolated (`{company_name}` →
+   tenant name). `OnProposalCreated → draft_v0` then auto-drafts sections via the `section_drafter`
+   agent. This is **V0** — the instantiated skeleton. Emits **`capture:workspace.released`**.
+5. **Customer builds V0 → V0.5 → V1** (see the version model below).
 
-For V1, your role after curation is mostly monitoring. The customer drives the proposal writing. In future phases, you'll participate in color team reviews and provide expert guidance.
+### Version model
+
+| Stage | What it is | Clock |
+|---|---|---|
+| **→ V0** | skeleton instantiated for the tenant (matrix + molds + guardrails, blank) | the 72h (skeletoning only) |
+| **V0 → V0.5** | **library plug-and-play** — atoms pulled into the molds → first draft (~15 min) | none |
+| **V0.5 → V1** | draft, compliance, finalize; **Force-advance to V1** available | none |
+
+### Reuse — the second buyer is instant
+
+Because the skeleton is built **once on the master solicitation** and reused per tenant, a second
+customer who buys the same opportunity skips the 72h build — molds already exist, so it's a fast
+release straight to V0. **⚠ future:** today every purchase still opens `curation_pending`; an
+automatic skip for already-skeletoned opportunities is on the backlog.
+
+### Your role during proposal build
+
+Today the shadow admin bootstraps the build (draft, lock, force-advance). The intended end state is
+**mostly customer-executed** via Workplan automation (nudges/actions pushed into the approved shadow
++ company-admin accounts) — **⚠ partial** today: `section_drafter` auto-drafts on release,
+`compliance_reviewer` runs inline in the AI route, and `color_team_reviewer` is defined but not wired.
 
 ---
 
@@ -458,7 +531,13 @@ Correct them. Every correction writes to curation memory with the namespace key 
 
 ---
 
-## For the Ubihere Test (Tomorrow)
+## For the Ubihere Test (reference script)
+
+> **Note.** The current single-operator end-to-end is
+> [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) (Immobileyes → Navy, comp-code
+> purchase → shadow curation → V0→V1). The Ubihere script below is kept for reference; its
+> purchase/build steps have been aligned to the comp-code flow. Admin steps 4–6 build the **Release 2**
+> master skeleton; step 7 is the **Release 1** push.
 
 ### As admin (eric@rfppipeline.com):
 
@@ -478,10 +557,13 @@ Correct them. Every correction writes to curation memory with the namespace key 
 2. Log in with temp password → set permanent password
 3. Upload a few company documents (create simple test docs if needed)
 4. Review and accept atoms
-5. Browse Spotlight → pin a topic
-6. Create proposal from pinned topic
-7. Run "Draft All Sections"
-8. Review in canvas editor
-9. Export to .docx
+5. Browse the opportunity **cards** feed (`/portal/<slug>/cards`) → pin a topic
+6. **Purchase** the portal on the pinned card → enter comp code `rfppipelinetest` → the portal opens
+   **`curation_pending`** with a live 72h countdown
+7. *(switch to admin)* Resolve the **"Purchase — needs curation"** ToDo at `/admin/rfp-curation` →
+   **Release** (`action=release`) → the workspace provisions **unlocked** (V0) and auto-drafts
+8. *(back as customer)* Library plug-and-play into the molds (V0 → V0.5), then **Lock all** /
+   **Force advance to V1**
+9. Review in canvas editor → **Download Proposal (.docx)**
 
 That's the full loop. Every step has an event in the system_events table.

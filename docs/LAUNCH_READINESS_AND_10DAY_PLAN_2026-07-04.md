@@ -1,5 +1,7 @@
 # Launch Readiness + 10-Day Plan — 2026-07-04
 
+> **Update since this 2026-07-04 snapshot:** the comp-code **purchase → curation → release** flow shipped (migs **105–108**); pricing is **Spotlight $499/mo, Phase I $1,999, Phase II $4,999 / $3,999-linked**. See docs/MASTER_MIRROR_OPP_DESIGN.md.
+
 **Target launch:** ~2026-07-14 (10 days). **Method:** a deep 8-track code sweep (the 6 product
 areas + greenfield migrations + infra/prod-readiness), every claim traced to `file:line`, then
 reconciled against the prior audits (`HITL_WIRING_AUDIT_2026-07-03.md`, `V1_DEPLOY_GAP_REPORT.md`,

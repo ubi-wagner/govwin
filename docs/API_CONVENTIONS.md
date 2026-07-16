@@ -138,6 +138,10 @@ export const POST = withHandler({
 - AppError → HTTP translation with stable `code`
 - Unknown exception catching with stack-trace logging + generic 500 response
 
+### As-built exception — RLS-scoped portal routes
+
+A few newer tenant-portal routes that must run inside a Postgres RLS transaction — notably `POST /api/portal/[tenantSlug]/purchase` and the portal-launch route `/api/portal/[tenantSlug]/portals/[portalId]` (`?action=accept|release|revoke-shadow`, plus `PATCH`) — currently satisfy this contract **by hand**: a local `gate()` (auth -> role -> `verifyTenantAccess`) plus `withTenant(tenantId, …)` for the RLS tx, returning the same `{ data }` / `{ error, code }` envelope via `NextResponse.json`. They honor the response-shape and auth-ordering invariants but do **not** yet route through `withHandler`. Reconciling them (a `withHandler` variant that opens the RLS tx) is tracked follow-up; until then, match the surrounding file's pattern when editing these routes.
+
 ---
 
 ## Authentication & session
@@ -393,6 +397,7 @@ Notes:
 - The zod input uses `z.coerce.number()` for numeric query params because the URL-encoded value is always a string.
 - The SQL `LIMIT ${limit + 1}` trick cheaply detects a next page without a `COUNT(*)` query.
 - No event is emitted for reads; events are for state changes.
+- ⚠ **Stale table (2026-07-15):** this example reads `tenant_pipeline_items`, the **retired** legacy pipeline surface. The canonical customer surface is the opportunity-card spine (`tenant_opportunity_cards`, ranked via `tenant_bucket_scores`) — see CLAUDE.md / ARCHITECTURE_V10.md. The *pattern* (cursor pagination, `ctx.tenantId` scoping) is unchanged; only the table/columns differ. Left as-is pending a fuller rewrite.
 
 ---
 
@@ -737,7 +742,7 @@ export const POST = withHandler({
 
 1. **Atomic state transition.** `UPDATE curated_solicitations SET status = 'pushed_to_pipeline', pushed_at = now() WHERE id = ${solId} AND status = 'approved' RETURNING opportunity_id`. Zero rows → `ConflictError('solicitation not in approved state')`.
 2. **Required-variable check.** Before the UPDATE, the tool fetches the row's compliance matrix and verifies every `compliance_variables.is_system = true` row has a corresponding value on `solicitation_compliance`. Missing required variables → `ValidationError` with `details: { missingVariables: [...] }` → 422.
-3. **Domain event.** `emitEventSingle({ namespace: 'finder', type: 'rfp.curated_and_pushed', ... })` fires after the UPDATE commits. This event is what downstream scoring workers subscribe to.
+3. **Domain event.** `emitEventSingle({ namespace: 'finder', type: 'solicitation.pushed', ... })` fires after the UPDATE commits. This event is what downstream scoring workers subscribe to.
 4. **Procedural memory write.** `invoke('memory.write', { memoryType: 'procedural', ... }, ctx)` records a cross-cycle learning artifact: "for namespace X, curation took N rounds, these variables were hardest, these annotations were most common." The inner tool invocation reuses `ctx.parentEventId` so the event tree reconstructs cleanly (see `TOOL_CONVENTIONS.md §"Audit logging"`).
 5. **Return** `{ solicitationId, opportunityId, pushedAt }` so the UI can redirect to `/portal/[tenantSlug]/opportunities/[opportunityId]`.
 
@@ -803,7 +808,7 @@ test('happy path: returns opportunityId, writes procedural memory, emits event',
   expect(row.status).toBe('pushed_to_pipeline');
   expect(row.pushed_at).not.toBeNull();
 
-  const events = await sql`SELECT type FROM system_events WHERE type = 'finder.rfp.curated_and_pushed'`;
+  const events = await sql`SELECT type FROM system_events WHERE type = 'solicitation.pushed'`;
   expect(events).toHaveLength(1);
 
   const memories = await sql`SELECT id FROM procedural_memories WHERE name LIKE 'curation:%'`;

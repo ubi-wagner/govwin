@@ -1,7 +1,7 @@
 # Customer Admin — User Test Manual
 
 **Audience:** the small-business owner using the portal to pursue and build federal R&D proposals — role **`tenant_admin`**.
-**Covers:** your end-to-end journey — Spotlight → pin → pursue → build a proposal → draft/review/lock/advance → team & partners → record the win.
+**Covers:** your end-to-end journey — browse **Opportunities** cards → rank with **Buckets** → **pin** → **purchase** (comp code) → wait for RFP-expert curation (72h) → build **V0 → V0.5 → V1** (draft / library / lock / advance) → team & partners → record the win.
 **You are testing the live UI.** Each step says what to click and what to expect. Tick the **✅ Verify** boxes.
 
 ### Conventions
@@ -10,7 +10,8 @@
 
 ### Prerequisites
 - A `tenant_admin` account (provisioned by RFP Pipeline when your application was accepted — your **first login forces a password change**).
-- At least one opportunity **pushed to the pipeline** by the RFP admin so it appears in your Spotlight feed.
+- At least one opportunity **pushed** by the RFP admin so it appears in your **Opportunities** feed (`/cards`). A brand-new account is auto-mirrored the whole live opportunity river at signup.
+- **Test-instance notes** (for whoever stands up the environment): migrations run via `node db/migrations/migrate.mjs` (high-water **108**; migs **105–108** shipped the comp-code purchase → curation → release model + `spotlight_summary`). Seed with `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true` (marketing pages).
 
 ---
 
@@ -22,8 +23,8 @@
 3. **Email "To-Do" links:** a nudge email's button opens **`/go?task=<id>`**. If you're signed out it sends you to `/login` and back; once signed in it routes you **straight to the relevant proposal** (or your dashboard task queue). ✅ Verify clicking an email link lands you on the right proposal.
 
 ### Portal navigation (left sidebar — exact labels)
-**Dashboard** · **Spotlight** (path `/spotlights`) · **Pipeline** · **Library** · **Proposals** · **Processes** · **Activity** · **Team** · **Documents** · **Billing** · **AI Usage** (admin) · **Automation** (admin) · **Settings** (path `/profile`) · **Sign out**.
-> Label↔path to know: **Spotlight**=`/spotlights`, **AI Usage**=`/agents`, **Settings**=`/profile`.
+**Dashboard** · **Opportunities** (path `/cards`) · **Buckets** · **Atoms** · **Library** · **Builds** (path `/portals`) · **Proposals** · **Processes** · **Activity** · **Team** · **Documents** · **Billing** · **AI Usage** (admin) · **Automation** (admin) · **Settings** (path `/profile`) · **Sign out**.
+> Label↔path to know: **Opportunities**=`/cards`, **Builds**=`/portals`, **AI Usage**=`/agents`, **Settings**=`/profile`. The old **Spotlight** (`/spotlights`) and **Pipeline** (`/pipeline`) links now **redirect to `/cards`** — the legacy `tenant_pipeline_items` surface is **retired** (see docs/MASTER_MIRROR_OPP_DESIGN.md).
 
 ---
 
@@ -31,53 +32,77 @@
 
 1. Nav **Settings** → `/portal/<slug>/profile`. Click **"Edit"**.
 2. Fill **Company Summary**, **Technology Focus**, **NAICS Codes (comma-separated)**, **Keywords (comma-separated)**, plus Target Agencies / Set-Aside Types / Research Areas → **"Save"**.
-3. ✅ **Verify:** the fields persist. These feed Spotlight scoring and AI drafting — your **NAICS + Keywords** directly change your match scores in §2.
+3. ✅ **Verify:** the fields persist. These feed AI drafting; your ranking of the **Opportunities** feed is driven by the **Buckets** ranking lenses you define (§2).
 
 ---
 
-## 2. Spotlight — find & pin opportunities
+## 2. Opportunities & Buckets — browse, rank & pin
 
-### 2.1 Browse the scored feed
-1. Nav **Spotlight** → `/portal/<slug>/spotlights`. You see **"Spotlight Feed"**, "N topics found", and opportunity cards each with a **score circle** (solid = pipeline "Score"; dashed = "Est."), a match bar, a close-date countdown, and **"Why this matches:"** reason chips.
-   - ⚠️ If your profile is empty you'll see "No profile data found. Scores are based on available data only." → do §1 first.
-2. Use the filters **Agency**, **Program**, **Min score**, **Sort by** (Match score / Close date / Posted date). ✅ Verify the list re-filters.
+### 2.1 Browse the opportunity cards
+1. Nav **Opportunities** → `/portal/<slug>/cards`. You see **"Opportunity Pipeline"**, "N cards", an **"Include closed"** checkbox, and **"Refresh"**. Each card shows the **title**, **agency · program type**, a **"Closes {date}"** line, and a submission-stage badge (**NOFO / Pre-Release / Updated / Closed / Archived**).
+   - These are your denormalized **mirror cards**, fanned to you over the one-way bridge from the RFP-side master opportunity (design: docs/MASTER_MIRROR_OPP_DESIGN.md). A brand-new account is back-filled the whole live river at signup.
+   - ⚠️ The card does **not** yet render a numeric rank inline (the page copy says "ranked by your spotlight buckets" — the per-bucket rank shows on the **Buckets** page, §2.2). Inline card ranks are **⚠ future**.
+2. Toggle **"Include closed"** to reveal archived/closed opportunities (hidden by default) → ✅ Verify the list refreshes.
 
-### 2.2 Pin an opportunity (this creates a To-Do)
-1. On a card click **"Pin"** (it shows "Saving…", then becomes **"Unpin"**).
-2. ✅ **Verify three things:** (a) the card shows **Unpin**; (b) the opportunity now appears under **Pipeline** (§3); (c) a **"Decide whether to pursue: …"** To-Do appears on your **Dashboard** (due in 7 days). Clicking **"Unpin"** cancels that task.
+### 2.2 Buckets — your ranking lenses
+1. Nav **Buckets** → `/portal/<slug>/buckets`. You see **"Spotlight Buckets"** — "Your ranking lenses — each ranks the whole pipeline by the criteria you set."
+2. In **"New bucket"** fill **Name** (e.g. "AF Autonomy"), **keywords** (comma-sep), **agencies** (comma-sep), **program types** (SBIR, STTR), **NAICS codes** (comma-sep), optional **Include closed** → **"Create"**. ✅ Verify the bucket appears. (As `tenant_admin` you can create/delete; a `tenant_user` can view + rank.)
+3. On a bucket click **"Rank →"**. ✅ Verify a ranked list **#1 … #N** of your opportunity cards against that lens. Every card is scored against **every** active bucket (one card, up to 5 bucket scores — not 5 cards).
+   - 🚫 Attaching library **atoms** as extra bucket *context* is **⚠ future** — buckets rank on the fields above only.
 
-### 2.3 Opportunity detail
-1. Click **"View Details"** → `/spotlights/<id>`. ✅ Verify **"Your fit by bucket"** cards reading **"{Bucket} #rank/total"** (hover: "Ranks #N of #M in your {bucket} pipeline") — the "ranks #N in bucket" signal; plus Topic Details, a **Compliance Preview** (limited — "Full compliance matrix available after proposal portal purchase."), and **Source Documents** with **"Download"** links.
-2. Action buttons: **"Pin to Spotlight"** / **"Unpin from Spotlight"**, and — **only when pinned** — **"Build Proposal"** (or **"Go to Proposal"** if one exists).
-
----
-
-## 3. Pipeline — track what you're pursuing
-
-1. Nav **Pipeline** → `/portal/<slug>/pipeline`. ✅ Verify **"My Pipeline"** lists your pinned opportunities, each with a countdown badge and a status badge — a proposal **stage** ("Drafting"/"Review"/"Final"/"Submitted") if a workspace exists, else **"Pinned"**.
-2. On a pinned-but-not-yet-built card click **"Build Proposal"** (routes you to the Spotlight detail to create it). On a built one click **"Open"** → the proposal workspace.
+### 2.3 Pin an opportunity (copies the OPP's files to you)
+1. On a card click **"Pin (copy docs)"** ("…", then the card gains a **"Pinned"** badge + **"Unpin"**).
+2. ✅ **Verify:** pinning copies the opportunity's attached source documents into your tenant space (`customers/<slug>/pinned/<oppId>/…`) and arms update nudges. A pinned card whose master advanced shows an amber **"Update available"** with **"Resync"**.
+3. Only a **pinned** card exposes the **"Purchase"** button (§3). **"Build →"** jumps to your **Builds** list for that opportunity.
+   - ⚠️ Pinned-opp push **nudges** to you (email/bell) are **⚠ future**; the amber "Update available" badge works today.
 
 ---
 
-## 4. Create a proposal workspace
+## 3. Builds — purchase, wait for curation, release (→ V0)
 
-1. From a pinned opportunity's **Spotlight detail** click **"Build Proposal"** (it shows "Creating…").
-   - ⚠️ **Paywall is OFF for the founding cohort** (`FOUNDING_COHORT_BYPASS`): you can create a workspace **without a Stripe purchase**. (Wording elsewhere says "purchase a topic" — creation is free while the bypass is on.) A duplicate for the same opportunity returns a conflict.
-2. ✅ **Verify:** you're routed to **`/proposals/<proposalId>`** with a section skeleton, a compliance matrix, and the opportunity card.
-3. **What just happened:** the proposal is created **locked for a 72-hour admin review** — RFP staff review the skeleton/compliance before you edit.
-   - ⚠️ As the **tenant_admin you do NOT see the yellow "under admin review" banner** (that's shown to your `tenant_user`/partner teammates). You see the full **Admin Panel** with a **"Locked (#0)"** chip; editors are read-only until staff unlock. When unlocked, your team gets an email "Your proposal is ready".
+> **How you buy (current model).** Live self-serve **Stripe checkout is descoped**; the founding cohort buys with a **comp code**. Pin an opportunity → **Purchase** → enter the comp code → your build opens in **"Waiting for RFP Expert Curation"** (a 72-hour expert SLA). An RFP expert curates the skeleton and **releases** it — then your workspace is live and **unlocked**. Design of record: docs/MASTER_MIRROR_OPP_DESIGN.md; operator side: docs/HITL_IMMOBILEYES_CLICKPLAN.md.
+
+### 3.1 Purchase a proposal workspace (comp code)
+1. On a **pinned** card (§2.3) click **"Purchase"** → the **"Purchase proposal workspace"** modal.
+   - ⚠️ **Card checkout is shown at the top but not enabled** ("Card checkout is not available yet — use an access code below"). Enter the founding-cohort **comp code `rfppipelinetest`** in the code box at the bottom → the purchase completes at **$0**.
+2. ✅ **Verify:** you're routed to **Builds** (`/portals?opp=…`) and the build reads **"Waiting for RFP Expert Curation."** Behind the scenes this opened a `proposal_portals` row in **`curation_pending`** with a **72h** `curation_due_at`, wrote a $0 completed purchase, granted the RFP expert a **shadow-admin** visit to your tenant, emitted `capture:purchase.completed`, and parked a **"Curate + release the purchased proposal workspace"** ToDo on the RFP admin (due 72h).
+   - ⚠️ A second purchase of the **same** opportunity returns **409 "This opportunity already has a workspace."**
+
+### 3.2 Wait for curation
+1. Nav **Builds** → `/portal/<slug>/portals`. ✅ Verify the purchased build shows the amber **"Waiting for RFP Expert Curation"** panel and a live **"Expert SLA: {time} remaining"** countdown (flips to "past 72h target" if overdue).
+   - **What the 72h covers:** the RFP expert building/reviewing the **master skeleton** (compliance matrix + volumes + section molds) — **not** your drafting. If the skeleton was pre-built for this opportunity, it's a ~15-minute review, not 72h.
+
+### 3.3 Release → V0
+1. When the RFP expert clicks **"Release to customer"**, the portal flips `curation_pending → launched`, the proposal is **provisioned unlocked**, the compliance matrix is instantiated, and the `draft_v0` auto-draft fires. This is **V0** — a section skeleton with molds + guardrails, matrix rows, and (once the pipeline worker runs the auto-draft) AI-drafted first-pass sections.
+2. ✅ **Verify:** the build now shows **"Open build →"** → `/proposals/<proposalId>` — an **editable** workspace (no admin-review lock in the live release path). Your team gets a "your proposal is ready" email if email is configured.
+   - ⚠️ On the legacy **admin-create** provision path the workspace can arrive **locked at `lock_count=0`**; an RFP/master admin clears that first lock via the release action. The live purchase→release path above provisions already-unlocked.
 
 ---
 
-## 5. The Proposal Workspace (the core)
+## 4. The version model — V0 → V0.5 → V1
 
-Open **Proposals** → a proposal → `/proposals/<proposalId>`.
+Your build advances through three versions. **The 72h SLA covers skeletoning (→ V0) only** — there is no clock on the draft itself.
+
+| Version | What it is | How you get there |
+|---|---|---|
+| **V0** | Skeleton instantiated for you: compliance matrix + blank templated **molds** + guardrails (blank, but carrying font / margins / page-limit), plus the `draft_v0` first pass | RFP expert builds the master skeleton; **Release** provisions & auto-drafts (§3.3) |
+| **V0.5** | **Library plug-and-play** — pull your **atoms** into the molds so the sections read as yours (~15 min) | You (or a shadow-admin helper) in the workspace (§5.2–5.3, §7.1) |
+| **V1** | Draft finalized: compliance run, sections locked, stage advanced | **Accept & Lock** all + **Advance**, or **Force advance** (§5.4–5.5) |
+
+Everything from here happens in the **Proposal Workspace** (§5). ⚠️ Fully automated V0→V1 "workplan" nudges are **⚠ future** — today the build is customer-executed (shadow-assisted).
+
+---
+
+## 5. The Proposal Workspace (build V0.5 → V1)
+
+Open **Proposals** (or **Builds** → **"Open build →"**) → a proposal → `/proposals/<proposalId>`.
 
 ### 5.1 Orientation
 1. ✅ Verify the header (title, Topic/agency/Due-date) and the collapsible **"Opportunity origin & compliance"** card with **three tabs**: **Overview** (stage, Open/Locked, source bucket), **Origin** (frozen-at-purchase opp summary + bought-from bucket/score), **Compliance** (live % bar + Satisfied/Partial/Not addressed/N/A counts).
 2. Tabs across the workspace: **All Sections** / **My Sections** / **Timeline** (admin default = All Sections).
 
 ### 5.2 AI-draft the sections
+> ⚠️ On the **Release** path the `draft_v0` auto-draft may have **already** filled your empty sections (V0) — so some rows arrive "drafted." Re-draft or revise as needed. Auto-draft requires the **Python pipeline worker** running with the pipeline `ANTHROPIC_API_KEY`.
 1. In **All Sections**, click **"Draft All Sections"** (the AI Section Drafter; appears when there are empty sections and the proposal is unlocked — else use **"Show AI Drafter"**).
 2. ✅ **Verify:** each section row cycles "drafting… → drafted" and you see "All sections drafted. Review each section and accept or revise the AI content." (This is live; requires the tenant's AI to be enabled and within budget.)
 3. Alternatively, in the Admin Panel **"AI & Library"** tab click **"Draft with AI"** → toast "AI drafting queued for N sections…".
@@ -100,7 +125,7 @@ On the **Stage/Gate bar**:
 2. ⚠️ **All-locked gate:** if some sections aren't accepted & locked, advance is blocked and an amber box lists "N sections not yet accepted & locked". As an admin you then get **"Force advance anyway →"** (force-override).
    - ✅ Verify: with all sections locked, **Advance** moves the stage (e.g. draft → final); with some unlocked, you see the blocked list + the force option.
 3. At **final** stage: **"Unlock for Edit"** / **"Re-lock"** appear. ⚠️ After the first unlock you get a **7-day** edit window; "Further changes require RFP Pipeline support" appears at lock #2.
-4. **Export the package:** in Artifacts click **"Export Package"** → ✅ Verify it downloads **`proposal-package-<id>.json`** (it's a JSON bundle, **not a PDF**). ⚠️ Export only works once you've locked at least once (or reached submitted/archived) — otherwise the button helper says "Lock the proposal or advance to submitted stage to export".
+4. **Download the package:** in Artifacts click **"Download Proposal (.docx)"** → ✅ Verify it downloads a real **`.docx`** Word document (headings / tables / TOC) — **not** a JSON manifest (the button now POSTs `?format=docx`; the old `.json`-bundle behavior is **superseded**). ⚠️ Export only works once you've locked at least once (or reached submitted/archived) — otherwise the button helper says "Lock the proposal or advance to submitted stage to export".
 
 ---
 
@@ -154,8 +179,9 @@ On the proposal page, expand the **"Assign a task"** section (collapsed by defau
 
 ## 9. Quick smoke checklist (one pass)
 - [ ] Sign in → dashboard; set Profile (NAICS/Keywords) and save.
-- [ ] Spotlight → **Pin** an opportunity → a To-Do appears + it shows in Pipeline.
-- [ ] Spotlight detail → **Build Proposal** → routed to the workspace.
+- [ ] **Opportunities** (`/cards`) → **Pin (copy docs)** an opportunity; create a **Bucket** → **Rank →**.
+- [ ] Pinned card → **Purchase** (comp code `rfppipelinetest`) → **Builds** shows "Waiting for RFP Expert Curation" + 72h countdown.
+- [ ] After RFP expert **Release** → **Open build** → editable workspace (**V0**).
 - [ ] Workspace → **Draft All Sections** → sections drafted.
 - [ ] A section → edit in canvas → **Save** → **Export .docx**.
 - [ ] Admin Panel → **Accept & Lock All** → **Advance** the stage.
@@ -167,6 +193,27 @@ On the proposal page, expand the **"Assign a task"** section (collapsed by defau
 
 ## 10. Stubs / disabled — keep OUT of pass/fail
 - 🚫 **"AI Review (coming soon)"** (AI & Library tab) — disabled.
-- 🚫 **"Export .pdf"** in the section editor — disabled; package export is **JSON**, not PDF.
+- 🚫 **"Export .pdf"** in the section editor — disabled ("coming soon", no renderer). The whole-proposal **package download is now `.docx`** (superseded the old JSON manifest); PDF export is **⚠ future**.
 - 🚫 **"Split"** in Library Review — local toggle, no backend.
-- ⚠️ **Billing/Stripe** (`/billing`): **"Subscribe to Spotlight ($299/mo)"**, **"Manage Billing"**, expert-hours purchase all redirect to Stripe — with the founding-cohort bypass and no live keys, only verify the buttons render/redirect, not end-to-end payment.
+- ⚠️ **Billing/Stripe** (`/billing`): live self-serve checkout is **descoped** — the founding cohort buys proposals with the **comp code `rfppipelinetest`** (§3.1), and Spotlight subscription billing is **⚠ future**. Only verify billing buttons render/redirect, not end-to-end payment.
+
+---
+
+## 11. Pricing (launch — August 2026)
+
+Superseded since older drafts (which showed "$299 Spotlight / $999 Phase I"). Current price sheet:
+
+| Product | Price | Notes |
+|---|---|---|
+| **Spotlight** (subscription) | **$499/mo** | **3-month minimum** — no month-to-month |
+| **Phase I** proposal | **$1,999** | one-time, per opportunity |
+| **Phase II** proposal | **$4,999** | no linked Phase I |
+| **Phase II** proposal (linked) | **$3,999** | when a **linked Phase I** is already in the system + library — the "**only $3,000 more**" upgrade |
+
+## 12. ⚠ Future — not yet built (don't test as working)
+- Inline numeric card rank on `/cards` (ranks show on **Buckets**, §2.2).
+- Library **atoms as bucket context** (§2.2).
+- Pinned-opp push **nudges** (email/bell); the "Update available" badge works (§2.3).
+- **Auto-skip curation** when the master skeleton is pre-built (every purchase opens `curation_pending` today, §3).
+- Fully automated **V0→V1 workplan** nudges/actions (build is customer-executed today, §4).
+- Live self-serve **Stripe** checkout + Spotlight subscription billing (§10).

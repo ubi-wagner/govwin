@@ -1,5 +1,11 @@
 # HITL Test Plan — Ingest → Download (RFP-admin, solo)
 
+> ## ⚠ SUPERSEDED (updated 2026-07-15)
+> This walkthrough predates the comp-code purchase model. Use **`docs/ALPHA_HITL_RUNBOOK.md`** +
+> **`docs/HITL_IMMOBILEYES_CLICKPLAN.md`** for the current end-to-end HITL (comp-code purchase → curation_pending →
+> admin release → V0 draft → V1 revise → download). The phases below still illustrate the ingest→curate→build→
+> download mechanics, but the purchase/provision entry point has changed.
+
 A click-by-click, human-in-the-loop walkthrough of the greenfield pipeline, run entirely
 as an RFP admin operating a customer tenant as a shadow admin. `⛱` marks a human-in-the-loop
 gate (you decide / approve / accept).

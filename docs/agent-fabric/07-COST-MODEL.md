@@ -130,32 +130,34 @@ Total infrastructure: ~$2.60/month per tenant
 
 ## Break-Even Analysis
 
-### Finder Subscription ($199/month)
+> Pricing updated to the current sheet (launch **August 2026**): **Spotlight $499/mo** (3-month minimum), **Phase I $1,999**, **Phase II $4,999** (or **$3,999** with a linked Phase I). Supersedes the old "$199 Finder / $999 portal" figures. The per-call / per-proposal **AI costs** above are unchanged. Canonical pricing + model: docs/MASTER_MIRROR_OPP_DESIGN.md.
+
+### Spotlight Subscription ($499/month, 3-month minimum)
 
 ```
-Revenue:           $199.00
+Revenue:           $499.00
 AI cost (active):   $9.95
 Infrastructure:     $2.60
 ──────────────────────────
-Gross margin:      $186.45 (94%)
+Gross margin:      $486.45 (~97%)
 ```
 
-Even a power user at $17.55 AI cost leaves 91% gross margin on the subscription.
+Even a power user at $17.55 AI cost leaves ~96% gross margin on the subscription.
 
-### Proposal Portal Purchase ($999 one-time)
+### Proposal Portal Purchase (Phase I $1,999 · Phase II $4,999, or $3,999 linked)
 
 ```
-Revenue:           $999.00
+Revenue:           $1,999.00 (Phase I) · $4,999 / $3,999 linked (Phase II)
 AI cost:            $4.50 - $12.50
 Infrastructure:     ~$1.00
 ──────────────────────────
-Gross margin:      $985 - $993 (98-99%)
+Gross margin:      $1,993 - $4,991 (>99%)
 ```
 
 **The AI cost per proposal is negligible relative to revenue.**
-At $5-12 per proposal in AI compute versus $999 in revenue, AI is a
-<2% cost of goods sold. Even at 10x the estimated cost, margins remain
-above 85%.
+At $5-12 per proposal in AI compute versus $1,999-$4,999 in revenue, AI is
+well under 1% cost of goods sold. Even at 10x the estimated cost, margins
+remain above 95%.
 
 ### Scaling to 100 Tenants
 
@@ -166,8 +168,8 @@ Railway (3 workers): ~$60/month
 Anthropic API overhead: ~$0
 ──────────────────────────
 Total monthly cost: ~$1,110
-Monthly revenue (100 × $199): $19,900
-Gross margin: 94%
+Monthly revenue (100 × $499): $49,900
+Gross margin: ~98%
 ```
 
 ---

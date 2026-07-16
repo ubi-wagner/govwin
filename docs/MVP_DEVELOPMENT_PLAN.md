@@ -8,6 +8,12 @@ AI drafting, WYSIWYG canvas editing, and MS Office export.
 Manager (Claude) orchestrates, monitors, and validates each task before
 advancing. No task exceeds 100 lines or 3 minutes of agent work.
 
+> **Superseded since (2026-07):** this 6-phase plan predates the as-built purchase model. The
+> **portal purchase is a comp-code flow** (pin → **Purchase** → code `rfppipelinetest` → 72h curation
+> → release), **not** live Stripe checkout (descoped; the comp code stands in); pricing is **Spotlight
+> $499/mo (3-mo min), Phase I $1,999, Phase II $4,999 / $3,999-linked**; and the customer surface is
+> **`/cards`** (Spotlight/Pipeline retired). As-built spine: docs/MASTER_MIRROR_OPP_DESIGN.md.
+
 ---
 
 ## Phase 1: Spotlight Pipeline (Admin → Customer)
@@ -59,7 +65,7 @@ sees scored matches → pins topics.
 | Task | Description | Files | Agent Size |
 |------|-------------|-------|------------|
 | 1.2.1 | Migration 020: `subscriptions`, `invoices`, `payment_events` tables | 1 file | Small |
-| 1.2.2 | `/api/stripe/checkout/route.ts` — create Stripe checkout session for Spotlight ($299/mo) | 1 file | Medium |
+| 1.2.2 | `/api/stripe/checkout/route.ts` — create Stripe checkout session for Spotlight (**$499/mo**, 3-mo min) — ⚠ self-serve Stripe descoped for launch (comp code stands in) | 1 file | Medium |
 | 1.2.3 | `/api/stripe/webhook/route.ts` — handle checkout.session.completed, invoice.paid, subscription.canceled | 1 file | Medium |
 | 1.2.4 | `/api/stripe/portal/route.ts` — Stripe customer portal redirect (manage billing) | 1 file | Small |
 | 1.2.5 | Billing UI component — current plan, payment status, manage button | 1 file | Medium |
@@ -77,7 +83,7 @@ ready for AI drafting.
 ### What Gets Built
 
 **UI Changes:**
-- "Build Proposal" button on Spotlight detail page triggers Stripe checkout for portal purchase ($999/$1999)
+- ⚠ **Superseded:** the "Build Proposal → Stripe checkout for portal purchase" model shipped instead as a **comp-code purchase** — pin an opportunity card (`/cards`) → **Purchase** → comp code `rfppipelinetest` → `POST /api/portal/[slug]/purchase` opens the portal in `curation_pending` (72h SLA) → RFP-expert release. Live self-serve **Stripe checkout is descoped** (comp code stands in). Current pricing: **Phase I $1,999 / Phase II $4,999** (or **$3,999** with a linked Phase I).
 - Proposal workspace page renders real section data from volume_required_items — section number, title, page allocation, format requirements
 - Stage progress bar (Outline → Draft → Pink → Red → Gold → Final → Submitted) shows current position
 - Canvas editor loads with compliance-aware presets — correct font, margins, page limit, header/footer templates with {company_name}, {topic_number}, {page n of N} interpolation

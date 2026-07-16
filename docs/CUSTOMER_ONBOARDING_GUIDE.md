@@ -10,6 +10,22 @@ RFP Pipeline pairs isolated AI with expert human curation to help small business
 
 ---
 
+## Pricing
+
+Founding-cohort launch target: **August 2026.**
+
+| Product | Price | Notes |
+|---|---|---|
+| **Spotlight** | **$499/mo** | 3-month minimum |
+| **Proposal portal — Phase I** | **$1,999** | per portal |
+| **Proposal portal — Phase II** | **$4,999** | standalone |
+| **Proposal portal — Phase II (linked)** | **$3,999** | when your linked Phase I is already in the system + library |
+
+During the founding cohort, proposal portals are purchased with a **comp code** (a $0 recorded
+purchase); live self-serve checkout is coming soon.
+
+---
+
 ## Step 1: Apply for the Founding Cohort
 
 1. Go to the RFP Pipeline homepage
@@ -74,9 +90,10 @@ After login, you land at `/portal/[your-company-slug]/dashboard`
 
 **Your sidebar navigation:**
 - Dashboard
-- Library (your content atoms)
-- Spotlights (matched opportunities)
-- Proposals (your active proposals)
+- Library / Atoms (your content atoms — upload and atomize)
+- Opportunities (the **card** feed at `/cards`; the old `/spotlights` link redirects here)
+- Buckets (saved Spotlight filters that **rank** your cards)
+- Portals / Proposals (purchased proposal portals + your active proposals)
 - Documents, Profile, Team (additional features)
 
 ---
@@ -183,7 +200,7 @@ Your library grows over time. Every proposal you work on can feed content back i
 
 ## Step 7: Review Your Spotlight Feed
 
-**Path:** `/portal/[slug]/spotlights`
+**Path:** `/portal/[slug]/cards` (the old `/spotlights` link redirects here)
 
 The Spotlight feed shows federal opportunities ranked by how well they match your profile.
 
@@ -193,6 +210,11 @@ The Spotlight feed shows federal opportunities ranked by how well they match you
 - **Agency match** (your target agencies vs. the opportunity's agency) → 20 points
 - **Program type match** (SBIR, STTR, BAA, etc.) → 15 points
 - **Library content match** (you have atoms in a relevant category) → 10 point bonus
+
+> **Ranking is now per Spotlight bucket.** Create a few **Spotlight buckets**
+> (agency / program type / keyword filters) on the Buckets page; each opportunity card is scored and
+> **ranked within every bucket**, so you can watch several theses at once. One card carries multiple
+> bucket ranks — it is not duplicated per bucket.
 
 ### Each opportunity card shows:
 
@@ -211,22 +233,31 @@ The Spotlight feed shows federal opportunities ranked by how well they match you
 
 ---
 
-## Step 8: Create a Proposal from a Pinned Topic
+## Step 8: Purchase a Proposal Portal for a Pinned Topic
 
-**Path:** `/portal/[slug]/proposals`
+**Path:** `/portal/[slug]/cards` → the pinned card → **Purchase**
 
-Once you've pinned topics you want to pursue:
+Pinning tracks an opportunity; **purchasing** a proposal portal is what unlocks the build workspace.
 
-1. Navigate to **Proposals**
-2. The system creates a proposal workspace when you select a pinned topic
-3. The proposal is automatically structured with sections from the RFP's volume requirements:
-   - If the admin defined required items (Technical Approach, Management Plan, Past Performance, etc.), those become your sections
-   - If no required items were defined, a default structure is created
+### How the founding cohort buys (comp code)
 
-### The Proposal Workspace shows:
+1. On a pinned card, click **Purchase**
+2. Enter the comp code **`rfppipelinetest`** and confirm
+   - This records a **$0 purchase** — live self-serve card checkout is coming soon (⚠ future); the
+     comp code stands in for the founding cohort
+3. Your portal opens in **"Waiting for RFP Expert Curation"** with a **live countdown (up to 72
+   hours)**. An RFP expert builds/reviews the proposal skeleton for your opportunity, then
+   **releases** your workspace.
+4. When released, your **proposal workspace** opens already populated — this is **V0**.
+
+> **What the 72 hours covers.** The clock is for the **expert setup** (the compliance matrix, volumes,
+> and formatted blank "molds" for your opportunity) — not your drafting. If the skeleton was already
+> built for a prior buyer of the same opportunity, your release is usually **~15 minutes**, not 72h.
+
+### The Proposal Workspace (V0) shows:
 
 - **Proposal header**: Title, topic number, agency, program type, close date
-- **Stage progress**: Outline → Drafting → Pink Team → Red Team → Gold Team → Final → Submitted
+- **Stage progress**: your build advances **V0 → V0.5 → V1** (shown as Draft → Final → Submitted)
 - **Section list**: Each section with:
   - Section number and title
   - Status indicator (Empty, AI Draft, In Progress, Complete, Approved)
@@ -239,6 +270,10 @@ Once you've pinned topics you want to pursue:
 ## Step 9: AI Drafts Your Sections
 
 In the Proposal Workspace, the **AI Section Drafter** panel appears when you have empty sections.
+
+> When your workspace is released (Step 8), the AI Section Drafter has usually **already produced a
+> first pass** from the expert's notes and any library atoms (this is **V0**). Plugging your best
+> atoms into the molds (Step 10) is the **V0 → V0.5** jump — typically ~15 minutes.
 
 ### How it works:
 
@@ -293,6 +328,16 @@ Click any section from the workspace to open the **WYSIWYG Canvas Editor**.
 - **Letter-format sections** → Export as .docx (Word)
 - **Slide sections** → Export as .pptx (PowerPoint)
 - **Table sections** → Export as .xlsx (Excel)
+
+### Finalize (V1)
+
+When your sections are ready, **Lock all** (or **Force advance to V1** to finalize without locking
+every section). Advancing to V1 auto-locks the workspace and enables the final **Download Proposal
+(.docx)**. A first unlock is free if you need to make changes; further unlocks may need admin help.
+
+For the full operator walkthrough of purchase → curation → release → build, see
+[`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md) (design:
+[`MASTER_MIRROR_OPP_DESIGN.md`](./MASTER_MIRROR_OPP_DESIGN.md)).
 
 ---
 

@@ -16,6 +16,19 @@
 >
 > **Two large features remain (each warrants its own focused effort — see end of §4):** the 3-source AI **generation** (the `section_drafter`/`proposal_architect` workforce, "built but not yet wired" — it lands via the shipped `publish_section_draft`); and **E13 document-level access control** (an ACL subsystem that needs the access-model decisions — the Expert shadow-identity + per-document grants).
 
+> **Update (2026-07-15) — the spine landed; the L1 + purchase surfaces evolved past this doc.** The
+> `opportunity_id` spine (migs 088–091) is as-built, but two framings here have since converged: (1) the
+> **L1 per-tenant layer is no longer `tenant_pipeline_items`** — it is the **master + mirror one-way
+> bridge** → `tenant_opportunity_cards` (mig 094), ranked by `tenant_spotlight_buckets`/`tenant_bucket_scores`
+> (096); `tenant_pipeline_items` is **RETIRED** off the customer path (so "Spotlight stays *data* on
+> `tenant_pipeline_items`" in §1.6, and the `⋈ tenant_pipeline_items` arm of the §1.3 rollup, now read on
+> the card mirror). (2) The **purchase bridge** that launches the `proposal_setup` HITL gate (§R3.3b) is now
+> the **comp-code purchase route** (`POST /api/portal/[slug]/purchase`, code `rfppipelinetest`) calling
+> `launchProjectCollaboration` — **not** the Stripe webhook; **live Stripe checkout is descoped.** The
+> `ProjectCollaboration` template, `launchProjectCollaboration`, and the spine key are unchanged. Canonical
+> opp→purchase→proposal design of record: **[`MASTER_MIRROR_OPP_DESIGN.md`](MASTER_MIRROR_OPP_DESIGN.md)**
+> (as-built to migration 108).
+
 **This supersedes the R1/R2 status-cutover draft.** A 3-factor adversarial design review (soundness ·
 migration-safety · best-vs-simpler) **converged unanimously**: *do not make a workflow instance own
 status.* The proposal already owns its status correctly (OCC `version`, the all-locked gate,

@@ -13,6 +13,8 @@ analyzed, marked up, compliance-verified, and staged before any customer ever se
 a purchasable proposal portal. This is NOT autonomous — it is human-gated at every
 critical step, with AI assistance that improves over time.
 
+> **As-built note (2026-07-15).** The admin-side curation pipeline below (ingest → triage → AI shred → curate → approve/push) is largely shipped: shredding runs in the pipeline **shredder** (`OnRfpUploaded` → `shred`, Sonnet), and triage/curation live in the admin RFP-curation workspace. The AI "shredding" is done by that shredder component — the "Opportunity Analyst archetype" framing later in this chapter is design-intent (that archetype is registered-but-dormant; see `docs/AGENT_FRAMEWORK.md` §3). On approval, `solicitation.push` now fans every activated opportunity onto the forward-only opportunity-card spine (`opportunity_bridge` → `tenant_opportunity_cards`), which supersedes the legacy Spotlight/`tenant_pipeline_items` surface. For the canonical opportunity→purchase→proposal flow see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+
 ---
 
 ## The Flow
@@ -422,6 +424,8 @@ CREATE INDEX idx_outlines_sol ON solicitation_outlines(solicitation_id);
 ---
 
 ## How This Changes the Customer Purchase Flow
+
+> See `docs/MASTER_MIRROR_OPP_DESIGN.md` for the canonical purchase→provision→V0 spine as-built: comp-code purchase (`POST /api/portal/[slug]/purchase`) → `proposal_portals` `curation_pending` (72h SLA) → shadow release → `provisionProposalForPortal` → `OnProposalCreated`→`draft_v0` auto-draft → V0. (Supersedes the "AI generates outline from scratch" model below.)
 
 ### Before (Old Model)
 ```

@@ -9,6 +9,14 @@ BAA, and OTA funding without burning a month of payroll per submission.
 Launch: June 1, 2026. Founding cohort: 20 seats. Pricing: $299/mo
 Spotlight + $999/$1,999 per Proposal Portal.
 
+> **Aspirational "day 365" snapshot (last updated 2026-04-26).** Kept as a vision/plan doc; the status
+> matrix, migration count (001–019), and STUB markers below are **dated** — the as-built system is far
+> ahead (migrations to **108**; the proposal portal, the bridge/`cards` mirror, and agent wiring
+> shipped). **Current pricing/model:** launch **August 2026**; **Spotlight $499/mo (3-mo min), Phase I
+> $1,999, Phase II $4,999 / $3,999-linked**; comp-code **purchase → curation → release** (live Stripe
+> descoped); customer surface **`/cards`**. The as-built spine of record is
+> **docs/MASTER_MIRROR_OPP_DESIGN.md**.
+
 ---
 
 ## 1. System Architecture

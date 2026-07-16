@@ -26,13 +26,13 @@ sandbox before/after (drive-test), not just tsc/unit.
   `as unknown as Parameters<typeof sql.json>[0]` casts at ~10 typed sites.
 
 ### 1.2 Migrations / schema
-- ✅ 000→104 apply clean on a fresh pgvector DB; CI has a migrate-vs-pgvector gate. Latest = **104**.
+- ✅ 000→108 apply clean on a fresh pgvector DB; CI has a migrate-vs-pgvector gate. Latest = **108**.
 - 🔴 **pgvector pre-flight** on any NEW prod/staging DB (`001`+`101` `CREATE EXTENSION vector`) — confirm the
   image has pgvector and the role can `CREATE EXTENSION` (else crash-loop). Doc: LAUNCH plan §5.
 - 🟡 **FORCE RLS vs DB role** — greenfield tenant tables are FORCE-RLS; correctness relies on the app role
   being superuser/BYPASSRLS (the `WHERE tenant_id` + `withTenant` GUC are the guard). Verify the prod role;
   don't flip to a non-owner without auditing bare-`sql` callers. Files: `lib/rls.ts`, migs 094/096/097/101.
-- ⚪ `MIGRATIONS_RUNBOOK.md` + CLIFFNOTES migration count are stale (say 008/067; real = 104).
+- ⚪ `MIGRATIONS_RUNBOOK.md` + CLIFFNOTES migration count are stale (say 008/067; real = 108).
 
 ### 1.3 Events / automation runtime
 - ✅ Event audit posts objects end-to-end (jsonb fix load-bearing); 7 canonical namespaces enforced.
@@ -71,7 +71,7 @@ For each: **U**I / **A**PI / **T**ool / **E**vent state, then ToDos.
   temp-password (✅ returned to UI this cycle) + ✅ card mirror on signup**. U✅ A✅ E✅.
 - 🟡 `admin/waitlist` ✅ repointed to the real `waitlist` table (was reading applications).
 - 🔴 (prod) email delivery of the welcome/temp-password (config, Tier 1.4).
-- ⚪ Provisioning seeds no `product_tier`/`subscription_status` (fine while admin-provisioned).
+- ⚪ Provisioning seeds no `product_tier`/`subscription_status` (fine for the founding cohort's comp-code purchase; revisit with live Stripe tiers).
 
 ### 2.2 Scout engine + source management + admin notifications
 - Works: source registry + admin annotate UI; manual scout → change-detection → `source_review` ToDo +
@@ -103,12 +103,17 @@ For each: **U**I / **A**PI / **T**ool / **E**vent state, then ToDos.
 - ⚪ Seed default buckets on signup; bucket edit UI; pin→S3 e2e spec.
 
 ### 2.5 Purchase → skeleton curation → release → EconDev → portal
-- Works: real Stripe SDK+webhook; **real per-solicitation curation** (compliance + volumes + ✅
-  template-link + ✅ expert-notes now reach the mold); **provision** (artifacts+sections+matrix+templates);
-  ✅ **release** (initial unlock at `lock_count=0`); partner_user stage-scoped access. A✅ T✅ E✅.
-- 🔴 **Self-serve purchase→provision chain** — no buy CTA; proposal checkout unreachable from UI; purchase
-  creates no proposal. For Alpha: **admin-provisioned** (works). For prod: wire CTA + provision-on-purchase.
-  Files: `components/cards/opportunity-card.tsx`, `billing-panel.tsx`, `stripe/webhook/route.ts`, `proposals/create`.
+- Works: ✅ **comp-code purchase** (`rfppipelinetest`) → **curation_pending** (72h SLA) ToDo; **real per-solicitation
+  curation** (compliance + volumes + ✅ template-link + ✅ expert-notes now reach the mold); **provision**
+  (artifacts+sections+matrix+templates); ✅ **release** (`action=release` provisions UNLOCKED);
+  partner_user stage-scoped access. A✅ T✅ E✅.
+- ✅ **Comp-code purchase→curation→release→provision chain SHIPPED (migs 105–108)** — `POST /api/portal/[slug]/purchase`
+  (code `rfppipelinetest`) → `proposal_portals` **curation_pending** (72h SLA, `CURATION_SLA_HOURS=72`) → RFP admin
+  resolves a "purchase needs curation" ToDo → **Release** (`action=release`) provisions the build **UNLOCKED** →
+  `OnProposalCreated`→`draft_v0` → V0. Files: `app/api/portal/[tenantSlug]/purchase/route.ts`, `proposals/create`.
+- 🔴 **Live self-serve Stripe checkout** — still descoped; the comp code stands in for the founding cohort. For prod:
+  wire the buy CTA + Stripe checkout → provision-on-purchase. Files: `components/cards/opportunity-card.tsx`,
+  `billing-panel.tsx`, `stripe/webhook/route.ts`.
 - 🟡 **Curation UI last-mile** — the template **picker** + expert-notes field aren't in `AddEditItemModal`
   (backend proven; admins link via the tool today). File: `components/rfp-curation/curation-workspace.tsx:2470`.
 - 🟡 **Template Studio CRUD UI** (browse-only today) + **seed real bodies** for the 4 registry templates
@@ -186,9 +191,26 @@ Each role's happy path across **UI → API → tool → event**, and where it ca
 
 ---
 
+## ⚠ GAP REGISTER (future / post-Alpha, per as-built canonical 2026-07-15)
+Open items intentionally deferred past the founding-cohort Alpha (tracked, not silently missing):
+- 🟡 **Buyer/outcome ledger** — no durable record tying a comp-code purchase → provisioned build → win/loss outcome.
+- 🟡 **sbir.gov outcomes ingest** — pull award/outcome data from sbir.gov to close the learning loop.
+- 🟡 **Proposal-ready nudge to mirror cards** — surface a "ready to build" prompt on a tenant's mirrored
+  `tenant_opportunity_cards`.
+- 🟡 **T&C shadow opt-out toggle** — tenant-facing switch to opt out of the `shadow_admin_grants` (source `t_and_c`) shadow.
+- 🟡 **Curation auto-skip** — let a fully-molded solicitation skip the manual curation gate on purchase.
+- 🟡 **Full V0→V1 workplan automation** — auto-drive skeleton (V0) → library plug-and-play (V0.5) → draft/finalize (V1)
+  without per-step clicks.
+- 🟡 **EconDev appointed-shadow role** — a dedicated EconDev reviewer role (today: partner_user stand-in; see 2.5/3.3).
+- 🔴 **Retire the `verifyTenantAccess` god-view** — `frontend/lib/db.ts:52` still grants admins a global tenant view that
+  `shadow_admin_grants` (mig 097) was meant to replace; the one-way bridge's only sanctioned backflow is a ToDo routing
+  an admin into a tenant's RLS shadow account. **Security gap** until removed.
+
+---
+
 ## Prioritized next actions (if continuing toward prod)
 1. 🔴 Config/runbook truth pass + email + keys (Tier 1.4) — unblocks everything.
-2. 🔴 Self-serve purchase→provision (2.5) OR keep founding-cohort admin-provisioned for Alpha.
+2. 🔴 Live self-serve Stripe checkout (2.5) — the comp-code purchase→curation→release→provision chain already shipped (migs 105–108); Stripe is the remaining prod payment step.
 3. 🟡 Ingest B3/B4 auto-propagation (2.3) + B1/B2 robustness.
 4. 🟡 Curation UI last-mile + Template Studio CRUD + seed bodies (2.5).
 5. 🟡 `/cards` rank display + pinned-opp nudges + atoms→bucket context (2.4).
