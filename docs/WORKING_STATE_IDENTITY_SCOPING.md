@@ -83,6 +83,12 @@ ASSIGNED sections, cannot edit UNASSIGNED, comment only where granted, `canAdvan
 - **G6** invite-accept tolerates `user_id=NULL` (no login created).
 
 ## Progress log
-- 2026-07-16: verified model end-to-end (harness green); wrote `IDENTITY_AUTHZ_MODEL.md`; scoped G1
-  (25/32 routes tenant-only); designed the two-helper fix. **NEXT:** implement helpers + apply to the
-  core collaborate spine (page.tsx, save, comments, sections GET), extend harness, tsc+tests, commit.
+- 2026-07-16 (1): verified model end-to-end (harness green); wrote `IDENTITY_AUTHZ_MODEL.md`; scoped G1
+  (25/32 routes tenant-only); designed the two-helper fix.
+- 2026-07-16 (2): **G1 core spine LANDED (commit b5ea26d).** Added `isTenantWideMember` (rbac.ts) +
+  `verifyProposalAccess` (db.ts) + rbac unit tests. Applied to the collaborate spine: workspace
+  `page.tsx`, section-editor `page.tsx`, `sections/[sectionId]/save`, `comments` GET/POST (scoping
+  predicate generalized `partner_user`→`!isTenantWideMember`). Harness P6 proves admit+scope; 613 tests · tsc 0.
+  **NEXT (remaining G1 routes):** widen + scope the rest of the collaborator-reachable list — `sections/route.ts`
+  GET, `review/page.tsx`, `sections/[sectionId]/versions|export|lock`, `comments/[commentId]/resolve`,
+  `activity`, `compliance`, `supporting-docs` (GET + POST canUpload), `atomize-node`. Then G2 (accept relocate guard).
