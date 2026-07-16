@@ -79,4 +79,15 @@
 - 2026-07-16 (recon): PG sandbox restarted (115 tables). Mapped the as-built: roll-up EXISTS
   (section→artifact persistent, volume/proposal events); docx/pptx/xlsx exporters exist; **no PDF
   exporter**; package is whole-proposal-docx only. Gaps A–E identified. Phase-1 design locked (above).
-  **NEXT:** implement Phase 1 step 1 (extract `lockSectionCore`) + step 2 (`lock-scope` route).
+- 2026-07-16 (**Phase 1 COMPLETE** — commits `7633b47` backend, `4644210` UI):
+  - `lib/proposal/lock-section.ts::lockSectionCore` extracted (the per-canvas audited stricture);
+    section-lock route delegates to it (behaviour identical; section-lock+advance suites green).
+  - `lock-scope/route.ts` (POST) — hierarchical push at scope `artifact`|`volume`|`proposal`; loops
+    `lockSectionCore`, so every canvas is audited + the roll-ups fire naturally. Admin-gated.
+  - Admin panel: per-volume **"Lock Volume (N)"** push + **"✓ Volume locked"** roll-up chip.
+  - Proven: `scratchpad/verify_lock_rollup.mjs` **11/11** (section→artifact→volume→proposal cascade,
+    per-canvas matrix audit, hierarchical push, idempotent). tsc 0 · frontend 613 tests.
+  **NEXT (Phase 2, task #48):** the E2E build. Start with the two blockers: (D) `lib/export/pdf-exporter.ts`
+  (canvas → PDF for supporting docs), (E) per-artifact/per-format export routing. Then provision a fake
+  multi-volume proposal (edge-AI co) with the 4 canvas types, draft+style each (SVG/headers/footers/color),
+  lock canvas-by-canvas → hierarchical push, generate + commit docx/pptx/xlsx/pdf deliverables.
