@@ -2,6 +2,7 @@ export { readDocx } from './docx-reader';
 export { readPptx } from './pptx-reader';
 export { readPdf } from './pdf-reader';
 export { readText } from './text-reader';
+export { readXlsx } from './xlsx-reader';
 export type {
   ImportResult,
   ImportedAtom,
@@ -13,6 +14,7 @@ import { readDocx } from './docx-reader';
 import { readPptx } from './pptx-reader';
 import { readPdf } from './pdf-reader';
 import { readText } from './text-reader';
+import { readXlsx } from './xlsx-reader';
 import type { ImportResult } from './types';
 
 /**
@@ -34,6 +36,9 @@ export async function readDocument(
       return readPptx(buffer, filename);
     case 'pdf':
       return readPdf(buffer, filename);
+    case 'xlsx':
+    case 'xls':
+      return readXlsx(buffer, filename);
     case 'txt':
     case 'md':
       return readText(buffer, filename);

@@ -17,7 +17,7 @@ export interface ImportedAtom {
 export interface ImportResult {
   atoms: ImportedAtom[];
   sourceFilename: string;
-  sourceFormat: 'docx' | 'pptx' | 'pdf' | 'txt' | 'md';
+  sourceFormat: 'docx' | 'pptx' | 'pdf' | 'txt' | 'md' | 'xlsx';
   totalChars: number;
   metadata: DocumentMetadata;
 }

@@ -29,7 +29,7 @@ const CATEGORY_TO_VOL: Record<string, string> = {
 const CATEGORY_TO_KIND: Record<string, string> = {
   key_personnel: 'bio', qualifications: 'bio', teaming: 'bio', cost_volume: 'budget_data',
 };
-const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc', txt: 'doc', md: 'doc' };
+const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc', txt: 'doc', md: 'doc', xlsx: 'table' };
 
 export const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 

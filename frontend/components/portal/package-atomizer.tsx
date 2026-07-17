@@ -13,7 +13,7 @@ import { useCallback, useState } from 'react';
 interface DocResult { file: string; format: string; atoms: number; error?: string }
 interface PackageResult { packageName: string | null; filesProcessed: number; totalAtoms: number; context: string[]; docs: DocResult[] }
 
-const ACCEPT = '.pdf,.docx,.doc,.pptx,.ppt,.txt,.md';
+const ACCEPT = '.pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.txt,.md';
 const PROGRAMS = ['', 'sbir', 'sttr', 'baa', 'ota', 'cso', 'rif'];
 const PHASES = ['', '1', '2', '3'];
 
@@ -84,7 +84,7 @@ export function PackageAtomizer({ tenantSlug, onDone }: { tenantSlug: string; on
             <input type="file" multiple accept={ACCEPT} className="hidden" disabled={busy}
                    onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           </label>
-          <p className="mt-2 text-[11px] text-gray-400">pdf · docx · pptx · txt · md — up to 12 files. Every file becomes a foundational document; its sections become tagged, reusable atoms.</p>
+          <p className="mt-2 text-[11px] text-gray-400">pdf · docx · pptx · xlsx · txt · md — up to 12 files. Every file becomes a foundational document; its sections become tagged, reusable atoms.</p>
         </div>
 
         {files.length > 0 && (
