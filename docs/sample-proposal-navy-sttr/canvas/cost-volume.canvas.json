@@ -1,0 +1,517 @@
+{
+  "version": 1,
+  "document_id": "b7a86e1a-2818-4161-aabd-f0d3c02ab429",
+  "canvas": {
+    "format": "spreadsheet",
+    "width": 1200,
+    "height": 800,
+    "margins": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "header": null,
+    "footer": null,
+    "font_default": {
+      "family": "Calibri",
+      "size": 11
+    },
+    "line_spacing": 1,
+    "max_pages": null,
+    "max_slides": null
+  },
+  "nodes": [
+    {
+      "id": "53965811-7336-4729-bc1f-d8ec4f1ba829",
+      "type": "table",
+      "content": {
+        "sheet_name": "Base 18mo $250k",
+        "headers": [
+          "Cost Category",
+          "Basis",
+          "Performer",
+          "Amount"
+        ],
+        "rows": [
+          [
+            "Direct Labor — PI (Ellison)",
+            "0.25 FTE × 18 mo",
+            "SBC",
+            {
+              "text": "43200",
+              "cell_type": "currency",
+              "value": 43200
+            }
+          ],
+          [
+            "Direct Labor — Systems Engineer (Reyes)",
+            "0.35 FTE × 18 mo",
+            "SBC",
+            {
+              "text": "34800",
+              "cell_type": "currency",
+              "value": 34800
+            }
+          ],
+          [
+            "Direct Labor — ML Engineer (Nandakumar)",
+            "0.20 FTE × 18 mo",
+            "SBC",
+            {
+              "text": "14000",
+              "cell_type": "currency",
+              "value": 14000
+            }
+          ],
+          [
+            {
+              "text": "SBC Fringe",
+              "style": {}
+            },
+            "25% of SBC labor",
+            "SBC",
+            {
+              "text": "23000",
+              "cell_type": "currency",
+              "value": 23000
+            }
+          ],
+          [
+            {
+              "text": "SBC Materials & Travel",
+              "style": {}
+            },
+            "Edge kits, hydrophones, 2 trips",
+            "SBC",
+            {
+              "text": "18000",
+              "cell_type": "currency",
+              "value": 18000
+            }
+          ],
+          [
+            {
+              "text": "SBC Indirect (Overhead)",
+              "style": {}
+            },
+            "17.3% of SBC modified base",
+            "SBC",
+            {
+              "text": "20500",
+              "cell_type": "currency",
+              "value": 20500
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — SBC (Aerivio)",
+              "style": {
+                "bold": true
+              }
+            },
+            "52.6% of total",
+            "SBC",
+            {
+              "text": "153500",
+              "cell_type": "currency",
+              "value": 153500,
+              "style": {
+                "bold": true,
+                "bg": "#e0e7ff"
+              }
+            }
+          ],
+          [
+            "RI Subaward — Co-I (Okonkwo) + grad researchers",
+            "Labor + fringe",
+            "RI",
+            {
+              "text": "62000",
+              "cell_type": "currency",
+              "value": 62000
+            }
+          ],
+          [
+            "RI Subaward — Range/tank use & materials",
+            "Facility + supplies",
+            "RI",
+            {
+              "text": "15500",
+              "cell_type": "currency",
+              "value": 15500
+            }
+          ],
+          [
+            "RI Subaward — Indirect",
+            "RI negotiated rate",
+            "RI",
+            {
+              "text": "10000",
+              "cell_type": "currency",
+              "value": 10000
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — RI (Cascadia State)",
+              "style": {
+                "bold": true
+              }
+            },
+            "35.0% of total",
+            "RI",
+            {
+              "text": "87500",
+              "cell_type": "currency",
+              "value": 87500,
+              "style": {
+                "bold": true,
+                "bg": "#cffafe"
+              }
+            }
+          ],
+          [
+            "Consultant — Acoustics SME",
+            "60 hrs @ $150",
+            "Other",
+            {
+              "text": "9000",
+              "cell_type": "currency",
+              "value": 9000
+            }
+          ],
+          [
+            {
+              "text": "BASE TOTAL",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "18-month base",
+              "style": {
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "",
+              "style": {
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "250000",
+              "cell_type": "currency",
+              "value": 250000,
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            }
+          ]
+        ],
+        "header_style": {
+          "bg": "#0f2942",
+          "bold": true
+        }
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "2da8b9b1-2e80-4c96-8cbf-89d5918ff009",
+      "type": "table",
+      "content": {
+        "sheet_name": "Option 6mo $150k",
+        "headers": [
+          "Cost Category",
+          "Basis",
+          "Performer",
+          "Amount"
+        ],
+        "rows": [
+          [
+            "Direct Labor — PI + Systems Engineer",
+            "HIL + pre-demo, 6 mo",
+            "SBC",
+            {
+              "text": "46000",
+              "cell_type": "currency",
+              "value": 46000
+            }
+          ],
+          [
+            {
+              "text": "SBC Fringe",
+              "style": {}
+            },
+            "25% of SBC labor",
+            "SBC",
+            {
+              "text": "11500",
+              "cell_type": "currency",
+              "value": 11500
+            }
+          ],
+          [
+            {
+              "text": "SBC Indirect",
+              "style": {}
+            },
+            "17.3% of SBC modified base",
+            "SBC",
+            {
+              "text": "11750",
+              "cell_type": "currency",
+              "value": 11750
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — SBC (Aerivio)",
+              "style": {
+                "bold": true
+              }
+            },
+            "46.2% of option",
+            "SBC",
+            {
+              "text": "69250",
+              "cell_type": "currency",
+              "value": 69250,
+              "style": {
+                "bold": true,
+                "bg": "#e0e7ff"
+              }
+            }
+          ],
+          [
+            "RI Subaward — Range pre-demonstration",
+            "Co-I + range time",
+            "RI",
+            {
+              "text": "52500",
+              "cell_type": "currency",
+              "value": 52500
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — RI (Cascadia State)",
+              "style": {
+                "bold": true
+              }
+            },
+            "35.0% of option",
+            "RI",
+            {
+              "text": "52500",
+              "cell_type": "currency",
+              "value": 52500,
+              "style": {
+                "bold": true,
+                "bg": "#cffafe"
+              }
+            }
+          ],
+          [
+            "SBC/RI Travel — at-sea pre-demo",
+            "2 trips + shipping",
+            "Joint",
+            {
+              "text": "28250",
+              "cell_type": "currency",
+              "value": 28250
+            }
+          ],
+          [
+            {
+              "text": "OPTION TOTAL",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "6-month option",
+              "style": {
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "",
+              "style": {
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "150000",
+              "cell_type": "currency",
+              "value": 150000,
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            }
+          ]
+        ],
+        "header_style": {
+          "bg": "#0f2942",
+          "bold": true
+        }
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "357340d7-dee0-46c9-87e2-0c18732f4c7a",
+      "type": "table",
+      "content": {
+        "sheet_name": "Summary",
+        "headers": [
+          "Period",
+          "Duration",
+          "SBC share",
+          "RI share",
+          "Total"
+        ],
+        "rows": [
+          [
+            "Base",
+            "18 months",
+            {
+              "text": "153500",
+              "cell_type": "currency",
+              "value": 153500
+            },
+            {
+              "text": "87500",
+              "cell_type": "currency",
+              "value": 87500
+            },
+            {
+              "text": "250000",
+              "cell_type": "currency",
+              "value": 250000
+            }
+          ],
+          [
+            "Option",
+            "6 months",
+            {
+              "text": "69250",
+              "cell_type": "currency",
+              "value": 69250
+            },
+            {
+              "text": "52500",
+              "cell_type": "currency",
+              "value": 52500
+            },
+            {
+              "text": "150000",
+              "cell_type": "currency",
+              "value": 150000
+            }
+          ],
+          [
+            {
+              "text": "Program (Base + Option)",
+              "style": {
+                "bold": true
+              }
+            },
+            "24 months",
+            {
+              "text": "222750",
+              "cell_type": "currency",
+              "value": 222750,
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "text": "140000",
+              "cell_type": "currency",
+              "value": 140000,
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "text": "400000",
+              "cell_type": "currency",
+              "value": 400000,
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            }
+          ],
+          [
+            {
+              "text": "STTR work-split check",
+              "style": {
+                "bold": true
+              }
+            },
+            "SBC ≥ 40%, RI ≥ 30%",
+            {
+              "text": "SBC 56%",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "RI 35%",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "COMPLIANT",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            }
+          ]
+        ],
+        "header_style": {
+          "bg": "#0f2942",
+          "bold": true
+        }
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    }
+  ],
+  "metadata": {
+    "title": "Aerivio Navy STTR Cost Volume",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  }
+}

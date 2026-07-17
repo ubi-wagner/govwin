@@ -1,0 +1,621 @@
+{
+  "version": 1,
+  "document_id": "54494fc5-56f1-4dce-9472-eb58878dd5aa",
+  "canvas": {
+    "format": "slide_16_9",
+    "width": 960,
+    "height": 540,
+    "margins": {
+      "top": 40,
+      "right": 40,
+      "bottom": 40,
+      "left": 40
+    },
+    "header": null,
+    "footer": null,
+    "font_default": {
+      "family": "Arial",
+      "size": 18
+    },
+    "line_spacing": 1.2,
+    "max_pages": null,
+    "max_slides": 25
+  },
+  "nodes": [
+    {
+      "id": "23e52cef-ec9d-4838-b4e2-e1979c02344d",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Aerivio Systems"
+      },
+      "style": {
+        "color": "#0f2942"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "df26ae00-2f58-4147-80cb-8c95fb8b1967",
+      "type": "text_block",
+      "content": {
+        "text": "Company Overview",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#0e7490"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "67a40398-3b27-48e1-a27b-569859d20437",
+      "type": "text_block",
+      "content": {
+        "text": "Edge AI for distributed maritime autonomy",
+        "inline_formats": []
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "f01185e9-f82d-454c-8c58-9eb03645198b",
+      "type": "text_block",
+      "content": {
+        "text": "Volume 5 Supporting Document · Navy STTR Phase I · Topic N25B-T042",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#64748b"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "d6a7344d-a696-44b6-b560-ed9beae21e88",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "ccc0cbb0-3292-486b-bdef-6b652fb1a9fa",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Who We Are"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a246f4aa-03aa-4ef8-bbfe-dffe35409df0",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Small business building power-efficient, on-device AI for defense maritime autonomy"
+          },
+          {
+            "text": "Founded by low-power ML and embedded-systems engineers"
+          },
+          {
+            "text": "Core competency: compressing accurate acoustic classifiers to single-digit-watt edge modules"
+          },
+          {
+            "text": "Mission: put reliable classification where connectivity fails — the contested edge"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "359cb885-76a6-412d-a9a3-9be7f75c8d4c",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "9757432f-72b5-4ba3-bd22-be1675adc202",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "The Team"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a935af61-9bba-4f83-a456-c032ca765201",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Dr. Mara Ellison — PI · 12 yrs low-power ML for sensing; author of core quantization IP"
+          },
+          {
+            "text": "Tomas Reyes — Systems · 9 yrs embedded real-time; two fielded maritime autonomy stacks"
+          },
+          {
+            "text": "Priya Nandakumar — ML · model compression & data augmentation"
+          },
+          {
+            "text": "Advisory: acoustics SME + transition advisor (former program office)"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "9234c143-2823-4a02-8b21-a666156be794",
+      "type": "text_block",
+      "content": {
+        "text": "Teamed with Cascadia State University for undersea acoustics research (STTR RI).",
+        "inline_formats": [
+          {
+            "start": 12,
+            "length": 25,
+            "format": "bold"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "efd809ab-e4cf-45c8-ac84-8a3eb4ac432e",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "13249e0a-df60-413f-8ee7-9bf332630455",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Core Technology & IP"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "69818f5a-18c7-4bf7-beec-8349c03eedde",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Quantization-aware training to 4-bit weights with <1.5-point accuracy loss"
+          },
+          {
+            "text": "Saliency-guided structured pruning — removes ~70% of parameters (patent pending)"
+          },
+          {
+            "text": "Deterministic sub-watt runtime — guaranteed p99 latency at a fixed power budget"
+          },
+          {
+            "text": "Result: an accurate maritime classifier in a 2-watt envelope"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "e1e54114-a490-4aa0-9350-5ece867075ab",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "b42ae5ee-4297-4ac5-b559-3228e4aa06fd",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Past Performance"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "4ad66fec-4d89-4616-ac23-3ca330f69ecc",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "AFWERX SBIR Phase I (CSO) — single-vessel 4-bit acoustic classifier, 92%+ balanced accuracy at 2 W"
+          },
+          {
+            "text": "Two prior fielded maritime autonomy stacks (systems team)"
+          },
+          {
+            "text": "Peer-reviewed quantization and edge-scheduling publications"
+          },
+          {
+            "text": "Reusable, meta-tagged content library carried pursuit-to-pursuit"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "2a3e4d8d-971e-4086-9540-01bc02894492",
+      "type": "text_block",
+      "content": {
+        "text": "This STTR builds directly on the AFWERX result — distribution and propagation are the new science.",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#0e7490"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "e0d9b483-361a-4741-802f-ea01f885b709",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "a6f52bb2-f4c9-4944-a36a-e3fa33ad1173",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "The STTR Partnership"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "368bf3ee-ecf6-457b-bd82-bbafdeb503ef",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Aerivio (SBC, prime) — edge AI, quantization, on-node runtime, fusion implementation (56%)"
+          },
+          {
+            "text": "Cascadia State (RI) — channel characterization, propagation models, corpus, range validation (35%)"
+          },
+          {
+            "text": "Single PI at the SBC; RI Co-Investigator leads ocean-acoustics tasks"
+          },
+          {
+            "text": "Allocation of Rights executed pre-award — transition path kept unencumbered"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "c3348823-ff32-47fe-b906-add819fe3c70",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "b2262d3a-aa7a-4d98-a3b9-4766f70854e7",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Facilities & Capabilities"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "dc182fe4-ffb6-4e3c-8aca-200bd2627d3e",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Aerivio: acoustics bench, anechoic enclosure, 2-watt edge kits, GPU cluster, power-measurement bench"
+          },
+          {
+            "text": "Cascadia State: calibrated test tank, hydrophone array, coastal test range, HPC for propagation modeling"
+          },
+          {
+            "text": "Combined stack spans lab bench to at-sea range — no single party could replicate it"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "f022d4d5-63d0-43c9-9ded-8b9493d695bf",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "cac46a9e-6b5b-4a3b-afef-f1c0cc790826",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Why Aerivio"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "95da2a63-1004-493f-ac2b-6b0ffee98140",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "On-node inference where incumbents depend on backhaul that undersea denies"
+          },
+          {
+            "text": "Validated 2-watt classifier — not a research prototype"
+          },
+          {
+            "text": "Propagation-aware + consensus fusion — weak partial observations become confident classification"
+          },
+          {
+            "text": "Software transition into existing node power budgets — no new hardware program"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "f4cef223-cb95-465a-b0ed-74d54df2da18",
+      "type": "image",
+      "content": {
+        "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iNDQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjIwIiB5PSIyNCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzBmMjk0MiI+U2VydmljZWFibGUgbWFya2V0ICgkTS95cik8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjE1NCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjNjdlOGY5Ii8+PHRleHQgeD0iNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI2PC90ZXh0Pjx0ZXh0IHg9Ijc1IiB5PSIxNDkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzMzNDE1NSI+JDlNPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iMTIxIiB3aWR0aD0iNzAiIGhlaWdodD0iNDkiIGZpbGw9IiMyMmQzZWUiLz48dGV4dCB4PSIxNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI4PC90ZXh0Pjx0ZXh0IHg9IjE3NSIgeT0iMTE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPiQyOE08L3RleHQ+PHJlY3QgeD0iMjQwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzA4OTFiMiIvPjx0ZXh0IHg9IjI3NSIgeT0iMTg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPjIwMzA8L3RleHQ+PHRleHQgeD0iMjc1IiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4kNjhNPC90ZXh0Pjwvc3ZnPg==",
+        "alt_text": "Market growth chart",
+        "width": 420,
+        "height": 190
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "67930209-e2da-4cbf-8f0d-c66fdea17b7c",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "53be9091-6b16-40cb-9937-8f33dd8dc4eb",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Transition & Commercialization"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "459c2e58-828b-4543-8dc3-72c414cfa889",
+      "type": "numbered_list",
+      "content": {
+        "items": [
+          {
+            "text": "Phase I: feasibility in simulation + tank/range (now)"
+          },
+          {
+            "text": "Phase II: hardened nodes + at-sea multi-node demo (~$1.6M / 24 mo)"
+          },
+          {
+            "text": "Phase III: Navy undersea / USV program of record"
+          },
+          {
+            "text": "Commercial: port & offshore-energy maritime domain awareness (dual-use)"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "60b5cc9d-06f4-4169-a7d2-43e63551939b",
+      "type": "page_break",
+      "content": null,
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "5bf32dce-e53b-4d36-a02c-b9d316c31854",
+      "type": "heading",
+      "content": {
+        "level": 1,
+        "text": "Summary"
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "46998a92-0df9-4ddd-b843-6162e8ce59ad",
+      "type": "bulleted_list",
+      "content": {
+        "items": [
+          {
+            "text": "Proven edge-AI small business + a leading ocean-acoustics research lab"
+          },
+          {
+            "text": "A validated 2-watt classifier extended to distributed, propagation-aware, contested undersea sensing"
+          },
+          {
+            "text": "Compliant STTR teaming, clear transition, dual-use market"
+          }
+        ]
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "c19eecc9-3aa3-45e2-841e-e6149ddd56dd",
+      "type": "text_block",
+      "content": {
+        "text": "Aerivio Systems · contact@aerivio.example · Proprietary",
+        "inline_formats": []
+      },
+      "style": {
+        "color": "#64748b"
+      },
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    }
+  ],
+  "metadata": {
+    "title": "Aerivio Company Overview",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  }
+}
