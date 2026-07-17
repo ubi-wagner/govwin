@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Atom library — browse/curate the tenant's atoms: filter by tag/status/grain,
@@ -42,6 +42,8 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AtomDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const detailReq = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -60,27 +62,35 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const toggle = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const setStatusOf = useCallback(async (id: string, s: 'approved' | 'archived') => {
-    setBusy(true);
-    try { await fetch(`/api/portal/${tenantSlug}/atoms/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: s }) }); await load(); }
-    finally { setBusy(false); }
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: s }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? `Could not ${s === 'archived' ? 'archive' : 'approve'} atom`); return; }
+      await load();
+    } catch { setErr('Network error'); } finally { setBusy(false); }
   }, [tenantSlug, load]);
 
   const openDetail = useCallback(async (id: string) => {
-    if (openId === id) { setOpenId(null); setDetail(null); return; }
-    setOpenId(id); setDetail(null);
-    try { const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}`); if (res.ok) setDetail((await res.json()).data?.atom as AtomDetail); } catch { /* keep */ }
+    if (openId === id) { setOpenId(null); setDetail(null); detailReq.current = null; return; }
+    setOpenId(id); setDetail(null); detailReq.current = id;
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/${id}`);
+      // Ignore a stale response if the user has since opened a different atom.
+      if (res.ok && detailReq.current === id) setDetail((await res.json()).data?.atom as AtomDetail);
+    } catch { /* keep */ }
   }, [tenantSlug, openId]);
 
   const groupSelected = useCallback(async () => {
     if (sel.size < 2) return;
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/atoms`, {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ grain: 'group', title: groupTitle.trim() || 'Group', memberAtomIds: [...sel], status: 'approved', source: 'manual' }),
       });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not create group'); return; }
       setSel(new Set()); setGroupTitle(''); await load();
-    } finally { setBusy(false); }
+    } catch { setErr('Network error'); } finally { setBusy(false); }
   }, [tenantSlug, sel, groupTitle, load]);
 
   const grainColor: Record<string, string> = { primitive: 'bg-teal-100 text-teal-700', group: 'bg-purple-100 text-purple-700', reference: 'bg-gray-100 text-gray-500' };
@@ -102,6 +112,8 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
         <button onClick={load} className="text-sm text-blue-600 hover:underline">Refresh</button>
         <span className="text-xs text-gray-400 ml-auto">{atoms.length} atoms</span>
       </div>
+
+      {err && <p className="text-xs text-rose-600">{err}</p>}
 
       {tagFilter && (
         <div className="flex items-center gap-2 text-xs">

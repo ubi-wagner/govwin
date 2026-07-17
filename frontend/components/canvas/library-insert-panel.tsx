@@ -34,19 +34,22 @@ export function LibraryInsertPanel({ tenantSlug, sectionTitle, sectionId, contex
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  // Stable string key — `context` is often a fresh [] literal each render, which would
+  // make the effect re-run forever if listed directly.
+  const contextParam = context.join(',');
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const qs = new URLSearchParams({ vol: slugVol(sectionTitle), limit: '30' });
-        if (context.length) qs.set('context', context.join(','));
+        if (contextParam) qs.set('context', contextParam);
         const res = await fetch(`/api/portal/${tenantSlug}/atoms/select?${qs.toString()}`);
         if (!cancelled && res.ok) setAtoms((((await res.json()).data?.atoms ?? []) as Ranked[]).filter((a) => a.content && a.content.trim()));
       } catch { /* keep */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [tenantSlug, sectionTitle, context]);
+  }, [tenantSlug, sectionTitle, contextParam]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

@@ -36,7 +36,11 @@ export async function readXlsx(buffer: Buffer, filename: string): Promise<Import
   for (const ws of wb.worksheets) {
     const rows: string[][] = [];
     ws.eachRow((row) => {
-      const vals = (Array.isArray(row.values) ? row.values.slice(1) : []).map(cellText);
+      // exceljs row.values is a SPARSE array (blank cells are holes). Array.map skips
+      // holes, leaving them as `null` in the table node → crashes docx/pptx export.
+      // Densify with a length-driven map so every cell is a real string.
+      const raw = Array.isArray(row.values) ? row.values.slice(1) : [];
+      const vals = Array.from({ length: raw.length }, (_, i) => cellText(raw[i]));
       if (vals.some((c) => c.trim())) rows.push(vals);
     });
     if (rows.length === 0) continue;

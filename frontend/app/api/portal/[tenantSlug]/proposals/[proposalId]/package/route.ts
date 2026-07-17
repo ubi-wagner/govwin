@@ -228,14 +228,23 @@ export async function POST(request: Request, ctx: RouteContext) {
   // the zip assembles each artifact from its sections and renders it natively.
   if (format === 'zip') {
     try {
+      // Ownership + the SAME lock/stage download gate the docx/json paths enforce,
+      // BEFORE touching artifact data.
+      const [prop] = await sql<{ title: string | null; stage: string; isLocked: boolean }[]>`
+        SELECT title, stage, is_locked FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      if (!prop) return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+      if (!prop.isLocked && prop.stage !== 'submitted' && prop.stage !== 'archived') {
+        return NextResponse.json({ error: 'Proposal must be locked or in submitted/archived stage to export package', code: 'FORBIDDEN' }, { status: 403 });
+      }
+
       const artifacts = await sql<{ id: string; artifactType: string; volumeName: string; volumeNumber: number }[]>`
         SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", volume_number AS "volumeNumber"
         FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid
         ORDER BY volume_number, volume_name`;
-      const [prop] = await sql<{ title: string | null }[]>`SELECT title FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
-      if (!prop) return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
       const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', topic_number: '' };
       const zip = new JSZip();
+      const failed: string[] = [];
       let fileCount = 0;
       for (const a of artifacts) {
         const secs = await sql<{ title: string | null; content: string | null }[]>`
@@ -243,12 +252,20 @@ export async function POST(request: Request, ctx: RouteContext) {
         if (secs.length === 0) continue;
         const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
         const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
-        let buf: Buffer;
-        try { buf = await renderCanvas(fmt, doc, vars); }
-        catch (e) { console.error('[package/zip] volume render skipped', a.volumeName, e); continue; }
-        const safe = `V${a.volumeNumber}_${(a.volumeName || 'volume').replace(/[^a-z0-9]+/gi, '_')}`;
-        zip.file(`${safe}.${fmt}`, buf);
-        fileCount++;
+        try {
+          const buf = await renderCanvas(fmt, doc, vars);
+          const safe = `V${a.volumeNumber}_${(a.volumeName || 'volume').replace(/[^a-z0-9]+/gi, '_')}`;
+          zip.file(`${safe}.${fmt}`, buf);
+          fileCount++;
+        } catch (e) {
+          console.error('[package/zip] volume render failed', a.volumeName, e);
+          failed.push(a.volumeName || `volume ${a.volumeNumber}`);
+        }
+      }
+      // Never ship a silently-incomplete package: if any volume failed to render,
+      // fail the whole zip and name the volumes so the user can retry / export singly.
+      if (failed.length > 0) {
+        return NextResponse.json({ error: `Could not render ${failed.length} volume(s): ${failed.join(', ')}. Export each volume individually or retry.`, code: 'EXPORT_ERROR' }, { status: 500 });
       }
       if (fileCount === 0) {
         return NextResponse.json({ error: 'No volumes with content to export', code: 'NOT_FOUND' }, { status: 404 });
@@ -532,7 +549,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       });
 
-      const safeFilename = proposal.title.replace(/[^a-zA-Z0-9-_ ]/g, '');
+      const safeFilename = (proposal.title ?? 'proposal').replace(/[^a-zA-Z0-9-_ ]/g, '') || 'proposal';
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {

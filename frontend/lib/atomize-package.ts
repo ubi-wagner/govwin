@@ -32,17 +32,23 @@ const CATEGORY_TO_KIND: Record<string, string> = {
 const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc', txt: 'doc', md: 'doc', xlsx: 'table' };
 
 export const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+/** Coerce an unknown (from JSON.parse) to a trimmed string — never throws on a number/array/object. */
+const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
-/** Package-level source-context tags from the uploader's inputs (the "FROM" pedigree). */
-export function contextTags(ctx: Record<string, string | undefined>): AtomTagInput[] {
+/**
+ * Package-level source-context tags from the uploader's inputs (the "FROM" pedigree).
+ * Best-effort: non-string values (a numeric/array JSON field) are ignored, never thrown.
+ */
+export function contextTags(ctx: Record<string, unknown>): AtomTagInput[] {
   const out: AtomTagInput[] = [];
-  if (ctx.agency) out.push({ dimension: 'agency', value: slug(ctx.agency), source: 'auto', confirmed: true, isOther: true });
-  const prog = (ctx.program ?? '').toLowerCase().match(/sbir|sttr|baa|ota|cso|rif/)?.[0];
+  const agency = str(ctx.agency), program = str(ctx.program).toLowerCase(), phase = str(ctx.phase).toLowerCase(), sol = str(ctx.sol), topic = str(ctx.topic);
+  if (agency) out.push({ dimension: 'agency', value: slug(agency), source: 'auto', confirmed: true, isOther: true });
+  const prog = program.match(/sbir|sttr|baa|ota|cso|rif/)?.[0];
   if (prog) out.push({ dimension: 'program', value: prog, source: 'auto', confirmed: true });
-  const phase = (ctx.phase ?? '').toLowerCase().match(/(?:phase[_ -]?)?([123])/)?.[1];
-  if (phase) out.push({ dimension: 'phase', value: `phase_${phase}`, source: 'auto', confirmed: true });
-  if (ctx.sol) out.push({ dimension: 'sol', value: slug(ctx.sol), source: 'auto', confirmed: true, isOther: true });
-  if (ctx.topic) out.push({ dimension: 'topic', value: slug(ctx.topic), source: 'auto', confirmed: true, isOther: true });
+  const ph = phase.match(/(?:phase[_ -]?)?([123])/)?.[1];
+  if (ph) out.push({ dimension: 'phase', value: `phase_${ph}`, source: 'auto', confirmed: true });
+  if (sol) out.push({ dimension: 'sol', value: slug(sol), source: 'auto', confirmed: true, isOther: true });
+  if (topic) out.push({ dimension: 'topic', value: slug(topic), source: 'auto', confirmed: true, isOther: true });
   return out;
 }
 

@@ -405,12 +405,14 @@ export default function AdminTemplatesPage() {
                     </button>
                   </>
                 )}
-                <button
-                  onClick={() => setPreviewKey(record.template_key)}
-                  className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
-                >
-                  Preview
-                </button>
+                {record.id.startsWith('registry-') && (
+                  <button
+                    onClick={() => setPreviewKey(record.template_key)}
+                    className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+                  >
+                    Preview
+                  </button>
+                )}
               </div>
             </div>
           ))}

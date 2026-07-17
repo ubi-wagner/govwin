@@ -103,7 +103,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
     // COALESCE-style partial update: only provided fields change. node_count is
     // recomputed when canvas_document is supplied.
-    const nameVal = typeof body.name === 'string' ? body.name.trim() : null;
+    // Empty/whitespace name must NOT blank the column (POST rejects empty names) —
+    // coerce '' to null so the COALESCE below preserves the existing name.
+    const nameVal = typeof body.name === 'string' ? (body.name.trim() || null) : null;
     const descVal = typeof body.description === 'string' ? body.description : null;
     const typeVal = typeof body.templateType === 'string' ? body.templateType : null;
     const agencyVal = typeof body.agency === 'string' ? body.agency : null;
