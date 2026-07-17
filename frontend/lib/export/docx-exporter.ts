@@ -50,6 +50,29 @@ import type {
  * @param variables — template variable substitutions (company_name, topic_number, etc.)
  * @returns Buffer containing the .docx file bytes
  */
+/**
+ * Tokenize a footer template into runs, substituting {n}/{N} with live page-number
+ * fields (so "Page {n} of {N}" renders "Page 1 of 5", not "Page  of 1 of 5"). A
+ * template with no {n}/{N} gets "· Page X of Y" appended.
+ */
+function footerRuns(template: string, font: string, size: number): TextRun[] {
+  const runs: TextRun[] = [];
+  for (const part of template.split(/(\{n\}|\{N\})/g)) {
+    if (part === '{n}') runs.push(new TextRun({ children: [PageNumber.CURRENT], font, size }));
+    else if (part === '{N}') runs.push(new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size }));
+    else if (part) runs.push(new TextRun({ text: part, font, size }));
+  }
+  if (!/\{n\}|\{N\}/.test(template)) {
+    runs.push(
+      new TextRun({ text: ' · Page ', font, size }),
+      new TextRun({ children: [PageNumber.CURRENT], font, size }),
+      new TextRun({ text: ' of ', font, size }),
+      new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size }),
+    );
+  }
+  return runs;
+}
+
 export async function exportToDocx(
   doc: CanvasDocument,
   variables: Record<string, string> = {},
@@ -90,18 +113,7 @@ export async function exportToDocx(
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: sub(canvas.footer.template)
-                .replace('{n}', '')
-                .replace('{N}', ''),
-              font: canvas.footer.font.family,
-              size: canvas.footer.font.size * 2,
-            }),
-            new TextRun({ children: [PageNumber.CURRENT] }),
-            new TextRun({ text: ' of ' }),
-            new TextRun({ children: [PageNumber.TOTAL_PAGES] }),
-          ],
+          children: footerRuns(sub(canvas.footer.template), canvas.footer.font.family, canvas.footer.font.size * 2),
         }),
       ],
     }),
@@ -239,10 +251,14 @@ function nodeToDocx(
     case 'bulleted_list':
     case 'numbered_list': {
       const c = node.content as ListContent;
+      // Each numbered list gets its own concrete `instance` so a second list restarts
+      // at 1 instead of continuing the first list's counter (one shared reference =
+      // one continuous counter otherwise).
+      const instance = node.type === 'numbered_list' ? allNodes.filter((n) => n.type === 'numbered_list').indexOf(node) : 0;
       return c.items.map((item) =>
         new Paragraph({
           bullet: node.type === 'bulleted_list' ? { level: item.indent_level ?? 0 } : undefined,
-          numbering: node.type === 'numbered_list' ? { reference: 'default-numbering', level: item.indent_level ?? 0 } : undefined,
+          numbering: node.type === 'numbered_list' ? { reference: 'default-numbering', level: item.indent_level ?? 0, instance } : undefined,
           children: [new TextRun({ text: item.text, font, size })],
         }),
       );

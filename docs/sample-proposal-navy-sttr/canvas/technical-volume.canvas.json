@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "dc2166ca-b903-48af-b813-d43dc78c955f",
+  "document_id": "0f304f1f-d497-4297-b033-befef16cecda",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "d13390d4-daae-430c-aa66-44bb208a3751",
+      "id": "0ab5907f-e257-4f5c-bd7e-915ae2e9137b",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "abda56fd-1fe6-49f2-afb9-c6b5f798d807",
+      "id": "dd48df49-1f46-4553-9b7c-7828f6d82cf2",
       "type": "text_block",
       "content": {
         "text": "{company_name} (Small Business) with {ri_name}, {ri_lab} (Research Institution)",
@@ -74,7 +74,7 @@
       "library_eligible": false
     },
     {
-      "id": "3e36bb6f-f645-4708-812e-ecc23c0eea8f",
+      "id": "6ec40548-9ca1-47b5-9324-4d38dcf7601e",
       "type": "text_block",
       "content": {
         "text": "US Navy STTR Phase I · Topic {topic_number}: {topic_title}",
@@ -90,7 +90,7 @@
       "library_eligible": false
     },
     {
-      "id": "6d07c3e6-62cc-4016-9e17-739da60b0b7c",
+      "id": "8e53afee-e852-40bb-9921-fccc90ec874b",
       "type": "text_block",
       "content": {
         "text": "Base Period: 18 months / $250,000   ·   Option: 6 months / $150,000   ·   Distribution: Proprietary",
@@ -106,7 +106,7 @@
       "library_eligible": false
     },
     {
-      "id": "892dd6c3-d532-4c79-bb77-376a9c8727b2",
+      "id": "62c6cbbd-4089-4764-b7ee-3c7e11690d06",
       "type": "heading",
       "content": {
         "level": 2,
@@ -122,7 +122,7 @@
       "library_eligible": false
     },
     {
-      "id": "3aaa32b5-29da-4c10-b562-2d6ec5686576",
+      "id": "d585b65a-b127-4b7a-8e0d-97b19e8f29d3",
       "type": "text_block",
       "content": {
         "text": "The Navy is fielding distributed unmanned maritime systems — unmanned surface vessels and unattended undersea nodes — to hold contested waters at scale. Their value depends on classifying acoustic contacts (submarines, torpedoes, surface combatants, biologics) reliably, yet the undersea channel denies the connectivity those systems assume. Nodes cannot relay raw acoustics to a shore or ship-borne processor in real time: acoustic backhaul is low-rate, RF is unavailable underwater, and a surfacing node is a detectable node. Classification must therefore happen at the edge, on each node, within a severe power and compute budget — and, crucially, the nodes must agree, fusing weak local evidence into one undersea picture without a central processor.",
@@ -136,7 +136,7 @@
       "library_eligible": false
     },
     {
-      "id": "a2568fc0-7bdb-440e-953c-db6dfde3bec6",
+      "id": "54694092-cdfb-4d27-bd09-4cd3e490d801",
       "type": "text_block",
       "content": {
         "text": "Aerivio’s AFWERX Phase I effort proved that a maritime acoustic classifier can be compressed to 4-bit precision and run on a single 2-watt vessel module while holding balanced accuracy above 92%. That result is the point of departure here. The unsolved problem this STTR addresses is distribution: propagation-aware classification across a mesh of independent, power-starved nodes, where each node hears a different, degraded slice of the same event and the network must reach consensus at the tactical edge. Solving it requires two capabilities Aerivio does not hold alone — rigorous underwater-acoustic propagation science and access to representative range data — which is precisely why this is proposed as an STTR with a research institution.",
@@ -150,7 +150,7 @@
       "library_eligible": false
     },
     {
-      "id": "d232f8c1-a5a7-4aac-88a4-03eb8093fee2",
+      "id": "01f98173-44d7-4d77-98e3-9bb85327e871",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -161,7 +161,7 @@
       "library_eligible": false
     },
     {
-      "id": "263951c8-28bf-4bc3-be10-8166c11e99e4",
+      "id": "72c75f56-1812-4607-91aa-08fb05c58519",
       "type": "heading",
       "content": {
         "level": 2,
@@ -177,7 +177,7 @@
       "library_eligible": false
     },
     {
-      "id": "8e08a30e-a2ac-4298-89fb-f6d36d622a23",
+      "id": "178f3aab-77c3-49e8-b3ad-b393cfc1cc7b",
       "type": "text_block",
       "content": {
         "text": "Phase I establishes feasibility of propagation-aware, distributed edge classification against pre-registered, defense-relevant criteria:",
@@ -191,7 +191,7 @@
       "library_eligible": false
     },
     {
-      "id": "8ae83927-953d-416c-aabc-b3bd95352a42",
+      "id": "f894e2ec-44e9-4455-a130-3339e01f219d",
       "type": "numbered_list",
       "content": {
         "items": [
@@ -217,7 +217,7 @@
       "library_eligible": false
     },
     {
-      "id": "8955a88f-6055-409f-8de4-a1187f9e267b",
+      "id": "ac1cb159-5c72-41c6-ab40-12c56596af64",
       "type": "heading",
       "content": {
         "level": 3,
@@ -233,7 +233,7 @@
       "library_eligible": false
     },
     {
-      "id": "18b6e25b-6f21-4c7e-bb34-fec61cca697e",
+      "id": "6cc1a3e2-9751-459d-8ca5-b9158a5efa50",
       "type": "text_block",
       "content": {
         "text": "Each node runs on-device feature extraction and a quantized CNN, then exchanges compact posteriors with neighbors over the acoustic link; an on-node consensus step fuses them into an undersea picture that feeds the autonomy bus. Figure 1 shows the distributed architecture. All inference and fusion occur on-node at a measured 2.0-watt draw — no central processor, no assumption of backhaul.",
@@ -247,7 +247,7 @@
       "library_eligible": false
     },
     {
-      "id": "f01ffe1e-73ad-475b-805a-509425605629",
+      "id": "910d86aa-f5e8-4944-9d1a-d52122416ff2",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NjAiIGhlaWdodD0iMjIwIj48cmVjdCB3aWR0aD0iNDYwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2VjZmVmZiIvPgogICA8Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSIxNiIgZmlsbD0iIzBlNzQ5MCIvPjx0ZXh0IHg9IjYwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjkiIGZpbGw9IiNmZmYiPm5vZGU8L3RleHQ+PGNpcmNsZSBjeD0iNjAiIGN5PSIxNTAiIHI9IjE2IiBmaWxsPSIjMGU3NDkwIi8+PHRleHQgeD0iNjAiIHk9IjE1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjkiIGZpbGw9IiNmZmYiPm5vZGU8L3RleHQ+PGNpcmNsZSBjeD0iMTMwIiBjeT0iMTA1IiByPSIxNiIgZmlsbD0iIzBlNzQ5MCIvPjx0ZXh0IHg9IjEzMCIgeT0iMTA5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+bm9kZTwvdGV4dD48Y2lyY2xlIGN4PSI0MCIgY3k9IjEwNSIgcj0iMTYiIGZpbGw9IiMwZTc0OTAiLz48dGV4dCB4PSI0MCIgeT0iMTA5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+bm9kZTwvdGV4dD4KICAgPGxpbmUgeDE9IjYwIiB5MT0iNjAiIHgyPSIxMzAiIHkyPSIxMDUiIHN0cm9rZT0iIzY3ZThmOSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjYwIiB5MT0iMTUwIiB4Mj0iMTMwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSI0MCIgeTE9IjEwNSIgeDI9IjEzMCIgeTI9IjEwNSIgc3Ryb2tlPSIjNjdlOGY5IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iNjAiIHkxPSI2MCIgeDI9IjQwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSI2MCIgeTE9IjE1MCIgeDI9IjQwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPgogICA8cmVjdCB4PSIxODAiIHk9IjgwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjUyIiByeD0iNiIgZmlsbD0iIzA4OTFiMiIvPjx0ZXh0IHg9IjI0MCIgeT0iMTAyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTEiIGZpbGw9IiNmZmYiPkVkZ2UgRnVzaW9uPC90ZXh0Pjx0ZXh0IHg9IjI0MCIgeT0iMTE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2NmZmFmZSI+KG9uLW5vZGUgQ05OICsgY29uc2Vuc3VzKTwvdGV4dD4KICAgPHJlY3QgeD0iMzMwIiB5PSI1MCIgd2lkdGg9IjExMCIgaGVpZ2h0PSI0NSIgcng9IjYiIGZpbGw9IiMwMjg0YzciLz48dGV4dCB4PSIzODUiIHk9Ijc3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPlVuZGVyc2VhIFBpY3R1cmU8L3RleHQ+CiAgIDxyZWN0IHg9IjMzMCIgeT0iMTIwIiB3aWR0aD0iMTEwIiBoZWlnaHQ9IjQ1IiByeD0iNiIgZmlsbD0iIzAzNjlhMSIvPjx0ZXh0IHg9IjM4NSIgeT0iMTQ3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPlVTViAvIEF1dG9ub215PC90ZXh0PgogICA8bGluZSB4MT0iMTMwIiB5MT0iMTA1IiB4Mj0iMTgwIiB5Mj0iMTA2IiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIzMDAiIHkxPSI5OCIgeDI9IjMzMCIgeTI9Ijc0IiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIzMDAiIHkxPSIxMTIiIHgyPSIzMzAiIHkyPSIxNDAiIHN0cm9rZT0iIzMzNDE1NSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+",
@@ -263,7 +263,7 @@
       "library_eligible": false
     },
     {
-      "id": "b9ef0fb7-c6ae-489f-ada3-fc824ab40c53",
+      "id": "75e72895-1a65-46f3-94bb-872c732bdc67",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -278,7 +278,7 @@
       "library_eligible": false
     },
     {
-      "id": "79f0508f-1945-4969-91df-6236bcbf416f",
+      "id": "bfdad8b8-0af9-4c9b-b8a9-7b4c0664a5cd",
       "type": "text_block",
       "content": {
         "text": "Two co-designed advances make this feasible. First, propagation-aware features: the Research Institution’s channel models supply per-node context (multipath, absorption, sound-speed profile) that Aerivio folds into the classifier as auxiliary inputs, so a node discounts evidence its own geometry makes unreliable. Second, posterior consensus: rather than sharing raw audio, nodes exchange low-rate calibrated posteriors and reach agreement through a bandwidth-frugal fusion rule, turning several weak, partial observations into one confident classification.",
@@ -292,7 +292,7 @@
       "library_eligible": false
     },
     {
-      "id": "46b954b1-16c5-4471-bd04-d94c99aecab0",
+      "id": "6437cfa8-ef86-4d3b-b4bd-f0b3c32431db",
       "type": "text_block",
       "content": {
         "text": "The classifier reuses Aerivio’s validated quantization-aware training and saliency-guided pruning (patent pending) so the added propagation inputs and fusion logic still fit the 2-watt budget. Preliminary single-node results from the prior effort (Table 1) anchor the Phase I targets; the Phase I novelty is the propagation coupling and the multi-node fusion gain.",
@@ -306,7 +306,7 @@
       "library_eligible": false
     },
     {
-      "id": "e8fd40c8-07b3-4296-86e2-1bfcf2252a98",
+      "id": "6a1ca793-40f4-42bb-9d3c-4ab34e7f369c",
       "type": "table",
       "content": {
         "headers": [
@@ -361,7 +361,7 @@
       "library_eligible": false
     },
     {
-      "id": "f7a8fcc6-7f36-45ee-bf83-9160aba52dbd",
+      "id": "285ea2b0-c7d3-4c8f-b123-ce9cc5c8005f",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -376,7 +376,7 @@
       "library_eligible": false
     },
     {
-      "id": "876811e5-cd7d-4097-906d-20fd245f8ffb",
+      "id": "5bd0e316-1a8f-4aa0-915b-1a29fd21fb1e",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -387,7 +387,7 @@
       "library_eligible": false
     },
     {
-      "id": "8fb9f97f-753a-49f9-bd42-9dc550e1a42c",
+      "id": "7e3a2506-a7ac-4c3f-88fa-7794818bfd7f",
       "type": "heading",
       "content": {
         "level": 2,
@@ -403,7 +403,7 @@
       "library_eligible": false
     },
     {
-      "id": "59055daa-9c97-4d8e-9f97-dd8da5ec9eef",
+      "id": "545cba9f-3098-42d7-956e-58a9d8f02bb2",
       "type": "text_block",
       "content": {
         "text": "This effort is a cooperative research partnership between {company_name} (the Small Business Concern and prime) and the {ri_lab} at {ri_name} (the Research Institution). It satisfies the STTR requirement for a formal SBC–RI collaboration and the statutory work-split: the SBC performs not less than 40% and the RI not less than 30% of the work, measured by cost.",
@@ -417,7 +417,7 @@
       "library_eligible": false
     },
     {
-      "id": "4598251c-46f7-4fe9-866b-18687f531039",
+      "id": "b2c28723-c52a-43e6-a37b-df8cca453598",
       "type": "table",
       "content": {
         "headers": [
@@ -469,7 +469,7 @@
       "library_eligible": false
     },
     {
-      "id": "0cfeca6b-46f9-44a2-a3c8-4c604b38784a",
+      "id": "3d9fd3b0-2ce2-4491-a146-c3a179444674",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -484,7 +484,7 @@
       "library_eligible": false
     },
     {
-      "id": "e2cdbc8f-fea8-4c19-a726-2fcd8c6a6993",
+      "id": "fa82edf5-71be-40bf-a691-57ef05942c87",
       "type": "text_block",
       "content": {
         "text": "Principal Investigator. Dr. Mara Ellison is the single PI for the effort and is primarily employed (>50%) by {company_name}, consistent with STTR rules permitting the PI at either party. Dr. Ligia Okonkwo (Cascadia State) serves as RI Co-Investigator and technical lead for the ocean-acoustics tasks.",
@@ -498,7 +498,7 @@
       "library_eligible": false
     },
     {
-      "id": "2b0b0b90-3516-4752-bbb3-0122e92a10d9",
+      "id": "4d329f44-b2c7-4ca1-a8c1-b465eae74525",
       "type": "text_block",
       "content": {
         "text": "Allocation of rights. An Allocation of Rights Agreement between {company_name} and {ri_name} is executed prior to award (attached to the Cost Volume). It assigns background IP to its owner, grants the SBC an exclusive option to foreground IP for commercialization, and gives the RI retained rights for internal research and publication subject to a pre-publication review period. This structure keeps the transition path unencumbered while protecting the RI’s academic mission.",
@@ -512,7 +512,7 @@
       "library_eligible": false
     },
     {
-      "id": "0d4ae3a5-c31b-4ece-8b34-2a2f70b30ae4",
+      "id": "a00bbbe9-4359-4ced-b6fb-010d87e984fc",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -523,7 +523,7 @@
       "library_eligible": false
     },
     {
-      "id": "a9c74740-302e-4bb4-bd5f-59fe2be941f7",
+      "id": "497d6f34-9146-460c-832c-9b82e8005faa",
       "type": "heading",
       "content": {
         "level": 2,
@@ -539,7 +539,7 @@
       "library_eligible": false
     },
     {
-      "id": "26373889-8750-49bd-9355-6a739f49a00f",
+      "id": "a2603fca-0407-4adc-b53a-e1b12ac2f827",
       "type": "text_block",
       "content": {
         "text": "Distributed acoustic sensing has been studied for seismic and pipeline monitoring, but those systems assume power and backhaul that undersea nodes lack. Edge-audio classification work targets keyword spotting at low class counts, not multi-class maritime threat discrimination under a hard power ceiling. Decentralized sensor-fusion literature offers consensus algorithms, but typically assumes rich inter-node bandwidth rather than a low-rate acoustic link. Aerivio’s contribution — validated in the prior single-node effort — is compressing an accurate maritime classifier to a 2-watt budget; the Research Institution’s contribution is rigorous, range-validated propagation modeling. The novel coupling proposed here, propagation-aware features feeding a bandwidth-frugal posterior-consensus rule, has not, to our knowledge, been demonstrated for undersea threat classification.",
@@ -553,7 +553,7 @@
       "library_eligible": false
     },
     {
-      "id": "1686e14e-7e7b-40b3-af27-d0057ce005e8",
+      "id": "c5a9ddb3-ad9f-4587-92f7-b486939256ce",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -564,7 +564,7 @@
       "library_eligible": false
     },
     {
-      "id": "e45b9375-f3f8-4d0f-99c6-c1db22b4ca21",
+      "id": "eb73a96a-1264-40fe-8166-bb3dbb35d36c",
       "type": "heading",
       "content": {
         "level": 2,
@@ -580,7 +580,7 @@
       "library_eligible": false
     },
     {
-      "id": "11c7995f-663a-4c99-bb26-1a9b2b5b257e",
+      "id": "da573b9d-b480-48d2-a8ab-205c71cc09cf",
       "type": "text_block",
       "content": {
         "text": "Dr. Mara Ellison (PI, {company_name}) — 12 years in low-power machine learning for sensing; author of the quantization research underpinning Aerivio’s core IP; led the AFWERX Phase I classifier. Tomas Reyes (Senior Systems Engineer, {company_name}) — 9 years of embedded real-time systems and two fielded maritime autonomy stacks; owns the on-node runtime and fusion implementation. Priya Nandakumar (ML Engineer, {company_name}) — model compression and data augmentation; leads corpus integration and quantization-aware training.",
@@ -594,7 +594,7 @@
       "library_eligible": false
     },
     {
-      "id": "1d5e83de-abe3-4df1-9e0d-db3d86de72e1",
+      "id": "c7ef0f7b-61ea-4b77-8f40-75526440dd1a",
       "type": "text_block",
       "content": {
         "text": "Dr. Ligia Okonkwo (RI Co-Investigator, {ri_name}) — 15 years in underwater acoustic propagation and array processing; directs the Applied Ocean Acoustics Laboratory and its range-test program. Two graduate researchers support channel characterization and corpus labeling. Full biographies for all key personnel appear in the Volume 5 supporting documents.",
@@ -608,7 +608,7 @@
       "library_eligible": false
     },
     {
-      "id": "0d2650c9-6a43-4f69-83a6-5655778d26ce",
+      "id": "02155b1e-a8cb-4c69-87f9-ac05d3552660",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -619,7 +619,7 @@
       "library_eligible": false
     },
     {
-      "id": "a13d6ec1-f901-463d-8576-3896eab468d9",
+      "id": "f7a00aef-b8e8-4866-b7c7-5a144a515daa",
       "type": "heading",
       "content": {
         "level": 2,
@@ -635,7 +635,7 @@
       "library_eligible": false
     },
     {
-      "id": "eb30bc01-001e-476a-b0e3-e8a400424171",
+      "id": "8a1fe762-b9f8-4b98-b195-f15cc2b03eea",
       "type": "text_block",
       "content": {
         "text": "Small Business ({company_name}). A 3,200 sq ft engineering facility with a dedicated acoustics bench, a custom anechoic test enclosure, six 2-watt edge-compute development kits, an on-premises GPU training cluster, and a calibrated power-measurement bench for rail-level draw. All Phase I edge-AI development and benchmarking is performed in-house.",
@@ -649,7 +649,7 @@
       "library_eligible": false
     },
     {
-      "id": "eaf846a3-794f-44c2-980e-129bad583faa",
+      "id": "3a88544d-4839-4493-add8-cd48a8a9f23f",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNDAiIGhlaWdodD0iMTkwIj48cmVjdCB3aWR0aD0iMzQwIiBoZWlnaHQ9IjE5MCIgZmlsbD0iI2UwZjJmZSIvPjxyZWN0IHg9IjMwIiB5PSI3MCIgd2lkdGg9IjEzMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMzY5YTEiLz48cmVjdCB4PSIxNzUiIHk9IjQwIiB3aWR0aD0iMTM1IiBoZWlnaHQ9IjEzMCIgZmlsbD0iIzAyODRjNyIvPjxyZWN0IHg9IjQ1IiB5PSI5MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjYmFlNmZkIi8+PHJlY3QgeD0iODAiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxMTUiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxOTUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48cmVjdCB4PSIyMzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48cmVjdCB4PSIyNzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48dGV4dCB4PSIxNzAiIHk9IjE4NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjMGM0YTZlIj5BZXJpdmlvIEhRIOKAlCBFZGdlIEFJICYgQWNvdXN0aWNzIExhYjwvdGV4dD48L3N2Zz4=",
@@ -665,7 +665,7 @@
       "library_eligible": false
     },
     {
-      "id": "3f1fe87d-428e-4303-be52-136f26654964",
+      "id": "fbb79dfd-9f1f-49b1-9d60-1da6bb4109e3",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -680,7 +680,7 @@
       "library_eligible": false
     },
     {
-      "id": "b7976d0a-94ae-4620-abd6-e8c379aec9d9",
+      "id": "c8c52b10-219f-46ae-8083-0d06a59e78bd",
       "type": "text_block",
       "content": {
         "text": "Research Institution ({ri_name}). The {ri_lab} operates a calibrated acoustic test tank, a multi-element hydrophone array, a coastal test range with documented environmental characterization, and high-performance computing for propagation modeling. This provides representative undersea acoustic conditions and range data no small business could economically replicate — the core rationale for the STTR teaming.",
@@ -694,7 +694,7 @@
       "library_eligible": false
     },
     {
-      "id": "78f69fca-1e93-49d1-bad0-41ad65d7b83d",
+      "id": "289a6703-9483-4093-9925-5b39dddb64bf",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNDAiIGhlaWdodD0iMTkwIj48cmVjdCB3aWR0aD0iMzQwIiBoZWlnaHQ9IjE5MCIgZmlsbD0iI2NmZmFmZSIvPjxyZWN0IHg9IjMwIiB5PSI3MCIgd2lkdGg9IjEzMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxNTVlNzUiLz48cmVjdCB4PSIxNzUiIHk9IjQwIiB3aWR0aD0iMTM1IiBoZWlnaHQ9IjEzMCIgZmlsbD0iIzBlNzQ5MCIvPjxyZWN0IHg9IjQ1IiB5PSI5MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjYmFlNmZkIi8+PHJlY3QgeD0iODAiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxMTUiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxOTUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48cmVjdCB4PSIyMzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48cmVjdCB4PSIyNzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNmMGY5ZmYiLz48dGV4dCB4PSIxNzAiIHk9IjE4NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjMGM0YTZlIj5DYXNjYWRpYSBTdGF0ZSDigJQgQXBwbGllZCBPY2VhbiBBY291c3RpY3MgTGFiPC90ZXh0Pjwvc3ZnPg==",
@@ -710,7 +710,7 @@
       "library_eligible": false
     },
     {
-      "id": "689d81b7-1699-4f1f-8714-8ba16fc544df",
+      "id": "7443e0e1-32c6-47a4-a02f-13b75c5a8c92",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -725,7 +725,7 @@
       "library_eligible": false
     },
     {
-      "id": "3901e0df-83a1-4f02-8195-2acec44da004",
+      "id": "9805d336-e2ca-4467-b41f-338995ff2a84",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -736,7 +736,7 @@
       "library_eligible": false
     },
     {
-      "id": "f6b7ba05-04b2-4cfb-816d-9e29bd22a594",
+      "id": "96e0e5d8-1c4d-46a9-bced-b3908deb7306",
       "type": "heading",
       "content": {
         "level": 2,
@@ -752,7 +752,7 @@
       "library_eligible": false
     },
     {
-      "id": "42e73b57-b25d-4bd4-8ada-66b9cddfa7eb",
+      "id": "27d60995-251e-43b0-9826-7095c41eb627",
       "type": "text_block",
       "content": {
         "text": "Phase I establishes feasibility in simulation and tank/range tests. Phase II hardens the node software, extends the corpus to fielded recordings, and conducts an at-sea multi-node demonstration against the same gates plus a robustness gate across sea states; we anticipate pursuing approximately $1.6M over 24 months. Phase III targets integration with a Navy undersea or USV program of record through the relevant program office. Because classification and fusion run within the existing node power budget, transition is a software integration and accreditation effort rather than a hardware program — materially lowering the transition barrier.",
@@ -766,7 +766,7 @@
       "library_eligible": false
     },
     {
-      "id": "c818535a-3c48-487f-830d-10a8c683eb31",
+      "id": "d58c05aa-0f90-495f-82c6-e4873d816300",
       "type": "text_block",
       "content": {
         "text": "Commercialization follows a dual-use path: Navy undersea and USV programs first, then allied navies, then commercial maritime domain awareness — port and offshore-energy protection — where the same propagation-aware, power-efficient distributed classifier applies with minimal modification. The RI partnership additionally seeds a talent and follow-on-research pipeline. Full commercialization detail is provided in the Volume 5 company overview.",
@@ -780,7 +780,7 @@
       "library_eligible": false
     },
     {
-      "id": "fe0b551a-b5b6-4143-a021-89de27ef98ce",
+      "id": "d14dde9a-5388-40bb-845b-7b1c6b7be73f",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -791,7 +791,7 @@
       "library_eligible": false
     },
     {
-      "id": "7529d070-c48d-4ca8-a0f5-0a673f509a31",
+      "id": "91c94d81-8b08-44de-9247-cec671284691",
       "type": "heading",
       "content": {
         "level": 2,
@@ -807,7 +807,7 @@
       "library_eligible": false
     },
     {
-      "id": "da97ecff-e4bf-47c0-8d1c-6fc38a47b1d6",
+      "id": "f9ab2fea-30d3-4bfa-a556-30fde4d031d7",
       "type": "text_block",
       "content": {
         "text": "Foreign nationals. {company_name} anticipates no foreign nationals performing on the SBC scope. Any RI personnel requiring disclosure will be identified to the Contracting Officer with country of origin and visa/work-permit status prior to participation, consistent with the solicitation.",
@@ -821,7 +821,7 @@
       "library_eligible": false
     },
     {
-      "id": "365ddeb5-77d0-4171-a9b1-8f042151f65b",
+      "id": "12aafa11-77c3-4f87-b11d-b5ee7d044ec7",
       "type": "text_block",
       "content": {
         "text": "Prior, current, or pending support. The specific work proposed — propagation-aware, 4-bit distributed undersea acoustic classification under a 2-watt per-node ceiling — has not been submitted to or funded by another Federal agency. Aerivio’s background IP (saliency-guided quantization) was developed under internal funds and matured under the prior AFWERX Phase I; the distributed and propagation-coupling work is new to this effort. Any overlapping proposal submitted during evaluation will be promptly disclosed to the Contracting Officer.",
@@ -835,7 +835,7 @@
       "library_eligible": false
     },
     {
-      "id": "722081f0-8b85-4657-b292-512d6db7770f",
+      "id": "e3337682-1eb6-4987-a372-33ad5fc0cee2",
       "type": "text_block",
       "content": {
         "text": "Human/animal subjects, hazardous materials: none. All data derives from Distribution-A corpora plus synthetic augmentation and the RI’s range collections under its existing environmental authorizations — no classified or controlled data in Phase I.",
@@ -849,7 +849,7 @@
       "library_eligible": false
     },
     {
-      "id": "3c59b1a1-3154-4198-9d7e-87f65d108d09",
+      "id": "0bcc54e2-6b75-4f64-bacf-4bf96305c699",
       "type": "heading",
       "content": {
         "level": 3,
@@ -865,7 +865,7 @@
       "library_eligible": false
     },
     {
-      "id": "d5f012de-2f6a-4e09-90f5-b655090543c1",
+      "id": "db8410ce-f689-479e-9682-7362acb08f9f",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -891,7 +891,7 @@
       "library_eligible": false
     },
     {
-      "id": "86639b1f-1cf0-4a65-b5f8-4b676d1b5835",
+      "id": "8dd162f7-eb80-44df-ac58-45e61553c983",
       "type": "heading",
       "content": {
         "level": 3,
@@ -907,7 +907,7 @@
       "library_eligible": false
     },
     {
-      "id": "0d59aca1-6208-488d-8290-9d0f68d49f44",
+      "id": "f8bf7f11-3931-4494-b4a6-11e92b93b808",
       "type": "text_block",
       "content": {
         "text": "This volume addresses each Navy STTR Phase I required element; the full compliance matrix is maintained in the proposal workspace and advances to “satisfied” as each section is accepted and locked.",
@@ -921,7 +921,7 @@
       "library_eligible": false
     },
     {
-      "id": "443d17aa-3589-4a55-ba95-c94fe9be366f",
+      "id": "d27e8cb0-4da3-4cfe-9acd-b47a93e234d9",
       "type": "table",
       "content": {
         "headers": [

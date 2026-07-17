@@ -52,7 +52,7 @@ export function contextTags(ctx: Record<string, unknown>): AtomTagInput[] {
   return out;
 }
 
-export interface DocAtomizeResult { file: string; format: string; atoms: number; cocoonId: string | null; error?: string }
+export interface DocAtomizeResult { file: string; format: string; atoms: number; cocoonId: string | null; reference?: boolean; error?: string }
 
 /**
  * Atomize a single uploaded document into the library. Best-effort per step —
@@ -124,5 +124,5 @@ export async function atomizeDocumentIntoLibrary(
       made++;
     } catch (e) { console.error('[atomize-package] primitive create failed', filename, i, e); }
   }
-  return { file: filename, format: parsed.sourceFormat, atoms: made, cocoonId };
+  return { file: filename, format: parsed.sourceFormat, atoms: made, cocoonId, reference: !!referenceId };
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "95c78c73-aa8e-4643-92d4-acda56b536e6",
+  "document_id": "f27ae766-9011-473b-bcde-6e58fa5bed25",
   "canvas": {
     "format": "slide_16_9",
     "width": 960,
@@ -23,7 +23,7 @@
   },
   "nodes": [
     {
-      "id": "3be33485-9816-49fb-a793-1583e353818f",
+      "id": "895b7db2-31e7-41a4-8551-46a1a90743bf",
       "type": "heading",
       "content": {
         "level": 1,
@@ -39,7 +39,7 @@
       "library_eligible": false
     },
     {
-      "id": "290d8d60-7fc1-4db5-b23d-7434620af13e",
+      "id": "25e76251-0e77-499f-981a-74b262787647",
       "type": "text_block",
       "content": {
         "text": "Company Overview",
@@ -55,7 +55,7 @@
       "library_eligible": false
     },
     {
-      "id": "2d1b0912-1220-4615-b470-e811d0a63bae",
+      "id": "228a0cb8-5e80-4c5c-8a89-e0491ff2c3f2",
       "type": "text_block",
       "content": {
         "text": "Edge AI for distributed maritime autonomy",
@@ -69,7 +69,7 @@
       "library_eligible": false
     },
     {
-      "id": "ffe1d75c-3fe3-4b1a-92cb-a66be2200820",
+      "id": "60ca8dd7-77e0-4044-99f1-0881cdd721a4",
       "type": "text_block",
       "content": {
         "text": "Volume 5 Supporting Document · Navy STTR Phase I · Topic N25B-T042",
@@ -85,7 +85,7 @@
       "library_eligible": false
     },
     {
-      "id": "8710d465-4c12-4a3c-a058-7a66be181776",
+      "id": "5cc3827d-4474-48dd-b0ae-23ddbfe1134a",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -96,7 +96,7 @@
       "library_eligible": false
     },
     {
-      "id": "9dbc269d-c057-43a2-b1aa-42f3fac8a262",
+      "id": "ad51f4bc-b00d-4950-acdf-c13df5cb7c8a",
       "type": "heading",
       "content": {
         "level": 1,
@@ -110,7 +110,7 @@
       "library_eligible": false
     },
     {
-      "id": "31c73b00-9730-4b77-96ec-b882b25bc7b8",
+      "id": "d7b88b79-2c62-4c5e-878e-f2787523a40e",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -136,7 +136,7 @@
       "library_eligible": false
     },
     {
-      "id": "0920b5c0-56ec-4ee3-893a-7fb4c05a3ffc",
+      "id": "c138e77e-2e86-4c7b-83ad-4cdfd704ed98",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -147,7 +147,7 @@
       "library_eligible": false
     },
     {
-      "id": "cfdde572-84bf-4c29-8292-4bc18c85e28a",
+      "id": "3a755bd0-406b-4cc8-96b5-2b27bc36ef69",
       "type": "heading",
       "content": {
         "level": 1,
@@ -161,7 +161,7 @@
       "library_eligible": false
     },
     {
-      "id": "6652b604-b75c-4168-89d0-a9e75e4f2324",
+      "id": "1bdbfa53-cd4c-42a3-be45-330324af14ac",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -187,7 +187,7 @@
       "library_eligible": false
     },
     {
-      "id": "0e5fb9b7-b147-4bf5-8298-cbec2c3044a1",
+      "id": "33043190-43ac-4ce2-b87a-2883f6033564",
       "type": "text_block",
       "content": {
         "text": "Teamed with Cascadia State University for undersea acoustics research (STTR RI).",
@@ -207,7 +207,7 @@
       "library_eligible": false
     },
     {
-      "id": "95b4f515-a593-436d-9079-60ee42faa83f",
+      "id": "d8e8f0cd-f22e-4244-a59b-fd5abc4cc417",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -218,7 +218,7 @@
       "library_eligible": false
     },
     {
-      "id": "ecef9b80-ba98-49d5-86f0-7fa5902de0fb",
+      "id": "cdd61bad-619a-4d2a-b2d6-2f4567727557",
       "type": "heading",
       "content": {
         "level": 1,
@@ -232,7 +232,7 @@
       "library_eligible": false
     },
     {
-      "id": "1fed8766-ff9a-4c10-9398-7acd70e00bcf",
+      "id": "a707f928-18c6-4e20-95c0-dd3b89d8f3a1",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -258,7 +258,7 @@
       "library_eligible": false
     },
     {
-      "id": "dc916167-467b-4974-a477-d07faf4b24cc",
+      "id": "62b49b2d-9d42-41e9-b6de-0cae59232053",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NjAiIGhlaWdodD0iMjIwIj48cmVjdCB3aWR0aD0iNDYwIiBoZWlnaHQ9IjIyMCIgZmlsbD0iI2VjZmVmZiIvPgogICA8Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSIxNiIgZmlsbD0iIzBlNzQ5MCIvPjx0ZXh0IHg9IjYwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjkiIGZpbGw9IiNmZmYiPm5vZGU8L3RleHQ+PGNpcmNsZSBjeD0iNjAiIGN5PSIxNTAiIHI9IjE2IiBmaWxsPSIjMGU3NDkwIi8+PHRleHQgeD0iNjAiIHk9IjE1NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjkiIGZpbGw9IiNmZmYiPm5vZGU8L3RleHQ+PGNpcmNsZSBjeD0iMTMwIiBjeT0iMTA1IiByPSIxNiIgZmlsbD0iIzBlNzQ5MCIvPjx0ZXh0IHg9IjEzMCIgeT0iMTA5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+bm9kZTwvdGV4dD48Y2lyY2xlIGN4PSI0MCIgY3k9IjEwNSIgcj0iMTYiIGZpbGw9IiMwZTc0OTAiLz48dGV4dCB4PSI0MCIgeT0iMTA5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2ZmZiI+bm9kZTwvdGV4dD4KICAgPGxpbmUgeDE9IjYwIiB5MT0iNjAiIHgyPSIxMzAiIHkyPSIxMDUiIHN0cm9rZT0iIzY3ZThmOSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjYwIiB5MT0iMTUwIiB4Mj0iMTMwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSI0MCIgeTE9IjEwNSIgeDI9IjEzMCIgeTI9IjEwNSIgc3Ryb2tlPSIjNjdlOGY5IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iNjAiIHkxPSI2MCIgeDI9IjQwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSI2MCIgeTE9IjE1MCIgeDI9IjQwIiB5Mj0iMTA1IiBzdHJva2U9IiM2N2U4ZjkiIHN0cm9rZS13aWR0aD0iMiIvPgogICA8cmVjdCB4PSIxODAiIHk9IjgwIiB3aWR0aD0iMTIwIiBoZWlnaHQ9IjUyIiByeD0iNiIgZmlsbD0iIzA4OTFiMiIvPjx0ZXh0IHg9IjI0MCIgeT0iMTAyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTEiIGZpbGw9IiNmZmYiPkVkZ2UgRnVzaW9uPC90ZXh0Pjx0ZXh0IHg9IjI0MCIgeT0iMTE4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iOSIgZmlsbD0iI2NmZmFmZSI+KG9uLW5vZGUgQ05OICsgY29uc2Vuc3VzKTwvdGV4dD4KICAgPHJlY3QgeD0iMzMwIiB5PSI1MCIgd2lkdGg9IjExMCIgaGVpZ2h0PSI0NSIgcng9IjYiIGZpbGw9IiMwMjg0YzciLz48dGV4dCB4PSIzODUiIHk9Ijc3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPlVuZGVyc2VhIFBpY3R1cmU8L3RleHQ+CiAgIDxyZWN0IHg9IjMzMCIgeT0iMTIwIiB3aWR0aD0iMTEwIiBoZWlnaHQ9IjQ1IiByeD0iNiIgZmlsbD0iIzAzNjlhMSIvPjx0ZXh0IHg9IjM4NSIgeT0iMTQ3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPlVTViAvIEF1dG9ub215PC90ZXh0PgogICA8bGluZSB4MT0iMTMwIiB5MT0iMTA1IiB4Mj0iMTgwIiB5Mj0iMTA2IiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIzMDAiIHkxPSI5OCIgeDI9IjMzMCIgeTI9Ijc0IiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIzMDAiIHkxPSIxMTIiIHgyPSIzMzAiIHkyPSIxNDAiIHN0cm9rZT0iIzMzNDE1NSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+",
@@ -275,7 +275,7 @@
       "library_eligible": false
     },
     {
-      "id": "6845db77-b6b5-4c4f-a50d-d4956cfed2f3",
+      "id": "c55ee9c9-2b3c-411a-bdda-41dc3028b8bc",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -286,7 +286,7 @@
       "library_eligible": false
     },
     {
-      "id": "bc3c99ff-6cea-4996-a873-aec9fdba6aeb",
+      "id": "89f72615-3ceb-4bc1-bdbb-3aee84080d6d",
       "type": "heading",
       "content": {
         "level": 1,
@@ -300,7 +300,7 @@
       "library_eligible": false
     },
     {
-      "id": "7b11a800-0885-4d9e-b66d-2843755df82c",
+      "id": "eb0355aa-bb4a-4bbf-8d0b-02532c0a840d",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -326,7 +326,7 @@
       "library_eligible": false
     },
     {
-      "id": "c2041cca-4063-4c0d-a9e6-a0d83766b07f",
+      "id": "7f1345f9-d1ac-4d0b-8b49-f97744ad2055",
       "type": "text_block",
       "content": {
         "text": "This STTR builds directly on the AFWERX result — distribution and propagation are the new science.",
@@ -342,7 +342,7 @@
       "library_eligible": false
     },
     {
-      "id": "9aef0ceb-a2e6-4788-95e1-4a9f12b47f29",
+      "id": "54220b54-1fc7-47b6-b6a8-efa2527ac7a7",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -353,7 +353,7 @@
       "library_eligible": false
     },
     {
-      "id": "ea908597-cd53-452b-b5e3-6c37d47c03be",
+      "id": "c6285472-76db-4be0-a00c-5cef9bc6b91c",
       "type": "heading",
       "content": {
         "level": 1,
@@ -367,7 +367,7 @@
       "library_eligible": false
     },
     {
-      "id": "2d31ff29-8e26-473f-84db-3c68005dea33",
+      "id": "d2819cb7-71f8-48c8-9ecd-6cf92a448b0a",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -393,7 +393,7 @@
       "library_eligible": false
     },
     {
-      "id": "24ea1f4e-f769-4291-abf6-739ef1c38b27",
+      "id": "2ebe9a9a-eb8f-4383-95b6-d6a6150f6255",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -404,7 +404,7 @@
       "library_eligible": false
     },
     {
-      "id": "2a75d0bc-d57e-4bb8-86f7-bb2dd10ae5e8",
+      "id": "e33e9e7c-a393-4deb-9828-769973c9901e",
       "type": "heading",
       "content": {
         "level": 1,
@@ -418,7 +418,7 @@
       "library_eligible": false
     },
     {
-      "id": "9c3a77b1-8680-4ed0-9964-d02fdaecf533",
+      "id": "5f53fb6e-0eeb-405c-901f-3e82e0ed1972",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -441,7 +441,7 @@
       "library_eligible": false
     },
     {
-      "id": "5d8c6c8e-172b-4292-8512-76fc507a84b2",
+      "id": "40c64d37-c2ff-48e8-8c0a-00cd1fdc78d9",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -452,7 +452,7 @@
       "library_eligible": false
     },
     {
-      "id": "c4b98de2-a399-49ca-aae7-5148834e9a68",
+      "id": "758bfabb-c25e-471c-8b91-cd182250f997",
       "type": "heading",
       "content": {
         "level": 1,
@@ -466,7 +466,7 @@
       "library_eligible": false
     },
     {
-      "id": "e038f95b-65a8-4cf9-be0a-0b22731fd6bd",
+      "id": "5ac50f5a-26ac-4d53-b398-84c338a4d5d3",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -492,7 +492,7 @@
       "library_eligible": false
     },
     {
-      "id": "f7ee51af-67d5-4ea6-a076-ef659a2eaef1",
+      "id": "5f14297e-1c69-4989-9d1f-16c72a41f5d7",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iNDQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZmZiIvPjx0ZXh0IHg9IjIwIiB5PSIyNCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEzIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzBmMjk0MiI+U2VydmljZWFibGUgbWFya2V0ICgkTS95cik8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjE1NCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjE2IiBmaWxsPSIjNjdlOGY5Ii8+PHRleHQgeD0iNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI2PC90ZXh0Pjx0ZXh0IHg9Ijc1IiB5PSIxNDkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzMzNDE1NSI+JDlNPC90ZXh0PjxyZWN0IHg9IjE0MCIgeT0iMTIxIiB3aWR0aD0iNzAiIGhlaWdodD0iNDkiIGZpbGw9IiMyMmQzZWUiLz48dGV4dCB4PSIxNzUiIHk9IjE4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4yMDI4PC90ZXh0Pjx0ZXh0IHg9IjE3NSIgeT0iMTE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPiQyOE08L3RleHQ+PHJlY3QgeD0iMjQwIiB5PSI1MCIgd2lkdGg9IjcwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzA4OTFiMiIvPjx0ZXh0IHg9IjI3NSIgeT0iMTg1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiMzMzQxNTUiPjIwMzA8L3RleHQ+PHRleHQgeD0iMjc1IiB5PSI0NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjMzM0MTU1Ij4kNjhNPC90ZXh0Pjwvc3ZnPg==",
@@ -508,7 +508,7 @@
       "library_eligible": false
     },
     {
-      "id": "525587c6-b7fc-4816-9796-740f7df2097d",
+      "id": "fb07dc30-2c12-4fb7-9840-851197dc447a",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -519,7 +519,7 @@
       "library_eligible": false
     },
     {
-      "id": "00e45748-7f12-4960-af76-cde8c734ef66",
+      "id": "89499d59-cd47-402c-82da-7899f04206d2",
       "type": "heading",
       "content": {
         "level": 1,
@@ -533,7 +533,7 @@
       "library_eligible": false
     },
     {
-      "id": "2d960f22-01b1-44e6-b845-23c71490b2bd",
+      "id": "551e0555-fa5c-41c5-bdbe-2b2892534cc3",
       "type": "numbered_list",
       "content": {
         "items": [
@@ -559,7 +559,7 @@
       "library_eligible": false
     },
     {
-      "id": "2e86e8e9-b5a9-45d5-90b3-03f7e0a5b591",
+      "id": "81d57603-0207-4cfa-96fb-39673d88c753",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -570,7 +570,7 @@
       "library_eligible": false
     },
     {
-      "id": "01f30aff-a997-458e-bcb7-a8132f1bb24b",
+      "id": "c6bb6f0b-be32-437b-8e98-9d93c35858f7",
       "type": "heading",
       "content": {
         "level": 1,
@@ -584,7 +584,7 @@
       "library_eligible": false
     },
     {
-      "id": "4e66b852-27ea-4cb5-a915-564a5654a821",
+      "id": "e4ef14a6-feea-48cf-a398-5d6f0766da9d",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -607,7 +607,7 @@
       "library_eligible": false
     },
     {
-      "id": "272e07c3-75d9-46fb-a2aa-0f1bc8e35ac6",
+      "id": "ce157822-03cb-4ad9-9946-d6515f7c1d69",
       "type": "text_block",
       "content": {
         "text": "Aerivio Systems · contact@aerivio.example · Proprietary",

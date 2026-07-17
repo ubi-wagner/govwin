@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "065e2fcd-ca3b-4bc2-8574-ec05a5b19e10",
+  "document_id": "b4b7744c-4316-4146-8214-37003931f6cd",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "51d7885b-0885-4a6a-ae7e-e54dee0bfdd9",
+      "id": "53d10d7c-dafd-4d58-bcc5-a0677302f5f0",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "60605ff9-6923-47ac-b000-46d1d4dcb690",
+      "id": "67416bbf-56fa-4bc5-8d05-22a04eaad3b2",
       "type": "text_block",
       "content": {
         "text": "{company_name} (SBC) with {ri_name} (RI) · Navy STTR Phase I · Topic {topic_number}",
@@ -70,7 +70,7 @@
       "library_eligible": false
     },
     {
-      "id": "f3aeb448-8902-4989-b9a5-6520608bd40c",
+      "id": "0606b214-59c0-4778-9b76-a877b901641a",
       "type": "text_block",
       "content": {
         "text": "Base Period: 18 months / $250,000   ·   Option Period: 6 months / $150,000",
@@ -86,7 +86,7 @@
       "library_eligible": false
     },
     {
-      "id": "36fd8dcb-6970-47b8-8f09-9954a017e954",
+      "id": "56e7632a-39b8-4afa-ad57-371e8778bff9",
       "type": "text_block",
       "content": {
         "text": "This Statement of Work defines the tasks, responsibilities, deliverables, and schedule for the Phase I base period and the priced option. Responsibility is marked SBC ({company_name}), RI ({ri_name}), or Joint. The task structure preserves the STTR work-split (SBC ≥ 40%, RI ≥ 30%); the cost realization of that split is in the Cost Volume.",
@@ -100,7 +100,7 @@
       "library_eligible": false
     },
     {
-      "id": "36518a02-8bf6-4c75-91fb-6654a49f8f3f",
+      "id": "fb0ea03b-70d5-42d0-838f-94a82dc833df",
       "type": "text_block",
       "content": {
         "text": "The base period is a single 18-month period of performance decomposed into five tasks. Two run largely in parallel — the RI-led channel and corpus track (Task 1) and the SBC-led classifier track (Task 2) — and converge in the joint fusion and validation tasks (Tasks 4–5). The priced option adds a hardware-in-the-loop prototype and a tank/at-sea pre-demonstration that carry the effort to a Phase II readiness decision. Each task below states scope, the responsible party and level of effort, and a concrete deliverable; all levels of effort are consistent with the Cost Volume.",
@@ -114,7 +114,7 @@
       "library_eligible": false
     },
     {
-      "id": "d8024a11-190d-498d-8401-036ae6d8ac74",
+      "id": "0394a13a-f52e-4825-90ff-f95d11449615",
       "type": "heading",
       "content": {
         "level": 2,
@@ -130,7 +130,7 @@
       "library_eligible": false
     },
     {
-      "id": "445975e4-dba3-463d-8133-0043cc7721da",
+      "id": "446f8d54-e482-4034-8e4e-577335d3cf84",
       "type": "table",
       "content": {
         "headers": [
@@ -190,7 +190,7 @@
       "library_eligible": false
     },
     {
-      "id": "243597f3-4c1a-41e2-abfe-94d88959e0d5",
+      "id": "fc4c9258-1cd1-4d9d-a5e6-f5cbbaf1d148",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -205,7 +205,7 @@
       "library_eligible": false
     },
     {
-      "id": "cf8e1350-1c3f-4881-b429-754116ce79fa",
+      "id": "147143bf-7cac-48e0-8bc1-923b1c03d63a",
       "type": "heading",
       "content": {
         "level": 3,
@@ -221,7 +221,7 @@
       "library_eligible": false
     },
     {
-      "id": "011d889c-5847-440c-8048-3e4f4a5b1c2c",
+      "id": "d343914c-df22-469a-9617-a83429000b65",
       "type": "text_block",
       "content": {
         "text": "The Research Institution characterizes the undersea acoustic channel for the target shallow-water environments — multipath structure, absorption, and sound-speed profiles — and assembles a propagation-labeled, multi-node corpus from range collections and Distribution-A sources, balanced across threat classes and documented in a data card. Effort: RI Co-I 0.20 FTE + one graduate researcher. Deliverable: propagation-labeled multi-node corpus + data card.",
@@ -235,7 +235,7 @@
       "library_eligible": false
     },
     {
-      "id": "a6b7d2aa-2305-4732-b88b-84fd26365fe8",
+      "id": "c8021013-6663-4106-8479-b84107daa486",
       "type": "heading",
       "content": {
         "level": 3,
@@ -251,7 +251,7 @@
       "library_eligible": false
     },
     {
-      "id": "bc7c1da3-430b-4181-9229-cc84264e150d",
+      "id": "f32ba012-e459-4513-a5f2-0171953a9ee3",
       "type": "text_block",
       "content": {
         "text": "Aerivio extends its 4-bit classifier to consume the RI’s propagation features as auxiliary inputs and emit calibrated per-node posteriors, retraining with quantization-aware training and saliency-guided pruning so the added inputs still fit the 2-watt budget. Effort: PI 0.25 FTE + ML engineer 0.20 FTE. Deliverable: extended 4-bit model + accuracy report on a session-disjoint split.",
@@ -265,7 +265,7 @@
       "library_eligible": false
     },
     {
-      "id": "19b312be-ece9-4730-8695-d65057609899",
+      "id": "f7411430-15f3-481e-b991-523d02d49826",
       "type": "heading",
       "content": {
         "level": 3,
@@ -281,7 +281,7 @@
       "library_eligible": false
     },
     {
-      "id": "37cba005-fdd5-4e4c-abb7-05747a1cb13c",
+      "id": "cb6cd316-d593-46cf-a80b-91f7d1995432",
       "type": "text_block",
       "content": {
         "text": "Port the extended classifier to the 2-watt node, integrate the deterministic scheduler, and benchmark p99 latency and sustained rail power under continuous load. Effort: systems engineer 0.35 FTE. Deliverable: node runtime + power/latency benchmark log.",
@@ -295,7 +295,7 @@
       "library_eligible": false
     },
     {
-      "id": "15070e7a-641b-4be4-a337-9faf924d3828",
+      "id": "cd723fdc-f258-4dfe-994c-459565b8e23e",
       "type": "heading",
       "content": {
         "level": 3,
@@ -311,7 +311,7 @@
       "library_eligible": false
     },
     {
-      "id": "dbb86e74-af89-4966-a25a-55a948780474",
+      "id": "f7024fd8-4a95-4826-b871-bff7ebd640f4",
       "type": "text_block",
       "content": {
         "text": "Jointly design a bandwidth-frugal posterior-consensus rule for the low-rate acoustic link and quantify fusion gain in a multi-node simulator driven by the Task 1 corpus and channel models. SBC owns the on-node implementation; RI owns the channel-accurate simulation. Deliverable: fusion protocol specification + simulated fusion-gain report.",
@@ -325,7 +325,7 @@
       "library_eligible": false
     },
     {
-      "id": "9b9d1b19-e4e5-46fb-bf73-a888c32cfaaf",
+      "id": "dad4c649-7e2f-40bc-ba26-7b66468ddb6f",
       "type": "heading",
       "content": {
         "level": 3,
@@ -341,7 +341,7 @@
       "library_eligible": false
     },
     {
-      "id": "668818d4-ebde-48f4-abea-94fb9b5d6220",
+      "id": "32b669d4-b0dc-4ca4-8f9f-2daf176f714b",
       "type": "text_block",
       "content": {
         "text": "Validate accuracy, per-node latency and power, and multi-node fusion gain against pre-registered gates (per-node balanced F1 ≥ 0.92; 4-node fused F1 ≥ 0.96; per-node p99 ≤ 150 ms; sustained ≤ 2.0 W). Document results, limitations, and the Phase II at-sea demonstration plan. Deliverable: Phase I feasibility report + Phase II plan.",
@@ -355,7 +355,7 @@
       "library_eligible": false
     },
     {
-      "id": "de6e6e87-411d-45a3-b55a-f9e0f1ab1733",
+      "id": "f8774453-d0d1-4116-8655-0858125d6db8",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -366,7 +366,7 @@
       "library_eligible": false
     },
     {
-      "id": "10257fc0-daa0-4956-bf6b-76e050b08d37",
+      "id": "a53eb644-50fd-4908-825d-f1d97fb48cee",
       "type": "heading",
       "content": {
         "level": 2,
@@ -382,7 +382,7 @@
       "library_eligible": false
     },
     {
-      "id": "63435d80-9644-4c4c-89f4-4835f395e4b1",
+      "id": "d3750450-b597-4716-b6d3-5a1548b580ff",
       "type": "table",
       "content": {
         "headers": [
@@ -421,7 +421,7 @@
       "library_eligible": false
     },
     {
-      "id": "1c0a0a85-70a0-4875-b126-2ca7faab4e04",
+      "id": "fa26622e-215a-4b19-8851-c72c1bb436f7",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -436,7 +436,7 @@
       "library_eligible": false
     },
     {
-      "id": "eb71e30f-8525-46e3-9954-95c8b03d3a67",
+      "id": "ab067099-5c2a-4a39-b108-dff214158e4c",
       "type": "heading",
       "content": {
         "level": 3,
@@ -452,7 +452,7 @@
       "library_eligible": false
     },
     {
-      "id": "49f68426-5ce5-4146-8674-262c9b6bf1de",
+      "id": "56793190-1f01-4b9b-a794-dc853bdc1eb6",
       "type": "text_block",
       "content": {
         "text": "Assemble a multi-node hardware-in-the-loop bench and exercise the fusion protocol across physical nodes under injected channel conditions. Effort: systems engineer 0.30 FTE + PI 0.10 FTE. Deliverable: HIL bench + test report.",
@@ -466,7 +466,7 @@
       "library_eligible": false
     },
     {
-      "id": "63f8f162-454b-4cde-93be-4f111aeca25d",
+      "id": "0933282f-a74d-4faa-bf07-f6cae474f628",
       "type": "heading",
       "content": {
         "level": 3,
@@ -482,7 +482,7 @@
       "library_eligible": false
     },
     {
-      "id": "891e6f56-34c5-46ca-be6f-503f2ae0123d",
+      "id": "dae4ae17-d95d-42f6-910e-5cd95660f6c6",
       "type": "text_block",
       "content": {
         "text": "Conduct a controlled tank and short at-sea pre-demonstration at the RI range to confirm fusion gain under real propagation, de-risking the Phase II demonstration. Deliverable: range pre-demo results + Phase II readiness memo.",
@@ -496,7 +496,7 @@
       "library_eligible": false
     },
     {
-      "id": "4a9db50d-9955-4d34-9e5d-193eeceaa547",
+      "id": "82e1a0ca-28f3-4f47-a400-1e0743b67e17",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -507,7 +507,7 @@
       "library_eligible": false
     },
     {
-      "id": "dd1bc88a-2fbd-4683-b700-28338e92cf88",
+      "id": "357d467c-6cc8-4c4c-9d75-2e7077fc718e",
       "type": "heading",
       "content": {
         "level": 2,
@@ -523,7 +523,7 @@
       "library_eligible": false
     },
     {
-      "id": "b1b94263-a9fd-4205-a28b-6989ff256d5d",
+      "id": "551cf657-06ac-4c6d-afb5-4dbed5381c9e",
       "type": "text_block",
       "content": {
         "text": "Feasibility is judged against pre-registered gates, all of which must pass. The principal technical risks and their mitigations are tracked from kickoff and reviewed at each monthly status memo; the mid-base review (Month 9) is the decision point for the Task 3 latency budget and the Task 4 fusion approach.",
@@ -537,7 +537,7 @@
       "library_eligible": false
     },
     {
-      "id": "3a7990b7-d104-46ed-921d-86cd85cff787",
+      "id": "824ec970-d959-422d-8584-edeabd1e87c8",
       "type": "table",
       "content": {
         "headers": [
@@ -591,7 +591,7 @@
       "library_eligible": false
     },
     {
-      "id": "69ac4f64-838a-4c97-aaf6-49f966af5786",
+      "id": "d8fd67fa-3089-4479-897b-0030d1674273",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -606,7 +606,7 @@
       "library_eligible": false
     },
     {
-      "id": "eebf4581-4cae-4d05-b685-b979333d4cf4",
+      "id": "2ad1cef4-c8ce-4272-bbf3-606409747094",
       "type": "text_block",
       "content": {
         "text": "Cross-cutting mitigations: the effort is structured so that the SBC edge-AI track and the RI ocean-acoustics track can proceed in parallel with a small number of well-defined interfaces (the propagation feature schema and the posterior format), limiting the blast radius of any single slip.",
@@ -620,7 +620,7 @@
       "library_eligible": false
     },
     {
-      "id": "8c859f3e-d56e-4d9b-b5fb-f81695234d3e",
+      "id": "4d3fe814-3275-42cd-a9ea-8efad4245a01",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -631,7 +631,7 @@
       "library_eligible": false
     },
     {
-      "id": "ae69790f-d275-4859-87ab-5d75dd0173bb",
+      "id": "5e2bf097-a7b1-4fa0-9191-8be4e02744b3",
       "type": "heading",
       "content": {
         "level": 2,
@@ -647,7 +647,7 @@
       "library_eligible": false
     },
     {
-      "id": "77b05f4e-81b4-4e1c-97a3-13c69052aeec",
+      "id": "6fd3b097-2944-4172-a757-a8dbe0375a5f",
       "type": "table",
       "content": {
         "headers": [
@@ -705,7 +705,7 @@
       "library_eligible": false
     },
     {
-      "id": "cab0cc71-2067-4ef1-8f85-b49faa4166b5",
+      "id": "ca093b43-f28a-4afb-b2d5-c4fd0c507b44",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -720,7 +720,7 @@
       "library_eligible": false
     },
     {
-      "id": "d537e134-95af-4db3-81d5-048e3a7e915a",
+      "id": "7bc1b290-58a1-4186-b74e-0d8d343d2ad8",
       "type": "text_block",
       "content": {
         "text": "Reporting: monthly technical status memos and financial reporting, a mid-base review at Month 9, and a Phase I final review at Month 18. All deliverables are furnished with clearly marked data rights consistent with the Allocation of Rights Agreement.",
@@ -734,7 +734,7 @@
       "library_eligible": false
     },
     {
-      "id": "0a6f90c6-9b2d-4c4d-956f-d2e723a80968",
+      "id": "f700cc6c-ae3e-45de-996a-26e183ff5df8",
       "type": "heading",
       "content": {
         "level": 2,
@@ -750,7 +750,7 @@
       "library_eligible": false
     },
     {
-      "id": "bc56479f-71d3-4161-b456-a923f75c50a0",
+      "id": "99cf8ffd-443c-4b40-a5d1-1b69f4537048",
       "type": "text_block",
       "content": {
         "text": "All Phase I data derives from Distribution-A corpora plus synthetic augmentation and the RI’s range collections gathered under its existing environmental authorizations — no classified or controlled data. The corpus, channel models, and trained artifacts are versioned and retained for the period of performance plus three years, with a shared data card documenting provenance, class balance, and known limitations. Foreground results are delivered to the Government with rights clearly marked; background IP (the SBC’s saliency-guided quantization and the RI’s propagation models) is retained by its owner under the Allocation of Rights Agreement, which grants the SBC an exclusive commercialization option and the RI retained rights for internal research and publication subject to a pre-publication review period. This keeps the Phase III transition path unencumbered while protecting the RI’s academic mission.",
