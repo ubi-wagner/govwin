@@ -9,9 +9,11 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { TemplatePreviewer } from '@/components/admin/template-previewer';
 import { getTemplate } from '@/lib/templates';
-import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { createEmptyCanvas, CANVAS_PRESETS, type CanvasDocument } from '@/lib/types/canvas-document';
 
 // --- Template metadata (mirrors the document_templates DB schema) ---
 
@@ -89,48 +91,43 @@ function buildRegistryRecords(): TemplateRecord[] {
 
 // --- DB template loader (optional, fails gracefully) ---
 
-function useDbTemplates(): { records: TemplateRecord[]; loading: boolean } {
+function useDbTemplates(): { records: TemplateRecord[]; loading: boolean; reload: () => void } {
   const [records, setRecords] = useState<TemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const resp = await fetch('/api/admin/templates');
-        if (!resp.ok) {
-          // DB table may not exist yet; that is fine
-          if (!cancelled) setLoading(false);
-          return;
-        }
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch('/api/admin/templates');
+      if (resp.ok) {
         const json = await resp.json();
-        if (!cancelled && json.data) {
-          const mapped: TemplateRecord[] = (json.data as Array<Record<string, unknown>>).map((row) => ({
-            id: row.id as string,
-            name: row.name as string,
-            description: (row.description as string) ?? '',
-            template_type: row.template_type as string,
-            agency: (row.agency as string) ?? null,
-            program_type: (row.program_type as string) ?? null,
-            template_key: row.storage_key as string,
-            node_count: (row.node_count as number) ?? 0,
-            format: ((row.canvas_preset as Record<string, unknown>)?.format as string) ?? 'letter',
-            page_limit: ((row.canvas_preset as Record<string, unknown>)?.max_pages as number) ?? null,
-            slide_limit: ((row.canvas_preset as Record<string, unknown>)?.max_slides as number) ?? null,
-            is_system: (row.is_system as boolean) ?? false,
-            canvas_doc: null,
-          }));
-          setRecords(mapped);
-        }
-      } catch {
-        // API not available; that is fine
+        // GET returns { data: { templates: [...] } } — read .templates, not .data.
+        const rows = (json.data?.templates ?? []) as Array<Record<string, unknown>>;
+        setRecords(rows.map((row) => ({
+          id: row.id as string,
+          name: row.name as string,
+          description: (row.description as string) ?? '',
+          template_type: row.template_type as string,
+          agency: (row.agency as string) ?? null,
+          program_type: (row.program_type as string) ?? null,
+          template_key: (row.storage_key as string) ?? (row.id as string),
+          node_count: (row.node_count as number) ?? 0,
+          format: ((row.canvas_preset as Record<string, unknown>)?.format as string) ?? 'letter',
+          page_limit: ((row.canvas_preset as Record<string, unknown>)?.max_pages as number) ?? null,
+          slide_limit: ((row.canvas_preset as Record<string, unknown>)?.max_slides as number) ?? null,
+          is_system: (row.is_system as boolean) ?? false,
+          canvas_doc: null,
+        })));
       }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
+    } catch {
+      // API not available; that is fine
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { records, loading };
+  useEffect(() => { void reload(); }, [reload]);
+  return { records, loading, reload };
 }
 
 // --- Filter helpers ---
@@ -173,14 +170,64 @@ function formatBadge(format: string) {
 
 // --- Main page component ---
 
+const PRESETS: Array<{ value: keyof typeof CANVAS_PRESETS; label: string }> = [
+  { value: 'letter_sbir_phase1', label: 'Letter / DOCX' },
+  { value: 'slide_cso', label: 'Slides / PPTX' },
+  { value: 'spreadsheet', label: 'Spreadsheet / XLSX' },
+];
+
 export default function AdminTemplatesPage() {
+  const router = useRouter();
   const registryRecords = useMemo(() => buildRegistryRecords(), []);
-  const { records: dbRecords, loading: dbLoading } = useDbTemplates();
+  const { records: dbRecords, loading: dbLoading, reload: reloadDb } = useDbTemplates();
 
   const [filterType, setFilterType] = useState('');
   const [filterAgency, setFilterAgency] = useState('');
   const [filterProgram, setFilterProgram] = useState('');
   const [previewKey, setPreviewKey] = useState<string | null>(null);
+
+  // Create-from-scratch state
+  const [showNew, setShowNew] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState('technical_volume');
+  const [newPreset, setNewPreset] = useState<keyof typeof CANVAS_PRESETS>('letter_sbir_phase1');
+  const [creating, setCreating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const createTemplate = useCallback(async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setCreating(true); setActionError(null);
+    try {
+      const preset = CANVAS_PRESETS[newPreset];
+      const now = new Date().toISOString();
+      const doc = createEmptyCanvas({
+        documentId: '00000000-0000-0000-0000-000000000000',
+        canvas: preset,
+        metadata: { title: name, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '', created_at: now, last_modified_at: now, last_modified_by: '', version_number: 1, status: 'ai_drafted' },
+      });
+      const res = await fetch('/api/admin/templates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, templateType: newType, canvasPreset: preset, canvasDocument: doc }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.data?.templateId) {
+        router.push(`/admin/templates/${json.data.templateId}/edit`);
+      } else {
+        setActionError(json.error ?? 'Create failed');
+      }
+    } catch { setActionError('Create failed'); } finally { setCreating(false); }
+  }, [newName, newType, newPreset, router]);
+
+  const deleteTemplate = useCallback(async (id: string) => {
+    if (!confirm('Delete this template? Required-items pointing at it will fall back to the registry.')) return;
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/templates/${id}`, { method: 'DELETE' });
+      if (res.ok) { void reloadDb(); }
+      else { const j = await res.json().catch(() => ({})); setActionError(j.error ?? 'Delete failed'); }
+    } catch { setActionError('Delete failed'); }
+  }, [reloadDb]);
 
   // Merge registry + DB records, dedup by key
   const allRecords = useMemo(() => {
@@ -211,11 +258,49 @@ export default function AdminTemplatesPage() {
             Browse and preview canvas document templates for proposal artifacts.
           </p>
         </div>
-        <span className="text-xs text-gray-400">
-          {allRecords.length} template{allRecords.length !== 1 ? 's' : ''}
-          {dbLoading && ' (loading...)'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">
+            {allRecords.length} template{allRecords.length !== 1 ? 's' : ''}
+            {dbLoading && ' (loading...)'}
+          </span>
+          <button onClick={() => setShowNew((v) => !v)} className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+            + New Template
+          </button>
+        </div>
       </div>
+
+      {/* Create from scratch */}
+      {showNew && (
+        <div className="mb-6 border border-blue-200 bg-blue-50 rounded-lg p-4 flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] text-gray-500">Name</label>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Navy STTR — Technical Volume" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-72" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] text-gray-500">Type</label>
+            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              <option value="technical_volume">Technical Volume</option>
+              <option value="cost_volume">Cost Volume</option>
+              <option value="slide_deck">Slide Deck</option>
+              <option value="key_personnel">Key Personnel</option>
+              <option value="commercialization">Commercialization</option>
+              <option value="supporting_docs">Supporting Docs</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] text-gray-500">Canvas</label>
+            <select value={newPreset} onChange={(e) => setNewPreset(e.target.value as keyof typeof CANVAS_PRESETS)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+              {PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
+          <button onClick={createTemplate} disabled={creating || !newName.trim()} className="px-4 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50">
+            {creating ? 'Creating…' : 'Create & open editor'}
+          </button>
+          <button onClick={() => setShowNew(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+        </div>
+      )}
+      {actionError && <p className="mb-3 text-xs text-rose-600">{actionError}</p>}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -303,12 +388,30 @@ export default function AdminTemplatesPage() {
               </div>
 
               {/* Actions */}
-              <button
-                onClick={() => setPreviewKey(record.template_key)}
-                className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                Preview
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {!record.id.startsWith('registry-') && !record.is_system && (
+                  <>
+                    <Link
+                      href={`/admin/templates/${record.id}/edit`}
+                      className="px-3 py-1.5 text-xs border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors whitespace-nowrap"
+                    >
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => deleteTemplate(record.id)}
+                      className="px-3 py-1.5 text-xs border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50 transition-colors whitespace-nowrap"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setPreviewKey(record.template_key)}
+                  className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+                >
+                  Preview
+                </button>
+              </div>
             </div>
           ))}
         </div>

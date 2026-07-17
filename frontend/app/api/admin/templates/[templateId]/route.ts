@@ -143,3 +143,40 @@ export async function PATCH(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/admin/templates/[templateId] — remove a non-system template.
+ * Unlinks any required-items that pointed at it (they fall back to the registry).
+ */
+export async function DELETE(_request: Request, ctx: Ctx) {
+  try {
+    if (!authz(await auth())) {
+      return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const { templateId } = await ctx.params;
+    if (!isValidUUID(templateId)) {
+      return NextResponse.json({ error: 'Invalid templateId', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    let existing;
+    try {
+      [existing] = await sql<{ id: string; is_system: boolean }[]>`
+        SELECT id, is_system FROM document_templates WHERE id = ${templateId}::uuid LIMIT 1`;
+    } catch (e) {
+      console.error('[admin/templates/:id] DELETE existence check failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (!existing) return NextResponse.json({ error: 'Template not found', code: 'NOT_FOUND' }, { status: 404 });
+    if (existing.is_system) return NextResponse.json({ error: 'System templates cannot be deleted', code: 'FORBIDDEN' }, { status: 403 });
+    try {
+      await sql`UPDATE volume_required_items SET template_id = NULL WHERE template_id = ${templateId}::uuid`;
+      await sql`DELETE FROM document_templates WHERE id = ${templateId}::uuid AND is_system = false`;
+    } catch (e) {
+      console.error('[admin/templates/:id] delete failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    return NextResponse.json({ data: { deleted: true } });
+  } catch (e) {
+    console.error('[admin/templates/:id] DELETE failed:', e);
+    return NextResponse.json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}

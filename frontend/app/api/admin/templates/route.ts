@@ -49,7 +49,8 @@ export async function GET(request: Request) {
     try {
       templates = await sql`
         SELECT id, name, description, template_type, agency, program_type,
-               node_count, is_system, tenant_id, created_by, created_at, updated_at
+               node_count, is_system, tenant_id, created_by, created_at, updated_at,
+               storage_key, canvas_preset
         FROM document_templates
         WHERE (${templateType}::text IS NULL OR template_type = ${templateType})
           AND (${programType}::text IS NULL OR program_type = ${programType})
