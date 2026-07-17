@@ -16,6 +16,7 @@ import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
@@ -113,7 +114,9 @@ function CanvasEditorInner({
 
   // ── Atomization rail: accept library-eligible nodes into the tenant library ──
   const canAtomize = Boolean(tenantSlug && proposalId && sectionId && !readOnly);
+  const canInsertLibrary = Boolean(tenantSlug && !readOnly);
   const [showAtomRail, setShowAtomRail] = useState(false);
+  const [showInsert, setShowInsert] = useState(false);
   const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);
   const [atomBusyId, setAtomBusyId] = useState<string | null>(null);
   const [acceptedNodeIds, setAcceptedNodeIds] = useState<Set<string>>(new Set());
@@ -349,6 +352,23 @@ function CanvasEditorInner({
         };
       }),
     }));
+  }, [updateDoc, actorId, actorName]);
+
+  /** Insert hand-picked library atoms as new canvas nodes (heading + paragraphs). */
+  const handleInsertAtoms = useCallback((atoms: InsertAtom[]) => {
+    if (atoms.length === 0) return;
+    lastRevisionMetaRef.current = { source: 'library_import', aiInstruction: `Inserted ${atoms.length} atom(s) from library` };
+    updateDoc((prev) => {
+      const nodes = [...prev.nodes];
+      for (const a of atoms) {
+        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName }));
+        for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
+          nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName }));
+        }
+      }
+      return { ...prev, nodes };
+    });
+    setShowInsert(false);
   }, [updateDoc, actorId, actorName]);
 
   const handleUndo = useCallback(() => {
@@ -606,6 +626,17 @@ function CanvasEditorInner({
             >
               Redo
             </button>
+            {canInsertLibrary && (
+              <button
+                onClick={() => setShowInsert((v) => !v)}
+                className={`px-3 py-1.5 text-xs border rounded ${
+                  showInsert ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'hover:bg-gray-50'
+                }`}
+                title="Insert atoms from your library into this section"
+              >
+                + From Library
+              </button>
+            )}
             {canAtomize && (
               <button
                 onClick={() => setShowAtomRail((v) => !v)}
@@ -650,6 +681,19 @@ function CanvasEditorInner({
           />
         )}
       </div>
+
+      {/* Insert from library — hand-pick canonical atoms into this section's canvas */}
+      {canInsertLibrary && showInsert && tenantSlug && (
+        <div className="border border-indigo-200 rounded-lg p-3 bg-white shadow-sm">
+          <LibraryInsertPanel
+            tenantSlug={tenantSlug}
+            sectionTitle={doc.metadata.title || 'Section'}
+            sectionId={sectionId}
+            onInsert={handleInsertAtoms}
+            onClose={() => setShowInsert(false)}
+          />
+        </div>
+      )}
 
       {/* Atomization rail — accept library-eligible nodes into the tenant library */}
       {canAtomize && showAtomRail && (

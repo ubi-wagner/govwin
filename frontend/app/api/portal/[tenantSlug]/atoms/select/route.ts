@@ -60,3 +60,47 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     return NextResponse.json({ error: 'Select failed', code: 'DB_ERROR' }, { status: 500 });
   }
 }
+
+/**
+ * POST /api/portal/[tenantSlug]/atoms/select  { sectionId, atomIds }
+ *
+ * Record the EXACT atoms a user hand-picked to ground a section (the manual
+ * counterpart to the GET's ranked auto-record), unioned with any already set, so
+ * the atom return at lock sets derived_from lineage to precisely those atoms.
+ */
+export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
+  try {
+    const { tenantSlug } = await params;
+    const session = await auth();
+    if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
+    const u = session.user as { id?: string; role?: unknown };
+    const role: Role | null = isRole(u.role) ? u.role : null;
+    if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
+    const tenantId = tenant.id as string;
+    if (!(await verifyTenantAccess(u.id, role, tenantId))) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+
+    let body: { sectionId?: string; atomIds?: unknown };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+    const sectionId = body.sectionId;
+    if (!sectionId || !isValidUUID(sectionId)) return NextResponse.json({ error: 'valid sectionId required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    const ids = Array.isArray(body.atomIds) ? body.atomIds.filter((x): x is string => typeof x === 'string' && isValidUUID(x)) : [];
+
+    await withTenant(tenantId, async (tx) => {
+      const [row] = await tx<Array<{ ids: unknown }>>`
+        SELECT coalesce(meta->'sourceAtomIds', '[]'::jsonb) AS ids FROM proposal_sections
+        WHERE id = ${sectionId}::uuid AND proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)`;
+      if (!row) return;
+      const existing = Array.isArray(row.ids) ? (row.ids as string[]) : [];
+      const union = Array.from(new Set([...existing, ...ids]));
+      await tx`UPDATE proposal_sections SET meta = coalesce(meta, '{}'::jsonb) || ${tx.json({ sourceAtomIds: union })}
+               WHERE id = ${sectionId}::uuid AND proposal_id IN (SELECT id FROM proposals WHERE tenant_id = ${tenantId}::uuid)`;
+    });
+    return NextResponse.json({ data: { recorded: ids.length } });
+  } catch (err) {
+    console.error('[portal/atoms/select] POST error', err);
+    return NextResponse.json({ error: 'Record failed', code: 'DB_ERROR' }, { status: 500 });
+  }
+}
