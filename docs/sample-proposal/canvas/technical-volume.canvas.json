@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "29dd28e5-3068-4fef-b8ff-e8ca4b20490d",
+  "document_id": "e78cec2d-97d3-425e-953b-718a745d4658",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -15,7 +15,7 @@
       "template": "{company_name} — Technical Volume",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -23,7 +23,7 @@
       "template": "AFWERX SBIR Phase I · Topic N251-042 · Proprietary · Page {n} of {N}",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "a1dccdc4-8878-446d-a14c-d1b8d5f4fc0d",
+      "id": "0d148328-8f6e-4817-8028-7671cab09de0",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "bfab491f-88b8-42e3-91e8-26035176998c",
+      "id": "3b77a8b8-ad29-4d48-8d18-8ad3f4e02759",
       "type": "text_block",
       "content": {
         "text": "{company_name} — AFWERX SBIR Phase I (CSO)",
@@ -74,7 +74,7 @@
       "library_eligible": false
     },
     {
-      "id": "d3c5250c-9e8b-4e83-9148-c54247931fbb",
+      "id": "44481b63-8936-41f2-9591-65d4a3a8eccf",
       "type": "text_block",
       "content": {
         "text": "Topic {topic_number}: {topic_title}",
@@ -90,7 +90,7 @@
       "library_eligible": false
     },
     {
-      "id": "2bf0374f-3639-4da2-a3cc-338fa61fb61e",
+      "id": "a1dd6a86-a7da-48e2-94c5-2ec74969665c",
       "type": "text_block",
       "content": {
         "text": "Period of Performance: 6 months   ·   Requested Funding: $150,000   ·   Distribution: Proprietary",
@@ -106,7 +106,7 @@
       "library_eligible": false
     },
     {
-      "id": "a9f5bf83-50c0-4640-9cf1-02f4d025feb8",
+      "id": "3eb70959-a0b2-462c-93c6-cc6fc57c3097",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -117,7 +117,7 @@
       "library_eligible": false
     },
     {
-      "id": "54443475-8c0e-4539-bd6e-4939d835e6cb",
+      "id": "06713dfe-bb4a-4f54-b6a4-f931d0988865",
       "type": "heading",
       "content": {
         "level": 2,
@@ -133,7 +133,7 @@
       "library_eligible": false
     },
     {
-      "id": "6de70bae-a450-4195-b62f-6e7c9c0b3bbb",
+      "id": "056ca187-6755-4c3e-b801-86e648139b6d",
       "type": "text_block",
       "content": {
         "text": "Unmanned surface vessels (USVs) increasingly operate beyond reliable communications, yet current acoustic-threat detection depends on shore-side processing that introduces prohibitive latency. When a SATCOM link degrades — the norm in contested or high-sea-state environments — classification stalls and the vessel loses the ability to distinguish a biologic from a torpedo. Autonomy is throttled precisely when it matters most.",
@@ -147,7 +147,7 @@
       "library_eligible": false
     },
     {
-      "id": "5a0ed08b-dc44-4b55-a480-41dbebffb39a",
+      "id": "e8719cab-e9ee-4a52-8ac8-4a204368ede3",
       "type": "text_block",
       "content": {
         "text": "Consider a representative scenario. A USV on a persistent picket mission detects an ambiguous acoustic signature. Under today’s architecture the raw stream is buffered and, if bandwidth permits, relayed to a shore station; the round trip can exceed several seconds. A torpedo closing at 40 knots covers more than 60 meters in that window. The vessel needs a decision at the tactical edge, in tens of milliseconds, with no assumption of connectivity.",
@@ -161,7 +161,7 @@
       "library_eligible": false
     },
     {
-      "id": "b0561376-a421-4580-a0e0-61da7d8b520a",
+      "id": "8dda8a66-033d-4385-b036-f17d32436cf8",
       "type": "text_block",
       "content": {
         "text": "The threat space is broad and confusable. Table 1 summarizes the principal acoustic classes and why they are hard to distinguish under compression.",
@@ -175,7 +175,7 @@
       "library_eligible": false
     },
     {
-      "id": "84ae596d-7457-4ddd-858a-36879ef360d8",
+      "id": "b14fa5de-0614-4283-b6c8-6103b1f7b099",
       "type": "table",
       "content": {
         "headers": [
@@ -223,7 +223,7 @@
       "library_eligible": false
     },
     {
-      "id": "36f7a3a5-c2b1-4052-8e64-18bb36eef973",
+      "id": "c2ea4ef9-474f-410f-a4df-07d6e75c5d5f",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -238,7 +238,7 @@
       "library_eligible": false
     },
     {
-      "id": "72dd1477-e683-414f-afa0-912808f5b783",
+      "id": "aae7641d-06e7-444d-82fb-88d0ce2f0727",
       "type": "text_block",
       "content": {
         "text": "Significance: every autonomous hull the Air Force and Navy field inherits this connectivity dependency. Three hard requirements follow and jointly define the problem: the classifier must (i) achieve high balanced accuracy across confusable classes — a mean that hides a torpedo-versus-fast-craft confusion is useless; (ii) return a decision within a worst-case deadline of tens of milliseconds; and (iii) do so within the fielded 2-watt compute budget. Any approach that satisfies two of the three does not transition. The opportunity is timely: the unmanned fleet is scaling while edge-compute modules have matured to run useful inference within single-digit watts. What is missing is the machine-learning-systems work to compress an accurate maritime classifier without destroying it — precisely the gap {company_name} closes.",
@@ -252,7 +252,7 @@
       "library_eligible": false
     },
     {
-      "id": "abfaae6b-84b0-4a42-917c-8b6a24548f9a",
+      "id": "136f93af-595c-45e9-8734-add29e5a62eb",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -263,7 +263,7 @@
       "library_eligible": false
     },
     {
-      "id": "5a3b3925-7621-4a89-aff9-b456f62cb997",
+      "id": "e865afb0-7831-4548-909f-8d4ac4e83786",
       "type": "heading",
       "content": {
         "level": 2,
@@ -279,7 +279,7 @@
       "library_eligible": false
     },
     {
-      "id": "69a8c849-09a8-4ce7-9959-790de60b5d6d",
+      "id": "c89a5af6-5f8d-465f-82fe-1568351e769f",
       "type": "text_block",
       "content": {
         "text": "The objectives of Phase I are to establish feasibility of the edge classifier against pre-registered, defense-relevant criteria:",
@@ -293,7 +293,7 @@
       "library_eligible": false
     },
     {
-      "id": "85a6e327-e2a0-4f94-b768-e4f9222cc2d4",
+      "id": "8cf7b6c7-2194-4b89-b59e-97bccaab66e1",
       "type": "numbered_list",
       "content": {
         "items": [
@@ -319,7 +319,7 @@
       "library_eligible": false
     },
     {
-      "id": "ca7dc8ea-ac7c-419c-9b07-6b702cec960f",
+      "id": "1d0c8b54-7cc2-4249-bd1e-056589f25f13",
       "type": "heading",
       "content": {
         "level": 3,
@@ -335,7 +335,7 @@
       "library_eligible": false
     },
     {
-      "id": "8a59053e-7067-4a01-986d-97571f36add6",
+      "id": "9ca34746-dfd5-4905-aef1-ecbad8bfc6c6",
       "type": "text_block",
       "content": {
         "text": "The edge module ingests raw hydrophone-array streams, performs on-device feature extraction, and runs a quantized CNN whose outputs feed the USV autonomy bus. Figure 1 shows the architecture; Figure 2 the on-device inference pipeline. All inference occurs on-vessel at a measured 2.0-watt draw.",
@@ -349,7 +349,7 @@
       "library_eligible": false
     },
     {
-      "id": "9a593d37-1a56-40b3-8216-63c1812a1e8f",
+      "id": "c6657697-3478-4df0-9a96-a784914bf0c3",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NjAiIGhlaWdodD0iMjEwIj48cmVjdCB3aWR0aD0iNDYwIiBoZWlnaHQ9IjIxMCIgZmlsbD0iI2VlZjJmZiIvPgogICA8cmVjdCB4PSIyMCIgeT0iODAiIHdpZHRoPSI5MCIgaGVpZ2h0PSI1MCIgcng9IjYiIGZpbGw9IiM2MzY2ZjEiLz48dGV4dCB4PSI2NSIgeT0iMTEwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTEiIGZpbGw9IiNmZmYiPkh5ZHJvcGhvbmUgQXJyYXk8L3RleHQ+CiAgIDxyZWN0IHg9IjE1MCIgeT0iODAiIHdpZHRoPSIxMTAiIGhlaWdodD0iNTAiIHJ4PSI2IiBmaWxsPSIjNGY0NmU1Ii8+PHRleHQgeD0iMjA1IiB5PSIxMDIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMSIgZmlsbD0iI2ZmZiI+RWRnZSBBSSBNb2R1bGU8L3RleHQ+PHRleHQgeD0iMjA1IiB5PSIxMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI5IiBmaWxsPSIjYzdkMmZlIj4ocXVhbnRpemVkIENOTik8L3RleHQ+CiAgIDxyZWN0IHg9IjMwMCIgeT0iNTAiIHdpZHRoPSIxNDAiIGhlaWdodD0iNDUiIHJ4PSI2IiBmaWxsPSIjMGVhNWU5Ii8+PHRleHQgeD0iMzcwIiB5PSI3NyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjExIiBmaWxsPSIjZmZmIj5UaHJlYXQgQ2xhc3NpZmllcjwvdGV4dD4KICAgPHJlY3QgeD0iMzAwIiB5PSIxMjAiIHdpZHRoPSIxNDAiIGhlaWdodD0iNDUiIHJ4PSI2IiBmaWxsPSIjMDI4NGM3Ii8+PHRleHQgeD0iMzcwIiB5PSIxNDciIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMSIgZmlsbD0iI2ZmZiI+VVNWIEF1dG9ub215IEJ1czwvdGV4dD4KICAgPGxpbmUgeDE9IjExMCIgeTE9IjEwNSIgeDI9IjE1MCIgeTI9IjEwNSIgc3Ryb2tlPSIjMzM0MTU1IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iMjYwIiB5MT0iOTUiIHgyPSIzMDAiIHkyPSI3MiIgc3Ryb2tlPSIjMzM0MTU1IiBzdHJva2Utd2lkdGg9IjIiLz48bGluZSB4MT0iMjYwIiB5MT0iMTE1IiB4Mj0iMzAwIiB5Mj0iMTQyIiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==",
@@ -365,7 +365,7 @@
       "library_eligible": false
     },
     {
-      "id": "20376265-cede-44f3-9ad2-c383910a2e4b",
+      "id": "4b078ca4-c930-4a71-aa9f-19989e1e22ac",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -380,7 +380,7 @@
       "library_eligible": false
     },
     {
-      "id": "990de994-4321-49af-a945-657d24ed5b36",
+      "id": "ded503a9-7040-488a-9931-217bf27b0af8",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NjAiIGhlaWdodD0iMTIwIj48cmVjdCB3aWR0aD0iNDYwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iI2Y4ZmFmYyIvPgogICA8cmVjdCB4PSIxMCIgeT0iNDAiIHdpZHRoPSI4MiIgaGVpZ2h0PSI0MCIgcng9IjYiIGZpbGw9IiM0ZjQ2ZTUiLz48dGV4dCB4PSI1MSIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iI2ZmZiI+UmF3IGF1ZGlvPC90ZXh0PjxsaW5lIHgxPSI5MiIgeTE9IjYwIiB4Mj0iMTAyIiB5Mj0iNjAiIHN0cm9rZT0iIzMzNDE1NSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHJlY3QgeD0iMTAyIiB5PSI0MCIgd2lkdGg9IjgyIiBoZWlnaHQ9IjQwIiByeD0iNiIgZmlsbD0iIzRmNDZlNSIvPjx0ZXh0IHg9IjE0MyIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iI2ZmZiI+U1RGVDwvdGV4dD48bGluZSB4MT0iMTg0IiB5MT0iNjAiIHgyPSIxOTQiIHkyPSI2MCIgc3Ryb2tlPSIjMzM0MTU1IiBzdHJva2Utd2lkdGg9IjIiLz48cmVjdCB4PSIxOTQiIHk9IjQwIiB3aWR0aD0iODIiIGhlaWdodD0iNDAiIHJ4PSI2IiBmaWxsPSIjNGY0NmU1Ii8+PHRleHQgeD0iMjM1IiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIiBmaWxsPSIjZmZmIj5Mb2ctbWVsPC90ZXh0PjxsaW5lIHgxPSIyNzYiIHkxPSI2MCIgeDI9IjI4NiIgeTI9IjYwIiBzdHJva2U9IiMzMzQxNTUiIHN0cm9rZS13aWR0aD0iMiIvPjxyZWN0IHg9IjI4NiIgeT0iNDAiIHdpZHRoPSI4MiIgaGVpZ2h0PSI0MCIgcng9IjYiIGZpbGw9IiM0ZjQ2ZTUiLz48dGV4dCB4PSIzMjciIHk9IjY0IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTAiIGZpbGw9IiNmZmYiPlF1YW50aXplZCBDTk48L3RleHQ+PGxpbmUgeDE9IjM2OCIgeTE9IjYwIiB4Mj0iMzc4IiB5Mj0iNjAiIHN0cm9rZT0iIzMzNDE1NSIgc3Ryb2tlLXdpZHRoPSIyIi8+PHJlY3QgeD0iMzc4IiB5PSI0MCIgd2lkdGg9IjgyIiBoZWlnaHQ9IjQwIiByeD0iNiIgZmlsbD0iIzRmNDZlNSIvPjx0ZXh0IHg9IjQxOSIgeT0iNjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxMCIgZmlsbD0iI2ZmZiI+U29mdG1heDwvdGV4dD48L3N2Zz4=",
@@ -396,7 +396,7 @@
       "library_eligible": false
     },
     {
-      "id": "0baf4b31-685b-4a61-ba90-18fafe5741d2",
+      "id": "d778c6fc-707a-40c7-8b32-93c01e4b5390",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -411,7 +411,7 @@
       "library_eligible": false
     },
     {
-      "id": "4c42c888-be5d-4825-9f59-203c2573f273",
+      "id": "bb1b68e0-604d-4029-bb66-b694d3cb57b1",
       "type": "text_block",
       "content": {
         "text": "Four co-designed components make edge-native classification feasible under the power ceiling. (a) A fixed-point signal front-end (STFT → log-mel, ~40 bins) with array beamforming that yields a bearing estimate alongside the class label, consuming under 15% of the per-frame budget. (b) Quantization-aware training at 4-bit weights / 8-bit activations via a straight-through estimator, holding accuracy within 1.4 points of full precision versus a 9-point drop for post-training quantization.",
@@ -425,7 +425,7 @@
       "library_eligible": false
     },
     {
-      "id": "9fd972c6-c377-459f-b94a-23fbe741be7a",
+      "id": "5dc868a2-4df7-4d50-845f-5549a005e28d",
       "type": "text_block",
       "content": {
         "text": "(c) Saliency-guided structured pruning that scores each channel by its contribution to inter-class separation and removes ~70% of parameters while preserving the discriminative bands — {company_name}’s defensible IP (patent pending). (d) A deterministic, statically scheduled runtime that pins inference to reserved cores and disables frequency scaling, guaranteeing a 99th-percentile latency under 100 ms at 2.0 watts.",
@@ -445,7 +445,7 @@
       "library_eligible": false
     },
     {
-      "id": "059d26a1-f855-49d4-8dd2-dcf6861e75ea",
+      "id": "4419afbb-6913-4545-8bd0-ec796b899536",
       "type": "text_block",
       "content": {
         "text": "The classifier itself is a compact five-stage residual CNN over the log-mel stream, favoring depth over width and using only operators the target module accelerates natively. Preliminary bench experiments on a representative corpus subset already indicate feasibility (Table 2), and Phase I will formalize and extend them to the full corpus and target hardware.",
@@ -459,7 +459,7 @@
       "library_eligible": false
     },
     {
-      "id": "b0cb2983-184f-43cb-932d-bbb32f8ba6fa",
+      "id": "f67dcd01-50cf-458e-867e-ab515dc398de",
       "type": "table",
       "content": {
         "headers": [
@@ -520,7 +520,7 @@
       "library_eligible": false
     },
     {
-      "id": "393303f2-9c14-47af-8e20-2c4b552c0891",
+      "id": "ef96efe5-9554-40b4-9758-3bf2c7b0be4d",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -535,7 +535,7 @@
       "library_eligible": false
     },
     {
-      "id": "c1ac156f-2cb5-46fb-bc9e-a8f5635d6c76",
+      "id": "ef9df061-f983-46ac-bf9c-3d9881390815",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -546,7 +546,7 @@
       "library_eligible": false
     },
     {
-      "id": "7b3aa66d-f32c-4189-822f-118f3d7933b6",
+      "id": "6a1b83d9-87da-4c9b-9d50-55b3838a821f",
       "type": "heading",
       "content": {
         "level": 2,
@@ -562,7 +562,7 @@
       "library_eligible": false
     },
     {
-      "id": "4da36472-fdbc-4db8-a2a5-ecfa6f170da0",
+      "id": "55f4ec84-90f8-450d-a172-a85f8b6360fd",
       "type": "text_block",
       "content": {
         "text": "The six-month effort is organized into four sequential-but-overlapping tasks. Table 3 gives the schedule and lead; the narrative details scope, methods, effort, and deliverables per task.",
@@ -576,7 +576,7 @@
       "library_eligible": false
     },
     {
-      "id": "895cab58-3d10-4bda-ae38-fc0db47b89f2",
+      "id": "c60f926e-195b-41f2-a713-56cf17ad57b7",
       "type": "table",
       "content": {
         "headers": [
@@ -629,7 +629,7 @@
       "library_eligible": false
     },
     {
-      "id": "51bea079-ae53-4f8a-8f1d-989c8bddff50",
+      "id": "251baf04-ca56-4e06-bca9-011c2e871d06",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -644,7 +644,7 @@
       "library_eligible": false
     },
     {
-      "id": "40524e29-d049-4dd8-a1bb-0f44605edaa7",
+      "id": "7b9527df-6f8f-489a-8938-50d584e4d366",
       "type": "heading",
       "content": {
         "level": 3,
@@ -660,7 +660,7 @@
       "library_eligible": false
     },
     {
-      "id": "d5204e13-4979-438d-9ee2-6d8a0e517a3f",
+      "id": "f334d99c-0787-45a7-9633-834737eedf0e",
       "type": "text_block",
       "content": {
         "text": "Assemble a labeled corpus from the DARPA hydrophone release, augmented with sea-state noise, Doppler, and multipath models; balance each class by controlled resampling; document provenance and limitations in a data card. Effort: 0.25 FTE ML engineer. Deliverable: labeled dataset + data card.",
@@ -674,7 +674,7 @@
       "library_eligible": false
     },
     {
-      "id": "f8932644-2847-4d59-9b85-88cc0b5d6145",
+      "id": "ccf80a2c-e3f8-48b6-9d11-9c5c9c731623",
       "type": "heading",
       "content": {
         "level": 3,
@@ -690,7 +690,7 @@
       "library_eligible": false
     },
     {
-      "id": "1f7e9d91-3f3b-4a90-bb07-156771c22a15",
+      "id": "f6e7a785-cf27-488f-8017-d310dc74cb01",
       "type": "text_block",
       "content": {
         "text": "Train the classifier with 4-bit quantization and saliency-guided pruning in the loop, iterating the saliency threshold; run ablations attributing accuracy retention to each technique. Effort: 0.30 FTE PI + 0.20 FTE ML engineer. Deliverable: trained 4-bit model + accuracy report on a session-disjoint split.",
@@ -704,7 +704,7 @@
       "library_eligible": false
     },
     {
-      "id": "eadf2039-47db-4072-851a-a0ce17e81110",
+      "id": "b3601d17-a288-4bdf-b5d1-8c7ec6c44b9c",
       "type": "heading",
       "content": {
         "level": 3,
@@ -720,7 +720,7 @@
       "library_eligible": false
     },
     {
-      "id": "12b838f2-fd75-4e80-8a69-fe868d4bced1",
+      "id": "8b5b81dc-655c-49f7-83f9-9cba906c8805",
       "type": "text_block",
       "content": {
         "text": "Port the runtime to the 2-watt module, integrate the deterministic scheduler, and benchmark p99 latency and sustained power under continuous load; apply selective mixed precision to the most confusable layers if required. Effort: 0.40 FTE systems engineer. Deliverable: runtime on target + benchmark log.",
@@ -734,7 +734,7 @@
       "library_eligible": false
     },
     {
-      "id": "d086f2fa-bada-4987-97dc-a2fb188f972b",
+      "id": "c12b2374-5ae7-41fa-82df-d562fbd347b6",
       "type": "heading",
       "content": {
         "level": 3,
@@ -750,7 +750,7 @@
       "library_eligible": false
     },
     {
-      "id": "c2fead75-3d0c-4eca-8fc5-3e73905f75c8",
+      "id": "dfb1b36b-e570-41de-be16-f5ca47913da0",
       "type": "text_block",
       "content": {
         "text": "Validate accuracy, latency, and power against relevant threat scenarios from held-out sessions; document results, limitations, and the Phase II plan. Effort: 0.20 FTE PI + support. Deliverable: Phase I feasibility report.",
@@ -764,7 +764,7 @@
       "library_eligible": false
     },
     {
-      "id": "571a144f-ba88-454d-9334-245c7b5e210b",
+      "id": "d98483b9-7039-4ff0-9599-9e475e99561e",
       "type": "heading",
       "content": {
         "level": 3,
@@ -780,7 +780,7 @@
       "library_eligible": false
     },
     {
-      "id": "5226d657-2029-4e60-89af-ccc91bb82f86",
+      "id": "6e5b953d-8cbc-45f9-b256-231088baa20e",
       "type": "text_block",
       "content": {
         "text": "Feasibility is judged against pre-registered gates, all of which must pass: balanced F1 ≥ 0.92 on a session-disjoint split; end-to-end p99 latency < 100 ms on target; sustained rail draw ≤ 2.0 W. The full confusion matrix is a deliverable, because the operationally important errors are specific confusions rather than average error. All data derives from the Distribution-A DARPA corpus plus synthetic augmentation — no classified or controlled data — versioned and retained for the period of performance plus three years. The principal risks and mitigations are in Table 4.",
@@ -794,7 +794,7 @@
       "library_eligible": false
     },
     {
-      "id": "a3667d62-042a-4422-8023-c3ba4b93a1fe",
+      "id": "b87bf1ef-8751-4bfc-bf12-c6fea6c78c80",
       "type": "table",
       "content": {
         "headers": [
@@ -842,7 +842,7 @@
       "library_eligible": false
     },
     {
-      "id": "29e7ec00-6466-4f99-ba9f-d28cf35a914b",
+      "id": "9209c238-c8b6-4e8f-b7d0-447694a09456",
       "type": "caption",
       "content": {
         "prefix": "Table",
@@ -857,7 +857,7 @@
       "library_eligible": false
     },
     {
-      "id": "010b3065-4853-4a14-990e-b04aa14845e5",
+      "id": "e3321da5-8760-4e22-b146-9f69765a25a1",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -868,7 +868,7 @@
       "library_eligible": false
     },
     {
-      "id": "92f97fc8-7934-49d3-93b3-410ea4e7216b",
+      "id": "907b736b-b82e-4804-9bad-88f67c88effc",
       "type": "heading",
       "content": {
         "level": 2,
@@ -884,7 +884,7 @@
       "library_eligible": false
     },
     {
-      "id": "09b357b3-c059-4d3b-b695-49a8c642f771",
+      "id": "e5b8b8a8-b381-420c-b798-27aa0be02410",
       "type": "text_block",
       "content": {
         "text": "Prior edge-audio efforts target keyword spotting at low fidelity and small class counts; none address multi-class maritime threat discrimination under a hard power ceiling. Post-training quantization strands accuracy on confusable classes; magnitude pruning is blind to inter-class saliency; unstructured sparsity does not map efficiently onto edge vector units. {company_name}’s contribution is the coupling of quantization-aware training with a saliency-guided, structured pruning metric specific to acoustic threat discrimination, validated in preliminary bench tests and pursued as protected IP. We build on established foundations — integer-arithmetic inference, straight-through estimators, and margin-based feature attribution — and contribute their integration and specialization to this operational problem.",
@@ -898,7 +898,7 @@
       "library_eligible": false
     },
     {
-      "id": "e639325f-4f7b-4516-ad35-b0fb59f13f5c",
+      "id": "d3678b0f-f173-4111-a01b-a541e95269cb",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -909,7 +909,7 @@
       "library_eligible": false
     },
     {
-      "id": "ff5c555e-a104-421d-8311-de654b4096ec",
+      "id": "060280ec-8c9c-4345-8059-1e01ec90bfbe",
       "type": "heading",
       "content": {
         "level": 2,
@@ -925,7 +925,7 @@
       "library_eligible": false
     },
     {
-      "id": "77965e54-b70a-4561-b4d7-15e8a53dcc8d",
+      "id": "dda7b1e9-c510-48b1-95da-b431d0271f19",
       "type": "text_block",
       "content": {
         "text": "Phase I establishes feasibility on the target module. Phase II hardens the module, extends the corpus to fielded recordings, and conducts an at-sea demonstration on a DoD USV against the same gates plus a robustness gate across sea states; we will pursue approximately $1.1M over 24 months. In Phase III we target integration with a USV program of record through the relevant program office. Because the classifier fits the existing compute budget, transition requires only a software integration and accreditation effort — not a hardware program — which materially lowers the transition barrier. Background IP (the saliency-pruning method) is protected under standard SBIR data rights; foreground results are delivered to the Government with rights clearly marked, so transition is not encumbered by ambiguous IP claims.",
@@ -939,7 +939,7 @@
       "library_eligible": false
     },
     {
-      "id": "f2ce2f50-0d55-479b-bbbf-699f271c299c",
+      "id": "9cd7ae4b-66e1-4a81-a1c1-5ffbad7512eb",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -950,7 +950,7 @@
       "library_eligible": false
     },
     {
-      "id": "a5f91044-709a-42ba-aa8d-5a9418b62949",
+      "id": "13ce9726-eada-405a-a01a-23aa29507625",
       "type": "heading",
       "content": {
         "level": 2,
@@ -966,7 +966,7 @@
       "library_eligible": false
     },
     {
-      "id": "ba547e2a-40d3-404f-a953-c270388e0ce1",
+      "id": "9ca59927-d356-4b86-a347-2549dfc42740",
       "type": "text_block",
       "content": {
         "text": "{company_name} pursues a dual-use commercialization path in which the Air Force / Navy customer and the commercial market reinforce each other. The Phase I classifier is the wedge: defense USV programs of record in Phase III, then allied navies, then commercial maritime security — port monitoring and offshore-energy protection — where the same edge-native, power-efficient classifier applies with minimal modification.",
@@ -980,7 +980,7 @@
       "library_eligible": false
     },
     {
-      "id": "4eb8f257-4964-4770-9774-ee812eb80633",
+      "id": "227b421f-421d-4363-b7d0-d424942e3a84",
       "type": "text_block",
       "content": {
         "text": "Customer discovery is an explicit Phase I activity. We have identified an initial defense end-user (a USV program office) and will conduct structured interviews to validate the operational requirement, the accreditation path, and the sustainment model (a delivered, accredited model plus a maintenance and re-training subscription). On the commercial side, the serviceable market is projected to grow from roughly $8M/yr in 2026 to over $60M/yr by 2030; {company_name}’s position is defensible against shore-side incumbents because on-vessel inference is a capability they structurally cannot match. The dual-use revenue path reduces reliance on any single government program and is detailed in the separate Commercialization volume.",
@@ -994,7 +994,7 @@
       "library_eligible": false
     },
     {
-      "id": "a01e5af8-0316-40a4-8aad-78bc000b5c01",
+      "id": "08fdf5b7-0293-490b-846c-d9257e88b99a",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1005,7 +1005,7 @@
       "library_eligible": false
     },
     {
-      "id": "e84b0c30-a2e9-444a-8106-e70e113daf63",
+      "id": "d4b5032a-1e83-4d2d-8b8d-6216d1dbc1fb",
       "type": "heading",
       "content": {
         "level": 2,
@@ -1021,7 +1021,7 @@
       "library_eligible": false
     },
     {
-      "id": "df783df5-aaec-4a8e-a1b8-d081bf90645e",
+      "id": "a6dbf00f-2c98-4c31-a87b-b6c5e510a23a",
       "type": "text_block",
       "content": {
         "text": "Dr. Mara Ellison (Principal Investigator, 0.30 FTE) — 12 years in low-power machine learning for sensing; author of the quantization research underpinning {company_name}’s core IP. Tomas Reyes (Senior Systems Engineer) — 9 years of embedded real-time systems, two fielded maritime autonomy stacks; owns the edge-port and scheduler tasks. Priya Nandakumar (ML Engineer) — model compression and data augmentation; leads corpus curation and quantization-aware training. The team has collaborated on two prior efforts and shares a common toolchain, de-risking the six-month schedule. Full biographies appear in the Key Personnel supporting document.",
@@ -1035,7 +1035,7 @@
       "library_eligible": false
     },
     {
-      "id": "e25cc7b4-77a5-405b-8730-d45c0fd711c2",
+      "id": "858417ae-1c18-4b4a-b4d4-d0feb8c8849d",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1046,7 +1046,7 @@
       "library_eligible": false
     },
     {
-      "id": "b7282336-9427-4498-b53d-8e501ed2d8dd",
+      "id": "bac8ae70-f465-4d25-9502-5370855a2698",
       "type": "heading",
       "content": {
         "level": 2,
@@ -1062,7 +1062,7 @@
       "library_eligible": false
     },
     {
-      "id": "e7f8c54d-8102-4cb0-a511-d13c7b71f3e8",
+      "id": "b85bf1b0-b0ad-403f-b171-e6cb9605c868",
       "type": "text_block",
       "content": {
         "text": "{company_name} anticipates no foreign nationals performing on this effort. All key personnel are U.S. citizens. Should any individual requiring disclosure be added, {company_name} will notify the Contracting Officer and provide the required country of origin and visa/work-permit status prior to their participation, consistent with the solicitation instructions.",
@@ -1076,7 +1076,7 @@
       "library_eligible": false
     },
     {
-      "id": "9495a527-d593-4652-bfb8-c35a258c7b96",
+      "id": "fe8006cc-5b74-4655-9dc9-54f6b2296abf",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1087,7 +1087,7 @@
       "library_eligible": false
     },
     {
-      "id": "a2efa080-4932-4193-8ad7-c72d115b0127",
+      "id": "a05b0e90-0d6c-443b-832b-bfa0786f3fdc",
       "type": "heading",
       "content": {
         "level": 2,
@@ -1103,7 +1103,7 @@
       "library_eligible": false
     },
     {
-      "id": "0a0d7cca-f4eb-4d19-9327-c6ef0b936942",
+      "id": "7965db2c-0953-45ce-ada8-e17f743d183f",
       "type": "text_block",
       "content": {
         "text": "{company_name} maintains a 3,200 sq ft engineering facility with a dedicated acoustics bench, a custom anechoic test enclosure, six 2-watt edge-compute development kits, an on-premises GPU training cluster, and a calibrated power-measurement bench for rail-level draw. Data collection leverages an existing partnership with a regional marine research station, providing representative acoustic conditions at no additional Phase I cost. All Phase I work can be performed in-house. Facilities are described in full in the Facilities supporting document.",
@@ -1117,7 +1117,7 @@
       "library_eligible": false
     },
     {
-      "id": "feb8912a-9bfa-48c8-9f28-dceba5380f94",
+      "id": "fc8a4471-01eb-4b03-a5df-4661ef268630",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1128,7 +1128,7 @@
       "library_eligible": false
     },
     {
-      "id": "247122ba-a266-4cd9-a58a-19e5a4491669",
+      "id": "b4aeb984-f30e-4bf7-a162-b4158e3f6535",
       "type": "heading",
       "content": {
         "level": 2,
@@ -1144,7 +1144,7 @@
       "library_eligible": false
     },
     {
-      "id": "8d255122-9ebf-4de4-bfe4-3a065eeedbbb",
+      "id": "9d8390f4-09eb-426b-8954-d86ebf079ce1",
       "type": "text_block",
       "content": {
         "text": "{company_name} will engage one consultant — an acoustics subject-matter expert (40 hours) — to review the corpus curation methodology and the evaluation protocol, budgeted in the Cost Volume. No subcontractors are proposed for Phase I; all development is performed by {company_name} personnel. The consultant will not have access to limited-rights data beyond what is required for the review.",
@@ -1158,7 +1158,7 @@
       "library_eligible": false
     },
     {
-      "id": "61820393-1a39-4ef8-9424-9b9ef845303c",
+      "id": "068fcb54-bec0-4b75-b938-575582a201a1",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1169,7 +1169,7 @@
       "library_eligible": false
     },
     {
-      "id": "e5da6f92-e819-467e-8126-ad5b7ea43150",
+      "id": "72dc929a-dc25-4576-84b9-cb758e0f0ea8",
       "type": "heading",
       "content": {
         "level": 2,
@@ -1185,7 +1185,7 @@
       "library_eligible": false
     },
     {
-      "id": "26af4abe-efcf-4ed1-a694-ad424ab86f8f",
+      "id": "db47d018-ab57-4c14-ab42-978439350adf",
       "type": "text_block",
       "content": {
         "text": "The specific work proposed here — edge-deployable, 4-bit maritime acoustic threat classification under a 2-watt ceiling — has not been submitted to, or funded by, any other Federal agency. No prior, current, or pending support duplicates this effort. {company_name}’s background IP (the saliency-pruning method) was developed with internal funds prior to this proposal. Should any overlapping proposal be submitted during the evaluation period, {company_name} will promptly notify the Contracting Officer as required.",
@@ -1199,7 +1199,7 @@
       "library_eligible": false
     },
     {
-      "id": "16c2273e-1743-437e-99ce-383a26aac018",
+      "id": "156acff3-6afb-43b4-9e08-7a38f9d8c5e4",
       "type": "page_break",
       "content": null,
       "style": {},
@@ -1210,7 +1210,7 @@
       "library_eligible": false
     },
     {
-      "id": "0fb14b4e-7906-4a00-9ab7-7dbc7a742854",
+      "id": "88f09a12-91fb-4be6-81ba-e65a06935f41",
       "type": "heading",
       "content": {
         "level": 3,
@@ -1226,7 +1226,7 @@
       "library_eligible": false
     },
     {
-      "id": "e36f738b-ef20-4497-ab54-c59b30dee093",
+      "id": "128cd481-3374-4128-a692-5026fdec1de8",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -1255,7 +1255,7 @@
       "library_eligible": false
     },
     {
-      "id": "4269d16d-4be0-4d56-b410-391a0d69bbef",
+      "id": "62094bd9-53bf-4101-a409-d666c68df0bd",
       "type": "heading",
       "content": {
         "level": 3,
@@ -1271,7 +1271,7 @@
       "library_eligible": false
     },
     {
-      "id": "b8859178-e61d-4999-90e7-8e9272b87a09",
+      "id": "f450c4e6-f5f9-43c8-bfb3-9916699c12d5",
       "type": "text_block",
       "content": {
         "text": "This volume addresses each AFWERX/DoD Phase I required element as below; the full compliance matrix is maintained in the proposal workspace and advances to “satisfied” as each section is accepted and locked.",
@@ -1285,7 +1285,7 @@
       "library_eligible": false
     },
     {
-      "id": "ccf88bde-7af0-4cdd-971b-60d11b7c3e39",
+      "id": "4305e463-cb83-4a9a-9201-61074e3b76bf",
       "type": "table",
       "content": {
         "headers": [

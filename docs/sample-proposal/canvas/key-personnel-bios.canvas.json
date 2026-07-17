@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "eb8acf8e-509f-4506-882a-7f2932ee051d",
+  "document_id": "85e544bf-c79c-4f50-8a06-61aa422886a6",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -15,7 +15,7 @@
       "template": "{company_name} — Key Personnel",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -23,7 +23,7 @@
       "template": "SBIR Phase I · Supporting Documents · Proprietary · Page {n} of {N}",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "b5fb2665-dd32-4f70-8693-a48fefc3f66d",
+      "id": "1e80ec0b-3fea-4806-a9f6-d799b8fa8799",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "ab67421f-df91-4f45-aefa-70b6acecf3ba",
+      "id": "5859f3dd-f040-4b3a-9845-1a864a56ca00",
       "type": "heading",
       "content": {
         "level": 2,
@@ -70,7 +70,7 @@
       "library_eligible": false
     },
     {
-      "id": "4a5582b6-5b8a-41b9-a3b0-9c898df43d05",
+      "id": "557937c5-b8ce-475d-a5e2-ae2f4faad790",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjNjM2NmYxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiM2MzY2ZjEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPk1FPC90ZXh0Pjwvc3ZnPg==",
@@ -86,7 +86,7 @@
       "library_eligible": false
     },
     {
-      "id": "db8352fa-309a-49f4-bb71-5162e038c603",
+      "id": "90e863a1-4215-4139-887b-2772398fd4fa",
       "type": "text_block",
       "content": {
         "text": "Dr. Ellison holds a Ph.D. in Electrical Engineering and has 12 years of experience in low-power machine learning for sensing. She led the quantization research that underpins Aerivio’s core IP and will devote 0.30 FTE to this effort as Principal Investigator.",
@@ -106,7 +106,7 @@
       "library_eligible": false
     },
     {
-      "id": "c0ec6b3d-93b2-42b3-9ec4-4372478489e7",
+      "id": "c94e580a-35d9-4621-937e-3bf32a45fd1d",
       "type": "heading",
       "content": {
         "level": 2,
@@ -122,7 +122,7 @@
       "library_eligible": false
     },
     {
-      "id": "90f8fa00-d410-4760-892f-aaa456838eee",
+      "id": "9b110c63-f523-4c57-9691-77999f95e447",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMGVhNWU5Ii8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMwZWE1ZTkiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlRSPC90ZXh0Pjwvc3ZnPg==",
@@ -138,7 +138,7 @@
       "library_eligible": false
     },
     {
-      "id": "6798585d-b2e3-4797-9316-4ba8ac95d608",
+      "id": "9fbf0bc7-722a-49b0-be90-329d6834bd9a",
       "type": "text_block",
       "content": {
         "text": "Mr. Reyes brings 9 years of embedded real-time systems experience, including two fielded maritime autonomy stacks. He owns the edge-port and latency-benchmark tasks and the deterministic scheduler design.",
@@ -152,7 +152,7 @@
       "library_eligible": false
     },
     {
-      "id": "b56e2fec-f071-47ad-8611-75d92dbc31f1",
+      "id": "5b8ecb05-8cde-45ad-ab83-843eb5c8b057",
       "type": "heading",
       "content": {
         "level": 2,
@@ -168,7 +168,7 @@
       "library_eligible": false
     },
     {
-      "id": "4ba17a04-12b1-47c7-af43-d543f3b57fdc",
+      "id": "1dfa06fc-8856-4738-9599-b99c34e86a1b",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2YxZjVmOSIvPjxjaXJjbGUgY3g9Ijc1IiBjeT0iNjAiIHI9IjM0IiBmaWxsPSIjMTBiOTgxIi8+PHJlY3QgeD0iMzMiIHk9IjEwMCIgd2lkdGg9Ijg0IiBoZWlnaHQ9IjQ2IiByeD0iMjAiIGZpbGw9IiMxMGI5ODEiLz48dGV4dCB4PSI3NSIgeT0iNzAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNiIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBOPC90ZXh0Pjwvc3ZnPg==",
@@ -184,7 +184,7 @@
       "library_eligible": false
     },
     {
-      "id": "413ba6fc-ebcf-4a30-a0b9-c4967ddd1a73",
+      "id": "d1f864e9-4e2c-46f4-a7ca-c9bd540e62f7",
       "type": "text_block",
       "content": {
         "text": "Ms. Nandakumar specializes in model compression and data augmentation. She will lead corpus curation and quantization-aware training, and maintain the data card and evaluation protocol.",

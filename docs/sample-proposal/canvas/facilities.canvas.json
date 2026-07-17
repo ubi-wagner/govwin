@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "8aa60918-2f15-439a-be74-2c6f8aa9cf0d",
+  "document_id": "ae24740f-b151-419e-848d-c23b892e81a3",
   "canvas": {
     "format": "letter",
     "width": 612,
@@ -15,7 +15,7 @@
       "template": "{company_name} — Facilities & Equipment",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -23,7 +23,7 @@
       "template": "SBIR Phase I · Supporting Documents · Proprietary · Page {n} of {N}",
       "font": {
         "family": "Arial",
-        "size": 9
+        "size": 10.5
       },
       "height": 22
     },
@@ -38,7 +38,7 @@
   },
   "nodes": [
     {
-      "id": "a35ef3c5-62c3-4551-84cc-e8a47ad1a36c",
+      "id": "f151dfa5-ccf8-44bf-92d6-68e9edabfb95",
       "type": "heading",
       "content": {
         "level": 1,
@@ -54,7 +54,7 @@
       "library_eligible": false
     },
     {
-      "id": "a284345b-55ff-42f8-b3f8-99807fce8446",
+      "id": "95408fdb-f2c6-4e27-91dd-b9667913be88",
       "type": "text_block",
       "content": {
         "text": "Aerivio Systems maintains a 3,200 sq ft engineering facility with a dedicated acoustics bench and an anechoic test enclosure sufficient to conduct all Phase I bench work in-house.",
@@ -68,7 +68,7 @@
       "library_eligible": false
     },
     {
-      "id": "e4f54fca-9d84-440a-bd94-1fe58db45684",
+      "id": "c4b32e72-bd65-4b01-adaa-4c87dbe3de50",
       "type": "image",
       "content": {
         "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNDAiIGhlaWdodD0iMTkwIj48cmVjdCB3aWR0aD0iMzQwIiBoZWlnaHQ9IjE5MCIgZmlsbD0iI2UwZjJmZSIvPjxyZWN0IHg9IjMwIiB5PSI3MCIgd2lkdGg9IjEzMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMzY5YTEiLz48cmVjdCB4PSIxNzUiIHk9IjQwIiB3aWR0aD0iMTM1IiBoZWlnaHQ9IjEzMCIgZmlsbD0iIzAyODRjNyIvPjxyZWN0IHg9IjQ1IiB5PSI5MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjYmFlNmZkIi8+PHJlY3QgeD0iODAiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxMTUiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxOTUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48cmVjdCB4PSIyMzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48cmVjdCB4PSIyNzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48dGV4dCB4PSIxNzAiIHk9IjE4NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjMGM0YTZlIj5BZXJpdmlvIEhRIOKAlCBFbmdpbmVlcmluZyAmIEFjb3VzdGljcyBMYWI8L3RleHQ+PC9zdmc+",
@@ -84,7 +84,7 @@
       "library_eligible": false
     },
     {
-      "id": "81195240-c83d-4648-81ab-8d8cdad39b45",
+      "id": "4736d890-4227-41a6-bca8-aa7bec19ac83",
       "type": "caption",
       "content": {
         "prefix": "Figure",
@@ -99,7 +99,7 @@
       "library_eligible": false
     },
     {
-      "id": "ca299d8b-e914-4081-af42-4f221f74c945",
+      "id": "1e79de2c-9baa-4fe7-9e90-8e86ea0b2494",
       "type": "heading",
       "content": {
         "level": 2,
@@ -115,7 +115,7 @@
       "library_eligible": false
     },
     {
-      "id": "332545f5-d7cc-4773-b408-6168f4b76765",
+      "id": "00cb4110-c977-4308-bd4c-804038cb316b",
       "type": "bulleted_list",
       "content": {
         "items": [
@@ -144,7 +144,7 @@
       "library_eligible": false
     },
     {
-      "id": "88c33123-aa97-4a77-ae21-dd0649f50491",
+      "id": "b28fc8ee-f4bb-40ad-87a2-aefd6e0bb154",
       "type": "heading",
       "content": {
         "level": 2,
@@ -160,7 +160,7 @@
       "library_eligible": false
     },
     {
-      "id": "93e97bc7-5f7f-4369-a994-61b619aeb49a",
+      "id": "608c2ea9-fb95-4e75-bbac-9645023134c6",
       "type": "text_block",
       "content": {
         "text": "At-sea data collection is conducted under an existing partnership with a regional marine research station, providing access to representative acoustic conditions without additional Phase I cost.",

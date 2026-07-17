@@ -26,8 +26,10 @@ import {
   NumberFormat,
   BorderStyle,
   ShadingType,
+  ImageRun,
   convertInchesToTwip,
 } from 'docx';
+import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -113,10 +115,20 @@ export async function exportToDocx(
     left: margins.left * 20,
   };
 
+  // Pre-rasterize image nodes (SVG/data-URI → PNG) so the sync node walker can
+  // embed real pictures instead of a "[Image: …]" stub.
+  const raster = new Map<CanvasNode, RasterPng | null>();
+  await Promise.all(
+    nodes.filter((n) => n.type === 'image').map(async (n) => {
+      const key = (n.content as { storage_key?: string })?.storage_key;
+      raster.set(n, await rasterizeDataUri(key));
+    }),
+  );
+
   // Build children from nodes
   const children: (Paragraph | Table)[] = [];
   for (const node of nodes) {
-    const elements = nodeToDocx(node, fontDefault, lineSpacing, nodes);
+    const elements = nodeToDocx(node, fontDefault, lineSpacing, nodes, raster);
     children.push(...elements);
   }
 
@@ -177,6 +189,7 @@ function nodeToDocx(
   fontDefault: { family: string; size: number },
   lineSpacing: number,
   allNodes: CanvasNode[],
+  raster?: Map<CanvasNode, RasterPng | null>,
 ): (Paragraph | Table)[] {
   // A node may carry no explicit style (hand-authored content / template output);
   // default it so per-node style reads never crash. Field fallbacks below still apply.
@@ -369,11 +382,36 @@ function nodeToDocx(
       return tocParagraphs;
     }
 
-    case 'image':
-      return [new Paragraph({
+    case 'image': {
+      const ic = node.content as { alt_text?: string; caption?: string; width?: number; height?: number };
+      const r = raster?.get(node);
+      if (!r) {
+        return [new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: `[Image: ${ic.alt_text ?? 'image'}]`, italics: true, color: '999999', font, size })],
+        })];
+      }
+      // Display size: the node's intended width/height, else the intrinsic raster
+      // size, capped to the ~6.5" content column (624px @ 96dpi), aspect-preserved.
+      const natW = ic.width && ic.width > 0 ? ic.width : r.width;
+      const natH = ic.height && ic.height > 0 ? ic.height : r.height;
+      const aspect = natW > 0 && natH > 0 ? natW / natH : 1;
+      let dispW = Math.min(natW, 470);
+      let dispH = Math.round(dispW / aspect);
+      const out: Paragraph[] = [new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `[Image: ${(node.content as { alt_text: string })?.alt_text ?? 'image'}]`, italics: true, color: '999999', font, size })],
+        spacing: { before: 60, after: 40 },
+        children: [new ImageRun({ type: 'png', data: r.buffer, transformation: { width: dispW, height: dispH } })],
       })];
+      if (ic.caption) {
+        out.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+          children: [new TextRun({ text: ic.caption, italics: true, color: '666666', font, size: size - 2 })],
+        }));
+      }
+      return out;
+    }
 
     default:
       return [];

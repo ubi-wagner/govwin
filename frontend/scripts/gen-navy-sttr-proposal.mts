@@ -61,8 +61,8 @@ const svgChart = (title: string, bars: Array<[string, number, string]>) => {
 // ── canvas rules ─────────────────────────────────────────────────────────────
 const letter = (title: string, footer: string, size = 11, spacing = 1.35, maxPages = 20): CanvasRules => ({
   format: 'letter', width: 612, height: 792, margins: { top: 72, right: 72, bottom: 72, left: 72 },
-  header: { template: `{company_name} — ${title}`, font: { family: 'Arial', size: 9 }, height: 22 } as CanvasRules['header'],
-  footer: { template: `${footer} · Page {n} of {N}`, font: { family: 'Arial', size: 9 }, height: 22 } as CanvasRules['footer'],
+  header: { template: `{company_name} — ${title}`, font: { family: 'Arial', size: 10.5 }, height: 22 } as CanvasRules['header'],
+  footer: { template: `${footer} · Page {n} of {N}`, font: { family: 'Arial', size: 10.5 }, height: 22 } as CanvasRules['footer'],
   font_default: { family: 'Georgia', size, color: '#111827' }, line_spacing: spacing, max_pages: maxPages, max_slides: null,
 });
 const meta = (title: string) => ({ title, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '', created_at: '', last_modified_at: '', last_modified_by: '', version_number: 1, status: 'ai_drafted' as const });
@@ -327,6 +327,7 @@ const overview = doc(slide, [
   // 4 — Core Technology & IP
   h(1, 'Core Technology & IP'),
   ul(['Quantization-aware training to 4-bit weights with <1.5-point accuracy loss', 'Saliency-guided structured pruning — removes ~70% of parameters (patent pending)', 'Deterministic sub-watt runtime — guaranteed p99 latency at a fixed power budget', 'Result: an accurate maritime classifier in a 2-watt envelope']),
+  img(svgMesh(), 'Distributed edge-AI architecture', 440, 210, 'On-node inference + consensus fusion — classification at the distributed edge.'),
   brk(),
   // 5 — Past Performance
   h(1, 'Past Performance'),
