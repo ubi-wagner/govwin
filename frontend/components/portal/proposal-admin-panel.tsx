@@ -187,14 +187,14 @@ export function ProposalAdminPanel({
   );
 
   // ── Export Package handler ───────────────────────────────────
-  const handleExport = useCallback(async () => {
+  // format=docx → one assembled Word doc; format=zip → each volume in its NATIVE
+  // format (docx/pptx/xlsx/pdf) bundled into a .zip (lossless for mixed proposals).
+  const handleExport = useCallback(async (fmt: 'docx' | 'zip' = 'docx') => {
     setExportLoading(true);
     setExportMessage(null);
     try {
-      // Request the assembled Word document (the package route builds a real .docx
-      // from every section); download the binary blob rather than a JSON manifest.
       const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=docx`,
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=${fmt}`,
         { method: 'POST' },
       );
       if (!res.ok) {
@@ -206,10 +206,10 @@ export function ProposalAdminPanel({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `proposal-${proposalId.slice(0, 8)}.docx`;
+      a.download = `proposal-${proposalId.slice(0, 8)}.${fmt}`;
       a.click();
       URL.revokeObjectURL(url);
-      setExportMessage({ type: 'success', text: 'Proposal exported (.docx)' });
+      setExportMessage({ type: 'success', text: `Proposal exported (.${fmt})` });
     } catch {
       setExportMessage({ type: 'error', text: 'Network error' });
     } finally {
@@ -644,11 +644,19 @@ export function ProposalAdminPanel({
           {/* Export Package */}
           <div className="mt-4 flex items-center gap-3">
             <button
-              onClick={handleExport}
+              onClick={() => handleExport('docx')}
               disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {exportLoading ? 'Exporting...' : 'Download Proposal (.docx)'}
+            </button>
+            <button
+              onClick={() => handleExport('zip')}
+              disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
+              className="px-4 py-2 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Every volume in its native format (docx/pptx/xlsx/pdf), bundled as a .zip"
+            >
+              Download all (.zip)
             </button>
             {(!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived') && (
               <span className="text-xs text-gray-400">Lock the proposal or advance to submitted stage to export</span>

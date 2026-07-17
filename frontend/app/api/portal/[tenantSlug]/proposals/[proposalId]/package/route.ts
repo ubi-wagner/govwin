@@ -16,6 +16,8 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
+import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import JSZip from 'jszip';
 import {
   CANVAS_PRESETS,
   type CanvasDocument,
@@ -157,10 +159,10 @@ export async function POST(request: Request, ctx: RouteContext) {
   // ── Parse format from query string ──────────────────────────────
   const url = new URL(request.url);
   const format = url.searchParams.get('format') || 'json';
-  if (format !== 'json' && format !== 'docx') {
+  if (format !== 'json' && format !== 'docx' && format !== 'zip') {
     return NextResponse.json(
       {
-        error: 'Invalid format. Supported: json, docx',
+        error: 'Invalid format. Supported: json, docx, zip',
         code: 'VALIDATION_ERROR',
       },
       { status: 400 },
@@ -219,6 +221,48 @@ export async function POST(request: Request, ctx: RouteContext) {
       { error: 'Forbidden', code: 'FORBIDDEN' },
       { status: 403 },
     );
+  }
+
+  // ── ZIP export path (whole proposal, each volume in its NATIVE format) ──
+  // A proposal mixes docx/pptx/xlsx volumes, so a single-format download is lossy;
+  // the zip assembles each artifact from its sections and renders it natively.
+  if (format === 'zip') {
+    try {
+      const artifacts = await sql<{ id: string; artifactType: string; volumeName: string; volumeNumber: number }[]>`
+        SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", volume_number AS "volumeNumber"
+        FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY volume_number, volume_name`;
+      const [prop] = await sql<{ title: string | null }[]>`SELECT title FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      if (!prop) return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+      const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', topic_number: '' };
+      const zip = new JSZip();
+      let fileCount = 0;
+      for (const a of artifacts) {
+        const secs = await sql<{ title: string | null; content: string | null }[]>`
+          SELECT title, content FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY section_number`;
+        if (secs.length === 0) continue;
+        const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
+        const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
+        let buf: Buffer;
+        try { buf = await renderCanvas(fmt, doc, vars); }
+        catch (e) { console.error('[package/zip] volume render skipped', a.volumeName, e); continue; }
+        const safe = `V${a.volumeNumber}_${(a.volumeName || 'volume').replace(/[^a-z0-9]+/gi, '_')}`;
+        zip.file(`${safe}.${fmt}`, buf);
+        fileCount++;
+      }
+      if (fileCount === 0) {
+        return NextResponse.json({ error: 'No volumes with content to export', code: 'NOT_FOUND' }, { status: 404 });
+      }
+      const zipBuf = await zip.generateAsync({ type: 'nodebuffer' });
+      const safeName = (prop.title || 'proposal').replace(/[^a-z0-9]+/gi, '_').slice(0, 60);
+      return new Response(new Uint8Array(zipBuf), {
+        status: 200,
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${safeName}.zip"` },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/package] zip failed:', e);
+      return NextResponse.json({ error: 'Package zip failed', code: 'DB_ERROR' }, { status: 500 });
+    }
   }
 
   // ── Emit start event ────────────────────────────────────────────
