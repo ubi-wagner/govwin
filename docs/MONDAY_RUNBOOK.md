@@ -95,8 +95,8 @@ Open **`/portal/immobileyes/proposals/{id}`** (the build workspace). As `tenant_
    sources are usage-marked, never mutated).
 4. **Advance** the stage when sections are locked (Force-advance available to admins).
 5. **Download.** Per volume, once locked: **Download** (native docx/pptx/xlsx) + **PDF**;
-   whole proposal as **.docx**. (For pptx/xlsx/pdf of a specific piece, use the
-   per-artifact export.)
+   whole proposal as **.docx** (one combined doc) or **Download all (.zip)** — every
+   volume in its native format bundled together (the lossless "download my proposal").
 
 Result: the finished package, assembled from Immobileyes' own atoms, exportable in
 every format — and its sections are now back in the library for the *next* pursuit.
@@ -109,6 +109,7 @@ every format — and its sections are now back in the library for the *next* pur
 |---|---|---|
 | Ingest RFP / opportunity | `/admin/rfp-curation/upload`, `/admin/intake` | `api/admin/rfp-upload`, `lib/intake.ts` |
 | Curate matrix + volumes + molds | `/admin/rfp-curation` (curation workspace) | `volume.*` / `compliance.*` tools |
+| **Author templates (skeleton builder)** | `/admin/templates` → **New Template** → WYSIWYG canvas editor; Edit/Delete | `api/admin/templates` (create/PATCH/DELETE) |
 | **Upload + atomize a package** | `/portal/[t]/atoms` → **Upload package** | `atoms/atomize-package` → `lib/atomize-package.ts` |
 | **Browse + curate the library** | `/portal/[t]/atoms` → **Library** | `atoms` (list), `atoms/[id]` (detail/status) |
 | Refine / hand-shred one doc | `/portal/[t]/atoms` → **Atomize** | `atoms/upload`, `atoms` (create) |
