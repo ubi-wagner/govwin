@@ -185,6 +185,34 @@ export function CurationWorkspace({
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
+  const [assistBusy, setAssistBusy] = useState(false);
+
+  // Ingest Assist — one action that runs the whole ingest SOP for this claimed
+  // solicitation: parse its text → auto-build the compliance matrix + volumes +
+  // section molds → publish the opportunity card(s) (a suite for a multi-topic
+  // solicitation). The same materializer the Scouts feed.
+  const handleIngestAssist = async () => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds, then publish the opportunity card(s). Existing volumes/compliance for this solicitation are replaced. Continue?'
+    )) return;
+    setAssistBusy(true);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${sol.id}/ingest-assist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
+      const d = json.data ?? {};
+      if (typeof window !== 'undefined') window.alert(
+        `Ingest Assist complete (${d.source}):\n• ${d.volumes} volumes · ${d.items} section molds\n• ${d.topics} topic(s) · ${d.cards} card(s) published`
+      );
+      router.refresh();
+    } catch (e) {
+      if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : 'Ingest Assist failed');
+    } finally {
+      setAssistBusy(false);
+    }
+  };
   const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -662,6 +690,14 @@ export function CurationWorkspace({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleIngestAssist}
+            disabled={assistBusy}
+            title="Parse this solicitation and auto-build the matrix, volumes, section molds, and publish the opportunity card(s)"
+            className="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {assistBusy ? 'Building…' : '✨ Ingest Assist'}
+          </button>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${
             sol.status === 'pushed_to_pipeline' ? 'bg-emerald-100 text-emerald-800' :
             sol.status === 'dismissed' ? 'bg-gray-200 text-gray-600' :
