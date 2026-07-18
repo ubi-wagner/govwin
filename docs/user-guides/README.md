@@ -38,7 +38,7 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | [Library & atoms — upload, atomize, reuse](./library-atoms.md) | tenant_admin | 🔲 planned |
 | [Spotlight & purchase — cards → comp code](./spotlight-purchase.md) | tenant_admin | 🔲 planned |
 | [Team & collaborators](./team-collaborators.md) | tenant_admin, partner_user | 🔲 planned |
-| [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | 🔲 planned |
+| [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | ✅ written |
 
 Legend: ✅ written · 📝 in progress · 🔲 planned (todo below).
 
