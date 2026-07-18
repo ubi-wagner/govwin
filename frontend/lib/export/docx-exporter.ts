@@ -30,9 +30,11 @@ import {
   convertInchesToTwip,
 } from 'docx';
 import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { docNodes } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
+  CanvasSection,
   HeadingContent,
   TextBlockContent,
   ListContent,
@@ -42,6 +44,9 @@ import type {
   FootnoteContent,
   UrlContent,
 } from '@/lib/types/canvas-document';
+
+/** Paragraph-level pagination flags applied to a keep-together group's content. */
+type ParaOpts = { keepLines?: boolean; keepNext?: boolean };
 
 /**
  * Convert a CanvasDocument to a .docx Buffer suitable for download.
@@ -77,7 +82,10 @@ export async function exportToDocx(
   doc: CanvasDocument,
   variables: Record<string, string> = {},
 ): Promise<Buffer> {
-  const { canvas, nodes } = doc;
+  const { canvas } = doc;
+  // Flat node view of either shape (v2 sections flattened) for the raster
+  // pre-pass, numbered-list instance indexing, and the TOC.
+  const nodes = docNodes(doc);
 
   // Canvas config is optional / may be partial on a hand-authored or freshly
   // provisioned section; fall back to document defaults (US Letter, 1" margins,
@@ -137,12 +145,12 @@ export async function exportToDocx(
     }),
   );
 
-  // Build children from nodes
-  const children: (Paragraph | Table)[] = [];
-  for (const node of nodes) {
-    const elements = nodeToDocx(node, fontDefault, lineSpacing, nodes, raster);
-    children.push(...elements);
-  }
+  // Build children. A v2 doc walks sections→groups→nodes (flow, no forced
+  // breaks; keep_together sections/groups get keepLines/keepNext + break_before
+  // a page break); a v1 doc walks the flat node list exactly as before.
+  const children: (Paragraph | Table)[] = doc.sections && doc.sections.length
+    ? sectionsToDocxChildren(doc.sections, fontDefault, lineSpacing, nodes, raster)
+    : nodes.flatMap((node) => nodeToDocx(node, fontDefault, lineSpacing, nodes, raster));
 
   const document = new Document({
     numbering: {
@@ -196,12 +204,44 @@ export async function exportToDocx(
   return Buffer.from(buffer);
 }
 
+/**
+ * Walk the section layer (v2) into docx children. Sections FLOW — Word's native
+ * pagination fills each page and runs content across boundaries, so there are no
+ * bottom-of-page gaps. `break_before` inserts a page break before the section; a
+ * `keep_together` section or group tags its paragraphs keepLines/keepNext (and
+ * its table rows cantSplit) so Word keeps the block whole on one page.
+ */
+function sectionsToDocxChildren(
+  sections: CanvasSection[],
+  fontDefault: { family: string; size: number },
+  lineSpacing: number,
+  allNodes: CanvasNode[],
+  raster: Map<CanvasNode, RasterPng | null>,
+): (Paragraph | Table)[] {
+  const children: (Paragraph | Table)[] = [];
+  sections.forEach((section, i) => {
+    if (section.layout?.break_before && i > 0) {
+      children.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+    }
+    const sectionKeep = section.layout?.mode === 'keep_together';
+    for (const group of section.groups ?? []) {
+      const keep = sectionKeep || !!group.keep_together;
+      const paraOpts: ParaOpts = keep ? { keepLines: true, keepNext: true } : {};
+      for (const node of group.nodes ?? []) {
+        children.push(...nodeToDocx(node, fontDefault, lineSpacing, allNodes, raster, paraOpts));
+      }
+    }
+  });
+  return children;
+}
+
 function nodeToDocx(
   node: CanvasNode,
   fontDefault: { family: string; size: number },
   lineSpacing: number,
   allNodes: CanvasNode[],
   raster?: Map<CanvasNode, RasterPng | null>,
+  paraOpts: ParaOpts = {},
 ): (Paragraph | Table)[] {
   // A node may carry no explicit style (hand-authored content / template output);
   // default it so per-node style reads never crash. Field fallbacks below still apply.
@@ -220,6 +260,7 @@ function nodeToDocx(
       const c = node.content as HeadingContent;
       const level = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 }[c.level] ?? HeadingLevel.HEADING_2;
       return [new Paragraph({
+        ...paraOpts,
         heading: level,
         children: [new TextRun({
           text: (c.numbering ? `${c.numbering} ` : '') + c.text,
@@ -238,6 +279,7 @@ function nodeToDocx(
         italic: style.style === 'italic',
       });
       return [new Paragraph({
+        ...paraOpts,
         alignment,
         indent: style.indent ? { left: style.indent * 20 } : undefined,
         spacing: {
@@ -257,6 +299,7 @@ function nodeToDocx(
       const instance = node.type === 'numbered_list' ? allNodes.filter((n) => n.type === 'numbered_list').indexOf(node) : 0;
       return c.items.map((item) =>
         new Paragraph({
+          ...paraOpts,
           bullet: node.type === 'bulleted_list' ? { level: item.indent_level ?? 0 } : undefined,
           numbering: node.type === 'numbered_list' ? { reference: 'default-numbering', level: item.indent_level ?? 0, instance } : undefined,
           children: [new TextRun({ text: item.text, font, size })],
@@ -270,6 +313,7 @@ function nodeToDocx(
         typeof cell === 'string' ? { text: cell } : cell;
 
       const headerRow = new TableRow({
+        cantSplit: !!paraOpts.keepLines,
         children: c.headers.map((h) => {
           const cell = resolveCell(h);
           const mergedStyle = { ...c.header_style, ...cell.style };
@@ -295,6 +339,7 @@ function nodeToDocx(
       });
       const dataRows = c.rows.map((row) =>
         new TableRow({
+          cantSplit: paraOpts.keepLines || undefined,
           children: row.map((rawCell) => {
             const cell = resolveCell(rawCell);
             const cellStyle = cell.style;
@@ -327,6 +372,7 @@ function nodeToDocx(
     case 'caption': {
       const c = node.content as CaptionContent;
       return [new Paragraph({
+        ...paraOpts,
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({ text: `${c.prefix} ${c.number}: `, bold: true, italics: true, font, size }),
@@ -338,6 +384,7 @@ function nodeToDocx(
     case 'footnote': {
       const c = node.content as FootnoteContent;
       return [new Paragraph({
+        ...paraOpts,
         children: [
           new TextRun({ text: c.marker, superScript: true, font, size: size - 4 }),
           new TextRun({ text: ` ${c.text}`, font, size: size - 4 }),
@@ -349,6 +396,7 @@ function nodeToDocx(
     case 'url': {
       const c = node.content as UrlContent;
       return [new Paragraph({
+        ...paraOpts,
         children: [new TextRun({ text: c.display_text, font, size, color: '0000FF' })],
       })];
     }
@@ -403,6 +451,7 @@ function nodeToDocx(
       const r = raster?.get(node);
       if (!r) {
         return [new Paragraph({
+          ...paraOpts,
           alignment: AlignmentType.CENTER,
           children: [new TextRun({ text: `[Image: ${ic.alt_text ?? 'image'}]`, italics: true, color: '999999', font, size })],
         })];
@@ -415,12 +464,14 @@ function nodeToDocx(
       let dispW = Math.min(natW, 470);
       let dispH = Math.round(dispW / aspect);
       const out: Paragraph[] = [new Paragraph({
+        ...paraOpts,
         alignment: AlignmentType.CENTER,
         spacing: { before: 60, after: 40 },
         children: [new ImageRun({ type: 'png', data: r.buffer, transformation: { width: dispW, height: dispH } })],
       })];
       if (ic.caption) {
         out.push(new Paragraph({
+          ...paraOpts,
           alignment: AlignmentType.CENTER,
           spacing: { after: 80 },
           children: [new TextRun({ text: ic.caption, italics: true, color: '666666', font, size: size - 2 })],

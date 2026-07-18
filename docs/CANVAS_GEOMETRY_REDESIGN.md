@@ -267,13 +267,31 @@ it — then "tighten to 10" by pulling section budgets down until green.
 
 ## 9. Path to completion (phased, shippable, spine intact)
 
-**Phase 1 — Section layer + retire the page-break hack (fixes continuity).**
+**Phase 1 — Section layer + retire the page-break hack (fixes continuity). ✅ SHIPPED.**
 Add `sections/groups` to `CanvasDocument` (v2, v1 lifts to one flow section). Teach the
 exporters to walk sections→groups→nodes and emit `keep_together` (docx *keep-with-next /
 keep-lines-together*; HTML `break-inside: avoid`; one section per slide). Rework the
 generators to flow sections (delete forced `page_break`s). Add `paginate()` + a read-only
 per-section/total page gauge. *Outcome: content flows across pages, whitespace gaps gone,
 page counts emerge and are reported.*
+
+> **As-built (2026-07-18).** `CanvasSection/CanvasGroup/SectionLayout` +
+> `sections?` are additive on `CanvasDocument` (`lib/types/canvas-document.ts`), with
+> `toSections()` (v1→section lift, split on `page_break`), `sectionsToNodes()`, `docNodes()`,
+> `createSection/createGroup`. The exporters branch on `doc.sections?.length` — v2 walks
+> the section layer (canvas-html `<section>` + `break-inside:avoid`; docx page-break-before
+> + `keepLines/keepNext` + row `cantSplit`; pptx one-slide-per-section) while **v1 uses the
+> untouched flat-node path** — the app's live section-save/harvest paths still emit v1, and
+> `__tests__/canvas-sections.test.ts` pins that path (a v1 doc renders with no `<section>`
+> wrapper and its `page_break` intact). `paginate()` (`lib/export/paginate.ts`) reports
+> per-section start/end page, total, and vs `max_pages`. Both sample generators author v2
+> flow: `gen-navy-sttr-proposal.mts` hand-authors sections (figures/tables = `keep_together`
+> groups, **no forced breaks**); `gen-sample-proposal.mts` (AFWERX) lifts its docs with
+> `liftToFlowSections()` — the mechanical v1→flow upgrade (drop page-breaks, auto-coalesce
+> figure/table+caption). Measured (`measure-canvas-flow.mts`, real Chromium+pdfjs), **every
+> document artifact flows gap-free within cap**: Navy TV 6 / SOW 4; AFWERX TV **8 (was a
+> padded 15)** / Key Personnel 2 / Facilities 1 — no near-empty interior pages anywhere; the
+> decks are one-section-per-slide. 636 tests green (incl. `canvas-sections.test.ts`), `tsc` clean.
 
 **Phase 2 — Annotation atomizer.** The recommendation view + click/box/group/section
 tools + bulk context tagging, writing atoms/groups/sections with `SourceAnchor` regions.

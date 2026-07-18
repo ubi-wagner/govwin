@@ -13,6 +13,8 @@
 import type {
   CanvasDocument,
   CanvasNode,
+  CanvasSection,
+  CanvasGroup,
   HeadingContent,
   TextBlockContent,
   ListContent,
@@ -204,11 +206,39 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
   }
 }
 
+/** Render one group's nodes, wrapping in a keep-together box when marked. */
+function renderGroup(group: CanvasGroup, vars: Record<string, string>): string {
+  const inner = (group.nodes ?? []).map((n) => renderNode(n, vars)).join('\n');
+  return group.keep_together ? `<div style="break-inside:avoid;page-break-inside:avoid">${inner}</div>` : inner;
+}
+
+/**
+ * Render the section layer (v2). Sections FLOW by default — no forced page
+ * breaks — so content runs continuously across page boundaries (the fix for
+ * the bottom-of-page whitespace). `break_before` starts a new page; a
+ * `keep_together` section (or group) gets `break-inside: avoid` so the
+ * renderer keeps it whole and pushes it to the next page instead of splitting.
+ */
+function renderSectionsToHtml(sections: CanvasSection[], vars: Record<string, string>): string {
+  return sections
+    .map((s, i) => {
+      const inner = (s.groups ?? []).map((g) => renderGroup(g, vars)).join('\n');
+      const bits: string[] = [];
+      if (s.layout?.break_before && i > 0) bits.push('page-break-before:always', 'break-before:page');
+      if (s.layout?.mode === 'keep_together') bits.push('break-inside:avoid', 'page-break-inside:avoid');
+      const style = bits.length ? ` style="${bits.join(';')}"` : '';
+      return `<section${style}>${inner}</section>`;
+    })
+    .join('\n');
+}
+
 export function renderCanvasToHtml(doc: CanvasDocument, variables: Record<string, string> = {}): string {
   const canvas = doc.canvas;
   const font = canvas?.font_default ?? { family: 'Times New Roman', size: 12 };
   const lineSpacing = canvas?.line_spacing ?? 1.15;
-  const body = (doc.nodes ?? []).map((n) => renderNode(n, variables)).join('\n');
+  const body = doc.sections && doc.sections.length
+    ? renderSectionsToHtml(doc.sections, variables)
+    : (doc.nodes ?? []).map((n) => renderNode(n, variables)).join('\n');
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     * { box-sizing: border-box; }
     body { font-family: ${JSON.stringify(font.family ?? 'Times New Roman')}, serif; font-size: ${font.size ?? 12}pt; line-height: ${lineSpacing}; color: ${font.color ?? '#111827'}; margin: 0; }

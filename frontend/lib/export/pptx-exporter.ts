@@ -27,6 +27,7 @@ import type {
   UrlContent,
 } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
+import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
 
 // ─── Layout constants (inches) ────────────────────────────────────────
 const SLIDE_LAYOUTS: Record<string, { w: number; h: number }> = {
@@ -58,7 +59,10 @@ export async function exportToPptx(
   doc: CanvasDocument,
   variables: Record<string, string> = {},
 ): Promise<Buffer> {
-  const { canvas, nodes } = doc;
+  const { canvas } = doc;
+  // Flat node view (v2 sections flattened) for the raster pre-pass, deck accent,
+  // and per-slide TOC.
+  const nodes = docNodes(doc);
   const sub = (t: string) => t.replace(/\{(\w+)\}/g, (_, k: string) => variables[k] ?? `{${k}}`);
   const dims = SLIDE_LAYOUTS[canvas.format] ?? SLIDE_LAYOUTS.slide_16_9;
 
@@ -81,7 +85,11 @@ export async function exportToPptx(
   const firstHeadingColor = nodes.find((n) => n.type === 'heading')?.style?.color;
   const accent = hex(firstHeadingColor) ?? DEFAULT_ACCENT;
 
-  const slideGroups = splitIntoSlides(nodes);
+  // v2: one section per slide (break intent is implicit — each section is a
+  // discrete slide). v1: split the flat node list on page_break as before.
+  const slideGroups = doc.sections && doc.sections.length
+    ? doc.sections.map((s) => sectionsToNodes([s]))
+    : splitIntoSlides(nodes);
   const bodyW = dims.w - 2 * MARGIN;
 
   let slideIndex = 0;

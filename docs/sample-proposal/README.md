@@ -26,8 +26,8 @@ what a finished proposal looks like across formats, and reuse the canvas JSON in
 
 | File | Format | Exporter | Demonstrates |
 |---|---|---|---|
-| `Aerivio_Technical_Volume.docx` | Word | `lib/export/docx-exporter` | **Exactly 15-page** narrative — the **11 AFWERX/DoD Phase I required-element sections** (1–11) + References + a Compliance Cross-Reference table: headings, **bold**/*italic*, colored section heads, Figure 1 (SVG architecture) + inline SVG pipeline, Tables 1–4, running header/footer, 12pt Georgia / 1.55 |
-| `Aerivio_Technical_Volume.pdf` | PDF | `lib/export/pdf-exporter` (Chromium) | Full-fidelity **15-page** view incl. the inline **SVG architecture + pipeline figures** + page numbers |
+| `Aerivio_Technical_Volume.docx` | Word | `lib/export/docx-exporter` | **13 flow sections** (v2), **8 pages within the 15-page cap** — the **11 AFWERX/DoD Phase I required-element sections** (1–11) + References + a Compliance Cross-Reference table: headings, **bold**/*italic*, colored section heads, Figure 1 (SVG architecture) + inline SVG pipeline, Tables 1–4, running header/footer, 12pt Georgia / 1.55 |
+| `Aerivio_Technical_Volume.pdf` | PDF | `lib/export/pdf-exporter` (Chromium) | Full-fidelity **8-page** view (flows — no forced-break gaps) incl. the inline **SVG architecture + pipeline figures** + page numbers |
 | `Aerivio_Commercialization.pptx` | PowerPoint | `lib/export/pptx-exporter` | **5 complete slides** (title, market + **SVG bar chart**, competition, go-to-market, financials) — AFWERX SBIR Phase I (CSO) framing |
 | `Aerivio_Cost_Volume.xlsx` | Excel | `lib/export/xlsx-exporter` | **2 tabs** — Direct Labor detail (roles/rate/hours) + Budget Summary; currency cells, subtotals, highlighted **$150,000** total |
 | `Aerivio_Key_Personnel.pdf` | PDF | `lib/export/pdf-exporter` | 3 bios (2 pages) with **generated SVG headshot** placeholders |
@@ -37,6 +37,13 @@ what a finished proposal looks like across formats, and reuse the canvas JSON in
 running headers + footers with page numbers, bulleted + numbered lists, tables
 with currency formatting and highlighted cells, and generated SVGs used as image
 placeholders (architecture diagram, pipeline, market chart, headshots, facility).
+
+> **v2 section flow (canvas geometry redesign, Phase 1).** Every document/slide
+> artifact here is lifted to **v2 flow sections** (`liftToFlowSections`) before export —
+> the forced `page_break`s are dropped so content runs continuously (the TV flows from a
+> padded 15 to a gap-free 8 pages, within cap), and figures/tables are auto-kept-together
+> so a figure never splits from its caption. Verify with `scripts/measure-canvas-flow.mts`.
+> See `docs/CANVAS_GEOMETRY_REDESIGN.md` §5–9.
 
 ## Reusable canvas templates
 

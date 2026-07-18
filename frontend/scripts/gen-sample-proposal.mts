@@ -11,6 +11,7 @@ import { exportToDocx } from '@/lib/export/docx-exporter';
 import { exportToPptx } from '@/lib/export/pptx-exporter';
 import { exportToXlsx } from '@/lib/export/xlsx-exporter';
 import { exportToPdf } from '@/lib/export/pdf-exporter';
+import { liftToFlowSections } from '@/lib/types/canvas-document';
 import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
 
 // ── node builders ───────────────────────────────────────────────────────────
@@ -301,18 +302,25 @@ const results: Array<[string, number]> = [];
 async function emit(name: string, buf: Buffer) { writeFileSync(`${OUT}/${name}`, buf); results.push([name, buf.length]); }
 function saveCanvas(name: string, d: CanvasDocument) { writeFileSync(`${CANVAS}/${name}.canvas.json`, JSON.stringify(d, null, 2)); }
 
-saveCanvas('technical-volume', white);
-saveCanvas('commercialization', deck);
-saveCanvas('cost-volume', budget);
-saveCanvas('key-personnel-bios', bios);
-saveCanvas('facilities', facilities);
+// Retire the forced page_breaks: lift every DOCUMENT/slide artifact to v2 flow
+// sections (figures/tables auto-kept-together). The cost sheet stays tabular v1.
+const whiteV2 = liftToFlowSections(white);
+const deckV2 = liftToFlowSections(deck);
+const biosV2 = liftToFlowSections(bios);
+const facilitiesV2 = liftToFlowSections(facilities);
 
-await emit('Aerivio_Technical_Volume.docx', await exportToDocx(white, VARS));
-await emit('Aerivio_Technical_Volume.pdf', await exportToPdf(white, VARS));
-await emit('Aerivio_Commercialization.pptx', await exportToPptx(deck, VARS));
+saveCanvas('technical-volume', whiteV2);
+saveCanvas('commercialization', deckV2);
+saveCanvas('cost-volume', budget);
+saveCanvas('key-personnel-bios', biosV2);
+saveCanvas('facilities', facilitiesV2);
+
+await emit('Aerivio_Technical_Volume.docx', await exportToDocx(whiteV2, VARS));
+await emit('Aerivio_Technical_Volume.pdf', await exportToPdf(whiteV2, VARS));
+await emit('Aerivio_Commercialization.pptx', await exportToPptx(deckV2, VARS));
 await emit('Aerivio_Cost_Volume.xlsx', await exportToXlsx(budget, VARS));
-await emit('Aerivio_Key_Personnel.pdf', await exportToPdf(bios, VARS));
-await emit('Aerivio_Facilities.pdf', await exportToPdf(facilities, VARS));
+await emit('Aerivio_Key_Personnel.pdf', await exportToPdf(biosV2, VARS));
+await emit('Aerivio_Facilities.pdf', await exportToPdf(facilitiesV2, VARS));
 
 console.log('\n── Deliverables generated ──');
 for (const [n, b] of results) console.log(`  ${n.padEnd(38)} ${(b / 1024).toFixed(1)} KB`);

@@ -35,21 +35,32 @@ STTR requires, so its library carries and re-contextualizes pursuit-to-pursuit.
 
 | File | Format | Size | Demonstrates |
 |---|---|---|---|
-| `Aerivio_Navy_STTR_Technical_Volume.docx` / `.pdf` | Word / PDF | **exactly 10 pages** | Volume 2 — 8 Navy STTR required-element sections incl. the STTR-specific **Research Institution & Cooperative Arrangement** (work-split table, PI/Co-I, allocation of rights); distributed-mesh **SVG** architecture; SBC + RI facilities with two SVGs; headings, **bold**/*italic*, colored heads, tables, running header/footer |
-| `Aerivio_Navy_STTR_Statement_of_Work.docx` / `.pdf` | Word / PDF | **exactly 5 pages** | Volume 3 — base-period Tasks 1–5 + option Tasks 6–7 with SBC/RI/Joint responsibility, a risk table, milestone schedule, and data-management/rights |
+| `Aerivio_Navy_STTR_Technical_Volume.docx` / `.pdf` | Word / PDF | **6 pages (flows, within the 10-page cap)** | Volume 2 — 8 Navy STTR required-element sections incl. the STTR-specific **Research Institution & Cooperative Arrangement** (work-split table, PI/Co-I, allocation of rights); distributed-mesh **SVG** architecture; SBC + RI facilities with two SVGs; headings, **bold**/*italic*, colored heads, tables, running header/footer |
+| `Aerivio_Navy_STTR_Statement_of_Work.docx` / `.pdf` | Word / PDF | **4 pages (flows, within the 5-page cap)** | Volume 3 — base-period Tasks 1–5 + option Tasks 6–7 with SBC/RI/Joint responsibility, a risk table, milestone schedule, and data-management/rights |
 | `Aerivio_Navy_STTR_Cost_Volume.xlsx` | Excel | 3 tabs | Volume 4 — **Base 18mo → $250,000**, **Option 6mo → $150,000**, and a Summary tab with the **STTR work-split check (SBC 56% / RI 35% → COMPLIANT)**; SBC and RI subtotals, currency cells, highlighted totals |
 | `Aerivio_Navy_STTR_Company_Overview.pptx` | PowerPoint | **10 slides** | Volume 5 supporting document — company overview (who/team/IP/past performance incl. the AFWERX tie-in/partnership/facilities/differentiators/transition/summary) with an **SVG market chart** |
 
 *(Volume 1 is the government cover sheet, not a content deliverable.)*
 
+> **v2 section flow (canvas geometry redesign, Phase 1).** The Technical Volume, SOW,
+> and deck are authored as **v2 CanvasDocuments** — an ordered `sections → groups → nodes`
+> layer with layout intent (`flow` for documents, one section per slide). **No forced
+> `page_break`s:** content runs continuously across page boundaries, so the
+> bottom-of-page whitespace gaps are gone and the page count *emerges* (6 / 4, each
+> within its compliance cap) rather than being padded to a target. Figures and tables
+> are `keep_together` groups so a figure never splits from its caption. Measure it with
+> `scripts/measure-canvas-flow.mts` (paginate() estimate + the real Chromium/pdfjs page
+> count + a continuity check that flags any near-empty interior page). See
+> `docs/CANVAS_GEOMETRY_REDESIGN.md` §5–9.
+
 ## Reusable canvas templates
 
 Each deliverable's source **CanvasDocument JSON** is under `canvas/`:
 
-- `canvas/technical-volume.canvas.json`  (letter, 11.5pt/1.5, 8 required-element sections)
-- `canvas/statement-of-work.canvas.json`  (letter, 11pt/1.4, base + option tasks)
-- `canvas/cost-volume.canvas.json`  (spreadsheet, 3 tabs, base+option, work-split)
-- `canvas/company-overview.canvas.json`  (slide_16_9, 10 slides)
+- `canvas/technical-volume.canvas.json`  (**v2**, letter 11.5pt/1.5, 9 flow sections — title + 8 required elements)
+- `canvas/statement-of-work.canvas.json`  (**v2**, letter 11pt/1.4, 6 flow sections — base + option tasks)
+- `canvas/cost-volume.canvas.json`  (v1 spreadsheet, 3 tabs, base+option, work-split — tabular, no flow)
+- `canvas/company-overview.canvas.json`  (**v2**, slide_16_9, 10 section-slides)
 
 ## The lifecycle + the reuse loop (emulated end-to-end)
 
@@ -80,6 +91,7 @@ exactly what flags them for re-context. Run: `node --import tsx scripts/navy-stt
 ```bash
 cd frontend
 npx tsx scripts/gen-navy-sttr-proposal.mts   # writes the 6 files here + canvas/ templates
+npx tsx scripts/measure-canvas-flow.mts      # paginate() estimate + real PDF page count + continuity check
 node --import tsx scripts/navy-sttr-e2e.mts   # matrix + skeleton + reuse loop (needs DATABASE_URL)
 ```
 

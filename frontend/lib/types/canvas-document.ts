@@ -283,6 +283,56 @@ export interface CanvasNode {
   library_tags?: string[];
 }
 
+// ─── Section layer (v2) — Section → Group → Node ────────────────────
+//
+// The section layer sits between the frame (CanvasRules) and the atoms
+// (CanvasNode). It carries LAYOUT INTENT — a section flows across pages,
+// stays on one page (keep_together), or is pinned to slide coordinates —
+// so pagination is measured, not hacked with forced `page_break` nodes.
+// See docs/CANVAS_GEOMETRY_REDESIGN.md §5. Fully backward-compatible: a v1
+// flat `nodes[]` lifts into one flow section (toSections), and the exporters
+// keep the flat-node path untouched for docs with no `sections`.
+
+/** How a section (or pinned group) occupies the frame. */
+export interface SectionLayout {
+  /** flow: reflow across pages · keep_together: never split · pinned: placed by box (slides). */
+  mode: 'flow' | 'keep_together' | 'pinned';
+  /** Force a new page/slide at the section start (replaces the page_break-as-content hack). */
+  break_before?: boolean;
+  /** Soft page target (documents) — drives the page-fill gauge + reflow, never a hard cut. */
+  page_budget?: number;
+  /** Absolute placement (slides / pinned blocks only); ignored for flow document sections. */
+  box?: { page: number; x: number; y: number; w: number; h: number };
+}
+
+/**
+ * A group of nodes inside a section. Optionally instantiates a library atom
+ * (`atom_ref`) — e.g. a "Team Bios" group whose members are individual bio
+ * atoms — and can be marked `keep_together` (don't split across a page/slide).
+ */
+export interface CanvasGroup {
+  id: string;
+  label?: string;
+  keep_together?: boolean;
+  atom_ref?: string;
+  nodes: CanvasNode[];
+}
+
+/**
+ * A first-class section: an ordered set of groups with a layout intent. Maps
+ * to a mold / compliance-matrix element via `section_type` (the `vol`), and
+ * remembers the library atoms it was assembled from (`source_atom_ids`) for
+ * the harvest-with-lineage loop.
+ */
+export interface CanvasSection {
+  id: string;
+  title?: string;
+  section_type?: string;
+  layout: SectionLayout;
+  groups: CanvasGroup[];
+  source_atom_ids?: string[];
+}
+
 // ─── Canvas Document ────────────────────────────────────────────────
 
 export type DocumentStatus = 'empty' | 'ai_drafted' | 'in_progress' | 'review' | 'accepted';
@@ -301,10 +351,18 @@ export interface CanvasDocumentMetadata {
 }
 
 export interface CanvasDocument {
-  version: 1;
+  /** 1 = flat `nodes[]` (legacy) · 2 = section layer present. Both render. */
+  version: 1 | 2;
   document_id: string;
   canvas: CanvasRules;
+  /**
+   * Flat node list. The canonical content for v1 docs; for a v2 doc it may be
+   * empty ([]) with content living under `sections`. Readers wanting a flat
+   * view of either shape should use `docNodes(doc)`.
+   */
   nodes: CanvasNode[];
+  /** Section layer (v2). Present ⇒ exporters walk sections→groups→nodes. */
+  sections?: CanvasSection[];
   metadata: CanvasDocumentMetadata;
 }
 
@@ -372,7 +430,7 @@ export function estimatePageCount(doc: CanvasDocument): number {
   );
 
   let totalChars = 0;
-  for (const node of doc.nodes) {
+  for (const node of docNodes(doc)) {
     if (node.type === 'page_break') { totalChars += linesPerPage * charsPerLine; continue; }
     if (node.type === 'spacer' || node.type === 'toc') continue;
     const text = getNodeText(node);
@@ -405,4 +463,131 @@ export function getNodeText(node: CanvasNode): string {
 
 function flattenListItems(items: ListContent['items']): string {
   return items.map((i) => i.text + (i.children ? ' ' + flattenListItems(i.children) : '')).join(' ');
+}
+
+// ─── Section-layer helpers (v1 ⇄ v2 bridge) ─────────────────────────
+
+/** First heading's text in a node run (for a lifted section title). */
+function firstHeadingText(nodes: CanvasNode[]): string | undefined {
+  const h = nodes.find((n) => n.type === 'heading');
+  return h ? (h.content as HeadingContent).text : undefined;
+}
+
+/**
+ * Normalize any CanvasDocument to a section list. A v2 doc returns its
+ * `sections` as-is; a v1 doc lifts its flat `nodes[]` into flow sections,
+ * splitting on `page_break` (each break ⇒ the next section carries
+ * `break_before`), so a legacy doc renders identically through the
+ * section-aware path. A doc with neither yields one empty flow section.
+ */
+export function toSections(doc: CanvasDocument): CanvasSection[] {
+  if (doc.sections && doc.sections.length) return doc.sections;
+  const sections: CanvasSection[] = [];
+  let current: CanvasNode[] = [];
+  let breakBefore = false;
+  const flush = () => {
+    if (current.length === 0) return;
+    sections.push({
+      id: crypto.randomUUID(),
+      title: firstHeadingText(current),
+      layout: { mode: 'flow', ...(breakBefore ? { break_before: true } : {}) },
+      groups: [{ id: crypto.randomUUID(), nodes: current }],
+    });
+    current = [];
+  };
+  for (const n of doc.nodes ?? []) {
+    if (n.type === 'page_break') { flush(); breakBefore = true; continue; }
+    current.push(n);
+  }
+  flush();
+  if (sections.length === 0) {
+    sections.push({ id: crypto.randomUUID(), layout: { mode: 'flow' }, groups: [{ id: crypto.randomUUID(), nodes: [] }] });
+  }
+  return sections;
+}
+
+/** Flatten a section list to its content nodes (no synthetic breaks). */
+export function sectionsToNodes(sections: CanvasSection[]): CanvasNode[] {
+  return sections.flatMap((s) => s.groups.flatMap((g) => g.nodes));
+}
+
+/** A flat node view of either doc shape (v2 sections flattened, else `nodes`). */
+export function docNodes(doc: CanvasDocument): CanvasNode[] {
+  return doc.sections && doc.sections.length ? sectionsToNodes(doc.sections) : (doc.nodes ?? []);
+}
+
+/** Build a group from nodes (optionally a labeled, keep-together, atom-backed group). */
+export function createGroup(
+  nodes: CanvasNode[],
+  opts: { label?: string; keepTogether?: boolean; atomRef?: string } = {},
+): CanvasGroup {
+  return {
+    id: crypto.randomUUID(),
+    ...(opts.label ? { label: opts.label } : {}),
+    ...(opts.keepTogether ? { keep_together: true } : {}),
+    ...(opts.atomRef ? { atom_ref: opts.atomRef } : {}),
+    nodes,
+  };
+}
+
+/**
+ * Lift a v1 flat-node document into a v2 FLOW document: split on `page_break`
+ * into sections but DROP the forced breaks (mode `flow`, no `break_before`) so
+ * content runs continuously, and auto-coalesce each figure/table (with its
+ * following caption) into a `keep_together` group so it never splits. This is
+ * the mechanical "retire the page-break hack" upgrade — the same operation the
+ * annotation atomizer and any v1→v2 content migration reuse. A doc already
+ * carrying `sections` is returned unchanged.
+ */
+export function liftToFlowSections(doc: CanvasDocument): CanvasDocument {
+  if (doc.sections && doc.sections.length) return doc;
+  const chunks: CanvasNode[][] = [];
+  let cur: CanvasNode[] = [];
+  for (const n of doc.nodes ?? []) {
+    if (n.type === 'page_break') { if (cur.length) chunks.push(cur); cur = []; continue; }
+    cur.push(n);
+  }
+  if (cur.length) chunks.push(cur);
+  if (chunks.length === 0) chunks.push([]);
+
+  const sections: CanvasSection[] = chunks.map((chunk) => {
+    const groups: CanvasGroup[] = [];
+    let buf: CanvasNode[] = [];
+    const flush = () => { if (buf.length) { groups.push({ id: crypto.randomUUID(), nodes: buf }); buf = []; } };
+    for (let i = 0; i < chunk.length; i++) {
+      const n = chunk[i];
+      if (n.type === 'image' || n.type === 'table') {
+        flush();
+        const nodes = [n];
+        if (chunk[i + 1]?.type === 'caption') { nodes.push(chunk[i + 1]); i++; }
+        groups.push({ id: crypto.randomUUID(), keep_together: true, nodes });
+      } else {
+        buf.push(n);
+      }
+    }
+    flush();
+    if (groups.length === 0) groups.push({ id: crypto.randomUUID(), nodes: [] });
+    return { id: crypto.randomUUID(), title: firstHeadingText(chunk), layout: { mode: 'flow' }, groups };
+  });
+  return { ...doc, version: 2, nodes: [], sections };
+}
+
+/** Build a section from groups (or a flat node run wrapped in one group). */
+export function createSection(opts: {
+  title?: string;
+  sectionType?: string;
+  layout?: Partial<SectionLayout>;
+  groups?: CanvasGroup[];
+  nodes?: CanvasNode[];
+  sourceAtomIds?: string[];
+}): CanvasSection {
+  const groups = opts.groups ?? [createGroup(opts.nodes ?? [])];
+  return {
+    id: crypto.randomUUID(),
+    ...(opts.title ? { title: opts.title } : {}),
+    ...(opts.sectionType ? { section_type: opts.sectionType } : {}),
+    layout: { mode: 'flow', ...opts.layout },
+    groups,
+    ...(opts.sourceAtomIds ? { source_atom_ids: opts.sourceAtomIds } : {}),
+  };
 }

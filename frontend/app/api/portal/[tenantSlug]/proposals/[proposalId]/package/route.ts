@@ -20,8 +20,10 @@ import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/l
 import JSZip from 'jszip';
 import {
   CANVAS_PRESETS,
+  sectionsToNodes,
   type CanvasDocument,
   type CanvasNode,
+  type CanvasSection,
   type HeadingContent,
   type TextBlockContent,
   type ListContent,
@@ -47,9 +49,18 @@ function parseSectionContent(raw: string | null): {
   if (!raw) return { nodes: [], canvas: null };
   try {
     const parsed = JSON.parse(raw);
-    // Full CanvasDocument shape
-    if (parsed.version === 1 && Array.isArray(parsed.nodes) && parsed.canvas) {
-      return { nodes: parsed.nodes, canvas: parsed.canvas };
+    // Full CanvasDocument shape (v2 flattens its section layer to a flat node
+    // run for this combined-document assembly; section flow is preserved by the
+    // per-artifact native export, not the merged package).
+    if ((parsed.version === 1 || parsed.version === 2) && parsed.canvas) {
+      if (Array.isArray(parsed.sections) && parsed.sections.length) {
+        return { nodes: sectionsToNodes(parsed.sections as CanvasSection[]), canvas: parsed.canvas };
+      }
+      if (Array.isArray(parsed.nodes)) return { nodes: parsed.nodes, canvas: parsed.canvas };
+    }
+    // Bare section layer without a canvas
+    if (Array.isArray(parsed.sections) && parsed.sections.length) {
+      return { nodes: sectionsToNodes(parsed.sections as CanvasSection[]), canvas: null };
     }
     // Object with a nodes array
     if (parsed.nodes && Array.isArray(parsed.nodes)) {

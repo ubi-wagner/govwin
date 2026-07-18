@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "document_id": "fc8db7d3-bcdd-45e4-a0a0-d90cafa37c62",
+  "document_id": "2cb4f834-e55b-4d35-ac15-6599083364e5",
   "canvas": {
     "format": "spreadsheet",
     "width": 1200,
@@ -23,7 +23,7 @@
   },
   "nodes": [
     {
-      "id": "af3c2f0a-4d9d-44ed-b8d9-7b9473cae6c1",
+      "id": "0703d5f8-cbba-43eb-ba35-203d6bf9a273",
       "type": "table",
       "content": {
         "sheet_name": "Direct Labor",
@@ -128,7 +128,7 @@
       "library_eligible": false
     },
     {
-      "id": "3dfb397e-6601-433e-a0cd-ec6e4f307222",
+      "id": "34b10a7e-80fe-4095-9166-591c8af49ecb",
       "type": "table",
       "content": {
         "sheet_name": "Budget Summary",
