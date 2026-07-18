@@ -35,9 +35,9 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | [Getting started + portal tour](./getting-started.md) | all customer roles | ✅ written |
 | [Documents — create, template, export](./documents.md) | tenant_admin, tenant_user | ✅ written |
 | [Proposal build — draft → lock → export](./proposal-build.md) | tenant_admin, tenant_user | ✅ written |
-| [Library & atoms — upload, atomize, reuse](./library-atoms.md) | tenant_admin | 🔲 planned |
-| [Spotlight & purchase — cards → comp code](./spotlight-purchase.md) | tenant_admin | 🔲 planned |
-| [Team & collaborators](./team-collaborators.md) | tenant_admin, partner_user | 🔲 planned |
+| [Library & atoms — upload, atomize, reuse](./library-atoms.md) | tenant_admin | ✅ written |
+| [Spotlight & purchase — cards → comp code](./spotlight-purchase.md) | tenant_admin | ✅ written |
+| [Team & collaborators](./team-collaborators.md) | tenant_admin, partner_user | ✅ written |
 | [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | ✅ written |
 
 Legend: ✅ written · 📝 in progress · 🔲 planned (todo below).
