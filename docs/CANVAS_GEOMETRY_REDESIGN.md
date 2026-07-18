@@ -402,10 +402,23 @@ page counts emerge and are reported.*
 > padded 15)** / Key Personnel 2 / Facilities 1 — no near-empty interior pages anywhere; the
 > decks are one-section-per-slide. 636 tests green (incl. `canvas-sections.test.ts`), `tsc` clean.
 
-**Phase 2 — Annotation atomizer.** The recommendation view + click/box/group/section
+**Phase 2 — Annotation atomizer. ✅ SHIPPED.** The recommendation view + click/box/group/section
 tools + bulk context tagging, writing atoms/groups/sections with `SourceAnchor` regions.
 *Outcome: upload a package and box-and-tag it into reusable, sectioned content in one
 pass.*
+
+> **As-built (2026-07-19).** `components/portal/atomizer.tsx` is the annotation
+> atomizer. Upload (`atoms/upload` now returns each block's real `nodes` +
+> `primaryType`) or paste → typed, selectable objects. Mint at the right GRAIN:
+> image → a **figure atom**; table/list → one **extendable atom** OR a **group of
+> rows/items** (`splitTableRows`/`splitListItems`); several objects → a **group**
+> ("Team Bios"). A **section tray** boxes a **section** over the groups/atoms you
+> made (a group-of-groups — "Team Section", tagged `kind:section`). A **session
+> FROM-pedigree** (agency/program/phase/sol/topic) stamps every mint; every atom
+> keeps a `SourceAnchor` to its source block. Verified against the live DB: figure
+> atom, table→2-row group, Team Bios group, Section=group-of-groups, context tags,
+> and lineage all persist. The box-drawing marquee over a rendered page (vs the
+> structured object list) is the one visual enhancement deferred.
 
 **Phase 3 — Slide geometry.** First-class `box{x,y,w,h}` per slide group + frame zones
 (title/content/image); make the pptx placement read boxes. *Outcome: slides stop

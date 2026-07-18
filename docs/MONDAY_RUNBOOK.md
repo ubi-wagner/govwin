@@ -112,7 +112,8 @@ every format — and its sections are now back in the library for the *next* pur
 | **Author templates (skeleton builder)** | `/admin/templates` → **New Template** → WYSIWYG canvas editor; Edit/Delete | `api/admin/templates` (create/PATCH/DELETE) |
 | **Upload + atomize a package** | `/portal/[t]/atoms` → **Upload package** | `atoms/atomize-package` → `lib/atomize-package.ts` |
 | **Browse + curate the library** | `/portal/[t]/atoms` → **Library** | `atoms` (list), `atoms/[id]` (detail/status) |
-| Refine / hand-shred one doc | `/portal/[t]/atoms` → **Atomize** | `atoms/upload`, `atoms` (create) |
+| **Annotation atomizer** (box-and-tag ingest) | `/portal/[t]/atoms` → **Atomize** | `atoms/upload` (typed blocks + nodes) → `atoms` (grain-aware create) |
+| ↳ image→figure atom · table/list→atom or group-of-rows/items · several→group ("Team Bios") · box a **section** (group-of-groups) · session FROM-pedigree stamps all | same | `splitTableRows`/`splitListItems`; `atom_members` for groups/sections |
 | Spotlight cards + buckets | `/portal/[t]/cards` | `tenant_opportunity_cards` / buckets |
 | Buy / create portal | `/portal/[t]/cards` (comp code), `/portal/[t]/portals` | `portal/[t]/purchase`, `portals/[portalId]` |
 | Build: draft / save / lock / advance / download | `/portal/[t]/proposals/[id]` | `sections/*`, `lock-scope`, `advance`, `artifacts/[id]/export` |
