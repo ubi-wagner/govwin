@@ -11,7 +11,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { exportToDocx } from '@/lib/export/docx-exporter';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -150,6 +151,18 @@ export async function POST(request: Request, ctx: RouteContext) {
         { error: 'Section not found', code: 'NOT_FOUND' },
         { status: 404 },
       );
+    }
+
+    // ── Section-level access — a collaborator scoped to one section can't export
+    //    another's content. (admin/tenant-wide member ⇒ all sections.)
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      const canView = access.viewableSections.includes(sectionId)
+        || access.commentableSections.includes(sectionId)
+        || access.editableSections.includes(sectionId);
+      if (!canView) {
+        return NextResponse.json({ error: 'You do not have access to this section', code: 'FORBIDDEN' }, { status: 403 });
+      }
     }
 
     const title = doc.metadata?.title || section.title || 'document';

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -66,6 +67,34 @@ export async function POST(_request: Request, ctx: RouteContext) {
 
     if (!proposal) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Load the comment (with its section) ──────────────────────────
+    let existing: { id: string; sectionId: string | null } | undefined;
+    try {
+      [existing] = await sql<{ id: string; sectionId: string | null }[]>`
+        SELECT id, section_id FROM proposal_comments
+        WHERE id = ${commentId} AND proposal_id = ${proposalId}
+        LIMIT 1
+      `;
+    } catch (dbErr) {
+      console.error('[api/portal/proposals/comments/resolve] comment query failed:', dbErr);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (!existing) {
+      return NextResponse.json({ error: 'Comment not found', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // ── Section-level access — a collaborator can only resolve comments on a
+    //    section they can reach (admin/tenant-wide member ⇒ all sections). ──
+    if (existing.sectionId && !hasRoleAtLeast(role, 'tenant_admin')) {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      const canReach = access.viewableSections.includes(existing.sectionId)
+        || access.commentableSections.includes(existing.sectionId)
+        || access.editableSections.includes(existing.sectionId);
+      if (!canReach) {
+        return NextResponse.json({ error: 'You do not have access to this section', code: 'FORBIDDEN' }, { status: 403 });
+      }
     }
 
     // ── Resolve the comment ──────────────────────────────────────────

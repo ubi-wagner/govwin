@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { harvestNodeToLibrary } from '@/lib/proposal-harvest';
 
@@ -63,6 +64,16 @@ export async function POST(
     } catch (e) {
       console.error('[atomize-node] proposal ownership check failed', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // ---------- Section-level EDIT access ----------
+    // Harvesting a node into the library is a curation action — a collaborator
+    // must hold EDIT access to THIS section (admin/tenant-wide member ⇒ all).
+    if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      if (!access.editableSections.includes(sectionId)) {
+        return NextResponse.json({ error: 'You do not have edit access to this section', code: 'FORBIDDEN' }, { status: 403 });
+      }
     }
 
     // ---------- Body ----------

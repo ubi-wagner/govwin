@@ -127,6 +127,13 @@ every format — and its sections are now back in the library for the *next* pur
 - **Tenant segmentation at every level.** Every library/portal write goes through
   `verifyTenantAccess` + RLS (`withTenant` sets `app.tenant_id`); the E2E asserts a
   second tenant sees zero atoms. Verified.
+- **Auth to any canvas/section is layered: middleware floor → tenant → proposal →
+  section.** `requiredRoleForPath` gates `/admin`→rfp_admin, `/portal`+`/api/portal`
+  →partner_user; routes then scope tenant + proposal; and section-scoped routes
+  (save/lock/versions/export/atomize-node/comment-resolve) enforce **per-section**
+  access via `resolveUserAccess` (admin/tenant-wide ⇒ all sections; a collaborator
+  ⇒ only granted). So a collaborator scoped to one section can't reach another's
+  content — the collaborator-landing model.
 - **Role-gated UI.** rfp_admin/master_admin: ingest + curation + release. tenant_admin:
   library + full portal build. Reads open to collaborators; partner_user is scoped.
 - **Same spine, any document size.** A one-page flier and a full multi-volume proposal
