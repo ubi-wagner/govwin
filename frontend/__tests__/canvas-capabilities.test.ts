@@ -7,8 +7,15 @@ describe('resolveCanvasCapabilities — one gate, role × stage × permission', 
     expect(c).toMatchObject({
       canEditContent: true, canFormat: true, canInsertLibrary: true, canDraftAI: true,
       canManageFloorplan: true, canAtomize: true, canManageStructure: true,
-      canComment: true, canExport: true,
+      canComment: true, canExport: true, canLock: true,
     });
+  });
+
+  it('Complete & Lock (canLock) is admin-only and gone once locked', () => {
+    expect(resolveCanvasCapabilities({ role: 'tenant_admin', stage: 'draft' }).canLock).toBe(true);
+    expect(resolveCanvasCapabilities({ role: 'tenant_user', stage: 'draft' }).canLock).toBe(false);
+    expect(resolveCanvasCapabilities({ role: 'partner_user', permission: 'edit', stage: 'draft' }).canLock).toBe(false);
+    expect(resolveCanvasCapabilities({ role: 'tenant_admin', stage: 'draft', locked: true }).canLock).toBe(false);
   });
 
   it('tenant_user drafting → author content, but NOT curation/floorplan/structure', () => {

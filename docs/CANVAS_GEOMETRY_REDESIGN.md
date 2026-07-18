@@ -397,12 +397,19 @@ Walked end-to-end across every actor (verified in `__tests__/canvas-toolbox.test
 | **Anyone** | locked (ToDo done) | **Review** | Review · `[Compliance · Export]` — read + comment + export |
 | **Automation** (agents) | headless | — | no sidebar; the same capability/route gates apply server-side |
 
-Each card is capability-gated (§8a) and stage-ordered. "Complete your ToDo" =
-lock the section, surfaced on the Review card (and rolled up in the workspace).
-The card *bodies* are today's panels (Compliance, Node/Format, Insert, Floorplan
-= Settings, Review = comments) plus the rails (Library insert, Annotate/Atomize)
-and actions (Template = Save-as-template, Export) — the toolbox just decides
-which appear, and in what order, for who.
+Each card is capability-gated (§8a) and stage-ordered. **The cards are actionable**
+(`onToolAction` / tab switch), not just indicators: Compliance/Insert/Format/
+Floorplan/Review → sidebar tabs; Library/Atomize/Export/Template → the editor's
+panels/rails/actions. **"Complete your ToDo" = Complete & Lock**, wired from the
+canvas (toolbar button + the Review tab) to the admin-gated section-lock route
+(`canLock`); a non-admin editor saves and an admin accepts+locks. The **Review
+tab** is the collaboration workbench — section comments + revise-on-canvas +
+Complete & Lock — so a collaborator's primary card is a first-class flow. The
+card *bodies* are today's panels (Compliance, Node/Format, Insert, Floorplan =
+Settings, Review = comments + lock) plus the editor rails (Library insert,
+Annotate/Atomize) and actions (Template = save-as-template from the canvas,
+Export) — the toolbox decides which appear, in what order, for who, and launches
+each.
 
 ## 9. Path to completion (phased, shippable, spine intact)
 

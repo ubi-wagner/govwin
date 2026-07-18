@@ -40,12 +40,14 @@ export interface CanvasCapabilities {
   canExport: boolean;
   /** section/group structure edits — drag-resize budgets, keep-together (Phase 4). */
   canManageStructure: boolean;
+  /** accept + lock the section (complete the ToDo) — admin action; server-gated. */
+  canLock: boolean;
 }
 
 const NONE: CanvasCapabilities = {
   canEditContent: false, canFormat: false, canManageFloorplan: false, canInsertLibrary: false,
   canAtomize: false, canAnnotate: false, canDraftAI: false, canComment: false, canExport: false,
-  canManageStructure: false,
+  canManageStructure: false, canLock: false,
 };
 
 export interface CapabilityInput {
@@ -90,6 +92,9 @@ export function resolveCanvasCapabilities(input: CapabilityInput): CanvasCapabil
   caps.canManageFloorplan = isTenantAdmin;
   caps.canManageStructure = isTenantAdmin;
   caps.canAtomize = isTenantAdmin;
+  // Accept + lock (complete the ToDo) is an admin action — matches the
+  // section lock route's `access.role === 'admin'` gate.
+  caps.canLock = isTenantAdmin;
   // The box-and-tag ingest atomizer belongs to an admin at ingest/template time
   // (the RFP admin curating, or the tenant admin building their own library).
   caps.canAnnotate = isTenantAdmin && (stage === 'ingest' || stage === 'template');

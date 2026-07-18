@@ -127,6 +127,7 @@ export function CanvasEditorPage({
           readOnly={readOnly}
           capabilities={capabilities}
           stage={stage}
+          onLocked={() => router.refresh()}
           proposalId={proposalId}
           sectionId={sectionId}
           tenantSlug={tenantSlug}

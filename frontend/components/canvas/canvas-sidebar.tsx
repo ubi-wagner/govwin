@@ -24,6 +24,8 @@ interface Props {
   capabilities?: CanvasCapabilities;
   /** Process stage for toolbox ordering ('draft' | 'review' | 'locked' | 'ingest' | 'template'). */
   stage?: string;
+  /** Launch an editor-hosted tool from a toolbox card (library/atomize/export/template/lock). */
+  onToolAction?: (id: string) => void;
   /** Current section category slug for library search (e.g. 'technical_approach') */
   sectionCategory?: string;
   onAddNode: (type: CanvasNode['type'], after?: string) => void;
@@ -316,6 +318,7 @@ export function CanvasSidebar({
   readOnly = false,
   capabilities,
   stage,
+  onToolAction,
   sectionCategory,
   onAddNode,
   onDeleteNode,
@@ -330,7 +333,7 @@ export function CanvasSidebar({
   tenantSlug,
   sectionId,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings'>('compliance');
+  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings' | 'review'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
   const maxPages = doc.canvas.max_pages;
@@ -345,17 +348,20 @@ export function CanvasSidebar({
 
   // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
   // user keeps the read panels (status, node info, history, comments).
+  const hasComments = Boolean(proposalId && tenantSlug && sectionId);
   const tabs = [
     'compliance' as const,
     'node' as const,
     ...(!readOnly ? ['add' as const] : []),
-    ...(proposalId && tenantSlug && sectionId ? ['history' as const] : []),
+    ...(hasComments ? ['review' as const] : []),
+    ...(hasComments ? ['history' as const] : []),
     ...(!readOnly ? ['settings' as const] : []),
   ];
 
   // The prioritized toolbox for this role×context — most-likely card first.
   const toolbox = capabilities ? toolboxFromCapabilities(capabilities, stage ?? (readOnly ? 'review' : 'draft')) : null;
-  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings' };
+  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings', review: 'review' };
+  const ACTION_CARDS = new Set(['library', 'atomize', 'export', 'template', 'lock']);
 
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
@@ -367,11 +373,13 @@ export function CanvasSidebar({
             {toolbox.cards.map((c) => {
               const tab = CARD_TAB[c.id];
               const isPrimary = toolbox.primary?.id === c.id;
-              const clickable = tab && tabs.includes(tab);
+              const toTab = tab && tabs.includes(tab);
+              const isAction = ACTION_CARDS.has(c.id) && !!onToolAction;
+              const clickable = !!toTab || isAction;
               return (
                 <button
                   key={c.id}
-                  onClick={() => clickable && setActiveTab(tab!)}
+                  onClick={() => (toTab ? setActiveTab(tab!) : isAction ? onToolAction!(c.id) : undefined)}
                   disabled={!clickable}
                   title={c.hint}
                   className={`w-full text-left flex items-start gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
@@ -790,6 +798,32 @@ export function CanvasSidebar({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Review tab — the collaboration workbench: comment · revise · complete ── */}
+        {activeTab === 'review' && proposalId && tenantSlug && sectionId && (
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Review · Modify · Lock</h3>
+              <p className="text-[11px] text-gray-400">
+                {readOnly ? 'You have review access — comment below.' : 'Comment, revise on the canvas, then complete this section.'}
+              </p>
+            </div>
+            {capabilities?.canLock ? (
+              <button
+                onClick={() => onToolAction?.('lock')}
+                className="w-full text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-2"
+                title="Save + accept & lock this section (complete the ToDo)"
+              >
+                Complete &amp; Lock this section
+              </button>
+            ) : !readOnly ? (
+              <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+                Save your edits — an admin accepts &amp; locks the section to complete it.
+              </p>
+            ) : null}
+            <CommentsSection nodeId={sectionId} proposalId={proposalId} tenantSlug={tenantSlug} />
           </div>
         )}
 

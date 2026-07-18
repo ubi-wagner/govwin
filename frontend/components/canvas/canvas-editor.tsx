@@ -47,6 +47,9 @@ interface Props {
   initialDocument: CanvasDocument;
   onSave: (doc: CanvasDocument) => Promise<void>;
   onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => Promise<void>;
+  /** Called after a successful Complete & Lock, so the host can refresh (the
+   *  server then re-renders the now-locked section read-only). */
+  onLocked?: () => void;
   variables?: Record<string, string>;
   readOnly?: boolean;
   /** The live tool set (role × stage × permission). When present, gates the
@@ -110,6 +113,7 @@ function CanvasEditorInner({
   readOnly = false,
   capabilities,
   stage,
+  onLocked,
   actorId,
   actorName,
   proposalId,
@@ -449,6 +453,57 @@ function CanvasEditorInner({
     }
   }, [doc, onSave]);
 
+  // ── Complete & Lock (finish the ToDo) — save, then POST the section lock
+  //    route (admin-gated server-side). On success, refresh so the server
+  //    re-renders the now-locked section read-only. ──
+  const handleCompleteLock = useCallback(async () => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    setSaving(true); setSaveError(null);
+    try {
+      if (dirty) await onSave(doc);
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/lock`, { method: 'POST' });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Lock failed'); }
+      setDirty(false);
+      onLocked?.();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Lock failed');
+    } finally {
+      setSaving(false);
+    }
+  }, [doc, dirty, onSave, onLocked, tenantSlug, proposalId, sectionId]);
+
+  // ── Save this canvas as a reusable template (skeleton). Admin-gated route. ──
+  const handleSaveTemplate = useCallback(async () => {
+    if (!tenantSlug) return;
+    const name = typeof window !== 'undefined' ? window.prompt('Template name', doc.metadata.title || 'Template') : null;
+    if (!name?.trim()) return;
+    const fmt = doc.canvas.format;
+    const templateType = fmt.startsWith('slide') ? 'slide_deck' : fmt === 'spreadsheet' ? 'cost_volume' : 'custom';
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/templates/extract`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canvas: doc, name: name.trim(), templateType }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Save template failed'); }
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save template failed');
+    }
+  }, [doc, tenantSlug]);
+
+  // ── One dispatch the sidebar toolbox cards call for editor-hosted tools. ──
+  const handleToolAction = useCallback((id: string) => {
+    if (id === 'library') setShowInsert((v) => !v);
+    else if (id === 'atomize') setShowAtomRail((v) => !v);
+    else if (id === 'template') handleSaveTemplate();
+    else if (id === 'lock') handleCompleteLock();
+    else if (id === 'export' && onExport) {
+      const fmt = doc.canvas.format.startsWith('slide') ? 'pptx' : doc.canvas.format === 'spreadsheet' ? 'xlsx' : 'docx';
+      onExport(doc, fmt).catch((err) => setSaveError(err instanceof Error ? err.message : 'Export failed'));
+    }
+  }, [doc, onExport, handleSaveTemplate, handleCompleteLock]);
+
   // ── Atomization rail wiring ──
   const atomItems: AtomBubble[] = useMemo(
     () =>
@@ -675,13 +730,25 @@ function CanvasEditorInner({
             {readOnly ? (
               <span className="px-2 py-1.5 text-xs text-gray-400 italic" title="You have view access to this section">read-only</span>
             ) : (
-              <button
-                onClick={handleSave}
-                disabled={saving || !dirty}
-                className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
-              >
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+              <>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !dirty}
+                  className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                {capabilities?.canLock && (
+                  <button
+                    onClick={handleCompleteLock}
+                    disabled={saving}
+                    title="Save + accept & lock this section (complete the ToDo)"
+                    className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded font-medium"
+                  >
+                    Complete &amp; Lock
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -758,6 +825,7 @@ function CanvasEditorInner({
         readOnly={readOnly}
         capabilities={capabilities}
         stage={stage}
+        onToolAction={handleToolAction}
         onAddNode={handleAddNode}
         onDeleteNode={handleDeleteNode}
         onMoveNode={handleMoveNode}
