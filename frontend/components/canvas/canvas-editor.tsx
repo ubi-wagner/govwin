@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
 import { createNode, getNodeText, toEditableFlat } from '@/lib/types/canvas-document';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
@@ -48,6 +49,9 @@ interface Props {
   onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => Promise<void>;
   variables?: Record<string, string>;
   readOnly?: boolean;
+  /** The live tool set (role × stage × permission). When present, gates the
+   *  fine tools (atomize / insert-from-library); falls back to !readOnly. */
+  capabilities?: CanvasCapabilities;
   actorId: string;
   actorName: string;
   /** Proposal ID — enables AI revision and comments when present */
@@ -102,6 +106,7 @@ function CanvasEditorInner({
   onExport,
   variables,
   readOnly = false,
+  capabilities,
   actorId,
   actorName,
   proposalId,
@@ -117,9 +122,10 @@ function CanvasEditorInner({
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
-  // ── Atomization rail: accept library-eligible nodes into the tenant library ──
-  const canAtomize = Boolean(tenantSlug && proposalId && sectionId && !readOnly);
-  const canInsertLibrary = Boolean(tenantSlug && !readOnly);
+  // ── Fine tools gated by the resolved capabilities (role × stage), falling back
+  //    to !readOnly when the caller hasn't resolved them yet. ──
+  const canAtomize = Boolean(tenantSlug && proposalId && sectionId && (capabilities?.canAtomize ?? !readOnly));
+  const canInsertLibrary = Boolean(tenantSlug && (capabilities?.canInsertLibrary ?? !readOnly));
   const [showAtomRail, setShowAtomRail] = useState(false);
   const [showInsert, setShowInsert] = useState(false);
   const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);

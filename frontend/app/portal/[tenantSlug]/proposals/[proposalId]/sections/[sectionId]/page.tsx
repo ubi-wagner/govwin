@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
 import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
+import { resolveCanvasCapabilities, type CanvasPermission, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
@@ -88,15 +89,19 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   // Anyone WITHOUT tenant-wide access (a partner_user, OR a cross-company
   // collaborator) is collaborator-scoped: only sections granted on THIS proposal
   // are viewable, and only 'edit'-granted sections are writable.
-  let partnerReadOnly = false;
+  // A collaborator's grant on THIS section → a CanvasPermission; tenant-wide
+  // members carry no grant (⇒ undefined ⇒ full edit in the capability resolver).
+  let permission: CanvasPermission | undefined;
   if (!isTenantWideMember(role, sessionUser.tenantId, tenantId)) {
     const access = await resolveUserAccess(userId, proposalId, tenantId);
-    const canView =
-      access.editableSections.includes(sectionId) ||
-      access.commentableSections.includes(sectionId) ||
-      access.viewableSections.includes(sectionId);
-    if (!canView) notFound();
-    partnerReadOnly = !access.editableSections.includes(sectionId);
+    permission = access.editableSections.includes(sectionId)
+      ? 'edit'
+      : access.commentableSections.includes(sectionId)
+        ? 'comment'
+        : access.viewableSections.includes(sectionId)
+          ? 'view'
+          : undefined;
+    if (!permission) notFound();
   }
 
   // If no canvas content yet, create an empty one with default preset
@@ -122,6 +127,18 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     });
   }
 
+  // Resolve the live tool set (role × stage × permission × type) — the one gate
+  // the canvas toolbars read. readOnly follows from it (no edit ⇒ read-only).
+  const fmt = canvasDoc.canvas?.format ?? 'letter';
+  const artifactType: CanvasArtifactType = fmt.startsWith('slide') ? 'slide' : fmt === 'spreadsheet' ? 'spreadsheet' : 'document';
+  const capabilities = resolveCanvasCapabilities({
+    role,
+    locked: proposal.isLocked || section.isLocked,
+    permission,
+    stage: 'draft',
+    artifactType,
+  });
+
   return (
     <CanvasEditorPage
       canvasDocument={canvasDoc}
@@ -130,7 +147,8 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       actorId={userId}
       actorName={userName}
       initialVersion={section.version}
-      readOnly={proposal.isLocked || partnerReadOnly || section.isLocked}
+      readOnly={!capabilities.canEditContent}
+      capabilities={capabilities}
       tenantSlug={tenantSlug}
     />
   );

@@ -8,6 +8,7 @@ import { useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasEditor } from './canvas-editor';
 import { useTool } from '@/lib/hooks/use-tool';
 
@@ -18,6 +19,8 @@ interface Props {
   actorId: string;
   actorName: string;
   readOnly?: boolean;
+  /** Resolved tool set (role × stage × permission) — threaded to the canvas. */
+  capabilities?: CanvasCapabilities;
   tenantSlug?: string;
   initialVersion?: number;
 }
@@ -29,6 +32,7 @@ export function CanvasEditorPage({
   actorId,
   actorName,
   readOnly = false,
+  capabilities,
   tenantSlug,
   initialVersion,
 }: Props) {
@@ -118,6 +122,7 @@ export function CanvasEditorPage({
           actorId={actorId}
           actorName={actorName}
           readOnly={readOnly}
+          capabilities={capabilities}
           proposalId={proposalId}
           sectionId={sectionId}
           tenantSlug={tenantSlug}
