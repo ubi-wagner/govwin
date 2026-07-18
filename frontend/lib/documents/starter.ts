@@ -161,9 +161,16 @@ export function starterFromTemplate(tpl: TemplateRow, opts: StarterOpts): Starte
   return { canvas, docType, title };
 }
 
-/** Count content nodes for the `node_count` column (flat or section layer). */
+/**
+ * Count content nodes for the `node_count` column (flat or section layer).
+ * Total-safe against a malformed section/group shape (client-supplied on save):
+ * a missing `groups`/`nodes` array contributes 0 rather than throwing.
+ */
 export function countNodes(canvas: CanvasDocument): number {
   if (Array.isArray(canvas.nodes) && canvas.nodes.length) return canvas.nodes.length;
-  if (Array.isArray(canvas.sections)) return canvas.sections.reduce((sum, s) => sum + s.groups.reduce((g, grp) => g + grp.nodes.length, 0), 0);
+  if (Array.isArray(canvas.sections)) {
+    return canvas.sections.reduce((sum, s) => sum
+      + (Array.isArray(s?.groups) ? s.groups.reduce((g, grp) => g + (Array.isArray(grp?.nodes) ? grp.nodes.length : 0), 0) : 0), 0);
+  }
   return 0;
 }

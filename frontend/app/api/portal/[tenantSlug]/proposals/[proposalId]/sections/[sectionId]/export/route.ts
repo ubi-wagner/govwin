@@ -221,11 +221,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       pdf: 'application/pdf',
     };
 
+    // Sanitize the title before it enters the header — a raw quote or CR/LF
+    // would corrupt or reject the Content-Disposition value.
+    const safe = title.replace(/[^a-z0-9._-]+/gi, '_') || 'document';
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': contentTypes[format],
-        'Content-Disposition': `attachment; filename="${title}.${format}"`,
+        'Content-Disposition': `attachment; filename="${safe}.${format}"`,
         'Content-Length': String(buffer.length),
       },
     });

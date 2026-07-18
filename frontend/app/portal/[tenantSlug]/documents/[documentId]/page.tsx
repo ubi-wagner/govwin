@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveDocumentCapabilities, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import { coerceJsonb } from '@/lib/jsonb';
+import { isValidUUID } from '@/lib/validation';
 import {
   createEmptyCanvas, CANVAS_PRESETS,
   type CanvasDocument,
@@ -38,6 +39,8 @@ export default async function PortalDocumentEditorPage({ params }: Props) {
   };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) redirect('/login?error=session');
+
+  if (!isValidUUID(documentId)) notFound();
 
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');

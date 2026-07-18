@@ -133,6 +133,9 @@ describe('countNodes', () => {
   it('empty → 0', () => {
     expect(countNodes({ version: 1, nodes: [] } as unknown as CanvasDocument)).toBe(0);
   });
+  it('malformed sections (missing groups/nodes) → 0, no throw', () => {
+    expect(countNodes({ version: 2, nodes: [], sections: [{}, { groups: [{}] }] } as unknown as CanvasDocument)).toBe(0);
+  });
 });
 
 describe('type guards', () => {
