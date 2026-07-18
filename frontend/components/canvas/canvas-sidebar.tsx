@@ -16,6 +16,8 @@ import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
 interface Props {
   document: CanvasDocument;
   selectedNode: CanvasNode | null;
+  /** View-only (locked proposal, or a comment/view-scoped collaborator) — hides edit affordances. */
+  readOnly?: boolean;
   /** Current section category slug for library search (e.g. 'technical_approach') */
   sectionCategory?: string;
   onAddNode: (type: CanvasNode['type'], after?: string) => void;
@@ -305,6 +307,7 @@ function VersionHistorySection({
 export function CanvasSidebar({
   document: doc,
   selectedNode,
+  readOnly = false,
   sectionCategory,
   onAddNode,
   onDeleteNode,
@@ -332,11 +335,21 @@ export function CanvasSidebar({
   const libraryNodes = doc.nodes.filter((n) => n.provenance.source === 'library').length;
   const manualNodes = doc.nodes.filter((n) => n.provenance.source === 'manual').length;
 
+  // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
+  // user keeps the read panels (status, node info, history, comments).
+  const tabs = [
+    'compliance' as const,
+    'node' as const,
+    ...(!readOnly ? ['add' as const] : []),
+    ...(proposalId && tenantSlug && sectionId ? ['history' as const] : []),
+    ...(!readOnly ? ['settings' as const] : []),
+  ];
+
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
       {/* Tabs */}
       <div className="flex border-b border-gray-200 text-xs">
-        {(['compliance', 'node', 'add', ...(proposalId && tenantSlug && sectionId ? ['history'] as const : []), 'settings'] as const).map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as typeof activeTab)}
@@ -459,21 +472,23 @@ export function CanvasSidebar({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-1">
-              <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
-              <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
-              <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
-              <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
-              <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
-              {onReplaceFromLibrary && (
-                <button
-                  onClick={() => setShowLibraryPicker((prev) => !prev)}
-                  className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
-                >
-                  Replace from Library
-                </button>
-              )}
-            </div>
+            {!readOnly && (
+              <div className="flex flex-wrap gap-1">
+                <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
+                <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
+                <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
+                <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
+                {onReplaceFromLibrary && (
+                  <button
+                    onClick={() => setShowLibraryPicker((prev) => !prev)}
+                    className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
+                  >
+                    Replace from Library
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Library picker — shown when "Replace from Library" is clicked */}
             {showLibraryPicker && onReplaceFromLibrary && (
@@ -492,7 +507,7 @@ export function CanvasSidebar({
             )}
 
             {/* ── Format ──────────────────────────────────── */}
-            {onUpdateNodeStyle && (
+            {!readOnly && onUpdateNodeStyle && (
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Format</h3>
 

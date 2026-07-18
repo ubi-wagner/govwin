@@ -23,7 +23,7 @@ import { randomUUID } from 'crypto';
 import { createHash } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
-import { getNodeText } from '@/lib/types/canvas-document';
+import { getNodeText, docNodes } from '@/lib/types/canvas-document';
 
 // ─── Section title → library category mapping ────────────────────────
 // Same mapping used in draft-all-sections.tsx for consistency.
@@ -224,7 +224,10 @@ async function harvestSectionNodes(
     // Not valid canvas JSON — skip
     return { atomsHarvested, atomsSkipped };
   }
-  if (!canvasDoc.nodes || !Array.isArray(canvasDoc.nodes)) {
+  // Flatten either shape (a v2 section-layer doc keeps content under `sections`,
+  // not `nodes`) so a template-provisioned section still harvests.
+  const docNodeList = docNodes(canvasDoc);
+  if (docNodeList.length === 0) {
     return { atomsHarvested, atomsSkipped };
   }
 
@@ -244,7 +247,7 @@ async function harvestSectionNodes(
     ...(ctx.namespace ? [`sol:${slugify(ctx.namespace)}`] : []),
   ];
 
-  for (const node of canvasDoc.nodes) {
+  for (const node of docNodeList) {
     if (!isHarvestable(node)) {
       atomsSkipped++;
       continue;

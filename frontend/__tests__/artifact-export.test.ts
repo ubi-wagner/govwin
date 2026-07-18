@@ -50,6 +50,24 @@ describe('assembleArtifactCanvas', () => {
     expect(doc.metadata.title).toBe('Technical Volume');
   });
 
+  it('splits a slide deck stored as ONE mold into one section per slide (not one overloaded slide)', () => {
+    const slide = { format: 'slide_16_9', width: 960, height: 540 };
+    const deck = [
+      { type: 'heading', content: { level: 1, text: 'Slide 1' } },
+      { type: 'page_break', content: null },
+      { type: 'heading', content: { level: 1, text: 'Slide 2' } },
+      { type: 'page_break', content: null },
+      { type: 'heading', content: { level: 1, text: 'Slide 3' } },
+    ];
+    const doc = assembleArtifactCanvas([sec('Deck', deck, slide)], 'narrative', 'Company Overview');
+    expect(doc.sections).toHaveLength(3); // 3 slides, NOT 1 collapsed slide
+    // the page_breaks are consumed as boundaries, not stacked into one slide
+    expect(sectionsToNodes(doc.sections!).filter((n) => n.type === 'page_break')).toHaveLength(0);
+    expect(sectionsToNodes(doc.sections!).map((n) => (n.content as { text: string }).text)).toEqual(['Slide 1', 'Slide 2', 'Slide 3']);
+    // subsequent slide-sections carry break_before (documents page-break; slides new-slide)
+    expect(doc.sections!.slice(1).every((s) => s.layout.break_before)).toBe(true);
+  });
+
   it('adopts the first section canvas that carries one', () => {
     const doc = assembleArtifactCanvas(
       [sec('A', [{ type: 'text_block', content: { text: 'x' } }], { format: 'slide_16_9', width: 960, height: 540 })],

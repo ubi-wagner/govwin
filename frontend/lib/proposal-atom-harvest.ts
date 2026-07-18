@@ -19,7 +19,7 @@
 import { withTenant } from '@/lib/rls';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
 import { textOfNodes } from '@/lib/atom-size';
-import type { CanvasNode } from '@/lib/types/canvas-document';
+import { docNodes, type CanvasNode, type CanvasDocument } from '@/lib/types/canvas-document';
 
 /** One document cocoon per proposal — created on the first section return. */
 export async function getOrCreateProposalCocoon(tenantId: string, proposalId: string, name: string): Promise<string> {
@@ -67,11 +67,16 @@ export async function harvestSectionToAtomLibrary(
   );
   if (!section) return null;
 
-  // Content is a stored CanvasDocument JSON string; extract nodes + text.
+  // Content is a stored CanvasDocument JSON string; extract nodes + text. A v2
+  // section-layer doc keeps content under `sections`, so flatten via docNodes.
   let nodes: CanvasNode[] = [];
   try {
-    const parsed = JSON.parse(section.content ?? '{}') as { nodes?: CanvasNode[] } | CanvasNode[];
-    nodes = Array.isArray(parsed) ? parsed : Array.isArray(parsed.nodes) ? parsed.nodes : [];
+    const parsed = JSON.parse(section.content ?? '{}') as CanvasDocument | CanvasNode[];
+    nodes = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray(parsed.sections) && parsed.sections.length) || Array.isArray(parsed.nodes)
+        ? docNodes(parsed as CanvasDocument)
+        : [];
   } catch { /* not valid canvas JSON → treat as empty */ }
   const text = textOfNodes(nodes);
   if (!text.trim()) return null; // nothing drafted yet — don't return an empty atom

@@ -334,6 +334,46 @@ longer fits turns red with "AI fit to budget" / "trim." Allow a temporary **over
 (e.g. +5 pages P1→P2) as an artifact policy — the gauge shows amber in the band, red past
 it — then "tighten to 10" by pulling section budgets down until green.
 
+## 8a. The ONE canvas — what's constant vs what varies (founder, 2026-07-18)
+
+**There is a single canvas ("browser") for every user, every role, every artifact
+type, every stage.** Switching from a locked Technical Volume to a Cost Volume — or
+logging in as a partner instead of the tenant admin — **does not swap the canvas.**
+Three things vary on top of the one constant shell:
+
+**Constant (the shell):** the editor chrome (title/status/save/export/undo), the
+document model (`document → header · footer · margins → section → group → atom`), the
+sidebar frame, and the library. Same component (`CanvasEditor`) mounted everywhere —
+admin and portal, via thin per-context wrappers (`CanvasEditorPage`,
+`TemplateCanvasEditor`). Confirmed: no fork.
+
+1. **Content rendering — varies by ARTIFACT TYPE.** A document paginates + flows
+   (`CanvasRenderer`), a deck lays out slides (`SlideEditor`), a spreadsheet is a grid
+   (`SheetEditor`). Same shell, swap the *inner renderer* — never the shell. *(Divergence
+   to reconcile: `SheetEditor` is currently an early-return fork with its own chrome;
+   it must become a renderer inside the common shell, the way `SlideEditor` already is.)*
+
+2. **Tools — vary by ROLE × PROCESS-STAGE.** All toolbars exist for everyone; their
+   **enabled/visible** state is resolved from `(role × stage × artifact-type × permission)`
+   — not hidden per-user, *gated* per-context. Ingest/curation → the annotate+atomize
+   toolbar; draft → format + insert-from-library + AI-draft; review → comment; lock →
+   read + export. A partner_user in review sees comment enabled; a tenant_admin in draft
+   sees the full authoring set; a locked section is read+export only. This is a single
+   pure resolver — `resolveCanvasCapabilities({ role, stage, artifactType, permission })
+   → { canFormat, canInsertLibrary, canAtomize, canAnnotate, canComment, canDraftAI,
+   canEditStructure, canManageFloorplan, … }` — that every toolbar/panel reads, so the
+   gating is defined once and identical across the shell. (Today's `readOnly` +
+   `canAtomize`/`canInsertLibrary` flags are the seed of this resolver.)
+
+3. **Data — varies by the DOCUMENT loaded.** Same shell, different content; a v2
+   section doc normalizes to editable flat nodes on load (`toEditableFlat`) and
+   re-sections on export.
+
+**Net:** one canvas; the renderer follows the artifact type, the tools follow role×stage,
+the content follows the document. That is the whole document-and-library solution — and
+because the foundation is already one shared editor, reaching it is an evolution (a
+capabilities resolver + folding `SheetEditor` into the shell), not a greenfield.
+
 ## 9. Path to completion (phased, shippable, spine intact)
 
 **Phase 1 — Section layer + retire the page-break hack (fixes continuity). ✅ SHIPPED.**

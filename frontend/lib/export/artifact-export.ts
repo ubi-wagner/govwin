@@ -47,6 +47,18 @@ function fallbackCanvas(artifactType: string | null | undefined): CanvasRules {
   return CANVAS_PRESETS.letter_sbir_phase1;
 }
 
+/** Split a node run on `page_break` into chunks (each chunk = one slide / one page-broken block). */
+function splitOnPageBreak(nodes: CanvasNode[]): CanvasNode[][] {
+  const chunks: CanvasNode[][] = [];
+  let cur: CanvasNode[] = [];
+  for (const n of nodes) {
+    if (n.type === 'page_break') { if (cur.length) chunks.push(cur); cur = []; }
+    else cur.push(n);
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+
 /** Flatten one mold's stored content (v1 nodes or a v2 section blob) to nodes. */
 type ParsedMold = { canvas?: CanvasRules; nodes?: unknown; sections?: unknown };
 function moldNodes(content: string | null): { nodes: CanvasNode[]; canvas: CanvasRules | null } {
@@ -80,13 +92,19 @@ export function assembleArtifactCanvas(
     const { nodes, canvas: secCanvas } = moldNodes(s.content);
     if (nodes.length === 0) continue;
     if (!canvas && secCanvas) canvas = secCanvas;
-    const groups = coalesceGroups(nodes);
-    if (groups.length === 0) continue;
-    outSections.push({
-      id: crypto.randomUUID(),
-      title: s.title ?? undefined,
-      layout: { mode: 'flow' },
-      groups,
+    // A single mold may itself contain page_breaks — a whole slide deck stored as
+    // one section, or a document with a deliberate break. Split on them so each
+    // becomes its own section (⇒ its own slide for pptx; a break_before page for
+    // documents). Molds still FLOW into each other (no break between molds).
+    splitOnPageBreak(nodes).forEach((chunk, ci) => {
+      const groups = coalesceGroups(chunk);
+      if (groups.length === 0) return;
+      outSections.push({
+        id: crypto.randomUUID(),
+        ...(ci === 0 && s.title ? { title: s.title } : {}),
+        layout: { mode: 'flow', ...(ci > 0 ? { break_before: true } : {}) },
+        groups,
+      });
     });
   }
   return {

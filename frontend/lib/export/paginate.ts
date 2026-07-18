@@ -70,6 +70,8 @@ function metricsOf(doc: CanvasDocument): Metrics {
 /** Estimated rendered height (points) of one node. */
 function nodeHeight(node: CanvasNode, mt: Metrics): number {
   const lh = mt.lineHeight;
+  // Malformed / content-less node — don't dereference (getNodeText guards the same).
+  if (node.content == null) return node.type === 'page_break' ? 0 : lh;
   const wrap = (text: string) => Math.max(1, Math.ceil((text?.length ?? 0) / mt.charsPerLine));
   switch (node.type) {
     case 'heading': {

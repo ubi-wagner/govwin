@@ -3,7 +3,7 @@ import { coerceJsonb } from '@/lib/jsonb';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
-import { getNodeText, type CanvasNode } from '@/lib/types/canvas-document';
+import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
 
 /**
  * Shared proposal stage-advance core.
@@ -19,10 +19,10 @@ import { getNodeText, type CanvasNode } from '@/lib/types/canvas-document';
 export function extractCanvasText(content: string | null): string {
   if (!content) return '';
   try {
-    const doc = JSON.parse(content) as { nodes?: unknown[] };
-    if (!Array.isArray(doc.nodes)) return '';
-    return doc.nodes
-      .map((n) => getNodeText(n as CanvasNode))
+    // Flatten either shape — a v2 section-layer doc keeps content under `sections`.
+    const doc = JSON.parse(content) as CanvasDocument;
+    return docNodes(doc)
+      .map((n) => getNodeText(n))
       .filter(Boolean)
       .join('\n\n')
       .trim();

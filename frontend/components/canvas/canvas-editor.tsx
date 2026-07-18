@@ -621,22 +621,26 @@ function CanvasEditorInner({
                 Export .xlsx
               </button>
             )}
-            <button
-              onClick={handleUndo}
-              disabled={undoStack.length === 0}
-              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
-            >
-              Undo
-            </button>
-            <button
-              onClick={handleRedo}
-              disabled={redoStack.length === 0}
-              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
-            >
-              Redo
-            </button>
+            {!readOnly && (
+              <>
+                <button
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
+                >
+                  Undo
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={redoStack.length === 0}
+                  className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
+                >
+                  Redo
+                </button>
+              </>
+            )}
             {canInsertLibrary && (
               <button
                 onClick={() => setShowInsert((v) => !v)}
@@ -659,13 +663,17 @@ function CanvasEditorInner({
                 Library{atomItems.length > 0 ? ` (${atomItems.length})` : ''}
               </button>
             )}
-            <button
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+            {readOnly ? (
+              <span className="px-2 py-1.5 text-xs text-gray-400 italic" title="You have view access to this section">read-only</span>
+            ) : (
+              <button
+                onClick={handleSave}
+                disabled={saving || !dirty}
+                className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -738,6 +746,7 @@ function CanvasEditorInner({
       <CanvasSidebar
         document={doc}
         selectedNode={selectedNode}
+        readOnly={readOnly}
         onAddNode={handleAddNode}
         onDeleteNode={handleDeleteNode}
         onMoveNode={handleMoveNode}
