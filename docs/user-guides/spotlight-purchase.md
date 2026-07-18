@@ -15,16 +15,23 @@ team releases opportunities to your tenant.
 Click **Opportunities** in the left nav. This is your **spotlight** — live
 opportunity cards, ranked by your spotlight buckets.
 
-![The Opportunity Pipeline — ranked cards (shown here before any are released)](./img/portal-cards.png)
+![The Opportunity Pipeline — live DoD SBIR/STTR (DSIP) opportunity cards](./img/portal-cards.png)
 
-Until the RFP team releases opportunities to you, you'll see *"No opportunities
-yet — cards appear here as the RFP team releases opportunities."* Once released,
-each **card** shows the opportunity, its fit summary, and its bucket ranking.
+Each **card** shows the opportunity's title and topic code, its component
+(DARPA, Navy, …), program/phase, and **close date** — plus **Pin (copy docs)** to
+pull its documents local and **Build →** to start a proposal. The cards above are
+real current **DoD SBIR 2026 (DSIP)** topics — DARPA's MANTRAS (Rydberg atomic
+sensors), ExCAIPE (air-independent power), FALCON (ML + LLMs), and a NAVWAR open
+topic, among others.
 
 - **Include closed** toggles closed opportunities in/out.
 - **Refresh** re-pulls the latest.
 - Open **Buckets** (left nav) to see *how* opportunities are scored and ranked for
   your company.
+
+> **New tenant?** Until the RFP team releases opportunities to you, this reads
+> *"No opportunities yet — cards appear here as the RFP team releases
+> opportunities."* Cards populate as the pipeline pushes live topics.
 
 ---
 

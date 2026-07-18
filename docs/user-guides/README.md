@@ -173,4 +173,10 @@ via `executablePath` (the project pins a newer Playwright than the cached
 browser), so no `playwright install` is needed.
 
 > **Demo data.** Guides are shot against a seeded demo tenant (**Acme Navy
-> Systems**) so screens are populated. Your real screens show your own data.
+> Systems**) so screens are populated. Your real screens show your own data. The
+> **opportunities are real current DoD SBIR 2026 (DSIP) topics** — DARPA DSO/BTO
+> and NAVWAR FY26 releases (MANTRAS, ExCAIPE, FALCON, …) — seeded via
+> `frontend/scripts/seed-dsip-opps.mts`, which drives the product's own
+> publish→fan-out so they land on both the admin triage queue and the tenant
+> spotlight (auto-scored). Codes/titles/dates verified from public sources
+> (dodsbirsttr.mil / darpa.mil).

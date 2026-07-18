@@ -31,10 +31,13 @@ Two ways in, both under **Opportunities**:
 
 New solicitations land in the **RFP Triage Queue**.
 
-![The RFP triage queue — incoming solicitations with Claim](./img/admin-rfp-curation.png)
+![The RFP triage queue — live DoD SBIR (DSIP) solicitations awaiting curation](./img/admin-rfp-curation.png)
 
-Each row shows the title, source, agency, status (`new`), namespace, and ingest
-date. Click **Claim** to take a solicitation and open its curation workspace.
+Each row shows the title, **source** (here `dsip`), agency (DARPA, Navy, …),
+status (`new`), namespace, and ingest date. The queue above holds real current
+**DoD SBIR 2026 (DSIP)** topics — DARPA DSO/BTO and NAVWAR releases; a superseded
+notice is shown `dismissed`. Click **Claim** to take a solicitation and open its
+curation workspace.
 
 ---
 
