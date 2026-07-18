@@ -9,6 +9,7 @@
  */
 
 import ExcelJS from 'exceljs';
+import { docNodes } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
@@ -41,7 +42,8 @@ export async function exportToXlsx(
   doc: CanvasDocument,
   variables: Record<string, string> = {},
 ): Promise<Buffer> {
-  const { nodes } = doc;
+  // Flat node view of either shape (a v2 doc's tables live under sections).
+  const nodes = docNodes(doc);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = variables.company_name ?? 'GovWin';

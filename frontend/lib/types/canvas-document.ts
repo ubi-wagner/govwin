@@ -551,25 +551,36 @@ export function liftToFlowSections(doc: CanvasDocument): CanvasDocument {
   if (chunks.length === 0) chunks.push([]);
 
   const sections: CanvasSection[] = chunks.map((chunk) => {
-    const groups: CanvasGroup[] = [];
-    let buf: CanvasNode[] = [];
-    const flush = () => { if (buf.length) { groups.push({ id: crypto.randomUUID(), nodes: buf }); buf = []; } };
-    for (let i = 0; i < chunk.length; i++) {
-      const n = chunk[i];
-      if (n.type === 'image' || n.type === 'table') {
-        flush();
-        const nodes = [n];
-        if (chunk[i + 1]?.type === 'caption') { nodes.push(chunk[i + 1]); i++; }
-        groups.push({ id: crypto.randomUUID(), keep_together: true, nodes });
-      } else {
-        buf.push(n);
-      }
-    }
-    flush();
+    const groups = coalesceGroups(chunk);
     if (groups.length === 0) groups.push({ id: crypto.randomUUID(), nodes: [] });
     return { id: crypto.randomUUID(), title: firstHeadingText(chunk), layout: { mode: 'flow' }, groups };
   });
   return { ...doc, version: 2, nodes: [], sections };
+}
+
+/**
+ * Coalesce a flat node run into groups: each image/table (plus its following
+ * caption) becomes its own `keep_together` group so a figure never splits from
+ * its caption; runs of other nodes flow together in a plain group. Shared by
+ * `liftToFlowSections` and the export assembly (each mold → one flow section).
+ */
+export function coalesceGroups(nodes: CanvasNode[]): CanvasGroup[] {
+  const groups: CanvasGroup[] = [];
+  let buf: CanvasNode[] = [];
+  const flush = () => { if (buf.length) { groups.push({ id: crypto.randomUUID(), nodes: buf }); buf = []; } };
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.type === 'image' || n.type === 'table') {
+      flush();
+      const grp = [n];
+      if (nodes[i + 1]?.type === 'caption') { grp.push(nodes[i + 1]); i++; }
+      groups.push({ id: crypto.randomUUID(), keep_together: true, nodes: grp });
+    } else {
+      buf.push(n);
+    }
+  }
+  flush();
+  return groups;
 }
 
 /** Build a section from groups (or a flat node run wrapped in one group). */

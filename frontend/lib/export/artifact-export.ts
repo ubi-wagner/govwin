@@ -11,8 +11,8 @@
  * pdf-exporter's dynamic import — an infra dependency; callers should surface a
  * clear error when Chromium is unavailable.
  */
-import type { CanvasDocument, CanvasNode, CanvasRules } from '@/lib/types/canvas-document';
-import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
+import type { CanvasDocument, CanvasNode, CanvasRules, CanvasSection } from '@/lib/types/canvas-document';
+import { CANVAS_PRESETS, coalesceGroups, sectionsToNodes } from '@/lib/types/canvas-document';
 import { exportToDocx } from './docx-exporter';
 
 export type ExportFormat = 'docx' | 'pptx' | 'xlsx' | 'pdf';
@@ -41,48 +41,60 @@ export function resolveArtifactFormat(
   return 'docx';
 }
 
-function pageBreak(): CanvasNode {
-  return { id: crypto.randomUUID(), type: 'page_break', content: null, style: {}, provenance: { source: 'template' }, history: [], library_eligible: false };
-}
-
 /** A default canvas by artifact type when a section carries none. */
 function fallbackCanvas(artifactType: string | null | undefined): CanvasRules {
   if (artifactType === 'cost') return CANVAS_PRESETS.spreadsheet;
   return CANVAS_PRESETS.letter_sbir_phase1;
 }
 
+/** Flatten one mold's stored content (v1 nodes or a v2 section blob) to nodes. */
+type ParsedMold = { canvas?: CanvasRules; nodes?: unknown; sections?: unknown };
+function moldNodes(content: string | null): { nodes: CanvasNode[]; canvas: CanvasRules | null } {
+  let parsed: ParsedMold | null = null;
+  try {
+    parsed = content ? (JSON.parse(content) as ParsedMold) : null;
+  } catch {
+    parsed = null;
+  }
+  const nodes: CanvasNode[] = Array.isArray(parsed?.sections) && parsed.sections.length
+    ? sectionsToNodes(parsed.sections as CanvasSection[])
+    : Array.isArray(parsed?.nodes) ? (parsed.nodes as CanvasNode[]) : [];
+  return { nodes, canvas: parsed?.canvas ?? null };
+}
+
 /**
- * Assemble an artifact's ordered section canvases into one CanvasDocument:
- * the first section's canvas rules (or a type default) + every section's nodes,
- * separated by a page break. Malformed section content is skipped, not fatal.
+ * Assemble an artifact's ordered molds into ONE v2 CanvasDocument that FLOWS:
+ * each mold becomes a `flow` CanvasSection (figures/tables kept together), with
+ * NO forced page breaks between molds — content runs continuously and the page
+ * count emerges (the fix for bottom-of-page gaps between sections). The first
+ * mold's canvas rules win; malformed/empty mold content is skipped, not fatal.
  */
 export function assembleArtifactCanvas(
   sections: Array<{ title: string | null; content: string | null }>,
   artifactType: string | null | undefined,
   title: string,
 ): CanvasDocument {
-  const nodes: CanvasNode[] = [];
+  const outSections: CanvasSection[] = [];
   let canvas: CanvasRules | null = null;
-  let placed = 0;
   for (const s of sections) {
-    let parsed: { canvas?: CanvasRules; nodes?: unknown } | null = null;
-    try {
-      parsed = s.content ? (JSON.parse(s.content) as { canvas?: CanvasRules; nodes?: unknown }) : null;
-    } catch {
-      parsed = null;
-    }
-    const secNodes: CanvasNode[] = Array.isArray(parsed?.nodes) ? (parsed!.nodes as CanvasNode[]) : [];
-    if (secNodes.length === 0) continue;
-    if (!canvas && parsed?.canvas) canvas = parsed.canvas;
-    if (placed > 0) nodes.push(pageBreak());
-    nodes.push(...secNodes);
-    placed++;
+    const { nodes, canvas: secCanvas } = moldNodes(s.content);
+    if (nodes.length === 0) continue;
+    if (!canvas && secCanvas) canvas = secCanvas;
+    const groups = coalesceGroups(nodes);
+    if (groups.length === 0) continue;
+    outSections.push({
+      id: crypto.randomUUID(),
+      title: s.title ?? undefined,
+      layout: { mode: 'flow' },
+      groups,
+    });
   }
   return {
-    version: 1,
+    version: 2,
     document_id: crypto.randomUUID(),
     canvas: canvas ?? fallbackCanvas(artifactType),
-    nodes,
+    nodes: [],
+    sections: outSections,
     metadata: {
       title, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '',
       created_at: '', last_modified_at: '', last_modified_by: '', version_number: 1, status: 'accepted',

@@ -21,6 +21,7 @@ import JSZip from 'jszip';
 import {
   CANVAS_PRESETS,
   sectionsToNodes,
+  coalesceGroups,
   type CanvasDocument,
   type CanvasNode,
   type CanvasSection,
@@ -440,48 +441,33 @@ export async function POST(request: Request, ctx: RouteContext) {
         parsedSections.find((s) => s.canvas)?.canvas ??
         CANVAS_PRESETS.letter_standard;
 
-      const allNodes: CanvasNode[] = [];
-      for (const section of parsedSections) {
-        // Add a heading node for each section
-        allNodes.push({
+      // One FLOW section per mold — its H1 heading then its content, figures/
+      // tables kept together. No forced page breaks between molds: the whole
+      // proposal flows continuously (headings mark the sections).
+      const docSections: CanvasSection[] = parsedSections.map((section) => {
+        const headingNode: CanvasNode = {
           id: crypto.randomUUID(),
           type: 'heading',
-          content: {
-            level: 1 as const,
-            text: `${section.sectionNumber}. ${section.title}`,
-          },
+          content: { level: 1 as const, text: `${section.sectionNumber}. ${section.title}` },
           style: {},
-          provenance: {
-            source: 'manual',
-            drafted_at: new Date().toISOString(),
-          },
+          provenance: { source: 'manual', drafted_at: new Date().toISOString() },
           history: [],
           library_eligible: false,
-        });
-        // Append the section's canvas nodes
-        allNodes.push(...section.nodes);
-        // Add a page break between sections (except after the last)
-        if (section !== parsedSections[parsedSections.length - 1]) {
-          allNodes.push({
-            id: crypto.randomUUID(),
-            type: 'page_break',
-            content: null,
-            style: {},
-            provenance: {
-              source: 'manual',
-              drafted_at: new Date().toISOString(),
-            },
-            history: [],
-            library_eligible: false,
-          });
-        }
-      }
+        };
+        return {
+          id: crypto.randomUUID(),
+          title: section.title,
+          layout: { mode: 'flow' as const },
+          groups: coalesceGroups([headingNode, ...section.nodes]),
+        };
+      });
 
       const combinedDoc: CanvasDocument = {
-        version: 1,
+        version: 2,
         document_id: crypto.randomUUID(),
         canvas: firstCanvas,
-        nodes: allNodes,
+        nodes: [],
+        sections: docSections,
         metadata: {
           title: proposal.title,
           volume_id: '',

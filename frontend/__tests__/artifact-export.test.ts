@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveArtifactFormat, assembleArtifactCanvas } from '@/lib/export/artifact-export';
+import { sectionsToNodes } from '@/lib/types/canvas-document';
 
 describe('resolveArtifactFormat', () => {
   it('honors an explicit, valid requested format', () => {
@@ -34,13 +35,18 @@ describe('assembleArtifactCanvas', () => {
   const sec = (title: string, nodes: unknown[], canvas?: unknown) =>
     ({ title, content: JSON.stringify({ version: 1, ...(canvas ? { canvas } : {}), nodes }) });
 
-  it('merges multiple sections with a page break between them', () => {
+  it('merges multiple molds as FLOW sections — no forced page break between them', () => {
     const doc = assembleArtifactCanvas(
       [sec('A', [{ type: 'heading', content: { level: 1, text: 'A' } }]), sec('B', [{ type: 'heading', content: { level: 1, text: 'B' } }])],
       'narrative', 'Technical Volume',
     );
-    const types = doc.nodes.map((n) => n.type);
-    expect(types).toEqual(['heading', 'page_break', 'heading']);
+    expect(doc.version).toBe(2);
+    expect(doc.sections).toHaveLength(2); // one flow section per mold
+    expect(doc.sections!.every((s) => s.layout.mode === 'flow')).toBe(true);
+    expect(doc.sections!.every((s) => !s.layout.break_before)).toBe(true);
+    // content is continuous — no page_break node injected between molds
+    const types = sectionsToNodes(doc.sections!).map((n) => n.type);
+    expect(types).toEqual(['heading', 'heading']);
     expect(doc.metadata.title).toBe('Technical Volume');
   });
 
@@ -57,8 +63,9 @@ describe('assembleArtifactCanvas', () => {
       [{ title: 'bad', content: '{not json' }, { title: 'empty', content: JSON.stringify({ nodes: [] }) }, sec('C', [{ type: 'text_block', content: { text: 'ok' } }])],
       'narrative', 'V',
     );
-    // only the one valid, non-empty section contributes — no leading page break
-    expect(doc.nodes.map((n) => n.type)).toEqual(['text_block']);
+    // only the one valid, non-empty mold contributes — one flow section, no breaks
+    expect(doc.sections).toHaveLength(1);
+    expect(sectionsToNodes(doc.sections!).map((n) => n.type)).toEqual(['text_block']);
   });
 
   it('falls back to a preset canvas by type when no section carries one', () => {
