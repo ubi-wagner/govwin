@@ -131,13 +131,11 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   // the canvas toolbars read. readOnly follows from it (no edit ⇒ read-only).
   const fmt = canvasDoc.canvas?.format ?? 'letter';
   const artifactType: CanvasArtifactType = fmt.startsWith('slide') ? 'slide' : fmt === 'spreadsheet' ? 'spreadsheet' : 'document';
-  const capabilities = resolveCanvasCapabilities({
-    role,
-    locked: proposal.isLocked || section.isLocked,
-    permission,
-    stage: 'draft',
-    artifactType,
-  });
+  const locked = proposal.isLocked || section.isLocked;
+  const capabilities = resolveCanvasCapabilities({ role, locked, permission, stage: 'draft', artifactType });
+  // Toolbox ordering: a locked/completed section → review; a view/comment
+  // collaborator (can't edit) → review-first; otherwise the drafting toolbox.
+  const stage = locked ? 'locked' : capabilities.canEditContent ? 'draft' : 'review';
 
   return (
     <CanvasEditorPage
@@ -149,6 +147,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       initialVersion={section.version}
       readOnly={!capabilities.canEditContent}
       capabilities={capabilities}
+      stage={stage}
       tenantSlug={tenantSlug}
     />
   );

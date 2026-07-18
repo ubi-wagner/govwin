@@ -118,6 +118,7 @@ every format — and its sections are now back in the library for the *next* pur
 | Buy / create portal | `/portal/[t]/cards` (comp code), `/portal/[t]/portals` | `portal/[t]/purchase`, `portals/[portalId]` |
 | Build: draft / save / lock / advance / download | `/portal/[t]/proposals/[id]` | `sections/*`, `lock-scope`, `advance`, `artifacts/[id]/export` |
 | **Edit: insert + format toolbar** (all doc types) | canvas editor top bar (`CanvasToolbar`) | per-node handlers; per-section export docx/pptx/xlsx/**pdf** |
+| **Role×context toolbox** (sidebar card list, most-likely on top) | canvas sidebar header | `resolveCanvasCapabilities` → `resolveCanvasToolbox`; one canvas, tools vary by role×stage |
 | **Per-volume page-budget gauge** (pages/slides/tabs) | proposal workspace Artifacts tab (`VolumeLayoutGauge`) | `artifacts/[id]/layout` → `paginate()` |
 | **Save volume as template** (extract skeleton) | Artifacts tab → **Save as template** (`SaveAsTemplate`) | `templates/extract` → `lib/templates/extract-skeleton` |
 

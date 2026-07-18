@@ -21,6 +21,8 @@ interface Props {
   readOnly?: boolean;
   /** Resolved tool set (role × stage × permission) — threaded to the canvas. */
   capabilities?: CanvasCapabilities;
+  /** Process stage — orders the sidebar toolbox. */
+  stage?: string;
   tenantSlug?: string;
   initialVersion?: number;
 }
@@ -33,6 +35,7 @@ export function CanvasEditorPage({
   actorName,
   readOnly = false,
   capabilities,
+  stage,
   tenantSlug,
   initialVersion,
 }: Props) {
@@ -123,6 +126,7 @@ export function CanvasEditorPage({
           actorName={actorName}
           readOnly={readOnly}
           capabilities={capabilities}
+          stage={stage}
           proposalId={proposalId}
           sectionId={sectionId}
           tenantSlug={tenantSlug}

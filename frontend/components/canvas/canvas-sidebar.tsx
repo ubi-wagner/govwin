@@ -12,12 +12,18 @@ import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
 import { CommentThread, type NodeComment } from './collaboration';
 import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
+import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 
 interface Props {
   document: CanvasDocument;
   selectedNode: CanvasNode | null;
   /** View-only (locked proposal, or a comment/view-scoped collaborator) — hides edit affordances. */
   readOnly?: boolean;
+  /** Resolved tool set (role × stage) — drives the prioritized toolbox card list. */
+  capabilities?: CanvasCapabilities;
+  /** Process stage for toolbox ordering ('draft' | 'review' | 'locked' | 'ingest' | 'template'). */
+  stage?: string;
   /** Current section category slug for library search (e.g. 'technical_approach') */
   sectionCategory?: string;
   onAddNode: (type: CanvasNode['type'], after?: string) => void;
@@ -308,6 +314,8 @@ export function CanvasSidebar({
   document: doc,
   selectedNode,
   readOnly = false,
+  capabilities,
+  stage,
   sectionCategory,
   onAddNode,
   onDeleteNode,
@@ -345,8 +353,43 @@ export function CanvasSidebar({
     ...(!readOnly ? ['settings' as const] : []),
   ];
 
+  // The prioritized toolbox for this role×context — most-likely card first.
+  const toolbox = capabilities ? toolboxFromCapabilities(capabilities, stage ?? (readOnly ? 'review' : 'draft')) : null;
+  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings' };
+
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+      {/* Toolbox — the role×context card list (most-likely tool on top). */}
+      {toolbox && toolbox.cards.length > 0 && (
+        <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Your toolbox</div>
+          <div className="space-y-1">
+            {toolbox.cards.map((c) => {
+              const tab = CARD_TAB[c.id];
+              const isPrimary = toolbox.primary?.id === c.id;
+              const clickable = tab && tabs.includes(tab);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => clickable && setActiveTab(tab!)}
+                  disabled={!clickable}
+                  title={c.hint}
+                  className={`w-full text-left flex items-start gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
+                    isPrimary ? 'bg-blue-50 border border-blue-200' : c.ambient ? 'text-gray-400' : 'hover:bg-white border border-transparent'
+                  } ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+                >
+                  <span className={isPrimary ? 'text-blue-500' : 'text-gray-300'}>{isPrimary ? '★' : '·'}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`font-medium ${isPrimary ? 'text-blue-700' : c.ambient ? 'text-gray-400' : 'text-gray-700'}`}>{c.title}</span>
+                    {isPrimary && <span className="block text-[10px] text-gray-400 truncate">{c.hint}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-gray-200 text-xs">
         {tabs.map((tab) => (

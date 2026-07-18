@@ -374,6 +374,36 @@ the content follows the document. That is the whole document-and-library solutio
 because the foundation is already one shared editor, reaching it is an evolution (a
 capabilities resolver + folding `SheetEditor` into the shell), not a greenfield.
 
+## 8b. The toolbox — the sidebar as a role×context card list (founder)
+
+The sidebar is **one component-card list**. Which cards show, and their order
+(**most-likely-for-this-context first**), is resolved by `resolveCanvasToolbox`
+(`lib/canvas/toolbox.ts`) on top of the capability resolver. `cards[0]` is the
+**primary** tool for the (role × context); ambient cards (Compliance/Status,
+Export) sort last. Sometimes the list is essentially one card; sometimes many.
+Walked end-to-end across every actor (verified in `__tests__/canvas-toolbox.test.ts`):
+
+| Actor (role) | Context | Primary card | Toolbox (ordered · `[ambient]`) |
+|---|---|---|---|
+| **Collaborator** (partner_user) | review · comment grant | **Review · Modify · Lock** | Review · `[Compliance · Export]` — *essentially one card* |
+| Collaborator | draft · edit grant | **Insert** | Insert · Format · Library · AI · Review · `[…]` |
+| Collaborator | view grant | *(none)* | `[Compliance · Export]` only |
+| **RFP Admin** | **ingest an RFP** | **Annotate & Atomize** | Annotate · Template · Sections · Floorplan · Insert · Format · Library · AI · `[…]` — *many* |
+| RFP Admin / Tenant Admin | template building | **Template** | Template · Sections · Floorplan · Insert · Format · Annotate · Library · `[…]` |
+| **Tenant Admin** | proposal build (draft) | **Insert** | Insert · Format · Library · AI · Sections · Floorplan · Template · `[…]` |
+| Tenant Admin | review | **Review · Modify · Lock** | Review · AI · Format · `[…]` |
+| Tenant Admin | ingest (own library) | **Annotate & Atomize** | *(as RFP-admin ingest — the tenant curates its own library)* |
+| **Tenant User** | draft | **Insert** | Insert · Format · Library · AI · `[…]` — *no curation/structure cards* |
+| **Anyone** | locked (ToDo done) | **Review** | Review · `[Compliance · Export]` — read + comment + export |
+| **Automation** (agents) | headless | — | no sidebar; the same capability/route gates apply server-side |
+
+Each card is capability-gated (§8a) and stage-ordered. "Complete your ToDo" =
+lock the section, surfaced on the Review card (and rolled up in the workspace).
+The card *bodies* are today's panels (Compliance, Node/Format, Insert, Floorplan
+= Settings, Review = comments) plus the rails (Library insert, Annotate/Atomize)
+and actions (Template = Save-as-template, Export) — the toolbox just decides
+which appear, and in what order, for who.
+
 ## 9. Path to completion (phased, shippable, spine intact)
 
 **Phase 1 — Section layer + retire the page-break hack (fixes continuity). ✅ SHIPPED.**

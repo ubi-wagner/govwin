@@ -52,6 +52,8 @@ interface Props {
   /** The live tool set (role × stage × permission). When present, gates the
    *  fine tools (atomize / insert-from-library); falls back to !readOnly. */
   capabilities?: CanvasCapabilities;
+  /** Process stage — orders the sidebar toolbox card list. */
+  stage?: string;
   actorId: string;
   actorName: string;
   /** Proposal ID — enables AI revision and comments when present */
@@ -107,6 +109,7 @@ function CanvasEditorInner({
   variables,
   readOnly = false,
   capabilities,
+  stage,
   actorId,
   actorName,
   proposalId,
@@ -753,6 +756,8 @@ function CanvasEditorInner({
         document={doc}
         selectedNode={selectedNode}
         readOnly={readOnly}
+        capabilities={capabilities}
+        stage={stage}
         onAddNode={handleAddNode}
         onDeleteNode={handleDeleteNode}
         onMoveNode={handleMoveNode}
