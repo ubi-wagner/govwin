@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamManager } from './team-manager';
 import { ProposalDropbox } from './proposal-dropbox';
+import { VolumeLayoutGauge } from './volume-layout-gauge';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -493,8 +494,13 @@ export function ProposalAdminPanel({
                   <span className="text-xs text-gray-500">
                     {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
                     {volume.sections.length} locked
-                    {volume.totalPages > 0 && ` • ${volume.usedPages}/${volume.totalPages} pages`}
                   </span>
+                  {(() => {
+                    const gaugeArtifactId = volume.sections.find((s) => s.artifactId)?.artifactId;
+                    return gaugeArtifactId ? (
+                      <VolumeLayoutGauge tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} />
+                    ) : null;
+                  })()}
                   {(() => {
                     const vnum = volume.sections[0]?.volumeNumber ?? null;
                     const allLocked = volume.sections.length > 0 && volume.sections.every((s) => isSectionLocked(s));

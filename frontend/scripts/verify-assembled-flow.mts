@@ -12,6 +12,7 @@
  *   cd frontend && npx tsx scripts/verify-assembled-flow.mts
  */
 import { assembleArtifactCanvas, renderCanvas } from '@/lib/export/artifact-export';
+import { paginate } from '@/lib/export/paginate';
 import { sectionsToNodes } from '@/lib/types/canvas-document';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import ExcelJS from 'exceljs';
@@ -71,6 +72,24 @@ await wb.xlsx.load(xlsx as unknown as Parameters<typeof wb.xlsx.load>[0]);
 const ws = wb.worksheets[0];
 check('xlsx has a worksheet', !!ws, ws ? `"${ws.name}"` : 'none');
 check('worksheet has the table rows', !!ws && ws.rowCount >= 3, ws ? `${ws.rowCount} rows` : '0');
+
+// ── Layout gauge covers ALL document types (mirrors the /layout route branch) ──
+console.log('\n▸ Layout metrics across every artifact type (pages · slides · tabs)');
+const layoutOf = (docu: ReturnType<typeof assembleArtifactCanvas>) => {
+  const fmt = docu.canvas?.format ?? 'letter';
+  if (fmt === 'spreadsheet') return { unit: 'tabs', tabs: (docu.sections ?? []).reduce((n, s) => n + sectionsToNodes([s]).filter((nd) => nd.type === 'table').length, 0) };
+  if (fmt.startsWith('slide')) return { unit: 'slides', totalPages: docu.sections?.length ?? 0, maxPages: docu.canvas?.max_slides ?? null };
+  const lay = paginate(docu);
+  return { unit: 'pages', totalPages: lay.totalPages, maxPages: lay.vsMaxPages.max };
+};
+const docL = layoutOf(doc);
+check('document → pages', docL.unit === 'pages' && (docL.totalPages ?? 0) >= 2, `${docL.totalPages}/${docL.maxPages} pages`);
+const SLIDE = { format: 'slide_16_9', width: 960, height: 540, margins: { top: 40, right: 40, bottom: 40, left: 40 }, header: null, footer: null, font_default: { family: 'Arial', size: 18 }, line_spacing: 1.2, max_pages: null, max_slides: 12 };
+const slideMolds = [1, 2, 3].map((i) => ({ title: `Slide ${i}`, content: JSON.stringify({ version: 1, canvas: SLIDE, nodes: [heading(`Slide ${i}`), para('bullet content')] }) }));
+const slideL = layoutOf(assembleArtifactCanvas(slideMolds, 'narrative', 'Deck'));
+check('slides → one page per section', slideL.unit === 'slides' && slideL.totalPages === 3, `${slideL.totalPages}/${slideL.maxPages} slides`);
+const costL = layoutOf(costDoc);
+check('spreadsheet → tab count', costL.unit === 'tabs' && (costL.tabs ?? 0) >= 1, `${costL.tabs} tabs`);
 
 console.log(`\n══ ${ok ? 'PASS' : 'FAIL'} ══`);
 process.exit(ok ? 0 : 1);
