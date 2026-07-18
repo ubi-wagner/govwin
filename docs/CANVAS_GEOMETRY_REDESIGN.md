@@ -147,6 +147,46 @@ interface CanvasGroup {
 - **Migration is cheap:** a v1 `nodes[]` → one `flow` section with one group; the harvest,
   save, and export paths keep working while the section-aware paths roll in.
 
+### 5a. Atom taxonomy — image / table / list grains (confirmed)
+
+Every content object is an atom; the grain decides reuse granularity.
+
+- **Image = a primitive atom.** `grain: primitive`, `kind: figure`, `canvas_nodes:
+  [image node]`. Self-contained and reusable — box a figure at ingest → an image atom;
+  drop it into any section inline. (`library_atoms.canvas_nodes` already stores the node,
+  so no schema change.)
+- **Table = an *extendable* atom OR a *group of rows*.** Two grains, same render:
+  - *Extendable atom* — `grain: primitive`, `kind: table`, `canvas_nodes: [table node]`.
+    One reusable unit; its rows are edited **inline** (add / remove / reorder) — the
+    "extendable" property. Reuse the whole "Direct Labor" table.
+  - *Group of rows* — `grain: group`; each **row is a member atom** (a one-row table
+    fragment), assembled in order via `atom_members`. Reuse a single "PI labor line"
+    across budgets; reorder/insert rows by editing membership.
+- **List = an *extendable* atom OR a *group of items*.** Same duality:
+  - *Extendable atom* — the whole list is one atom; bullets edited inline.
+  - *Group of items* — each **item is a member atom**; "Team Bios" is a group whose
+    members are the individual bio atoms (your example, exactly). Delete a member → the
+    group shrinks; reuse a bio elsewhere.
+
+The **grain is chosen at atomize time** (the box toolkit — §7 — offers "as one atom" vs
+"as rows/items") **or at insert time**. Both grains render identically; a group just
+carries no content of its own and assembles from its ordered members (already how
+`selectForSection` materializes groups).
+
+### 5b. Inline addition inside a section (confirmed)
+
+A section is an **ordered** sequence of groups → nodes with a layout intent, so the
+geometry supports **inline addition at any caret position**:
+- Drop an **atom or group** between existing content in a section → it takes that ordinal;
+  `paginate()` reflows the section within its page budget.
+- Add a **row/item** to an extendable table/list atom, or a **member** to a table/list
+  group → the container grows in place and reflows.
+- A `keep_together` group that no longer fits after an inline add moves wholesale to the
+  next page (documents) or flags overflow (pinned/slide) — the intent still governs.
+
+So: images are atoms; tables and lists are extendable atoms *or* groups of rows/items; and
+sections accept inline atom/group insertion with reflow. **Confirmed.**
+
 ## 6. The measure / paginate engine (the missing piece)
 
 A pure function `paginate(doc, vars) → LayoutResult` that lays sections into the frame:
@@ -189,6 +229,10 @@ recommendation view + a box/select toolkit**:
      `keep_together` default on).
   4. **Box a section** — draw around the region → a `CanvasSection` ("Team Section",
      `mode: flow`).
+  - **Grain prompt (§5a):** boxing a **table** or **list** asks *one extendable atom* vs
+     *a group of rows/items*; boxing an **image** → an image atom directly. So the same
+     box gesture mints the right grain — a whole budget table, a reusable labor row, a
+     team of bios, or a figure.
 - **Context on drop:** each box shows an inline tag-chip row (vol/kind curated + agency/
   program/phase/… free). Select many boxes → **bulk-tag** a context (the package
   "FROM" pedigree). One pass atomizes *and* tags everything.
