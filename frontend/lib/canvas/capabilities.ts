@@ -100,3 +100,33 @@ export function resolveCanvasCapabilities(input: CapabilityInput): CanvasCapabil
   caps.canAnnotate = isTenantAdmin && (stage === 'ingest' || stage === 'template');
   return caps;
 }
+
+/**
+ * Capabilities for a STANDALONE document (Tier 2, #3) — the same resolver, then
+ * mask off the proposal-scoped powers that have no route behind a standalone
+ * document: section lock (no section), proposal comments (no thread),
+ * harvest-to-library (needs a section), proposal-grounded AI revise, and the
+ * ingest-time box-and-tag annotator. Insert-from-library STAYS on — it is
+ * tenant-scoped, so "quick document creation from template AND library" holds.
+ */
+export function resolveDocumentCapabilities(input: {
+  role: Role;
+  /** the document is marked final ⇒ read-only. */
+  final?: boolean;
+  artifactType?: CanvasArtifactType;
+}): CanvasCapabilities {
+  const base = resolveCanvasCapabilities({
+    role: input.role,
+    locked: input.final ?? false,
+    stage: 'draft',
+    artifactType: input.artifactType,
+  });
+  return {
+    ...base,
+    canLock: false,
+    canComment: false,
+    canAtomize: false,
+    canDraftAI: false,
+    canAnnotate: false,
+  };
+}

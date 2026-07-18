@@ -374,6 +374,25 @@ the content follows the document. That is the whole document-and-library solutio
 because the foundation is already one shared editor, reaching it is an evolution (a
 capabilities resolver + folding `SheetEditor` into the shell), not a greenfield.
 
+**8a-i. Third target: standalone documents (Tier 2, ✅ SHIPPED).** The same shell now
+serves a THIRD persistence target alongside proposal sections and admin templates:
+a **standalone tenant document** (`tenant_documents`, mig 110) — the founder's *"quick
+document creation from template and library … a super simple 1-page flier or the whole
+proposal."* Entry is `/portal/[t]/documents` → **+ New Document** → a chooser
+(`/documents/new`) that starts from a **blank preset** (flier / letter / deck / workbook)
+or from any **`document_templates`** skeleton (the tenant's own extracted templates + the
+system library — the same rows the extraction flow writes; §5d). `starterFromTemplate`
+resolves the skeleton three ways (real body → `toEditableFlat`; outline-only
+`metadata.sections` → one heading per name; else page-rules-only), and the doc opens in
+`CanvasEditorPage` (now dual-mode: section **or** document). Tools are resolved by
+`resolveDocumentCapabilities` — the standard resolver with the proposal-scoped powers
+(section-lock, proposal-comments, harvest-to-library, proposal-grounded AI, ingest
+annotate) **masked off**, since no section/matrix sits behind them; **insert-from-library
+stays on** (tenant-scoped), so "from template AND library" holds. Save is the same
+optimistic-locked contract (`baseVersion` compare-and-swap); export reuses the same real
+docx/pptx/xlsx/pdf exporters. One shell, three targets — the renderer still follows the
+artifact type, the tools still follow role×stage.
+
 ## 8b. The toolbox — the sidebar as a role×context card list (founder)
 
 The sidebar is **one component-card list**. Which cards show, and their order
