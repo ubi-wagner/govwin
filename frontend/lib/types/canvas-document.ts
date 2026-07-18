@@ -516,6 +516,32 @@ export function docNodes(doc: CanvasDocument): CanvasNode[] {
   return doc.sections && doc.sections.length ? sectionsToNodes(doc.sections) : (doc.nodes ?? []);
 }
 
+/**
+ * Normalize any doc into a FLAT, editable v1 doc for the canvas editor (which
+ * edits `nodes`). A v1 doc passes through untouched. A v2 doc flattens its
+ * sections→groups→nodes so its content is visible + editable — documents flow
+ * (no synthetic breaks; the flat exporter paginates naturally), slides keep
+ * their boundaries (a `page_break` is inserted between section-slides so the
+ * slide editor still splits correctly). Re-sectioning happens at export
+ * (`assembleArtifactCanvas` / `coalesceGroups`), so edit-flat → export-flowed
+ * round-trips.
+ */
+export function toEditableFlat(doc: CanvasDocument): CanvasDocument {
+  if (!doc.sections || doc.sections.length === 0) return doc;
+  const isSlide = doc.canvas?.format === 'slide_16_9' || doc.canvas?.format === 'slide_4_3';
+  let nodes: CanvasNode[];
+  if (isSlide) {
+    nodes = [];
+    doc.sections.forEach((s, i) => {
+      if (i > 0) nodes.push({ id: crypto.randomUUID(), type: 'page_break', content: null, style: {}, provenance: { source: 'template' }, history: [], library_eligible: false });
+      nodes.push(...s.groups.flatMap((g) => g.nodes));
+    });
+  } else {
+    nodes = sectionsToNodes(doc.sections);
+  }
+  return { ...doc, version: 1, nodes, sections: undefined };
+}
+
 /** Build a group from nodes (optionally a labeled, keep-together, atom-backed group). */
 export function createGroup(
   nodes: CanvasNode[],

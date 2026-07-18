@@ -187,6 +187,73 @@ geometry supports **inline addition at any caret position**:
 So: images are atoms; tables and lists are extendable atoms *or* groups of rows/items; and
 sections accept inline atom/group insertion with reflow. **Confirmed.**
 
+### 5c. Placement laws — the geometry rules (founder, 2026-07-18)
+
+**The major floorplan actors** are the seven levels of the chain, split by role:
+**frame actors** — `document` (page size/format), `header`, `footer`, `margins` — are the
+fixed floorplan, authored/locked first, together with the **grid + spacing gap** (5 pt / cm)
+that is the snapping substrate; **content actors** — `section`, `group`, `atom` — are mapped
+*into* that frame and snap to its grid. Frame is stable; content flows and snaps.
+
+The floorplan-then-map-it-out model runs on a few load-bearing laws. **Every level keeps
+its hierarchy and meta-context** — an atom, the group it belongs to, and the section that
+holds the group each carry their own Dewey tags + FROM-pedigree, and lifting a section into
+a proposal (or extracting a template) preserves that lineage. On top of that, placement is
+**grain-specific** — mutability differs by what a thing *is*:
+
+- **Text is mutable geometry.** A text atom reflows to fill the column and **may wrap around
+  an image** (float): it yields space and rewraps. Text has no fixed box — only an ordinal
+  and a section budget.
+- **Images are rigid.** An image atom occupies a real box and **cannot overlap another
+  image** (they would collide/overlap). Image placement is collision-checked: two images
+  reserve disjoint boxes; text fills the remainder. So a section can inline an image and let
+  the surrounding text wrap, but it can never stack two images into the same space.
+- **Tables / pinned blocks** behave like images for collision (rigid box), like text for
+  internal reflow (rows extend).
+
+**Floorplan first, then map.** The frame (`CanvasRules`) is authored/locked first — margins,
+header/footer bands, image policy, page/slide cap. Content is then *mapped into* the frame,
+snapped to a **grid**:
+
+- **Snap targets:** the four margins, and a canvas-wide grid across the content column.
+- **Definable spacing gaps:** a unit choice (**5 pt** default, or **cm**) sets the grid pitch
+  and the inter-block gap; drag/resize snaps to it. This is what makes "almost anything"
+  layable-out without free-floating chaos — everything lands on the grid or a margin.
+
+Implications for the model: an image node gains an optional **box** (like `SectionLayout.box`,
+§5) with grid-snapped `x/y/w/h`; a section's non-image content flows and wraps around any
+boxed images it contains; the paginator (§6) collision-checks image boxes and reserves them
+before flowing text. Documents keep flow-intent (compliance reflow); slides use true boxes
+(§3, Phase 3). Grid + gap unit live on `CanvasRules` (a new `grid: { unit: 'pt'|'cm'; size }`).
+
+### 5d. Template extraction on ingest (founder, 2026-07-18)
+
+Ingesting old proposals builds the **library** (atoms) *and*, when the admin declares a
+package **a sound template** ("standard AFWERX 15-page with these sections"), yields a
+reusable **template** in one pass. Extraction = **keep the frame + the section skeleton,
+strip the specific content**: the floorplan (`CanvasRules`), the ordered section titles/
+headings, each section's **page budget** and layout intent (flow / keep-together), and the
+FROM-pedigree (agency/program/phase) — but not the prose/figures. The result is a
+`document_templates` row (frame in `canvas_preset`, skeleton in `canvas_document`) that
+"new document from template + library" (Phase 5) drafts into. This is Phase 5 pulled forward
+to ingest time, because that is where the admin already knows the structure is sound.
+
+**A document is not one glob — it is a skeleton with well-defined organs, muscles, and skin,
+and the organs are transplantable (founder).** The canonical containment chain (founder) is:
+
+> **document → header · footer · margins (the frame) → section → group → atom**
+
+and it maps 1:1 to the model — `CanvasDocument` → `CanvasRules.{header, footer, margins}` →
+`CanvasSection` → `CanvasGroup` → `CanvasNode`. In anatomy terms: **skeleton** = the frame
+(`CanvasRules` — the header, footer, and margins the whole body hangs on); **organs** =
+sections; **muscles** = groups (a "Team Bios" group, a figure, a table); **skin** =
+heading/node styling + the floorplan's visual rules. Each organ and muscle is a **typed, swappable slot** with a clean interface —
+a section carries a `section_type`, a group a slot `kind` (narrative / figure / table / list)
++ `keep_together` — so "draft from template" **fills** each slot from the library, and you can
+later **replace a kidney** (swap one section or group for a better library atom/group via
+`source_atom_ids` / `atom_ref`) without disturbing the rest of the body. Extraction preserves
+exactly this anatomy and strips only the tissue (the specific prose/figures).
+
 ## 6. The measure / paginate engine (the missing piece)
 
 A pure function `paginate(doc, vars) → LayoutResult` that lays sections into the frame:

@@ -11,7 +11,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
-import { createNode, getNodeText } from '@/lib/types/canvas-document';
+import { createNode, getNodeText, toEditableFlat } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
@@ -75,11 +75,15 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
 }
 
 export function CanvasEditor(props: Props) {
+  // Normalize a v2 (section-layer) doc into a flat, editable doc so its content
+  // is visible + editable in the canvas — every editor surface edits `nodes`.
+  const initialDocument = toEditableFlat(props.initialDocument);
+
   // Delegate to SheetEditor for spreadsheet format
-  if (props.initialDocument.canvas.format === 'spreadsheet') {
+  if (initialDocument.canvas.format === 'spreadsheet') {
     return (
       <SheetEditor
-        initialDocument={props.initialDocument}
+        initialDocument={initialDocument}
         onSave={props.onSave}
         onExport={props.onExport}
         actorId={props.actorId}
@@ -89,7 +93,7 @@ export function CanvasEditor(props: Props) {
     );
   }
 
-  return <CanvasEditorInner {...props} />;
+  return <CanvasEditorInner {...props} initialDocument={initialDocument} />;
 }
 
 function CanvasEditorInner({

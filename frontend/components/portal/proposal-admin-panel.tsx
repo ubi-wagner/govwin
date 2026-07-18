@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { TeamManager } from './team-manager';
 import { ProposalDropbox } from './proposal-dropbox';
 import { VolumeLayoutGauge } from './volume-layout-gauge';
+import { SaveAsTemplate } from './save-as-template';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -498,7 +499,10 @@ export function ProposalAdminPanel({
                   {(() => {
                     const gaugeArtifactId = volume.sections.find((s) => s.artifactId)?.artifactId;
                     return gaugeArtifactId ? (
-                      <VolumeLayoutGauge tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} />
+                      <>
+                        <VolumeLayoutGauge tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} />
+                        <SaveAsTemplate tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} volumeName={volume.label} />
+                      </>
                     ) : null;
                   })()}
                   {(() => {

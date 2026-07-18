@@ -6,6 +6,7 @@ import {
   createSection,
   createGroup,
   liftToFlowSections,
+  toEditableFlat,
   CANVAS_PRESETS,
   type CanvasDocument,
   type CanvasNode,
@@ -126,6 +127,38 @@ describe('liftToFlowSections', () => {
   it('is a no-op on a doc that already has sections', () => {
     const doc = v2([createSection({ nodes: [para('x')] })]);
     expect(liftToFlowSections(doc)).toBe(doc);
+  });
+});
+
+describe('toEditableFlat — v2 docs must be editable in the canvas', () => {
+  it('passes a v1 doc through untouched', () => {
+    const d = v1([heading('A'), para('a')]);
+    expect(toEditableFlat(d)).toBe(d);
+  });
+
+  it('flattens a v2 DOCUMENT to visible nodes (no synthetic breaks, sections cleared)', () => {
+    const doc = v2([
+      createSection({ nodes: [heading('1'), para('a')] }),
+      createSection({ nodes: [heading('2'), para('b')] }),
+    ]);
+    const flat = toEditableFlat(doc);
+    expect(flat.version).toBe(1);
+    expect(flat.sections).toBeUndefined();
+    expect(flat.nodes.map((n) => n.type)).toEqual(['heading', 'text_block', 'heading', 'text_block']);
+    expect(flat.nodes.some((n) => n.type === 'page_break')).toBe(false); // documents flow
+  });
+
+  it('flattens a v2 SLIDE deck keeping slide boundaries as page_breaks', () => {
+    const slideCanvas = { ...CANVAS_PRESETS.letter_sbir_phase1, format: 'slide_16_9' as const };
+    const doc: CanvasDocument = {
+      version: 2, document_id: 'd', canvas: slideCanvas, nodes: [],
+      sections: [createSection({ nodes: [heading('S1')] }), createSection({ nodes: [heading('S2')] }), createSection({ nodes: [heading('S3')] })],
+      metadata: meta,
+    };
+    const flat = toEditableFlat(doc);
+    expect(flat.nodes.filter((n) => n.type === 'page_break')).toHaveLength(2); // 3 slides → 2 breaks
+    expect(flat.nodes[0].type).toBe('heading');
+    expect(flat.nodes.map((n) => n.type)).toEqual(['heading', 'page_break', 'heading', 'page_break', 'heading']);
   });
 });
 
