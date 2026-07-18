@@ -92,9 +92,9 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    if (format !== 'docx' && format !== 'pptx' && format !== 'xlsx') {
+    if (format !== 'docx' && format !== 'pptx' && format !== 'xlsx' && format !== 'pdf') {
       return NextResponse.json(
-        { error: `Format "${format}" not supported. Available: docx, pptx, xlsx`, code: 'VALIDATION_ERROR' },
+        { error: `Format "${format}" not supported. Available: docx, pptx, xlsx, pdf`, code: 'VALIDATION_ERROR' },
         { status: 422 },
       );
     }
@@ -174,6 +174,16 @@ export async function POST(request: Request, ctx: RouteContext) {
     } else if (format === 'xlsx') {
       const { exportToXlsx } = await import('@/lib/export/xlsx-exporter');
       buffer = await exportToXlsx(doc, vars);
+    } else if (format === 'pdf') {
+      // PDF needs Chromium (infra dep) — return a clear 503 when unavailable
+      // rather than a 500, so the UI can point the user at .docx.
+      try {
+        const { exportToPdf } = await import('@/lib/export/pdf-exporter');
+        buffer = await exportToPdf(doc, vars);
+      } catch (pdfErr) {
+        console.error('[api/portal/proposals/sections/export] PDF render failed (Chromium unavailable?):', pdfErr);
+        return NextResponse.json({ error: 'PDF export is temporarily unavailable. Use .docx, or download the PDF from the volume once locked.', code: 'EXPORT_ERROR' }, { status: 503 });
+      }
     } else {
       buffer = await exportToDocx(doc, vars);
     }
@@ -195,6 +205,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      pdf: 'application/pdf',
     };
 
     return new NextResponse(new Uint8Array(buffer), {

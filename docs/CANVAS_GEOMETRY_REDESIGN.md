@@ -252,12 +252,14 @@ One editor, a context rail that swaps by mode (evolves today's `canvas-editor.ts
 
 | Rail panel | What it edits | Status |
 |---|---|---|
-| **Floorplan** | `CanvasRules`: margins, header/footer template+font, slide zones, font floor, image policy, page cap | data exists; expose it |
-| **Sections** | ordered section list; per-section **page-fill bar** (used/budget), **mode** toggle (flow / keep-together / pinned), **drag-resize** budget handle; a **total-pages gauge vs max_pages** (green/amber/red) | NEW (needs §6) |
+| **Formatting toolbar** | always-visible Insert group (heading/text/list/table/image/caption) + Format group (bold/italic/align/size/color) on the selected block | **SHIPPED** (`CanvasToolbar`) |
+| **Floorplan** | `CanvasRules`: margins, header/footer template+font, slide zones, font floor, image policy, page cap | built (sidebar Settings) |
+| **Sections** | ordered section list; per-section **page-fill bar** (used/budget), **mode** toggle (flow / keep-together / pinned), **drag-resize** budget handle; a **total-pages gauge vs max_pages** (green/amber/red) | **gauge SHIPPED** (`VolumeLayoutGauge`, all doc types); mode toggle + drag-resize = Phase 4 |
 | **Insert from Library** | pick atoms/groups → drop into the active section | built (`LibraryInsertPanel`) |
 | **Annotate / Atomize** | the box toolkit (§7), ingest mode | NEW |
 | **AI** | draft/revise a section into its budget; **"fit to budget"** (shorten to hit target) | draft exists; add fit |
 | **Collaborate** | node/section comments, presence, stage-scoped edit | comments exist |
+| **Export** | per-section **docx / pptx / xlsx / pdf** from the toolbar; per-volume native + PDF from the workspace | **SHIPPED** (pdf added to both section routes with a 503-when-Chromium-down fallback) |
 
 The **drag-resize** is your P1→P2 story: each section shows a page allowance; drag its
 handle to give it fewer/more pages; the live `paginate` re-measures; a section that no

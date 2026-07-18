@@ -16,6 +16,7 @@ import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+import { CanvasToolbar } from './canvas-toolbar';
 import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
@@ -574,9 +575,15 @@ function CanvasEditorInner({
                   Export .docx
                 </button>
                 <button
-                  disabled
-                  title="Coming soon"
-                  className="px-3 py-1.5 text-xs border rounded bg-gray-100 text-gray-400 cursor-not-allowed"
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'pdf');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                  title="Export this section as PDF"
                 >
                   Export .pdf
                 </button>
@@ -657,6 +664,17 @@ function CanvasEditorInner({
             </button>
           </div>
         </div>
+
+        {/* Formatting toolbar — insert blocks + format the selected one */}
+        {!readOnly && (
+          <CanvasToolbar
+            format={doc.canvas.format}
+            selectedNode={selectedNode}
+            onAddNode={handleAddNode}
+            onUpdateNodeStyle={handleUpdateNodeStyle}
+            readOnly={readOnly}
+          />
+        )}
 
         {isSlideFormat ? (
           <SlideEditor
