@@ -143,6 +143,36 @@ all tenants, problems surfaced first*, filterable by tenant or health.
 
 ---
 
+## 5. Automation — rules that fire off the event queue
+
+**System → Automation** (`/admin/automation`) is the rule book: **event-driven rules
+that trigger actions** the moment a matching event lands on the queue.
+
+![Automation Rules — trigger → action, active toggles, and 24h execution count](./img/admin-automation.png)
+
+Each rule pairs a **trigger** (`namespace:type`, e.g. `capture:application.submitted`)
+with an **action** and an **active** toggle. When an event is emitted, the engine
+finds enabled rules whose trigger matches, checks the rule's **conditions** against
+the payload, honours its **cooldown** and **hourly rate limit**, runs the action,
+and records the outcome — the **Executions (24h)** stat and each rule's **View
+Logs** come straight from that record.
+
+**What actually fires today:**
+
+- **`create_todo`** → an admin ToDo (`admin_review` — a defined [workflow](#1a-every-todo-is-a-step-in-a-defined-workflow)),
+  its title filled from the event (e.g. *"Review application from {company_name}"*).
+- **`notify_admin`** → an admin **broadcast** ToDo (acknowledge-on-read).
+
+Both land in the admin **ToDo queue** — so *automation feeds the same workflow
+spine as everything else*. Other actions (**`send_email`**, **`distribute_social`**,
+**`publish_content`**) are **recorded** on each match but executed by their own
+routes/services, so nothing double-sends.
+
+> This closes the loop you'll hear described as *"preferences → real triggers off
+> the event queue."* The rules were always here; now they **fire**.
+
+---
+
 ## Related
 
 - Purchases & the curation queue → [RFP admin](./admin-rfp.md)

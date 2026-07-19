@@ -153,6 +153,13 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'automation') {
+      await login(page, 'eric@rfppipeline.com'); // master_admin
+      await page.goto(`${BASE}/admin/automation`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2200);
+      await shot(page, 'admin-automation', { full: true });
+    }
+
     if (journey === 'workflows') {
       await login(page, 'eric@rfppipeline.com'); // master_admin
       const stops: Array<[string, string]> = [
