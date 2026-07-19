@@ -49,13 +49,28 @@ provisioned from (you author the skeleton, not per-proposal rows):
 - **Compliance Matrix** — set/confirm the required elements.
 - **Volumes** — *Add volume* (Technical, Cost, Supporting…), then *Add required
   item* under each (the section molds). Set page/slide limits and fonts per item.
-- **Templates** — point a required item at a **template** (below) so its section
-  starts from a real skeleton.
-- **Expert notes** — per-volume / per-section guidance that grounds the AI draft.
+
+Every required item's **Add / Edit** dialog carries a **Section grounding** block —
+this is where you decide what a customer's build starts from:
+
+![Required-item dialog — compliance fields plus the Section grounding block (template picker + expert notes)](./img/curation-item-template-picker.png)
+
+- **Starter template (mold)** — point the item at a **canvas template** from
+  [Template Studio](#4-author-templates-template-studio) (grouped by type). At
+  provision the item's section is created **from that template's layout**, styled to
+  the format rules above. Leave it *None* for a blank section.
+- **Expert notes (grounding)** — win themes, evaluator hot-buttons, or must-hit
+  points; passed to the drafter as grounding for this item.
+
+Linked items show a **📄 template** and **✎ notes** badge in the volume list, so the
+skeleton's grounding is visible at a glance:
+
+![A required item badged with its linked template and expert notes](./img/curation-item-template-badge.png)
 
 > **What just happened:** when a customer's portal is later released, the
 > per-proposal **compliance matrix + section molds are materialized automatically**
-> from this skeleton.
+> from this skeleton — each item's section seeded from its linked template and
+> grounded by its expert notes.
 
 ---
 

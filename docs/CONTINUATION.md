@@ -68,7 +68,16 @@ whole portal like any customer (atomize into our own library_atoms). Portal layo
 admin AND not-a-member`, so no shadow banner on our own tenant; customer tenants still show it.
 **Identity/lifecycle/admin model is now essentially COMPLETE.** Remaining: #111 (deploy-verify, auto),
 #114 (shadow role-rewrite — likely already satisfied by the audited model; low priority), and the
-NON-identity gaps #117 (dormant agents), #77/#69/#18 (curation/template features).
+NON-identity gaps #117 (dormant agents), #69/#18 (curation/template features).
+
+**#77 DONE (this session) — required-item → template picker in curation.** The AddEditItemModal now
+carries a **Section grounding** block: a **Starter template (mold)** picker (fetches `/api/admin/templates`,
+grouped by type) that sets `volume_required_items.template_id`, plus an **Expert notes** textarea →
+`expert_notes`. Both were already accepted by the `volume.add/update_required_item` tools and consumed by
+provisioning (`create/route.ts` SELECTs `canvas_document` by `template_id` → interpolates the section mold;
+`expert_notes` → section.meta; via `compliance-resolver.ts`), so this closed the UI gap end-to-end. Linked
+items show 📄 template + ✎ notes badges in the volume list. Proven by `scripts/drive-item-template-picker.mts`
+(8/8, real modal). Manual: `admin-rfp.md` §3 (screenshots `curation-item-template-picker/-badge.png`).
 
 **Identity state ladder (user directive) — active · inactive · archived, all reversible + auditable, nothing destroyed:**
 - **active / inactive** = per-USER (never hard-delete; mark inactive, keep history, re-invite reconstitutes
