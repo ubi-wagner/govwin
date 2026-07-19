@@ -241,3 +241,11 @@ and the "switch company" flow are the customer-facing manual pieces).
   company where they're only a collaborator is rewritten to `partner_user`, pinned,
   cannot hop to their home tenant, and `/select-company` is re-pick-proof; a
   single-membership user and an admin are unaffected. tsc clean, 701/701 unit tests.
+- ✅ **P3 — collaborator invite → membership.** The proposal-collaborator invite path
+  now INSERTs an `active` `(tenant, partner_user|tenant_user, source='collaborator')`
+  membership (`ON CONFLICT (user_id, tenant_id) DO NOTHING`, never downgrading an
+  existing one) **without touching `users.tenant_id`** — so a cross-company
+  collaborator's home is preserved *and* they can actually reach the inviting tenant's
+  portal (the singular-session gate is membership-based; their `users.tenant_id` points
+  at their own company). This is what makes the multi-company collaborator case work
+  for real invites, not just seeded data.

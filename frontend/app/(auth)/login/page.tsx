@@ -98,7 +98,11 @@ export default async function LoginPage({ searchParams }: PageProps) {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-sm p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
-        <p className="text-sm text-gray-500 mb-6">RFP Pipeline</p>
+        <p className="text-sm text-gray-500 mb-2">RFP Pipeline</p>
+        <p className="text-xs text-gray-400 mb-6">
+          One sign-in for customers, collaborators, and staff. If your email works with
+          more than one company, you&apos;ll choose which to enter next.
+        </p>
 
         {justChanged ? (
           <div

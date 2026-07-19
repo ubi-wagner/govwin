@@ -209,7 +209,11 @@ export async function POST(request: Request, ctx: RouteContext) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     const collabRole = typeof body.role === 'string' ? body.role : 'contributor';
-    const assignedSections = Array.isArray(body.assignedSections) ? body.assignedSections : [];
+    // assigned_sections is a uuid[] column — keep only valid UUIDs so the array casts
+    // cleanly (a bad element would otherwise 500 the whole invite).
+    const assignedSections = Array.isArray(body.assignedSections)
+      ? body.assignedSections.filter((s): s is string => typeof s === 'string' && isValidUUID(s))
+      : [];
     const permission = typeof body.permission === 'string' ? body.permission : 'view';
 
     if (!email || !email.includes('@')) {
@@ -289,15 +293,18 @@ export async function POST(request: Request, ctx: RouteContext) {
         SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
       `;
 
+      // The membership role this invite grants at THIS company (independent of any
+      // role the person holds at other companies — see multi-membership identity).
+      const membershipRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
+
       if (!existingUser) {
         isNewUser = true;
         tempPassword = randomUUID().slice(0, 12);
         const passwordHash = await bcrypt.hash(tempPassword, 12);
-        const userRole = collabRole === 'external' ? 'partner_user' : 'tenant_user';
 
         const [newUser] = await tx<{ id: string }[]>`
           INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
-          VALUES (${email}, ${name || null}, ${userRole}, ${tenantId}, ${passwordHash}, true)
+          VALUES (${email}, ${name || null}, ${membershipRole}, ${tenantId}, ${passwordHash}, true)
           RETURNING id
         `;
         existingUser = { id: newUser.id, tenantId: tenantId };
@@ -316,7 +323,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         VALUES (
           ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
           ${collabRole}, ${sessionUser.id},
-          ${sql.array(assignedSections)}, true, ${acceptedAt}::timestamptz
+          ${sql.array(assignedSections)}::uuid[], true, ${acceptedAt}::timestamptz
         )
         RETURNING id
       `;
@@ -333,6 +340,19 @@ export async function POST(request: Request, ctx: RouteContext) {
           )
         `;
       }
+
+      // Materialize the login-selectable membership (multi-membership identity, P3).
+      // This is what lets a CROSS-COMPANY collaborator reach this tenant's portal:
+      // verifyTenantAccess gates on an active membership, and their users.tenant_id is
+      // their OWN company, not this one. Bind it to this tenant as a 'collaborator'
+      // membership WITHOUT touching users.tenant_id (their home is preserved). ON
+      // CONFLICT DO NOTHING so an existing membership (e.g. they're really an admin
+      // here) is never downgraded to partner_user. See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+      await tx`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+        VALUES (${existingUser.id}, ${tenantId}, ${membershipRole}, 'active', 'collaborator', ${sessionUser.id})
+        ON CONFLICT (user_id, tenant_id) DO NOTHING
+      `;
 
       return { collaboratorId: collaborator.id, finalUserId: existingUser.id };
     });
