@@ -47,8 +47,16 @@ So email = the nudge; completion happens in-platform, auditable.
 Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
-113 (tenants.archived_at). All idempotent + auto-applied on deploy via `entrypoint.sh → migrate.mjs`.
-Verify post-deploy.
+113 (tenants.archived_at), 114 (rfp-pipeline tenant + staff memberships). All idempotent +
+auto-applied on deploy via `entrypoint.sh → migrate.mjs`. Verify post-deploy.
+
+**#112 "including us" DONE (`c7c00f7`):** RFP Pipeline is a real tenant; staff hold tenant_admin home
+memberships; **Our Workspace** admin-nav link → `/portal/rfp-pipeline` gives us the upload/atomizer +
+whole portal like any customer (atomize into our own library_atoms). Portal layout: `isShadowAdmin =
+admin AND not-a-member`, so no shadow banner on our own tenant; customer tenants still show it.
+**Identity/lifecycle/admin model is now essentially COMPLETE.** Remaining: #111 (deploy-verify, auto),
+#114 (shadow role-rewrite — likely already satisfied by the audited model; low priority), and the
+NON-identity gaps #117 (dormant agents), #77/#69/#18 (curation/template features).
 
 **Identity state ladder (user directive) — active · inactive · archived, all reversible + auditable, nothing destroyed:**
 - **active / inactive** = per-USER (never hard-delete; mark inactive, keep history, re-invite reconstitutes
