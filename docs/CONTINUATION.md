@@ -26,6 +26,18 @@ One email → many `(company, role)` memberships; pick one at login; the session
 | `465a47a` | **Never hard-delete a user** — collaborator soft-delete + reactivate (mig 112); fixes removal 500 |
 | `d09c348` | membership-ify all user-creation paths (team invite + onboarding accept) |
 | `836353f` | **Company ARCHIVE** (license slumber) — third state (mig 113); reversible + lossless |
+| `74f1f10` | **#115** retire legacy users.tenant_id access read-through — access is now membership-pure |
+| `f1d1fb3` | **#118** team-member deactivate/reactivate (never delete) + dispatcher redirect-loop fix |
+| `5d54174` | RFP-admin **create company + admin POC** (was a stub) + "New Company" admin UI |
+| `994aa41` | **Notification deep-link** — /go + /api/enter land recipients directly in their company queue |
+
+**Admin/RFP capability set (all done + verified):** tenant_admin adds/(de)activates users
+(`team/[userId]`) + collaborators (invite/soft-delete/reactivate); a shadow rfp_admin passes the same
+tenant_admin gate, audited. RFP-admin creates companies+POC (`POST /api/admin/tenants`), archives/
+restores companies, and shadows in to help upload+atomize. Nudge emails (platform@rfppipeline.com via
+`GOOGLE_WORKSPACE_EMAIL`+Gmail API) link to `/go?task=` or `/go?tenant=` → `/api/enter` pins the target
+company so a multi-membership recipient lands straight in the right queue.
+Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
 113 (tenants.archived_at). All idempotent + auto-applied on deploy via `entrypoint.sh → migrate.mjs`.
