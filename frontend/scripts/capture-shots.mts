@@ -160,6 +160,30 @@ async function run() {
       await shot(page, 'admin-scout-monitor', { full: true });
     }
 
+    if (journey === 'auth' || journey === 'select-company') {
+      // 1. The single sign-in screen (unauthenticated) — one login for everyone.
+      await page.context().clearCookies();
+      await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+      await shot(page, 'login');
+      // 2. A user with >1 active company → the selector (singular session).
+      await login(page, 'expert@beacon-labs.test');
+      await page.waitForTimeout(1500);
+      await shot(page, 'select-company', { full: true });
+      console.log('   multi-membership landed at:', page.url());
+      // 3. Pick a company → land IN it (here: collaborator at Acme).
+      try {
+        await page.getByRole('link', { name: /Acme Navy Systems/i }).click();
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(2000);
+        await shot(page, 'auth-landed-collaborator', { full: true });
+        console.log('   after pick, landed at:', page.url());
+      } catch (e) { console.error('  ⚠ pick:', e instanceof Error ? e.message : e); }
+      // 4. Control: a single-membership user goes straight to their dashboard.
+      await login(page, 'teammate@acme-navy.test');
+      await page.waitForTimeout(1500);
+      console.log('   single-membership landed at:', page.url());
+    }
+
     if (journey === 'sysadmin') {
       // RFP-admin observability: System Health + System State.
       await login(page, 'eric@rfppipeline.com');

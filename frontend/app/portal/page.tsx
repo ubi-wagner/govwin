@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
-import { getLandingPath, isRole, type Role } from '@/lib/rbac';
+import { getLandingPath, isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { getActiveMemberships } from '@/lib/memberships';
 
 /**
  * /portal — post-login traffic cop.
@@ -56,6 +57,22 @@ export default async function PortalDispatcher() {
 
   if (!role) {
     redirect('/login?error=session');
+  }
+
+  // Multi-membership selection (identity P2). A person with MORE THAN ONE active
+  // company must choose which to act as — a session is singular. Admins skip this
+  // (they log in at the platform, then descend deliberately). With exactly one
+  // membership (everyone today) this is a no-op. See
+  // docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+  const dispatchUserId = (sessionUser as { id?: string }).id;
+  if (dispatchUserId && !hasRoleAtLeast(role, 'rfp_admin')) {
+    try {
+      const memberships = await getActiveMemberships(dispatchUserId);
+      if (memberships.length > 1) redirect('/select-company');
+    } catch (e) {
+      // NEXT_REDIRECT must propagate; only swallow genuine query errors.
+      if ((e as { digest?: string } | null)?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+    }
   }
 
   let tenantSlug = sessionUser.tenantSlug ?? null;

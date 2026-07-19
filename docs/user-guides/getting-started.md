@@ -20,6 +20,25 @@ reset.
 - **You're routed automatically** to the right home: customers land in their
   portal; RFP/master admins land in `/admin`.
 
+### Choosing a company (if you belong to more than one)
+
+You sign in with **one email**. If that email has access to **more than one
+company** — say you're a team member at your own company *and* an outside
+collaborator on another company's proposal — you'll pick which one to work in:
+
+![Choosing a company — one login, pick which company to enter](./img/select-company.png)
+
+- **You work in one company at a time.** Picking a company scopes your whole
+  session to it. To work in a *different* company you **sign out and sign back in**
+  and pick that one — you're never in two at once (a hard tenant-isolation rule).
+- **Most people never see this** — if your email belongs to exactly one company
+  you go straight to your home, no extra step.
+
+After you pick, you land in that company — e.g. as an outside collaborator you land
+on that company's **Proposals**, scoped to just what you were granted:
+
+![Landing in the chosen company as a collaborator](./img/auth-landed-collaborator.png)
+
 ---
 
 ## 2. The dashboard

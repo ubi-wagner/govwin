@@ -57,7 +57,8 @@ implies it exists).
 
 ### A. Onboarding & access
 
-- [x] ✅ **Log in** with email + password — all roles → [getting-started](./getting-started.md#1-sign-in)
+- [x] ✅ **Log in** with email + password (one login for everyone) — all roles → [getting-started](./getting-started.md#1-sign-in)
+- [x] ✅ **Choose a company** when your email has >1 active membership (singular session; sign out to switch) — multi-company collaborators → [getting-started](./getting-started.md#choosing-a-company-if-you-belong-to-more-than-one)
 - [x] ✅ **Reset password** (`/reset-password`) — all roles
 - [x] ✅ **Accept an invite** and set a password (`/invite/[token]`) — tenant_user, partner_user
 - [x] ✅ **Land on the right home** (portal vs `/admin`) by role — middleware floor
