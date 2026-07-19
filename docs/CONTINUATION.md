@@ -3,6 +3,18 @@
 **Last updated:** 2026-07-19 (identity sprint COMPLETE + deep-link hardening + #77 picker + #114 proof)
 **Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `2de0a81` (+ this doc commit)
 
+**#117 IN PROGRESS — agent workforce (pattern-first).** The Librarian is greenfielded onto the current
+spine (library_atoms/atom_tags, DB memory — no vectors) + producer wired (atomize-package →
+requestAgentTask → agent_task_queue); proven by `pipeline/tests/test_librarian_wiring.py` (7/7). RFP-admin
+oversight shipped: `/admin/agents` → Agent Workforce roster (10 archetypes, scope, trigger,
+live/wired/dormant, 30d queue) + **usage-by-tenant rollup**. TENANT-DISCRETION: tenant-space agents are
+role-bound to their assigned tenant (tenant_user authority; tool schemas expose no tenant_id — model can't
+cross tenants, locked by test). BRIDGE INVARIANT: oversight conveys usage METADATA forward only — tenant
+DATA stays in the tenant (forward-only bridge); control is bidirectional; to see an agent's OUTPUT the admin
+shadows in. Full pattern + continuation for the other 6 agents (scoring_strategist, opportunity_analyst,
+proposal_architect, packaging_specialist, capture_strategist, partner_coordinator) in **docs/AGENT_WORKFORCE.md**.
+Deploy has the real ANTHROPIC_API_KEY (Railway); LLM reasoning runs live there, wiring verified here.
+
 **LAUNCH-READINESS — all green this session (2026-07-19):** identity×deeplink 22/22, shadow-tenant-admin
 10/10, pin 15/15, p3-lifecycle 13/13, immobileyes-shadow 4/4, item-template-picker 8/8, **full Monday
 journey E2E green** (ingest→matrix→atomize→spotlight→provision→draft-from-atoms→lock→harvest(lineage)→
