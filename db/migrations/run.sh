@@ -116,7 +116,7 @@ if $STATUS_ONLY; then
   ensure_tracking_table
   echo -e "${CYAN}Migration Status${NC}"
   echo "-------------------------------------------"
-  for migration in "$SCRIPT_DIR"/0*.sql; do
+  for migration in "$SCRIPT_DIR"/[0-9][0-9][0-9]*.sql; do
     file=$(basename "$migration")
     if should_skip_destructive "$file"; then
       echo -e "  ${YELLOW}skip${NC}     $file (destructive — ALLOW_SCHEMA_RESET not set)"
@@ -166,7 +166,7 @@ applied=0
 skipped=0
 failed=0
 
-for migration in "$SCRIPT_DIR"/0*.sql; do
+for migration in "$SCRIPT_DIR"/[0-9][0-9][0-9]*.sql; do
   file=$(basename "$migration")
 
   if should_skip_destructive "$file"; then

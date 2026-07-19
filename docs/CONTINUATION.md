@@ -54,8 +54,25 @@ re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p
 ## 2. Spin up the sandbox (exact commands + gotchas)
 
 ```bash
-# DB is already running on :5433 (postgres role 'claude', db govtech_intel)
 export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
+
+# The disk PERSISTS across idle (git repo, node_modules, .next build, AND the
+# postgres data dir at /tmp/pgs_gov/data all survive) — but the postgres + next
+# PROCESSES are stopped when the container goes idle. So on resume you usually
+# only need to RESTART both, not rebuild/reseed.
+
+# 1. Start postgres on the surviving data dir (PG16; runs as 'claude', NOT root):
+rm -f /tmp/pgs_gov/data/postmaster.pid            # clear the stale pid from last run
+mkdir -p /tmp/pgs_sock && chown -R claude:claude /tmp/pgs_gov /tmp/pgs_sock
+su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
+  -o '-p 5433 -k /tmp/pgs_sock' -l /tmp/pgs_gov/log start"
+psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 3
+
+# If /tmp was ALSO wiped (full reclaim, data dir gone): initdb a fresh cluster
+# (--auth=trust -U claude), createdb govtech_intel, then run every migration
+# `for f in db/migrations/0*.sql 1*.sql; do psql "$DATABASE_URL" -f "$f"; done`
+# (skip 000_drop_all.sql) and re-run the seed scripts (scripts/seed_dev_accounts.mjs,
+# frontend/scripts/seed-cuas-immobileyes.mts, seed-demo-*.mts).
 
 cd /home/user/govwin/frontend
 # Build (takes ~90s; the 2-min default Bash timeout WILL cut it off — use timeout 600000)
@@ -105,10 +122,14 @@ Acme proposal `3b0e7f8b-7ca2-4570-91d9-48326add00ff`; sections
 ## 3. Rebuilt gap list (tasks carry the detail; here's the map)
 
 **Deploy-gating (do before/at deploy):**
-- **#111 — apply migration 111 to staging/prod + backfill.** The identity code reads
-  `user_memberships` + JWT `membershipPinned`; mig 111 is applied to SANDBOX ONLY.
-  Without it in prod, `verifyTenantAccess` errors → everyone denied. Apply `psql -f`,
-  confirm the backfill, smoke-test one multi- + one single-membership login.
+- **#111 — migration 111 to staging/prod.** DE-RISKED 2026-07-19: production applies
+  migrations automatically via `entrypoint.sh` → `db/migrations/migrate.mjs` (glob
+  `^\d{3}.*\.sql$`, so it DOES pick up 100–111), and mig 111 is idempotent
+  (`CREATE TABLE IF NOT EXISTS` + backfill `ON CONFLICT DO NOTHING`) — verified by
+  running it through the tracked runner (no-op on re-run, data intact). Action is now
+  just **verify post-deploy**: `user_memberships` exists + backfilled, and one multi-
+  + one single-membership login work. NOTE: `db/migrations/run.sh` (manual dev tool)
+  had a `0*.sql` glob that silently skipped 100–111 — FIXED to `[0-9][0-9][0-9]*.sql`.
 
 **Identity model follow-ons (natural next phases):**
 - **#112 — our-org-as-a-tenant + platform upload/atomizer** ("including us"): make our
