@@ -153,6 +153,24 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'library') {
+      const slug = 'acme-navy-systems';
+      await login(page, 'admin@acme-navy.test');
+      await page.goto(`${BASE}/portal/${slug}/atoms`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2200);
+      await shot(page, 'portal-library-atoms', { full: true });
+      // Select all → the bulk curation bar (approve / archive / tag / group).
+      try {
+        await page.getByRole('button', { name: /^Select all$/ }).click();
+        await page.waitForTimeout(700);
+        await shot(page, 'portal-library-bulk', { full: true });
+        // Drive-test: bulk-approve the whole selection, then show the result.
+        await page.getByRole('button', { name: /^Approve all$/ }).click();
+        await page.waitForTimeout(1800);
+        await shot(page, 'portal-library-approved', { full: true });
+      } catch (e) { console.error('  ⚠ library bulk:', e instanceof Error ? e.message : e); }
+    }
+
     if (journey === 'collab') {
       const slug = 'acme-navy-systems';
       const proposalId = '3b0e7f8b-7ca2-4570-91d9-48326add00ff';

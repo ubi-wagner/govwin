@@ -64,10 +64,31 @@ group, and tag** content as you ingest:
 On the **Library** tab:
 
 - **Search** by title/summary; filter by **grain** (all grains / primitive /
-  group) and **status**.
-- Click an atom to open its **detail drawer** — lineage, a content preview, tags,
-  and usage.
-- **Curate** — adjust status and tags so the best content ranks first.
+  group) and **status** (draft / approved / archived).
+- Each atom shows its **word count**, **tags**, **source** (uploaded vs returned),
+  and reuse count. Click an atom to open its **detail drawer** — lineage, a content
+  preview, tags, and usage.
+- **Curate** per atom with **Approve** / **archive**, or adjust tags in the drawer.
+
+![The Library — atoms with word counts, tags, source badges, and per-atom curate actions](./img/portal-library-atoms.png)
+
+### Bulk curation
+
+Curating one-by-one is slow. Tick the checkboxes (or **Select all**) to act on
+many atoms at once — the **bulk bar** appears with the whole selection:
+
+![The bulk bar — Approve all / Archive all / Tag all / Group, over the whole selection](./img/portal-library-bulk.png)
+
+- **Approve all** / **Archive all** — set the status on every selected atom in one
+  call (one transaction, tenant-scoped — a spoofed id can't touch another tenant).
+- **Tag all** — pick a taxonomy **dimension** (agency · program · phase · tech ·
+  dept · kind · vol) and a **value**, and confirm that tag across the whole
+  selection. This is how you retro-tag an imported batch to the one taxonomy.
+- **Group into new atom** (2+ selected) — compose the selection into a group atom
+  (e.g. a "Team for Navy") with lineage back to its members.
+
+> Bulk actions clear the selection and refresh the list when they finish, so the
+> board always reflects the current state.
 
 ---
 

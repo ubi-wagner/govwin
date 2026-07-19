@@ -81,6 +81,7 @@ implies it exists).
 - [x] ✅ **Annotation atomizer** — box / select / group / tag on ingest — tenant_admin
 - [x] ✅ **Browse & filter the library**, view lineage + preview — tenant_admin, tenant_user
 - [x] ✅ **Curate an atom** (status, tags, edit) — tenant_admin
+- [x] ✅ **Bulk-curate** — select-all → approve / archive / tag (one taxonomy dimension) across the whole selection — tenant_admin → [library-atoms §4](./library-atoms.md#bulk-curation)
 - [x] ✅ **Re-atomize / harvest** section content back to the library on lock — tenant_admin
 
 ### D. Provision the proposal (admin side)

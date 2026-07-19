@@ -6,20 +6,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * Atom library — browse/curate the tenant's atoms: filter by tag/status/grain,
  * see reuse (usage_count) + lineage, distinguish uploaded vs harvested (returned)
  * atoms, approve/archive, retag via the detail drawer, and compose a group from
- * selected atoms. Reads the canonical library_atoms API.
+ * selected atoms. Select-all + a bulk bar apply status (approve/archive) or a
+ * taxonomy tag across the whole selection in one call (POST atoms/bulk). Reads the
+ * canonical library_atoms API.
  */
 
+// NOTE: the DB layer (lib/db) transforms columns to camelCase, so the atoms API
+// returns camelCase keys — read `wordCount`, not `word_count` (a snake_case read
+// is silently undefined; that was the "N words" blank bug).
 interface Atom {
   id: string; grain: string; title: string | null; summary: string | null;
-  word_count: number; status: string; creator_kind: string; source: string;
-  usage_count: number; member_count: number; child_count: number; tags: string[];
-  owner_name: string | null; owner_email: string | null; visibility: string; is_mine: boolean;
+  wordCount: number; status: string; creatorKind: string; source: string;
+  usageCount: number; memberCount: number; childCount: number; tags: string[];
+  ownerName: string | null; ownerEmail: string | null; visibility: string; isMine: boolean;
 }
 interface AtomDetail {
   id: string; content: string | null;
-  tags: Array<{ dimension: string; value: string; is_other: boolean; confirmed: boolean }>;
-  parents: Array<{ parent_atom_id: string; title: string | null }>;
-  children: Array<{ child_atom_id: string; title: string | null }>;
+  tags: Array<{ dimension: string; value: string; isOther: boolean; confirmed: boolean }>;
+  parents: Array<{ parentAtomId: string; title: string | null }>;
+  children: Array<{ childAtomId: string; title: string | null }>;
 }
 
 const VIS_LABEL: Record<string, string> = { owner_only: 'private', admin_only: 'admin-only', shared_for_proposal: 'shared' };
@@ -39,6 +44,8 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
   const [mine, setMine] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [groupTitle, setGroupTitle] = useState('');
+  const [bulkTagDim, setBulkTagDim] = useState('agency');
+  const [bulkTagVal, setBulkTagVal] = useState('');
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AtomDetail | null>(null);
@@ -93,6 +100,26 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
     } catch { setErr('Network error'); } finally { setBusy(false); }
   }, [tenantSlug, sel, groupTitle, load]);
 
+  // Bulk curation across the whole selection in one transaction (status and/or tag).
+  const bulkCurate = useCallback(async (body: { status?: 'approved' | 'archived' | 'draft'; addTag?: { dimension: string; value: string } }) => {
+    if (sel.size === 0) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/atoms/bulk`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ atomIds: [...sel], ...body }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Bulk action failed'); return; }
+      if (body.addTag) setBulkTagVal('');
+      setSel(new Set()); await load();
+    } catch { setErr('Network error'); } finally { setBusy(false); }
+  }, [tenantSlug, sel, load]);
+
+  // Select every selectable (non-reference) atom currently shown.
+  const selectAll = useCallback(() => {
+    setSel(new Set(atoms.filter((a) => a.grain !== 'reference').map((a) => a.id)));
+  }, [atoms]);
+
   const grainColor: Record<string, string> = { primitive: 'bg-teal-100 text-teal-700', group: 'bg-purple-100 text-purple-700', reference: 'bg-gray-100 text-gray-500' };
   const parseTag = (t: string): { dimension: string; value: string } => { const i = t.indexOf(':'); return { dimension: t.slice(0, i), value: t.slice(i + 1) }; };
 
@@ -110,7 +137,14 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
           {mine ? 'My atoms' : 'All atoms'}
         </button>
         <button onClick={load} className="text-sm text-blue-600 hover:underline">Refresh</button>
-        <span className="text-xs text-gray-400 ml-auto">{atoms.length} atoms</span>
+        <span className="ml-auto flex items-center gap-2">
+          {atoms.length > 0 && (
+            sel.size > 0
+              ? <button onClick={() => setSel(new Set())} className="text-xs text-gray-500 hover:underline">Clear ({sel.size})</button>
+              : <button onClick={selectAll} className="text-xs text-blue-600 hover:underline">Select all</button>
+          )}
+          <span className="text-xs text-gray-400">{atoms.length} atoms</span>
+        </span>
       </div>
 
       {err && <p className="text-xs text-rose-600">{err}</p>}
@@ -125,11 +159,28 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
         </div>
       )}
 
-      {sel.size >= 2 && (
-        <div className="border border-purple-200 bg-purple-50 rounded-lg p-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-purple-700">{sel.size} selected →</span>
-          <input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} placeholder="Group name (e.g. Team for Navy)" className="border border-purple-200 rounded px-2 py-1 text-sm flex-1 min-w-[12rem]" />
-          <button onClick={groupSelected} disabled={busy} className="text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5 disabled:opacity-50">Group into new atom</button>
+      {sel.size >= 1 && (
+        <div className="border border-indigo-200 bg-indigo-50 rounded-lg p-3 space-y-2">
+          {/* Bulk status + tag across the whole selection (one transaction). */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-indigo-700">{sel.size} selected →</span>
+            <button onClick={() => bulkCurate({ status: 'approved' })} disabled={busy} className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-1.5 disabled:opacity-50">Approve all</button>
+            <button onClick={() => bulkCurate({ status: 'archived' })} disabled={busy} className="text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded px-3 py-1.5 disabled:opacity-50">Archive all</button>
+            <span className="mx-1 h-4 w-px bg-indigo-200" />
+            <select value={bulkTagDim} onChange={(e) => setBulkTagDim(e.target.value)} className="border border-indigo-200 rounded px-2 py-1.5 text-xs bg-white">
+              {['agency', 'program', 'phase', 'tech', 'dept', 'kind', 'vol'].map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <input value={bulkTagVal} onChange={(e) => setBulkTagVal(e.target.value)} placeholder="tag value (e.g. Navy)" className="border border-indigo-200 rounded px-2 py-1 text-xs w-40" />
+            <button onClick={() => bulkCurate({ addTag: { dimension: bulkTagDim, value: bulkTagVal.trim() } })} disabled={busy || !bulkTagVal.trim()} className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded px-3 py-1.5 disabled:opacity-50">Tag all</button>
+          </div>
+          {/* Compose a new group atom from the selection (needs ≥2). */}
+          {sel.size >= 2 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-indigo-100">
+              <span className="text-xs text-purple-700">Compose →</span>
+              <input value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} placeholder="Group name (e.g. Team for Navy)" className="border border-purple-200 rounded px-2 py-1 text-sm flex-1 min-w-[12rem]" />
+              <button onClick={groupSelected} disabled={busy} className="text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded px-3 py-1.5 disabled:opacity-50">Group into new atom</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -144,15 +195,15 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${grainColor[a.grain] ?? 'bg-gray-100'}`}>{a.grain === 'reference' ? 'foundational' : a.grain}</span>
                   <button onClick={() => openDetail(a.id)} className="text-sm font-medium text-gray-800 truncate hover:text-blue-600 hover:underline text-left">{a.title || 'Untitled atom'}</button>
-                  <span className="text-[11px] text-gray-400">{a.word_count} words</span>
-                  {a.usage_count > 0 && <span className="text-[11px] text-amber-600" title="reused in this many drafts (non-destructive)">↺ used {a.usage_count}×</span>}
-                  {a.member_count > 0 && <span className="text-[11px] text-purple-500">{a.member_count} members</span>}
-                  {a.child_count > 0 && <span className="text-[11px] text-blue-500">{a.child_count} derived</span>}
+                  <span className="text-[11px] text-gray-400">{a.wordCount} words</span>
+                  {a.usageCount > 0 && <span className="text-[11px] text-amber-600" title="reused in this many drafts (non-destructive)">↺ used {a.usageCount}×</span>}
+                  {a.memberCount > 0 && <span className="text-[11px] text-purple-500">{a.memberCount} members</span>}
+                  {a.childCount > 0 && <span className="text-[11px] text-blue-500">{a.childCount} derived</span>}
                   <span className="ml-auto flex items-center gap-1.5">
                     {badge && <span className={`text-[9px] uppercase tracking-wide rounded px-1 py-0.5 ${badge.cls}`}>{badge.label}</span>}
                     {a.visibility && a.visibility !== 'tenant' && <span className="text-[9px] uppercase tracking-wide bg-amber-100 text-amber-700 rounded px-1 py-0.5">{VIS_LABEL[a.visibility] ?? a.visibility}</span>}
-                    {a.is_mine && <span className="text-[9px] uppercase bg-blue-100 text-blue-700 rounded px-1 py-0.5">mine</span>}
-                    <span className="text-[10px] text-gray-400" title={a.owner_email ?? undefined}>{a.owner_name || a.creator_kind}</span>
+                    {a.isMine && <span className="text-[9px] uppercase bg-blue-100 text-blue-700 rounded px-1 py-0.5">mine</span>}
+                    <span className="text-[10px] text-gray-400" title={a.ownerEmail ?? undefined}>{a.ownerName || a.creatorKind}</span>
                   </span>
                 </div>
                 {a.summary && <p className="text-xs text-gray-500 truncate mt-0.5">{a.summary}</p>}
@@ -180,7 +231,7 @@ export function AtomLibrary({ tenantSlug }: { tenantSlug: string }) {
                         <span className="text-gray-400">tags: </span>
                         {detail.tags.map((t, i) => (
                           <span key={i} className={`inline-block mr-1 mb-1 rounded px-1.5 py-0.5 ${t.confirmed ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
-                            {t.dimension}:{t.value}{t.is_other ? '*' : ''}
+                            {t.dimension}:{t.value}{t.isOther ? '*' : ''}
                           </span>
                         ))}
                       </div>
