@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AtomsWorkbench } from '@/components/portal/atoms-workbench';
+import { TemplifyPastProposals } from '@/components/portal/templify-past-proposals';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,9 @@ export default async function AtomsPage({ params }: { params: Promise<{ tenantSl
           against the one taxonomy, and it&apos;s sized to drop into section molds. Primitives (a bio, a figure)
           combine into groups (a Team) with lineage back to their source.
         </p>
+      </div>
+      <div className="mb-6">
+        <TemplifyPastProposals tenantSlug={tenantSlug} />
       </div>
       <AtomsWorkbench tenantSlug={tenantSlug} />
     </div>

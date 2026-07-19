@@ -20,6 +20,7 @@ import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
 import { extractTemplateSkeleton } from '@/lib/templates/extract-skeleton';
+import { pastProposalToCanvas } from '@/lib/templates/past-proposal-canvas';
 import { sectionsToNodes, type CanvasDocument } from '@/lib/types/canvas-document';
 
 const TEMPLATE_TYPES = new Set([
@@ -59,7 +60,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Body / declaration ─────────────────────────────────────────────
     let body: {
-      artifactId?: unknown; proposalId?: unknown; canvas?: unknown;
+      artifactId?: unknown; proposalId?: unknown; canvas?: unknown; cocoonId?: unknown;
       name?: unknown; templateType?: unknown; agency?: unknown; program?: unknown;
       description?: unknown; sectionBudgets?: unknown;
     };
@@ -73,7 +74,41 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Resolve the source canvas ──────────────────────────────────────
     let sourceCanvas: CanvasDocument | null = null;
-    if (typeof body.artifactId === 'string') {
+    // When the source is a past-proposal PACKAGE from the library (a document_cocoon of
+    // atoms), we record the cocoon on the template so the library can show "already
+    // templified" and cross-link. See #18 (past-proposal templify).
+    let templifiedFromCocoon: string | null = null;
+    if (typeof body.cocoonId === 'string') {
+      // Templify a PAST PROPOSAL: reconstruct its ordered section skeleton from the
+      // primitive atoms of its cocoon (upload→atomize grouped them), content-stripped.
+      if (!isValidUUID(body.cocoonId)) {
+        return NextResponse.json({ error: 'Invalid cocoonId', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
+      try {
+        const [cocoon] = await sql<{ name: string | null }[]>`
+          SELECT name FROM document_cocoons
+          WHERE id = ${body.cocoonId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+        if (!cocoon) return NextResponse.json({ error: 'Past proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+        // Ordered by the source block index (b0, b1, … in source_anchor), created_at as tiebreak.
+        const atoms = await sql<{ title: string | null; content: string | null }[]>`
+          SELECT title, content FROM library_atoms
+          WHERE cocoon_id = ${body.cocoonId}::uuid AND tenant_id = ${tenantId}::uuid
+            AND grain = 'primitive' AND status <> 'archived'
+          ORDER BY NULLIF(regexp_replace(COALESCE(source_anchor->0->'blockIds'->>0, ''), '[^0-9]', '', 'g'), '')::int NULLS LAST,
+                   created_at ASC`;
+        if (atoms.length === 0) {
+          return NextResponse.json({ error: 'This past proposal has no section atoms to templify', code: 'VALIDATION_ERROR' }, { status: 400 });
+        }
+        // Lay the atoms out directly — one section per atom (title→heading, prose→body).
+        // (assembleArtifactCanvas molds markdown and drops bare prose, collapsing the
+        // structure; a past proposal's atoms are plain-text chunks.)
+        sourceCanvas = pastProposalToCanvas(atoms, templateType);
+        templifiedFromCocoon = body.cocoonId;
+      } catch (e) {
+        console.error('[templates/extract] cocoon templify failed:', e);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+    } else if (typeof body.artifactId === 'string') {
       if (!isValidUUID(body.artifactId) || (typeof body.proposalId === 'string' && !isValidUUID(body.proposalId))) {
         return NextResponse.json({ error: 'Invalid artifact/proposal id', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
@@ -99,7 +134,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       }
       sourceCanvas = c as CanvasDocument;
     } else {
-      return NextResponse.json({ error: 'Provide an artifactId or a canvas to extract from', code: 'VALIDATION_ERROR' }, { status: 400 });
+      return NextResponse.json({ error: 'Provide a cocoonId (past proposal), an artifactId, or a canvas to extract from', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
     // ── Extract skeleton + persist ─────────────────────────────────────
@@ -124,7 +159,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           false,
           ${tenantId}::uuid,
           ${su.id}::uuid,
-          ${sql.json({ extracted: true, sections: slots } as unknown as Parameters<typeof sql.json>[0])}
+          ${sql.json({ extracted: true, sections: slots, ...(templifiedFromCocoon ? { templifiedFromCocoon, source: 'past_proposal' } : {}) } as unknown as Parameters<typeof sql.json>[0])}
         )
         RETURNING id`;
     } catch (e) {
@@ -138,7 +173,11 @@ export async function POST(request: Request, ctx: RouteContext) {
         type: 'template.extracted',
         actor: userActor(su.id, su.email ?? undefined),
         tenantId,
-        payload: { templateId: created!.id, name, templateType, sections: slots.length },
+        payload: {
+          templateId: created!.id, name, templateType, sections: slots.length,
+          source: templifiedFromCocoon ? 'past_proposal' : 'built',
+          ...(templifiedFromCocoon ? { cocoonId: templifiedFromCocoon } : {}),
+        },
       });
     } catch (e) { console.error('[templates/extract] event emit failed (non-fatal):', e); }
 
