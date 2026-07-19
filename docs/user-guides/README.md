@@ -131,6 +131,7 @@ implies it exists).
 ### H. Operate & observe (admin)
 
 - [x] ✅ **Admin dashboard** — system state at a glance + **unified ToDo queue** (defined-workflow steps; broadcast/acknowledge floor) — master_admin, rfp_admin → [admin-observability](./admin-observability.md#1a-every-todo-is-a-step-in-a-defined-workflow)
+- [x] ✅ **System admin pages** — System Health (queue/events/errors/tool latencies + catalog) + System State; customer **Settings** (account/subscription/company profile) — master_admin, tenant_admin → [admin-observability §6](./admin-observability.md#6-system-health--state-master-admin)
 - [x] ✅ **Tenants** — manage customer accounts — master_admin
 - [x] ✅ **Purchases / curation queue** — triage new buys — rfp_admin
 - [x] ✅ **Shadow / god-view** into a tenant to act on their behalf — rfp_admin

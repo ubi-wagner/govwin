@@ -173,6 +173,32 @@ routes/services, so nothing double-sends.
 
 ---
 
+## 6. System health & state (master admin)
+
+**System → System Health** (`/admin/system`) is the platform vitals board — the
+"is everything OK?" page.
+
+![System Health — queue depth, event/error rates, tool latencies, and the tool catalog](./img/admin-system-health.png)
+
+- **Queue depth · Events (1h) · Errors (1h)** — the top-line pulse. Errors green at
+  zero is what you want.
+- **Tool invocations (24h)** — per-tool **calls / errors / p50 / p95** latency.
+- **Registered tools** — the full dual-use tool catalog (each tool's namespace,
+  scope, and what it does) — proof the agent/tool framework is live and callable.
+- **Recent errors** — the last error events, or *"No errors recorded. That's good."*
+
+**System → System State** (`/admin/system-state`) complements it with the workflow
+engine's health summary (mirrors the Process Ledger's classifier).
+
+> **The customer-admin half.** A tenant admin's settings live on **Settings**
+> (`/portal/[tenant]/profile`): **Your Account**, **Subscription**, and an editable
+> **Company Profile** whose fields (NAICS, target agencies, keywords, research
+> areas) feed proposal templates and AI drafting. Their observability is the
+> **Activity** feed, **Processes** ledger, **Agents**, and **AI Usage** — the
+> tenant-scoped mirrors of these admin surfaces.
+
+---
+
 ## Related
 
 - Purchases & the curation queue → [RFP admin](./admin-rfp.md)

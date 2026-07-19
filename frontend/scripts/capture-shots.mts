@@ -153,6 +153,23 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'sysadmin') {
+      // RFP-admin observability: System Health + System State.
+      await login(page, 'eric@rfppipeline.com');
+      for (const [path, name] of [['system', 'admin-system-health'], ['system-state', 'admin-system-state']] as Array<[string, string]>) {
+        try {
+          await page.goto(`${BASE}/admin/${path}`, { waitUntil: 'domcontentloaded' });
+          await page.waitForTimeout(2200);
+          await shot(page, name, { full: true });
+        } catch (e) { console.error(`  ⚠ ${name}: ${e instanceof Error ? e.message : e}`); }
+      }
+      // Customer-admin settings (account · subscription · company profile).
+      await login(page, 'admin@acme-navy.test');
+      await page.goto(`${BASE}/portal/acme-navy-systems/profile`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      await shot(page, 'portal-settings', { full: true });
+    }
+
     if (journey === 'automation') {
       await login(page, 'eric@rfppipeline.com'); // master_admin
       await page.goto(`${BASE}/admin/automation`, { waitUntil: 'domcontentloaded' });
