@@ -96,6 +96,53 @@ views never disagree — they're two windows onto the same immutable record.
 
 ---
 
+## 4. Workflow managers — driving the OPP-bridge automations
+
+Behind the ToDos and the event stream runs the **workflow engine**: long-running
+processes that fan a solicitation out to tenants, provision a new customer, and
+run the proposal review gates. Two admin surfaces manage them — both sides of the
+OPP bridge (admin curation/release **and** customer build) in one place.
+
+### 4a. Workflow Monitor (`/admin/workflows`)
+
+**System → Workflows** is the control room. It **launches** workflows, shows every
+**active** instance with live step progress, and keeps a **24-hour history**.
+
+![The Workflow Monitor — launchers, active instances with step progress, and history](./img/admin-workflow-monitor.png)
+
+- **Status rollup** — Running / Paused / Completed 24h / Failed 24h at a glance.
+- **Active Workflows** — each instance shows its `workflow_name`, current **step
+  N/total** with a progress bar, source, and (for a tenant workflow) the tenant.
+  A **paused** HITL gate (e.g. `on_proposal_advanced` at *Wait For Review*) gets an
+  **Advance** button — the same paused→retrying resume the ToDo queue uses. Every
+  instance has **Steps** (drill into per-step status) and **Cancel**.
+- **Recent History (24h)** — completed and failed instances; a **failed** one
+  (e.g. *Failed at step 1: ai_compliance_review*, retry #3) offers **Retry**.
+- **Launchers** — **Generate Content** (the CMS content vertical: AI drafts → parks
+  a review ToDo) and **Launch Review Gate** (park a manual HITL review/approval on
+  any entity — for one-off gates not covered by an automatic bridge).
+
+> The instances above span the bridge: `on_solicitation_pushed` (admin fan-out),
+> `on_application_accepted` (admin provisioning), and `on_proposal_advanced`
+> (customer build review).
+
+### 4b. Process Ledger (`/admin/processes`)
+
+**System → Process Ledger** is the cross-tenant roll-up — *active automation across
+all tenants, problems surfaced first*, filterable by tenant or health.
+
+![The Process Ledger — cross-tenant active processes, advance a waiting gate inline](./img/admin-process-ledger.png)
+
+- **Health** — Awaiting / Running / stalled / failed, using the **same** classifier
+  as the customer-side ledger, so badges never disagree across views.
+- **Advance** a waiting gate **inline** without opening the full monitor.
+- Filter by **tenant** (or All tenants) to scope to one customer.
+
+> **Process Monitor** (`/admin/process`) is the deeper single-pane view of active +
+> completed processes; the Ledger is the fast cross-tenant triage board.
+
+---
+
 ## Related
 
 - Purchases & the curation queue → [RFP admin](./admin-rfp.md)

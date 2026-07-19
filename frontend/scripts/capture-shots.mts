@@ -153,6 +153,22 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'workflows') {
+      await login(page, 'eric@rfppipeline.com'); // master_admin
+      const stops: Array<[string, string]> = [
+        ['workflows', 'admin-workflow-monitor'],
+        ['processes', 'admin-process-ledger'],
+        ['process', 'admin-process-monitor'],
+      ];
+      for (const [path, name] of stops) {
+        try {
+          await page.goto(`${BASE}/admin/${path}`, { waitUntil: 'domcontentloaded' });
+          await page.waitForTimeout(2200);
+          await shot(page, name, { full: true });
+        } catch (e) { console.error(`  ⚠ ${name}: ${e instanceof Error ? e.message : e}`); }
+      }
+    }
+
     if (journey === 'library') {
       const slug = 'acme-navy-systems';
       await login(page, 'admin@acme-navy.test');

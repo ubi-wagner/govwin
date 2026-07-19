@@ -136,6 +136,7 @@ implies it exists).
 - [x] ✅ **Shadow / god-view** into a tenant to act on their behalf — rfp_admin
 - [x] ✅ **Cross-tenant proposals** view — master_admin, rfp_admin
 - [x] ✅ **Sources / ingestion runs**, **events**, **system state** — master_admin
+- [x] ✅ **Workflow managers** — Workflow Monitor (launch / advance / cancel / retry + history) + cross-tenant Process Ledger, both OPP-bridge sides — master_admin, rfp_admin → [admin-observability §4](./admin-observability.md#4-workflow-managers--driving-the-opp-bridge-automations)
 - [⚠] ⚠ **Agent workforce** — only `section_drafter` live end-to-end; `compliance_reviewer` inline; ~7 archetypes dormant (do NOT document as fully live)
 
 ---
