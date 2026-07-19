@@ -147,8 +147,13 @@ auto-applied* by the fabric. Each agent needs an explicit **land-or-review** ste
    - Add RLS policy + `FORCE ROW LEVEL SECURITY` to `episodic_memories` and `proposals` (and audit every
      tenant-scoped table an agent touches).
    - Then set `app.tenant_id` centrally in the fabric per invocation → RLS becomes the real backstop over
-     the explicit `WHERE`. Until then, **tenant-discretion + explicit `WHERE tenant_id` is the ONLY
-     isolation** — every agent query MUST carry it (reviewed per agent).
+     the explicit `WHERE`. **Exact wiring:** in `fabric.invoke_agent` (`pipeline/src/agents/fabric.py`),
+     right after `tenant_id = tenant_id or context.get("tenant_id")`, inside the `try`, run
+     `await conn.execute("SELECT set_config('app.tenant_id', $1, false)", str(tenant_id) if tenant_id else '')`;
+     add a `finally` that resets it (`set_config('app.tenant_id', '', false)`) so the shared/pooled conn
+     isn't left scoped. Add a test that a query on that conn after invoke sees the GUC cleared. Inert under
+     today's bypass role; do it **with** the NOBYPASSRLS role change. Until then, **tenant-discretion +
+     explicit `WHERE tenant_id` is the ONLY isolation** — every agent query MUST carry it (reviewed per agent).
 3. **Writes through the registry:** agent write/landing actions call the RLS+role+audited frontend tools,
    never DB-direct — one `tool.invoke.start`/`end` audit pair per action.
 
