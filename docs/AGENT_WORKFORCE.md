@@ -94,18 +94,32 @@ next build, gated to rfp_admin — the "bidirectional control" leg.
 
 ---
 
-## 6. Continuation — the other six agents (apply §2)
+## 6. Continuation — the other agents (apply §2)
 
-Each: realign to the spine, enqueue at the producer site. All tenant-scoped ⇒ tenant-bound (§3).
+**Placement decision (confirmed).** Agents split into two shapes, and it's how each "sits in a
+workflow template as an actor" — both are agents-as-actors + kickoff trigger; the fan-out ones just fan out:
 
-| Agent | Producer site (enqueue `requestAgentTask`) | taskType | Modern tools |
+- **Fan-out, per-tenant** (scoring_strategist, opportunity_analyst) act on *(this tenant, this
+  opportunity)* ⇒ run **once per tenant** via a **per-tenant producer** (`requestAgentTask` → the
+  Librarian pattern), so they stay **tenant-bound (§3)**. They're the AI actors in each tenant's
+  card-arrival loop.
+- **Single-entity** (proposal_architect, packaging_specialist, capture_strategist, partner_coordinator)
+  act on one proposal/portal ⇒ drop in as a **declarative `AI_INVOKE` `Step`** in that entity's workflow,
+  literally a step actor beside the human steps. The `TOOL_ACTION_TO_ARCHETYPE` map is already registered.
+
+| Agent | Shape | Trigger / producer site | AI_INVOKE action |
 |---|---|---|---|
-| **scoring_strategist** | card push / spotlight scoring (`solicitation.push` fan-out; `tenant_opportunity_cards` insert) | `score` | read cards + `tenant_bucket_scores`/`tenant_spotlight_buckets`; write scores |
-| **opportunity_analyst** | card push (per tenant) | `analyze_fit` | read card + tenant profile (library dist + proposal focus); emit fit assessment |
-| **proposal_architect** | proposal provision (`proposals/create`) | `architect` | read solicitation volumes/matrix; propose skeleton (→ `volume.add_required_item`) |
-| **packaging_specialist** | all sections locked (proposal lock roll-up) | `assemble` | read locked sections; assemble/export (artifact-export) |
-| **capture_strategist** | portal purchased (`proposal_portals` curation_pending) | `capture_plan` | read opp + tenant profile; draft capture plan (memory) |
-| **partner_coordinator** | collaborator invited (`proposals/[id]/collaborators` POST) | `coordinate` | read collaborators + stage access; coordinate sections |
+| **scoring_strategist** | fan-out | card push → bucket-scored (per tenant) → producer | `tool.opportunity.score` |
+| **opportunity_analyst** | fan-out | card push (per tenant) → producer | `tool.opportunity.analyze` |
+| **proposal_architect** | single-entity step | proposal provision workflow | `tool.proposal.architect` |
+| **packaging_specialist** | single-entity step | all-sections-locked workflow | `tool.proposal.package` |
+| **capture_strategist** | single-entity step | portal-purchased workflow | `tool.capture.generate_strategy` |
+| **partner_coordinator** | single-entity step | collaborator-invited workflow | `tool.partner.coordinate` |
 
-Verify each like the Librarian: a `test_<agent>_wiring.py` (registered, handles trigger, modern tools, tool
-schemas expose no `tenant_id`) + the producer enqueue. LLM reasoning runs live on deploy.
+**Status:** `librarian` wired (§2). `scoring_strategist` greenfielded (tenant-discretion + current-spine
+tools, `test_scoring_strategist_wiring.py` 5/5); remaining = per-tenant producer at the bucket-scoring site
++ stress/E2E + output screenshot. Then the other four as AI_INVOKE steps.
+
+Verify each like the Librarian: a `test_<agent>_wiring.py` (registered, maps to its action / handles its
+trigger, modern tools, **tool schemas expose no `tenant_id`**) + the producer/step + a stress pass. LLM
+reasoning runs live on deploy (Railway key).
