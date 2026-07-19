@@ -112,6 +112,32 @@ payload, so every row reads **"email · role · company"** — including an empl
 acting inside a customer's space (email@ours → partner_user · Customer Y). This is
 the same audit spine from #109/#100, now fully attributed. (Ties to task #110.)
 
+## Reconciliation with the as-built model
+
+`docs/IDENTITY_AUTHZ_MODEL.md` documents today's deliberate choices, which this
+design **intentionally revisits**:
+
+- **Login is `email` alone**; an earlier `tenant_memberships` table was *collapsed*
+  into `users.tenant_id`. This design **re-introduces** that junction (as
+  `user_memberships`) — the earlier collapse was for simplicity when one company
+  per person was assumed; that assumption no longer holds.
+- Three separate mechanisms exist that `user_memberships` **unifies** into one
+  login-selectable concept:
+  1. **Home membership** = `users.tenant_id` + `role` → a `(tenant, role)` membership.
+  2. **RFP shadow admin** = `shadow_admin_grants (source='t_and_c')` (god-view into
+     any tenant) → the **derived** `(every tenant, tenant_admin)` shadow membership.
+  3. **Cross-company collaborator** = `proposal_collaborators` (+ `partner_user`) →
+     a `(that tenant, partner_user)` membership, with the per-section grants staying
+     in `collaborator_stage_access`.
+- This also closes the documented §4 gap (routes that check tenant membership but
+  not per-section `resolveUserAccess`): with the active membership explicit in the
+  session, the coarse gate and the fine-grained scope resolve off the same source.
+
+**Coexistence, not big-bang.** `proposal_collaborators` / `collaborator_stage_access`
+/ `shadow_admin_grants` remain the source of the *grant*; `user_memberships` is the
+**materialized, login-selectable projection** of them (+ the home row). P1 backfills
+it from all three; later phases can make the grant-writers also write the membership.
+
 ## Migration / rollout (compatible, phased)
 
 - **P1 — schema + backfill (no behavior change).** Create `user_memberships`;
