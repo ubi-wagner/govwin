@@ -258,6 +258,7 @@ export async function completeTask(opts: {
     assigneeRole: string | null;
     assigneeUserId: string | null;
     processInstanceId: string | null;
+    taskType: string;
   }[];
   try {
     rows = await sql<{
@@ -267,8 +268,9 @@ export async function completeTask(opts: {
       assigneeRole: string | null;
       assigneeUserId: string | null;
       processInstanceId: string | null;
+      taskType: string;
     }[]>`
-      SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id
+      SELECT id, status, tenant_id, assignee_role, assignee_user_id, process_instance_id, task_type
       FROM tasks WHERE id = ${taskId}::uuid
     `;
   } catch (e) {
@@ -325,6 +327,16 @@ export async function completeTask(opts: {
     // If the instance couldn't be resumed (e.g. already moved on), the task is
     // still legitimately completed — report success but reflect resumed=false.
   }
+
+  // Audit the completion (the counterpart to createTask's proposal:task.assigned).
+  // A plain human-delegated task otherwise closes with no event on the queue.
+  await emitEventSingle({
+    namespace: 'proposal',
+    type: 'task.completed',
+    actor: userActor(actor.id, actor.email ?? undefined),
+    tenantId: task.tenantId,
+    payload: { taskId, taskType: task.taskType, resumed, completedBy: actor.id },
+  });
 
   return { ok: true, data: { taskId, resumed } };
 }
