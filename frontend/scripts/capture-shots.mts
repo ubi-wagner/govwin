@@ -194,6 +194,18 @@ async function run() {
       console.log('   single-membership landed at:', page.url());
     }
 
+    if (journey === 'shadow') {
+      // RFP-admin DESCENDS into a customer's space → ack modal + persistent banner + audit.
+      await login(page, 'eric@rfppipeline.com');
+      await page.goto(`${BASE}/portal/immobileyes/dashboard`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2200);
+      await shot(page, 'shadow-descend-ack', { full: true });
+      // Acknowledge → the persistent "acting in their space · logged" banner remains.
+      await page.getByRole('button', { name: /I understand/i }).click().catch(() => {});
+      await page.waitForTimeout(800);
+      await shot(page, 'shadow-descend-banner', { full: true });
+    }
+
     if (journey === 'sysadmin') {
       // RFP-admin observability: System Health + System State.
       await login(page, 'eric@rfppipeline.com');

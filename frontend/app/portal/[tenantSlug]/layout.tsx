@@ -5,6 +5,7 @@ import { SignOutButton } from '@/components/auth/sign-out-button';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
+import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -65,6 +66,11 @@ export default async function PortalLayout({
   const basePath = `/portal/${tenantSlug}`;
   const isPartner = role === 'partner_user';
   const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
+  // An RFP/master admin viewing a customer's portal IS a shadow descent — they have
+  // no home tenant, so any tenant space is a descent. Flag it so the banner + audit
+  // + acknowledgment fire. (Multi-membership identity: RFP-admins are the only ones
+  // who switch scope in-session.)
+  const isShadowAdmin = role === 'rfp_admin' || role === 'master_admin';
 
   return (
     <div className="min-h-screen flex">
@@ -110,8 +116,9 @@ export default async function PortalLayout({
           <SignOutButton className="text-xs text-gray-400 hover:text-white" />
         </div>
       </aside>
-      <main className="flex-1 p-8">
-        {children}
+      <main className="flex-1">
+        {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
+        <div className="p-8">{children}</div>
       </main>
     </div>
   );
