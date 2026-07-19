@@ -107,3 +107,8 @@ See CLAUDE_CLIFFNOTES.md for:
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
 docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow.
+
+**Continuity:** `docs/CONTINUATION.md` is the durable "start here" memory — current
+sprint state, how to spin up the sandbox, verified demo accounts, the live gap list, and
+the recurring bug-classes. Read it first when resuming; the identity model is in
+docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
