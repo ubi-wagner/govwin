@@ -447,6 +447,17 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   });
 
+  // Defense in depth: a SCOPED collaborator (NOT a tenant-wide member) must never
+  // even RECEIVE metadata for sections they weren't granted — withhold unassigned
+  // sections here so nothing leaks client-side (e.g. a pricing section's title in
+  // the "All" tab). A collaborator sees ONLY what the company admin assigned. Home
+  // staff / admins (tenant-wide) keep the full section set. (Identity: collaborators
+  // work across companies; scope is enforced off the grant, never assumed.)
+  const tenantWide = isTenantWideMember(role, sessionUser.tenantId, tenantId);
+  const visibleSections = tenantWide
+    ? sectionsWithPermission
+    : sectionsWithPermission.filter((s) => s.permission !== 'none');
+
   return (
     <div>
       {/* ── Proposal Header ───────────────────────────────────────────── */}
@@ -517,7 +528,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         proposalId={proposalId}
         tenantSlug={tenantSlug}
         contextSlugs={opportunityContextSlugs({ agency: proposal.agency, program: proposal.programType })}
-        sections={sectionsWithPermission}
+        sections={visibleSections}
         hasEmptySections={hasEmptySections}
         proposalStage={proposal.stage}
         isLocked={proposal.isLocked}

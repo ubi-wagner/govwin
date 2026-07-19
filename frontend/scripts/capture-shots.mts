@@ -177,6 +177,16 @@ async function run() {
         await page.waitForTimeout(2000);
         await shot(page, 'auth-landed-collaborator', { full: true });
         console.log('   after pick, landed at:', page.url());
+        // Open the proposal — she must see ONLY her assigned section (scoped visibility).
+        await page.getByRole('link', { name: /Acme .* Navy SBIR Phase I/i }).first().click().catch(() => {});
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(2000);
+        await shot(page, 'collab-scoped-visibility', { full: true });
+        console.log('   proposal view at:', page.url());
+        // Click "All" — the unassigned section must be WITHHELD server-side (no leak).
+        await page.getByRole('button', { name: /^All$/ }).click().catch(() => {});
+        await page.waitForTimeout(700);
+        await shot(page, 'collab-scoped-all-tab', { full: true });
       } catch (e) { console.error('  ⚠ pick:', e instanceof Error ? e.message : e); }
       // 4. Control: a single-membership user goes straight to their dashboard.
       await login(page, 'teammate@acme-navy.test');
