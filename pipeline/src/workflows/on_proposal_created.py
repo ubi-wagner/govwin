@@ -104,6 +104,20 @@ class OnProposalCreated(Workflow):
         # publish_section_draft BEFORE the human review gate. Guarded: only
         # empty/ai_drafted sections are touched, and it is a safe no-op if the
         # fabric / API key is unavailable.
+        # AI actor (#117): the proposal_architect reviews the just-provisioned skeleton and
+        # suggests structure/organization improvements — ADVISORY. Independent of drafting
+        # (no depends_on), so a failure/skip never blocks the loop; the fabric treats agent
+        # output as advisory (never auto-writes). Tenant-bound via payload.tenantId.
+        Step(
+            name="architect_review",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.architect",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
         Step(
             name="draft_sections",
             step_type=StepType.ACTION,
