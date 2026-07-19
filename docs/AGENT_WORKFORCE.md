@@ -123,3 +123,38 @@ tools, `test_scoring_strategist_wiring.py` 5/5); remaining = per-tenant producer
 Verify each like the Librarian: a `test_<agent>_wiring.py` (registered, maps to its action / handles its
 trigger, modern tools, **tool schemas expose no `tenant_id`**) + the producer/step + a stress pass. LLM
 reasoning runs live on deploy (Railway key).
+
+## 7. Landing + security (CONFIRMED — applies to all agents)
+
+**7a. The landing step (advisory → surface).** AI_INVOKE / agent-task results are *advisory, never
+auto-applied* by the fabric. Each agent needs an explicit **land-or-review** step to close its loop:
+- **Auto-apply only where bounded/safe:** `scoring_strategist`'s ±15 adjustment lands **alongside** the
+  algorithmic score — into `tenant_bucket_scores.factors` (jsonb, e.g. `{ai_adjustment, ai_rationale}`),
+  **never overwriting** `score`; the card ranking reads both.
+- **HITL-gate anything that mutates customer content:** `librarian` catalog → a tenant-admin review queue;
+  `proposal_architect` skeleton, `packaging_specialist` package, drafts → a review/lock gate. The landing
+  action goes through the **audited frontend tool registry** (`POST /api/tools/:name`), not raw SQL.
+
+**7b. Tenant isolation for the Python agents — 🚩 BIG FLAG (verified against the live DB).**
+1. **Tenant-discretion (done):** tool schemas expose no `tenant_id`; the trusted tenant comes from the task
+   context; the model can never reference another tenant. This is the guarantee **today**.
+2. **RLS is currently BYPASSED for the agents — must be fixed before agents are trusted with auto-landing.**
+   `library_atoms` / `tenant_bucket_scores` / `tenant_opportunity_cards` are `FORCE ROW LEVEL SECURITY`,
+   BUT the connecting role (`claude` in sandbox; whatever prod uses) has **`rolbypassrls = true`**, so RLS
+   never fires and `SET app.tenant_id` is a **no-op**. Also `episodic_memories` is NOT FORCE'd and
+   `proposals` has **no RLS policy at all**. Remediation (an infra task, do before relying on RLS):
+   - Introduce a dedicated **agent DB role with `NOBYPASSRLS`** and connect the pipeline/agents as it.
+   - Add RLS policy + `FORCE ROW LEVEL SECURITY` to `episodic_memories` and `proposals` (and audit every
+     tenant-scoped table an agent touches).
+   - Then set `app.tenant_id` centrally in the fabric per invocation → RLS becomes the real backstop over
+     the explicit `WHERE`. Until then, **tenant-discretion + explicit `WHERE tenant_id` is the ONLY
+     isolation** — every agent query MUST carry it (reviewed per agent).
+3. **Writes through the registry:** agent write/landing actions call the RLS+role+audited frontend tools,
+   never DB-direct — one `tool.invoke.start`/`end` audit pair per action.
+
+**7c. Guardrails gate the landing — 🚩 FLAG.** An agent's output does not land raw. Before any auto-apply
+or surface, it passes the tenant's **guardrails** (`guardrail_templates` / guardrail defaults): bound the
+scoring adjustment to ±15, strip/deny disallowed content, enforce the compliance floor, cap cost. A
+guardrail failure routes to HITL review instead of applying. The landing action (through the frontend
+registry) is where the guardrail check runs — so "advisory → guardrail → land or review" is the loop, never
+"advisory → land."
