@@ -28,7 +28,7 @@ const OFFICES = [
   'DARPA/I2O', 'DARPA/DSO', 'DARPA/MTO', 'DARPA/STO',
 ];
 
-type Status = 'idle' | 'uploading' | 'success' | 'error';
+type Status = 'idle' | 'uploading' | 'assisting' | 'success' | 'error';
 
 const PROGRAM_TYPES = [
   { value: 'sbir_phase_1', label: 'SBIR Phase I' },
@@ -55,6 +55,7 @@ export function UploadForm() {
   const [agency, setAgency] = useState('');
   const [office, setOffice] = useState('');
   const [dupeLink, setDupeLink] = useState<string | null>(null);
+  const [runAssist, setRunAssist] = useState(true);
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   const totalMb = totalBytes / 1024 / 1024;
@@ -157,8 +158,20 @@ export function UploadForm() {
         }
         throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
       }
+      // Ingest Assist — auto-build the matrix, volumes & section molds and publish
+      // the card(s) right after upload. The same materializer the Scouts feed.
+      // Best-effort: on failure, the workspace still has the manual button.
+      const solId = json.data.solicitation_id as string;
+      if (runAssist && solId) {
+        setStatus('assisting');
+        try {
+          await fetch(`/api/admin/rfp-curation/${solId}/ingest-assist`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+          });
+        } catch { /* non-fatal */ }
+      }
       setStatus('success');
-      router.push(`/admin/rfp-curation/${json.data.solicitation_id}`);
+      router.push(`/admin/rfp-curation/${solId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
@@ -352,13 +365,32 @@ export function UploadForm() {
         </div>
       )}
 
+      {/* Ingest Assist opt-in — run the ingest SOP right after upload. */}
+      <label className="flex items-start gap-2 p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={runAssist}
+          onChange={(e) => setRunAssist(e.target.checked)}
+          className="mt-0.5 accent-indigo-600"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-indigo-800">✨ Run Ingest Assist after upload</span>
+          <span className="block text-xs text-indigo-700/80">
+            Parse the solicitation and auto-build the compliance matrix, volumes &amp; section molds, then
+            publish the opportunity card(s). You&apos;ll land in the curation workspace with it ready to review.
+          </span>
+        </span>
+      </label>
+
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={status === 'uploading' || files.length === 0}
+          disabled={status === 'uploading' || status === 'assisting' || files.length === 0}
           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
         >
-          {status === 'uploading' ? 'Uploading…' : 'Upload & Create Solicitation'}
+          {status === 'uploading' ? 'Uploading…'
+            : status === 'assisting' ? 'Building matrix & skeleton…'
+            : runAssist ? 'Upload & Ingest Assist' : 'Upload & Create Solicitation'}
         </button>
         <a
           href="/admin/rfp-curation"

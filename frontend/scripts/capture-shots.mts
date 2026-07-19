@@ -128,6 +128,25 @@ async function run() {
       }
     }
 
+    if (journey === 'ingest') {
+      await login(page, 'eric@rfppipeline.com'); // rfp_admin
+      page.on('dialog', (d) => { d.accept().catch(() => {}); }); // auto-accept confirm + alert
+      const bareSol = 'f7cf49d3-f3dc-433b-a5e0-c8fc0e6439c1'; // Engineering Sleep — 0 volumes
+      // Before — the workspace with the ✨ Ingest Assist button, no skeleton yet.
+      await page.goto(`${BASE}/admin/rfp-curation/${bareSol}`, { waitUntil: 'networkidle' });
+      await shot(page, 'ingest-workspace-before', { full: true });
+      // Click Ingest Assist → parse (default) → build the matrix → publish → refresh.
+      try {
+        await page.getByRole('button', { name: /Ingest Assist/i }).click();
+        await page.waitForTimeout(5000);
+        await page.waitForLoadState('networkidle');
+        await shot(page, 'ingest-workspace-after', { full: true });
+      } catch (e) { console.error('  ⚠ ingest click:', e instanceof Error ? e.message : e); }
+      // The upload form with the new "Run Ingest Assist after upload" checkbox.
+      await page.goto(`${BASE}/admin/rfp-curation/upload`, { waitUntil: 'networkidle' });
+      await shot(page, 'ingest-upload-checkbox', { full: true });
+    }
+
     if (journey === 'admin') {
       await login(page, 'eric@rfppipeline.com');
       const stops: Array<[string, string]> = [

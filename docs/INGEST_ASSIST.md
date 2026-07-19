@@ -6,8 +6,18 @@ same materializer the **Scouts** will feed when they place new OPPs.
 
 ## Where
 
-RFP curation workspace (`/admin/rfp-curation/[solId]`) → the **✨ Ingest Assist**
-button (top-right, next to the status). Runs against the claimed solicitation.
+Two entry points:
+- **RFP curation workspace** (`/admin/rfp-curation/[solId]`) → the **✨ Ingest
+  Assist** button (top-right). One click builds the whole skeleton on the
+  solicitation:
+
+  ![Ingest Assist built the full 6-volume / 22-item matrix on one click](user-guides/img/ingest-workspace-after.png)
+
+- **Upload flow** (`/admin/rfp-curation/upload`) → the **✨ Run Ingest Assist
+  after upload** checkbox (on by default). The button reads **Upload & Ingest
+  Assist**, and you land in the workspace with the matrix already built:
+
+  ![The upload form offers Ingest Assist immediately](user-guides/img/ingest-upload-checkbox.png)
 
 ## What it does (the SOP)
 
