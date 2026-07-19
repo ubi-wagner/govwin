@@ -19,6 +19,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { duplicatePastProposalAtoms } from '@/lib/documents/duplicate-past-proposal';
 import {
   starterFromPreset, starterFromTemplate, isBlankPreset, countNodes,
   type TemplateRow,
@@ -131,8 +132,32 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (e) { console.error('[portal/documents] event emit failed (non-fatal):', e); }
 
+    // Branch-and-promote (#18): when regenerating from a template templified from a past
+    // proposal, copy the seminal atoms into WORKING draft copies bound to this document,
+    // each with derived_from lineage to its seminal atom (mutated/collaborated until full
+    // lock promotes them to foundation). Best-effort — never fail document creation.
+    let regenerated: { copiedAtoms: number } | null = null;
+    if (sourceTemplateId) {
+      try {
+        const actorKind = hasRoleAtLeast(role, 'tenant_admin') ? 'admin' : 'collaborator';
+        const dup = await duplicatePastProposalAtoms(tenantId, created!.id, sourceTemplateId, { id: su.id, kind: actorKind });
+        if (dup && dup.copied > 0) {
+          regenerated = { copiedAtoms: dup.copied };
+          try {
+            await emitEventSingle({
+              namespace: 'library',
+              type: 'document.regenerated',
+              actor: userActor(su.id, su.email ?? undefined),
+              tenantId,
+              payload: { documentId: created!.id, seminalCocoonId: dup.seminalCocoonId, copiedAtoms: dup.copied },
+            });
+          } catch (e) { console.error('[portal/documents] regenerated event emit failed (non-fatal):', e); }
+        }
+      } catch (e) { console.error('[portal/documents] past-proposal duplicate failed (non-fatal):', e); }
+    }
+
     return NextResponse.json(
-      { data: { documentId: created!.id, title: starter.title, docType: starter.docType } },
+      { data: { documentId: created!.id, title: starter.title, docType: starter.docType, ...(regenerated ? { regenerated } : {}) } },
       { status: 201 },
     );
   } catch (e) {

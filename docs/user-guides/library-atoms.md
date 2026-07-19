@@ -106,6 +106,40 @@ Your library powers the rest of the product:
 
 ---
 
+## 6. Reuse a past proposal — templify, then regenerate
+
+At the top of the Library is **Reuse a past proposal**. Every proposal package you
+upload is listed here with its section count; turn a winning one into a reusable
+**template** (its structure, content stripped), then spin up fresh drafts from it.
+
+![The "Reuse a past proposal" panel — each uploaded proposal with a "Save as template" action](./img/library-templify-panel.png)
+
+**Save as template (templify).** Click **Save as template**, name it, and pick a type.
+The proposal's section structure is extracted into a reusable template that shows up
+under **Templates** — and in the RFP-admin curation picker. The content is stripped;
+only the winning skeleton is kept.
+
+![Templify a past proposal — name it and choose a type](./img/library-templify-form.png)
+
+**New draft (regenerate).** Once templified, the card offers **New draft**. This
+*duplicates* the past proposal into a brand-new document **and copies its atoms** as
+your own working drafts — each linked by lineage back to the original. You and your
+team **mutate and collaborate** on these copies freely; the originals are never touched.
+
+![A regenerated draft opens with a "Lock for download" bar; edit freely, then lock](./img/document-lock-bar.png)
+
+**Full lock for download.** When the document is done, **Lock for download** finalizes
+it and commits its working copies to your library as **new foundation atoms** — each
+still carrying **lineage back to the seminal proposal**. So a locked document branches
+into fresh, reusable, traceable library content, and your originals stay pristine
+(non-destructive). Every step is on your **Activity** log.
+
+> **The loop:** upload → atomize → **templify** → **regenerate** (copies + lineage) →
+> edit/collaborate → **full lock** (new foundation atoms + lineage back). Your winning
+> work compounds without ever overwriting the source.
+
+---
+
 ## Troubleshooting
 
 - **"No atoms yet" after uploading.** Make sure you clicked **Atomize package**

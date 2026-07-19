@@ -64,7 +64,26 @@ target's role; unauthed deep-link to a NON-home company survives login; non-memb
 dead-link ack; `/api/enter` no-silent-switch guard. Manual: `getting-started.md` "Following a
 notification link" (screenshots `deeplink-switch/-login-notice/-here/-donetask.png`).
 Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13), `drive-identity-deeplink.mts` (22),
-`drive-shadow-tenant-admin.mts` (10, #114), `drive-item-template-picker.mts` (8, #77).
+`drive-shadow-tenant-admin.mts` (10, #114), `drive-item-template-picker.mts` (8, #77),
+`drive-past-proposal-templify.mts` (27, #18).
+
+**#18 DONE (this session) — past-proposal templify + regen + branch-and-promote lineage loop.** In the
+Library, "Reuse a past proposal" lists uploaded proposal packages (document_cocoons). **Templify** →
+`templates/extract` new `cocoonId` source reconstructs the ordered section skeleton via
+`lib/templates/past-proposal-canvas.ts` (lay atoms out DIRECTLY — assembleArtifactCanvas→moldNodes drops
+bare prose and collapses structure), persisted as a tenant template (metadata.templifiedFromCocoon), emits
+`library:template.extracted` (source=past_proposal). **Regen** (`New draft` → documents POST) creates a new
+tenant_document AND copies the seminal atoms into WORKING drafts (source=manual, status=draft) bound to the
+doc via a working `document_cocoons.origin_document_id` (mig 115), each with `atom_lineage` derived_from →
+the seminal atom; emits `library:document.regenerated`. **Full lock for download** (`DocumentLockBar` →
+`documents/[id]/lock`) sets the doc `status=final` and PROMOTES the working copies to FOUNDATION atoms
+(status=approved, source=download_derivative) via `lib/documents/lock-document.ts`, lineage preserved; emits
+`library:document.locked`. Seminal atoms are NEVER touched (non-destructive). Constraints: atom source CHECK
+= upload|harvest|download_derivative|manual (no 'regen'); cocoon source CHECK = upload|download|system|harvest;
+tenant_documents.status CHECK = draft|final (lock = 'final'). Proven `drive-past-proposal-templify.mts` (27/27,
+incl. 4/4 sections+titles preserved, lineage to seminal, promotion, non-destructive) + unit
+`__tests__/past-proposal-canvas.test.ts`. Manual: `library-atoms.md` §6 (screenshots library-templify-panel/
+-form, document-lock-bar). **Mig 115 must apply on deploy** (auto via entrypoint→migrate.mjs).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
 113 (tenants.archived_at), 114 (rfp-pipeline tenant + staff memberships). All idempotent +

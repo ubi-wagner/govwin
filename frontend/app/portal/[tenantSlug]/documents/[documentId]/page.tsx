@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveDocumentCapabilities, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
+import { DocumentLockBar } from '@/components/portal/document-lock-bar';
 import { coerceJsonb } from '@/lib/jsonb';
 import { isValidUUID } from '@/lib/validation';
 import {
@@ -92,16 +93,21 @@ export default async function PortalDocumentEditorPage({ params }: Props) {
   const stage = isFinal ? 'locked' : capabilities.canEditContent ? 'draft' : 'review';
 
   return (
-    <CanvasEditorPage
-      canvasDocument={canvasDoc}
-      documentId={documentId}
-      actorId={userId}
-      actorName={userName}
-      initialVersion={row.version}
-      readOnly={!capabilities.canEditContent}
-      capabilities={capabilities}
-      stage={stage}
-      tenantSlug={tenantSlug}
-    />
+    <div>
+      {hasRoleAtLeast(role, 'tenant_user') && (
+        <DocumentLockBar tenantSlug={tenantSlug} documentId={documentId} initialStatus={row.status as string} />
+      )}
+      <CanvasEditorPage
+        canvasDocument={canvasDoc}
+        documentId={documentId}
+        actorId={userId}
+        actorName={userName}
+        initialVersion={row.version}
+        readOnly={!capabilities.canEditContent}
+        capabilities={capabilities}
+        stage={stage}
+        tenantSlug={tenantSlug}
+      />
+    </div>
   );
 }

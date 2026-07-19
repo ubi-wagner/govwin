@@ -107,30 +107,91 @@ try {
   mine = list.find((p: { id: string }) => p.id === cocoonId);
   ok(mine?.templateId === templateId, 'library now cross-links the past proposal to its template');
 
-  // 5. Regen → a fresh draft from the template.
+  // Snapshot the seminal atoms (to prove non-destructive reuse afterward).
+  const seminalBefore = await sql<{ id: string; content: string | null; status: string; source: string }[]>`
+    SELECT id, content, status, source FROM library_atoms
+    WHERE cocoon_id = ${cocoonId}::uuid AND grain = 'primitive' ORDER BY content`;
+
+  // 5. Regen → a fresh draft: new document + COPIED working atoms with lineage to seminal.
   res = await page.request.post(`${BASE}/api/portal/${SLUG}/documents`, { data: { templateId } });
   ok(res.status() === 201, `regen (new draft from template) → 201 (got ${res.status()})`);
-  documentId = (await res.json())?.data?.documentId ?? '';
+  const regenBody = (await res.json())?.data ?? {};
+  documentId = regenBody.documentId ?? '';
   ok(!!documentId, 'regen returned a documentId');
+  ok(regenBody.regenerated?.copiedAtoms === SECTIONS.length,
+    `regen COPIED ${SECTIONS.length} working atoms (got ${regenBody.regenerated?.copiedAtoms})`);
 
   const [doc] = await sql<{ src: string | null }[]>`
     SELECT source_template_id AS src FROM tenant_documents WHERE id = ${documentId}::uuid`;
   ok(doc?.src === templateId, 'the new draft is sourced from the templified template (source_template_id)');
 
+  // Working copies: bound to the document (via a working cocoon), draft + mutable.
+  const working = await sql<{ id: string; status: string; source: string }[]>`
+    SELECT a.id, a.status, a.source FROM library_atoms a
+    JOIN document_cocoons c ON c.id = a.cocoon_id
+    WHERE c.origin_document_id = ${documentId}::uuid AND a.grain = 'primitive'`;
+  ok(working.length === SECTIONS.length, `${SECTIONS.length} working copies bound to the document (got ${working.length})`);
+  ok(working.every((w) => w.status === 'draft' && w.source === 'manual'), 'working copies are draft + mutable (status=draft, source=manual)');
+
+  // Each working copy carries derived_from lineage to a seminal atom.
+  const seminalIds = new Set(seminalBefore.map((s) => s.id));
+  const lineage = await sql<{ parent: string; child: string }[]>`
+    SELECT parent_atom_id AS parent, child_atom_id AS child FROM atom_lineage
+    WHERE child_atom_id = ANY(${working.map((w) => w.id)}::uuid[]) AND relation = 'derived_from'`;
+  ok(lineage.length === SECTIONS.length, `every working copy has derived_from lineage (got ${lineage.length}/${SECTIONS.length})`);
+  ok(lineage.every((e) => seminalIds.has(e.parent)), 'lineage points back to the SEMINAL atoms');
+
   const [dev] = await sql<{ n: number }[]>`
     SELECT COUNT(*)::int AS n FROM system_events
-    WHERE type='document.created' AND tenant_id=${tenantId}::uuid AND payload->>'documentId'=${documentId}`;
-  ok((dev?.n ?? 0) >= 1, 'regen emitted library:document.created (audited)');
+    WHERE type='document.regenerated' AND tenant_id=${tenantId}::uuid AND payload->>'documentId'=${documentId}`;
+  ok((dev?.n ?? 0) >= 1, 'regen emitted library:document.regenerated (audited)');
 
-  console.log('\nPast-proposal templify + regen drive-test complete.');
+  // 6. Full lock for download → promote working copies to FOUNDATION atoms (lineage kept).
+  res = await page.request.post(`${BASE}/api/portal/${SLUG}/documents/${documentId}/lock`, { data: {} });
+  ok(res.status() === 200, `full lock → 200 (got ${res.status()})`);
+  ok((await res.json())?.data?.promotedAtoms === SECTIONS.length, 'lock promoted all working copies to foundation');
+
+  const [locked] = await sql<{ status: string }[]>`SELECT status FROM tenant_documents WHERE id = ${documentId}::uuid`;
+  ok(locked?.status === 'final', `document is locked (status=final, got ${locked?.status})`);
+  const promoted = await sql<{ status: string; source: string }[]>`
+    SELECT a.status, a.source FROM library_atoms a JOIN document_cocoons c ON c.id = a.cocoon_id
+    WHERE c.origin_document_id = ${documentId}::uuid AND a.grain = 'primitive'`;
+  ok(promoted.every((p) => p.status === 'approved' && p.source === 'download_derivative'),
+    'working copies promoted to FOUNDATION atoms (status=approved, source=download_derivative)');
+  // Lineage survives the promotion.
+  const lineageAfter = await sql<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM atom_lineage
+    WHERE child_atom_id = ANY(${working.map((w) => w.id)}::uuid[]) AND relation = 'derived_from'`;
+  ok((lineageAfter[0]?.n ?? 0) === SECTIONS.length, 'derived_from lineage survives the promotion');
+
+  // NON-DESTRUCTIVE: the seminal atoms are untouched.
+  const seminalAfter = await sql<{ id: string; content: string | null; status: string; source: string }[]>`
+    SELECT id, content, status, source FROM library_atoms
+    WHERE cocoon_id = ${cocoonId}::uuid AND grain = 'primitive' ORDER BY content`;
+  ok(JSON.stringify(seminalBefore) === JSON.stringify(seminalAfter),
+    'the SEMINAL past-proposal atoms are UNCHANGED (non-destructive reuse)');
+
+  console.log('\nPast-proposal templify + regen + branch-and-promote drive-test complete.');
 } catch (e) {
   console.error('DRIVE-TEST ERROR', e);
   exitCode = 1;
 } finally {
   try {
-    if (documentId) await sql`DELETE FROM tenant_documents WHERE id=${documentId}::uuid`;
+    if (documentId) {
+      // working cocoon + its copies (+ their lineage edges) bound to the document
+      const wc = await sql<{ id: string }[]>`SELECT id FROM document_cocoons WHERE origin_document_id=${documentId}::uuid`;
+      for (const c of wc) {
+        const atoms = await sql<{ id: string }[]>`SELECT id FROM library_atoms WHERE cocoon_id=${c.id}::uuid`;
+        if (atoms.length) await sql`DELETE FROM atom_lineage WHERE child_atom_id = ANY(${atoms.map((a) => a.id)}::uuid[])`;
+        await sql`DELETE FROM library_atoms WHERE cocoon_id=${c.id}::uuid`;
+        await sql`DELETE FROM document_cocoons WHERE id=${c.id}::uuid`;
+      }
+      await sql`DELETE FROM tenant_documents WHERE id=${documentId}::uuid`;
+    }
     if (templateId) await sql`DELETE FROM document_templates WHERE id=${templateId}::uuid`;
     if (cocoonId) {
+      const seminal = await sql<{ id: string }[]>`SELECT id FROM library_atoms WHERE cocoon_id=${cocoonId}::uuid`;
+      if (seminal.length) await sql`DELETE FROM atom_lineage WHERE parent_atom_id = ANY(${seminal.map((a) => a.id)}::uuid[])`;
       await sql`DELETE FROM library_atoms WHERE cocoon_id=${cocoonId}::uuid`;
       await sql`DELETE FROM document_cocoons WHERE id=${cocoonId}::uuid`;
     }
