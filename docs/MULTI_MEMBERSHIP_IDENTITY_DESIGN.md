@@ -109,17 +109,39 @@ membership**: any `rfp_admin`/`master_admin` identity is offered a shadow member
 in every active tenant.
 
 The critical rule (data integrity, as previously agreed): **when an RFP admin moves
-down into a tenant's space, they always assume the `tenant_admin` (company-admin)
-role — never `rfp_admin`.** So inside a customer, an employee is indistinguishable
-from a real company admin for the purposes of RLS, authorization, and business
-rules; the only trace that it was staff is the audit actor (email@ours) on the
+down into a tenant's space, they act with exactly company-admin authority — no more,
+no less** — and every action is on the company's audited queue. So inside a customer,
+an employee wields the same powers as a real company admin for RLS, authorization, and
+business rules; the trace that it was staff is the audit actor (email@ours) on the
 company's queue. There is no elevated "admin acting" mode that could bypass a
 company-level constraint — the shadow admin *is* a company admin while down there.
 
-Concretely: the derived shadow membership an RFP admin selects at login (or via the
-existing shadow-admin ToDo hop) resolves to `{ tenantId: <customer>, role:
-'tenant_admin' }`. This is the membership form of today's `assumeShadowAdmin`
-(`shadow_admin_grants`) — now a first-class option in the membership selector.
+**AS-BUILT (#114) — we deliver this by hierarchy, NOT by a role rewrite.** The shadow
+session keeps its real `rfp_admin`/`master_admin` role; it does not become
+`tenant_admin`. This is deliberate and strictly better for the "still all audited"
+requirement:
+- **Identical in-tenant authority.** Every customer-portal gate is
+  `hasRoleAtLeast(role, 'tenant_admin')` (or explicitly lists the admin roles), and
+  `rfp_admin`/`master_admin` outrank `tenant_admin` — so the shadow admin passes every
+  tenant_admin gate a real company admin would. There is NO in-tenant action gated on
+  *exactly* `tenant_admin` that would exclude the platform role, and NO rfp_admin-only
+  bypass inside a single customer portal (elevated powers live on `/admin` + cross-tenant
+  tools, never inside a tenant's own surface). Effective authority is the same either way.
+- **Honest audit provenance.** Keeping the platform role means the event's actor role
+  truthfully reads "an RFP/master admin did this in shadow," not an anonymized
+  `tenant_admin`. Rewriting the role would erase that distinction (only the email would
+  differ) — the opposite of "still all audited."
+- **Shadow UX integrity.** The portal layout detects a shadow session via
+  `isAdmin && !hasActiveMembership` and exempts admins from the singular-session pin.
+  Downgrading the role to `tenant_admin` would make `isAdmin` false, breaking the shadow
+  banner and the descend/ascend exemption.
+
+Proven end-to-end by `frontend/scripts/drive-shadow-tenant-admin.mts` (10/10): a shadow
+admin holds no membership at the target, keeps its platform role in-tenant (not
+downgraded), performs a tenant_admin-GATED write, and that write is audited under the
+admin's real user id scoped to the customer tenant. (The derived shadow membership
+still *presents* as "Admin · <Customer>" in the selector — that's a display label; the
+session role underneath stays the platform role, by design.)
 
 ## Login → membership selection
 

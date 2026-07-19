@@ -56,7 +56,8 @@ Proven end-to-end by `scripts/drive-identity-deeplink.mts` (22/22): switch round
 target's role; unauthed deep-link to a NON-home company survives login; non-member denial; completed-task
 dead-link ack; `/api/enter` no-silent-switch guard. Manual: `getting-started.md` "Following a
 notification link" (screenshots `deeplink-switch/-login-notice/-here/-donetask.png`).
-Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13), `drive-identity-deeplink.mts` (22).
+Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13), `drive-identity-deeplink.mts` (22),
+`drive-shadow-tenant-admin.mts` (10, #114), `drive-item-template-picker.mts` (8, #77).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
 113 (tenants.archived_at), 114 (rfp-pipeline tenant + staff memberships). All idempotent +
@@ -66,9 +67,21 @@ auto-applied on deploy via `entrypoint.sh → migrate.mjs`. Verify post-deploy.
 memberships; **Our Workspace** admin-nav link → `/portal/rfp-pipeline` gives us the upload/atomizer +
 whole portal like any customer (atomize into our own library_atoms). Portal layout: `isShadowAdmin =
 admin AND not-a-member`, so no shadow banner on our own tenant; customer tenants still show it.
-**Identity/lifecycle/admin model is now essentially COMPLETE.** Remaining: #111 (deploy-verify, auto),
-#114 (shadow role-rewrite — likely already satisfied by the audited model; low priority), and the
+**Identity/lifecycle/admin model is now COMPLETE.** Remaining: #111 (deploy-verify, auto), and the
 NON-identity gaps #117 (dormant agents), #69/#18 (curation/template features).
+
+**#114 DONE (this session) — shadow-admin-as-company-admin, proven + reconciled.** The design once
+imagined rewriting the shadow session role to `tenant_admin`; the as-built delivers the SAME authority by
+HIERARCHY and deliberately keeps the platform role. Every customer-portal gate is
+`hasRoleAtLeast(role,'tenant_admin')` (or lists the admin roles) and rfp_admin/master_admin outrank
+tenant_admin, so a shadow admin passes every tenant_admin gate; there is NO in-tenant action gated on
+*exactly* tenant_admin and NO rfp_admin-only bypass inside a single customer portal. Keeping the platform
+role (a) preserves honest audit provenance ("an RFP admin did this in shadow", not an anonymized
+tenant_admin — the user's "still all audited" requirement), and (b) keeps the shadow banner + singular-session
+exemption working (`isShadowAdmin = isAdmin && !hasActiveMembership`). Proven by
+`scripts/drive-shadow-tenant-admin.mts` (10/10): no membership at target, role stays platform-admin
+in-tenant, tenant_admin-gated WRITE succeeds, audited under the admin's real user id scoped to the customer.
+Design reconciled in MULTI_MEMBERSHIP_IDENTITY_DESIGN.md ("AS-BUILT (#114)").
 
 **#77 DONE (this session) — required-item → template picker in curation.** The AddEditItemModal now
 carries a **Section grounding** block: a **Starter template (mold)** picker (fetches `/api/admin/templates`,
