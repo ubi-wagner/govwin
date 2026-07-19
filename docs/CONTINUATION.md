@@ -24,13 +24,21 @@ One email → many `(company, role)` memberships; pick one at login; the session
 | `ecaaad9` | **P3** — collaborator invite → membership (multi-company works) + uuid[] fix + login copy |
 | `be5eb82` | launch-hardening — run.sh glob footgun fix; Immobileyes shadow flow verified; #116 sweep clean |
 | `465a47a` | **Never hard-delete a user** — collaborator soft-delete + reactivate (mig 112); fixes removal 500 |
+| `d09c348` | membership-ify all user-creation paths (team invite + onboarding accept) |
+| `836353f` | **Company ARCHIVE** (license slumber) — third state (mig 113); reversible + lossless |
 
-**Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at).
-Both idempotent and auto-applied on deploy via `entrypoint.sh → migrate.mjs`. Verify post-deploy.
+**Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
+113 (tenants.archived_at). All idempotent + auto-applied on deploy via `entrypoint.sh → migrate.mjs`.
+Verify post-deploy.
 
-**Principle locked in (user directive):** NEVER hard-delete a user/membership — mark inactive,
-keep full history, reconstitute auditably. Collaborators implement it (revoked_at + reactivate);
-the same for tenant_users/admins is gap #118. See the identity design's "Never hard-delete" section.
+**Identity state ladder (user directive) — active · inactive · archived, all reversible + auditable, nothing destroyed:**
+- **active / inactive** = per-USER (never hard-delete; mark inactive, keep history, re-invite reconstitutes
+  the same row auditably). Collaborators DONE (revoked_at + reactivate). Tenant_users/admins = gap #118.
+- **archived** = whole COMPANY (license lapsed): `tenants.archived_at`, orthogonal to per-user state so
+  renewal restores everyone to their exact prior state for free. Archived companies vanish from the login
+  list (`getActiveMemberships` filters them); admins can still enter to renew. Admin control on the tenant
+  page. DONE + verified (`scripts/drive-archive.mts`). Every user-creation path now writes a membership.
+See the identity design's "Never hard-delete" + "third state: ARCHIVED" sections.
 
 **As-built mechanism (don't re-derive):**
 - The active `(role, tenantId, tenantSlug)` + a `membershipPinned` flag live in the
