@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
+import { NewCompanyForm } from '@/components/admin/new-company-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,13 +61,16 @@ export default async function TenantsPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">Tenant Management</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {queryError
-            ? 'Unable to load tenant data'
-            : `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''} registered`}
-        </p>
+      <header className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Tenant Management</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {queryError
+              ? 'Unable to load tenant data'
+              : `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''} registered`}
+          </p>
+        </div>
+        <NewCompanyForm />
       </header>
 
       {queryError ? (

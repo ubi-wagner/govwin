@@ -11,6 +11,17 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
+import { backfillTenant } from '@/lib/opportunity-bridge';
+import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
+import bcrypt from 'bcryptjs';
+
+function slugify(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+function validEmail(e: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+}
 
 export async function GET(request: Request) {
   try {
@@ -175,19 +186,90 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: Implement manual tenant creation
-    //
-    // Body: { name, slug, legalName, website, billingEmail, productTier }
-    // 1. Validate required fields
-    // 2. Check slug uniqueness
-    // 3. INSERT INTO tenants (...)
-    // 4. Optionally create admin user for this tenant
-    // 5. Emit finder:tenant.created event
+    // Body: create a company + its admin POC directly (the "we/expert add them" path,
+    // vs. the customer self-serve /apply → accept flow). See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+    let body: { name?: unknown; adminEmail?: unknown; adminName?: unknown; legalName?: unknown; website?: unknown };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const adminEmail = typeof body.adminEmail === 'string' ? body.adminEmail.trim().toLowerCase() : '';
+    const adminName = typeof body.adminName === 'string' ? body.adminName.trim() : null;
+    const legalName = typeof body.legalName === 'string' && body.legalName.trim() ? body.legalName.trim() : null;
+    const website = typeof body.website === 'string' && body.website.trim() ? body.website.trim() : null;
+    if (!name) return NextResponse.json({ error: 'Company name is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (!adminEmail || !validEmail(adminEmail)) return NextResponse.json({ error: 'A valid admin POC email is required', code: 'VALIDATION_ERROR' }, { status: 400 });
+
+    const tempPw = crypto.randomUUID().slice(0, 12);
+    const hash = await bcrypt.hash(tempPw, 12);
+
+    let created: { tenantId: string; slug: string; adminUserId: string; isNewUser: boolean };
+    try {
+      created = await sql.begin(async (tx: any) => {
+        // Race-free unique slug (bump suffix on conflict).
+        const baseSlug = slugify(name) || 'company';
+        let finalSlug = baseSlug;
+        let tenantId: string | undefined;
+        for (let suffix = 2; suffix < 1000; suffix++) {
+          const inserted = await tx`
+            INSERT INTO tenants (name, slug, legal_name, website, status, lifecycle_stage)
+            VALUES (${name}, ${finalSlug}, ${legalName}, ${website}, 'active', 'customer')
+            ON CONFLICT (slug) DO NOTHING
+            RETURNING id`;
+          if (inserted.length > 0) { tenantId = inserted[0].id; break; }
+          finalSlug = `${baseSlug}-${suffix}`;
+        }
+        if (!tenantId) throw new Error('could not allocate a unique tenant slug');
+
+        // Admin POC user. A brand-new email gets this as its HOME tenant; an existing
+        // user (already at another company) keeps their home and gets a MANUAL admin
+        // membership here (multi-membership). Never clobber an existing user's home.
+        const [existing] = await tx<{ id: string }[]>`SELECT id FROM users WHERE email = ${adminEmail} LIMIT 1`;
+        let adminUserId: string;
+        let isNewUser = false;
+        if (existing) {
+          adminUserId = existing.id;
+        } else {
+          isNewUser = true;
+          const [u] = await tx<{ id: string }[]>`
+            INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password, is_active)
+            VALUES (${adminEmail}, ${adminName}, 'tenant_admin', ${tenantId}, ${hash}, true, true)
+            RETURNING id`;
+          adminUserId = u.id;
+        }
+        await tx`
+          INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+          VALUES (${adminUserId}, ${tenantId}, 'tenant_admin', 'active', ${existing ? 'manual' : 'home'}, ${sessionUser.id})
+          ON CONFLICT (user_id, tenant_id) DO UPDATE
+            SET status = 'active', role = 'tenant_admin'
+            WHERE user_memberships.status <> 'active'`;
+        return { tenantId, slug: finalSlug, adminUserId, isNewUser };
+      });
+    } catch (txErr) {
+      console.error('[admin/tenants/create] tx failed', txErr);
+      return NextResponse.json({ error: 'Company creation failed', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Seed the new company's spotlight + pipeline (best-effort — don't fail creation).
+    try { await seedDefaultBuckets(created.tenantId, created.adminUserId); } catch (e) { console.error('[admin/tenants/create] seed buckets failed', e); }
+    let cardsBackfilled = 0;
+    try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[admin/tenants/create] backfill failed', e); }
+
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'tenant.created',
+      actor: userActor(sessionUser.id ?? '', (session.user as { email?: string }).email ?? undefined),
+      tenantId: created.tenantId,
+      payload: { tenantId: created.tenantId, slug: created.slug, name, adminEmail, source: 'admin_manual', cardsBackfilled },
+    });
 
     return NextResponse.json({
-      error: 'Not implemented — see V1_TODO.md P2-23',
-      code: 'NOT_IMPLEMENTED',
-    }, { status: 501 });
+      data: {
+        tenantId: created.tenantId,
+        slug: created.slug,
+        name,
+        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null },
+        cardsBackfilled,
+      },
+    }, { status: 201 });
   } catch (err) {
     console.error('[admin/tenants/create] error:', err);
     return NextResponse.json(
