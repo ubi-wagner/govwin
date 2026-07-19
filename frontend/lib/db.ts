@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { isTenantWideMember } from './rbac';
+import { isTenantWideMember, hasRoleAtLeast, isRole } from './rbac';
 
 // Next.js "Collecting page data" step at build time loads every
 // route module with NODE_ENV=production but without runtime secrets
@@ -55,18 +55,25 @@ export async function verifyTenantAccess(userId: string, role: string, tenantId:
     // tenant their session role becomes tenant_admin; this coarse gate stays true.
     // (Multi-membership identity P1 — docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.)
     if (role === 'master_admin' || role === 'rfp_admin') return true;
-    // Everyone else: an ACTIVE membership for (user, tenant). During the P1 transition
-    // we also read-through to the legacy users.tenant_id so access never regresses if a
-    // membership row wasn't backfilled. (Cross-company collaborators still pass via the
-    // proposal-scoped verifyProposalAccess, not here.)
-    const [row] = await sql`
-      SELECT 1 FROM user_memberships
+    // Everyone else: the user's granted role(s) at this tenant — an ACTIVE membership
+    // row and/or the legacy users.tenant_id read-through (so access never regresses if a
+    // membership wasn't backfilled). Cross-company collaborators pass via the membership
+    // row (source='collaborator'); the proposal-scoped verifyProposalAccess is separate.
+    const rows = await sql<{ role: string }[]>`
+      SELECT role FROM user_memberships
         WHERE user_id = ${userId} AND tenant_id = ${tenantId} AND status = 'active'
       UNION ALL
-      SELECT 1 FROM users
-        WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true
-      LIMIT 1`;
-    return !!row;
+      SELECT role FROM users
+        WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true`;
+    if (rows.length === 0) return false;
+    // Fail CLOSED on role escalation (singular-session enforcement, defense-in-depth):
+    // the session's ACTIVE role must not exceed the role the user was actually granted
+    // at THIS tenant. A multi-membership user whose JWT still carries a higher home role
+    // (e.g. tenant_admin at their own company) is capped to their real role here (e.g.
+    // partner_user as a collaborator), so no cross-tenant privilege bleeds through even
+    // if the active-membership rewrite didn't take. See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+    if (!isRole(role)) return false;
+    return rows.some((r) => isRole(r.role) && hasRoleAtLeast(r.role, role));
   } catch (e) {
     console.error('[verifyTenantAccess] Error:', e);
     return false;

@@ -65,7 +65,11 @@ export default async function PortalDispatcher() {
   // membership (everyone today) this is a no-op. See
   // docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
   const dispatchUserId = (sessionUser as { id?: string }).id;
-  if (dispatchUserId && !hasRoleAtLeast(role, 'rfp_admin')) {
+  const dispatchPinned = (sessionUser as { membershipPinned?: boolean }).membershipPinned === true;
+  // Once the session has committed to a company (pinned), skip the selector entirely —
+  // land them in that company. Only offer the picker to a not-yet-committed
+  // multi-membership user.
+  if (dispatchUserId && !dispatchPinned && !hasRoleAtLeast(role, 'rfp_admin')) {
     try {
       const memberships = await getActiveMemberships(dispatchUserId);
       if (memberships.length > 1) redirect('/select-company');

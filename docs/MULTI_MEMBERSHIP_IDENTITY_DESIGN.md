@@ -200,3 +200,44 @@ it from all three; later phases can make the grant-writers also write the member
 
 Each phase is independently shippable and screenshot-verifiable (the login selector
 and the "switch company" flow are the customer-facing manual pieces).
+
+## Implemented so far (as-built)
+
+- ✅ **P1 foundation** — `user_memberships` (mig 111) + backfill; `verifyTenantAccess`
+  reads memberships (legacy read-through). Isolation verified.
+- ✅ **P2 selector** — one login → `/select-company` when >1 active membership;
+  single-membership + admins go straight through. Drive-tested.
+- ✅ **Collaborator scoping** — a scoped collaborator only *receives* their granted
+  sections (server-side withhold); pricing/unassigned never leak.
+- ✅ **Universal upload + atomizer** — an "Add content" card on the customer dashboard
+  AND the collaborator view; collaborators atomize to *offer content up*
+  (`atoms/atomize-package` now allows `partner_user`, membership-gated).
+- ✅ **RFP-admin shadow descend/ascend** — banner + first-entry acknowledgment modal;
+  `identity:shadow.descended` / `.ascended` audited both directions.
+- ✅ **Singular ENFORCEMENT** — the active membership is pinned in the **session JWT**,
+  not a side cookie. Picking a company at `/select-company` calls `unstable_update`
+  (`app/actions/auth-actions.ts`) to **rewrite the token's `role` + `tenantId` +
+  `tenantSlug` to the SELECTED membership** and set `membershipPinned = true`. So the
+  session doesn't merely pin a *tenant* — it pins a **(company, role)**, and every
+  downstream reader (portal layout, all ~40 portal API routes, middleware) authorizes
+  off that one membership. Concretely:
+  - **Role follows the company.** A `tenant_admin`-at-home who is only a
+    `partner_user` elsewhere is dropped to `partner_user` on selecting that company —
+    no home-company powers carry across. (JWT-rewrite is what makes this reach the
+    routes without touching each one.)
+  - **Re-pick-proof.** Once `membershipPinned`, `/select-company` forwards to the
+    active company instead of re-offering the list; the dispatcher skips the selector;
+    the portal layout redirects any tenant ≠ the pinned one back. No in-session switch.
+  - **Logout resets it.** The pin lives in the JWT, so signing out drops it and a
+    fresh login starts unpinned (that's how "log out to switch" works).
+  - **Fail-closed safety net.** `verifyTenantAccess` now also caps a non-admin's
+    active role to the role they were actually granted at that tenant (`db.ts`
+    `hasRoleAtLeast(membershipRole, sessionRole)`), so even if the rewrite ever didn't
+    take, routes deny (never escalate) rather than leak cross-tenant privilege.
+  - **RFP/master admins are exempt** — they are the only accounts that re-scope
+    in-session (the shadow descend/ascend flow), so the layout never pins them.
+
+  Verified end-to-end (`scripts/drive-pin.mts`): a multi-membership user picking a
+  company where they're only a collaborator is rewritten to `partner_user`, pinned,
+  cannot hop to their home tenant, and `/select-company` is re-pick-proof; a
+  single-membership user and an admin are unaffected. tsc clean, 701/701 unit tests.

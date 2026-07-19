@@ -44,7 +44,7 @@ export const authConfig: NextAuthConfig = {
   },
   providers: [], // Credentials provider is added in auth.ts
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // First sign-in: copy the custom fields from the authorize()
       // return value onto the token so they persist across requests.
       if (user) {
@@ -53,6 +53,26 @@ export const authConfig: NextAuthConfig = {
         token.tenantId = (user as { tenantId: string | null }).tenantId;
         token.tenantSlug = (user as { tenantSlug: string | null }).tenantSlug;
         token.tempPassword = (user as { tempPassword: boolean }).tempPassword;
+        // Fresh login → not yet committed to a company. A multi-membership user is
+        // routed to /select-company to pick (which pins); single-membership users
+        // never see it. Singular-session enforcement, see
+        // docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+        token.membershipPinned = false;
+      }
+      // Membership selection: the /select-company server action calls unstable_update
+      // to REWRITE the active company + role onto the token, so every downstream reader
+      // (portal layout, all portal API routes, middleware) authorizes off the SELECTED
+      // membership — not the home role. This is what caps a tenant_admin-at-home to
+      // partner_user when they act as a collaborator elsewhere. The data is
+      // server-produced (validated membership) but we still narrow it defensively.
+      if (trigger === 'update' && session && typeof session === 'object') {
+        const su = (session as { user?: Record<string, unknown> }).user;
+        if (su && typeof su === 'object') {
+          if (typeof su.role === 'string') token.role = su.role as Role;
+          if ('tenantId' in su) token.tenantId = (su.tenantId as string | null) ?? null;
+          if ('tenantSlug' in su) token.tenantSlug = (su.tenantSlug as string | null) ?? null;
+          token.membershipPinned = true;
+        }
       }
       return token;
     },
@@ -68,6 +88,9 @@ export const authConfig: NextAuthConfig = {
           (token.tenantSlug as string | null | undefined) ?? null;
         (session.user as { tempPassword?: boolean }).tempPassword =
           (token.tempPassword as boolean | undefined) ?? false;
+        // Whether this session has committed to a company (singular-session pin).
+        (session.user as { membershipPinned?: boolean }).membershipPinned =
+          (token.membershipPinned as boolean | undefined) ?? false;
       }
       return session;
     },

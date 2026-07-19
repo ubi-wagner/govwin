@@ -92,6 +92,23 @@ comment resolution), not just hidden in the UI — so the collaborator-landing m
 is safe by construction. Collaborators also appear back on the **Team** page's
 **Proposal Collaborators** table (Accepted / Pending).
 
+### The collaborator's own role can't leak in
+
+The same person may be a **company admin at their own company** and a **collaborator
+on yours** — one email, several companies. When they enter *your* company they arrive
+as the collaborator you scoped, **not** with their home-company powers: their active
+role follows the company they pick at sign-in, so an admin-elsewhere still sees only
+the sections you granted here. Below, *Bea Expert* — a company admin at Beacon Labs —
+lands in Acme as an external collaborator: a trimmed sidebar (just **Proposals**) and
+only her assigned work.
+
+![A cross-company collaborator lands scoped — admin at her own company, collaborator here](./img/auth-landed-collaborator.png)
+
+And because a session is pinned to **one company at a time**, she can't be working in
+your proposal and her own company at once — to move between them she signs out and
+back in. Pricing and any section you didn't grant never appear for her, in either
+place.
+
 ---
 
 ## 4. What each role can do (summary)

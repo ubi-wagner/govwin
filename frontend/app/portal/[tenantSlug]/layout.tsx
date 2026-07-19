@@ -6,6 +6,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
+import { getActiveMemberships } from '@/lib/memberships';
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -33,6 +34,7 @@ export default async function PortalLayout({
     name?: string | null;
     role?: unknown;
     tenantId?: string | null;
+    membershipPinned?: boolean;
   };
 
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
@@ -60,17 +62,36 @@ export default async function PortalLayout({
     redirect('/portal');
   }
 
+  // An RFP/master admin viewing a customer's portal IS a shadow descent (they have
+  // no home tenant, so any tenant space is a descent). They are the only accounts
+  // that re-scope in-session, so they are EXEMPT from the singular-session pin.
+  const isShadowAdmin = role === 'rfp_admin' || role === 'master_admin';
+
+  // Singular-session enforcement (non-admins). A session acts as exactly ONE
+  // (company, role); the active membership is pinned onto the JWT when the user picks
+  // it at /select-company. See docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+  if (!isShadowAdmin) {
+    const pinned = sessionUser.membershipPinned === true;
+    const activeTenantId = sessionUser.tenantId ?? null;
+    if (pinned) {
+      // Committed to one company → any OTHER tenant is a cross-tenant hop; deny it.
+      // /select-company is re-pick-proof and forwards back to the pinned company.
+      if (activeTenantId && activeTenantId !== tenantId) redirect('/select-company');
+    } else {
+      // Not yet committed. Force a deliberate pick ONLY when there's a real choice
+      // (>1 active company) so two tenants can't be open at once; single-membership
+      // users run with nothing to choose (zero friction).
+      const memberships = await getActiveMemberships(userId);
+      if (memberships.length > 1) redirect('/select-company');
+    }
+  }
+
   const companyName = (tenant.name as string) ?? tenantSlug;
   const userName = sessionUser.name ?? sessionUser.id ?? '';
 
   const basePath = `/portal/${tenantSlug}`;
   const isPartner = role === 'partner_user';
   const isTenantAdmin = hasRoleAtLeast(role, 'tenant_admin');
-  // An RFP/master admin viewing a customer's portal IS a shadow descent — they have
-  // no home tenant, so any tenant space is a descent. Flag it so the banner + audit
-  // + acknowledgment fire. (Multi-membership identity: RFP-admins are the only ones
-  // who switch scope in-session.)
-  const isShadowAdmin = role === 'rfp_admin' || role === 'master_admin';
 
   return (
     <div className="min-h-screen flex">

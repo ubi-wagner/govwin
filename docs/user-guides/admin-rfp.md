@@ -104,6 +104,23 @@ Use **Portal →** to enter a tenant's portal and act on their behalf —
 upload/atomize their library, provision a portal, or troubleshoot a build. This is
 the same portal the customer sees, under their tenant's row-level security.
 
+**You are the only account that changes scope without logging out.** Customers and
+collaborators are pinned to one company per session (they sign out to switch). RFP
+Pipeline staff instead **descend** into any customer and **ascend** back — and every
+transition is guarded:
+
+- **You act as their company admin, never as an RFP admin.** On descent your working
+  role inside the tenant is `tenant_admin`, so their data-integrity rules apply to
+  you exactly as to a real company admin. There is no elevated "admin acting" mode
+  that bypasses a company-level constraint.
+- **Every descent and ascent is audited.** Entering writes `identity:shadow.descended`
+  and leaving writes `identity:shadow.ascended` to the customer's own trail — so their
+  queue (and the platform log) shows exactly when staff were in their space.
+- **You always know where you are.** A persistent amber banner marks the customer's
+  space, and a one-time acknowledgment modal confirms the descent.
+
+![The shadow-space banner + first-entry acknowledgment — you're acting as company admin, logged](./img/shadow-descend-ack.png)
+
 ---
 
 ## Admin surfaces at a glance

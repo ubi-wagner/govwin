@@ -28,16 +28,33 @@ collaborator on another company's proposal — you'll pick which one to work in:
 
 ![Choosing a company — one login, pick which company to enter](./img/select-company.png)
 
-- **You work in one company at a time.** Picking a company scopes your whole
-  session to it. To work in a *different* company you **sign out and sign back in**
-  and pick that one — you're never in two at once (a hard tenant-isolation rule).
-- **Most people never see this** — if your email belongs to exactly one company
-  you go straight to your home, no extra step.
+Each choice shows the **company** and **your role there** — e.g. *Beacon Labs ·
+Company admin* vs *Acme Navy Systems · Collaborator · external*.
 
-After you pick, you land in that company — e.g. as an outside collaborator you land
-on that company's **Proposals**, scoped to just what you were granted:
+- **You work in one company at a time, for real.** Picking a company scopes your
+  whole session to it *and pins it* — every page, every action is checked against
+  that one company. Try to open a different company's URL mid-session and you're
+  sent right back to the one you picked. To work in a *different* company you **sign
+  out and sign back in** and choose that one. You are never in two at once (a hard
+  tenant-isolation rule, not a convention).
+- **Your role follows the company you pick.** If you're a company admin at your own
+  company but only a collaborator on someone else's proposal, picking *their*
+  company drops you to **collaborator** access there — you never carry your
+  home-company powers across.
+- **Most people never see this** — if your email belongs to exactly one company you
+  go straight to your home, no extra step.
 
-![Landing in the chosen company as a collaborator](./img/auth-landed-collaborator.png)
+After you pick, you land in that company scoped to exactly your role there. Below,
+the same person who is a company admin at *their* company lands in **Acme** as an
+outside collaborator — a trimmed sidebar (just **Proposals**) and only the sections
+they were granted:
+
+![Landing in the chosen company as a collaborator — trimmed sidebar, scoped to granted work](./img/auth-landed-collaborator.png)
+
+> **Switching companies = sign out, sign back in.** There is no in-session
+> company switcher for customers or collaborators — that's what keeps one company's
+> work from ever bleeding into another's. (RFP Pipeline staff are the one exception;
+> see the admin guide.)
 
 ---
 
