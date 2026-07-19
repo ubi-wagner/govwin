@@ -233,6 +233,8 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.library.curate": "librarian",
     "tool.partner.coordinate": "partner_coordinator",
     "tool.proposal.architect": "proposal_architect",
+    # on_application_accepted.py — new-tenant cold-start (Batch B)
+    "tool.onboarding.concierge": "onboarding_agent",
 }
 
 
