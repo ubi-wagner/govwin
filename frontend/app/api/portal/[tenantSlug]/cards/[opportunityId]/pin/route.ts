@@ -14,6 +14,8 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { pinCard, unpinCard, resyncPinnedCard } from '@/lib/opportunity-pin';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { requestAgentTask } from '@/lib/agent-client';
+import { sql } from '@/lib/db';
 
 async function resolve(tenantSlug: string, opportunityId: string) {
   const session = await auth();
@@ -51,6 +53,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       tenantId: r.tenantId,
       payload: { opportunityId, docCount: result.docs.length },
     });
+    // Producer (#117): a pin is the tenant showing interest — enqueue the scoring_strategist
+    // agent (tenant-bound) to add an advisory ±15 fit adjustment ALONGSIDE the algorithmic
+    // score for this one (tenant, opportunity). Bounded (only pinned cards → no fan-out
+    // runaway); the pipeline runs it live (deploy key). Best-effort — never fail the pin.
+    try {
+      // Enrich the task so it's self-contained (the agent's prompt reads opportunity +
+      // base_score). Scoped to THIS tenant's top algorithmic score for the opp.
+      const [opp] = await sql<Array<Record<string, unknown>>>`
+        SELECT title, agency, office, program_type, naics_codes, set_aside_type, description
+        FROM opportunities WHERE id = ${opportunityId}::uuid LIMIT 1`;
+      const [bs] = await sql<Array<{ base: number | null }>>`
+        SELECT MAX(score) AS base FROM tenant_bucket_scores
+        WHERE tenant_id = ${r.tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid`;
+      await requestAgentTask({
+        tenantId: r.tenantId,
+        agentRole: 'scoring_strategist',
+        taskType: 'score_adjustment',
+        input: { opportunityId, opportunity: opp ?? {}, base_score: bs?.base ?? 0 },
+      });
+    } catch (e) { console.error('[portal/cards/pin] scoring_strategist enqueue failed (non-fatal)', e); }
     return NextResponse.json({ data: { pinned: true, docCount: result.docs.length, docs: result.docs } });
   } catch (err) {
     console.error('[portal/cards/pin] error', err);
