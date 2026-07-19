@@ -20,7 +20,11 @@ export interface Membership {
   source: string;
 }
 
-/** A user's active, materialized memberships (oldest first — home tends to be first). */
+/**
+ * A user's active, materialized memberships (oldest first — home tends to be first).
+ * ARCHIVED tenants (company slumber / license lapsed) are excluded: you can't select or
+ * act at a company that is archived, so it must not appear in the selector or dispatcher.
+ */
 export async function getActiveMemberships(userId: string): Promise<Membership[]> {
   try {
     return await sql<Membership[]>`
@@ -28,7 +32,7 @@ export async function getActiveMemberships(userId: string): Promise<Membership[]
              m.role, m.status, m.source
       FROM user_memberships m
       JOIN tenants t ON t.id = m.tenant_id
-      WHERE m.user_id = ${userId}::uuid AND m.status = 'active'
+      WHERE m.user_id = ${userId}::uuid AND m.status = 'active' AND t.archived_at IS NULL
       ORDER BY m.created_at ASC`;
   } catch (e) {
     console.error('[memberships] getActiveMemberships failed:', e);
@@ -36,12 +40,14 @@ export async function getActiveMemberships(userId: string): Promise<Membership[]
   }
 }
 
-/** True iff the user holds an active membership for the tenant (materialized only). */
+/** True iff the user holds an active membership for a NON-archived tenant. */
 export async function hasActiveMembership(userId: string, tenantId: string): Promise<boolean> {
   try {
     const [row] = await sql`
-      SELECT 1 FROM user_memberships
-      WHERE user_id = ${userId}::uuid AND tenant_id = ${tenantId}::uuid AND status = 'active'
+      SELECT 1 FROM user_memberships m
+      JOIN tenants t ON t.id = m.tenant_id
+      WHERE m.user_id = ${userId}::uuid AND m.tenant_id = ${tenantId}::uuid
+        AND m.status = 'active' AND t.archived_at IS NULL
       LIMIT 1`;
     return !!row;
   } catch (e) {

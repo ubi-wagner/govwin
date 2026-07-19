@@ -59,12 +59,20 @@ export async function verifyTenantAccess(userId: string, role: string, tenantId:
     // row and/or the legacy users.tenant_id read-through (so access never regresses if a
     // membership wasn't backfilled). Cross-company collaborators pass via the membership
     // row (source='collaborator'); the proposal-scoped verifyProposalAccess is separate.
+    // The tenant JOIN also gates on archived_at: if the company is ARCHIVED (license
+    // lapsed / slumber) no non-admin gets in, regardless of their own membership state —
+    // and their per-user active/inactive state is left untouched so renewal restores it
+    // exactly. Admins short-circuit above, so they can still enter to renew.
     const rows = await sql<{ role: string }[]>`
-      SELECT role FROM user_memberships
-        WHERE user_id = ${userId} AND tenant_id = ${tenantId} AND status = 'active'
+      SELECT m.role FROM user_memberships m
+        JOIN tenants t ON t.id = m.tenant_id
+        WHERE m.user_id = ${userId} AND m.tenant_id = ${tenantId}
+          AND m.status = 'active' AND t.archived_at IS NULL
       UNION ALL
-      SELECT role FROM users
-        WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true`;
+      SELECT u.role FROM users u
+        JOIN tenants t ON t.id = u.tenant_id
+        WHERE u.id = ${userId} AND u.tenant_id = ${tenantId}
+          AND u.is_active = true AND t.archived_at IS NULL`;
     if (rows.length === 0) return false;
     // Fail CLOSED on role escalation (singular-session enforcement, defense-in-depth):
     // the session's ACTIVE role must not exceed the role the user was actually granted

@@ -85,8 +85,10 @@ export default async function PortalDispatcher() {
   // from a deleted tenant (e.g., after a DB wipe for HITL testing).
   if (tenantSlug) {
     try {
-      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' LIMIT 1`;
-      if (!t) tenantSlug = null; // Tenant gone — treat as no workspace
+      // Exclude suspended AND archived (license slumber) tenants — either way the user
+      // has no reachable workspace, so fall through to the friendly message (no loop).
+      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' AND archived_at IS NULL LIMIT 1`;
+      if (!t) tenantSlug = null; // Tenant gone / archived — treat as no workspace
     } catch {
       tenantSlug = null;
     }
@@ -100,7 +102,7 @@ export default async function PortalDispatcher() {
         const [u] = await sql<{ slug: string }[]>`
           SELECT t.slug FROM users u
           JOIN tenants t ON t.id = u.tenant_id
-          WHERE u.id = ${userId}::uuid AND t.status != 'suspended'
+          WHERE u.id = ${userId}::uuid AND t.status != 'suspended' AND t.archived_at IS NULL
         `;
         if (u) tenantSlug = u.slug;
       }
@@ -113,16 +115,34 @@ export default async function PortalDispatcher() {
     redirect(target);
   }
 
-  // No valid landing path — user is authenticated but has no tenant
-  // assigned. Render a message instead of looping.
+  // No valid landing path. Distinguish a company in license SLUMBER (archived) from a
+  // genuinely unlinked account, so the message is accurate. Render (never redirect from
+  // /portal to /portal) to stay loop-safe.
+  let companyArchived = false;
+  const jwtSlug = sessionUser.tenantSlug ?? null;
+  if (jwtSlug) {
+    try {
+      const [t] = await sql`SELECT 1 FROM tenants WHERE slug = ${jwtSlug} AND archived_at IS NOT NULL LIMIT 1`;
+      companyArchived = !!t;
+    } catch { /* fall back to the generic message */ }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900">No workspace assigned</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {companyArchived ? 'Access paused' : 'No workspace assigned'}
+        </h1>
         <p className="mt-3 text-sm text-gray-600">
-          You&apos;re signed in but your account isn&apos;t linked to a tenant
-          yet. Ask your administrator to grant you access, or contact
-          support if you think this is an error.
+          {companyArchived ? (
+            <>Your company&apos;s access is paused while its license is renewed. Your work
+            is safe and will be exactly where you left it once access is restored. Contact
+            your administrator or RFP Pipeline to reactivate.</>
+          ) : (
+            <>You&apos;re signed in but your account isn&apos;t linked to a tenant
+            yet. Ask your administrator to grant you access, or contact
+            support if you think this is an error.</>
+          )}
         </p>
         <div className="mt-6">
           <SignOutButton className="w-full rounded-md bg-gray-100 hover:bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700" />

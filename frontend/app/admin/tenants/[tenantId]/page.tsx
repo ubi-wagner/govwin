@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { TenantAiConfigCard } from '@/components/admin/tenant-ai-config-card';
 import { StatCard, type StatPreview } from '@/components/admin/stat-card';
+import { TenantArchiveControl } from '@/components/admin/tenant-archive-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +50,7 @@ export default async function TenantDetailPage({ params }: Props) {
     stripeCustomerId: string | null;
     trialEndsAt: Date | null;
     createdAt: Date;
+    archivedAt: Date | null;
   }
 
   let tenant: TenantRow | null = null;
@@ -56,7 +58,7 @@ export default async function TenantDetailPage({ params }: Props) {
     const [row] = await sql<TenantRow[]>`
       SELECT id, name, slug, legal_name, website, status, product_tier,
              subscription_status, billing_email, stripe_customer_id,
-             trial_ends_at, created_at
+             trial_ends_at, created_at, archived_at
       FROM tenants
       WHERE id = ${tenantId}
     `;
@@ -201,8 +203,14 @@ export default async function TenantDetailPage({ params }: Props) {
           <p className="text-sm text-gray-500 mt-1 font-mono">{tenant.slug}</p>
         </div>
         <div className="flex items-center gap-3">
+          {tenant.archivedAt && (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-200 text-gray-600">
+              archived
+            </span>
+          )}
           {statusBadge(tenant.status)}
           {statusBadge(tenant.subscriptionStatus)}
+          <TenantArchiveControl tenantId={tenant.id} archived={tenant.archivedAt != null} />
         </div>
       </div>
 

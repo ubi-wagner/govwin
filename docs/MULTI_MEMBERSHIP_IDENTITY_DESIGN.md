@@ -277,3 +277,28 @@ removal is a soft, reversible, audited state:
   general deactivate/reactivate surface for higher roles (tenant_users/admins via
   `users.is_active` + `user_memberships.status`, plus an inactive-members view) is the
   next step — same pattern, tracked as a gap (#118).
+
+### The third state: ARCHIVED (company slumber / license lapsed)
+
+Above active/inactive there is a **company-level** state: when a company loses its
+license the whole tenant is **archived** (put to sleep). This is deliberately
+**orthogonal** to each user's own active/inactive state so that renewal is trivial and
+lossless:
+
+- **`tenants.archived_at`** (mig 113). Set = slumber; NULL = current. Access =
+  membership active **AND** `tenant.archived_at IS NULL`. RFP/master admins are exempt
+  (they enter a slumbering company to renew it).
+- **Archiving touches NO per-user rows.** So restoring (clear `archived_at`) returns
+  everyone to **exactly** their prior state — active users active, individually-inactive
+  users still inactive — for free, no snapshot needed. Verified end-to-end
+  (`scripts/drive-archive.mts`): archived → all users denied; admin still enters;
+  restored → back; the individually-inactive user stays inactive.
+- **An archived company disappears from the login list.** `getActiveMemberships` excludes
+  archived tenants, so a user only ever lands on / selects a *reachable* company; if all
+  their companies are archived they get an "Access paused" message (never a broken land).
+- **Admin control + audit.** RFP-admin archives/restores from the tenant page
+  (`POST`/`DELETE /api/admin/tenants/[tenantId]/archive`), emitting
+  `finder:tenant.archived` / `finder:tenant.restored`.
+
+So the full ladder is **active · inactive (per-user) · archived (whole company)** — all
+reversible, all auditable, nothing ever destroyed.
