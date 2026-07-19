@@ -1,33 +1,34 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-19 (identity COMPLETE + #77 + #114 + #18 loop + #117 agents started)
-**Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `9240d7e`
+**Last updated:** 2026-07-19 (identity COMPLETE + #117 agent workforce COMPLETE + #120 foundation + Batches A/B/C → 19 archetypes)
+**Branch:** `claude/nice-hamilton-kBqtD`
 
-**AGENT WORKFORCE (#117) is the ACTIVE workstream — full plan in `docs/AGENT_WORKFORCE.md` (§1–8).**
-Read that first for the agents. This run wired the pattern + safety, NOT all six yet. Done + verified:
-**librarian** greenfielded + producer (atomize→`agent_task_queue`) + injection-fenced (`test_librarian_wiring` 8/8);
-**scoring_strategist** greenfielded (tenant-discretion, current-spine SQL, `test_scoring_strategist_wiring` 5/5);
-**RFP-admin oversight** (`/admin/agents` → Agent Workforce roster + per-tenant usage rollup, forward-only
-bridge); **safety contract** (§8: injection ✅ fixed+tested, runaway ✅ + deadend ✅ verified in the runtime);
-**mig 116** forces RLS + tenant policy on `episodic_memories` (agent memory). NEXT (staged, exact steps in
-§7–8): NOBYPASSRLS agent role + central `SET app.tenant_id` in `fabric.invoke_agent` (exact insertion point
-documented) + `proposals` RLS (after a query audit); guardrail-gated landing; then roll the six —
-fan-out (scoring_strategist, opportunity_analyst) via per-tenant producers, single-entity
-(proposal_architect, packaging_specialist, capture_strategist, partner_coordinator) as AI_INVOKE steps.
-Pipeline tests need `pip install anthropic asyncpg pytest`; run `cd pipeline/src && PYTHONPATH=. python3 -m
-pytest ../tests/test_*_wiring.py -q`. The **RFP-Pipeline (our-org) agents come AFTER this run.**
+**AGENT WORKFORCE — COMPLETE + EXPANDED (19 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
+forward plan: `docs/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
 
-**#117 IN PROGRESS — agent workforce (pattern-first).** The Librarian is greenfielded onto the current
-spine (library_atoms/atom_tags, DB memory — no vectors) + producer wired (atomize-package →
-requestAgentTask → agent_task_queue); proven by `pipeline/tests/test_librarian_wiring.py` (7/7). RFP-admin
-oversight shipped: `/admin/agents` → Agent Workforce roster (10 archetypes, scope, trigger,
-live/wired/dormant, 30d queue) + **usage-by-tenant rollup**. TENANT-DISCRETION: tenant-space agents are
-role-bound to their assigned tenant (tenant_user authority; tool schemas expose no tenant_id — model can't
-cross tenants, locked by test). BRIDGE INVARIANT: oversight conveys usage METADATA forward only — tenant
-DATA stays in the tenant (forward-only bridge); control is bidirectional; to see an agent's OUTPUT the admin
-shadows in. Full pattern + continuation for the other 6 agents (scoring_strategist, opportunity_analyst,
-proposal_architect, packaging_specialist, capture_strategist, partner_coordinator) in **docs/AGENT_WORKFORCE.md**.
-Deploy has the real ANTHROPIC_API_KEY (Railway); LLM reasoning runs live there, wiring verified here.
+- **#117 DONE — all 10 original archetypes awake as workflow actors.** section_drafter / compliance_reviewer /
+  color_team_reviewer were live; this run woke librarian (producer in atomize-package), scoring_strategist +
+  opportunity_analyst (per-tenant producers on the PIN route), proposal_architect + capture_strategist
+  (AI_INVOKE in OnProposalCreated), packaging_specialist (AI_INVOKE in OnProposalAdvancedToFinal),
+  partner_coordinator (AI_INVOKE in the new OnCollaboratorInvited). Each greenfielded to `library_atoms`,
+  tenant-discretion (no `tenant_id` in schemas), injection-fenced, locked by `test_<agent>_wiring.py`.
+- **#120 DONE — the two 🚩 flags are built.** Mig 117 adds the `rfp_agent` NOBYPASSRLS role + FORCE-RLS +
+  tenant_isolation on proposals/proposal_sections/tenant_profiles/atom_tags (PROVEN in sandbox: cross-tenant/
+  unset reads return 0 rows). `fabric.invoke_agent` sets/resets `app.tenant_id` per call (optional agent pool
+  via `AGENT_DATABASE_URL`). `agents/guardrails.py::enforce_guardrails` gates every result (advisory →
+  guardrail → land-or-review): disallowed content → review, scoring adjustment clamped to ±15, fail-safe.
+  **Deploy step (gated):** provision a login member of `rfp_agent` + set `AGENT_DATABASE_URL`.
+- **Batches A/B/C DONE — fabric now 19.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
+  platform-scope opportunity_scout/ingest_analyst/matrix_stager/skeleton_architect (OnOpportunitiesDetected +
+  OnRfpUploaded). Batch C outcome_analyst/amendment_monitor/cost_estimator/pp_matcher (OnProposalOutcomeRecorded
+  / OnSourceChangeDetected / OnProposalCreated). Platform agents skip tenant-discretion (no tenant) but KEEP
+  the injection fence + land into the admin curation review.
+- **Verify:** `cd pipeline/src && PYTHONPATH=. python3 -m pytest ../tests/test_*_wiring.py ../tests/test_agents.py
+  ../tests/test_agents_security.py ../tests/test_guardrails.py -q` → 332 green (crypto failures are a
+  pre-existing PyO3 env artifact). Deploy has the real ANTHROPIC_API_KEY (Railway); LLM reasoning runs live
+  there — in-sandbox we verify routing + producer/step + tool SQL against the live schema.
+- **NEXT:** the **RFP-Pipeline (our-org) agents** — a separate future run (as agreed). Oversight surface is
+  `/admin/agents` → Agent Workforce (roster + per-tenant usage rollup, forward-only bridge).
 
 **LAUNCH-READINESS — all green this session (2026-07-19):** identity×deeplink 22/22, shadow-tenant-admin
 10/10, pin 15/15, p3-lifecycle 13/13, immobileyes-shadow 4/4, item-template-picker 8/8, **full Monday

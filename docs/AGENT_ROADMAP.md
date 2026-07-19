@@ -1,9 +1,19 @@
 # Agent Roadmap — the next batches (master-side, onboarding, tenant-side)
 
-**Companion to `docs/AGENT_WORKFORCE.md`** (the as-built 10-archetype workforce, #117 complete).
-This doc is the forward plan: the **master-side (RFP-admin) agents**, a **new-customer onboarding**
-agent, and the **additional tenant-side** agents that make sense — analyzed against the current
-architecture so each one is an *integration*, not a reinvention.
+**Companion to `docs/AGENT_WORKFORCE.md`** (the as-built workforce). This doc is the forward plan:
+the **master-side (RFP-admin) agents**, a **new-customer onboarding** agent, and the **additional
+tenant-side** agents — analyzed against the current architecture so each one is an *integration*,
+not a reinvention.
+
+> **STATUS — ALL THREE BATCHES BUILT (#127–#129, 2026-07-19).** The foundation (#120) landed first
+> (NOBYPASSRLS `rfp_agent` role + `app.tenant_id` in the fabric + guardrail-gated landing). Then:
+> **Batch B** `onboarding_agent` (AI_INVOKE in `OnApplicationAccepted`); **Batch A** `opportunity_scout`
+> / `ingest_analyst` / `matrix_stager` / `skeleton_architect` (platform-scope AI_INVOKE actors in
+> `OnOpportunitiesDetected` + `OnRfpUploaded`); **Batch C** `outcome_analyst` / `amendment_monitor` /
+> `cost_estimator` / `pp_matcher` (in `OnProposalOutcomeRecorded` / `OnSourceChangeDetected` /
+> `OnProposalCreated`). **The fabric now registers 19 archetypes**; every agent is an advisory,
+> injection-fenced, independent workflow actor with a `test_*_wiring.py`. LLM reasoning runs on deploy.
+> The sections below are retained as the design rationale.
 
 ---
 

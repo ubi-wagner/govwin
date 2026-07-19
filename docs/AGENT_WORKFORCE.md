@@ -26,7 +26,26 @@ Ten specialist AI agents, each a role with its own prompt, tools, and trigger:
 **As of #117 all ten archetypes are awake as workflow actors.** Six were greenfielded onto the current
 spine this run (tenant-discretion + injection-fence + `library_atoms`); each is locked by a
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
-verify routing + producer/step + tool SQL against the live schema. **42 agent-wiring tests green.**
+verify routing + producer/step + tool SQL against the live schema.
+
+**Then the fabric grew to 19 (#127–#129, see `docs/AGENT_ROADMAP.md`)** — 9 new agents on the same
+pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
+
+| Agent | Scope | Wakes on | What it does |
+|---|---|---|---|
+| **Onboarding Concierge** (`onboarding_agent`) | 🔒 tenant | Application accepted (`OnApplicationAccepted`) | Cold-starts a tenant: profile/buckets/first-atomize/getting-started ToDos. |
+| **Opportunity Scout** (`opportunity_scout`) | 🌐 platform | Opportunities detected | Prioritizes the new-triage backlog for the admin. |
+| **Ingest Analyst** (`ingest_analyst`) | 🌐 platform | RFP uploaded | Shredded solicitation → structured curation draft. |
+| **Matrix Stager** (`matrix_stager`) | 🌐 platform | RFP uploaded | Curated solicitation → compliance-matrix rows. |
+| **Skeleton Architect** (`skeleton_architect`) | 🌐 platform | RFP uploaded | Matrix → master response skeleton (tenant architect tailors it). |
+| **Outcome Analyst** (`outcome_analyst`) | 🔒 tenant | Outcome recorded | Win/loss lesson → memory → scoring calibration. |
+| **Amendment Monitor** (`amendment_monitor`) | 🌐 platform | Source change detected | Flags compliance-affecting amendments. |
+| **Cost Estimator** (`cost_estimator`) | 🔒 tenant | Proposal created | Cost-volume realism guidance. |
+| **PP Matcher** (`pp_matcher`) | 🔒 tenant | Proposal created | Surfaces PP atoms + flags teaming gaps. |
+
+🌐 **platform-scope** agents run at our authority on master data (no tenant to bind to), so tenant-discretion
+is N/A — but they keep the **mandatory injection fence** (they read the most untrusted text in the system)
+and land into the RFP-admin curation review. **Full suite: 332 agent/workflow/guardrail/security tests green.**
 
 ---
 
