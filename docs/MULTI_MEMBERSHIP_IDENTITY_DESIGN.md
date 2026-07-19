@@ -8,6 +8,26 @@ of their own company *and* a collaborator inside a customer's proposal. These
 businesses work with each other, so the same identity legitimately spans tenants —
 which is exactly why tenant scope must be **enforced**, never inferred.
 
+## First principle: a session's authorization is SINGULAR
+
+The membership **set** is many; the **active authorization is always exactly one
+`(company, role)`**. No session ever spans tenants simultaneously — that is the hard
+tenant-isolation guarantee, and it is why scope must be enforced off the *selected*
+membership, never inferred. Switching companies is a **deliberate re-scope** (a fresh
+active membership), not concurrent access.
+
+- **Anyone other than an RFP Pipeline (employee) account is strictly singular**: one
+  company + one role for the whole session; they can switch only among their *own*
+  explicit memberships, one at a time.
+- **RFP Pipeline (employee) accounts are the only non-singular reach**: they get the
+  platform/god-view for cross-customer triage AND may descend into any customer —
+  but the moment they descend, the session becomes a **singular `tenant_admin`** in
+  that one company (never `rfp_admin` carried down). So even the employee's in-tenant
+  session is singular; only their *platform* surface is cross-tenant.
+
+Everything below serves this: memberships enumerate the *choices*; the session pins
+exactly one; RLS + route authz read that one.
+
 ## Why the current model can't do it
 
 `users` is identity **and** membership fused into one row:
@@ -90,7 +110,10 @@ existing shadow-admin ToDo hop) resolves to `{ tenantId: <customer>, role:
      *Admin · Acme Navy Systems* / *Collaborator · Beacon Labs*.
 3. The chosen membership becomes the session's **active membership**:
    `{ userId, email, name }` (identity) + `{ membershipId, tenantId, role }` (active).
-4. A **"Switch"** control re-selects among active memberships without re-auth.
+4. A **"Switch company"** control re-selects among active memberships without
+   re-auth — but it is a **full re-scope**: the new active membership *replaces* the
+   old one (the session never holds two at once), server-side session state is
+   rewritten, and any tenant-scoped caches are dropped. Singular in, singular out.
 
 ## Enforcement (the tight part)
 
