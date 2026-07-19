@@ -51,6 +51,8 @@ interface Collaborator {
   dropboxEnabled: boolean;
   invitedAt: string;
   acceptedAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
   stageAccess: {
     collaboratorId: string;
     stage: string;

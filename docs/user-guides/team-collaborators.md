@@ -109,6 +109,21 @@ your proposal and her own company at once — to move between them she signs out
 back in. Pricing and any section you didn't grant never appear for her, in either
 place.
 
+### Removing a collaborator keeps their history
+
+Clicking the **✕** next to a collaborator **marks them inactive** — it does **not**
+delete them. Their access is revoked immediately (they drop out of the Access Matrix
+and can no longer open the proposal), but the record of their involvement stays: they
+remain in **Team Members**, dimmed and badged **Inactive**. A person is their email —
+so even someone who contributed once is kept, and the whole trail is auditable.
+
+![A removed collaborator stays in the list, badged Inactive, and drops out of the Access Matrix](./img/collab-inactive.png)
+
+**Re-inviting reactivates the same person.** Invite that email again and the original
+record comes back to life (a fresh grant, the same history) — the audit log records it
+as a reconstitution, not a brand-new invite. This "never delete, deactivate + revive"
+rule holds for everyone at every role, not just collaborators.
+
 ---
 
 ## 4. What each role can do (summary)

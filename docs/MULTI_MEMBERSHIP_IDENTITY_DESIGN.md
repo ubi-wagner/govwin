@@ -249,3 +249,31 @@ and the "switch company" flow are the customer-facing manual pieces).
   portal (the singular-session gate is membership-based; their `users.tenant_id` points
   at their own company). This is what makes the multi-company collaborator case work
   for real invites, not just seeded data.
+
+## Never hard-delete a user — deactivate, keep history, reconstitute (auditable)
+
+**A person IS their email** (email is the person-UUID; email+company is the membership
+key). Over time an org accumulates many deactivated users who may later come back, and
+that whole arc must stay auditable. So **no user or membership is ever hard-deleted** —
+removal is a soft, reversible, audited state:
+
+- **`users.is_active`** = the account on/off. **`user_memberships.status`**
+  (`active|invited|revoked`) = a specific (company, role) on/off.
+  **`proposal_collaborators.revoked_at`** (mig 112) = a specific proposal grant on/off.
+- **Removal marks inactive; the row stays.** Access-granting reads filter the inactive
+  state (`revoked_at IS NULL` / `status='active'` / `is_active=true`), so a removed
+  person loses access immediately — but history views still show them, badged inactive
+  (the Team Members list keeps a removed collaborator; the Access Matrix drops them).
+- **Re-inviting reconstitutes the SAME row** (`revoked_at → NULL`, `status → active`);
+  the event trail records `reactivated: true` — a reconstitution, not a new identity.
+- **As-built for collaborators** (2026-07-19): mig 112 `revoked_at`; the remove endpoint
+  soft-revokes the collaborator + its stage access + (if it was their last active
+  collaboration at the tenant) the `collaborator` membership; the invite endpoint
+  reactivates a revoked row instead of erroring/duplicating; the accept link is dead once
+  revoked; all six collaborator access reads filter `revoked_at`. Verified end-to-end
+  (`scripts/drive-p3-lifecycle.mts`): the row persists as revoked, still shows in history,
+  and re-invite revives it.
+- **Audited: no code path hard-deletes a user or membership** (swept 2026-07-19). The
+  general deactivate/reactivate surface for higher roles (tenant_users/admins via
+  `users.is_active` + `user_memberships.status`, plus an inactive-members view) is the
+  next step — same pattern, tracked as a gap (#118).

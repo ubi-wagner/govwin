@@ -255,6 +255,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     dropboxEnabled: boolean;
     invitedAt: string;
     acceptedAt: string | null;
+    revokedAt: string | null;
   }[] = [];
 
   try {
@@ -262,7 +263,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       SELECT
         id, user_id, email, name, role,
         assigned_sections, dropbox_enabled,
-        invited_at, accepted_at
+        invited_at, accepted_at, revoked_at
       FROM proposal_collaborators
       WHERE proposal_id = ${proposalId}
       ORDER BY invited_at ASC
@@ -299,6 +300,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
 
   const collaboratorsWithAccess = collaborators.map((c) => ({
     ...c,
+    active: c.revokedAt == null,
     stageAccess: stageAccessByCollab.get(c.id) || [],
   }));
 

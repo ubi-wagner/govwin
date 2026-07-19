@@ -13,6 +13,8 @@ interface Collaborator {
   dropboxEnabled: boolean;
   invitedAt: string;
   acceptedAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
   stageAccess: {
     collaboratorId: string;
     stage: string;
@@ -97,22 +99,27 @@ export function TeamManager({
         return;
       }
 
-      // Add to local state
-      setCollaborators((prev) => [
-        ...prev,
-        {
-          id: json.data.id,
-          userId: json.data.userId,
-          email: json.data.email,
-          name: json.data.name,
-          role: json.data.role,
-          assignedSections: json.data.assignedSections || [],
-          dropboxEnabled: true,
-          invitedAt: new Date().toISOString(),
-          acceptedAt: null,
-          stageAccess: [],
-        },
-      ]);
+      // Add to local state. Re-inviting a previously-inactive collaborator reactivates
+      // the SAME row (same id) — upsert so it doesn't appear twice.
+      const added = {
+        id: json.data.id,
+        userId: json.data.userId,
+        email: json.data.email,
+        name: json.data.name,
+        role: json.data.role,
+        assignedSections: json.data.assignedSections || [],
+        dropboxEnabled: true,
+        invitedAt: new Date().toISOString(),
+        acceptedAt: null,
+        revokedAt: null,
+        active: true,
+        stageAccess: [],
+      };
+      setCollaborators((prev) =>
+        prev.some((c) => c.id === added.id)
+          ? prev.map((c) => (c.id === added.id ? { ...c, ...added } : c))
+          : [...prev, added],
+      );
 
       setInviteEmail('');
       setInviteName('');
@@ -135,7 +142,7 @@ export function TeamManager({
   }, []);
 
   const handleRemoveCollaborator = useCallback(async (collaboratorId: string, email: string) => {
-    if (!confirm(`Remove ${email} from this proposal? Their access will be revoked immediately.`)) return;
+    if (!confirm(`Mark ${email} inactive on this proposal? Their access is revoked immediately. Their history is kept and you can re-invite them later.`)) return;
     try {
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/collaborators/${collaboratorId}`,
@@ -146,11 +153,18 @@ export function TeamManager({
         alert(json.error || 'Failed to remove collaborator');
         return;
       }
-      setCollaborators((prev) => prev.filter((c) => c.id !== collaboratorId));
+      // Never drop them from the list — mark inactive so their history stays visible.
+      setCollaborators((prev) =>
+        prev.map((c) => (c.id === collaboratorId ? { ...c, active: false, revokedAt: new Date().toISOString() } : c)),
+      );
     } catch {
       alert('Network error');
     }
   }, [tenantSlug, proposalId]);
+
+  // The Team Members list shows everyone (active + inactive, for history); the Access
+  // Matrix shows only ACTIVE collaborators (inactive ones hold no access).
+  const activeCollaborators = collaborators.filter((c) => c.active);
 
   return (
     <div className="space-y-5">
@@ -175,7 +189,7 @@ export function TeamManager({
             return (
               <div
                 key={collab.id}
-                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg"
+                className={`flex items-center gap-3 p-3 border rounded-lg ${collab.active ? 'border-gray-200' : 'border-gray-200 bg-gray-50 opacity-60'}`}
               >
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 ${avatarColor}`}
@@ -194,14 +208,21 @@ export function TeamManager({
                   >
                     {badge.label}
                   </span>
-                  {!collab.acceptedAt && (
+                  {!collab.active ? (
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-500"
+                      title={`Inactive${collab.revokedAt ? ` since ${new Date(collab.revokedAt).toLocaleDateString()}` : ''} — re-invite to restore`}
+                    >
+                      Inactive
+                    </span>
+                  ) : !collab.acceptedAt ? (
                     <span className="text-[10px] text-amber-500 font-medium">Pending</span>
-                  )}
-                  {canManage && (
+                  ) : null}
+                  {canManage && collab.active && (
                     <button
                       onClick={() => handleRemoveCollaborator(collab.id, collab.email)}
                       className="text-[10px] text-red-400 hover:text-red-600 font-medium px-1 py-0.5 rounded hover:bg-red-50 transition-colors"
-                      title="Remove collaborator"
+                      title="Mark inactive (revoke access; keeps history)"
                     >
                       ✕
                     </button>
@@ -296,7 +317,7 @@ export function TeamManager({
       )}
 
       {/* Access matrix */}
-      {collaborators.length > 0 && sections.length > 0 && (
+      {activeCollaborators.length > 0 && sections.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Access Matrix</h3>
           <div className="overflow-x-auto">
@@ -306,7 +327,7 @@ export function TeamManager({
                   <th className="text-left p-2 bg-gray-50 border-b border-gray-200 font-semibold text-gray-500">
                     Section
                   </th>
-                  {collaborators.map((c) => (
+                  {activeCollaborators.map((c) => (
                     <th
                       key={c.id}
                       className="text-left p-2 bg-gray-50 border-b border-gray-200 font-semibold text-gray-500"
@@ -322,7 +343,7 @@ export function TeamManager({
                     <td className="p-2 border-b border-gray-100 text-gray-700">
                       {section.title}
                     </td>
-                    {collaborators.map((c) => {
+                    {activeCollaborators.map((c) => {
                       const isAssigned = c.assignedSections?.includes(section.id);
                       const stageAccess = c.stageAccess?.[0];
                       let perm: 'edit' | 'comment' | 'view' | 'none' = 'none';

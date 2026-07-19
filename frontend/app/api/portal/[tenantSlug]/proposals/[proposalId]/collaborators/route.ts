@@ -79,6 +79,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
       dropboxEnabled: boolean;
       invitedAt: string;
       acceptedAt: string | null;
+      revokedAt: string | null;
     }[];
     let accessRows: {
       collaboratorId: string;
@@ -97,7 +98,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
           pc.assigned_sections,
           pc.dropbox_enabled,
           pc.invited_at,
-          pc.accepted_at
+          pc.accepted_at,
+          pc.revoked_at
         FROM proposal_collaborators pc
         WHERE pc.proposal_id = ${proposalId}
         ORDER BY pc.invited_at ASC
@@ -133,6 +135,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
       dropboxEnabled: c.dropboxEnabled,
       invitedAt: c.invitedAt,
       acceptedAt: c.acceptedAt,
+      revokedAt: c.revokedAt,
+      active: c.revokedAt == null,
       stageAccess: accessByCollaborator.get(c.id) || [],
     }));
 
@@ -252,11 +256,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // Check if collaborator already exists
-    let existing: { id: string } | undefined;
+    // Check if collaborator already exists. An ACTIVE one is a real duplicate (409);
+    // a REVOKED one is REACTIVATED (its row + history are preserved, never re-created).
+    let existing: { id: string; revokedAt: Date | null } | undefined;
     try {
-      [existing] = await sql<{ id: string }[]>`
-        SELECT id FROM proposal_collaborators
+      [existing] = await sql<{ id: string; revokedAt: Date | null }[]>`
+        SELECT id, revoked_at FROM proposal_collaborators
         WHERE proposal_id = ${proposalId} AND email = ${email}
         LIMIT 1
       `;
@@ -264,9 +269,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/collaborators] duplicate check failed:', dbErr);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
-    if (existing) {
+    if (existing && !existing.revokedAt) {
       return NextResponse.json({ error: 'Collaborator already invited', code: 'VALIDATION_ERROR' }, { status: 409 });
     }
+    const reactivateId: string | null = existing?.id ?? null;
 
     // ── Start event for collaborator invitation ──────────────────────
     const startId = await emitEventStart({
@@ -280,6 +286,9 @@ export async function POST(request: Request, ctx: RouteContext) {
         name: name.slice(0, 200),
         role: collabRole,
         permission,
+        // Reconstitution of a previously-removed collaborator is distinct from a
+        // fresh invite — the audit trail records which (never-delete + reactivate).
+        reactivated: reactivateId != null,
       },
     });
 
@@ -310,23 +319,45 @@ export async function POST(request: Request, ctx: RouteContext) {
         existingUser = { id: newUser.id, tenantId: tenantId };
       }
 
-      // Create collaborator record. An EXISTING user is auto-accepted (they already
-      // have an account — no acceptance ceremony, just set accepted_at so the access
-      // resolver grants them immediately). A NEW user is left pending until they set
-      // a password via /invite/<collaboratorId>, which sets accepted_at.
+      // Create (or REACTIVATE) the collaborator record. An EXISTING user is auto-accepted
+      // (they already have an account — just set accepted_at so the access resolver grants
+      // them immediately). A NEW user is left pending until they set a password via
+      // /invite/<collaboratorId>. Re-inviting a REVOKED collaborator reactivates the same
+      // row (revoked_at → NULL) so its history is never destroyed.
       const acceptedAt = isNewUser ? null : new Date().toISOString();
-      const [collaborator] = await tx<{ id: string }[]>`
-        INSERT INTO proposal_collaborators (
-          proposal_id, user_id, email, name, role, invited_by,
-          assigned_sections, dropbox_enabled, accepted_at
-        )
-        VALUES (
-          ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
-          ${collabRole}, ${sessionUser.id},
-          ${sql.array(assignedSections)}::uuid[], true, ${acceptedAt}::timestamptz
-        )
-        RETURNING id
-      `;
+      let collaborator: { id: string };
+      if (reactivateId) {
+        const [reactivated] = await tx<{ id: string }[]>`
+          UPDATE proposal_collaborators
+          SET revoked_at = NULL,
+              user_id = ${existingUser.id},
+              name = ${name || null},
+              role = ${collabRole},
+              invited_by = ${sessionUser.id},
+              invited_at = now(),
+              assigned_sections = ${sql.array(assignedSections)}::uuid[],
+              accepted_at = ${acceptedAt}::timestamptz
+          WHERE id = ${reactivateId}::uuid
+          RETURNING id
+        `;
+        collaborator = reactivated;
+        // Clear the prior (revoked) stage-access rows; fresh grants are inserted below.
+        await tx`DELETE FROM collaborator_stage_access WHERE collaborator_id = ${reactivateId}::uuid`;
+      } else {
+        const [inserted] = await tx<{ id: string }[]>`
+          INSERT INTO proposal_collaborators (
+            proposal_id, user_id, email, name, role, invited_by,
+            assigned_sections, dropbox_enabled, accepted_at
+          )
+          VALUES (
+            ${proposalId}, ${existingUser.id}, ${email}, ${name || null},
+            ${collabRole}, ${sessionUser.id},
+            ${sql.array(assignedSections)}::uuid[], true, ${acceptedAt}::timestamptz
+          )
+          RETURNING id
+        `;
+        collaborator = inserted;
+      }
 
       // Create stage access for current stage
       const gates = coerceJsonb<string[]>(proposal.gateConfig, ['draft', 'final']);
@@ -351,8 +382,13 @@ export async function POST(request: Request, ctx: RouteContext) {
       await tx`
         INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
         VALUES (${existingUser.id}, ${tenantId}, ${membershipRole}, 'active', 'collaborator', ${sessionUser.id})
-        ON CONFLICT (user_id, tenant_id) DO NOTHING
+        ON CONFLICT (user_id, tenant_id) DO UPDATE
+          SET status = 'active', role = EXCLUDED.role
+          WHERE user_memberships.source = 'collaborator' AND user_memberships.status <> 'active'
       `;
+      // ON CONFLICT reactivates a previously-REVOKED collaborator membership (so
+      // re-inviting a removed collaborator restores access) but the source guard leaves
+      // a home/manual membership untouched — an admin here is never downgraded.
 
       return { collaboratorId: collaborator.id, finalUserId: existingUser.id };
     });

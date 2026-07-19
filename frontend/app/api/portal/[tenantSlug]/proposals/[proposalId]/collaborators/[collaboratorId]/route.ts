@@ -82,7 +82,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
 
     const revokedAt = new Date().toISOString();
 
-    // Revoke all stage access rows
+    // Soft-revoke stage access (keep the rows — access reads filter access_revoked_at).
     try {
       await sql`
         UPDATE collaborator_stage_access
@@ -96,16 +96,50 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    // Remove proposal_collaborators row
+    // Collaborators are NEVER hard-deleted — mark inactive (revoked_at) so the full
+    // history is preserved (they may have contributed once and that record must
+    // endure). Access-granting reads filter revoked_at IS NULL; the Team list still
+    // shows them (badged inactive); a re-invite reactivates this same row.
     try {
       await sql`
-        DELETE FROM proposal_collaborators
+        UPDATE proposal_collaborators
+        SET revoked_at = now()
         WHERE id = ${collaboratorId}::uuid
           AND proposal_id = ${proposalId}::uuid
       `;
     } catch (e) {
-      console.error('[collaborators/delete] collaborators delete failed:', e);
+      console.error('[collaborators/delete] collaborator revoke failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Multi-membership hygiene: if this was the collaborator's LAST active collaboration
+    // at this tenant, revoke their 'collaborator' membership so they no longer reach the
+    // portal. The source guard means a home/manual membership (e.g. they are actually an
+    // admin here) is NEVER revoked. Best-effort — the collaborator is already removed.
+    // See docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+    let membershipRevoked = false;
+    if (collab.userId) {
+      try {
+        const [stillCollaborating] = await sql`
+          SELECT 1 FROM proposal_collaborators pc
+          JOIN proposals p ON p.id = pc.proposal_id
+          WHERE pc.user_id = ${collab.userId}::uuid AND p.tenant_id = ${tenantId}::uuid
+            AND pc.revoked_at IS NULL
+          LIMIT 1
+        `;
+        if (!stillCollaborating) {
+          const revoked = await sql`
+            UPDATE user_memberships
+            SET status = 'revoked'
+            WHERE user_id = ${collab.userId}::uuid AND tenant_id = ${tenantId}::uuid
+              AND source = 'collaborator' AND status = 'active'
+            RETURNING id
+          `;
+          membershipRevoked = revoked.length > 0;
+        }
+      } catch (e) {
+        console.error('[collaborators/delete] membership revoke check failed:', e);
+      }
     }
 
     // Emit event
@@ -115,13 +149,13 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
         type: 'collaborator.access_revoked',
         actor: userActor(sessionUser.id, sessionUser.email),
         tenantId,
-        payload: { proposalId, collaboratorId, collaboratorEmail: collab.email, revokedAt },
+        payload: { proposalId, collaboratorId, collaboratorEmail: collab.email, revokedAt, membershipRevoked },
       });
     } catch {
       // Best-effort
     }
 
-    return NextResponse.json({ data: { collaboratorId, revokedAt } });
+    return NextResponse.json({ data: { collaboratorId, revokedAt, membershipRevoked } });
   } catch (e) {
     console.error('[collaborators/delete] DELETE error:', e);
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
