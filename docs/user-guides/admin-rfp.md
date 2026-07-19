@@ -123,6 +123,28 @@ transition is guarded:
 
 ---
 
+## 7. Pause or restore a company (license)
+
+When a company's license lapses, **archive** it from its **Tenants → company** page.
+Archiving is a company-wide *slumber*, not a deletion:
+
+![The tenant page with the Archive (license lapsed) control next to the status badges](./img/admin-tenant-archive.png)
+
+- **Archive (license lapsed)** pauses access for **every** user of that company at once.
+  They see an "Access paused" message on sign-in, and the company **disappears from their
+  login list** — so a person who also works at other companies just lands there instead.
+- **Nobody is deleted and no work is lost.** Archiving doesn't touch any individual
+  user's active/inactive state, so **Restore access** returns everyone to *exactly* where
+  they were — active users active, anyone you'd individually deactivated still inactive.
+- **You (RFP staff) can still enter** an archived company (shadow) to renew or clean up.
+- Both actions are audited (`tenant.archived` / `tenant.restored`).
+
+This is the top of the **active · inactive · archived** ladder: a single user can be made
+inactive on a proposal or in a company (kept for history, re-invite to revive); a whole
+company can be archived (license slumber) and restored losslessly.
+
+---
+
 ## Admin surfaces at a glance
 
 | Area | Use it to… |
