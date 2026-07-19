@@ -66,13 +66,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const [bs] = await sql<Array<{ base: number | null }>>`
         SELECT MAX(score) AS base FROM tenant_bucket_scores
         WHERE tenant_id = ${r.tenantId}::uuid AND opportunity_id = ${opportunityId}::uuid`;
-      await requestAgentTask({
-        tenantId: r.tenantId,
-        agentRole: 'scoring_strategist',
-        taskType: 'score_adjustment',
-        input: { opportunityId, opportunity: opp ?? {}, base_score: bs?.base ?? 0 },
-      });
-    } catch (e) { console.error('[portal/cards/pin] scoring_strategist enqueue failed (non-fatal)', e); }
+      const input = { opportunityId, opportunity: opp ?? {}, base_score: bs?.base ?? 0 };
+      // Two fan-out agents fire on a pin, both tenant-bound: scoring_strategist (±15 fit
+      // adjustment) + opportunity_analyst (fit/pursue-evaluate-skip analysis). Bounded to
+      // pinned cards. Best-effort — never fail the pin.
+      await requestAgentTask({ tenantId: r.tenantId, agentRole: 'scoring_strategist', taskType: 'score_adjustment', input });
+      await requestAgentTask({ tenantId: r.tenantId, agentRole: 'opportunity_analyst', taskType: 'analyze_fit', input });
+    } catch (e) { console.error('[portal/cards/pin] agent enqueue failed (non-fatal)', e); }
     return NextResponse.json({ data: { pinned: true, docCount: result.docs.length, docs: result.docs } });
   } catch (err) {
     console.error('[portal/cards/pin] error', err);
