@@ -142,6 +142,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
       const newUserId = userRow.id;
 
+      // Materialize the owner's HOME membership (multi-membership identity) so the
+      // account is membership-backed from creation, not only via legacy users.tenant_id.
+      // In the tx: a new tenant owner always has a membership. ON CONFLICT reactivates a
+      // prior deactivated one (never-delete).
+      await tsql`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+        VALUES (${newUserId}, ${tenantId}, 'tenant_admin', 'active', 'home', ${userId})
+        ON CONFLICT (user_id, tenant_id) DO UPDATE
+          SET status = 'active', role = EXCLUDED.role
+          WHERE user_memberships.status <> 'active'
+      `;
+
       // Update application status AFTER tenant+user creation succeeds
       await tsql`
         UPDATE applications

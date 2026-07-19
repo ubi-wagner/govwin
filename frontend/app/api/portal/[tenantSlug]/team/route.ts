@@ -201,6 +201,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    // Materialize the login-selectable HOME membership (multi-membership identity) so
+    // every user is membership-backed, not only reachable via the legacy users.tenant_id
+    // read-through. ON CONFLICT reactivates a previously-deactivated one (never-delete).
+    try {
+      await sql`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+        VALUES (${newUser.id}, ${tenantId}, ${memberRole}, 'active', 'home', ${sessionUser.id})
+        ON CONFLICT (user_id, tenant_id) DO UPDATE
+          SET status = 'active', role = EXCLUDED.role
+          WHERE user_memberships.status <> 'active'
+      `;
+    } catch (dbErr) {
+      // Non-fatal — the user exists; legacy read-through still grants access in transition.
+      console.error('[api/portal/team] membership insert failed:', dbErr);
+    }
+
     // Send invite email with credentials
     let teamEmailResult: { provider: string; error?: string } = { provider: 'skipped' };
     try {
