@@ -197,19 +197,9 @@ Be thorough and methodical. A single missed requirement can disqualify an otherw
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query (e.g., agency name, program type)",
-                        },
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of memories",
-                            "default": 5,
-                        },
+                        # Tenant-discretion: NO tenant_id — bound to the assigned tenant.
+                        "query": {"type": "string", "description": "Search query (e.g., agency name, program type)"},
+                        "limit": {"type": "integer", "description": "Maximum number of memories", "default": 5},
                     },
                     "required": ["query"],
                 },

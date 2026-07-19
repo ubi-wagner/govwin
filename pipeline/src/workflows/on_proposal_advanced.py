@@ -227,6 +227,16 @@ class OnProposalAdvancedToFinal(Workflow):
     )
 
     steps = [
+        # AI actor (#117): the packaging_specialist reviews the final submission package —
+        # volume completeness, required attachments/forms, formatting — ADVISORY. Independent
+        # (no depends_on) so a failure/skip never blocks the export/notify loop. Tenant-bound.
+        Step(
+            name="ai_package_review",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.package",
+            input_map={"proposal_id": "payload.proposalId", "tenant_id": "payload.tenantId"},
+            timeout_minutes=10,
+        ),
         Step(
             name="generate_export_preview",
             action="workflows.actions.generate_preview.generate_preview",
