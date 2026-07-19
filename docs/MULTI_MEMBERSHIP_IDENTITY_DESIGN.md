@@ -31,7 +31,7 @@ users            -- pure identity (global)
 
 user_memberships -- one row per (person, company, role) they may act as
   id, user_id -> users.id,
-  tenant_id  -> tenants.id  (NULL = our internal/platform org, for employees),
+  tenant_id  -> tenants.id,   -- ALWAYS a real company, incl. OUR org (see below)
   role        (master_admin|rfp_admin|tenant_admin|tenant_user|partner_user),
   status      (active|invited|revoked),
   scope       (jsonb — e.g. partner_user section grants live here or via
@@ -40,11 +40,45 @@ user_memberships -- one row per (person, company, role) they may act as
   UNIQUE (user_id, tenant_id)     -- at most one membership per company per person
 ```
 
-- **Employee** → membership with `tenant_id = NULL` (or a dedicated internal org),
-  role `rfp_admin`/`master_admin`.
+**Everyone is email + a real company — including us.** Our organization is a
+first-class `tenants` row (e.g. "RFP Pipeline"), not a NULL/platform special case,
+because our people are customers too. So:
+
+- **Our employee** → membership `(our tenant, rfp_admin/master_admin)` — and, being
+  a customer as well, they can *also* hold `(our tenant, tenant_admin)` build access
+  and `(some customer tenant, partner_user)` collaborator access.
 - **Customer owner** → membership `(their tenant, tenant_admin)`.
 - **Cross-company collaborator** → one membership per company `(tenant, partner_user)`.
-- The same email can hold all of the above simultaneously.
+- The same email can hold all of the above simultaneously; each is a separate,
+  independently-revocable row.
+
+> **Events-convention note.** Today "admin events → `tenantId = null`" (CLAUDE.md).
+> Once our org is a real tenant, a platform-admin action can be attributed to *our
+> tenant* instead of null. Decision to lock before P2: keep `null` for genuinely
+> platform-wide/cross-tenant admin actions (triage across all customers) and use our
+> tenant only when the action is scoped to our own company. (Least-ripple: keep the
+> `null` convention for cross-tenant admin surfaces; attribute in-company actions.)
+
+## RFP-admin default: shadow-admin-as-company-admin (the T&C floor)
+
+For now — and as the **default written into the customer terms & conditions** —
+**every RFP-admin identity is an admin + shadow admin in *every* customer tenant.**
+Rather than materialize an `(admin × tenant)` row per customer, this is a **derived
+membership**: any `rfp_admin`/`master_admin` identity is offered a shadow membership
+in every active tenant.
+
+The critical rule (data integrity, as previously agreed): **when an RFP admin moves
+down into a tenant's space, they always assume the `tenant_admin` (company-admin)
+role — never `rfp_admin`.** So inside a customer, an employee is indistinguishable
+from a real company admin for the purposes of RLS, authorization, and business
+rules; the only trace that it was staff is the audit actor (email@ours) on the
+company's queue. There is no elevated "admin acting" mode that could bypass a
+company-level constraint — the shadow admin *is* a company admin while down there.
+
+Concretely: the derived shadow membership an RFP admin selects at login (or via the
+existing shadow-admin ToDo hop) resolves to `{ tenantId: <customer>, role:
+'tenant_admin' }`. This is the membership form of today's `assumeShadowAdmin`
+(`shadow_admin_grants`) — now a first-class option in the membership selector.
 
 ## Login → membership selection
 
