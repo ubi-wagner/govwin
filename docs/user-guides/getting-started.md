@@ -56,6 +56,23 @@ they were granted:
 > work from ever bleeding into another's. (RFP Pipeline staff are the one exception;
 > see the admin guide.)
 
+### Following a notification link
+
+Nudge and reminder emails (from **platform@rfppipeline.com**) link straight to the thing
+they're about — a section to finish, a portal to release — and land you **in the right
+company's queue**, so the actual work always happens in the platform (and is logged),
+with the email just the prompt.
+
+- **Already signed in to that company?** A quick confirmation, then you're on the task.
+- **Signed in to a *different* company?** Because each company is its own sign-in, you're
+  signed out and sent to re-log into the one the link is for — no silent switch:
+
+![A notification link for another company signs you out and back into the right one](./img/deeplink-switch.png)
+
+- **Not signed in?** You log in and land there.
+- **Link already handled** (the task's done, or the proposal was submitted/archived)? You
+  land on that company's queue with a note — never a broken page.
+
 ---
 
 ## 2. The dashboard

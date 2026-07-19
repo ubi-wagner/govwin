@@ -96,6 +96,20 @@ skeleton and the customer [Documents](./documents.md) browser draw from.
 
 The customer can now build (see [Proposal build](./proposal-build.md)).
 
+### Or add a company directly (we/expert onboard)
+
+Besides the customer's self-serve **/apply → accept** path, you can create a company
+yourself from **Customers → Tenants → + New Company**: enter the company name and its
+**admin point of contact** (email + name). That creates the company *and* its admin POC
+(with a temporary password) in one step, and seeds their spotlight + pipeline.
+
+![Add a company + admin POC directly from the Tenants page](./img/admin-new-company.png)
+
+Then **shadow into their space** (section 6) to help them **upload & atomize** their
+documents — the upload/atomizer is on their dashboard. Everything you do there is logged
+to their audit trail. All the tenant's user/collaborator adds and (de)activations come
+from their company admin — or from you acting as that admin in shadow, always audited.
+
 ---
 
 ## 6. Act inside a tenant (shadow / god-view)

@@ -47,6 +47,13 @@ export async function GET(req: NextRequest) {
   const chosen = memberships.find((m) => m.tenantSlug === slug);
   if (!chosen) return NextResponse.redirect(url('/portal')); // no access / archived → dispatcher
 
+  // Singular session: NEVER silently switch a user who is committed (pinned) to a
+  // DIFFERENT company. Hand off to /go, which renders the sign-out + re-login gate.
+  const sess = u as { tenantSlug?: string | null; membershipPinned?: boolean };
+  if (sess.membershipPinned === true && sess.tenantSlug && sess.tenantSlug !== slug) {
+    return NextResponse.redirect(url(`/go?tenant=${encodeURIComponent(slug)}${next ? `&next=${encodeURIComponent(next)}` : ''}`));
+  }
+
   // Pin the target company onto the session so they land there directly.
   await unstable_update({
     user: { role: chosen.role, tenantId: chosen.tenantId, tenantSlug: chosen.tenantSlug, membershipPinned: true },
