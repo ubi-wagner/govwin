@@ -129,6 +129,20 @@ async function run() {
       }
     }
 
+    if (journey === 'admin2') {
+      const slug = 'acme-navy-systems';
+      await login(page, 'eric@rfppipeline.com');
+      for (const [path, name] of [['purchases', 'admin-purchases'], ['tenants', 'admin-tenants']] as Array<[string, string]>) {
+        try { await page.goto(`${BASE}/admin/${path}`, { waitUntil: 'networkidle' }); await shot(page, name, { full: true }); }
+        catch (e) { console.error(`  ⚠ ${name}:`, e instanceof Error ? e.message : e); }
+      }
+      await login(page, 'admin@acme-navy.test');
+      for (const [path, name] of [['buckets', 'portal-buckets'], ['cards', 'portal-cards']] as Array<[string, string]>) {
+        try { await page.goto(`${BASE}/portal/${slug}/${path}`, { waitUntil: 'networkidle' }); await shot(page, name, { full: true }); }
+        catch (e) { console.error(`  ⚠ ${name}:`, e instanceof Error ? e.message : e); }
+      }
+    }
+
     if (journey === 'audit') {
       const slug = 'acme-navy-systems';
       // Admin side — the immutable event stream (audit) + dashboard ToDos.
