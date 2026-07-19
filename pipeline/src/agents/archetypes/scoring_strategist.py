@@ -141,46 +141,26 @@ Be precise and evidence-based. Every point of adjustment must be justified."""
         """Return tool definitions in Anthropic tool-use format."""
         return [
             {
+                # Tenant-discretion: NO tenant_id in the schema — the agent is bound to its
+                # assigned tenant (from the trusted task context), never the model's choice.
                 "name": "get_tenant_profile",
                 "description": (
-                    "Get the tenant's company profile including NAICS codes, "
-                    "technical focus areas, past award history, and capability "
-                    "areas for scoring calibration."
+                    "Get the assigned tenant's company profile: technical focus (from its "
+                    "library atoms) and past award history (agency/program) for scoring calibration."
                 ),
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant to profile",
-                        },
-                    },
-                    "required": ["tenant_id"],
-                },
+                "input_schema": {"type": "object", "properties": {}},
             },
             {
                 "name": "search_memory",
                 "description": (
-                    "Search agent memory for past scoring patterns, "
-                    "calibration data, and outcome-based adjustments. "
-                    "Helps calibrate scoring accuracy over time."
+                    "Search agent memory for past scoring patterns, calibration data, and "
+                    "outcome-based adjustments for the assigned tenant."
                 ),
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query for scoring memories",
-                        },
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of memories",
-                            "default": 5,
-                        },
+                        "query": {"type": "string", "description": "Search query for scoring memories"},
+                        "limit": {"type": "integer", "description": "Maximum number of memories", "default": 5},
                     },
                     "required": ["query"],
                 },
@@ -330,10 +310,11 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
             # Get capability categories from library
             capabilities = await conn.fetch(
                 """
-                SELECT category, COUNT(*) as count
-                FROM library_units
-                WHERE tenant_id = $1
-                GROUP BY category
+                SELECT t.value AS category, COUNT(DISTINCT a.id) AS count
+                FROM library_atoms a
+                JOIN atom_tags t ON t.atom_id = a.id AND t.dimension = 'vol'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                GROUP BY t.value
                 ORDER BY count DESC
                 LIMIT 10
                 """,
