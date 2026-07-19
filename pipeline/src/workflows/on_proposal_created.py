@@ -118,6 +118,22 @@ class OnProposalCreated(Workflow):
             },
             timeout_minutes=10,
         ),
+        # AI actor (#117): the capture_strategist develops win themes, competitive positioning,
+        # teaming recommendations, and a risk register for the just-created proposal — ADVISORY.
+        # The go/no-go is already settled (portal purchased), but the strategic frame seeds the
+        # build. Independent (no depends_on) so a failure/skip never blocks drafting; the fabric
+        # treats agent output as advisory (never auto-writes). Tenant-bound via payload.tenantId;
+        # the ContextAssembler resolves the solicitation from proposal_id and injects it.
+        Step(
+            name="ai_capture_strategy",
+            step_type=StepType.AI_INVOKE,
+            action="tool.capture.generate_strategy",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
         Step(
             name="draft_sections",
             step_type=StepType.ACTION,
