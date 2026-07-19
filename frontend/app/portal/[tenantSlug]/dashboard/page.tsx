@@ -5,6 +5,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
 import { TaskQueue } from '@/components/tasks/task-queue';
+import { UploadAtomizeCard } from '@/components/portal/upload-atomize-card';
 import { describeEvent } from '@/lib/event-labels';
 
 export const dynamic = 'force-dynamic';
@@ -187,6 +188,11 @@ export default async function DashboardPage({
       {/* To-Do queue + in-app deadline nudges (reads the unified tasks ledger) */}
       <div className="mt-6">
         <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
+      </div>
+
+      {/* Add content — upload + atomize on the landing, for anyone in this company. */}
+      <div className="mt-6">
+        <UploadAtomizeCard tenantSlug={tenantSlug} />
       </div>
 
       {/* Get Started checklist */}

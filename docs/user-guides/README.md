@@ -77,6 +77,7 @@ implies it exists).
 
 ### C. Build the content library
 
+- [x] ✅ **Add content on the landing** — an upload+atomize card on every landing (customer dashboard AND the collaborator view); collaborators atomize to **offer content up** to the company — all customer roles + collaborators
 - [x] ✅ **Upload a prior-proposal package** (docx/pdf/pptx/xlsx/txt) — tenant_admin → [library-atoms](./library-atoms.md)
 - [x] ✅ **Atomize the package** into tagged, reusable atoms (upload→atomize→select) — tenant_admin
 - [x] ✅ **Annotation atomizer** — box / select / group / tag on ingest — tenant_admin

@@ -23,7 +23,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const u = session.user as { id?: string; email?: string; role?: unknown };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
-    if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
+    // Collaborators (partner_user) may atomize too — this is how they OFFER content
+    // UP to the company (atoms are 'collaborator'-sourced + draft for the company to
+    // review). verifyTenantAccess below still requires a real membership at THIS
+    // company, so a collaborator can only offer into a company they belong to.
+    if (!hasRoleAtLeast(role, 'partner_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;
