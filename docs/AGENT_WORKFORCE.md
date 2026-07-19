@@ -13,15 +13,20 @@ Ten specialist AI agents, each a role with its own prompt, tools, and trigger:
 | Agent | Scope | Wakes on | Status | What it does |
 |---|---|---|---|---|
 | **Section Drafter** | tenant | Section draft requested (build) | live | Drafts a section grounded on the tenant's library atoms. |
-| **Compliance Reviewer** | tenant | Compliance check (inline) | live | Checks a draft against the compliance matrix. |
-| **Color Team Reviewer** | tenant | Review requested (advance) | live | Red/gold-team review before a stage advance. |
-| **Librarian** | tenant | Package atomized / document locked | **wired (#117)** | Catalogs, scores, dedupes & assesses freshness of new atoms. |
-| **Scoring Strategist** | tenant | Opportunity card pushed | dormant | Scores & ranks opportunities into the tenant's buckets. |
-| **Opportunity Analyst** | tenant | Opportunity card pushed | dormant | Assesses fit of a new opportunity for the tenant. |
-| **Proposal Architect** | tenant | Proposal provisioned | dormant | Shapes the response skeleton from the solicitation. |
-| **Packaging Specialist** | tenant | All sections locked | dormant | Assembles & formats the final submission package. |
-| **Capture Strategist** | tenant | Portal purchased | dormant | Drafts a capture/win strategy for the pursuit. |
-| **Partner Coordinator** | tenant | Collaborator invited | dormant | Coordinates teaming partners & their sections. |
+| **Compliance Reviewer** | tenant | Compliance check (inline + `tool.proposal.check_compliance`) | live | Checks a draft against the compliance matrix. |
+| **Color Team Reviewer** | tenant | Review requested (advance queue) | live | Red/gold-team review before a stage advance. |
+| **Librarian** | tenant | Package atomized / document locked (producer) | **live (#117)** | Catalogs, scores, dedupes & assesses freshness of new atoms. |
+| **Scoring Strategist** | tenant | Card **pinned** (per-tenant producer) | **live (#117)** | Scores & ranks opportunities into the tenant's buckets (±15, lands beside the algo score). |
+| **Opportunity Analyst** | tenant | Card **pinned** (per-tenant producer) | **live (#117)** | Assesses fit of a new opportunity for the tenant. |
+| **Proposal Architect** | tenant | Proposal created (`AI_INVOKE`) | **live (#117)** | Shapes/reviews the response skeleton from the solicitation. |
+| **Packaging Specialist** | tenant | Advanced to final (`AI_INVOKE`) | **live (#117)** | Reviews the final submission package (volumes, forms, format). |
+| **Capture Strategist** | tenant | Proposal created (`AI_INVOKE`) | **live (#117)** | Win themes, positioning, teaming & risk register to seed the build. |
+| **Partner Coordinator** | tenant | Collaborator invited (`AI_INVOKE`, new `OnCollaboratorInvited`) | **live (#117)** | Drafts partner welcome/onboarding + flags teaming risks (human-gated). |
+
+**As of #117 all ten archetypes are awake as workflow actors.** Six were greenfielded onto the current
+spine this run (tenant-discretion + injection-fence + `library_atoms`); each is locked by a
+`test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
+verify routing + producer/step + tool SQL against the live schema. **42 agent-wiring tests green.**
 
 ---
 
@@ -116,13 +121,23 @@ workflow template as an actor" — both are agents-as-actors + kickoff trigger; 
 | **capture_strategist** | single-entity step | portal-purchased workflow | `tool.capture.generate_strategy` |
 | **partner_coordinator** | single-entity step | collaborator-invited workflow | `tool.partner.coordinate` |
 
-**Status:** `librarian` wired (§2). `scoring_strategist` greenfielded (tenant-discretion + current-spine
-tools, `test_scoring_strategist_wiring.py` 5/5); remaining = per-tenant producer at the bucket-scoring site
-+ stress/E2E + output screenshot. Then the other four as AI_INVOKE steps.
+**Status (#117 COMPLETE):** all six are wired and locked by wiring tests.
+- `librarian` — producer in the atomize-package route (per cocoon).
+- `scoring_strategist` + `opportunity_analyst` — per-tenant producers on the **pin** route (bounded to
+  pinned cards; both enqueue with the enriched `{opportunity, base_score}` input).
+- `proposal_architect` + `capture_strategist` — `AI_INVOKE` steps in `OnProposalCreated` (both independent
+  of `draft_sections`).
+- `packaging_specialist` — `AI_INVOKE` step in `OnProposalAdvancedToFinal` (independent of the export loop).
+- `partner_coordinator` — `AI_INVOKE` step in the new `OnCollaboratorInvited` workflow (kickoff trigger
+  `proposal:collaborator.invited`; independent review-notify so it never dead-ends).
 
-Verify each like the Librarian: a `test_<agent>_wiring.py` (registered, maps to its action / handles its
-trigger, modern tools, **tool schemas expose no `tenant_id`**) + the producer/step + a stress pass. LLM
-reasoning runs live on deploy (Railway key).
+Each is verified like the Librarian: a `test_<agent>_wiring.py` (registered, maps to its action / handles
+its trigger, modern tools, **tool schemas expose no `tenant_id`**, **injection-fenced**, execute_tool binds
+the trusted tenant, and — for the step actors — it is an independent `AI_INVOKE` step so it can't dead-end
+the workflow). LLM reasoning runs live on deploy (Railway key).
+
+**Next:** the two foundation items in §7 (NOBYPASSRLS agent role + `app.tenant_id`; guardrail-gated landing),
+then the **master-side + onboarding batch** — see `docs/AGENT_ROADMAP.md`.
 
 ## 7. Landing + security (CONFIRMED — applies to all agents)
 
@@ -168,7 +183,7 @@ registry) is where the guardrail check runs — so "advisory → guardrail → l
 
 | Property | Status | How |
 |---|---|---|
-| **No prompt injection** | librarian ✅ (test), required for all | Untrusted tenant text (atoms/RFP/opportunity) is fenced (`--- BEGIN/END UNTRUSTED … ---`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Tested per agent. |
+| **No prompt injection** | ✅ all 10 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
 | **No runaway** | ✅ enforced by the runtime | `MAX_TOOL_ROUNDS=20` + `PER_CALL_CEILING_USD=$0.50` mid-loop + rate limit 50 calls/hr/tenant + $50/mo budget (fabric). Producers stay **bounded** — one task per package / per tenant, never per-atom; and an agent's output event must **not re-trigger the same agent** (no self-loop); task enqueue is idempotent. |
 | **No dead-ending a workflow/automation** | ✅ enforced by the runtime | The processor catches/logs/continues (never crashes the poll loop); an unmapped or failed `AI_INVOKE` action is a **safe skip** (no fabric call, no DB write); agent output is **advisory** (never writes business tables directly); the fabric returns an error status dict, **never raises**. So a failing agent-actor degrades gracefully — the human loop continues. `AI_INVOKE` steps also carry `on_failure`/`on_timeout`/`retry_count`. |
 | **Tenant isolation** | discretion ✅; RLS 🚩 | §7b: tenant-discretion holds today; RLS backstop pending the `NOBYPASSRLS` agent role + FORCE-RLS on the gap tables. |
