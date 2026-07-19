@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
+import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -177,6 +178,14 @@ export async function POST(request: Request, ctx: RouteContext) {
     //    Post-commit + best-effort: a backfill failure must NEVER fail the accept.
     //    Awaited (not fire-and-forget) so serverless doesn't kill it mid-replay; if
     //    the river grows large, move this to an out-of-band job keyed on the event.
+    // Seed the default spotlight buckets FIRST so the backfilled cards below rank
+    // on arrival (a fresh customer lands with a ranked pipeline, not a flat list).
+    try {
+      await seedDefaultBuckets(tenantId, newUserId);
+    } catch (bucketErr) {
+      console.error('[api/admin/applications/accept] default-bucket seed failed (non-fatal):', bucketErr);
+    }
+
     let cardsBackfilled = 0;
     try {
       cardsBackfilled = await backfillTenant(tenantId);

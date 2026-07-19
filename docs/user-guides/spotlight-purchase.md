@@ -35,6 +35,30 @@ topic, among others.
 
 ---
 
+## 1a. Spotlight buckets — your ranking lenses
+
+Click **Buckets** (left nav). Buckets are the lenses that **rank your whole
+pipeline** by criteria you choose. Every new tenant starts with a sensible
+**default set** — AI/Autonomy, Counter-UAS, Sensing/RF, Power/Energy, Human
+Performance/Biotech, and a broad SBIR/STTR Phase I bucket — so your cards are
+ranked from day one; you add or edit buckets from here.
+
+![Spotlight buckets — the default ranking lenses, each with Rank →](./img/portal-buckets.png)
+
+- **Create** a bucket with **keywords**, **agencies**, **program types**, and/or
+  **NAICS** — the criteria it scores against.
+- Click **Rank →** on any bucket to order the pipeline by that lens.
+
+> **How matching works.** A card's score blends several signals — but the primary
+> one is **keyword match against the opportunity's spotlight-match summary** (the
+> curated blurb the RFP admin writes for exactly this purpose, required before an
+> opportunity is released), plus its title and description. Structured signals —
+> **program type**, **agency**, **NAICS**, and the **close-date timeline** — round
+> out the score. So a well-written spotlight summary is what makes your ranking
+> sharp.
+
+---
+
 ## 2. Open a card and assess fit
 
 Click a card to read the opportunity summary — agency, program, topic, key dates,
