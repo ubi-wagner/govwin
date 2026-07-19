@@ -55,24 +55,21 @@ export async function verifyTenantAccess(userId: string, role: string, tenantId:
     // tenant their session role becomes tenant_admin; this coarse gate stays true.
     // (Multi-membership identity P1 — docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.)
     if (role === 'master_admin' || role === 'rfp_admin') return true;
-    // Everyone else: the user's granted role(s) at this tenant — an ACTIVE membership
-    // row and/or the legacy users.tenant_id read-through (so access never regresses if a
-    // membership wasn't backfilled). Cross-company collaborators pass via the membership
-    // row (source='collaborator'); the proposal-scoped verifyProposalAccess is separate.
-    // The tenant JOIN also gates on archived_at: if the company is ARCHIVED (license
-    // lapsed / slumber) no non-admin gets in, regardless of their own membership state —
-    // and their per-user active/inactive state is left untouched so renewal restores it
-    // exactly. Admins short-circuit above, so they can still enter to renew.
+    // Everyone else: access is PURELY membership-based (identity P4 — the legacy
+    // users.tenant_id read-through is retired). An ACTIVE membership at a NON-archived
+    // tenant grants access; anything else (revoked/inactive membership, or an archived
+    // company) denies. This is what makes deactivation real: revoking a membership
+    // actually removes access, with no legacy branch silently re-granting it. Every
+    // user-creation path writes a membership and mig 111 backfilled all pre-existing
+    // users, so nothing regresses. Cross-company collaborators pass via their
+    // source='collaborator' membership; the proposal-scoped verifyProposalAccess is
+    // separate. Archived tenants (license slumber) deny here without touching per-user
+    // state, so renewal restores everyone exactly. Admins short-circuit above.
     const rows = await sql<{ role: string }[]>`
       SELECT m.role FROM user_memberships m
         JOIN tenants t ON t.id = m.tenant_id
         WHERE m.user_id = ${userId} AND m.tenant_id = ${tenantId}
-          AND m.status = 'active' AND t.archived_at IS NULL
-      UNION ALL
-      SELECT u.role FROM users u
-        JOIN tenants t ON t.id = u.tenant_id
-        WHERE u.id = ${userId} AND u.tenant_id = ${tenantId}
-          AND u.is_active = true AND t.archived_at IS NULL`;
+          AND m.status = 'active' AND t.archived_at IS NULL`;
     if (rows.length === 0) return false;
     // Fail CLOSED on role escalation (singular-session enforcement, defense-in-depth):
     // the session's ACTIVE role must not exceed the role the user was actually granted
