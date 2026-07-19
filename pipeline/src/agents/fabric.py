@@ -63,14 +63,18 @@ from .archetypes import (
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    IngestAnalystArchetype,
     LibrarianArchetype,
+    MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
+    OpportunityScoutArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
+    SkeletonArchitectArchetype,
 )
 from .context import ContextAssembler
 from .guardrails import enforce_guardrails, load_guardrail_config
@@ -82,14 +86,18 @@ _ARCHETYPE_CLASSES = [
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    IngestAnalystArchetype,
     LibrarianArchetype,
+    MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
+    OpportunityScoutArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
+    SkeletonArchitectArchetype,
 ]
 
 logger = logging.getLogger("pipeline.agents")

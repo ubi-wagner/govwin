@@ -235,6 +235,11 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.proposal.architect": "proposal_architect",
     # on_application_accepted.py — new-tenant cold-start (Batch B)
     "tool.onboarding.concierge": "onboarding_agent",
+    # on_rfp_uploaded.py / on_opportunities_detected.py — master-side pipeline (Batch A, platform-scope)
+    "tool.opportunity.scout": "opportunity_scout",
+    "tool.solicitation.ingest": "ingest_analyst",
+    "tool.matrix.stage": "matrix_stager",
+    "tool.skeleton.build": "skeleton_architect",
 }
 
 
