@@ -22,6 +22,15 @@ One email → many `(company, role)` memberships; pick one at login; the session
 | `7662779` | RFP-admin shadow descend/ascend — banner + ack modal + audited |
 | `bab99b7` | **Singular ENFORCEMENT** — active membership pinned in the JWT (`unstable_update`) |
 | `ecaaad9` | **P3** — collaborator invite → membership (multi-company works) + uuid[] fix + login copy |
+| `be5eb82` | launch-hardening — run.sh glob footgun fix; Immobileyes shadow flow verified; #116 sweep clean |
+| `465a47a` | **Never hard-delete a user** — collaborator soft-delete + reactivate (mig 112); fixes removal 500 |
+
+**Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at).
+Both idempotent and auto-applied on deploy via `entrypoint.sh → migrate.mjs`. Verify post-deploy.
+
+**Principle locked in (user directive):** NEVER hard-delete a user/membership — mark inactive,
+keep full history, reconstitute auditably. Collaborators implement it (revoked_at + reactivate);
+the same for tenant_users/admins is gap #118. See the identity design's "Never hard-delete" section.
 
 **As-built mechanism (don't re-derive):**
 - The active `(role, tenantId, tenantSlug)` + a `membershipPinned` flag live in the
