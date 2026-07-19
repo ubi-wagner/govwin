@@ -199,6 +199,35 @@ engine's health summary (mirrors the Process Ledger's classifier).
 
 ---
 
+## 7. Scout worker pool (`/admin/scouts`)
+
+The **Source Scouts** are the workers that watch external opportunity sources and
+surface changes. **System / Opportunities → Scout Monitor** is their control room —
+**set up → run → monitor**, end-to-end:
+
+![Scout Monitor — worker-pool health, recent runs, and changes detected](./img/admin-scout-monitor.png)
+
+- **Set up** a source on the **Sources** page (a `source_profile`: URL, agency,
+  crawl instructions, regions).
+- **Run** it with **Scout Now** on that source — which enqueues a
+  `pipeline_jobs kind='scout_source'` that the Python `source_scout` worker picks
+  up: it fetches the page, hashes it against the last snapshot, and writes any
+  **diff**.
+- **Monitor** here:
+  - **Worker pool** — every source with its **health** (healthy / degraded /
+    error), consecutive failures, last success, avg run time, and last visit.
+  - **Recent scout runs** — the `scout_source` jobs (pending / running / completed
+    / failed) with the worker that ran them.
+  - **Changes detected** — meaningful `source_diffs` (severity-tagged), each a
+    candidate that flows into the triage queue as a new opportunity.
+
+> One data model, three layers: the admin routes (**Scout Now**), the Python
+> worker (`source_scout`), and this monitor all read/write the same
+> `source_profiles` / `source_health` / `pipeline_jobs` / `source_diffs` tables —
+> so what you see here is exactly what the workers are doing.
+
+---
+
 ## Related
 
 - Purchases & the curation queue → [RFP admin](./admin-rfp.md)

@@ -153,6 +153,13 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'scouts') {
+      await login(page, 'eric@rfppipeline.com'); // master_admin
+      await page.goto(`${BASE}/admin/scouts`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2200);
+      await shot(page, 'admin-scout-monitor', { full: true });
+    }
+
     if (journey === 'sysadmin') {
       // RFP-admin observability: System Health + System State.
       await login(page, 'eric@rfppipeline.com');
