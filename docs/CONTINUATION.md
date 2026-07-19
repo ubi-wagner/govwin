@@ -1,7 +1,14 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-19 (end of the multi-membership identity sprint)
-**Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `ecaaad9`
+**Last updated:** 2026-07-19 (identity sprint COMPLETE + deep-link hardening + #77 picker + #114 proof)
+**Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `2de0a81` (+ this doc commit)
+
+**LAUNCH-READINESS — all green this session (2026-07-19):** identity×deeplink 22/22, shadow-tenant-admin
+10/10, pin 15/15, p3-lifecycle 13/13, immobileyes-shadow 4/4, item-template-picker 8/8, **full Monday
+journey E2E green** (ingest→matrix→atomize→spotlight→provision→draft-from-atoms→lock→harvest(lineage)→
+export, tenant-isolated), vitest 701/701, tsc clean, build clean. Identity model is DONE. Remaining
+backlog is NON-critical: #117 (7 dormant agents — large, defer past launch), #69 (Ohio TVSF gen),
+#18 (past-proposal templify), #111 (deploy-verify, automatic).
 **This file is the durable "start here tomorrow" memory.** It's committed to git on
 purpose — the sandbox container is ephemeral and gets reclaimed; git is the layer that
 survives. Read this first, then `docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md`.
@@ -144,7 +151,10 @@ rm -f /tmp/pgs_gov/data/postmaster.pid            # clear the stale pid from las
 mkdir -p /tmp/pgs_sock && chown -R claude:claude /tmp/pgs_gov /tmp/pgs_sock
 su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
   -o '-p 5433 -k /tmp/pgs_sock' -l /tmp/pgs_gov/log start"
-psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 3
+psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 4 (incl. rfp-pipeline)
+# ^ If pg_ctl fails with 'could not create lock file /var/run/postgresql/...: Permission
+#   denied', the -k socket dir isn't being honoured — it MUST point at a claude-writable
+#   path (e.g. /tmp/pgs_sock). psql over TCP (127.0.0.1:5433) still works regardless.
 
 # If /tmp was ALSO wiped (full reclaim, data dir gone): initdb a fresh cluster
 # (--auth=trust -U claude), createdb govtech_intel, then run every migration
