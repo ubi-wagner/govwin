@@ -240,6 +240,11 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.solicitation.ingest": "ingest_analyst",
     "tool.matrix.stage": "matrix_stager",
     "tool.skeleton.build": "skeleton_architect",
+    # Batch C — outcome learning loop, amendment delta, cost realism, PP matching
+    "tool.outcome.analyze": "outcome_analyst",
+    "tool.solicitation.amendment_delta": "amendment_monitor",
+    "tool.proposal.cost_estimate": "cost_estimator",
+    "tool.proposal.match_past_performance": "pp_matcher",
 }
 
 

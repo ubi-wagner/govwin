@@ -60,17 +60,21 @@ from datetime import datetime, timezone
 import anthropic
 
 from .archetypes import (
+    AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    CostEstimatorArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
     OpportunityScoutArchetype,
+    OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
+    PpMatcherArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
@@ -83,17 +87,21 @@ from .tools import ToolRegistry, create_default_registry
 
 # All archetype classes to auto-register on fabric init
 _ARCHETYPE_CLASSES = [
+    AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    CostEstimatorArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
     OpportunityScoutArchetype,
+    OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
+    PpMatcherArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,

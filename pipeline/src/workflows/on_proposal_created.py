@@ -134,6 +134,29 @@ class OnProposalCreated(Workflow):
             },
             timeout_minutes=10,
         ),
+        # AI actors (#129, Batch C): cost_estimator seeds cost-volume realism guidance;
+        # pp_matcher surfaces relevant past performance + flags teaming gaps. Both ADVISORY,
+        # tenant-bound, and independent of draft_sections so a skip never blocks the loop.
+        Step(
+            name="ai_cost_estimator",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.cost_estimate",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
+        Step(
+            name="ai_pp_matcher",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.match_past_performance",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
         Step(
             name="draft_sections",
             step_type=StepType.ACTION,

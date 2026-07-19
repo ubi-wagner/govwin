@@ -110,6 +110,17 @@ class OnSourceChangeDetected(Workflow):
     )
 
     steps = [
+        # AI actor (#129, Batch C — PLATFORM-SCOPE, tenant_id=None): the amendment_monitor assesses
+        # whether the detected changes are compliance-affecting AMENDMENTS and flags the delta for
+        # the admin — ADVISORY. Independent (no depends_on) so it never blocks draft creation /
+        # notify / triage. Injection-fenced (raw external solicitation text).
+        Step(
+            name="ai_amendment_monitor",
+            step_type=StepType.AI_INVOKE,
+            action="tool.solicitation.amendment_delta",
+            input_map={"source": "payload.sourceName", "meaningfulChanges": "payload.meaningfulChanges"},
+            timeout_minutes=10,
+        ),
         Step(
             name="create_draft_solicitations",
             action="workflows.actions.create_drafts_from_scout.create_drafts_from_scout",
