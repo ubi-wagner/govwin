@@ -302,3 +302,15 @@ lossless:
 
 So the full ladder is **active · inactive (per-user) · archived (whole company)** — all
 reversible, all auditable, nothing ever destroyed.
+
+### As-built: RFP Pipeline is a real tenant (#112, "including us")
+
+Our organization is now a first-class `tenants` row (slug `rfp-pipeline`, mig 114), and
+every RFP/master admin holds a `tenant_admin` **home** membership there. So "us" gets the
+upload/atomizer — and the whole portal — exactly like any customer, with **no special
+platform-library plumbing**: staff atomize their documents into our own tenant's
+`library_atoms`. The admin nav has an **Our Workspace** link to `/portal/rfp-pipeline`.
+Because staff are real members there, the portal layout suppresses the shadow banner on
+our own tenant (`isShadowAdmin = admin AND not a member`), while a customer tenant (no
+membership) still shows it. Verified: staff reach our workspace with the atomizer and no
+shadow banner; Immobileyes still shows the shadow banner; pin 15/15, 701/701.

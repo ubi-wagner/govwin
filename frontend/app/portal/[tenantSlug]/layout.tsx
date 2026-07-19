@@ -6,7 +6,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
-import { getActiveMemberships } from '@/lib/memberships';
+import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 
 /**
  * Portal layout — server component with auth + tenant access check.
@@ -62,15 +62,17 @@ export default async function PortalLayout({
     redirect('/portal');
   }
 
-  // An RFP/master admin viewing a customer's portal IS a shadow descent (they have
-  // no home tenant, so any tenant space is a descent). They are the only accounts
-  // that re-scope in-session, so they are EXEMPT from the singular-session pin.
-  const isShadowAdmin = role === 'rfp_admin' || role === 'master_admin';
+  const isAdmin = role === 'rfp_admin' || role === 'master_admin';
+  // An RFP/master admin is SHADOWING only in a tenant where they are NOT a real member.
+  // Our own RFP Pipeline tenant (staff hold home memberships there, mig 114) is their real
+  // workspace, so the shadow banner is suppressed there. Admins are the only accounts that
+  // re-scope in-session, so they're EXEMPT from the singular-session pin either way.
+  const isShadowAdmin = isAdmin && !(await hasActiveMembership(userId, tenantId));
 
   // Singular-session enforcement (non-admins). A session acts as exactly ONE
   // (company, role); the active membership is pinned onto the JWT when the user picks
   // it at /select-company. See docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
-  if (!isShadowAdmin) {
+  if (!isAdmin) {
     const pinned = sessionUser.membershipPinned === true;
     const activeTenantId = sessionUser.tenantId ?? null;
     if (pinned) {

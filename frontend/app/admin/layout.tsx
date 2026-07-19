@@ -14,6 +14,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav className="flex flex-col gap-1 text-sm flex-1 mt-4">
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-2 mb-1">Overview</span>
           <AdminNavLink href="/admin/dashboard">Dashboard</AdminNavLink>
+          <AdminNavLink href="/portal/rfp-pipeline/dashboard">Our Workspace</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Opportunities</span>
           <AdminNavLink href="/admin/intake">Intake</AdminNavLink>
