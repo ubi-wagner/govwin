@@ -14,6 +14,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import type { CreatorKind } from '@/lib/atoms';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { requestAgentTask } from '@/lib/agent-client';
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
@@ -66,6 +67,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       tenantId,
       payload: { filesProcessed: docs.length, totalAtoms },
     });
+
+    // Producer (#117): hand each atomized package to the librarian agent to catalog —
+    // confirm tags, score quality/relevance, flag duplicates, assess freshness. The
+    // pipeline's process_task_queue picks it up (runs live with the deploy key).
+    // Best-effort — never fail the upload on an enqueue error.
+    for (const r of docs) {
+      if (!r.cocoonId || r.atoms === 0) continue;
+      try {
+        await requestAgentTask({
+          tenantId,
+          agentRole: 'librarian',
+          taskType: 'catalog',
+          input: { cocoonId: r.cocoonId, packageName: packageName || r.file, atomCount: r.atoms },
+        });
+      } catch (e) { console.error('[atomize-package] librarian enqueue failed (non-fatal)', e); }
+    }
 
     return NextResponse.json({
       data: {
