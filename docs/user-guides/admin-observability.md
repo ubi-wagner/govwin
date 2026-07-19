@@ -15,14 +15,42 @@ action by every actor** across the platform on one immutable audit queue.
 
 ## 1. The admin dashboard + ToDos
 
-`/admin` opens on the dashboard — system state at a glance plus **your open
-triage ToDos** (new solicitations to claim, purchases awaiting curation +
-release, anything holding up a customer).
+`/admin` opens on the dashboard — system state at a glance plus **Your To-Dos**,
+the same unified queue the customer portal shows, scoped to your admin work (new
+solicitations to claim, purchases awaiting curation + release, anything holding up
+a customer).
 
-![The RFP-admin dashboard with open ToDos and system state](./img/admin-dashboard.png)
+![The RFP-admin dashboard with open ToDos and system state](./img/admin-dashboard-todos.png)
 
 ToDos are computed from live state (the `tasks` spine + urgency), so the list is
 always what actually needs you — clearing to empty when there's nothing pending.
+
+### 1a. Every ToDo is a step in a defined workflow
+
+A ToDo is never a loose one-off — it is always **one step in a named workflow**.
+Each card shows the **workflow it belongs to** (the blue chip) and a **step trail**
+beneath the title, with completed steps struck through and **the step you're on in
+bold**:
+
+- **Proposal setup** — `Purchase → `**`Curate & release`**` → Draft sections → Review`
+  (the admin curation gate: run Ingest Assist, review the matrix, Release).
+- **Section review & lock** — `Draft → `**`Review`**` → Edit on canvas → Accept & Lock`.
+- **Proposal build** — `Provisioned → `**`Draft sections`**` → Review → Lock & export`.
+
+Completing the ToDo advances its workflow — and, when the ToDo is a parked engine
+step, resumes the paused `process_instance` with your decision.
+
+> **The atomic floor — a broadcast note.** The smallest possible ToDo is a
+> **Broadcast note**: a message to read and acknowledge, `Read → `**`Acknowledge`**,
+> cleared with a single **Acknowledge** click. Anything that isn't a richer defined
+> workflow collapses to this, so a ToDo can never be workflow-less — even an FYI is
+> a one-step workflow.
+
+> **Where ToDos come from.** Today they're raised by a person (a manager delegating)
+> or the workflow **engine** (a HITL step parking for a human). The catalog also
+> declares **automation** and **agent** as producers, so when event-trigger rules
+> and the agent workforce start raising ToDos, each still arrives as a step in one
+> of these same defined workflows.
 
 ---
 

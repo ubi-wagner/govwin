@@ -26,7 +26,7 @@ reset.
 
 After signing in you're on your **Dashboard** — a snapshot of your workspace.
 
-![The portal dashboard — stats, to-dos, get-started checklist, recent activity, AI usage](./img/portal-dashboard.png)
+![The portal dashboard — stats, to-dos with workflow trails, get-started checklist, recent activity, AI usage](./img/portal-dashboard-todos.png)
 
 - **Top stats:** Library Units, Active Proposals, Pinned Topics.
 - **Your To-Dos:** anything waiting on you (a section to finish, a portal to
@@ -35,6 +35,18 @@ After signing in you're on your **Dashboard** — a snapshot of your workspace.
   up your profile, review your spotlight, purchase your first proposal portal.
 - **Recent Activity** and **AI Agent Usage** (calls used vs. your hourly
   allocation).
+
+### Your To-Dos are steps in defined workflows
+
+Every ToDo is **one step in a named workflow**, not a loose task. Each card shows
+the **workflow** it belongs to (the blue chip) and a **step trail** with the step
+you're on in **bold** and finished steps struck through — e.g. a section shows
+**Section review & lock**: `Draft → `**`Review`**` → Edit on canvas → Accept & Lock`.
+Completing the ToDo advances that workflow.
+
+> The smallest ToDo is a **Broadcast note** — `Read → `**`Acknowledge`** — cleared
+> with one **Acknowledge** click. It's the catch-all: even a simple FYI is a
+> one-step workflow, so nothing on your list is ever unstructured.
 
 ---
 

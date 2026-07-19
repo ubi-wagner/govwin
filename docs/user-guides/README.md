@@ -61,6 +61,7 @@ implies it exists).
 - [x] ✅ **Reset password** (`/reset-password`) — all roles
 - [x] ✅ **Accept an invite** and set a password (`/invite/[token]`) — tenant_user, partner_user
 - [x] ✅ **Land on the right home** (portal vs `/admin`) by role — middleware floor
+- [x] ✅ **Unified ToDo queue on the landing** — every ToDo is a step in a defined workflow (step trail); broadcast notes acknowledge-on-read → [getting-started](./getting-started.md#your-to-dos-are-steps-in-defined-workflows)
 - [x] ✅ **View / edit profile** (`/portal/[t]/profile`) — all customer roles
 - [ ] ⚠ **Self-serve signup / Stripe checkout** — *descoped; the comp code stands in* (do NOT document as available)
 
@@ -128,7 +129,7 @@ implies it exists).
 
 ### H. Operate & observe (admin)
 
-- [x] ✅ **Admin dashboard** — system state at a glance — master_admin, rfp_admin
+- [x] ✅ **Admin dashboard** — system state at a glance + **unified ToDo queue** (defined-workflow steps; broadcast/acknowledge floor) — master_admin, rfp_admin → [admin-observability](./admin-observability.md#1a-every-todo-is-a-step-in-a-defined-workflow)
 - [x] ✅ **Tenants** — manage customer accounts — master_admin
 - [x] ✅ **Purchases / curation queue** — triage new buys — rfp_admin
 - [x] ✅ **Shadow / god-view** into a tenant to act on their behalf — rfp_admin

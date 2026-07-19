@@ -143,6 +143,16 @@ async function run() {
       }
     }
 
+    if (journey === 'todos') {
+      const slug = 'acme-navy-systems';
+      await login(page, 'admin@acme-navy.test');
+      await page.goto(`${BASE}/portal/${slug}/dashboard`, { waitUntil: 'networkidle' });
+      await shot(page, 'portal-dashboard-todos', { full: true });
+      await login(page, 'eric@rfppipeline.com');
+      await page.goto(`${BASE}/admin/dashboard`, { waitUntil: 'networkidle' });
+      await shot(page, 'admin-dashboard-todos', { full: true });
+    }
+
     if (journey === 'audit') {
       const slug = 'acme-navy-systems';
       // Admin side — the immutable event stream (audit) + dashboard ToDos.

@@ -163,6 +163,12 @@ export default async function DashboardPage() {
         ))}
       </div>
 
+      {/* Your ToDos — the admin's unified task queue (each a step in a defined
+          workflow; broadcast notes are acknowledged in one click). */}
+      <div className="mb-8">
+        <TaskQueue apiBase="/api/admin/tasks" emptyText="No admin ToDos right now — the triage queue is clear." />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent events — 2/3 width */}
         <div className="lg:col-span-2">

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Urgency, urgencyOf, sortByUrgency } from '@/lib/tasks/urgency';
 import { taskCompleterKind, formFields, uploadHref } from '@/lib/tasks/completers';
+import { resolveTaskWorkflow, type TaskWorkflowDef } from '@/lib/tasks/workflows';
 
 export interface QueueTask {
   id: string;
@@ -40,10 +41,6 @@ function dueLabel(dueAt: string | null, now: number): string {
     return absH < 24 ? `${Math.ceil(absH)}h overdue` : `${Math.ceil(absH / 24)}d overdue`;
   }
   return absH < 24 ? `due in ${Math.floor(absH)}h` : `due in ${Math.floor(absH / 24)}d`;
-}
-
-function prettyType(t: string): string {
-  return t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function TaskQueue({
@@ -142,6 +139,7 @@ export function TaskQueue({
         {sorted.map((t) => {
           const u = urgencyOf(t.dueAt, now);
           const style = URGENCY_STYLE[u];
+          const wf = resolveTaskWorkflow(t.taskType);
           return (
             <li
               key={t.id}
@@ -149,8 +147,11 @@ export function TaskQueue({
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-gray-900">{t.title}</span>
-                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
-                  {prettyType(t.taskType)}
+                <span
+                  className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700"
+                  title={wf.description}
+                >
+                  {wf.name}
                 </span>
                 {style.label && (
                   <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${style.chip}`}>
@@ -159,11 +160,13 @@ export function TaskQueue({
                 )}
                 <span className="ml-auto text-xs text-gray-400">{dueLabel(t.dueAt, now)}</span>
               </div>
+              <WorkflowTrail wf={wf} stepName={t.stepName} />
               {t.description && (
                 <p className="mt-1 text-xs text-gray-500">{t.description}</p>
               )}
               <TaskCompleter
                 task={t}
+                workflow={wf}
                 tenantSlug={tenantSlug}
                 busy={!!busy[t.id]}
                 onComplete={(decision) => complete(t.id, decision)}
@@ -176,25 +179,83 @@ export function TaskQueue({
   );
 }
 
+// ── Workflow trail ──────────────────────────────────────────────────────────
+
+/**
+ * Renders the defined workflow this ToDo belongs to as a step trail — so a
+ * reader sees the ToDo is one step in a real workflow, not a loose task. The
+ * current step (the task's `step_name` if it matches, else the workflow's
+ * `actionStep`) is bolded; earlier steps read as done.
+ */
+function WorkflowTrail({ wf, stepName }: { wf: TaskWorkflowDef; stepName: string | null }) {
+  const named = stepName
+    ? wf.steps.findIndex((s) => s.toLowerCase() === stepName.toLowerCase())
+    : -1;
+  const current = named >= 0 ? named : wf.actionStep;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] text-gray-400">
+      {wf.steps.map((s, i) => (
+        <span key={s} className="flex items-center gap-1">
+          {i > 0 && <span className="text-gray-300">→</span>}
+          <span
+            className={
+              i === current
+                ? 'font-semibold text-indigo-700'
+                : i < current
+                  ? 'text-gray-400 line-through decoration-gray-300'
+                  : 'text-gray-400'
+            }
+          >
+            {s}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Typed completers (W-M) ──────────────────────────────────────────────────
 
 function TaskCompleter({
   task,
+  workflow,
   tenantSlug,
   busy,
   onComplete,
 }: {
   task: QueueTask;
+  workflow: TaskWorkflowDef;
   tenantSlug?: string;
   busy: boolean;
   onComplete: (decision: Record<string, unknown>) => void;
 }) {
-  const kind = taskCompleterKind(task.params);
+  // Explicit params.kind wins; otherwise the ToDo completes the way its defined
+  // workflow prescribes (e.g. broadcast → acknowledge, review_section → review).
+  const kind = taskCompleterKind(task.params, workflow.completer);
+  if (kind === 'acknowledge') return <AcknowledgeCompleter busy={busy} onComplete={onComplete} />;
   if (kind === 'form') return <FormCompleter task={task} busy={busy} onComplete={onComplete} />;
   if (kind === 'upload') {
     return <UploadCompleter task={task} tenantSlug={tenantSlug} busy={busy} onComplete={onComplete} />;
   }
   return <ReviewCompleter busy={busy} onComplete={onComplete} />;
+}
+
+/**
+ * The atomic completer: a broadcast note read and acknowledged in one click.
+ * Accept-on-read — the smallest possible ToDo completion.
+ */
+function AcknowledgeCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => onComplete({ acknowledged: true })}
+        disabled={busy}
+        className="rounded border border-indigo-300 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+      >
+        {busy ? '…' : 'Acknowledge'}
+      </button>
+    </div>
+  );
 }
 
 function ReviewCompleter({ busy, onComplete }: { busy: boolean; onComplete: (d: Record<string, unknown>) => void }) {
