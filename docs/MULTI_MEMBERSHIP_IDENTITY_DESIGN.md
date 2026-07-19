@@ -16,14 +16,35 @@ tenant-isolation guarantee, and it is why scope must be enforced off the *select
 membership, never inferred. Switching companies is a **deliberate re-scope** (a fresh
 active membership), not concurrent access.
 
-- **Anyone other than an RFP Pipeline (employee) account is strictly singular**: one
-  company + one role for the whole session; they can switch only among their *own*
-  explicit memberships, one at a time.
-- **RFP Pipeline (employee) accounts are the only non-singular reach**: they get the
-  platform/god-view for cross-customer triage AND may descend into any customer —
-  but the moment they descend, the session becomes a **singular `tenant_admin`** in
-  that one company (never `rfp_admin` carried down). So even the employee's in-tenant
-  session is singular; only their *platform* surface is cross-tenant.
+- **Anyone other than an RFP Pipeline (employee) account is strictly singular AND
+  cannot switch in-session.** They pick one membership at login and are pinned to it
+  for the whole session. To act at a *different* company they must **log out and log
+  back in** and select that membership. A customer employee logs out to re-log in as
+  a collaborator elsewhere; a consultant on proposals at several companies can only
+  be logged into **one company at a time**. There is no in-session switch UI for them.
+- **RFP Pipeline (employee) accounts are the ONLY accounts that role-switch within a
+  single session.** They log in at the platform (god-view for cross-customer triage)
+  and may **descend** into any customer — becoming a **singular `tenant_admin`** in
+  that one company (never `rfp_admin` carried down) — then **ascend** back to the
+  platform. See the controlled-transition rules below.
+
+### RFP-admin in-session transitions (down / up) — tightly controlled
+
+Because it's the one place a session's scope changes without a re-login, it is
+guarded hard:
+
+1. **Audit + emit on every transition, both directions.** Descending into a customer
+   and ascending back each write an `identity`-namespace event (e.g.
+   `identity:shadow.descended` / `identity:shadow.ascended`) carrying `{ actorEmail,
+   fromScope, toScope: {tenantId, role} }` — so the platform log and the customer's
+   own queue both show exactly when staff entered/left their space.
+2. **Popup acknowledgment on transition.** A modal confirms the move — *"You are now
+   acting as Company Admin in **Immobileyes**. Everything you do here is logged to
+   their audit trail."* on the way down, and *"You're back on the RFP Pipeline
+   platform."* on the way up — so the employee is never unsure which space they're in.
+3. **Server-authoritative re-scope.** The active membership in the server session is
+   rewritten (not a client toggle); RLS + route authz immediately read the new
+   singular membership; tenant caches drop.
 
 Everything below serves this: memberships enumerate the *choices*; the session pins
 exactly one; RLS + route authz read that one.
@@ -110,10 +131,11 @@ existing shadow-admin ToDo hop) resolves to `{ tenantId: <customer>, role:
      *Admin · Acme Navy Systems* / *Collaborator · Beacon Labs*.
 3. The chosen membership becomes the session's **active membership**:
    `{ userId, email, name }` (identity) + `{ membershipId, tenantId, role }` (active).
-4. A **"Switch company"** control re-selects among active memberships without
-   re-auth — but it is a **full re-scope**: the new active membership *replaces* the
-   old one (the session never holds two at once), server-side session state is
-   rewritten, and any tenant-scoped caches are dropped. Singular in, singular out.
+4. **In-session switching is RFP-admin-only.** A customer/collaborator has no switch
+   control — their membership is pinned until logout (change company = log out + log
+   back in). Only RFP-admins get the descend/ascend control, and it follows the
+   controlled-transition rules above (audit + emit + ack modal + server re-scope).
+   Everyone's session holds exactly one active membership at all times.
 
 ## Enforcement (the tight part)
 
