@@ -60,11 +60,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }[];
     try {
       members = await sql<typeof members>`
-        SELECT id, email, name, role, is_active, last_login_at, created_at
-        FROM users
-        WHERE tenant_id = ${tenantId}
-          AND is_active = true
-        ORDER BY created_at ASC
+        SELECT u.id, u.email, u.name, m.role, (m.status = 'active') AS is_active,
+               u.last_login_at, u.created_at
+        FROM user_memberships m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')
+        ORDER BY u.created_at ASC
       `;
     } catch (dbErr) {
       console.error('[api/portal/team] GET query failed:', dbErr);

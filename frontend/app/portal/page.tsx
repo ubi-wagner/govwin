@@ -59,54 +59,29 @@ export default async function PortalDispatcher() {
     redirect('/login?error=session');
   }
 
-  // Multi-membership selection (identity P2). A person with MORE THAN ONE active
-  // company must choose which to act as — a session is singular. Admins skip this
-  // (they log in at the platform, then descend deliberately). With exactly one
-  // membership (everyone today) this is a no-op. See
-  // docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.
+  // Multi-membership + landing (identity P2/P4). For a NON-ADMIN the landing company
+  // must be one where they hold an ACTIVE membership at a non-archived tenant — the JWT
+  // tenantSlug is only a hint (getActiveMemberships is authoritative, filtering revoked
+  // memberships AND archived companies). This is what keeps a DEACTIVATED or archived
+  // user out of a redirect loop: no active membership → no landing → the friendly
+  // message below. A not-yet-committed multi-membership user picks which company first.
+  // Admins land on the platform regardless of slug. See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
   const dispatchUserId = (sessionUser as { id?: string }).id;
   const dispatchPinned = (sessionUser as { membershipPinned?: boolean }).membershipPinned === true;
-  // Once the session has committed to a company (pinned), skip the selector entirely —
-  // land them in that company. Only offer the picker to a not-yet-committed
-  // multi-membership user.
-  if (dispatchUserId && !dispatchPinned && !hasRoleAtLeast(role, 'rfp_admin')) {
-    try {
-      const memberships = await getActiveMemberships(dispatchUserId);
-      if (memberships.length > 1) redirect('/select-company');
-    } catch (e) {
-      // NEXT_REDIRECT must propagate; only swallow genuine query errors.
-      if ((e as { digest?: string } | null)?.digest?.startsWith('NEXT_REDIRECT')) throw e;
-    }
-  }
-
   let tenantSlug = sessionUser.tenantSlug ?? null;
 
-  // Validate the tenant still exists — the JWT may carry a stale slug
-  // from a deleted tenant (e.g., after a DB wipe for HITL testing).
-  if (tenantSlug) {
+  if (dispatchUserId && !hasRoleAtLeast(role, 'rfp_admin')) {
     try {
-      // Exclude suspended AND archived (license slumber) tenants — either way the user
-      // has no reachable workspace, so fall through to the friendly message (no loop).
-      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' AND archived_at IS NULL LIMIT 1`;
-      if (!t) tenantSlug = null; // Tenant gone / archived — treat as no workspace
-    } catch {
+      const memberships = await getActiveMemberships(dispatchUserId);
+      if (!dispatchPinned && memberships.length > 1) redirect('/select-company');
+      // Land at the JWT company iff it's still an active membership, else the first
+      // active one, else nothing (→ no-workspace / paused message).
+      const match = memberships.find((m) => m.tenantSlug === tenantSlug) ?? memberships[0] ?? null;
+      tenantSlug = match ? match.tenantSlug : null;
+    } catch (e) {
+      if ((e as { digest?: string } | null)?.digest?.startsWith('NEXT_REDIRECT')) throw e;
       tenantSlug = null;
     }
-  }
-
-  // If JWT has no tenant but user has one in DB (stale JWT), refresh
-  if (!tenantSlug && role !== 'master_admin' && role !== 'rfp_admin') {
-    try {
-      const userId = (sessionUser as { id?: string }).id;
-      if (userId) {
-        const [u] = await sql<{ slug: string }[]>`
-          SELECT t.slug FROM users u
-          JOIN tenants t ON t.id = u.tenant_id
-          WHERE u.id = ${userId}::uuid AND t.status != 'suspended' AND t.archived_at IS NULL
-        `;
-        if (u) tenantSlug = u.slug;
-      }
-    } catch { /* best effort */ }
   }
 
   const target = getLandingPath(role, tenantSlug);
