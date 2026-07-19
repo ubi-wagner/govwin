@@ -50,8 +50,22 @@ export async function getTenantBySlug(slug: string) {
 
 export async function verifyTenantAccess(userId: string, role: string, tenantId: string): Promise<boolean> {
   try {
+    // RFP-admins hold the DERIVED shadow membership (tenant_admin in every tenant, by
+    // T&C default) — access resolved here, not materialized. When they descend into a
+    // tenant their session role becomes tenant_admin; this coarse gate stays true.
+    // (Multi-membership identity P1 — docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.)
     if (role === 'master_admin' || role === 'rfp_admin') return true;
-    const [row] = await sql`SELECT 1 FROM users WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true`;
+    // Everyone else: an ACTIVE membership for (user, tenant). During the P1 transition
+    // we also read-through to the legacy users.tenant_id so access never regresses if a
+    // membership row wasn't backfilled. (Cross-company collaborators still pass via the
+    // proposal-scoped verifyProposalAccess, not here.)
+    const [row] = await sql`
+      SELECT 1 FROM user_memberships
+        WHERE user_id = ${userId} AND tenant_id = ${tenantId} AND status = 'active'
+      UNION ALL
+      SELECT 1 FROM users
+        WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true
+      LIMIT 1`;
     return !!row;
   } catch (e) {
     console.error('[verifyTenantAccess] Error:', e);
