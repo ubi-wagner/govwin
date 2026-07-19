@@ -158,3 +158,18 @@ scoring adjustment to ±15, strip/deny disallowed content, enforce the complianc
 guardrail failure routes to HITL review instead of applying. The landing action (through the frontend
 registry) is where the guardrail check runs — so "advisory → guardrail → land or review" is the loop, never
 "advisory → land."
+
+## 8. Runtime safety contract (every agent must satisfy)
+
+| Property | Status | How |
+|---|---|---|
+| **No prompt injection** | librarian ✅ (test), required for all | Untrusted tenant text (atoms/RFP/opportunity) is fenced (`--- BEGIN/END UNTRUSTED … ---`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Tested per agent. |
+| **No runaway** | ✅ enforced by the runtime | `MAX_TOOL_ROUNDS=20` + `PER_CALL_CEILING_USD=$0.50` mid-loop + rate limit 50 calls/hr/tenant + $50/mo budget (fabric). Producers stay **bounded** — one task per package / per tenant, never per-atom; and an agent's output event must **not re-trigger the same agent** (no self-loop); task enqueue is idempotent. |
+| **No dead-ending a workflow/automation** | ✅ enforced by the runtime | The processor catches/logs/continues (never crashes the poll loop); an unmapped or failed `AI_INVOKE` action is a **safe skip** (no fabric call, no DB write); agent output is **advisory** (never writes business tables directly); the fabric returns an error status dict, **never raises**. So a failing agent-actor degrades gracefully — the human loop continues. `AI_INVOKE` steps also carry `on_failure`/`on_timeout`/`retry_count`. |
+| **Tenant isolation** | discretion ✅; RLS 🚩 | §7b: tenant-discretion holds today; RLS backstop pending the `NOBYPASSRLS` agent role + FORCE-RLS on the gap tables. |
+| **Guardrail-gated landing** | 🚩 to build | §7c: advisory → guardrail → land-or-review. |
+
+Stress/pen tests per agent assert: (1) an injected instruction inside tenant content is ignored; (2) a
+flood of tasks stays within rate/budget and never per-atom fans out; (3) a forced agent failure leaves the
+workflow/automation advancing (safe skip), not stuck; (4) a cross-tenant `tenant_id` can't be reached
+(discretion) and — once the role lands — is RLS-denied.
