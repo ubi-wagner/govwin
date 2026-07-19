@@ -153,6 +153,29 @@ async function run() {
       await shot(page, 'admin-dashboard-todos', { full: true });
     }
 
+    if (journey === 'collab') {
+      const slug = 'acme-navy-systems';
+      const proposalId = '3b0e7f8b-7ca2-4570-91d9-48326add00ff';
+      // 1. Admin side — the Team & Access tab (invite + section-scoped grants + access matrix).
+      await login(page, 'admin@acme-navy.test');
+      await page.goto(`${BASE}/portal/${slug}/proposals/${proposalId}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      try {
+        await page.getByRole('button', { name: /Team & Access/i }).click();
+        await page.waitForTimeout(900);
+        await shot(page, 'collab-team-access', { full: true });
+        // open the invite form so the scoping controls are visible
+        await page.getByRole('button', { name: /^\+ Invite$/ }).click().catch(() => {});
+        await page.waitForTimeout(600);
+        await shot(page, 'collab-invite', { full: true });
+      } catch (e) { console.error('  ⚠ team tab:', e instanceof Error ? e.message : e); }
+      // 2. Collaborator side — a contributor's scoped landing (only assigned sections).
+      await login(page, 'teammate@acme-navy.test');
+      await page.goto(`${BASE}/portal/${slug}/proposals/${proposalId}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
+      await shot(page, 'collab-contributor-view', { full: true });
+    }
+
     if (journey === 'audit') {
       const slug = 'acme-navy-systems';
       // Admin side — the immutable event stream (audit) + dashboard ToDos.

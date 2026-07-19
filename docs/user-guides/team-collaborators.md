@@ -42,23 +42,55 @@ Click **Team** in the left nav. It has three parts: an **invite** form, your
 
 ## 3. Grant a collaborator section-scoped access
 
-External partners (`partner_user`) are invited to a **proposal** and scoped to
-**specific sections** at a specific level:
+Collaborators are invited **from inside a proposal** — open the build and click the
+**Team & Access** tab. This is where you scope who can touch which section, and at
+what level.
 
-| Grant | They can… |
-|---|---|
-| **View** | Read the section only |
-| **Comment** | Read + leave comments |
-| **Edit** | Read + comment + edit the section content |
+![The Team & Access tab — team members and the section × person Access Matrix](./img/collab-team-access.png)
 
-A collaborator **only ever sees the sections they're granted** — they can't reach
-another section's content, versions, or exports. This is enforced everywhere
-(save, lock, versions, export, atomize, comment resolution), not just hidden in
-the UI — so the collaborator-landing model is safe by construction.
+The tab has two parts:
 
-> Invite/manage collaborators from the proposal's **Team & Access** tab (see
-> [Proposal build](./proposal-build.md)); they then appear in the **Proposal
-> Collaborators** table here.
+- **Team Members** — everyone on this proposal, with their role and a **✕** to
+  revoke access instantly.
+- **Access Matrix** — a grid of **every section × every collaborator**, showing
+  exactly who has **E**dit / **C**omment / **V**iew / **—** (no access) on each
+  section. Above, *Theo* has **Edit** on the Assigned Section, *Bea* has **Comment**;
+  neither can touch the Unassigned Section.
+
+### Invite + scope, in one form
+
+Click **+ Invite** to open the invite form:
+
+![The Invite Collaborator form — role, permission, and per-section assignment](./img/collab-invite.png)
+
+1. Enter their **email** and **name**.
+2. Pick a **role** — *Contributor* (internal teammate) or *External* (outside
+   partner → `partner_user`).
+3. Pick a **permission** level:
+
+   | Grant | They can… |
+   |---|---|
+   | **View** | Read the section only |
+   | **Comment** | Read + leave comments |
+   | **Edit** | Read + comment + edit the section content |
+
+4. **Assign to sections** — click the section chips to pick exactly which sections
+   this grant covers. Unpicked sections stay invisible to them.
+5. **Send Invite.** An existing user is granted immediately; a brand-new email gets
+   an acceptance link to set a password, then lands straight in the proposal.
+
+### What the collaborator sees
+
+A collaborator **only ever sees the sections they're granted**. Signed in as *Theo*
+(Edit on one section), the workspace shows just that section — the unassigned one
+isn't even listed:
+
+![A contributor's scoped landing — only the assigned section, with an edit action](./img/collab-contributor-view.png)
+
+This scoping is enforced **everywhere** (save, lock, versions, export, atomize,
+comment resolution), not just hidden in the UI — so the collaborator-landing model
+is safe by construction. Collaborators also appear back on the **Team** page's
+**Proposal Collaborators** table (Accepted / Pending).
 
 ---
 

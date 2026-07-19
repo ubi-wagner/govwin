@@ -122,8 +122,8 @@ implies it exists).
 ### G. Collaboration & teams
 
 - [x] ✅ **Invite a teammate** and set their role/grants (`/portal/[t]/team`) — tenant_admin
-- [x] ✅ **Grant a collaborator section-scoped access** (view / comment / edit) — tenant_admin
-- [x] ✅ **Collaborator landing** — only assigned sections are reachable — partner_user
+- [x] ✅ **Grant a collaborator section-scoped access** (view / comment / edit) — tenant_admin → [team-collaborators §3](./team-collaborators.md#3-grant-a-collaborator-section-scoped-access) (Access Matrix + invite form)
+- [x] ✅ **Collaborator landing** — only assigned sections are reachable — partner_user → [team-collaborators §3](./team-collaborators.md#what-the-collaborator-sees)
 - [x] ✅ **Section-level auth** enforced on save/lock/versions/export/atomize/comment
 - [x] ✅ **Activity log** of who did what (`/portal/[t]/activity`) — tenant_admin
 
@@ -164,7 +164,7 @@ DATABASE_URL=…  AUTH_SECRET=…  node node_modules/next/dist/bin/next start -p
 # 2. (sandbox only) give the demo users a known password + seed demo templates
 #    — see scripts in the session scratchpad; never do this against production.
 
-# 3. Capture a journey (documents | portal-tour | proposal | admin)
+# 3. Capture a journey (documents | portal-tour | proposal | admin | todos | collab | ingest | audit)
 BASE_URL=http://localhost:3000 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
   node --import tsx scripts/capture-shots.mts documents
 ```
