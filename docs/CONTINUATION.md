@@ -1,7 +1,21 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-19 (identity sprint COMPLETE + deep-link hardening + #77 picker + #114 proof)
-**Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `2de0a81` (+ this doc commit)
+**Last updated:** 2026-07-19 (identity COMPLETE + #77 + #114 + #18 loop + #117 agents started)
+**Branch:** `claude/nice-hamilton-kBqtD`  •  **HEAD:** `9240d7e`
+
+**AGENT WORKFORCE (#117) is the ACTIVE workstream — full plan in `docs/AGENT_WORKFORCE.md` (§1–8).**
+Read that first for the agents. This run wired the pattern + safety, NOT all six yet. Done + verified:
+**librarian** greenfielded + producer (atomize→`agent_task_queue`) + injection-fenced (`test_librarian_wiring` 8/8);
+**scoring_strategist** greenfielded (tenant-discretion, current-spine SQL, `test_scoring_strategist_wiring` 5/5);
+**RFP-admin oversight** (`/admin/agents` → Agent Workforce roster + per-tenant usage rollup, forward-only
+bridge); **safety contract** (§8: injection ✅ fixed+tested, runaway ✅ + deadend ✅ verified in the runtime);
+**mig 116** forces RLS + tenant policy on `episodic_memories` (agent memory). NEXT (staged, exact steps in
+§7–8): NOBYPASSRLS agent role + central `SET app.tenant_id` in `fabric.invoke_agent` (exact insertion point
+documented) + `proposals` RLS (after a query audit); guardrail-gated landing; then roll the six —
+fan-out (scoring_strategist, opportunity_analyst) via per-tenant producers, single-entity
+(proposal_architect, packaging_specialist, capture_strategist, partner_coordinator) as AI_INVOKE steps.
+Pipeline tests need `pip install anthropic asyncpg pytest`; run `cd pipeline/src && PYTHONPATH=. python3 -m
+pytest ../tests/test_*_wiring.py -q`. The **RFP-Pipeline (our-org) agents come AFTER this run.**
 
 **#117 IN PROGRESS — agent workforce (pattern-first).** The Librarian is greenfielded onto the current
 spine (library_atoms/atom_tags, DB memory — no vectors) + producer wired (atomize-package →

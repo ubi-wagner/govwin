@@ -1,6 +1,19 @@
 # Agent Fabric Design — RFP Pipeline
 
-**Status:** Design document. Pre-implementation.
+**Status:** Partly as-built. The fabric + 10 archetypes are implemented; wiring the dormant ones is
+in progress (#117). **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and
+per-agent plan now live in `docs/AGENT_WORKFORCE.md` — read that as the source of truth for the workforce;
+this file is the original design rationale.**
+
+> **AS-BUILT (#117, 2026-07-19):** live = section_drafter, compliance_reviewer (inline), color_team_reviewer.
+> librarian greenfielded onto `library_atoms` + producer + injection-fenced; scoring_strategist greenfielded.
+> Two producer shapes: **per-tenant producer** (fan-out agents) and declarative **`AI_INVOKE` `Step`**
+> (single-entity; `TOOL_ACTION_TO_ARCHETYPE` maps every agent). Invariants: tenant-space agents are
+> **tenant-bound** (tenant_user; no `tenant_id` in tool schemas); output is **advisory → guardrail →
+> land-or-review** (never auto-writes business tables); untrusted content **injection-fenced**; runtime
+> bounds **runaway** (MAX_TOOL_ROUNDS=20, $0.50/call, 50/hr, $50/mo) and never **dead-ends** a workflow
+> (safe-skip). RLS: mig 116 forced RLS on `episodic_memories`; central `SET app.tenant_id` + a `NOBYPASSRLS`
+> agent role are the next step (`AGENT_WORKFORCE.md §7–8`). Oversight: `/admin/agents` → Agent Workforce.
 **Last updated:** 2026-04-24.
 **Author:** Claude (Opus 4.7) + Eric Wagner
 

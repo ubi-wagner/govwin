@@ -1,5 +1,16 @@
 # Design — Automation: Namespaces → Events → Rules → Workflows → Agents → ToDos (end to end)
 
+> **AS-BUILT UPDATE (#117, 2026-07-19) — agents as automation actors.** Agents run inside the automation
+> layer two ways: (1) a **declarative `AI_INVOKE` `Step`** in a workflow (single-entity agents — a step
+> actor beside the human `TODO`/`HITL_WAIT` steps; `TOOL_ACTION_TO_ARCHETYPE` in `workflows/processor.py`
+> maps each action → archetype; `fabric.invoke_agent` runs it), and (2) a **per-tenant producer**
+> (`requestAgentTask` → `agent_task_queue` → `process_task_queue`) for fan-out agents that act per
+> (tenant, opportunity). Kickoff triggers are the same `EventTrigger`s that launch the workflow (e.g.
+> `finder.solicitation.pushed`, provision, all-locked, purchase, collaborator-invited). Safety in the loop:
+> agent steps are **advisory + safe-skip** — a failed/unmapped `AI_INVOKE` never writes a business table and
+> never dead-ends the automation; output passes **guardrails** before landing; runtime caps prevent runaway.
+> Full contract + per-agent trigger map: **`docs/AGENT_WORKFORCE.md` §6–8**.
+
 **Status:** design of record for the automation layer. Describes the **intended architecture** and
 grounds every mechanism in the **as-built** code (`file:line`). Legend: **WIRED** (producer and
 consumer both exist and run) · **PARTIAL** (runs, but via a side path, not the designed loop) ·
