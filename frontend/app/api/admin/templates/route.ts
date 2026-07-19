@@ -15,6 +15,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 const TEMPLATE_TYPES = [
   'technical_volume', 'cost_volume', 'slide_deck', 'past_performance',
@@ -22,12 +23,12 @@ const TEMPLATE_TYPES = [
   'supporting_docs', 'custom',
 ] as const;
 
-function authz(session: unknown): { userId: string } | null {
-  const u = (session as { user?: { id?: string; role?: unknown } } | null)?.user;
+function authz(session: unknown): { userId: string; email: string | null } | null {
+  const u = (session as { user?: { id?: string; email?: string; role?: unknown } } | null)?.user;
   if (!u?.id) return null;
   const role = isRole(u.role) ? u.role : null;
   if (!role || !hasRoleAtLeast(role, 'rfp_admin')) return null;
-  return { userId: u.id };
+  return { userId: u.id, email: u.email ?? null };
 }
 
 export async function GET(request: Request) {
@@ -152,6 +153,14 @@ export async function POST(request: Request) {
       console.error('[admin/templates] insert failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
+
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.created',
+      actor: userActor(who.userId, who.email ?? undefined),
+      tenantId: null,
+      payload: { templateId: created.id, name, templateType },
+    });
 
     return NextResponse.json({ data: { templateId: created.id } }, { status: 201 });
   } catch (e) {

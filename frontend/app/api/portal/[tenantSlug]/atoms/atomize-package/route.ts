@@ -13,13 +13,14 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { atomizeDocumentIntoLibrary, contextTags, MAX_FILES, MAX_FILE_BYTES } from '@/lib/atomize-package';
 import type { CreatorKind } from '@/lib/atoms';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
   try {
     const { tenantSlug } = await params;
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
-    const u = session.user as { id?: string; role?: unknown };
+    const u = session.user as { id?: string; email?: string; role?: unknown };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
@@ -53,6 +54,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       totalAtoms += r.atoms;
       docs.push(r);
     }
+
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'package.atomized',
+      actor: userActor(u.id, u.email ?? undefined),
+      tenantId,
+      payload: { filesProcessed: docs.length, totalAtoms },
+    });
 
     return NextResponse.json({
       data: {

@@ -14,11 +14,12 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { createAtom, listAtoms, viewerFromRole, type CreateAtomInput, type CreatorKind } from '@/lib/atoms';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 async function gate(tenantSlug: string, minRole: Role) {
   const session = await auth();
   if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
-  const u = session.user as { id?: string; role?: unknown };
+  const u = session.user as { id?: string; email?: string; role?: unknown };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
@@ -26,7 +27,7 @@ async function gate(tenantSlug: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id, role };
+  return { tenantId, userId: u.id, role, email: u.email ?? null };
 }
 
 const GRAINS = ['primitive', 'group', 'reference'];
@@ -75,6 +76,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     // An admin-created atom is 'admin'; anything else defaults to the collaborator kind.
     const kind: CreatorKind = body.creatorKind ?? (hasRoleAtLeast(g.role, 'tenant_admin') || g.role === 'rfp_admin' || g.role === 'master_admin' ? 'admin' : 'collaborator');
     const created = await createAtom(g.tenantId, body, { id: g.userId, kind });
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'atom.created',
+      actor: userActor(g.userId, g.email ?? undefined),
+      tenantId: g.tenantId,
+      payload: { atomId: created.atomId, grain: body.grain, source: body.source ?? null, status: body.status ?? null },
+    });
     return NextResponse.json({ data: created });
   } catch (err) {
     console.error('[portal/atoms] POST error', err);

@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 interface RouteContext {
   params: Promise<{ solId: string }>;
@@ -154,7 +155,8 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-    const role = (session.user as { role?: Role }).role;
+    const u = session.user as { id?: string; email?: string; role?: Role };
+    const role = u.role;
     if (role !== 'master_admin' && role !== 'rfp_admin') {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -180,6 +182,13 @@ export async function PATCH(request: Request, routeCtx: RouteContext) {
       console.error('[rfp-curation] PATCH spotlight_summary failed:', err);
       return NextResponse.json({ error: 'Failed to update summary', code: 'DB_ERROR' }, { status: 500 });
     }
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'solicitation.summary_updated',
+      actor: userActor(u.id ?? '', u.email ?? undefined),
+      tenantId: null,
+      payload: { solicitationId: solId },
+    });
     return NextResponse.json({ data: { spotlightSummary: summary } });
   } catch (error) {
     console.error('[rfp-curation] PATCH failed:', error);

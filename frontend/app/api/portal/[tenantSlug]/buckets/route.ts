@@ -11,11 +11,12 @@ import { sql } from '@/lib/db';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withTenant } from '@/lib/rls';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 async function gate(tenantSlug: string, minRole: Role) {
   const session = await auth();
   if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
-  const u = session.user as { id?: string; role?: unknown };
+  const u = session.user as { id?: string; email?: string; role?: unknown };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
@@ -23,7 +24,7 @@ async function gate(tenantSlug: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id };
+  return { tenantId, userId: u.id, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -60,6 +61,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         VALUES (${g.tenantId}::uuid, ${body.name!}, ${body.description ?? null}, ${sql.json(criteria as Parameters<typeof sql.json>[0])}, ${g.userId}::uuid)
         RETURNING id`,
     );
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'bucket.created',
+      actor: userActor(g.userId, g.email ?? undefined),
+      tenantId: g.tenantId,
+      payload: { bucketId: row.id, name: body.name },
+    });
     return NextResponse.json({ data: { id: row.id } });
   } catch (err) {
     console.error('[portal/buckets] POST error', err);

@@ -11,11 +11,12 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { getAtom, confirmTags, viewerFromRole, type AtomTagInput } from '@/lib/atoms';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 async function gate(tenantSlug: string, atomId: string, minRole: Role) {
   const session = await auth();
   if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
-  const u = session.user as { id?: string; role?: unknown };
+  const u = session.user as { id?: string; email?: string; role?: unknown };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
@@ -24,7 +25,7 @@ async function gate(tenantSlug: string, atomId: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id, role };
+  return { tenantId, userId: u.id, role, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; atomId: string }> }) {
@@ -59,6 +60,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
         await tx`UPDATE library_atoms SET status = ${body.status} WHERE tenant_id = ${g.tenantId}::uuid AND id = ${atomId}::uuid`;
       });
     }
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'atom.curated',
+      actor: userActor(g.userId, g.email ?? undefined),
+      tenantId: g.tenantId,
+      payload: { atomId, tagsUpdated: updated, status: body.status ?? null },
+    });
     return NextResponse.json({ data: { updated, status: body.status ?? null } });
   } catch (err) {
     console.error('[portal/atoms/:id] PATCH error', err);

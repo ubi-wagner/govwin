@@ -14,6 +14,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 const TEMPLATE_TYPES = [
   'technical_volume', 'cost_volume', 'slide_deck', 'past_performance',
@@ -23,11 +24,12 @@ const TEMPLATE_TYPES = [
 
 interface Ctx { params: Promise<{ templateId: string }> }
 
-function authz(session: unknown): boolean {
-  const u = (session as { user?: { id?: string; role?: unknown } } | null)?.user;
-  if (!u?.id) return false;
+function authz(session: unknown): { userId: string; email: string | null } | null {
+  const u = (session as { user?: { id?: string; email?: string; role?: unknown } } | null)?.user;
+  if (!u?.id) return null;
   const role = isRole(u.role) ? u.role : null;
-  return !!role && hasRoleAtLeast(role, 'rfp_admin');
+  if (!role || !hasRoleAtLeast(role, 'rfp_admin')) return null;
+  return { userId: u.id, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, ctx: Ctx) {
@@ -64,7 +66,8 @@ export async function GET(_request: Request, ctx: Ctx) {
 
 export async function PATCH(request: Request, ctx: Ctx) {
   try {
-    if (!authz(await auth())) {
+    const who = authz(await auth());
+    if (!who) {
       return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
     const { templateId } = await ctx.params;
@@ -139,6 +142,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.updated',
+      actor: userActor(who.userId, who.email ?? undefined),
+      tenantId: null,
+      payload: { templateId },
+    });
+
     return NextResponse.json({ data: { templateId, updated: true } });
   } catch (e) {
     console.error('[admin/templates/:id] PATCH failed:', e);
@@ -152,7 +163,8 @@ export async function PATCH(request: Request, ctx: Ctx) {
  */
 export async function DELETE(_request: Request, ctx: Ctx) {
   try {
-    if (!authz(await auth())) {
+    const who = authz(await auth());
+    if (!who) {
       return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
     const { templateId } = await ctx.params;
@@ -176,6 +188,13 @@ export async function DELETE(_request: Request, ctx: Ctx) {
       console.error('[admin/templates/:id] delete failed:', e);
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.deleted',
+      actor: userActor(who.userId, who.email ?? undefined),
+      tenantId: null,
+      payload: { templateId },
+    });
     return NextResponse.json({ data: { deleted: true } });
   } catch (e) {
     console.error('[admin/templates/:id] DELETE failed:', e);
