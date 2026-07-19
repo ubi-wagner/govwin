@@ -69,9 +69,12 @@ with the email just the prompt.
 
 ![A notification link for another company signs you out and back into the right one](./img/deeplink-switch.png)
 
-- **Not signed in?** You log in and land there.
+- **Not signed in?** You log in and land there — even if your email belongs to several
+  companies, the link keeps its target through sign-in, so you arrive in the right one.
 - **Link already handled** (the task's done, or the proposal was submitted/archived)? You
-  land on that company's queue with a note — never a broken page.
+  land on that company's queue with a note — never a broken page:
+
+![A stale notification link lands you on your queue with an "already complete" note](./img/deeplink-donetask.png)
 
 ---
 

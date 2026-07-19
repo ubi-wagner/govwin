@@ -173,7 +173,11 @@ export default auth((req) => {
       return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
     }
     const loginUrl = new URL('/login', req.nextUrl);
-    loginUrl.searchParams.set('from', pathname);
+    // Preserve the full path INCLUDING the query string. A deep-link like
+    // /go?tenant=beacon-labs&task=… carries its target in the query; dropping
+    // it (from=pathname only) would strand a multi-membership recipient at the
+    // dispatcher after login instead of their intended company/queue.
+    loginUrl.searchParams.set('from', pathname + req.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 

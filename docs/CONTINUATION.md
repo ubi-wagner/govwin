@@ -44,7 +44,19 @@ proposal archived/submitted → "already done" note), then routes by session sta
 out + re-login, singular session, NO silent switch); unpinned multi-membership → `/api/enter` pins the
 target (first pick); admins straight in. `/api/enter` never silently cross-switches (hands to `/go`).
 So email = the nudge; completion happens in-platform, auditable.
-Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13).
+
+**Identity is 100% across deep-linked emails — hardened + proven (this session).** Two fixes closed the
+last gaps: (1) `middleware.ts` now preserves the FULL path INCLUDING the query on the unauthed→/login
+redirect (`from = pathname + req.nextUrl.search`) — before, a multi-membership recipient who wasn't
+signed in lost the `?tenant=`/`?task=` target and stranded at the dispatcher; (2) `/go`'s switch-relogin
+routes back through `/go?tenant=<target>` (not `/api/enter`) and the here-ack is restricted to
+`(pinned && sessionSlug === targetSlug) || memberships.length === 1`, so a fresh not-yet-pinned
+multi-membership session re-pins via `/api/enter` and lands PINNED to the target (not merely at its URL).
+Proven end-to-end by `scripts/drive-identity-deeplink.mts` (22/22): switch round-trip lands PINNED as the
+target's role; unauthed deep-link to a NON-home company survives login; non-member denial; completed-task
+dead-link ack; `/api/enter` no-silent-switch guard. Manual: `getting-started.md` "Following a
+notification link" (screenshots `deeplink-switch/-login-notice/-here/-donetask.png`).
+Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13), `drive-identity-deeplink.mts` (22).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
 113 (tenants.archived_at), 114 (rfp-pipeline tenant + staff memberships). All idempotent +

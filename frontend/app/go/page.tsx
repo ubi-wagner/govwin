@@ -115,17 +115,23 @@ export default async function GoPage({
   const pinned = u.membershipPinned === true;
 
   // Committed to a DIFFERENT company → singular session: sign out + re-login into target.
+  // Re-login goes back through /go (not /api/enter) so a fresh not-yet-pinned session is
+  // routed correctly (a multi-membership user must be PINNED to the target, not just land).
   if (pinned && sessionSlug && sessionSlug !== targetSlug) {
     const fromName = memberships.find((m) => m.tenantSlug === sessionSlug)?.tenantName ?? 'your current company';
-    const relogin = `/login?from=${encodeURIComponent(enterUrl)}&switchedTo=${encodeURIComponent(target.tenantName)}&switchedFrom=${encodeURIComponent(fromName)}`;
+    const backToGo = `/go?tenant=${encodeURIComponent(targetSlug)}${nextParam ? `&next=${encodeURIComponent(dest)}` : ''}`;
+    const relogin = `/login?from=${encodeURIComponent(backToGo)}&switchedTo=${encodeURIComponent(target.tenantName)}&switchedFrom=${encodeURIComponent(fromName)}`;
     return <DeepLinkGate mode="switch" toCompany={target.tenantName} fromCompany={fromName} reloginUrl={relogin} />;
   }
 
-  // Already in the target company (~75%) → confirm + continue.
-  if (sessionSlug === targetSlug) {
+  // Effectively committed to the target — pinned to it, OR single-membership (their one
+  // company, no pin needed) → confirm + continue. A NOT-pinned multi-membership user
+  // (even if their home slug happens to match) still needs to PIN first, so they fall
+  // through to /api/enter below.
+  if ((pinned && sessionSlug === targetSlug) || memberships.length === 1) {
     return <DeepLinkGate mode="here" toCompany={target.tenantName} dest={dest} taskDone={taskDone} />;
   }
 
-  // Not committed yet (multi-membership at the picker) → pin the target + land (first pick).
+  // Multi-membership, not yet committed → pin the target (first pick) + land.
   redirect(enterUrl);
 }
