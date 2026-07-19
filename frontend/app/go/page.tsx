@@ -16,18 +16,38 @@ export const dynamic = 'force-dynamic';
 export default async function GoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ task?: string }>;
+  searchParams: Promise<{ task?: string; tenant?: string }>;
 }) {
-  const { task: taskId } = await searchParams;
+  const { task: taskId, tenant: tenantParam } = await searchParams;
 
   const session = await auth();
   if (!session?.user) {
-    const cb = taskId ? `/go?task=${encodeURIComponent(taskId)}` : '/portal';
+    const cb = taskId
+      ? `/go?task=${encodeURIComponent(taskId)}`
+      : tenantParam
+        ? `/go?tenant=${encodeURIComponent(tenantParam)}`
+        : '/portal';
     redirect(`/login?callbackUrl=${encodeURIComponent(cb)}`);
   }
   const u = session.user as { id?: string; role?: unknown };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) redirect('/login?error=session');
+
+  // Route a non-admin through /api/enter to PIN the target company, so a
+  // multi-membership recipient lands DIRECTLY in that company's queue instead of the
+  // picker. Admins go straight (they shadow). See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+  const enter = (slug: string, dest: string) =>
+    hasRoleAtLeastAdmin(role)
+      ? dest
+      : `/api/enter?slug=${encodeURIComponent(slug)}&next=${encodeURIComponent(dest)}`;
+
+  // Company-queue deep link (no task): land on that company's dashboard — the queue
+  // (ToDos + notifications). Nudge emails that aren't tied to one task use this.
+  if (tenantParam && !taskId) {
+    const slug = tenantParam.trim();
+    if (slug) redirect(enter(slug, `/portal/${slug}/dashboard`));
+    redirect('/portal');
+  }
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!taskId || !UUID_RE.test(taskId)) redirect('/portal');
@@ -63,10 +83,10 @@ export default async function GoPage({
   if (!hasAccess) redirect('/portal');
 
   if (row.entityType === 'proposal' && row.entityId) {
-    redirect(`/portal/${row.slug}/proposals/${row.entityId}`);
+    redirect(enter(row.slug, `/portal/${row.slug}/proposals/${row.entityId}`));
   }
-  // No specific entity → the tenant's task queue (the dashboard surfaces it).
-  redirect(`/portal/${row.slug}`);
+  // No specific entity → the company's queue (the dashboard surfaces ToDos + notifications).
+  redirect(enter(row.slug, `/portal/${row.slug}/dashboard`));
 }
 
 function hasRoleAtLeastAdmin(role: Role): boolean {
