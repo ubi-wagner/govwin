@@ -243,16 +243,26 @@ async function run() {
 
     if (journey === 'audit') {
       const slug = 'acme-navy-systems';
-      // Admin side — the immutable event stream (audit) + dashboard ToDos.
+      // 0. Customer drives an auditable action end-to-end: pin a topic. This emits
+      //    capture:topic.pinned, which lands on the immutable queue AND fires the
+      //    "Topic pinned by customer" automation → an admin ToDo.
+      await login(page, 'admin@acme-navy.test');
+      page.on('dialog', (d) => { d.accept().catch(() => {}); });
+      await page.goto(`${BASE}/portal/${slug}/cards`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1800);
+      try {
+        await page.getByRole('button', { name: /Pin \(copy docs\)/i }).first().click();
+        await page.waitForTimeout(2500);
+      } catch (e) { console.error('  ⚠ pin:', e instanceof Error ? e.message : e); }
+      // 1. Customer side — the tenant activity feed shows their action on the queue.
+      await page.goto(`${BASE}/portal/${slug}/activity`, { waitUntil: 'networkidle' });
+      await shot(page, 'portal-activity', { full: true });
+      // 2. Admin side — the SAME action on the immutable event stream (audit).
       await login(page, 'eric@rfppipeline.com');
       await page.goto(`${BASE}/admin/events?namespace=proposal`, { waitUntil: 'networkidle' });
       await shot(page, 'admin-event-stream', { full: true });
       await page.goto(`${BASE}/admin/dashboard`, { waitUntil: 'networkidle' });
       await shot(page, 'admin-dashboard', { full: true });
-      // Customer side — the tenant activity feed (same immutable queue, tenant-scoped).
-      await login(page, 'admin@acme-navy.test');
-      await page.goto(`${BASE}/portal/${slug}/activity`, { waitUntil: 'networkidle' });
-      await shot(page, 'portal-activity', { full: true });
     }
 
     if (journey === 'ingest') {
