@@ -34,9 +34,16 @@ One email → many `(company, role)` memberships; pick one at login; the session
 **Admin/RFP capability set (all done + verified):** tenant_admin adds/(de)activates users
 (`team/[userId]`) + collaborators (invite/soft-delete/reactivate); a shadow rfp_admin passes the same
 tenant_admin gate, audited. RFP-admin creates companies+POC (`POST /api/admin/tenants`), archives/
-restores companies, and shadows in to help upload+atomize. Nudge emails (platform@rfppipeline.com via
-`GOOGLE_WORKSPACE_EMAIL`+Gmail API) link to `/go?task=` or `/go?tenant=` → `/api/enter` pins the target
-company so a multi-membership recipient lands straight in the right queue.
+restores companies, and shadows in to help upload+atomize.
+
+**Notification deep-link foundation (`c2ee5b8`) — for ALL external nudging.** Emails from
+platform@rfppipeline.com (`GOOGLE_WORKSPACE_EMAIL`+Gmail API) link to `/go?task=<id>` or
+`/go?tenant=<slug>`. `/go` is the orchestrator: checks link freshness (task completed/cancelled/expired,
+proposal archived/submitted → "already done" note), then routes by session state — in the target company
+→ "you're in X" confirm → the task; in a DIFFERENT company → `DeepLinkGate` "Switching companies" (sign
+out + re-login, singular session, NO silent switch); unpinned multi-membership → `/api/enter` pins the
+target (first pick); admins straight in. `/api/enter` never silently cross-switches (hands to `/go`).
+So email = the nudge; completion happens in-platform, auditable.
 Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13).
 
 **Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
