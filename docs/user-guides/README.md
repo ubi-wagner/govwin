@@ -39,6 +39,7 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | [Spotlight & purchase — cards → comp code](./spotlight-purchase.md) | tenant_admin | ✅ written |
 | [Team & collaborators](./team-collaborators.md) | tenant_admin, partner_user | ✅ written |
 | [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | ✅ written |
+| [Admin observability — dashboard, ToDos & event stream](./admin-observability.md) | master_admin, rfp_admin | ✅ written |
 
 Legend: ✅ written · 📝 in progress · 🔲 planned (todo below).
 

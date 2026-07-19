@@ -20,6 +20,7 @@ const PW = 'DemoPass123!';
 const journey = process.argv[2] ?? 'documents';
 
 async function login(page: Page, email: string) {
+  await page.context().clearCookies(); // fresh session so role-switching works
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PW);
@@ -126,6 +127,20 @@ async function run() {
           await shot(page, 'proposal-canvas-editor');
         }
       }
+    }
+
+    if (journey === 'audit') {
+      const slug = 'acme-navy-systems';
+      // Admin side — the immutable event stream (audit) + dashboard ToDos.
+      await login(page, 'eric@rfppipeline.com');
+      await page.goto(`${BASE}/admin/events?namespace=proposal`, { waitUntil: 'networkidle' });
+      await shot(page, 'admin-event-stream', { full: true });
+      await page.goto(`${BASE}/admin/dashboard`, { waitUntil: 'networkidle' });
+      await shot(page, 'admin-dashboard', { full: true });
+      // Customer side — the tenant activity feed (same immutable queue, tenant-scoped).
+      await login(page, 'admin@acme-navy.test');
+      await page.goto(`${BASE}/portal/${slug}/activity`, { waitUntil: 'networkidle' });
+      await shot(page, 'portal-activity', { full: true });
     }
 
     if (journey === 'ingest') {
