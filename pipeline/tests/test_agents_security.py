@@ -950,3 +950,62 @@ class TestToolRegistryStripsParams:
         result = await registry.execute(conn, TENANT_A, "nonexistent.tool", params={})
         assert "error" in result
         assert "Unknown tool" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Section E — #120 app.tenant_id GUC wiring (RLS backstop)
+# ---------------------------------------------------------------------------
+
+class TestAppTenantIdGucWiring:
+    """invoke_agent sets `app.tenant_id` for the tenant-scoped work and ALWAYS resets it,
+    so RLS (mig 117) enforces per-tenant once a NOBYPASSRLS role connects, and a shared/
+    pooled connection is never left scoped to a tenant."""
+
+    @pytest.mark.asyncio
+    async def test_E1_guc_set_to_tenant_then_reset(self):
+        from unittest.mock import AsyncMock
+        from agents.fabric import AgentFabric
+
+        fabric = AgentFabric()
+        # Force an early guard rejection so the LLM/tool loop never runs (no API key needed).
+        fabric._emit_event = AsyncMock(return_value="evt")
+        fabric._load_platform_config = AsyncMock(
+            return_value={"ai_enabled": False, "default_per_call_ceiling": 0.5}
+        )
+        fabric._log_task = AsyncMock()
+
+        conn = _make_conn()
+        res = await fabric.invoke_agent(conn, "scoring_strategist", {"type": "t"}, tenant_id=TENANT_A)
+        assert res["status"] == "rejected"  # AI disabled → rejected before any tool call
+
+        setcfg = [(sql, args) for sql, args in conn._execute_calls
+                  if "set_config" in sql and "app.tenant_id" in sql]
+        assert len(setcfg) >= 2, f"expected set + reset of app.tenant_id, got {setcfg}"
+        # first call binds the invocation tenant via $1
+        assert setcfg[0][1][0] == TENANT_A, "app.tenant_id must be set to the invocation tenant"
+        # last call is the finally reset — an inline '' (never left scoped)
+        assert "set_config('app.tenant_id', ''" in setcfg[-1][0], \
+            "app.tenant_id must be reset to '' on exit (never left scoped)"
+
+    @pytest.mark.asyncio
+    async def test_E2_guc_reset_even_when_unknown_archetype(self):
+        """Unknown archetype returns early — no GUC was set, so nothing to leak."""
+        from agents.fabric import AgentFabric
+        fabric = AgentFabric()
+        conn = _make_conn()
+        res = await fabric.invoke_agent(conn, "does_not_exist", {"type": "t"}, tenant_id=TENANT_A)
+        assert res["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_E3_agent_pool_absent_without_env(self):
+        """Without AGENT_DATABASE_URL the fabric uses the caller connection (no pool)."""
+        import os
+        from agents.fabric import AgentFabric
+        prev = os.environ.pop("AGENT_DATABASE_URL", None)
+        try:
+            fabric = AgentFabric()
+            pool = await fabric._get_agent_pool()
+            assert pool is None
+        finally:
+            if prev is not None:
+                os.environ["AGENT_DATABASE_URL"] = prev
