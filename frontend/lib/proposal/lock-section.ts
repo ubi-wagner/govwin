@@ -20,7 +20,6 @@
  */
 import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
-import { harvestSectionToLibrary } from '@/lib/proposal-harvest';
 import { harvestSectionToAtomLibrary } from '@/lib/proposal-atom-harvest';
 import { advanceProposalStage } from '@/lib/proposal-advance';
 import type { Role } from '@/lib/rbac';
@@ -114,16 +113,14 @@ export async function lockSectionCore(g: LockSectionCtx): Promise<LockSectionRes
     }
   }
 
-  // 5. Harvest the accepted section into the tenant libraries (legacy + unified).
-  try {
-    await harvestSectionToLibrary(tenantId, proposalId, section.id, userId);
-  } catch (e) {
-    console.error('[lockSectionCore] section harvest failed:', e);
-  }
+  // 5. Harvest the accepted section into the CANONICAL atom library (library_atoms).
+  //    The legacy library_units harvest (harvestSectionToLibrary) was removed — the
+  //    unified atom spine is the single source of truth (P0-1 library cutover; the
+  //    dual-write that fed the retired library_units on every accept is gone).
   try {
     await harvestSectionToAtomLibrary(tenantId, proposalId, section.id, userId);
   } catch (e) {
-    console.error('[lockSectionCore] greenfield atom return failed (non-fatal):', e);
+    console.error('[lockSectionCore] atom return failed (non-fatal):', e);
   }
 
   // 6. Artifact roll-up: when every section of this section's artifact is locked,
