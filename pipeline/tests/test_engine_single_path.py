@@ -51,3 +51,36 @@ def test_managed_engine_audits_failures_and_timeouts():
     assert "workflow.step_failed" in src        # failures audited
     assert "last_error" in src                    # + persisted on the instance
     assert "workflow.wait_timed_out" in src       # parked-gate timeouts audited by the sweep
+
+
+def test_never_an_action_without_an_outcome():
+    """Every step terminates in a recorded outcome, and every instance in a terminal status —
+    including ACCEPTED failures (status='failed' recorded, workflow still continues) and
+    FORCED advancements. No action is left without an outcome."""
+    src = inspect.getsource(mgr.WorkflowManager.execute_instance)
+    # the four terminal per-step outcomes are all written to step_status
+    for outcome in ('"completed"', '"failed"', '"skipped"', '"waiting"'):
+        assert f"step_status[step_name] = {outcome}" in src, f"step outcome {outcome} never recorded"
+    # every step's status is persisted (no silent step)
+    assert "_persist_step_status" in src
+    # the instance ALWAYS writes a terminal status at the end (completed/failed/cancelled)
+    assert "SET status = $2, completed_at = now()" in src
+
+
+def test_forced_advancement_records_an_outcome():
+    """A forced advancement (admin resolves a parked gate) is itself an audited outcome:
+    the core resumes the instance (status='retrying') AND emits process.force_advanced.
+
+    Guards the frontend shared core so the 'no action without an outcome' rule holds on the
+    human-override path too. Skipped if the frontend tree isn't checked out alongside."""
+    import os
+
+    here = os.path.dirname(__file__)
+    fa = os.path.abspath(os.path.join(here, "..", "..", "frontend", "lib", "process", "force-advance.ts"))
+    if not os.path.exists(fa):
+        import pytest
+
+        pytest.skip("frontend/lib/process/force-advance.ts not present")
+    body = open(fa, encoding="utf-8").read()
+    assert "status = 'retrying'" in body        # the parked instance resumes (outcome)
+    assert "process.force_advanced" in body       # and the override is audited
