@@ -10,8 +10,8 @@ two real product improvements that fell out of doing it honestly. Screenshots in
 | **Draft sections** | `proposalDraftSectionTool.handler(...)` — the **same `proposal.draft_section` tool the "Draft all sections" UI invokes** — per Vol-2 section, grounded in the real atoms | tool executed on **8/8 sections**, running its **budget-guard + fit-check** (target ≈1090 words/2-pg, `withinBudget:true`) + node generation; `placeholder` branch (no API key) | ✅ faithful (agent ran) |
 | **Cost canvas → .xlsx** | `renderCanvas('xlsx', assembleArtifactCanvas(costSections,'cost',…))` — the system exporter | 3 sheets (Summary/Base/Option) with **live formulas** + cached results + `$` formats; Base **$199,501.73 ≤ $200k**, Option **$114,464.25 ≤ $115k** | ✅ faithful |
 | **Provision + matrix** | `provisionProposalForPortal(...)` | 6 artifacts, 18 sections, matrix; **10 rows satisfied** (8 Technical + 2 Cost) | ✅ faithful |
-| Template mold | linked via `volume_required_items.template_id` (hand-built mold); **templify** path (`templates/extract` cocoonId) available via "Save as template" on each atomized package | mold linked; templify pending | ◑ partial |
-| Lock | direct-SQL CAS + compliance-flip (equivalent to `lockSectionCore`) | matrix → satisfied | ◑ equivalent |
+| **Template → mold** | atomize the DON TV2 template docx → **templify** via `pastProposalToCanvas → extractTemplateSkeleton → document_templates` (the "Save as template" core), linked to Vol 2 | 9-section **content-stripped skeleton** mold (18 nodes) linked to Volume 2 item 1 | ✅ faithful |
+| **Lock** | `lockSectionCore(...)` — the exact core the lock route runs (CAS lock + compliance→satisfied + harvest + roll-up) | **8/8 locked · 8 approved · 8 matrix satisfied** | ✅ faithful |
 
 ## Two real improvements this produced (not just the demo)
 
