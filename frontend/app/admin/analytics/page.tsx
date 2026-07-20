@@ -50,8 +50,8 @@ export default async function AnalyticsPage() {
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM tenants`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM tenants WHERE status = 'active'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM proposals`),
-    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_units`),
-    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_units WHERE outcome = 'awarded'`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_atoms`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_atoms WHERE outcome = 'awarded'`),
     safeSum(sql<{ total: string }[]>`SELECT COALESCE(SUM(amount_cents), 0)::text AS total FROM purchases WHERE status = 'completed'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM tenants WHERE subscription_status = 'active'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM source_diffs WHERE created_at > NOW() - INTERVAL '7 days'`),
@@ -77,10 +77,12 @@ export default async function AnalyticsPage() {
   interface CatRow { category: string; count: number }
   let atomsByCategory: CatRow[] = [];
   try {
+    // Canonical taxonomy lives in atom_tags (dimension/value), not a library_atoms.category
+    // column — group atoms by their tag value.
     atomsByCategory = await sql<CatRow[]>`
-      SELECT category, COUNT(*)::int AS count
-      FROM library_units
-      GROUP BY category
+      SELECT COALESCE(value, 'untagged') AS category, COUNT(DISTINCT atom_id)::int AS count
+      FROM atom_tags
+      GROUP BY value
       ORDER BY count DESC
       LIMIT 10
     `;

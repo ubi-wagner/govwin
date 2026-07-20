@@ -48,7 +48,7 @@ export default async function TenantsPage() {
     tenants = await sql<TenantRow[]>`
       SELECT t.id, t.name, t.slug, t.status, t.created_at,
              (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as user_count,
-             (SELECT COUNT(*) FROM library_units lu WHERE lu.tenant_id = t.id AND lu.status = 'approved') as library_count,
+             (SELECT COUNT(*) FROM library_atoms lu WHERE lu.tenant_id = t.id AND lu.status = 'approved') as library_count,
              (SELECT COUNT(*) FROM proposals p WHERE p.tenant_id = t.id) as proposal_count
       FROM tenants t
       ORDER BY t.created_at DESC

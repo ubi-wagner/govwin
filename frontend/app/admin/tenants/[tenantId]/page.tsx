@@ -115,7 +115,7 @@ export default async function TenantDetailPage({ params }: Props) {
 
   try {
     const [row] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM library_units WHERE tenant_id = ${tenantId}
+      SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}
     `;
     libraryCount = parseInt(row?.count ?? '0', 10);
   } catch (e) {
