@@ -431,6 +431,20 @@ async def _execute_step(
         )
         return {"result": None, "skipped": True, "reason": "hitl_wait_v1"}
 
+    if step.step_type == StepType.TODO:
+        # MED-4 defense-in-depth: a TODO is a human gate. The managed engine
+        # intercepts it in execute_instance (park + write a tasks-ledger row)
+        # BEFORE dispatching here, and the fire-and-forget path stops at the
+        # human-gate guard above — so this branch should never be reached in
+        # normal flow. Return a safe skip (never fall through to "unknown_type",
+        # which would read as an inert no-op and silently pass the gate).
+        log.warning(
+            "TODO: step '%s' reached the dispatcher unexpectedly — treating as a "
+            "human gate (skip, not bypass)",
+            step.name,
+        )
+        return {"result": None, "skipped": True, "reason": "todo_gate"}
+
     if step.step_type == StepType.CONDITION:
         passed = _evaluate_condition(step.condition, inputs)
         if not passed:
@@ -555,12 +569,16 @@ async def _run_workflow(
         # at a human gate. STOP the workflow here rather than silently skipping
         # human review and proceeding — that bypass was the old behavior and is
         # dangerous. A properly-migrated deployment uses the managed engine,
-        # which parks correctly at HITL_WAIT. (INC-5; EVENT_CONTRACT_V3 gap 5.)
-        if step.step_type == StepType.HITL_WAIT:
+        # which parks correctly at HITL_WAIT / TODO. (INC-5; EVENT_CONTRACT_V3 gap 5.)
+        # MED-4: TODO is a HITL_WAIT that ALSO writes a tasks-ledger row; in
+        # fire-and-forget mode it must stop for the SAME reason — otherwise the
+        # dispatcher's fall-through skips the gate as an "unknown step" and an
+        # unmigrated deploy would e.g. publish content with no human review.
+        if step.step_type in (StepType.HITL_WAIT, StepType.TODO):
             log.warning(
-                "workflow '%s' reached HITL_WAIT '%s' in fire-and-forget mode "
+                "workflow '%s' reached human gate '%s' (%s) in fire-and-forget mode "
                 "(process_instances missing) — stopping, NOT bypassing human review",
-                workflow_cls.__name__, step.name,
+                workflow_cls.__name__, step.name, step.step_type.value,
             )
             try:
                 await emit_event(

@@ -177,7 +177,10 @@ class OnProposalCreated(Workflow):
                 "template": '"admin_proposal_review_required"',
                 "tenant_id": "payload.tenantId",
                 "proposal_id": "payload.proposalId",
-                "proposal_title": "payload.proposalTitle",
+                # LOW-10: the proposal.created:end payload carries `title` (see
+                # proposals/create/route.ts emitEventEnd result), not `proposalTitle` —
+                # the old ref resolved to None, blanking the title in the admin email.
+                "proposal_title": "payload.title",
             },
         ),
     ]

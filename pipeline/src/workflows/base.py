@@ -144,10 +144,30 @@ class Workflow:
 
     @classmethod
     def validate(cls) -> list[str]:
-        """Check the workflow definition for common mistakes."""
+        """Check the workflow definition for common mistakes.
+
+        register_workflow() DROPS any workflow that returns errors here, so these are
+        hard registration gates, not warnings. Guards:
+          - trigger present, and NOT on system:workflow.* (the processor poll EXCLUDES
+            exactly those to avoid self-triggering → such a workflow would never fire)
+          - steps present; depends_on / on_timeout / on_failure name real steps
+          - HITL_WAIT has wait_for; TODO has task_type + an assignee
+          - every AI_INVOKE action is mapped in TOOL_ACTION_TO_ARCHETYPE (an unmapped
+            action is a guaranteed silent skip — catch the typo at boot)
+          - no depends_on cycle (a cycle makes step_execution_order() recurse forever)
+          - input_map 'step.<name>...' refs a real step that is a TRANSITIVE depends_on
+            ancestor (only depends_on defines order; a ref to a non-ancestor may resolve
+            to null because that step has not run yet)
+        """
         errors: list[str] = []
-        if not hasattr(cls, "trigger") or cls.trigger is None:
+        trig = getattr(cls, "trigger", None)
+        if trig is None:
             errors.append(f"{cls.__name__}: missing trigger")
+        elif trig.namespace == "system" and str(trig.type).startswith("workflow."):
+            errors.append(
+                f"{cls.__name__}: trigger on 'system:{trig.type}' is excluded by the "
+                f"processor poll filter (system:workflow.*) and would never fire"
+            )
         if not cls.steps:
             errors.append(f"{cls.__name__}: no steps defined")
 
@@ -176,6 +196,21 @@ class Workflow:
                         f"{cls.__name__}.{step.name}: todo step must define "
                         f"assignee_role or assignee_user"
                     )
+            # An unmapped AI_INVOKE action is a guaranteed silent no-op (the dispatcher
+            # safe-skips actions not in TOOL_ACTION_TO_ARCHETYPE). Reject at registration
+            # so a new agent step can't be added without wiring its archetype. Lazy
+            # import dodges the base<->processor import cycle; if the processor is not
+            # importable, skip the check rather than crash discovery.
+            if step.step_type == StepType.AI_INVOKE:
+                try:
+                    from workflows.processor import TOOL_ACTION_TO_ARCHETYPE as _MAP
+                except Exception:
+                    _MAP = None  # type: ignore[assignment]
+                if _MAP is not None and step.action not in _MAP:
+                    errors.append(
+                        f"{cls.__name__}.{step.name}: AI_INVOKE action '{step.action}' "
+                        f"not in TOOL_ACTION_TO_ARCHETYPE (would silently skip)"
+                    )
             # on_timeout / on_failure must name a real step in this workflow,
             # or the declared escalation/compensation is a dead-end (gap 6).
             if step.on_timeout and step.on_timeout not in step_names:
@@ -188,6 +223,73 @@ class Workflow:
                     f"{cls.__name__}.{step.name}: on_failure "
                     f"'{step.on_failure}' not found in steps"
                 )
+
+        # depends_on cycle detection (GREY=on-stack, BLACK=done). A cycle would make
+        # step_execution_order() recurse until RecursionError at execute time.
+        by_name = {s.name: s for s in cls.steps}
+        color: dict[str, int] = {}
+        has_cycle = False
+
+        def _visit(n: str) -> bool:
+            color[n] = 1  # on-stack
+            dep = by_name[n].depends_on
+            if dep and dep in by_name:
+                c = color.get(dep, 0)
+                if c == 1:
+                    return True
+                if c == 0 and _visit(dep):
+                    return True
+            color[n] = 2  # done
+            return False
+
+        for _n in by_name:
+            if color.get(_n, 0) == 0 and _visit(_n):
+                errors.append(
+                    f"{cls.__name__}: depends_on cycle detected involving step '{_n}'"
+                )
+                has_cycle = True
+                break
+
+        # input_map 'step.<name>' refs must name a real step that is a transitive
+        # depends_on ancestor of the referencing step (guaranteed to have run). Skip
+        # when a cycle was found — ancestor sets are undefined then.
+        if not has_cycle:
+            def _ancestors(name: str) -> set[str]:
+                acc: set[str] = set()
+                cur = by_name.get(name)
+                dep = cur.depends_on if cur else None
+                while dep and dep in by_name and dep not in acc:
+                    acc.add(dep)
+                    dep = by_name[dep].depends_on
+                return acc
+
+            for step in cls.steps:
+                anc: Optional[set[str]] = None
+                for key, path in (step.input_map or {}).items():
+                    if not (isinstance(path, str) and path.startswith("step.")):
+                        continue
+                    parts = path.split(".")
+                    ref = parts[1] if len(parts) >= 2 else ""
+                    if ref not in step_names:
+                        errors.append(
+                            f"{cls.__name__}.{step.name}: input_map '{key}' references "
+                            f"unknown step '{ref}' (in '{path}')"
+                        )
+                        continue
+                    if ref == step.name:
+                        errors.append(
+                            f"{cls.__name__}.{step.name}: input_map '{key}' references "
+                            f"itself ('{path}')"
+                        )
+                        continue
+                    if anc is None:
+                        anc = _ancestors(step.name)
+                    if ref not in anc:
+                        errors.append(
+                            f"{cls.__name__}.{step.name}: input_map '{key}' references "
+                            f"step '{ref}', which is not a (transitive) depends_on "
+                            f"ancestor — its result may not be ready"
+                        )
         return errors
 
     @classmethod

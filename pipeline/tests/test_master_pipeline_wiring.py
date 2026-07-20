@@ -70,8 +70,11 @@ def test_ingest_chain_are_independent_ai_invoke_actors():
         assert name in steps
         assert steps[name].step_type == StepType.AI_INVOKE
         assert steps[name].action == action
-    # notify never waits on an agent
-    assert steps["notify_curator"].depends_on == "extract_compliance"
+    # notify never waits on an agent — and, post HIGH-2 hardening, waits on NOTHING:
+    # it is fully INDEPENDENT so the RFP admin is alerted even when shred/extract FAILS
+    # (depending on extract_compliance dropped the alert on the very failure the admin
+    # most needs to hear about). See test_workflow_hardening.test_notify_curator_is_independent.
+    assert steps["notify_curator"].depends_on is None
 
 
 def test_scout_is_independent_ai_invoke_actor():
