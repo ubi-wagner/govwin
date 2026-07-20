@@ -12,7 +12,11 @@
 import { useEffect, useState } from 'react';
 
 type Status = 'live' | 'wired' | 'dormant';
-type Pod = 'Tenant — build & pursue' | 'Master — ingestion (platform)' | 'Our-org — RFP-admin ops';
+type Pod =
+  | 'Tenant — build & pursue'
+  | 'Master — ingestion (platform)'
+  | 'Our-org — RFP-admin ops'
+  | 'Our-org — CMS content';
 interface Agent {
   role: string;
   label: string;
@@ -27,6 +31,7 @@ const POD_ORDER: Pod[] = [
   'Tenant — build & pursue',
   'Master — ingestion (platform)',
   'Our-org — RFP-admin ops',
+  'Our-org — CMS content',
 ];
 
 // The 21 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
@@ -50,14 +55,18 @@ const ROSTER: Agent[] = [
   { role: 'onboarding_agent', label: 'Onboarding Concierge', scope: 'tenant', trigger: 'Application accepted', status: 'live', pod: 'Tenant — build & pursue', does: 'Cold-starts a new tenant: profile, buckets, first atomize, getting-started ToDos.' },
   { role: 'outcome_analyst', label: 'Outcome Analyst', scope: 'tenant', trigger: 'Outcome recorded', status: 'live', pod: 'Tenant — build & pursue', does: 'Win/loss lesson → memory → scoring calibration.' },
   // ── Master — ingestion (platform) ────────────────────────────────────────
-  { role: 'opportunity_scout', label: 'Opportunity Scout', scope: 'platform', trigger: 'Opportunities detected', status: 'live', pod: 'Master — ingestion (platform)', does: 'Prioritizes the new-triage backlog for the admin.' },
+  { role: 'opportunity_scout', label: 'Opportunity Scout', scope: 'platform', trigger: 'Opportunities detected (+ crawl findings)', status: 'live', pod: 'Master — ingestion (platform)', does: 'Prioritizes the triage backlog + crawler leads; flags likely updates/amendments.' },
   { role: 'ingest_analyst', label: 'Ingest Analyst', scope: 'platform', trigger: 'RFP uploaded', status: 'live', pod: 'Master — ingestion (platform)', does: 'Shredded solicitation → structured curation draft.' },
   { role: 'matrix_stager', label: 'Matrix Stager', scope: 'platform', trigger: 'RFP uploaded', status: 'live', pod: 'Master — ingestion (platform)', does: 'Curated solicitation → compliance-matrix rows.' },
   { role: 'skeleton_architect', label: 'Skeleton Architect', scope: 'platform', trigger: 'RFP uploaded', status: 'live', pod: 'Master — ingestion (platform)', does: 'Matrix → master response skeleton (tenant architect tailors it).' },
   { role: 'amendment_monitor', label: 'Amendment Monitor', scope: 'platform', trigger: 'Source change detected', status: 'live', pod: 'Master — ingestion (platform)', does: 'Flags compliance-affecting amendments.' },
   // ── Our-org — RFP-admin ops (POD 4) ──────────────────────────────────────
   { role: 'curation_qa', label: 'Curation QA', scope: 'platform', trigger: 'Curation submitted for review', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Pre-release QC of a curated solicitation before push.' },
-  { role: 'ops_digest', label: 'Ops Digest', scope: 'platform', trigger: 'Scheduled (every 24h)', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Scheduled health digest for master_admin (workforce, pipeline, SLA).' },
+  { role: 'ops_digest', label: 'Ops Digest', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Scheduled health digest for master_admin (workforce, pipeline, SLA).' },
+  // ── Our-org — CMS content ────────────────────────────────────────────────
+  { role: 'content_generator', label: 'Content Generator', scope: 'platform', trigger: 'Content requested', status: 'live', pod: 'Our-org — CMS content', does: 'Drafts new web/social copy from a brief, in our published voice (human-approved).' },
+  { role: 'content_curator', label: 'Content Curator', scope: 'platform', trigger: 'Scheduled — weekly (crawl findings)', status: 'live', pod: 'Our-org — CMS content', does: 'The social/web content scout: curates crawler findings into reshare drafts.' },
+  { role: 'social_scheduler', label: 'Social Scheduler', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — CMS content', does: 'Publisher: drafts a week of social posts from published content (human-approved).' },
 ];
 
 interface Stat { pending: number; running: number; done: number; failed: number; lastRun: string | null }

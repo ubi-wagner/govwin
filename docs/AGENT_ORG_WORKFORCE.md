@@ -3,10 +3,11 @@
 **Companion to `docs/AGENT_WORKFORCE.md`** (customer + master workforce) and `docs/AGENT_ROADMAP.md`.
 Those agents serve the *customers'* proposals and the *master* ingestion pipeline. This doc is the
 **our-org** workforce — agents that run **RFP Pipeline the business** (market → sell → onboard →
-support → operate), at **our authority** (master_admin / rfp_admin), mostly on the CMS/CRM + admin
-surface. Four pods; **POD 4 is built**, POD 1–3 are the forward plan.
+support → operate), at **our authority** (master_admin / rfp_admin), mostly on the CMS + admin
+surface. **POD 4 (RFP-admin ops) and the CMS content pod are built, plus the scout expansion +
+crawl infrastructure.** The fabric now registers **24 archetypes across 4 pods**.
 
-![Agent Workforce roster — 21 archetypes across 3 pods](./agent-workforce/img/org-workforce-roster.png)
+![Agent Workforce roster — 24 archetypes across 4 pods](./agent-workforce/img/org-workforce-roster.png)
 
 ---
 
@@ -22,11 +23,16 @@ missing:
    `condition: toState == "review_requested"` — i.e. only the *request_review* transition (curation
    done, pre-push). This is the cheapest way to add an admin gate: find the state-machine event that
    already fires and attach a conditional workflow.
-2. **Scheduled (cron-shaped) trigger** — genuinely new for this engine.
-   The workflow engine is **event-only** (`EventTrigger` = namespace/type/phase, no cron). `ops_digest`
-   needs "every 24h", so we added a **scheduler in the pipeline main loop** (`run_ops_digest_scheduler`)
-   that emits `system:ops.digest_requested` on an interval → the normal event → workflow path runs. This
-   is the reusable bridge from "on a schedule" to "an event fires"; future scheduled agents reuse it.
+2. **Scheduled (cron-shaped) trigger** — on the SHARED cron manager.
+   The workflow engine is **event-only** (`EventTrigger` = namespace/type/phase, no cron), so scheduled
+   work rides the existing cron: a `run_type='event'` row in **`pipeline_schedules`** (source
+   `namespace:type`) is ticked by **`ingest.dispatcher.tick_schedules`**, which emits the `system_event`
+   → the normal event→workflow→agent path runs it. One time manager, one event bus, one audit — no
+   bespoke scheduler. **UTC canonical** end-to-end (schedules, cron math, audit — microsecond precise);
+   each admin picks a **display timezone** (`users.timezone`) the UI renders in. Scheduled triggers are
+   `phase='single'` forward-only postings, so audit + actions stay in sync by construction. Adding a new
+   scheduled agent (ops digest, update-scan, content resurface, social, a future mailing-list scout) is a
+   single `pipeline_schedules` row.
 
 Both keep every #117/#120 invariant: advisory → guardrail → land-or-review, injection fence where any
 untrusted text is read, runaway caps, and **independent** steps so a failed/skipped agent never
@@ -66,32 +72,63 @@ surface).
 
 ---
 
-## POD 1–3 — the rest of the our-org workforce (forward plan)
+## CMS content pod (BUILT) — find-to-repost + generate + schedule
 
-These sit mostly on the **CMS/CRM** service (its own `govtech_cms` DB, bridged via `system_events`), so
-several wire as CMS-side workers rather than pipeline `AI_INVOKE` steps — confirm insertion points at
-build time, same as POD 4. All produce OUTBOUND, customer-facing content, so the guardrail profile adds
-**brand-voice + no-fabricated-claims + human-approve-before-send** (agents never auto-send external comms).
+CMS (not CRM): our own web + social content, all on `content_pages` (in govtech_intel) + the crawl
+findings store. All platform-scope, all **advisory → human-approve-before-publish** (brand-voice +
+no-fabricated-claims). The scheduled ones email the curated output to the team inbox
+(`eric@rfppipeline.com`) via an independent NOTIFY.
 
-- **POD 1 — Marketing / Content:** `content_marketer` (blog/landing/case-study into the content
-  pipeline — `OnCmsContentRequested` exists), `social_amplifier` (schedule social from published content).
-- **POD 2 — Sales / CRM:** `lead_qualifier` (score/enrich inbound applications/signups), `nurture_drafter`
-  (personalized drip emails by lead stage — email automation exists).
-- **POD 3 — Customer Success:** `activation_watcher` (our-side companion to the tenant `onboarding_agent`:
-  watch activation, draft check-ins, flag at-risk), `support_triage` (triage support/CS ToDos, draft
-  replies, escalate).
+| Agent | Job | Trigger → workflow |
+|---|---|---|
+| **content_generator** | Draft NEW web/social copy from a brief, in our published voice | `library:content.requested` → `AI_INVOKE` in `OnCmsContentRequested` |
+| **content_curator** | The social/web content SCOUT: curate the crawler's findings into repost drafts (w/ attribution) | `library:content.resurface_requested` (scheduled) → `OnContentResurfaceRequested` |
+| **social_scheduler** | PUBLISHER: draft a week of social posts from published content | `system:social.schedule_requested` (scheduled) → `OnSocialScheduleRequested` |
 
-**Recommended order after POD 4:** POD 3 `activation_watcher` (protects the tenants the Onboarding
-Concierge just cold-started) → POD 1 `content_marketer` (workflow exists) → POD 2 `lead_qualifier`
-(feeds the funnel) → the rest.
+## Scout expansion (BUILT) — better find / analyze / look-for-updates
+
+- **opportunity_scout** now reads BOTH the ingested triage queue AND the crawler's opportunity findings
+  (`scout_findings`), analyzes deeper (agency/program/set-aside), and flags **possible updates/amendments**
+  so the admin re-checks compliance instead of double-curating.
+- **`OnSolicitationUpdateScan`** (scheduled, every 6h) — a proactive WATCHER loop that re-scans for
+  compliance-affecting amendments by **reusing the `amendment_monitor` agent** (no new archetype). The
+  proactive counterpart to the reactive `OnSourceChangeDetected → amendment_monitor` path.
+
+## Crawl architecture (anticipated) — sources → findings → agents, with history + outcomes
+
+The content_curator and opportunity_scout consume what a **crawler worker** discovers — the content/
+opportunity analog of how the ingesters populate `opportunities`:
+
+- **`scout_sources`** — the crawl targets (org websites / social handles / RSS, `purpose` = content /
+  opportunity / both; `enabled` + optional per-source cron). An admin adds + enables sources.
+- **`scout_findings`** — candidate items the crawler writes (title/url/snippet/author), deduped by
+  `dedup_hash` (idempotent re-crawls). Each finding carries an **OUTCOME**: new → reviewed →
+  reposted/pursued/dismissed.
+- **`scout_runs`** — uniform RUN HISTORY for **scouts, watchers, and publishers** (role + kind + counts +
+  outcome + timings). One model for all three: "scouts have history and outcomes, and so do publishers
+  and watchers."
+- **`workers/content_crawler.py`** — reads enabled sources, fetches via a **pluggable fetcher**, upserts
+  findings + logs a `scout_runs` row. The fetcher is injected: on deploy it is an RSS/HTML/social fetcher
+  (outbound HTTPS via the agent proxy, robots + rate-limit aware); in tests it's a stub, so the DB
+  write/dedup/history loop is verified without network. Runs on the shared cron via a scheduled crawl
+  event + an ACTION step. New source kinds (a **mailing-list scout**) are a new fetcher, not a new pipeline.
+
+## Still forward (CS / Sales) — descoped this run
+
+Per direction (CMS-first, not CRM), the Customer-Success and Sales agents (`activation_watcher`,
+`support_triage`, `lead_qualifier`, `nurture_drafter`) are the remaining forward plan, on the same
+architecture.
 
 ---
 
 ## Verify
 
 ```
-cd pipeline/src && PYTHONPATH=. python3 -m pytest ../tests/test_pod4_wiring.py ../tests/test_agents.py -q
+cd pipeline/src && PYTHONPATH=. python3 -m pytest ../tests/test_pod4_wiring.py ../tests/test_cms_agents_wiring.py \
+  ../tests/test_scout_expansion_wiring.py ../tests/test_content_crawler.py ../tests/test_agents.py \
+  ../tests/test_cron_next_run.py -q
 ```
-Drive-tested: the scheduler emit lands a valid `system:ops.digest_requested` row that matches
-`OnOpsDigestRequested`; the QA gate matches `finder:solicitation.triaged` only when
-`toState==review_requested`. Fabric registers **21 archetypes**. LLM reasoning runs on deploy.
+Drive-tested end-to-end: `tick_schedules` emits `system:ops.digest_requested` (actor=cron) and advances
+`next_run` from the cron (UTC); the crawler writes deduped `scout_findings` + a `scout_runs` history row
+with outcome; the QA gate matches `finder:solicitation.triaged` only when `toState==review_requested`.
+Fabric registers **24 archetypes**. LLM reasoning runs on deploy (Railway key).
