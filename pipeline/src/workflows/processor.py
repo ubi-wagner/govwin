@@ -60,6 +60,12 @@ CHANGE LOG:
     PR #xxx (2026-05-22) — WorkflowManager integration: persistent workflow
                            execution with crash recovery. Falls back to
                            fire-and-forget if process_instances table missing.
+    PR (2026-07)         — "No fire-and-forget ever": removed the un-audited
+                           fallback executor. The managed engine (process_instances
+                           + transitions) is REQUIRED; when it is unavailable the
+                           processor REFUSES to run and emits an audited
+                           workflow.engine_unavailable / workflow.execution_refused
+                           signal instead of executing un-audited work.
 ================================================================================
 """
 from __future__ import annotations
@@ -432,12 +438,12 @@ async def _execute_step(
         return {"result": None, "skipped": True, "reason": "hitl_wait_v1"}
 
     if step.step_type == StepType.TODO:
-        # MED-4 defense-in-depth: a TODO is a human gate. The managed engine
-        # intercepts it in execute_instance (park + write a tasks-ledger row)
-        # BEFORE dispatching here, and the fire-and-forget path stops at the
-        # human-gate guard above — so this branch should never be reached in
-        # normal flow. Return a safe skip (never fall through to "unknown_type",
-        # which would read as an inert no-op and silently pass the gate).
+        # MED-4 defense-in-depth: a TODO is a human gate. The managed engine — the
+        # ONLY execution path (fire-and-forget was removed) — intercepts it in
+        # execute_instance (park + write a tasks-ledger row) BEFORE dispatching here,
+        # so this branch should never be reached in normal flow. Return a safe skip
+        # (never fall through to "unknown_type", which would read as an inert no-op
+        # and silently pass the gate).
         log.warning(
             "TODO: step '%s' reached the dispatcher unexpectedly — treating as a "
             "human gate (skip, not bypass)",
@@ -458,258 +464,6 @@ async def _execute_step(
 
     log.warning("Unknown step type '%s' for step '%s'", step.step_type, step.name)
     return {"result": None, "skipped": True, "reason": "unknown_type"}
-
-
-async def _execute_step_with_retry(
-    conn: asyncpg.Connection,
-    step: Any,
-    inputs: dict[str, Any],
-    trigger_event: dict[str, Any] | None = None,
-    fabric: Any = None,
-) -> dict[str, Any]:
-    """Execute a step with retry logic and timeout enforcement.
-
-    Retries use exponential backoff based on step.retry_delay_seconds.
-    Timeout is enforced via asyncio.wait_for using step.timeout_minutes.
-    """
-    last_exc: Optional[Exception] = None
-    max_attempts = 1 + max(step.retry_count, 0)
-
-    for attempt in range(max_attempts):
-        try:
-            # Enforce timeout
-            timeout_seconds = step.timeout_minutes * 60
-            result = await asyncio.wait_for(
-                _execute_step(conn, step, inputs, trigger_event=trigger_event, fabric=fabric),
-                timeout=timeout_seconds,
-            )
-            return result
-        except asyncio.TimeoutError:
-            last_exc = TimeoutError(
-                f"Step '{step.name}' timed out after {step.timeout_minutes}m "
-                f"(attempt {attempt + 1}/{max_attempts})"
-            )
-            log.error(
-                "step '%s' timed out after %dm (attempt %d/%d)",
-                step.name,
-                step.timeout_minutes,
-                attempt + 1,
-                max_attempts,
-            )
-        except Exception as exc:
-            last_exc = exc
-            log.error(
-                "step '%s' failed (attempt %d/%d): %s",
-                step.name,
-                attempt + 1,
-                max_attempts,
-                exc,
-            )
-
-        # If there are more attempts, wait with exponential backoff
-        if attempt < max_attempts - 1:
-            delay = step.retry_delay_seconds * (2 ** attempt)
-            log.info(
-                "retrying step '%s' in %ds (attempt %d/%d)",
-                step.name,
-                delay,
-                attempt + 2,
-                max_attempts,
-            )
-            await asyncio.sleep(delay)
-
-    # All attempts exhausted
-    raise last_exc  # type: ignore[misc]
-
-
-async def _run_workflow(
-    conn: asyncpg.Connection,
-    workflow_cls: type[Workflow],
-    event: dict[str, Any],
-    fabric: Any = None,
-) -> None:
-    """Execute all steps of a matched workflow in dependency order."""
-    workflow_name = workflow_cls.__name__
-    trigger_event_id = event.get("id")
-    tenant_id = event.get("tenant_id")
-    workflow_start_time = time.monotonic()
-
-    log.info(
-        "starting workflow %s for event %s:%s:%s (id=%s)",
-        workflow_name,
-        event.get("namespace"),
-        event.get("type"),
-        event.get("phase"),
-        trigger_event_id,
-    )
-
-    # Emit workflow.started event
-    try:
-        await emit_event(
-            conn,
-            namespace="system",
-            type="workflow.started",
-            payload={
-                "workflow": workflow_name,
-                "triggerEventId": trigger_event_id,
-                "tenant_id": tenant_id,
-            },
-            tenant_id=tenant_id,
-        )
-    except Exception as exc:
-        log.error("failed to emit workflow.started event: %s", exc)
-
-    steps = workflow_cls.step_execution_order()
-    step_results: dict[str, dict[str, Any]] = {}
-
-    for step in steps:
-        step_start_time = time.monotonic()
-
-        # The fire-and-forget fallback (no process_instances table) CANNOT park
-        # at a human gate. STOP the workflow here rather than silently skipping
-        # human review and proceeding — that bypass was the old behavior and is
-        # dangerous. A properly-migrated deployment uses the managed engine,
-        # which parks correctly at HITL_WAIT / TODO. (INC-5; EVENT_CONTRACT_V3 gap 5.)
-        # MED-4: TODO is a HITL_WAIT that ALSO writes a tasks-ledger row; in
-        # fire-and-forget mode it must stop for the SAME reason — otherwise the
-        # dispatcher's fall-through skips the gate as an "unknown step" and an
-        # unmigrated deploy would e.g. publish content with no human review.
-        if step.step_type in (StepType.HITL_WAIT, StepType.TODO):
-            log.warning(
-                "workflow '%s' reached human gate '%s' (%s) in fire-and-forget mode "
-                "(process_instances missing) — stopping, NOT bypassing human review",
-                workflow_cls.__name__, step.name, step.step_type.value,
-            )
-            try:
-                await emit_event(
-                    conn, namespace="system", type="workflow.hitl_unsupported",
-                    payload={"workflow": workflow_cls.__name__, "step": step.name},
-                    tenant_id=tenant_id,
-                )
-            except Exception as exc:
-                log.error("failed to emit workflow.hitl_unsupported: %s", exc)
-            break
-
-        if step.depends_on:
-            dep_result = step_results.get(step.depends_on, {})
-            # If dependency failed, log but continue (inputs will be None)
-            if "error" in dep_result:
-                log.warning(
-                    "step '%s' depends on failed step '%s' — inputs may be None",
-                    step.name,
-                    step.depends_on,
-                )
-
-        inputs = resolve_inputs(step.input_map, event, step_results)
-
-        try:
-            result = await _execute_step_with_retry(
-                conn, step, inputs, trigger_event=event, fabric=fabric
-            )
-            step_results[step.name] = result
-            step_duration_ms = int((time.monotonic() - step_start_time) * 1000)
-
-            try:
-                await emit_event(
-                    conn,
-                    namespace="system",
-                    type="workflow.step_completed",
-                    payload={
-                        "workflow": workflow_name,
-                        "step": step.name,
-                        "stepType": step.step_type.value,
-                        "skipped": result.get("skipped", False),
-                        "triggerEventId": trigger_event_id,
-                        "tenant_id": tenant_id,
-                        "duration_ms": step_duration_ms,
-                    },
-                    tenant_id=tenant_id,
-                )
-            except Exception as emit_exc:
-                log.error("failed to emit step_completed event: %s", emit_exc)
-
-            log.info(
-                "step '%s' completed (type=%s, skipped=%s, duration=%dms)",
-                step.name,
-                step.step_type.value,
-                result.get("skipped", False),
-                step_duration_ms,
-            )
-
-        except Exception as exc:
-            step_duration_ms = int((time.monotonic() - step_start_time) * 1000)
-            log.error(
-                "step '%s' in workflow %s failed: %s",
-                step.name,
-                workflow_name,
-                exc,
-            )
-            step_results[step.name] = {"error": str(exc)}
-
-            try:
-                await emit_event(
-                    conn,
-                    namespace="system",
-                    type="workflow.step_failed",
-                    payload={
-                        "workflow": workflow_name,
-                        "step": step.name,
-                        "stepType": step.step_type.value,
-                        "error": str(exc)[:500],
-                        "triggerEventId": trigger_event_id,
-                        "tenant_id": tenant_id,
-                        "duration_ms": step_duration_ms,
-                    },
-                    tenant_id=tenant_id,
-                )
-            except Exception as emit_exc:
-                log.error("failed to emit step_failed event: %s", emit_exc)
-
-            # Continue to next step -- don't abort the entire workflow
-            # (steps that depend on this one will still run but get None inputs)
-
-    workflow_duration_ms = int((time.monotonic() - workflow_start_time) * 1000)
-
-    steps_failed = sum(1 for r in step_results.values() if "error" in r)
-    steps_skipped = sum(1 for r in step_results.values() if r.get("skipped"))
-
-    try:
-        await emit_event(
-            conn,
-            namespace="system",
-            type="workflow.completed",
-            payload={
-                "workflow": workflow_name,
-                "triggerEventId": trigger_event_id,
-                "tenant_id": tenant_id,
-                "stepsExecuted": len(steps),
-                "stepsSkipped": steps_skipped,
-                "stepsFailed": steps_failed,
-                "duration_ms": workflow_duration_ms,
-            },
-            tenant_id=tenant_id,
-        )
-    except Exception as emit_exc:
-        log.error("failed to emit workflow.completed event: %s", emit_exc)
-
-    log.info(
-        "workflow %s completed (steps=%d, skipped=%d, failed=%d, duration=%dms)",
-        workflow_name,
-        len(steps),
-        steps_skipped,
-        steps_failed,
-        workflow_duration_ms,
-    )
-
-    # Warn if workflow took longer than expected
-    total_timeout_minutes = sum(s.timeout_minutes for s in steps)
-    if workflow_duration_ms > total_timeout_minutes * 60 * 1000:
-        log.warning(
-            "STUCK WORKFLOW: %s took %dms, exceeding total step timeout budget of %dm",
-            workflow_name,
-            workflow_duration_ms,
-            total_timeout_minutes,
-        )
 
 
 # ─── WorkflowManager integration ─────────────────────────────────
@@ -801,9 +555,11 @@ async def run_workflow_processor(
     Runs until shutdown_event is set. Connects to the database
     independently (separate connection from the ingester consumer).
 
-    If the process_instances table exists (migration 043), uses the
-    persistent WorkflowManager for crash recovery and audit trail.
-    Otherwise falls back to fire-and-forget execution.
+    The persistent WorkflowManager (process_instances, migration 043) is the
+    ONLY execution path — every run, failure, and timeout is audited and
+    recoverable. There is no fire-and-forget fallback: if the table is absent the
+    processor REFUSES to execute and emits an audited workflow.engine_unavailable /
+    workflow.execution_refused signal instead of running un-audited work.
 
     fabric: optional AgentFabric instance; when provided, AI_INVOKE steps
     are routed to the mapped archetype instead of being skipped (PIPE-12).
@@ -837,7 +593,27 @@ async def run_workflow_processor(
             except Exception as exc:
                 log.error("template catalog sync failed (non-fatal): %s", exc)
         else:
-            log.info("process_instances table not found — using fire-and-forget execution")
+            # "No fire-and-forget ever." The managed engine (process_instances +
+            # transitions + recoverable failures/timeouts) is REQUIRED — a missing table
+            # is a deploy misconfiguration, NOT license to run un-audited work. Emit a
+            # loud, audited signal and REFUSE to execute workflows (below); the processor
+            # keeps polling so it self-heals on the next restart once mig 043 is applied.
+            log.error(
+                "process_instances ABSENT — workflow engine unavailable. Refusing to run "
+                "workflows un-audited (no fire-and-forget). Apply migration 043."
+            )
+            try:
+                await emit_event(
+                    conn,
+                    namespace="system",
+                    type="workflow.engine_unavailable",
+                    payload={
+                        "reason": "process_instances_absent",
+                        "action": "refusing_unaudited_execution",
+                    },
+                )
+            except Exception as exc:
+                log.error("failed to emit workflow.engine_unavailable: %s", exc)
 
         # Seed last_processed_at to 5 minutes ago so events emitted during
         # pipeline restart are not missed (duplicate detection prevents re-runs)
@@ -926,14 +702,34 @@ async def run_workflow_processor(
                     # nor resumes a paused instance. That guard was dead until the
                     # poll began SELECTing the `error` column (above); see test_error_gating.
                     workflow_cls = get_workflow_for_event(event_dict)
-                    if workflow_cls:
+                    if workflow_cls and manager is None:
+                        # "No fire-and-forget ever": the managed engine is unavailable, so
+                        # we REFUSE to execute — but the refusal itself is AUDITED (one event
+                        # per triggering event) so the gap is visible in /admin, never silent.
+                        log.error(
+                            "refusing to run workflow %s for event %s — managed engine "
+                            "unavailable (no un-audited execution)",
+                            workflow_cls.__name__, event_dict["id"],
+                        )
                         try:
-                            if manager:
-                                await _run_workflow_managed(
-                                    conn, manager, workflow_cls, event_dict
-                                )
-                            else:
-                                await _run_workflow(conn, workflow_cls, event_dict, fabric=fabric)
+                            await emit_event(
+                                conn,
+                                namespace="system",
+                                type="workflow.execution_refused",
+                                payload={
+                                    "workflow": workflow_cls.__name__,
+                                    "triggerEventId": event_dict["id"],
+                                    "reason": "managed_engine_unavailable",
+                                },
+                                tenant_id=event_dict.get("tenant_id"),
+                            )
+                        except Exception as exc:
+                            log.error("failed to emit workflow.execution_refused: %s", exc)
+                    elif workflow_cls:
+                        try:
+                            await _run_workflow_managed(
+                                conn, manager, workflow_cls, event_dict
+                            )
                         except Exception as exc:
                             log.error(
                                 "workflow execution failed for event %s: %s",

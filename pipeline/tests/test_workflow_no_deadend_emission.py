@@ -127,17 +127,15 @@ def test_managed_engine_emits_full_instance_lifecycle():
     assert "step_status" in src and "step_results" in src and "last_error" in src
 
 
-def test_fire_and_forget_emits_started_steps_and_completed():
+def test_processor_refuses_unaudited_execution():
+    """There is no fire-and-forget path: when the engine is unavailable the processor
+    emits an AUDITED refusal instead of running un-audited work (no silent execution)."""
     from workflows import processor
 
-    src = inspect.getsource(processor._run_workflow)
-    for evt in (
-        "workflow.started",
-        "workflow.step_completed",
-        "workflow.step_failed",
-        "workflow.completed",
-    ):
-        assert evt in src, f"fire-and-forget path never emits {evt}"
+    assert not hasattr(processor, "_run_workflow"), "un-audited executor must be gone"
+    src = inspect.getsource(processor.run_workflow_processor)
+    assert "workflow.engine_unavailable" in src
+    assert "workflow.execution_refused" in src
 
 
 def test_every_step_completion_emits_an_event():

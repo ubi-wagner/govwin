@@ -7,8 +7,10 @@ Covers, with a mix of a live-DB drive-test and cheap static/definition locks:
           (Drive-tested against the sandbox process_instances table.)
   HIGH-2  OnRfpUploaded.notify_curator is INDEPENDENT (no depends_on) so the RFP admin is
           alerted even when shred/extract fails (the failure they most need to hear about).
-  MED-4   the fire-and-forget path stops at a TODO human gate (not just HITL_WAIT), and the
-          dispatcher treats a stray TODO as a safe skip, never an "unknown_type" no-op.
+  MED-4   the managed engine (the only executor) parks at a TODO human gate as well as
+          HITL_WAIT, and the dispatcher treats a stray TODO as a safe skip, never an
+          "unknown_type" no-op. (The fire-and-forget path this originally guarded has since
+          been removed entirely — see test_engine_single_path.)
   MED-6   tenantId is a HITL correlation key — a resume event for tenant B can't wake a
           parked instance for tenant A.
   LOW-10  OnProposalCreated.notify_admin_review reads payload.title (the real end-event key),
@@ -177,15 +179,19 @@ def test_proposal_created_notify_uses_title_not_proposalTitle():
 # MED-4 — TODO human gate (fire-and-forget stop + dispatcher safe-skip)
 # ────────────────────────────────────────────────────────────────────────────
 
-def test_fire_and_forget_stops_at_todo_gate():
-    """The fire-and-forget guard must stop at BOTH HITL_WAIT and TODO (not just HITL_WAIT)."""
-    from workflows import processor
+def test_managed_engine_parks_at_todo_gate():
+    """The managed engine (the ONLY executor) must park at a TODO gate, not skip it.
 
-    src = inspect.getsource(processor._run_workflow)
-    assert "StepType.HITL_WAIT, StepType.TODO" in src, (
-        "fire-and-forget human-gate guard must include StepType.TODO or an unmigrated "
-        "deploy silently skips the task gate"
+    (The fire-and-forget path that MED-4 originally guarded has since been removed
+    entirely — 'no fire-and-forget ever' — so the guarantee now lives in the managed
+    engine, which handles TODO alongside HITL_WAIT by parking + writing a tasks row.)"""
+    from workflows.manager import WorkflowManager
+
+    src = inspect.getsource(WorkflowManager.execute_instance)
+    assert "StepType.TODO, StepType.HITL_WAIT" in src or "StepType.HITL_WAIT, StepType.TODO" in src, (
+        "managed engine must intercept TODO as a human gate (park), not dispatch it"
     )
+    assert "_create_task" in src  # a TODO also writes to the unified tasks ledger
 
 
 @pytest.mark.asyncio

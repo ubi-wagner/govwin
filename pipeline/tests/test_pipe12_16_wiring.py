@@ -210,11 +210,9 @@ class TestFabricThreading:
         sig = inspect.signature(_execute_step)
         assert "fabric" in sig.parameters
 
-    def test_execute_step_with_retry_accepts_fabric(self):
-        import inspect
-        from workflows.processor import _execute_step_with_retry
-        sig = inspect.signature(_execute_step_with_retry)
-        assert "fabric" in sig.parameters
+    # (test_execute_step_with_retry_accepts_fabric removed — the fire-and-forget retry
+    #  wrapper was deleted with the un-audited path; the managed engine threads fabric
+    #  through _execute_step directly, covered by the two sibling tests here.)
 
     def test_execute_ai_invoke_accepts_fabric_and_trigger(self):
         import inspect
