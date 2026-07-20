@@ -284,6 +284,21 @@ def render_combined(manifest, specs):
       {secs}
     </div>"""
 
+    # The combined page is a shareable WEB view (unlike the print-paired per-guide pages),
+    # so it is theme-aware: redefine the palette tokens for dark under both the OS media query
+    # and the viewer's data-theme toggle. Components reference tokens, so this is enough.
+    DARK = """
+:root[data-theme="dark"]{--ink:#e6ecf5;--mut:#94a3b7;--line:#25313f;--brand:#9cc1ff;--accent:#6ea8ff;--eg:#152338;--egb:#2c4569;--warn:#2a2113;--warnb:#5a4626;--warnk:#f0b878;--bg:#0f1622}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e6ecf5;--mut:#94a3b7;--line:#25313f;--brand:#9cc1ff;--accent:#6ea8ff;--eg:#152338;--egb:#2c4569;--warn:#2a2113;--warnb:#5a4626;--warnk:#f0b878;--bg:#0f1622}}
+:root[data-theme="dark"] nav,@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) nav{background:#0c131d}}
+:root[data-theme="dark"] code,:root[data-theme="dark"] .route span,:root[data-theme="dark"] .tag{background:#172230;border-color:#25313f;color:#cdd8e6}
+:root[data-theme="dark"] .navhead:hover,:root[data-theme="dark"] nav a:hover{background:#182432}
+:root[data-theme="dark"] figure img{border-color:#2a3746;box-shadow:0 2px 16px rgba(0,0,0,.4)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) nav{background:#0c131d}
+:root:not([data-theme="light"]) code,:root:not([data-theme="light"]) .route span,:root:not([data-theme="light"]) .tag{background:#172230;border-color:#25313f;color:#cdd8e6}
+:root:not([data-theme="light"]) .navhead:hover,:root:not([data-theme="light"]) nav a:hover{background:#182432}
+:root:not([data-theme="light"]) figure img{border-color:#2a3746;box-shadow:0 2px 16px rgba(0,0,0,.4)}}
+"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{_html.escape(manifest.get('title','govwin Role Guides'))}</title>
@@ -293,7 +308,7 @@ def render_combined(manifest, specs):
 .navhead:hover{{background:#eef2f7;text-decoration:none}}
 .guide{{border-bottom:3px solid var(--line);margin-bottom:6px;padding-bottom:14px}}
 .guide:last-child{{border-bottom:0}}
-</style></head><body>
+{DARK}</style></head><body>
 <div class="wrap">
 <nav>
   <h1>{_html.escape(manifest.get('title','Role Guides'))}</h1>
