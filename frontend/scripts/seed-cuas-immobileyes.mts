@@ -105,7 +105,11 @@ try {
     RETURNING id`;
   const oppId = opp.id;
 
-  // ── Solicitation + link ──
+  // ── Solicitation + link ── (clean child rows first so a re-seed DELETE doesn't trip FKs
+  //   solicitation_compliance / solicitation_volumes → volume_required_items all reference the solicitation) ──
+  await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id IN (SELECT id FROM curated_solicitations WHERE opportunity_id = ${oppId}::uuid))`;
+  await sql`DELETE FROM solicitation_volumes WHERE solicitation_id IN (SELECT id FROM curated_solicitations WHERE opportunity_id = ${oppId}::uuid)`;
+  await sql`DELETE FROM solicitation_compliance WHERE solicitation_id IN (SELECT id FROM curated_solicitations WHERE opportunity_id = ${oppId}::uuid)`;
   await sql`DELETE FROM curated_solicitations WHERE opportunity_id = ${oppId}::uuid`;
   const [cs] = await sql<{ id: string }[]>`
     INSERT INTO curated_solicitations (opportunity_id, namespace, status, spotlight_summary, full_text)
