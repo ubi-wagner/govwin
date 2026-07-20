@@ -14,6 +14,13 @@ not a reinvention.
 > `OnProposalCreated`). **The fabric now registers 19 archetypes**; every agent is an advisory,
 > injection-fenced, independent workflow actor with a `test_*_wiring.py`. LLM reasoning runs on deploy.
 > The sections below are retained as the design rationale.
+>
+> **OUR-ORG WORKFORCE (POD 4 built).** Separate from the customer/master batches above, the agents that
+> run *our* business live in `docs/AGENT_ORG_WORKFORCE.md`. **POD 4 (RFP-admin ops) is built**:
+> `curation_qa` (pre-release QA gate — new `OnSolicitationReviewRequested` workflow) and `ops_digest`
+> (the first SCHEDULED automation — a main-loop scheduler emits `system:ops.digest_requested` →
+> `OnOpsDigestRequested`). Fabric now registers **21 archetypes**. POD 1–3 (marketing / sales / CS) are
+> the forward plan there.
 
 ---
 
