@@ -12,10 +12,20 @@ import { LibraryPicker, type LibraryAtomCandidate } from './library-picker';
 import { AIRevisionPanel } from './ai-revision-panel';
 import { CommentThread, type NodeComment } from './collaboration';
 import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
+import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 
 interface Props {
   document: CanvasDocument;
   selectedNode: CanvasNode | null;
+  /** View-only (locked proposal, or a comment/view-scoped collaborator) — hides edit affordances. */
+  readOnly?: boolean;
+  /** Resolved tool set (role × stage) — drives the prioritized toolbox card list. */
+  capabilities?: CanvasCapabilities;
+  /** Process stage for toolbox ordering ('draft' | 'review' | 'locked' | 'ingest' | 'template'). */
+  stage?: string;
+  /** Launch an editor-hosted tool from a toolbox card (library/atomize/export/template/lock). */
+  onToolAction?: (id: string) => void;
   /** Current section category slug for library search (e.g. 'technical_approach') */
   sectionCategory?: string;
   onAddNode: (type: CanvasNode['type'], after?: string) => void;
@@ -305,6 +315,10 @@ function VersionHistorySection({
 export function CanvasSidebar({
   document: doc,
   selectedNode,
+  readOnly = false,
+  capabilities,
+  stage,
+  onToolAction,
   sectionCategory,
   onAddNode,
   onDeleteNode,
@@ -319,7 +333,7 @@ export function CanvasSidebar({
   tenantSlug,
   sectionId,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings'>('compliance');
+  const [activeTab, setActiveTab] = useState<'compliance' | 'node' | 'add' | 'history' | 'settings' | 'review'>('compliance');
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
 
   const maxPages = doc.canvas.max_pages;
@@ -332,11 +346,61 @@ export function CanvasSidebar({
   const libraryNodes = doc.nodes.filter((n) => n.provenance.source === 'library').length;
   const manualNodes = doc.nodes.filter((n) => n.provenance.source === 'manual').length;
 
+  // Role/lock gates the EDIT tabs (Add blocks, page Settings) — a view/comment
+  // user keeps the read panels (status, node info, history, comments).
+  const hasComments = Boolean(proposalId && tenantSlug && sectionId);
+  const tabs = [
+    'compliance' as const,
+    'node' as const,
+    ...(!readOnly ? ['add' as const] : []),
+    ...(hasComments ? ['review' as const] : []),
+    ...(hasComments ? ['history' as const] : []),
+    ...(!readOnly ? ['settings' as const] : []),
+  ];
+
+  // The prioritized toolbox for this role×context — most-likely card first.
+  const toolbox = capabilities ? toolboxFromCapabilities(capabilities, stage ?? (readOnly ? 'review' : 'draft')) : null;
+  const CARD_TAB: Partial<Record<string, typeof activeTab>> = { compliance: 'compliance', insert: 'add', format: 'node', floorplan: 'settings', review: 'review' };
+  const ACTION_CARDS = new Set(['library', 'atomize', 'export', 'template', 'lock']);
+
   return (
     <div className="w-72 shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+      {/* Toolbox — the role×context card list (most-likely tool on top). */}
+      {toolbox && toolbox.cards.length > 0 && (
+        <div className="border-b border-gray-200 bg-gray-50/60 px-3 py-2">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Your toolbox</div>
+          <div className="space-y-1">
+            {toolbox.cards.map((c) => {
+              const tab = CARD_TAB[c.id];
+              const isPrimary = toolbox.primary?.id === c.id;
+              const toTab = tab && tabs.includes(tab);
+              const isAction = ACTION_CARDS.has(c.id) && !!onToolAction;
+              const clickable = !!toTab || isAction;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => (toTab ? setActiveTab(tab!) : isAction ? onToolAction!(c.id) : undefined)}
+                  disabled={!clickable}
+                  title={c.hint}
+                  className={`w-full text-left flex items-start gap-1.5 rounded px-2 py-1 text-xs transition-colors ${
+                    isPrimary ? 'bg-blue-50 border border-blue-200' : c.ambient ? 'text-gray-400' : 'hover:bg-white border border-transparent'
+                  } ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
+                >
+                  <span className={isPrimary ? 'text-blue-500' : 'text-gray-300'}>{isPrimary ? '★' : '·'}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`font-medium ${isPrimary ? 'text-blue-700' : c.ambient ? 'text-gray-400' : 'text-gray-700'}`}>{c.title}</span>
+                    {isPrimary && <span className="block text-[10px] text-gray-400 truncate">{c.hint}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex border-b border-gray-200 text-xs">
-        {(['compliance', 'node', 'add', ...(proposalId && tenantSlug && sectionId ? ['history'] as const : []), 'settings'] as const).map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as typeof activeTab)}
@@ -459,21 +523,23 @@ export function CanvasSidebar({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-1">
-              <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
-              <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
-              <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
-              <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
-              <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
-              {onReplaceFromLibrary && (
-                <button
-                  onClick={() => setShowLibraryPicker((prev) => !prev)}
-                  className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
-                >
-                  Replace from Library
-                </button>
-              )}
-            </div>
+            {!readOnly && (
+              <div className="flex flex-wrap gap-1">
+                <button onClick={() => onMoveNode(selectedNode.id, 'up')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Up</button>
+                <button onClick={() => onMoveNode(selectedNode.id, 'down')} className="px-2 py-1 text-xs border rounded hover:bg-gray-50">Move Down</button>
+                <button onClick={() => onAcceptNode(selectedNode.id)} className="px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100">Accept</button>
+                <button onClick={() => onRevertNode(selectedNode.id)} className="px-2 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded hover:bg-yellow-100">Revert</button>
+                <button onClick={() => onDeleteNode(selectedNode.id)} className="px-2 py-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100">Delete</button>
+                {onReplaceFromLibrary && (
+                  <button
+                    onClick={() => setShowLibraryPicker((prev) => !prev)}
+                    className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100"
+                  >
+                    Replace from Library
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Library picker — shown when "Replace from Library" is clicked */}
             {showLibraryPicker && onReplaceFromLibrary && (
@@ -492,7 +558,7 @@ export function CanvasSidebar({
             )}
 
             {/* ── Format ──────────────────────────────────── */}
-            {onUpdateNodeStyle && (
+            {!readOnly && onUpdateNodeStyle && (
               <div>
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Format</h3>
 
@@ -732,6 +798,32 @@ export function CanvasSidebar({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Review tab — the collaboration workbench: comment · revise · complete ── */}
+        {activeTab === 'review' && proposalId && tenantSlug && sectionId && (
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Review · Modify · Lock</h3>
+              <p className="text-[11px] text-gray-400">
+                {readOnly ? 'You have review access — comment below.' : 'Comment, revise on the canvas, then complete this section.'}
+              </p>
+            </div>
+            {capabilities?.canLock ? (
+              <button
+                onClick={() => onToolAction?.('lock')}
+                className="w-full text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-2"
+                title="Save + accept & lock this section (complete the ToDo)"
+              >
+                Complete &amp; Lock this section
+              </button>
+            ) : !readOnly ? (
+              <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1.5">
+                Save your edits — an admin accepts &amp; locks the section to complete it.
+              </p>
+            ) : null}
+            <CommentsSection nodeId={sectionId} proposalId={proposalId} tenantSlug={tenantSlug} />
           </div>
         )}
 

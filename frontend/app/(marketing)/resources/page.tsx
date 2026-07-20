@@ -21,8 +21,6 @@ export default async function ResourcesPage() {
   const programsHeader = single(lookup['programs-header']);
   const programs = many(lookup['programs']);
   const insightsHeader = single(lookup['insights-header']);
-  const portalsHeader = single(lookup['portals-header']);
-  const portals = many(lookup['portals']);
   const cta = single(lookup['cta']);
   const ctaMeta = (cta?.metadata ?? {}) as { ctaLabel?: string; ctaHref?: string };
 
@@ -34,16 +32,9 @@ export default async function ResourcesPage() {
     { title: 'CSO', icon: 'program-cso', body: 'Commercial Solutions Openings — typically Air Force (AFWERX). Slide-deck format, short-form proposals.' },
     { title: 'Grants / NOFO', icon: 'program-grants', body: 'Grants.gov Notices of Funding Opportunity — NSF, DOE, NIH. CFDA-based, different compliance structure.' },
   ];
-  const DEFAULT_PORTALS = [
-    { title: 'Spotlight Dashboard', body: 'Your ranked opportunity feed, deadline reminders, and pinned topics.', linkLabel: 'Login to access', linkHref: '/login' },
-    { title: 'Proposal Portals', body: 'Your purchased proposal workspaces — drafts, collaborators, and submission packages.', linkLabel: 'Login to access', linkHref: '/login' },
-  ];
   const resolvedPrograms = programs.length > 0
     ? programs.map((p) => ({ title: p.title, body: p.body, icon: (p.metadata as { icon?: string })?.icon }))
     : DEFAULT_PROGRAMS;
-  const resolvedPortals = portals.length > 0
-    ? portals.map((p) => { const m = (p.metadata ?? {}) as { linkLabel?: string; linkHref?: string }; return { title: p.title, body: p.body, linkLabel: m.linkLabel ?? 'Login to access', linkHref: m.linkHref ?? '/login' }; })
-    : DEFAULT_PORTALS;
 
   return (
     <>
@@ -87,25 +78,6 @@ export default async function ResourcesPage() {
           ) : (
             <ResourcesFilter content={JSON.parse(JSON.stringify(allContent))} />
           )}
-        </div>
-      </section>
-
-      {/* Subscriber portal links */}
-      <section className="bg-white border-t border-cream-200">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <h2 className="font-display text-2xl font-bold text-navy-900 mb-3">{portalsHeader?.title ?? 'Subscriber Portals'}</h2>
-          <p className="text-sm text-navy-500 mb-8">{portalsHeader?.body ?? 'Logged-in subscribers access their portals via the dashboard.'}</p>
-          <div className="grid md:grid-cols-2 gap-6">
-            {resolvedPortals.map((portal) => (
-              <div key={portal.title} className="p-6 border border-cream-200 rounded-lg bg-cream-50">
-                <h3 className="font-display font-bold text-navy-900">{portal.title}</h3>
-                <p className="mt-2 text-sm text-navy-600">{portal.body}</p>
-                <Link href={portal.linkHref} className="mt-4 inline-flex text-sm text-brand-500 hover:text-brand-700 font-medium">
-                  {portal.linkLabel} &rarr;
-                </Link>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

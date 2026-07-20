@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
+import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -101,23 +102,27 @@ export async function GET(request: Request, ctx: RouteContext) {
       );
     }
 
-    // ── Proposal-level access check for non-admin users ─────────────
+    // ── Section-level access — a collaborator scoped to one section must not
+    //    read another section's history (its content is returned on ?version=N).
+    //    resolveUserAccess returns EVERY section for an admin/tenant-wide member
+    //    and only the GRANTED sections for a collaborator, so this enforces both
+    //    proposal membership AND per-section scope in one check.
     if (!hasRoleAtLeast(role, 'tenant_admin')) {
+      let access;
       try {
-        const [collab] = await sql<{ userId: string }[]>`
-          SELECT user_id FROM proposal_collaborators
-          WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
-          LIMIT 1
-        `;
-        if (!collab) {
-          return NextResponse.json(
-            { error: 'You are not a collaborator on this proposal', code: 'FORBIDDEN' },
-            { status: 403 },
-          );
-        }
+        access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
       } catch (e) {
-        console.error('[versions] collaborator check failed:', e);
+        console.error('[versions] access check failed:', e);
         return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+      const canView = access.viewableSections.includes(sectionId)
+        || access.commentableSections.includes(sectionId)
+        || access.editableSections.includes(sectionId);
+      if (!canView) {
+        return NextResponse.json(
+          { error: 'You do not have access to this section', code: 'FORBIDDEN' },
+          { status: 403 },
+        );
       }
     }
 

@@ -109,6 +109,18 @@ class OnApplicationAccepted(Workflow):
     )
 
     steps = [
+        # AI actor (#127): the onboarding_agent cold-starts the new tenant — proposes profile
+        # enrichment, spotlight buckets to seed, whether to atomize uploads, and a getting-started
+        # ToDo plan — so the mirror agents (scoring/analyst/architect/librarian/capture) are
+        # effective on day one. ADVISORY (advisory → guardrail → land-or-review); tenant-bound via
+        # result.tenantId. Independent (no depends_on) so a skip never blocks library setup.
+        Step(
+            name="ai_onboarding_concierge",
+            step_type=StepType.AI_INVOKE,
+            action="tool.onboarding.concierge",
+            input_map={"tenant_id": "result.tenantId", "user_id": "result.userId"},
+            timeout_minutes=10,
+        ),
         Step(
             name="create_library_defaults",
             action="workflows.actions.create_library_defaults.create_default_categories",

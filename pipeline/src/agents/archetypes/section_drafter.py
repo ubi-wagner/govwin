@@ -187,15 +187,17 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         try:
             escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
-            # Use text search on library_units table
+            # Use text search on the canonical library_atoms table
             if category:
                 rows = await conn.fetch(
                     """
-                    SELECT id, heading_text, content, category, tags
-                    FROM library_units
+                    SELECT id, title AS heading_text, content,
+                           NULL AS category, '{}'::text[] AS tags
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
-                      AND category = $2
+                      AND EXISTS (SELECT 1 FROM atom_tags t
+                                  WHERE t.atom_id = library_atoms.id AND t.value = $2)
                       AND content ILIKE $3
                     ORDER BY updated_at DESC
                     LIMIT $4
@@ -208,11 +210,12 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT id, heading_text, content, category, tags
-                    FROM library_units
+                    SELECT id, title AS heading_text, content,
+                           NULL AS category, '{}'::text[] AS tags
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
-                      AND (content ILIKE $2 OR heading_text ILIKE $2)
+                      AND (content ILIKE $2 OR title ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3
                     """,

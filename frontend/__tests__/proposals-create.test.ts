@@ -264,18 +264,19 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     expect(json.code).toBe('PAYMENT_REQUIRED');
   });
 
-  it('proceeds (no 402) when FOUNDING_COHORT_BYPASS is unset — V1 paywall is opt-in', async () => {
+  it('enforces the paywall (402) when FOUNDING_COHORT_BYPASS is unset — fail-safe default', async () => {
+    // FAIL-SAFE: the paywall is ENFORCED by default; unset behaves like `false`. A
+    // founding-cohort deploy must EXPLICITLY set FOUNDING_COHORT_BYPASS=true to bypass.
     delete process.env.FOUNDING_COHORT_BYPASS;
 
     authMock.mockResolvedValue(makeSession());
     getTenantBySlugMock.mockResolvedValue(makeTenant());
     verifyTenantAccessMock.mockResolvedValue(true);
-    // Topic lookup → not found, which proves we passed the (now off-by-default) gate.
-    sqlMock.mockResolvedValueOnce([]);
 
     const res = await POST(makeRequest({ topicId: TOPIC_ID }), makeCtx());
-    expect(res.status).not.toBe(402);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(402);
+    const json = await res.json();
+    expect(json.code).toBe('PAYMENT_REQUIRED');
   });
 
   // ── Input validation ───────────────────────────────────────────────

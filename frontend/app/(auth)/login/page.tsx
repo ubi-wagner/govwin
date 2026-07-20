@@ -8,6 +8,8 @@ interface PageProps {
     error?: string;
     from?: string;
     justChanged?: string;
+    switchedTo?: string;
+    switchedFrom?: string;
   }>;
 }
 
@@ -44,9 +46,10 @@ export default async function LoginPage({ searchParams }: PageProps) {
   // Already authenticated — redirect to the appropriate workspace.
   if (session?.user) {
     // If we arrived here with error=session, don't auto-redirect —
-    // the session is corrupt and the user needs to sign out.
-    if (params.error === 'session') {
-      // Fall through to render the login form with error message
+    // the session is corrupt and the user needs to sign out. Same when mid-company-switch
+    // (a deep link to another company just signed them out): show the notice + form.
+    if (params.error === 'session' || params.switchedTo) {
+      // Fall through to render the login form with the message
     } else {
       const sessionUser = session.user as {
         role?: unknown;
@@ -98,7 +101,11 @@ export default async function LoginPage({ searchParams }: PageProps) {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-sm p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
-        <p className="text-sm text-gray-500 mb-6">RFP Pipeline</p>
+        <p className="text-sm text-gray-500 mb-2">RFP Pipeline</p>
+        <p className="text-xs text-gray-400 mb-6">
+          One sign-in for customers, collaborators, and staff. If your email works with
+          more than one company, you&apos;ll choose which to enter next.
+        </p>
 
         {justChanged ? (
           <div
@@ -106,6 +113,16 @@ export default async function LoginPage({ searchParams }: PageProps) {
             className="mb-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
           >
             Password updated. Please sign in with your new password.
+          </div>
+        ) : null}
+        {params.switchedTo ? (
+          <div
+            role="status"
+            className="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          >
+            You&apos;ve been signed out of <strong>{params.switchedFrom || 'your last company'}</strong>.
+            Sign in to continue into <strong>{params.switchedTo}</strong> — you&apos;ll land right where
+            your notification pointed you.
           </div>
         ) : null}
         {errorMsg ? (

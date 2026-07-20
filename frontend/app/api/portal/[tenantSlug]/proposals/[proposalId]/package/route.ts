@@ -16,10 +16,15 @@ import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { getSignedGetUrl } from '@/lib/storage/s3-client';
 import { exportToDocx } from '@/lib/export/docx-exporter';
+import { assembleArtifactCanvas, resolveArtifactFormat, renderCanvas } from '@/lib/export/artifact-export';
+import JSZip from 'jszip';
 import {
   CANVAS_PRESETS,
+  sectionsToNodes,
+  coalesceGroups,
   type CanvasDocument,
   type CanvasNode,
+  type CanvasSection,
   type HeadingContent,
   type TextBlockContent,
   type ListContent,
@@ -45,9 +50,18 @@ function parseSectionContent(raw: string | null): {
   if (!raw) return { nodes: [], canvas: null };
   try {
     const parsed = JSON.parse(raw);
-    // Full CanvasDocument shape
-    if (parsed.version === 1 && Array.isArray(parsed.nodes) && parsed.canvas) {
-      return { nodes: parsed.nodes, canvas: parsed.canvas };
+    // Full CanvasDocument shape (v2 flattens its section layer to a flat node
+    // run for this combined-document assembly; section flow is preserved by the
+    // per-artifact native export, not the merged package).
+    if ((parsed.version === 1 || parsed.version === 2) && parsed.canvas) {
+      if (Array.isArray(parsed.sections) && parsed.sections.length) {
+        return { nodes: sectionsToNodes(parsed.sections as CanvasSection[]), canvas: parsed.canvas };
+      }
+      if (Array.isArray(parsed.nodes)) return { nodes: parsed.nodes, canvas: parsed.canvas };
+    }
+    // Bare section layer without a canvas
+    if (Array.isArray(parsed.sections) && parsed.sections.length) {
+      return { nodes: sectionsToNodes(parsed.sections as CanvasSection[]), canvas: null };
     }
     // Object with a nodes array
     if (parsed.nodes && Array.isArray(parsed.nodes)) {
@@ -157,10 +171,10 @@ export async function POST(request: Request, ctx: RouteContext) {
   // ── Parse format from query string ──────────────────────────────
   const url = new URL(request.url);
   const format = url.searchParams.get('format') || 'json';
-  if (format !== 'json' && format !== 'docx') {
+  if (format !== 'json' && format !== 'docx' && format !== 'zip') {
     return NextResponse.json(
       {
-        error: 'Invalid format. Supported: json, docx',
+        error: 'Invalid format. Supported: json, docx, zip',
         code: 'VALIDATION_ERROR',
       },
       { status: 400 },
@@ -219,6 +233,65 @@ export async function POST(request: Request, ctx: RouteContext) {
       { error: 'Forbidden', code: 'FORBIDDEN' },
       { status: 403 },
     );
+  }
+
+  // ── ZIP export path (whole proposal, each volume in its NATIVE format) ──
+  // A proposal mixes docx/pptx/xlsx volumes, so a single-format download is lossy;
+  // the zip assembles each artifact from its sections and renders it natively.
+  if (format === 'zip') {
+    try {
+      // Ownership + the SAME lock/stage download gate the docx/json paths enforce,
+      // BEFORE touching artifact data.
+      const [prop] = await sql<{ title: string | null; stage: string; isLocked: boolean }[]>`
+        SELECT title, stage, is_locked FROM proposals
+        WHERE id = ${proposalId} AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      if (!prop) return NextResponse.json({ error: 'Proposal not found', code: 'NOT_FOUND' }, { status: 404 });
+      if (!prop.isLocked && prop.stage !== 'submitted' && prop.stage !== 'archived') {
+        return NextResponse.json({ error: 'Proposal must be locked or in submitted/archived stage to export package', code: 'FORBIDDEN' }, { status: 403 });
+      }
+
+      const artifacts = await sql<{ id: string; artifactType: string; volumeName: string; volumeNumber: number }[]>`
+        SELECT id, artifact_type AS "artifactType", volume_name AS "volumeName", volume_number AS "volumeNumber"
+        FROM proposal_artifacts WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY volume_number, volume_name`;
+      const vars = { company_name: (tenant as { name?: string }).name ?? 'Company', topic_number: '' };
+      const zip = new JSZip();
+      const failed: string[] = [];
+      let fileCount = 0;
+      for (const a of artifacts) {
+        const secs = await sql<{ title: string | null; content: string | null }[]>`
+          SELECT title, content FROM proposal_sections WHERE artifact_id = ${a.id}::uuid ORDER BY section_number`;
+        if (secs.length === 0) continue;
+        const doc = assembleArtifactCanvas(secs, a.artifactType, a.volumeName);
+        const fmt = resolveArtifactFormat(a.artifactType, doc.canvas?.format);
+        try {
+          const buf = await renderCanvas(fmt, doc, vars);
+          const safe = `V${a.volumeNumber}_${(a.volumeName || 'volume').replace(/[^a-z0-9]+/gi, '_')}`;
+          zip.file(`${safe}.${fmt}`, buf);
+          fileCount++;
+        } catch (e) {
+          console.error('[package/zip] volume render failed', a.volumeName, e);
+          failed.push(a.volumeName || `volume ${a.volumeNumber}`);
+        }
+      }
+      // Never ship a silently-incomplete package: if any volume failed to render,
+      // fail the whole zip and name the volumes so the user can retry / export singly.
+      if (failed.length > 0) {
+        return NextResponse.json({ error: `Could not render ${failed.length} volume(s): ${failed.join(', ')}. Export each volume individually or retry.`, code: 'EXPORT_ERROR' }, { status: 500 });
+      }
+      if (fileCount === 0) {
+        return NextResponse.json({ error: 'No volumes with content to export', code: 'NOT_FOUND' }, { status: 404 });
+      }
+      const zipBuf = await zip.generateAsync({ type: 'nodebuffer' });
+      const safeName = (prop.title || 'proposal').replace(/[^a-z0-9]+/gi, '_').slice(0, 60);
+      return new Response(new Uint8Array(zipBuf), {
+        status: 200,
+        headers: { 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${safeName}.zip"` },
+      });
+    } catch (e) {
+      console.error('[portal/proposals/package] zip failed:', e);
+      return NextResponse.json({ error: 'Package zip failed', code: 'DB_ERROR' }, { status: 500 });
+    }
   }
 
   // ── Emit start event ────────────────────────────────────────────
@@ -368,48 +441,33 @@ export async function POST(request: Request, ctx: RouteContext) {
         parsedSections.find((s) => s.canvas)?.canvas ??
         CANVAS_PRESETS.letter_standard;
 
-      const allNodes: CanvasNode[] = [];
-      for (const section of parsedSections) {
-        // Add a heading node for each section
-        allNodes.push({
+      // One FLOW section per mold — its H1 heading then its content, figures/
+      // tables kept together. No forced page breaks between molds: the whole
+      // proposal flows continuously (headings mark the sections).
+      const docSections: CanvasSection[] = parsedSections.map((section) => {
+        const headingNode: CanvasNode = {
           id: crypto.randomUUID(),
           type: 'heading',
-          content: {
-            level: 1 as const,
-            text: `${section.sectionNumber}. ${section.title}`,
-          },
+          content: { level: 1 as const, text: `${section.sectionNumber}. ${section.title}` },
           style: {},
-          provenance: {
-            source: 'manual',
-            drafted_at: new Date().toISOString(),
-          },
+          provenance: { source: 'manual', drafted_at: new Date().toISOString() },
           history: [],
           library_eligible: false,
-        });
-        // Append the section's canvas nodes
-        allNodes.push(...section.nodes);
-        // Add a page break between sections (except after the last)
-        if (section !== parsedSections[parsedSections.length - 1]) {
-          allNodes.push({
-            id: crypto.randomUUID(),
-            type: 'page_break',
-            content: null,
-            style: {},
-            provenance: {
-              source: 'manual',
-              drafted_at: new Date().toISOString(),
-            },
-            history: [],
-            library_eligible: false,
-          });
-        }
-      }
+        };
+        return {
+          id: crypto.randomUUID(),
+          title: section.title,
+          layout: { mode: 'flow' as const },
+          groups: coalesceGroups([headingNode, ...section.nodes]),
+        };
+      });
 
       const combinedDoc: CanvasDocument = {
-        version: 1,
+        version: 2,
         document_id: crypto.randomUUID(),
         canvas: firstCanvas,
-        nodes: allNodes,
+        nodes: [],
+        sections: docSections,
         metadata: {
           title: proposal.title,
           volume_id: '',
@@ -488,7 +546,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         },
       });
 
-      const safeFilename = proposal.title.replace(/[^a-zA-Z0-9-_ ]/g, '');
+      const safeFilename = (proposal.title ?? 'proposal').replace(/[^a-zA-Z0-9-_ ]/g, '') || 'proposal';
       return new NextResponse(new Uint8Array(buffer), {
         status: 200,
         headers: {

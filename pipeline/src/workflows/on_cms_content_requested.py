@@ -62,6 +62,22 @@ class OnCmsContentRequested(Workflow):
     )
 
     steps = [
+        # AI actor (our-org CMS): the content_generator drafts web + social copy from the brief,
+        # grounded in our published voice — ADVISORY input to the human review. Independent (no
+        # depends_on) so it runs alongside the deterministic draft and never blocks the pipeline.
+        # Outbound content is human-approved before publish (brand-voice guardrail).
+        Step(
+            name="ai_content_generate",
+            step_type=StepType.AI_INVOKE,
+            action="tool.content.generate",
+            input_map={
+                "title": "payload.title",
+                "brief": "payload.brief",
+                "contentType": "payload.contentType",
+                "tags": "payload.tags",
+            },
+            timeout_minutes=10,
+        ),
         Step(
             name="draft_content",
             action="workflows.actions.cms_content.draft_content",

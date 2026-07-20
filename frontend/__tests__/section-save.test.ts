@@ -15,20 +15,20 @@
  *   (k) 200 success: section.saved event emitted
  *   (l) Partner_user WITH edit permission → 200
  *
- * Mocked: @/auth, @/lib/db (sql + getTenantBySlug + verifyTenantAccess),
+ * Mocked: @/auth, @/lib/db (sql + getTenantBySlug + verifyProposalAccess),
  *         @/lib/events (emitEventSingle + userActor), @/lib/validation
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Hoisted mock factories ────────────────────────────────────────────────
-const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock,
+const { authMock, sqlMock, getTenantBySlugMock, verifyProposalAccessMock,
   emitEventSingleMock, isValidUUIDMock, resolveUserAccessMock } = vi.hoisted(() => {
   const sqlMock = vi.fn();
   return {
     authMock: vi.fn(),
     sqlMock,
     getTenantBySlugMock: vi.fn(),
-    verifyTenantAccessMock: vi.fn(),
+    verifyProposalAccessMock: vi.fn(),
     emitEventSingleMock: vi.fn(),
     isValidUUIDMock: vi.fn(),
     resolveUserAccessMock: vi.fn(),
@@ -42,7 +42,7 @@ vi.mock('@/auth', () => ({ auth: authMock }));
 vi.mock('@/lib/db', () => ({
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,
-  verifyTenantAccess: verifyTenantAccessMock,
+  verifyProposalAccess: verifyProposalAccessMock,
 }));
 
 vi.mock('@/lib/events', () => ({
@@ -139,7 +139,7 @@ function setupAuth(role = 'tenant_admin') {
   authMock.mockResolvedValue(makeSession(role));
   isValidUUIDMock.mockReturnValue(true);
   getTenantBySlugMock.mockResolvedValue(makeTenant());
-  verifyTenantAccessMock.mockResolvedValue(true);
+  verifyProposalAccessMock.mockResolvedValue(true);
   // Default: the actor can edit this section (admins get all sections; a
   // collaborator gets their assigned+edit set). Denial tests override to [].
   resolveUserAccessMock.mockResolvedValue({
@@ -189,7 +189,7 @@ describe('PUT section/save — auth guards', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -231,7 +231,7 @@ describe('PUT section/save — auth guards', () => {
     authMock.mockResolvedValue(makeSession());
     isValidUUIDMock.mockReturnValue(true);
     getTenantBySlugMock.mockResolvedValue(makeTenant());
-    verifyTenantAccessMock.mockResolvedValue(false);
+    verifyProposalAccessMock.mockResolvedValue(false);
     const res = await PUT(makeRequest({ content: {} }), makeCtx());
     expect(res.status).toBe(403);
     expect((await res.json()).code).toBe('FORBIDDEN');
@@ -243,7 +243,7 @@ describe('PUT section/save — input validation', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -307,7 +307,7 @@ describe('PUT section/save — proposal / section state checks', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -364,7 +364,7 @@ describe('PUT section/save — collaborator (partner_user) edit permission', () 
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -428,7 +428,7 @@ describe('PUT section/save — OCC version conflict (409)', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -482,7 +482,7 @@ describe('PUT section/save — canvas_versions snapshot', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);
@@ -545,7 +545,7 @@ describe('PUT section/save — success path', () => {
     authMock.mockReset();
     sqlMock.mockReset();
     getTenantBySlugMock.mockReset();
-    verifyTenantAccessMock.mockReset();
+    verifyProposalAccessMock.mockReset();
     emitEventSingleMock.mockReset();
     isValidUUIDMock.mockReset();
     emitEventSingleMock.mockResolvedValue(undefined);

@@ -36,6 +36,7 @@ from agents.fabric import (  # noqa: E402
 
 
 EXPECTED_ARCHETYPES = {
+    # original 10
     "capture_strategist",
     "color_team_reviewer",
     "compliance_reviewer",
@@ -46,6 +47,25 @@ EXPECTED_ARCHETYPES = {
     "proposal_architect",
     "scoring_strategist",
     "section_drafter",
+    # Batch B (#127) — new-tenant cold-start
+    "onboarding_agent",
+    # Batch A (#128) — master-side pipeline (platform-scope)
+    "ingest_analyst",
+    "matrix_stager",
+    "skeleton_architect",
+    "opportunity_scout",
+    # Batch C (#129) — outcome / amendment / cost / PP
+    "outcome_analyst",
+    "amendment_monitor",
+    "cost_estimator",
+    "pp_matcher",
+    # POD 4 (#130-131) — our-org RFP-admin ops
+    "curation_qa",
+    "ops_digest",
+    # Our-org CMS — content generation + social curation/scheduling
+    "content_generator",
+    "content_curator",
+    "social_scheduler",
 }
 
 
@@ -57,13 +77,13 @@ class TestAgentFabricConstruction:
     def setup_method(self):
         self.fabric = AgentFabric()
 
-    def test_archetype_class_list_has_10_entries(self):
-        """_ARCHETYPE_CLASSES must contain exactly 10 entries."""
-        assert len(_ARCHETYPE_CLASSES) == 10
+    def test_archetype_class_list_has_all_entries(self):
+        """_ARCHETYPE_CLASSES must contain exactly the expected roster (19 after #117-#129)."""
+        assert len(_ARCHETYPE_CLASSES) == len(EXPECTED_ARCHETYPES)
 
     def test_fabric_registers_all_archetypes(self):
         """Every class in _ARCHETYPE_CLASSES must be registered after init."""
-        assert len(self.fabric._archetypes) == 10
+        assert len(self.fabric._archetypes) == len(EXPECTED_ARCHETYPES)
 
     def test_registered_archetype_names_match_expected_set(self):
         registered = set(self.fabric._archetypes.keys())

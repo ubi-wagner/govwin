@@ -19,7 +19,7 @@
 import { withTenant } from '@/lib/rls';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
 import { textOfNodes } from '@/lib/atom-size';
-import type { CanvasNode } from '@/lib/types/canvas-document';
+import { docNodes, type CanvasNode, type CanvasDocument } from '@/lib/types/canvas-document';
 
 /** One document cocoon per proposal — created on the first section return. */
 export async function getOrCreateProposalCocoon(tenantId: string, proposalId: string, name: string): Promise<string> {
@@ -67,11 +67,16 @@ export async function harvestSectionToAtomLibrary(
   );
   if (!section) return null;
 
-  // Content is a stored CanvasDocument JSON string; extract nodes + text.
+  // Content is a stored CanvasDocument JSON string; extract nodes + text. A v2
+  // section-layer doc keeps content under `sections`, so flatten via docNodes.
   let nodes: CanvasNode[] = [];
   try {
-    const parsed = JSON.parse(section.content ?? '{}') as { nodes?: CanvasNode[] } | CanvasNode[];
-    nodes = Array.isArray(parsed) ? parsed : Array.isArray(parsed.nodes) ? parsed.nodes : [];
+    const parsed = JSON.parse(section.content ?? '{}') as CanvasDocument | CanvasNode[];
+    nodes = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray(parsed.sections) && parsed.sections.length) || Array.isArray(parsed.nodes)
+        ? docNodes(parsed as CanvasDocument)
+        : [];
   } catch { /* not valid canvas JSON → treat as empty */ }
   const text = textOfNodes(nodes);
   if (!text.trim()) return null; // nothing drafted yet — don't return an empty atom
@@ -84,15 +89,43 @@ export async function harvestSectionToAtomLibrary(
   const rawParents = (meta as { sourceAtomIds?: unknown }).sourceAtomIds;
   const parentAtomIds = Array.isArray(rawParents) ? rawParents.filter((x): x is string => typeof x === 'string') : [];
 
-  // Tag by vol (from section_type / volume) so the returned atom is findable for
-  // the next mold; kind=narrative marks it as drafted prose.
+  // Content-class tags: kind=narrative marks drafted prose; vol from section_type
+  // makes the atom findable for the next mold of the same section family.
   const tags: AtomTagInput[] = [{ dimension: 'kind', value: 'narrative', source: 'auto', confirmed: true }];
   if (section.sectionType) tags.push({ dimension: 'vol', value: section.sectionType, source: 'auto', confirmed: true });
+
+  // Source-document CONTEXT tags — the "FROM" pedigree (agency/program/phase/sol/
+  // topic) pulled from the proposal's opportunity, so the atom pivots on context
+  // (the AFWERX→Navy reuse loop), not just content class. Off-vocabulary values
+  // (agency/sol/topic) are flagged isOther; program/phase map to the seeded vocab.
+  const [opp] = await withTenant<Array<{ agency: string | null; programType: string | null; solicitationNumber: string | null; topicNumber: string | null }>>(
+    tenantId,
+    async (tx) => tx`
+      SELECT o.agency, o.program_type AS "programType",
+             o.solicitation_number AS "solicitationNumber", o.topic_number AS "topicNumber"
+      FROM proposals p JOIN opportunities o ON o.id = p.opportunity_id
+      WHERE p.id = ${proposalId}::uuid LIMIT 1`,
+  );
+  if (opp) {
+    const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (opp.agency) tags.push({ dimension: 'agency', value: slug(opp.agency), source: 'auto', confirmed: true, isOther: true });
+    const pt = (opp.programType ?? '').toLowerCase();
+    const prog = pt.match(/sbir|sttr|baa|ota|cso|rif/)?.[0];
+    if (prog) tags.push({ dimension: 'program', value: prog, source: 'auto', confirmed: true });
+    const phase = pt.match(/phase[_ -]?([123])/)?.[1];
+    if (phase) tags.push({ dimension: 'phase', value: `phase_${phase}`, source: 'auto', confirmed: true });
+    if (opp.solicitationNumber) tags.push({ dimension: 'sol', value: slug(opp.solicitationNumber), source: 'auto', confirmed: true, isOther: true });
+    if (opp.topicNumber) tags.push({ dimension: 'topic', value: slug(opp.topicNumber), source: 'auto', confirmed: true, isOther: true });
+  }
 
   const { atomId } = await createAtom(
     tenantId,
     {
-      grain: 'reference',
+      // A section returns as a selectable PRIMITIVE seminal atom; the whole locked
+      // document universe is the cocoon (the foundational "reference"). Previously
+      // 'reference', which excluded harvested atoms from selectForSection —
+      // contradicting the reuse intent above and this file's own header.
+      grain: 'primitive',
       title: section.title ?? 'Drafted section',
       content: text,
       canvasNodes: nodes.length ? nodes : null,
@@ -111,4 +144,47 @@ export async function harvestSectionToAtomLibrary(
     { id: actorId, kind: 'ai' },
   );
   return atomId;
+}
+
+/**
+ * Return EVERY accepted section of a locked proposal to the greenfield atom
+ * library (`library_atoms`) — the whole-proposal counterpart to
+ * harvestSectionToAtomLibrary, called on first lock. Loads the proposal's
+ * sections and returns each via harvestSectionToAtomLibrary (best-effort per
+ * section — one section's failure never aborts the rest). Returns
+ * harvested/skipped counts, shape-compatible with the legacy
+ * `harvestProposalToLibrary` the lock route previously used.
+ */
+export async function harvestProposalToAtomLibrary(
+  tenantId: string,
+  proposalId: string,
+  actorId: string,
+): Promise<{ atomsHarvested: number; atomsSkipped: number }> {
+  let sections: Array<{ id: string }>;
+  try {
+    sections = await withTenant<Array<{ id: string }>>(tenantId, async (tx) =>
+      tx`
+        SELECT id FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY section_number
+      `,
+    );
+  } catch (err) {
+    console.error('[atom-harvest] failed to load proposal sections:', err);
+    return { atomsHarvested: 0, atomsSkipped: 0 };
+  }
+
+  let atomsHarvested = 0;
+  let atomsSkipped = 0;
+  for (const s of sections) {
+    try {
+      const atomId = await harvestSectionToAtomLibrary(tenantId, proposalId, s.id, actorId);
+      if (atomId) atomsHarvested += 1;
+      else atomsSkipped += 1;
+    } catch (err) {
+      console.error(`[atom-harvest] section ${s.id} return failed (non-fatal):`, err);
+      atomsSkipped += 1;
+    }
+  }
+  return { atomsHarvested, atomsSkipped };
 }

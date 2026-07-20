@@ -19,6 +19,7 @@ import { auth } from '@/auth';
 import { isValidUUID } from '@/lib/validation';
 import type { Role } from '@/lib/rbac';
 import { publishAndFanOut, type BridgeEventType } from '@/lib/opportunity-bridge';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 const EVENTS: BridgeEventType[] = ['published', 'updated', 'closed', 'reopened', 'awarded', 'archived'];
 
@@ -31,7 +32,7 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-    const user = session.user as { id?: string; role?: Role };
+    const user = session.user as { id?: string; email?: string; role?: Role };
     if (user.role !== 'master_admin' && user.role !== 'rfp_admin') {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -47,6 +48,13 @@ export async function POST(
     if (!result) {
       return NextResponse.json({ error: 'Opportunity not found or snapshot failed', code: 'NOT_FOUND' }, { status: 404 });
     }
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'opportunity.card_published',
+      actor: userActor(user.id ?? '', user.email ?? undefined),
+      tenantId: null,
+      payload: { opportunityId: oppId, version: result.event.version, eventType: result.event.eventType, tenantsApplied: result.tenantsApplied },
+    });
     return NextResponse.json({
       data: { event: { id: result.event.id, version: result.event.version, eventType: result.event.eventType }, tenantsApplied: result.tenantsApplied },
     });

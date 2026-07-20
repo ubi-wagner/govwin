@@ -1,0 +1,221 @@
+{
+  "version": 2,
+  "document_id": "97406d51-f75e-4f4f-9f49-f02001d6f8da",
+  "canvas": {
+    "format": "letter",
+    "width": 612,
+    "height": 792,
+    "margins": {
+      "top": 72,
+      "right": 72,
+      "bottom": 72,
+      "left": 72
+    },
+    "header": {
+      "template": "{company_name} — Facilities & Equipment",
+      "font": {
+        "family": "Arial",
+        "size": 10.5
+      },
+      "height": 22
+    },
+    "footer": {
+      "template": "SBIR Phase I · Supporting Documents · Proprietary · Page {n} of {N}",
+      "font": {
+        "family": "Arial",
+        "size": 10.5
+      },
+      "height": 22
+    },
+    "font_default": {
+      "family": "Georgia",
+      "size": 11,
+      "color": "#111827"
+    },
+    "line_spacing": 1.35,
+    "max_pages": 15,
+    "max_slides": null
+  },
+  "nodes": [],
+  "metadata": {
+    "title": "Aerivio Facilities",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  },
+  "sections": [
+    {
+      "id": "86a192f0-02e6-4a0f-affc-28e5d4d45c70",
+      "title": "Facilities and Equipment",
+      "layout": {
+        "mode": "flow"
+      },
+      "groups": [
+        {
+          "id": "e1bef646-6064-4692-90c5-dfaabe290e04",
+          "nodes": [
+            {
+              "id": "7b03d995-0910-4e4c-aa6c-0d40f7645782",
+              "type": "heading",
+              "content": {
+                "level": 1,
+                "text": "Facilities and Equipment"
+              },
+              "style": {
+                "color": "#3730a3"
+              },
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            },
+            {
+              "id": "d6d54a69-e317-4001-8c0e-aef9a48f95f3",
+              "type": "text_block",
+              "content": {
+                "text": "Aerivio Systems maintains a 3,200 sq ft engineering facility with a dedicated acoustics bench and an anechoic test enclosure sufficient to conduct all Phase I bench work in-house.",
+                "inline_formats": []
+              },
+              "style": {},
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            }
+          ]
+        },
+        {
+          "id": "3748e761-0516-4334-889e-5d6a3a646835",
+          "keep_together": true,
+          "nodes": [
+            {
+              "id": "84ff6a07-0668-4d77-9334-ce9d034be095",
+              "type": "image",
+              "content": {
+                "storage_key": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNDAiIGhlaWdodD0iMTkwIj48cmVjdCB3aWR0aD0iMzQwIiBoZWlnaHQ9IjE5MCIgZmlsbD0iI2UwZjJmZSIvPjxyZWN0IHg9IjMwIiB5PSI3MCIgd2lkdGg9IjEzMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMwMzY5YTEiLz48cmVjdCB4PSIxNzUiIHk9IjQwIiB3aWR0aD0iMTM1IiBoZWlnaHQ9IjEzMCIgZmlsbD0iIzAyODRjNyIvPjxyZWN0IHg9IjQ1IiB5PSI5MCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjYmFlNmZkIi8+PHJlY3QgeD0iODAiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxMTUiIHk9IjkwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiNiYWU2ZmQiLz48cmVjdCB4PSIxOTUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48cmVjdCB4PSIyMzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48cmVjdCB4PSIyNzUiIHk9IjYwIiB3aWR0aD0iMjIiIGhlaWdodD0iMjIiIGZpbGw9IiNlMGYyZmUiLz48dGV4dCB4PSIxNzAiIHk9IjE4NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjMGM0YTZlIj5BZXJpdmlvIEhRIOKAlCBFbmdpbmVlcmluZyAmIEFjb3VzdGljcyBMYWI8L3RleHQ+PC9zdmc+",
+                "alt_text": "Facility illustration placeholder",
+                "width": 340,
+                "height": 190
+              },
+              "style": {},
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            },
+            {
+              "id": "d0b52ebc-0250-40b0-8116-9d2e259be0b1",
+              "type": "caption",
+              "content": {
+                "prefix": "Figure",
+                "number": 1,
+                "text": "Aerivio headquarters and acoustics laboratory (illustration)."
+              },
+              "style": {},
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            }
+          ]
+        },
+        {
+          "id": "006412c7-e675-4ad9-a63f-04361d40d547",
+          "nodes": [
+            {
+              "id": "4248b09c-d3a2-44f5-89a8-f10a77fb2130",
+              "type": "heading",
+              "content": {
+                "level": 2,
+                "text": "Key Equipment"
+              },
+              "style": {
+                "color": "#1e3a8a"
+              },
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            },
+            {
+              "id": "612cdb4c-08d6-488f-b012-4efd3e86c515",
+              "type": "bulleted_list",
+              "content": {
+                "items": [
+                  {
+                    "text": "4-channel calibrated hydrophone array"
+                  },
+                  {
+                    "text": "Anechoic test enclosure (custom)"
+                  },
+                  {
+                    "text": "2-watt edge compute development kits (×6)"
+                  },
+                  {
+                    "text": "On-premises GPU training cluster (8× accelerators)"
+                  },
+                  {
+                    "text": "Calibrated power-measurement bench for rail-level draw"
+                  }
+                ]
+              },
+              "style": {},
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            },
+            {
+              "id": "fdaf9367-7273-4c1d-b26f-6448e00a8eac",
+              "type": "heading",
+              "content": {
+                "level": 2,
+                "text": "Test Environment"
+              },
+              "style": {
+                "color": "#1e3a8a"
+              },
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            },
+            {
+              "id": "6cef541a-1436-4dea-9b1d-f371cd9c1322",
+              "type": "text_block",
+              "content": {
+                "text": "At-sea data collection is conducted under an existing partnership with a regional marine research station, providing access to representative acoustic conditions without additional Phase I cost.",
+                "inline_formats": [
+                  {
+                    "start": 162,
+                    "length": 31,
+                    "format": "italic"
+                  }
+                ]
+              },
+              "style": {},
+              "provenance": {
+                "source": "manual"
+              },
+              "history": [],
+              "library_eligible": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -64,6 +64,9 @@ export default async function CurationWorkspacePage({ params }: Props) {
       footerFormat: string | null;
       appliesToPhase: string[] | null;
       verifiedBy: string | null;
+      templateId: string | null;
+      templateName: string | null;
+      expertNotes: string | null;
     }> | null;
   }[] = [];
 
@@ -143,10 +146,15 @@ export default async function CurationWorkspacePage({ params }: Props) {
                 'headerFormat', i.header_format,
                 'footerFormat', i.footer_format,
                 'appliesToPhase', i.applies_to_phase,
-                'verifiedBy', i.verified_by
+                'verifiedBy', i.verified_by,
+                'templateId', i.template_id,
+                'templateName', dt.name,
+                'expertNotes', i.expert_notes
               ) ORDER BY i.item_number
             )
-            FROM volume_required_items i WHERE i.volume_id = v.id
+            FROM volume_required_items i
+            LEFT JOIN document_templates dt ON dt.id = i.template_id
+            WHERE i.volume_id = v.id
           ),
           '[]'::json
         ) AS items

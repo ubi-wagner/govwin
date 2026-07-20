@@ -1,7 +1,9 @@
 """compute_next_run — the dispatcher advances pipeline_schedules from the real
 cron_expression (daily / weekly / every-N-hours), with a warned fallback to a
-run_type step for anything it can't parse. Previously cron_expression was ignored
-and next_run was a flat 24h/168h step keyed only on run_type.
+run_type step for anything it can't parse.
+
+UTC canonical: cron hour/minute are UTC platform-wide (an admin's local schedule is
+converted to a UTC cron on save; the UI renders back in the admin's display timezone).
 """
 from datetime import datetime, timezone, timedelta
 

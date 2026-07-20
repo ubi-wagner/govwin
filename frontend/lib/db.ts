@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { isTenantWideMember, hasRoleAtLeast, isRole } from './rbac';
 
 // Next.js "Collecting page data" step at build time loads every
 // route module with NODE_ENV=production but without runtime secrets
@@ -49,11 +50,73 @@ export async function getTenantBySlug(slug: string) {
 
 export async function verifyTenantAccess(userId: string, role: string, tenantId: string): Promise<boolean> {
   try {
+    // RFP-admins hold the DERIVED shadow membership (tenant_admin in every tenant, by
+    // T&C default) — access resolved here, not materialized. When they descend into a
+    // tenant their session role becomes tenant_admin; this coarse gate stays true.
+    // (Multi-membership identity P1 — docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.)
     if (role === 'master_admin' || role === 'rfp_admin') return true;
-    const [row] = await sql`SELECT 1 FROM users WHERE id = ${userId} AND tenant_id = ${tenantId} AND is_active = true`;
-    return !!row;
+    // Everyone else: access is PURELY membership-based (identity P4 — the legacy
+    // users.tenant_id read-through is retired). An ACTIVE membership at a NON-archived
+    // tenant grants access; anything else (revoked/inactive membership, or an archived
+    // company) denies. This is what makes deactivation real: revoking a membership
+    // actually removes access, with no legacy branch silently re-granting it. Every
+    // user-creation path writes a membership and mig 111 backfilled all pre-existing
+    // users, so nothing regresses. Cross-company collaborators pass via their
+    // source='collaborator' membership; the proposal-scoped verifyProposalAccess is
+    // separate. Archived tenants (license slumber) deny here without touching per-user
+    // state, so renewal restores everyone exactly. Admins short-circuit above.
+    const rows = await sql<{ role: string }[]>`
+      SELECT m.role FROM user_memberships m
+        JOIN tenants t ON t.id = m.tenant_id
+        WHERE m.user_id = ${userId} AND m.tenant_id = ${tenantId}
+          AND m.status = 'active' AND t.archived_at IS NULL`;
+    if (rows.length === 0) return false;
+    // Fail CLOSED on role escalation (singular-session enforcement, defense-in-depth):
+    // the session's ACTIVE role must not exceed the role the user was actually granted
+    // at THIS tenant. A multi-membership user whose JWT still carries a higher home role
+    // (e.g. tenant_admin at their own company) is capped to their real role here (e.g.
+    // partner_user as a collaborator), so no cross-tenant privilege bleeds through even
+    // if the active-membership rewrite didn't take. See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+    if (!isRole(role)) return false;
+    return rows.some((r) => isRole(r.role) && hasRoleAtLeast(r.role, role));
   } catch (e) {
     console.error('[verifyTenantAccess] Error:', e);
+    return false;
+  }
+}
+
+/**
+ * Proposal-scoped access gate — the collaborator-aware widening of
+ * verifyTenantAccess. Returns true if the actor has tenant-wide access to the
+ * proposal's tenant (isTenantWideMember) OR is an ACCEPTED collaborator on THIS
+ * specific proposal.
+ *
+ * Cross-company collaborators (home tenant ≠ proposal tenant) and partner_users
+ * pass ONLY through the collaborator branch — so this is the coarse "may this user
+ * touch this proposal at all" gate. Callers MUST still enforce the fine-grained
+ * per-section scope (edit/comment/view) via resolveUserAccess, gated on
+ * `!isTenantWideMember(...)`. See docs/IDENTITY_AUTHZ_MODEL.md §4.
+ */
+export async function verifyProposalAccess(
+  userId: string,
+  role: string,
+  actorTenantId: string | null | undefined,
+  tenantId: string,
+  proposalId: string,
+): Promise<boolean> {
+  try {
+    if (isTenantWideMember(role, actorTenantId, tenantId)) return true;
+    const [row] = await sql`
+      SELECT 1 FROM proposal_collaborators
+      WHERE proposal_id = ${proposalId}
+        AND user_id = ${userId}
+        AND accepted_at IS NOT NULL
+        AND revoked_at IS NULL
+      LIMIT 1
+    `;
+    return !!row;
+  } catch (e) {
+    console.error('[verifyProposalAccess] Error:', e);
     return false;
   }
 }

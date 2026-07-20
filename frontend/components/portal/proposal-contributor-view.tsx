@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProposalDropbox } from './proposal-dropbox';
+import { UploadAtomizeCard } from './upload-atomize-card';
 
 interface SectionItem {
   id: string;
@@ -143,6 +144,10 @@ export function ProposalContributorView({
           canUpload={canUpload}
         />
       </div>
+
+      {/* Offer content up — a collaborator can atomize their own material into the
+          company's library for the company to review and use. */}
+      <UploadAtomizeCard tenantSlug={tenantSlug} />
 
       {/* Comment-only sections */}
       {commentSections.length > 0 && (

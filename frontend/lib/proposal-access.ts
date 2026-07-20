@@ -137,6 +137,7 @@ export async function resolveUserAccess(
     WHERE proposal_id = ${proposalId}
       AND user_id = ${userId}
       AND accepted_at IS NOT NULL
+      AND revoked_at IS NULL
     LIMIT 1
   `;
 

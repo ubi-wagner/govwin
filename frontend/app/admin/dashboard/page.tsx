@@ -82,7 +82,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM applications WHERE status = 'pending'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM tenants WHERE status = 'active'`),
-    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_units WHERE status = 'approved'`),
+    safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM library_atoms WHERE status = 'approved'`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM proposals WHERE stage NOT IN ('submitted', 'archived')`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM curated_solicitations WHERE status IN ('new', 'claimed', 'curation_in_progress', 'review_requested')`),
     safeCount(sql<{ count: number }[]>`SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '24 hours'`),
@@ -136,7 +136,7 @@ export default async function DashboardPage() {
 
   let draftAtoms = 0;
   try {
-    const [row] = await sql<{ count: number }[]>`SELECT COUNT(*) FROM library_units WHERE status = 'draft'`;
+    const [row] = await sql<{ count: number }[]>`SELECT COUNT(*) FROM library_atoms WHERE status = 'draft'`;
     draftAtoms = Number(row?.count ?? 0);
   } catch (e) {
     console.error('[admin/dashboard] draft atoms query failed:', e);
@@ -161,6 +161,12 @@ export default async function DashboardPage() {
             preview={s.preview}
           />
         ))}
+      </div>
+
+      {/* Your ToDos — the admin's unified task queue (each a step in a defined
+          workflow; broadcast notes are acknowledged in one click). */}
+      <div className="mb-8">
+        <TaskQueue apiBase="/api/admin/tasks" emptyText="No admin ToDos right now — the triage queue is clear." />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

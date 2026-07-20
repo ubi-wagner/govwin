@@ -2,22 +2,37 @@
 
 /**
  * Canvas Editor Page — wraps CanvasEditor with save/export wiring.
+ *
+ * One shell, two targets (the canvas itself is identical — only the persistence
+ * routes and back-link differ, docs/CANVAS_GEOMETRY_REDESIGN.md §8a):
+ *   • SECTION mode  — a proposal volume section (proposalId + sectionId given).
+ *   • DOCUMENT mode — a standalone tenant document (documentId given, Tier 2 #3).
+ * The proposal-scoped section tools (atomize-node, comments, complete-&-lock)
+ * light up only in section mode because proposalId/sectionId aren't threaded to
+ * the editor for a standalone document.
  */
 
 import { useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasEditor } from './canvas-editor';
-import { useTool } from '@/lib/hooks/use-tool';
 
 interface Props {
   canvasDocument: CanvasDocument;
-  sectionId: string;
-  proposalId: string;
+  /** Section mode: the proposal section this canvas belongs to. */
+  sectionId?: string;
+  proposalId?: string;
+  /** Document mode: the standalone tenant_documents row this canvas belongs to. */
+  documentId?: string;
   actorId: string;
   actorName: string;
   readOnly?: boolean;
+  /** Resolved tool set (role × stage × permission) — threaded to the canvas. */
+  capabilities?: CanvasCapabilities;
+  /** Process stage — orders the sidebar toolbox. */
+  stage?: string;
   tenantSlug?: string;
   initialVersion?: number;
 }
@@ -26,26 +41,42 @@ export function CanvasEditorPage({
   canvasDocument,
   sectionId,
   proposalId,
+  documentId,
   actorId,
   actorName,
   readOnly = false,
+  capabilities,
+  stage,
   tenantSlug,
   initialVersion,
 }: Props) {
   const router = useRouter();
-  const { invoke } = useTool();
   // The DB row version this editor loaded — sent as baseVersion so the save is a
   // real optimistic lock (reject if someone else saved since load), and synced
   // forward from each successful save so subsequent saves stay in step.
   const versionRef = useRef<number | undefined>(initialVersion);
 
-  const saveUrl = tenantSlug
-    ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
-    : `/api/admin/proposals/${proposalId}/sections/${sectionId}`;
+  const isDocument = Boolean(documentId);
 
-  const backUrl = tenantSlug
-    ? `/portal/${tenantSlug}/proposals/${proposalId}`
-    : `/admin/proposals/${proposalId}`;
+  const saveUrl = isDocument
+    ? `/api/portal/${tenantSlug}/documents/${documentId}/save`
+    : tenantSlug
+      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
+      : `/api/admin/proposals/${proposalId}/sections/${sectionId}`;
+
+  const exportUrl = isDocument
+    ? `/api/portal/${tenantSlug}/documents/${documentId}/export`
+    : tenantSlug
+      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
+      : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
+
+  const backUrl = isDocument
+    ? `/portal/${tenantSlug}/documents`
+    : tenantSlug
+      ? `/portal/${tenantSlug}/proposals/${proposalId}`
+      : `/admin/proposals/${proposalId}`;
+
+  const backLabel = isDocument ? 'Back to Documents' : 'Back to Proposal';
 
   const handleSave = useCallback(async (doc: CanvasDocument & { __revisionMeta?: { source: string; aiInstruction: string } }) => {
     // Extract revision metadata if present (set by AI revision panel)
@@ -63,23 +94,20 @@ export function CanvasEditorPage({
     });
     if (!resp.ok) {
       const json = await resp.json().catch(() => ({}));
-      // On a 409 the section changed under us — reflect the new base version and
+      // On a 409 the row changed under us — reflect the new base version and
       // surface a clear conflict so the user reloads rather than silently losing work.
       if (resp.status === 409 && typeof json.currentVersion === 'number') versionRef.current = json.currentVersion;
       throw new Error(
         resp.status === 409
-          ? 'This section was changed by someone else since you opened it. Reload to get the latest before saving.'
+          ? `This ${isDocument ? 'document' : 'section'} was changed by someone else since you opened it. Reload to get the latest before saving.`
           : json.error ?? `Save failed (HTTP ${resp.status})`,
       );
     }
     const okJson = await resp.json().catch(() => null);
     if (okJson?.data?.version != null) versionRef.current = okJson.data.version;
-  }, [saveUrl]);
+  }, [saveUrl, isDocument]);
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {
-    const exportUrl = tenantSlug
-      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
-      : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
     const resp = await fetch(exportUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,7 +125,7 @@ export function CanvasEditorPage({
     });
     a.click();
     URL.revokeObjectURL(url);
-  }, [proposalId, sectionId, tenantSlug]);
+  }, [exportUrl]);
 
   return (
     <div className="h-screen flex flex-col">
@@ -106,7 +134,7 @@ export function CanvasEditorPage({
           href={backUrl}
           className="text-sm text-blue-600 hover:text-blue-800"
         >
-          &larr; Back to Proposal
+          &larr; {backLabel}
         </Link>
         <span className="text-sm text-gray-400">{canvasDocument.metadata.title}</span>
       </div>
@@ -118,8 +146,11 @@ export function CanvasEditorPage({
           actorId={actorId}
           actorName={actorName}
           readOnly={readOnly}
-          proposalId={proposalId}
-          sectionId={sectionId}
+          capabilities={capabilities}
+          stage={stage}
+          onLocked={() => router.refresh()}
+          proposalId={isDocument ? undefined : proposalId}
+          sectionId={isDocument ? undefined : sectionId}
           tenantSlug={tenantSlug}
           variables={{
             company_name: 'Your Company',

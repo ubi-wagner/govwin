@@ -449,7 +449,7 @@ async def _library_search(
     category: str = "",
     limit: int = 10,
 ) -> dict:
-    """Search library_units by keyword and/or category.
+    """Search library_atoms by keyword and/or category.
 
     When EMBEDDINGS_PROVIDER is active AND a query is provided, uses cosine
     ORDER BY embedding <=> $vec (tenant-scoped). Category filter is still
@@ -484,12 +484,13 @@ async def _library_search(
                 cat_pattern = f"%{escaped_category}%"
                 rows = await conn.fetch(
                     """
-                    SELECT id, content, category, subcategory, tags,
-                           confidence, status, usage_count
-                    FROM library_units
+                    SELECT id, content, NULL AS category, NULL AS subcategory,
+                           '{}'::text[] AS tags, confidence, status, usage_count
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
-                      AND category ILIKE $3
+                      AND EXISTS (SELECT 1 FROM atom_tags t
+                                  WHERE t.atom_id = library_atoms.id AND t.value ILIKE $3)
                     ORDER BY embedding <=> $2::vector
                     LIMIT $4
                     """,
@@ -498,9 +499,9 @@ async def _library_search(
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT id, content, category, subcategory, tags,
-                           confidence, status, usage_count
-                    FROM library_units
+                    SELECT id, content, NULL AS category, NULL AS subcategory,
+                           '{}'::text[] AS tags, confidence, status, usage_count
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
                     ORDER BY embedding <=> $2::vector
@@ -513,13 +514,14 @@ async def _library_search(
             cat_pattern = f"%{escaped_category}%"
             rows = await conn.fetch(
                 """
-                SELECT id, content, category, subcategory, tags,
-                       confidence, status, usage_count
-                FROM library_units
+                SELECT id, content, NULL AS category, NULL AS subcategory,
+                       '{}'::text[] AS tags, confidence, status, usage_count
+                FROM library_atoms
                 WHERE tenant_id = $1
                   AND status != 'archived'
                   AND content ILIKE $2
-                  AND category ILIKE $3
+                  AND EXISTS (SELECT 1 FROM atom_tags t
+                              WHERE t.atom_id = library_atoms.id AND t.value ILIKE $3)
                 ORDER BY confidence DESC, usage_count DESC
                 LIMIT $4
                 """,
@@ -529,9 +531,9 @@ async def _library_search(
             query_pattern = f"%{escaped_query}%"
             rows = await conn.fetch(
                 """
-                SELECT id, content, category, subcategory, tags,
-                       confidence, status, usage_count
-                FROM library_units
+                SELECT id, content, NULL AS category, NULL AS subcategory,
+                       '{}'::text[] AS tags, confidence, status, usage_count
+                FROM library_atoms
                 WHERE tenant_id = $1
                   AND status != 'archived'
                   AND content ILIKE $2
@@ -544,12 +546,13 @@ async def _library_search(
             cat_pattern = f"%{escaped_category}%"
             rows = await conn.fetch(
                 """
-                SELECT id, content, category, subcategory, tags,
-                       confidence, status, usage_count
-                FROM library_units
+                SELECT id, content, NULL AS category, NULL AS subcategory,
+                       '{}'::text[] AS tags, confidence, status, usage_count
+                FROM library_atoms
                 WHERE tenant_id = $1
                   AND status != 'archived'
-                  AND category ILIKE $2
+                  AND EXISTS (SELECT 1 FROM atom_tags t
+                              WHERE t.atom_id = library_atoms.id AND t.value ILIKE $2)
                 ORDER BY confidence DESC, usage_count DESC
                 LIMIT $3
                 """,
@@ -558,9 +561,9 @@ async def _library_search(
         else:
             rows = await conn.fetch(
                 """
-                SELECT id, content, category, subcategory, tags,
-                       confidence, status, usage_count
-                FROM library_units
+                SELECT id, content, NULL AS category, NULL AS subcategory,
+                       '{}'::text[] AS tags, confidence, status, usage_count
+                FROM library_atoms
                 WHERE tenant_id = $1
                   AND status != 'archived'
                 ORDER BY usage_count DESC, confidence DESC
@@ -595,14 +598,15 @@ async def _library_get_unit(
     *,
     unit_id: str,
 ) -> dict:
-    """Get a specific library unit by ID (with tenant isolation)."""
+    """Get a specific library atom by ID (with tenant isolation)."""
     try:
         row = await conn.fetchrow(
             """
-            SELECT id, content, category, subcategory, tags,
-                   confidence, status, source_type, usage_count,
+            SELECT id, content, NULL AS category, NULL AS subcategory,
+                   '{}'::text[] AS tags, confidence, status,
+                   source AS source_type, usage_count,
                    created_at, updated_at
-            FROM library_units
+            FROM library_atoms
             WHERE id = $1 AND tenant_id = $2
             """,
             uuid.UUID(unit_id),

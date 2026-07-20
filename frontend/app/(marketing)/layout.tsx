@@ -102,12 +102,14 @@ export default async function MarketingLayout({ children }: { children: React.Re
             >
               {chrome.footer.ctaPrimary.label}
             </Link>
-            <Link
-              href={chrome.footer.ctaSecondary.href}
-              className="px-4 py-2.5 border border-navy-600 hover:border-brand-400 text-navy-300 hover:text-cream rounded-lg transition-colors text-sm"
-            >
-              {chrome.footer.ctaSecondary.label}
-            </Link>
+            {chrome.footer.ctaSecondary && (
+              <Link
+                href={chrome.footer.ctaSecondary.href}
+                className="px-4 py-2.5 border border-navy-600 hover:border-brand-400 text-navy-300 hover:text-cream rounded-lg transition-colors text-sm"
+              >
+                {chrome.footer.ctaSecondary.label}
+              </Link>
+            )}
           </div>
           <span className="text-xs text-navy-500">{chrome.footer.copyright}</span>
         </div>

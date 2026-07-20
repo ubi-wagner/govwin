@@ -73,18 +73,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       console.error('[atoms/upload] reference atom create failed (non-fatal)', e);
     }
 
-    // Deconstructed objects for the atomizer.
+    // Deconstructed objects for the annotation atomizer. Each block carries its
+    // real CanvasNodes + a primaryType so the atomizer can offer the right GRAIN
+    // (image → figure atom; table/list → one atom OR a group of rows/items; text
+    // → narrative) instead of flattening everything to text.
     const blocks = parsed.atoms.map((a, i) => {
       const text = textOfNodes(a.nodes);
-      const suggestedVol = CATEGORY_TO_VOL[a.suggestedCategory] ?? null;
+      const types = new Set(a.nodes.map((n) => n.type));
+      const primaryType: 'image' | 'table' | 'list' | 'heading' | 'narrative' =
+        types.has('image') ? 'image'
+        : types.has('table') ? 'table'
+        : (types.has('bulleted_list') || types.has('numbered_list')) ? 'list'
+        : (a.headingText && text.length < (text.indexOf('\n') + 1 || text.length + 1)) ? 'heading'
+        : 'narrative';
       return {
         id: `b${i}`,
         heading: a.headingText,
         text,
-        kind: a.headingText && text.length < text.indexOf('\n') + 1 ? 'heading' : 'narrative',
+        kind: primaryType === 'heading' ? 'heading' : 'narrative',
+        primaryType,
+        nodes: a.nodes,
         charOffset: a.charOffset,
         charLength: a.charLength,
-        suggestedVol,
+        suggestedVol: CATEGORY_TO_VOL[a.suggestedCategory] ?? null,
       };
     });
 

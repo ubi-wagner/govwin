@@ -80,6 +80,9 @@ interface RequiredItem {
   footerFormat: string | null;
   appliesToPhase: string[] | null;
   verifiedBy: string | null;
+  templateId: string | null;
+  templateName: string | null;
+  expertNotes: string | null;
 }
 
 interface Volume {
@@ -185,6 +188,34 @@ export function CurationWorkspace({
   const router = useRouter();
   const [sol, setSol] = useState(solicitation);
   const [compState, setCompState] = useState(compliance);
+  const [assistBusy, setAssistBusy] = useState(false);
+
+  // Ingest Assist — one action that runs the whole ingest SOP for this claimed
+  // solicitation: parse its text → auto-build the compliance matrix + volumes +
+  // section molds → publish the opportunity card(s) (a suite for a multi-topic
+  // solicitation). The same materializer the Scouts feed.
+  const handleIngestAssist = async () => {
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Ingest Assist will parse this solicitation and auto-build the compliance matrix, volumes, and section molds, then publish the opportunity card(s). Existing volumes/compliance for this solicitation are replaced. Continue?'
+    )) return;
+    setAssistBusy(true);
+    try {
+      const res = await fetch(`/api/admin/rfp-curation/${sol.id}/ingest-assist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Ingest Assist failed');
+      const d = json.data ?? {};
+      if (typeof window !== 'undefined') window.alert(
+        `Ingest Assist complete (${d.source}):\n• ${d.volumes} volumes · ${d.items} section molds\n• ${d.topics} topic(s) · ${d.cards} card(s) published`
+      );
+      router.refresh();
+    } catch (e) {
+      if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : 'Ingest Assist failed');
+    } finally {
+      setAssistBusy(false);
+    }
+  };
   const pdfViewerRef = useRef<import('./pdf-viewer').PdfViewerHandle>(null);
   const [editingVar, setEditingVar] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -662,6 +693,14 @@ export function CurationWorkspace({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleIngestAssist}
+            disabled={assistBusy}
+            title="Parse this solicitation and auto-build the matrix, volumes, section molds, and publish the opportunity card(s)"
+            className="px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {assistBusy ? 'Building…' : '✨ Ingest Assist'}
+          </button>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${
             sol.status === 'pushed_to_pipeline' ? 'bg-emerald-100 text-emerald-800' :
             sol.status === 'dismissed' ? 'bg-gray-200 text-gray-600' :
@@ -2201,6 +2240,24 @@ function VolumesPanel({
                               <td className="py-1.5 pr-2">
                                 <div className="font-medium text-gray-800">{item.itemName}</div>
                                 {item.required && <span className="text-xs text-red-600">required</span>}
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                  {item.templateName && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"
+                                      title={`Section seeds from template "${item.templateName}" at provision`}
+                                    >
+                                      📄 {item.templateName}
+                                    </span>
+                                  )}
+                                  {item.expertNotes && (
+                                    <span
+                                      className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                                      title={item.expertNotes}
+                                    >
+                                      ✎ notes
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-1.5 pr-2 text-gray-600">
                                 <code className="text-xs bg-gray-200 px-1 rounded">{item.itemType}</code>
@@ -2463,6 +2520,33 @@ function AddVolumeModal({
   );
 }
 
+const TEMPLATE_TYPE_LABELS: Record<string, string> = {
+  technical_volume: 'Technical Volume',
+  cost_volume: 'Cost Volume',
+  slide_deck: 'Slide Deck',
+  past_performance: 'Past Performance',
+  key_personnel: 'Key Personnel',
+  commercialization: 'Commercialization',
+  abstract: 'Abstract',
+  cover_sheet: 'Cover Sheet',
+  supporting_docs: 'Supporting Docs',
+  custom: 'Custom',
+};
+function prettyTemplateType(t: string | null): string {
+  if (!t) return 'Other';
+  return TEMPLATE_TYPE_LABELS[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+type TemplateOption = { id: string; name: string; templateType: string | null };
+function groupTemplatesByType(templates: TemplateOption[]): Array<[string, TemplateOption[]]> {
+  const groups = new Map<string, TemplateOption[]>();
+  for (const t of templates) {
+    const key = t.templateType ?? 'other';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+  return Array.from(groups.entries());
+}
+
 function AddEditItemModal({
   mode,
   volumeId,
@@ -2492,6 +2576,27 @@ function AddEditItemModal({
   const [headerFormat, setHeaderFormat] = useState(item?.headerFormat ?? '');
   const [footerFormat, setFooterFormat] = useState(item?.footerFormat ?? '');
   const [appliesToPhaseText, setAppliesToPhaseText] = useState(item?.appliesToPhase?.join(', ') ?? '');
+  // Grounding: link an authored canvas template (mold) + a per-item expert note.
+  // Provisioning seeds this item's section from the template's canvas_document and
+  // carries expert_notes into section.meta (create-route + compliance-resolver).
+  const [templateId, setTemplateId] = useState<string>(item?.templateId ?? '');
+  const [expertNotes, setExpertNotes] = useState(item?.expertNotes ?? '');
+  const [templates, setTemplates] = useState<{ id: string; name: string; templateType: string | null }[]>([]);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/templates')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (cancelled) return;
+        const rows = (j?.data?.templates ?? []) as Array<{ id: string; name: string; templateType: string | null }>;
+        setTemplates(rows.map((t) => ({ id: t.id, name: t.name, templateType: t.templateType ?? null })));
+      })
+      .catch(() => { /* non-fatal — picker shows "none available" */ })
+      .finally(() => { if (!cancelled) setTemplatesLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -2514,6 +2619,8 @@ function AddEditItemModal({
           headerFormat: headerFormat.trim() || undefined,
           footerFormat: footerFormat.trim() || undefined,
           appliesToPhase: phases.length ? phases : undefined,
+          templateId: templateId || undefined,
+          expertNotes: expertNotes.trim() || undefined,
         });
       } else if (item) {
         await invoke('volume.update_required_item', {
@@ -2529,6 +2636,8 @@ function AddEditItemModal({
           headerFormat: headerFormat.trim() || null,
           footerFormat: footerFormat.trim() || null,
           appliesToPhase: phases.length ? phases : null,
+          templateId: templateId || null,
+          expertNotes: expertNotes.trim() || null,
         });
       }
       onSaved();
@@ -2698,6 +2807,46 @@ function AddEditItemModal({
               value={appliesToPhaseText}
               onChange={(e) => setAppliesToPhaseText(e.target.value)}
               placeholder="sbir_phase_1"
+              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            />
+          </label>
+        </div>
+
+        {/* Section grounding — what a customer's provision seeds this item's draft from. */}
+        <div className="rounded-md border border-indigo-100 bg-indigo-50/50 p-3 space-y-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-indigo-800">Section grounding</span>
+            <span className="text-[11px] text-indigo-600">seeds the draft when a customer provisions this proposal</span>
+          </div>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Starter template (mold)</span>
+            <select
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
+              className="w-full rounded border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
+            >
+              <option value="">— None (blank section) —</option>
+              {groupTemplatesByType(templates).map(([type, opts]) => (
+                <optgroup key={type} label={prettyTemplateType(type)}>
+                  {opts.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <span className="mt-1 block text-[11px] text-gray-500">
+              {templatesLoaded && templates.length === 0
+                ? 'No templates in the library yet — build one in Template Studio (Admin → Templates).'
+                : 'Provisioning creates this section from the chosen canvas template, styled to the format rules above.'}
+            </span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-gray-700 mb-1">Expert notes (grounding)</span>
+            <textarea
+              value={expertNotes}
+              onChange={(e) => setExpertNotes(e.target.value)}
+              rows={2}
+              placeholder="Win themes, evaluator hot-buttons, or must-hit points for this item — passed to the drafter as grounding."
               className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 outline-none"
             />
           </label>

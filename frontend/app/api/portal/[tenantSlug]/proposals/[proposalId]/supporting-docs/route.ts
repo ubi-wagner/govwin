@@ -349,6 +349,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         const [collab] = await sql<{ userId: string }[]>`
           SELECT user_id FROM proposal_collaborators
           WHERE proposal_id = ${proposalId}::uuid AND user_id = ${sessionUser.id}::uuid
+            AND revoked_at IS NULL
           LIMIT 1
         `;
         if (!collab) {

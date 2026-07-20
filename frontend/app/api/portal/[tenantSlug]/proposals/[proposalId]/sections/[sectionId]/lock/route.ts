@@ -21,9 +21,7 @@ import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
-import { harvestSectionToLibrary } from '@/lib/proposal-harvest';
-import { harvestSectionToAtomLibrary } from '@/lib/proposal-atom-harvest';
-import { advanceProposalStage } from '@/lib/proposal-advance';
+import { lockSectionCore } from '@/lib/proposal/lock-section';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string; proposalId: string; sectionId: string }>;
@@ -130,228 +128,31 @@ function isErr(x: Resolved | NextResponse): x is NextResponse {
 export async function POST(_request: Request, ctx: RouteContext) {
   const g = await guard(ctx);
   if (isErr(g)) return g;
-  const { tenantId, tenantSlug, role, proposalId, userId, email, proposalStage, section } = g;
+  const { section, proposalStage } = g;
 
-  let lockedRows: { id: string }[];
+  // The per-section lock stricture now lives in lockSectionCore (shared with the
+  // hierarchical lock-scope push), so every canvas locked — one-off or via a
+  // hierarchical push — runs the identical audited side effects.
+  let result;
   try {
-    // Compare-and-swap: only flip an UNLOCKED section. Without the is_locked
-    // guard a double-submit re-runs the one-time side effects below (event,
-    // harvest, artifact roll-up, auto-advance). 0 rows ⇒ already locked.
-    lockedRows = await sql<{ id: string }[]>`
-      UPDATE proposal_sections
-      SET status = 'approved',
-          accepted_by = ${userId}::uuid,
-          accepted_at = now(),
-          completed_stage = ${proposalStage},
-          completed_at = now(),
-          is_locked = true,
-          locked_at = now(),
-          locked_by = ${userId}::uuid,
-          editing_by = NULL,
-          editing_since = NULL
-      WHERE id = ${section.id}::uuid AND is_locked = false
-      RETURNING id
-    `;
+    result = await lockSectionCore(g);
   } catch (dbErr) {
     console.error('[sections/lock] lock update failed:', dbErr);
     return NextResponse.json({ error: 'Failed to lock section', code: 'DB_ERROR' }, { status: 500 });
   }
-  if (lockedRows.length === 0) {
-    // Already locked (concurrent/double submit) — end state is correct; do NOT
-    // re-run harvest / auto-advance / events.
+
+  if (result.alreadyLocked) {
+    // Already locked (concurrent/double submit) — end state is correct; the core
+    // did NOT re-run the one-time side effects.
     return NextResponse.json({
       data: { sectionId: section.id, isLocked: true, status: 'approved', acceptedStage: proposalStage, alreadyLocked: true },
     });
   }
 
-  try {
-    await emitEventSingle({
-      namespace: 'proposal',
-      type: 'section.locked',
-      actor: userActor(userId, email),
-      tenantId,
-      payload: {
-        proposalId,
-        sectionId: section.id,
-        stage: proposalStage,
-        volumeName: section.volumeName,
-        title: section.title,
-      },
-    });
-  } catch (e) {
-    console.error('[sections/lock] event emission failed:', e);
-  }
-
-  // Compliance matrix: accepting (locking) a section satisfies the requirements
-  // it addresses — this is what drives the proposal card's percentComplete up.
-  // Best-effort: never fail the lock over a matrix update.
-  try {
-    await sql`
-      UPDATE proposal_compliance_matrix
-      SET status = 'satisfied', updated_at = now()
-      WHERE section_id = ${section.id}::uuid AND status <> 'not_applicable'
-    `;
-  } catch (e) {
-    console.error('[sections/lock] compliance matrix update failed (non-fatal):', e);
-  }
-
-  // ── Capture approved content + close-state signals (all best-effort: a
-  //    failure here must not fail the lock the user just performed) ──────────
-  // 1. Snapshot the accepted canvas version (preserves the approved version).
-  if (section.content) {
-    try {
-      await sql`
-        INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
-        VALUES (${section.id}::uuid, ${section.version}, ${section.content}::jsonb,
-                ${'section_accepted:' + proposalStage}, 'system', ${userId}::uuid)
-        ON CONFLICT (section_id, version_number) DO NOTHING
-      `;
-    } catch (e) {
-      console.error('[sections/lock] canvas snapshot failed:', e);
-    }
-  }
-
-  // 2. Harvest the accepted section into the tenant library (Option 1, legacy library_units).
-  try {
-    await harvestSectionToLibrary(tenantId, proposalId, section.id, userId);
-  } catch (e) {
-    console.error('[sections/lock] section harvest failed:', e);
-  }
-
-  // 2a. Greenfield atom return — the finalized section goes back to the unified
-  //     library_atoms as a DERIVATIVE atom bound to the proposal's document cocoon,
-  //     with lineage to its source atoms. Closes the atomize → mold → draft →
-  //     back-to-library loop. Best-effort: never fail the lock over the return.
-  try {
-    await harvestSectionToAtomLibrary(tenantId, proposalId, section.id, userId);
-  } catch (e) {
-    console.error('[sections/lock] greenfield atom return failed (non-fatal):', e);
-  }
-
-  // 2b. Artifact roll-up (E1): when every section of this section's artifact is
-  //     locked, mark the artifact locked + emit artifact.locked. The artifact is
-  //     the lockable document unit (supersedes the volume_name grouping).
-  if (section.artifactId) {
-    try {
-      // Atomic roll-up: lock the artifact iff it has sections and none remain
-      // unlocked — in ONE statement, so two concurrent final-section locks can't
-      // both observe "not all locked" and neither flip the artifact.
-      const locked = await sql<{ id: string; sectionCount: number }[]>`
-        UPDATE proposal_artifacts a
-        SET is_locked = true, status = 'locked', locked_at = now(), locked_by = ${userId}::uuid
-        WHERE a.id = ${section.artifactId}::uuid
-          AND a.is_locked = false
-          AND EXISTS (SELECT 1 FROM proposal_sections s WHERE s.artifact_id = a.id)
-          AND NOT EXISTS (
-            SELECT 1 FROM proposal_sections s WHERE s.artifact_id = a.id AND s.is_locked = false
-          )
-        RETURNING a.id,
-          (SELECT count(*)::int FROM proposal_sections s WHERE s.artifact_id = a.id) AS section_count
-      `;
-      if (locked.length > 0) {
-        await emitEventSingle({
-          namespace: 'proposal',
-          type: 'artifact.locked',
-          actor: userActor(userId, email),
-          tenantId,
-          payload: {
-            proposalId,
-            artifactId: section.artifactId,
-            stage: proposalStage,
-            sectionCount: locked[0].sectionCount,
-          },
-        });
-      }
-    } catch (e) {
-      console.error('[sections/lock] artifact roll-up failed (non-fatal):', e);
-    }
-  }
-
-  // 3. Document-close + proposal-ready signals (future automation: notify team,
-  //    "get ready" emails, auto-advance). A document closes when every section
-  //    of its volume is locked; the proposal is ready when all are.
-  let autoAdvancedTo: string | null = null;
-  try {
-    const [doc] = await sql<{ total: number; locked: number }[]>`
-      SELECT count(*)::int AS total,
-             count(*) FILTER (WHERE is_locked)::int AS locked
-      FROM proposal_sections
-      WHERE proposal_id = ${proposalId}::uuid
-        AND volume_number IS NOT DISTINCT FROM ${section.volumeNumber}
-    `;
-    if (doc && doc.total > 0 && doc.total === doc.locked) {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'document.locked',
-        actor: userActor(userId, email),
-        tenantId,
-        payload: {
-          proposalId,
-          volumeName: section.volumeName,
-          volumeNumber: section.volumeNumber,
-          sectionCount: doc.total,
-          stage: proposalStage,
-        },
-      });
-    }
-
-    const [all] = await sql<{ total: number; locked: number }[]>`
-      SELECT count(*)::int AS total,
-             count(*) FILTER (WHERE is_locked)::int AS locked
-      FROM proposal_sections
-      WHERE proposal_id = ${proposalId}::uuid
-    `;
-    if (all && all.total > 0 && all.total === all.locked) {
-      await emitEventSingle({
-        namespace: 'proposal',
-        type: 'proposal.advance_ready',
-        actor: userActor(userId, email),
-        tenantId,
-        payload: { proposalId, stage: proposalStage, sectionCount: all.total },
-      });
-
-      // Auto-advance (customer opt-in, default off). When every section is
-      // locked and the tenant enabled auto_advance_when_all_locked, advance one
-      // gate via the shared core — same gates/snapshots/events as a manual
-      // advance. Best-effort: a failure leaves the proposal ready for a manual
-      // advance. The lock route already verified admin access (guard).
-      try {
-        // NB: the db client camelCases columns (postgres.toCamel), so
-        // auto_advance_when_all_locked → autoAdvanceWhenAllLocked.
-        const [autoPref] = await sql<{ autoAdvanceWhenAllLocked: boolean }[]>`
-          SELECT auto_advance_when_all_locked FROM tenant_automation_preferences
-          WHERE tenant_id = ${tenantId}::uuid
-        `;
-        if (autoPref?.autoAdvanceWhenAllLocked) {
-          const result = await advanceProposalStage({
-            tenantId,
-            tenantSlug,
-            proposalId,
-            actorId: userId,
-            actorEmail: email ?? null,
-            actorRole: role,
-            force: false,
-            notes: 'Auto-advanced: all sections locked',
-            trigger: 'auto',
-          });
-          if (result.ok) {
-            autoAdvancedTo = result.data.stage;
-          } else {
-            console.error('[sections/lock] auto-advance skipped:', result.code);
-          }
-        }
-      } catch (autoErr) {
-        console.error('[sections/lock] auto-advance failed (non-fatal):', autoErr);
-      }
-    }
-  } catch (e) {
-    console.error('[sections/lock] close-state signals failed:', e);
-  }
-
   return NextResponse.json({
     data: {
       sectionId: section.id, isLocked: true, status: 'approved', acceptedStage: proposalStage,
-      ...(autoAdvancedTo ? { autoAdvancedTo } : {}),
+      ...(result.autoAdvancedTo ? { autoAdvancedTo: result.autoAdvancedTo } : {}),
     },
   });
 }

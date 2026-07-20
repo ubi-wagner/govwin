@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -54,9 +54,13 @@ export async function PUT(request: Request, ctx: RouteContext) {
     }
 
     const tenantId = tenant.id as string;
-    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    // Proposal-scoped gate: a tenant member OR an accepted collaborator on THIS
+    // proposal (cross-company collaborators pass here). The fine-grained
+    // editableSections check below (resolveUserAccess) is the real enforcement —
+    // it limits a collaborator to their assigned, edit-permission sections.
+    const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Input validation ─────────────────────────────────────────────

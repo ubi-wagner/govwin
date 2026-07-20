@@ -26,11 +26,15 @@ import {
   NumberFormat,
   BorderStyle,
   ShadingType,
+  ImageRun,
   convertInchesToTwip,
 } from 'docx';
+import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { docNodes } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
+  CanvasSection,
   HeadingContent,
   TextBlockContent,
   ListContent,
@@ -41,6 +45,9 @@ import type {
   UrlContent,
 } from '@/lib/types/canvas-document';
 
+/** Paragraph-level pagination flags applied to a keep-together group's content. */
+type ParaOpts = { keepLines?: boolean; keepNext?: boolean };
+
 /**
  * Convert a CanvasDocument to a .docx Buffer suitable for download.
  *
@@ -48,11 +55,37 @@ import type {
  * @param variables — template variable substitutions (company_name, topic_number, etc.)
  * @returns Buffer containing the .docx file bytes
  */
+/**
+ * Tokenize a footer template into runs, substituting {n}/{N} with live page-number
+ * fields (so "Page {n} of {N}" renders "Page 1 of 5", not "Page  of 1 of 5"). A
+ * template with no {n}/{N} gets "· Page X of Y" appended.
+ */
+function footerRuns(template: string, font: string, size: number): TextRun[] {
+  const runs: TextRun[] = [];
+  for (const part of template.split(/(\{n\}|\{N\})/g)) {
+    if (part === '{n}') runs.push(new TextRun({ children: [PageNumber.CURRENT], font, size }));
+    else if (part === '{N}') runs.push(new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size }));
+    else if (part) runs.push(new TextRun({ text: part, font, size }));
+  }
+  if (!/\{n\}|\{N\}/.test(template)) {
+    runs.push(
+      new TextRun({ text: ' · Page ', font, size }),
+      new TextRun({ children: [PageNumber.CURRENT], font, size }),
+      new TextRun({ text: ' of ', font, size }),
+      new TextRun({ children: [PageNumber.TOTAL_PAGES], font, size }),
+    );
+  }
+  return runs;
+}
+
 export async function exportToDocx(
   doc: CanvasDocument,
   variables: Record<string, string> = {},
 ): Promise<Buffer> {
-  const { canvas, nodes } = doc;
+  const { canvas } = doc;
+  // Flat node view of either shape (v2 sections flattened) for the raster
+  // pre-pass, numbered-list instance indexing, and the TOC.
+  const nodes = docNodes(doc);
 
   // Canvas config is optional / may be partial on a hand-authored or freshly
   // provisioned section; fall back to document defaults (US Letter, 1" margins,
@@ -88,18 +121,7 @@ export async function exportToDocx(
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: sub(canvas.footer.template)
-                .replace('{n}', '')
-                .replace('{N}', ''),
-              font: canvas.footer.font.family,
-              size: canvas.footer.font.size * 2,
-            }),
-            new TextRun({ children: [PageNumber.CURRENT] }),
-            new TextRun({ text: ' of ' }),
-            new TextRun({ children: [PageNumber.TOTAL_PAGES] }),
-          ],
+          children: footerRuns(sub(canvas.footer.template), canvas.footer.font.family, canvas.footer.font.size * 2),
         }),
       ],
     }),
@@ -113,12 +135,22 @@ export async function exportToDocx(
     left: margins.left * 20,
   };
 
-  // Build children from nodes
-  const children: (Paragraph | Table)[] = [];
-  for (const node of nodes) {
-    const elements = nodeToDocx(node, fontDefault, lineSpacing, nodes);
-    children.push(...elements);
-  }
+  // Pre-rasterize image nodes (SVG/data-URI → PNG) so the sync node walker can
+  // embed real pictures instead of a "[Image: …]" stub.
+  const raster = new Map<CanvasNode, RasterPng | null>();
+  await Promise.all(
+    nodes.filter((n) => n.type === 'image').map(async (n) => {
+      const key = (n.content as { storage_key?: string })?.storage_key;
+      raster.set(n, await rasterizeDataUri(key));
+    }),
+  );
+
+  // Build children. A v2 doc walks sections→groups→nodes (flow, no forced
+  // breaks; keep_together sections/groups get keepLines/keepNext + break_before
+  // a page break); a v1 doc walks the flat node list exactly as before.
+  const children: (Paragraph | Table)[] = doc.sections && doc.sections.length
+    ? sectionsToDocxChildren(doc.sections, fontDefault, lineSpacing, nodes, raster)
+    : nodes.flatMap((node) => nodeToDocx(node, fontDefault, lineSpacing, nodes, raster));
 
   const document = new Document({
     numbering: {
@@ -172,11 +204,44 @@ export async function exportToDocx(
   return Buffer.from(buffer);
 }
 
+/**
+ * Walk the section layer (v2) into docx children. Sections FLOW — Word's native
+ * pagination fills each page and runs content across boundaries, so there are no
+ * bottom-of-page gaps. `break_before` inserts a page break before the section; a
+ * `keep_together` section or group tags its paragraphs keepLines/keepNext (and
+ * its table rows cantSplit) so Word keeps the block whole on one page.
+ */
+function sectionsToDocxChildren(
+  sections: CanvasSection[],
+  fontDefault: { family: string; size: number },
+  lineSpacing: number,
+  allNodes: CanvasNode[],
+  raster: Map<CanvasNode, RasterPng | null>,
+): (Paragraph | Table)[] {
+  const children: (Paragraph | Table)[] = [];
+  sections.forEach((section, i) => {
+    if (section.layout?.break_before && i > 0) {
+      children.push(new Paragraph({ pageBreakBefore: true, children: [] }));
+    }
+    const sectionKeep = section.layout?.mode === 'keep_together';
+    for (const group of section.groups ?? []) {
+      const keep = sectionKeep || !!group.keep_together;
+      const paraOpts: ParaOpts = keep ? { keepLines: true, keepNext: true } : {};
+      for (const node of group.nodes ?? []) {
+        children.push(...nodeToDocx(node, fontDefault, lineSpacing, allNodes, raster, paraOpts));
+      }
+    }
+  });
+  return children;
+}
+
 function nodeToDocx(
   node: CanvasNode,
   fontDefault: { family: string; size: number },
   lineSpacing: number,
   allNodes: CanvasNode[],
+  raster?: Map<CanvasNode, RasterPng | null>,
+  paraOpts: ParaOpts = {},
 ): (Paragraph | Table)[] {
   // A node may carry no explicit style (hand-authored content / template output);
   // default it so per-node style reads never crash. Field fallbacks below still apply.
@@ -195,6 +260,7 @@ function nodeToDocx(
       const c = node.content as HeadingContent;
       const level = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 }[c.level] ?? HeadingLevel.HEADING_2;
       return [new Paragraph({
+        ...paraOpts,
         heading: level,
         children: [new TextRun({
           text: (c.numbering ? `${c.numbering} ` : '') + c.text,
@@ -213,6 +279,7 @@ function nodeToDocx(
         italic: style.style === 'italic',
       });
       return [new Paragraph({
+        ...paraOpts,
         alignment,
         indent: style.indent ? { left: style.indent * 20 } : undefined,
         spacing: {
@@ -226,10 +293,15 @@ function nodeToDocx(
     case 'bulleted_list':
     case 'numbered_list': {
       const c = node.content as ListContent;
+      // Each numbered list gets its own concrete `instance` so a second list restarts
+      // at 1 instead of continuing the first list's counter (one shared reference =
+      // one continuous counter otherwise).
+      const instance = node.type === 'numbered_list' ? allNodes.filter((n) => n.type === 'numbered_list').indexOf(node) : 0;
       return c.items.map((item) =>
         new Paragraph({
+          ...paraOpts,
           bullet: node.type === 'bulleted_list' ? { level: item.indent_level ?? 0 } : undefined,
-          numbering: node.type === 'numbered_list' ? { reference: 'default-numbering', level: item.indent_level ?? 0 } : undefined,
+          numbering: node.type === 'numbered_list' ? { reference: 'default-numbering', level: item.indent_level ?? 0, instance } : undefined,
           children: [new TextRun({ text: item.text, font, size })],
         }),
       );
@@ -241,6 +313,7 @@ function nodeToDocx(
         typeof cell === 'string' ? { text: cell } : cell;
 
       const headerRow = new TableRow({
+        cantSplit: !!paraOpts.keepLines,
         children: c.headers.map((h) => {
           const cell = resolveCell(h);
           const mergedStyle = { ...c.header_style, ...cell.style };
@@ -266,6 +339,7 @@ function nodeToDocx(
       });
       const dataRows = c.rows.map((row) =>
         new TableRow({
+          cantSplit: paraOpts.keepLines || undefined,
           children: row.map((rawCell) => {
             const cell = resolveCell(rawCell);
             const cellStyle = cell.style;
@@ -298,6 +372,7 @@ function nodeToDocx(
     case 'caption': {
       const c = node.content as CaptionContent;
       return [new Paragraph({
+        ...paraOpts,
         alignment: AlignmentType.CENTER,
         children: [
           new TextRun({ text: `${c.prefix} ${c.number}: `, bold: true, italics: true, font, size }),
@@ -309,6 +384,7 @@ function nodeToDocx(
     case 'footnote': {
       const c = node.content as FootnoteContent;
       return [new Paragraph({
+        ...paraOpts,
         children: [
           new TextRun({ text: c.marker, superScript: true, font, size: size - 4 }),
           new TextRun({ text: ` ${c.text}`, font, size: size - 4 }),
@@ -320,6 +396,7 @@ function nodeToDocx(
     case 'url': {
       const c = node.content as UrlContent;
       return [new Paragraph({
+        ...paraOpts,
         children: [new TextRun({ text: c.display_text, font, size, color: '0000FF' })],
       })];
     }
@@ -369,11 +446,39 @@ function nodeToDocx(
       return tocParagraphs;
     }
 
-    case 'image':
-      return [new Paragraph({
+    case 'image': {
+      const ic = node.content as { alt_text?: string; caption?: string; width?: number; height?: number };
+      const r = raster?.get(node);
+      if (!r) {
+        return [new Paragraph({
+          ...paraOpts,
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: `[Image: ${ic.alt_text ?? 'image'}]`, italics: true, color: '999999', font, size })],
+        })];
+      }
+      // Display size: the node's intended width/height, else the intrinsic raster
+      // size, capped to the ~6.5" content column (624px @ 96dpi), aspect-preserved.
+      const natW = ic.width && ic.width > 0 ? ic.width : r.width;
+      const natH = ic.height && ic.height > 0 ? ic.height : r.height;
+      const aspect = natW > 0 && natH > 0 ? natW / natH : 1;
+      let dispW = Math.min(natW, 470);
+      let dispH = Math.round(dispW / aspect);
+      const out: Paragraph[] = [new Paragraph({
+        ...paraOpts,
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `[Image: ${(node.content as { alt_text: string })?.alt_text ?? 'image'}]`, italics: true, color: '999999', font, size })],
+        spacing: { before: 60, after: 40 },
+        children: [new ImageRun({ type: 'png', data: r.buffer, transformation: { width: dispW, height: dispH } })],
       })];
+      if (ic.caption) {
+        out.push(new Paragraph({
+          ...paraOpts,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 },
+          children: [new TextRun({ text: ic.caption, italics: true, color: '666666', font, size: size - 2 })],
+        }));
+      }
+      return out;
+    }
 
     default:
       return [];

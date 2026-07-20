@@ -47,7 +47,13 @@ def test_workflow_validates():
 
 def test_chain_topology_draft_review_publish_notify():
     by_name = {s.name: s for s in OnCmsContentRequested.steps}
-    assert set(by_name) == {"draft_content", "review", "publish_content", "notify_author"}
+    assert set(by_name) == {
+        "ai_content_generate", "draft_content", "review", "publish_content", "notify_author"
+    }
+    # The AI drafter is ADVISORY and INDEPENDENT (no depends_on) — it runs alongside the
+    # deterministic draft and its failure/skip can never block or dead-end the pipeline.
+    assert by_name["ai_content_generate"].step_type == StepType.AI_INVOKE
+    assert by_name["ai_content_generate"].depends_on is None
     assert by_name["draft_content"].step_type == StepType.ACTION
     assert by_name["review"].step_type == StepType.TODO
     assert by_name["publish_content"].step_type == StepType.ACTION

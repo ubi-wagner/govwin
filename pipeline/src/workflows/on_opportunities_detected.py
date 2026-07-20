@@ -113,6 +113,17 @@ class OnOpportunitiesDetected(Workflow):
     )
 
     steps = [
+        # AI actor (#128, Batch A — PLATFORM-SCOPE, tenant_id=None): the opportunity_scout reads
+        # the newly-detected triage rows and prioritizes them for the admin — ADVISORY (never
+        # dismisses/promotes). Independent (no depends_on) so a failure never blocks the alert +
+        # triage ToDo. Injection-fenced (raw external titles/summaries).
+        Step(
+            name="ai_opportunity_scout",
+            step_type=StepType.AI_INVOKE,
+            action="tool.opportunity.scout",
+            input_map={"source": "payload.source", "newSolicitations": "payload.newSolicitations"},
+            timeout_minutes=10,
+        ),
         Step(
             name="notify_rfp_admin",
             step_type=StepType.NOTIFY,

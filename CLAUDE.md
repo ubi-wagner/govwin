@@ -24,13 +24,22 @@ proposal-portal build) over the one-way bridge; the only backflow is a ToDo even
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md** (migrations
 at 108). Self-serve Stripe checkout is still descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, 10 archetypes) is only PARTLY wired: `section_drafter`
-is live end-to-end (`draft_v0` → `markdown_to_canvas` → `publish_section_draft`, run on
-release/provision, gated on the pipeline `ANTHROPIC_API_KEY`); `compliance_reviewer` runs INLINE in
-the `ai/compliance` Next route (not through the fabric loop); `color_team_reviewer` is reachable only
-via the advance `agent_task_queue` path (its `proposal.review_requested` event otherwise has no
-consumer). The remaining ~7 archetypes are dormant (registered, no producer). `opportunity_id` keys
-the spine (mig 088); docs/V1_REFACTOR_DESIGN.md has the orchestration pattern.
+The pipeline agent workforce (`AgentFabric`, 10 archetypes) is being woken one at a time — **canonical
+plan + safety contract in `docs/AGENT_WORKFORCE.md` (read it before touching agents)**. Live: `section_drafter`
+(`draft_v0` → `markdown_to_canvas` → `publish_section_draft`, on release/provision, gated on the pipeline
+`ANTHROPIC_API_KEY`); `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance
+`agent_task_queue`. #117 in progress: `librarian` greenfielded onto `library_atoms` + producer
+(atomize→`agent_task_queue`) + injection-fenced; `scoring_strategist` greenfielded (tenant-discretion).
+The other 4 are dormant. Wiring pattern: realign to the current spine, then either a **per-tenant producer**
+(fan-out agents) or a declarative **`AI_INVOKE` `Step`** (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE`
+maps them). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
+authority; tool schemas expose NO `tenant_id`); output is **advisory → guardrail → land-or-review** (never
+auto-writes business tables); untrusted tenant content is **injection-fenced**; runtime bounds **runaway**
+(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop pending a
+`NOBYPASSRLS` agent role (mig 116 forced RLS on `episodic_memories`; `SET app.tenant_id` wiring specified in
+the doc). Oversight: `/admin/agents` → Agent Workforce (roster + per-tenant usage, forward-only bridge).
+`opportunity_id` keys the spine (mig 088); docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
+orchestration pattern.
 
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes → `frontend/`
@@ -107,3 +116,8 @@ See CLAUDE_CLIFFNOTES.md for:
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and
 docs/MASTER_MIRROR_OPP_DESIGN.md for the OPP → purchase → curation → proposal (V0→V1) flow.
+
+**Continuity:** `docs/CONTINUATION.md` is the durable "start here" memory — current
+sprint state, how to spin up the sandbox, verified demo accounts, the live gap list, and
+the recurring bug-classes. Read it first when resuming; the identity model is in
+docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md.

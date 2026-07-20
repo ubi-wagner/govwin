@@ -116,11 +116,48 @@ class OnRfpUploaded(Workflow):
             timeout_minutes=5,
             retry_count=1,
         ),
+        # AI actors (#128, Batch A — PLATFORM-SCOPE, tenant_id=None): the master-side pipeline.
+        # ingest_analyst reads the shredded text → structured curation draft; matrix_stager +
+        # skeleton_architect read the compliance vars → advisory matrix rows + master skeleton.
+        # ALL ADVISORY: they land in the RFP-admin curation review, never auto-write. Each
+        # depends on its DATA source, but NOTHING downstream (notify) depends on them, so a
+        # failure/skip never dead-ends the ingest pipeline. Injection-fenced (raw RFP text).
+        Step(
+            name="ai_ingest_analyst",
+            step_type=StepType.AI_INVOKE,
+            action="tool.solicitation.ingest",
+            depends_on="shred_document",
+            input_map={"solicitation_id": "payload.solicitationId"},
+            timeout_minutes=10,
+        ),
+        Step(
+            name="ai_matrix_stager",
+            step_type=StepType.AI_INVOKE,
+            action="tool.matrix.stage",
+            depends_on="extract_compliance",
+            input_map={"solicitation_id": "payload.solicitationId"},
+            timeout_minutes=10,
+        ),
+        Step(
+            name="ai_skeleton_architect",
+            step_type=StepType.AI_INVOKE,
+            action="tool.skeleton.build",
+            depends_on="extract_compliance",
+            input_map={"solicitation_id": "payload.solicitationId"},
+            timeout_minutes=10,
+        ),
+        # notify_curator is INDEPENDENT (no depends_on) so the RFP admin is ALWAYS
+        # alerted that a solicitation landed and needs curation — even when shred or
+        # extract_compliance FAILS. shred() re-raises on failure (loud audit); with the
+        # managed engine's continue-on-independent-failure semantics (HIGH-3), the failed
+        # shred skips its dependents (extract + the ai_* actors) but this NOTIFY still
+        # fires. Depending on extract_compliance (the old wiring) dropped the alert on the
+        # very failure the admin most needs to hear about — the workflow HIGH-2 finding.
+        # It is still LAST in the steps list, so it runs after the pipeline is attempted.
         Step(
             name="notify_curator",
             step_type=StepType.NOTIFY,
             action="system.notify",
-            depends_on="extract_compliance",
             input_map={
                 "channel": '"email"',
                 "to_role": '"rfp_admin"',

@@ -1,0 +1,314 @@
+# CONTINUATION — spin up exactly here
+
+**Last updated:** 2026-07-19 (identity COMPLETE + #117 agent workforce COMPLETE + #120 foundation + Batches A/B/C → 19 archetypes)
+**Branch:** `claude/nice-hamilton-kBqtD`
+
+**AGENT WORKFORCE — COMPLETE + EXPANDED (19 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
+forward plan: `docs/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
+
+- **#117 DONE — all 10 original archetypes awake as workflow actors.** section_drafter / compliance_reviewer /
+  color_team_reviewer were live; this run woke librarian (producer in atomize-package), scoring_strategist +
+  opportunity_analyst (per-tenant producers on the PIN route), proposal_architect + capture_strategist
+  (AI_INVOKE in OnProposalCreated), packaging_specialist (AI_INVOKE in OnProposalAdvancedToFinal),
+  partner_coordinator (AI_INVOKE in the new OnCollaboratorInvited). Each greenfielded to `library_atoms`,
+  tenant-discretion (no `tenant_id` in schemas), injection-fenced, locked by `test_<agent>_wiring.py`.
+- **#120 DONE — the two 🚩 flags are built.** Mig 117 adds the `rfp_agent` NOBYPASSRLS role + FORCE-RLS +
+  tenant_isolation on proposals/proposal_sections/tenant_profiles/atom_tags (PROVEN in sandbox: cross-tenant/
+  unset reads return 0 rows). `fabric.invoke_agent` sets/resets `app.tenant_id` per call (optional agent pool
+  via `AGENT_DATABASE_URL`). `agents/guardrails.py::enforce_guardrails` gates every result (advisory →
+  guardrail → land-or-review): disallowed content → review, scoring adjustment clamped to ±15, fail-safe.
+  **Deploy step (gated):** provision a login member of `rfp_agent` + set `AGENT_DATABASE_URL`.
+- **Batches A/B/C DONE — fabric now 19.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
+  platform-scope opportunity_scout/ingest_analyst/matrix_stager/skeleton_architect (OnOpportunitiesDetected +
+  OnRfpUploaded). Batch C outcome_analyst/amendment_monitor/cost_estimator/pp_matcher (OnProposalOutcomeRecorded
+  / OnSourceChangeDetected / OnProposalCreated). Platform agents skip tenant-discretion (no tenant) but KEEP
+  the injection fence + land into the admin curation review.
+- **Verify:** `cd pipeline/src && PYTHONPATH=. python3 -m pytest ../tests/test_*_wiring.py ../tests/test_agents.py
+  ../tests/test_agents_security.py ../tests/test_guardrails.py -q` → 332 green (crypto failures are a
+  pre-existing PyO3 env artifact). Deploy has the real ANTHROPIC_API_KEY (Railway); LLM reasoning runs live
+  there — in-sandbox we verify routing + producer/step + tool SQL against the live schema.
+- **NEXT:** the **RFP-Pipeline (our-org) agents** — a separate future run (as agreed). Oversight surface is
+  `/admin/agents` → Agent Workforce (roster + per-tenant usage rollup, forward-only bridge).
+
+**LAUNCH-READINESS — all green this session (2026-07-19):** identity×deeplink 22/22, shadow-tenant-admin
+10/10, pin 15/15, p3-lifecycle 13/13, immobileyes-shadow 4/4, item-template-picker 8/8, **full Monday
+journey E2E green** (ingest→matrix→atomize→spotlight→provision→draft-from-atoms→lock→harvest(lineage)→
+export, tenant-isolated), vitest 701/701, tsc clean, build clean. Identity model is DONE. Remaining
+backlog is NON-critical: #117 (7 dormant agents — large, defer past launch), #69 (Ohio TVSF gen),
+#18 (past-proposal templify), #111 (deploy-verify, automatic).
+**This file is the durable "start here tomorrow" memory.** It's committed to git on
+purpose — the sandbox container is ephemeral and gets reclaimed; git is the layer that
+survives. Read this first, then `docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md`.
+
+---
+
+## 1. What just shipped (this sprint = multi-membership identity, DONE + verified)
+
+One email → many `(company, role)` memberships; pick one at login; the session is
+**singular** and enforced. Commits on the branch, newest last:
+
+| Commit | What |
+|---|---|
+| `cf3989a` | P1 — `user_memberships` table (mig 111) + backfill; `verifyTenantAccess` reads it |
+| `42c8b3b` | P2 — `/select-company` selector when >1 membership |
+| `d8a3937` | Collaborator visibility — withhold unassigned sections server-side |
+| `7935ab7` | Universal upload+atomizer (dashboard + collaborator view) |
+| `7662779` | RFP-admin shadow descend/ascend — banner + ack modal + audited |
+| `bab99b7` | **Singular ENFORCEMENT** — active membership pinned in the JWT (`unstable_update`) |
+| `ecaaad9` | **P3** — collaborator invite → membership (multi-company works) + uuid[] fix + login copy |
+| `be5eb82` | launch-hardening — run.sh glob footgun fix; Immobileyes shadow flow verified; #116 sweep clean |
+| `465a47a` | **Never hard-delete a user** — collaborator soft-delete + reactivate (mig 112); fixes removal 500 |
+| `d09c348` | membership-ify all user-creation paths (team invite + onboarding accept) |
+| `836353f` | **Company ARCHIVE** (license slumber) — third state (mig 113); reversible + lossless |
+| `74f1f10` | **#115** retire legacy users.tenant_id access read-through — access is now membership-pure |
+| `f1d1fb3` | **#118** team-member deactivate/reactivate (never delete) + dispatcher redirect-loop fix |
+| `5d54174` | RFP-admin **create company + admin POC** (was a stub) + "New Company" admin UI |
+| `994aa41` | **Notification deep-link** — /go + /api/enter land recipients directly in their company queue |
+
+**Admin/RFP capability set (all done + verified):** tenant_admin adds/(de)activates users
+(`team/[userId]`) + collaborators (invite/soft-delete/reactivate); a shadow rfp_admin passes the same
+tenant_admin gate, audited. RFP-admin creates companies+POC (`POST /api/admin/tenants`), archives/
+restores companies, and shadows in to help upload+atomize.
+
+**Notification deep-link foundation (`c2ee5b8`) — for ALL external nudging.** Emails from
+platform@rfppipeline.com (`GOOGLE_WORKSPACE_EMAIL`+Gmail API) link to `/go?task=<id>` or
+`/go?tenant=<slug>`. `/go` is the orchestrator: checks link freshness (task completed/cancelled/expired,
+proposal archived/submitted → "already done" note), then routes by session state — in the target company
+→ "you're in X" confirm → the task; in a DIFFERENT company → `DeepLinkGate` "Switching companies" (sign
+out + re-login, singular session, NO silent switch); unpinned multi-membership → `/api/enter` pins the
+target (first pick); admins straight in. `/api/enter` never silently cross-switches (hands to `/go`).
+So email = the nudge; completion happens in-platform, auditable.
+
+**Identity is 100% across deep-linked emails — hardened + proven (this session).** Two fixes closed the
+last gaps: (1) `middleware.ts` now preserves the FULL path INCLUDING the query on the unauthed→/login
+redirect (`from = pathname + req.nextUrl.search`) — before, a multi-membership recipient who wasn't
+signed in lost the `?tenant=`/`?task=` target and stranded at the dispatcher; (2) `/go`'s switch-relogin
+routes back through `/go?tenant=<target>` (not `/api/enter`) and the here-ack is restricted to
+`(pinned && sessionSlug === targetSlug) || memberships.length === 1`, so a fresh not-yet-pinned
+multi-membership session re-pins via `/api/enter` and lands PINNED to the target (not merely at its URL).
+Proven end-to-end by `scripts/drive-identity-deeplink.mts` (22/22): switch round-trip lands PINNED as the
+target's role; unauthed deep-link to a NON-home company survives login; non-member denial; completed-task
+dead-link ack; `/api/enter` no-silent-switch guard. Manual: `getting-started.md` "Following a
+notification link" (screenshots `deeplink-switch/-login-notice/-here/-donetask.png`).
+Regression scripts: `scripts/drive-pin.mts` (15), `drive-p3-lifecycle.mts` (13), `drive-identity-deeplink.mts` (22),
+`drive-shadow-tenant-admin.mts` (10, #114), `drive-item-template-picker.mts` (8, #77),
+`drive-past-proposal-templify.mts` (27, #18).
+
+**#18 DONE (this session) — past-proposal templify + regen + branch-and-promote lineage loop.** In the
+Library, "Reuse a past proposal" lists uploaded proposal packages (document_cocoons). **Templify** →
+`templates/extract` new `cocoonId` source reconstructs the ordered section skeleton via
+`lib/templates/past-proposal-canvas.ts` (lay atoms out DIRECTLY — assembleArtifactCanvas→moldNodes drops
+bare prose and collapses structure), persisted as a tenant template (metadata.templifiedFromCocoon), emits
+`library:template.extracted` (source=past_proposal). **Regen** (`New draft` → documents POST) creates a new
+tenant_document AND copies the seminal atoms into WORKING drafts (source=manual, status=draft) bound to the
+doc via a working `document_cocoons.origin_document_id` (mig 115), each with `atom_lineage` derived_from →
+the seminal atom; emits `library:document.regenerated`. **Full lock for download** (`DocumentLockBar` →
+`documents/[id]/lock`) sets the doc `status=final` and PROMOTES the working copies to FOUNDATION atoms
+(status=approved, source=download_derivative) via `lib/documents/lock-document.ts`, lineage preserved; emits
+`library:document.locked`. Seminal atoms are NEVER touched (non-destructive). Constraints: atom source CHECK
+= upload|harvest|download_derivative|manual (no 'regen'); cocoon source CHECK = upload|download|system|harvest;
+tenant_documents.status CHECK = draft|final (lock = 'final'). Proven `drive-past-proposal-templify.mts` (27/27,
+incl. 4/4 sections+titles preserved, lineage to seminal, promotion, non-destructive) + unit
+`__tests__/past-proposal-canvas.test.ts`. Manual: `library-atoms.md` §6 (screenshots library-templify-panel/
+-form, document-lock-bar). **Mig 115 must apply on deploy** (auto via entrypoint→migrate.mjs).
+
+**Migrations added this stretch:** 111 (user_memberships), 112 (proposal_collaborators.revoked_at),
+113 (tenants.archived_at), 114 (rfp-pipeline tenant + staff memberships). All idempotent +
+auto-applied on deploy via `entrypoint.sh → migrate.mjs`. Verify post-deploy.
+
+**#112 "including us" DONE (`c7c00f7`):** RFP Pipeline is a real tenant; staff hold tenant_admin home
+memberships; **Our Workspace** admin-nav link → `/portal/rfp-pipeline` gives us the upload/atomizer +
+whole portal like any customer (atomize into our own library_atoms). Portal layout: `isShadowAdmin =
+admin AND not-a-member`, so no shadow banner on our own tenant; customer tenants still show it.
+**Identity/lifecycle/admin model is now COMPLETE.** Remaining: #111 (deploy-verify, auto), and the
+NON-identity gaps #117 (dormant agents), #69/#18 (curation/template features).
+
+**#114 DONE (this session) — shadow-admin-as-company-admin, proven + reconciled.** The design once
+imagined rewriting the shadow session role to `tenant_admin`; the as-built delivers the SAME authority by
+HIERARCHY and deliberately keeps the platform role. Every customer-portal gate is
+`hasRoleAtLeast(role,'tenant_admin')` (or lists the admin roles) and rfp_admin/master_admin outrank
+tenant_admin, so a shadow admin passes every tenant_admin gate; there is NO in-tenant action gated on
+*exactly* tenant_admin and NO rfp_admin-only bypass inside a single customer portal. Keeping the platform
+role (a) preserves honest audit provenance ("an RFP admin did this in shadow", not an anonymized
+tenant_admin — the user's "still all audited" requirement), and (b) keeps the shadow banner + singular-session
+exemption working (`isShadowAdmin = isAdmin && !hasActiveMembership`). Proven by
+`scripts/drive-shadow-tenant-admin.mts` (10/10): no membership at target, role stays platform-admin
+in-tenant, tenant_admin-gated WRITE succeeds, audited under the admin's real user id scoped to the customer.
+Design reconciled in MULTI_MEMBERSHIP_IDENTITY_DESIGN.md ("AS-BUILT (#114)").
+
+**#77 DONE (this session) — required-item → template picker in curation.** The AddEditItemModal now
+carries a **Section grounding** block: a **Starter template (mold)** picker (fetches `/api/admin/templates`,
+grouped by type) that sets `volume_required_items.template_id`, plus an **Expert notes** textarea →
+`expert_notes`. Both were already accepted by the `volume.add/update_required_item` tools and consumed by
+provisioning (`create/route.ts` SELECTs `canvas_document` by `template_id` → interpolates the section mold;
+`expert_notes` → section.meta; via `compliance-resolver.ts`), so this closed the UI gap end-to-end. Linked
+items show 📄 template + ✎ notes badges in the volume list. Proven by `scripts/drive-item-template-picker.mts`
+(8/8, real modal). Manual: `admin-rfp.md` §3 (screenshots `curation-item-template-picker/-badge.png`).
+
+**Identity state ladder (user directive) — active · inactive · archived, all reversible + auditable, nothing destroyed:**
+- **active / inactive** = per-USER (never hard-delete; mark inactive, keep history, re-invite reconstitutes
+  the same row auditably). Collaborators DONE (revoked_at + reactivate). Tenant_users/admins = gap #118.
+- **archived** = whole COMPANY (license lapsed): `tenants.archived_at`, orthogonal to per-user state so
+  renewal restores everyone to their exact prior state for free. Archived companies vanish from the login
+  list (`getActiveMemberships` filters them); admins can still enter to renew. Admin control on the tenant
+  page. DONE + verified (`scripts/drive-archive.mts`). Every user-creation path now writes a membership.
+See the identity design's "Never hard-delete" + "third state: ARCHIVED" sections.
+
+**As-built mechanism (don't re-derive):**
+- The active `(role, tenantId, tenantSlug)` + a `membershipPinned` flag live in the
+  **session JWT**. `auth.config.ts` `jwt` callback: sets them false on login, and on
+  `trigger === 'update'` copies them from `unstable_update` data and sets pinned=true.
+- `/select-company` posts to `selectCompanyAction` (`app/actions/auth-actions.ts`) →
+  validates the tenant is one of the caller's memberships → `unstable_update` rewrites
+  the JWT → redirects. So the active **role follows the selected company** (a
+  tenant_admin-at-home becomes partner_user when they enter a company where they're a
+  collaborator). This is what reaches all ~40 portal routes without editing each one.
+- Re-pick-proof: once pinned, `/select-company` + dispatcher forward to the active
+  company; the portal layout redirects any other tenant back. Logout clears the JWT
+  (= clears the pin) → "log out to switch" is a hard guarantee.
+- **Fail-closed safety net:** `verifyTenantAccess` (lib/db.ts) also caps a non-admin's
+  active role to the role actually granted at that tenant
+  (`hasRoleAtLeast(membershipRole, sessionRole)`), so even if the rewrite didn't take,
+  routes deny — never escalate.
+- RFP/master admins are **exempt** (they re-scope in-session via shadow descend/ascend).
+- P3 invite: `proposal_collaborators` route also INSERTs an active
+  `(tenant, partner_user|tenant_user, source='collaborator')` membership,
+  `ON CONFLICT (user_id,tenant_id) DO NOTHING`, **without touching users.tenant_id**
+  (home preserved, no clobber).
+
+**Verified:** `frontend/scripts/drive-pin.mts` (12/12: pin, role-rewrite, hop-denied,
+re-pick-proof, single-membership + admin controls) and `frontend/scripts/drive-p3-invite.mts`
+(cross-company invite → two memberships, home preserved). tsc clean; vitest 701/701.
+
+---
+
+## 2. Spin up the sandbox (exact commands + gotchas)
+
+```bash
+export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
+
+# The disk PERSISTS across idle (git repo, node_modules, .next build, AND the
+# postgres data dir at /tmp/pgs_gov/data all survive) — but the postgres + next
+# PROCESSES are stopped when the container goes idle. So on resume you usually
+# only need to RESTART both, not rebuild/reseed.
+
+# 1. Start postgres on the surviving data dir (PG16; runs as 'claude', NOT root):
+rm -f /tmp/pgs_gov/data/postmaster.pid            # clear the stale pid from last run
+mkdir -p /tmp/pgs_sock && chown -R claude:claude /tmp/pgs_gov /tmp/pgs_sock
+su claude -c "/usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgs_gov/data \
+  -o '-p 5433 -k /tmp/pgs_sock' -l /tmp/pgs_gov/log start"
+psql "$DATABASE_URL" -tAc "SELECT count(*) FROM tenants"   # sanity: expect 4 (incl. rfp-pipeline)
+# ^ If pg_ctl fails with 'could not create lock file /var/run/postgresql/...: Permission
+#   denied', the -k socket dir isn't being honoured — it MUST point at a claude-writable
+#   path (e.g. /tmp/pgs_sock). psql over TCP (127.0.0.1:5433) still works regardless.
+
+# If /tmp was ALSO wiped (full reclaim, data dir gone): initdb a fresh cluster
+# (--auth=trust -U claude), createdb govtech_intel, then run every migration
+# `for f in db/migrations/0*.sql 1*.sql; do psql "$DATABASE_URL" -f "$f"; done`
+# (skip 000_drop_all.sql) and re-run the seed scripts (scripts/seed_dev_accounts.mjs,
+# frontend/scripts/seed-cuas-immobileyes.mts, seed-demo-*.mts).
+
+cd /home/user/govwin/frontend
+# Build (takes ~90s; the 2-min default Bash timeout WILL cut it off — use timeout 600000)
+NEXT_TELEMETRY_DISABLED=1 npm run build
+
+# Start the server (production build; http, so NextAuth non-secure cookies work)
+setsid env DATABASE_URL="$DATABASE_URL" \
+  AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST='true' \
+  NEXTAUTH_URL='http://localhost:3000' ANTHROPIC_API_KEY='sk-noop' \
+  NODE_ENV=production node node_modules/next/dist/bin/next start -p 3000 \
+  >/tmp/next-app.log 2>&1 < /dev/null &
+disown
+until curl -s -o /dev/null http://localhost:3000/login; do sleep 1; done
+```
+
+**GOTCHAS learned the hard way this sprint (save yourself the time):**
+- **Restarting the server:** `pkill`/`kill next-server` often returns exit 144
+  (cosmetic) BUT the old server can keep serving the OLD in-memory build while a new
+  one fails to bind :3000. ALWAYS verify with
+  `ps -eo pid,etime,cmd | grep next-server` — if `etime` isn't ~seconds, you're on the
+  stale build. Force it: `pkill -9 -f next-server; fuser -k 3000/tcp; sleep 2` then
+  start fresh and re-check the pid age. Next.js `start` serves the `.next` from
+  **startup time** — a rebuild does nothing until you restart.
+- **Background wait-loops:** `until ! pgrep -f "next build"` matches its **own**
+  command line (which contains "next build") → infinite loop that never fires the
+  build. Match a narrower string or check for the node process, not the bash wrapper.
+- Playwright drive-tests must live under `frontend/` (else `playwright` won't resolve).
+  Chromium: `executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`.
+- `GET /api/auth/session` (public path) returns the JWT-derived session incl. our
+  custom `role/tenantId/tenantSlug/membershipPinned` — the fastest way to assert the
+  active membership in a drive-test.
+
+**Demo accounts** (password `DemoPass123!` unless noted):
+
+| Email | Home | Memberships | Use for |
+|---|---|---|---|
+| `expert@beacon-labs.test` | tenant_admin @ beacon-labs | +partner_user @ acme | THE multi-membership case |
+| `admin@acme-navy.test` | tenant_admin @ acme-navy-systems | 1 | acme admin / invites |
+| `teammate@acme-navy.test` | tenant_user @ acme-navy-systems | 1 | single-membership control |
+| `eric@rfppipeline.com` | master_admin (no tenant) | 0 | admin / shadow control |
+
+Acme proposal `3b0e7f8b-7ca2-4570-91d9-48326add00ff`; sections
+`dc8a44af-…` (Assigned) / `26a41b25-…` (Unassigned). Comp code `rfppipelinetest`.
+
+---
+
+## 3. Rebuilt gap list (tasks carry the detail; here's the map)
+
+**Deploy-gating (do before/at deploy):**
+- **#111 — migration 111 to staging/prod.** DE-RISKED 2026-07-19: production applies
+  migrations automatically via `entrypoint.sh` → `db/migrations/migrate.mjs` (glob
+  `^\d{3}.*\.sql$`, so it DOES pick up 100–111), and mig 111 is idempotent
+  (`CREATE TABLE IF NOT EXISTS` + backfill `ON CONFLICT DO NOTHING`) — verified by
+  running it through the tracked runner (no-op on re-run, data intact). Action is now
+  just **verify post-deploy**: `user_memberships` exists + backfilled, and one multi-
+  + one single-membership login work. NOTE: `db/migrations/run.sh` (manual dev tool)
+  had a `0*.sql` glob that silently skipped 100–111 — FIXED to `[0-9][0-9][0-9]*.sql`.
+
+**Identity model follow-ons (natural next phases):**
+- **#112 — our-org-as-a-tenant + platform upload/atomizer** ("including us"): make our
+  org a real `tenants` row so staff hold customer memberships; add UploadAtomizeCard to
+  `/admin`.
+- **#113 — collaborator removal → revoke the 'collaborator' membership** (only when no
+  proposal collaborations remain at that tenant; never touch home/manual memberships).
+- **#114 — shadow descend rewrites session role to tenant_admin** (currently stays
+  rfp_admin in-session; use the same `unstable_update` mechanism for true company-admin
+  parity + data-integrity).
+- **#115 — Identity P4:** retire the fused `users.tenant_id/role` read-throughs once
+  every caller reads the active membership and a backfill sweep is clean.
+
+**Bug-class + platform hardening:**
+- **#116 — array-column insert sweep:** audit every `sql.array(...)` binding against its
+  column type (uuid[]/int[]/enum[]); non-empty text[] into a typed[] column 500s.
+  Same family as the CHECK controlled-vocabulary class and the camelCase-read class.
+- **#117 — wire dormant AgentFabric archetypes** (~7 registered, no producer).
+
+**Carried over (pre-existing pending):** #18 past-proposal templify+regen, #69 Ohio
+TVSF end-to-end, #77 P4b required-item→template picker in curation.
+
+---
+
+## 4. Durable lessons this sprint reinforced (the "checks we keep doing")
+
+These are recurring bug-classes — treat them as a checklist, not one-offs:
+1. **Controlled vocabularies (CHECK columns):** confirm a literal is in the column's
+   CHECK before writing (process_instances.scope, source_health.status,
+   source_visits.action, source_diffs.severity, user_memberships.source/status…).
+2. **postgres.js global camelCase transform:** result rows are camelCase; JSONB column
+   *contents* are not. Read camelCase in components (this bit us in atom-library).
+3. **Array-column type match:** `sql.array(text[])` into a `uuid[]` column throws — cast
+   `::uuid[]` and validate elements. Only shows up with a NON-empty array.
+4. **Next.js start serves the startup-time build:** rebuild ≠ live; restart + verify pid
+   age. `pgrep`/`until` loops can match themselves.
+5. **JWT is the singular-session source of truth:** everything authz reads the active
+   membership off the token; never infer tenant from `users.tenant_id`.
+
+---
+
+## 5. Open question for the user (non-blocking)
+
+The "two login options (Spotlight vs Portal)" to consolidate: the codebase has a
+**single** `/login` CTA (site-chrome `chrome.nav.loginHref`) and one unified sign-in
+form — already the consolidated single-login → select-company flow the request
+describes. If a second login CTA is seen somewhere (a specific marketing page or a CMS
+override), point at it; otherwise this is considered resolved.

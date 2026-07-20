@@ -14,6 +14,7 @@ import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 const TEMPLATE_TYPES = [
   'technical_volume', 'cost_volume', 'slide_deck', 'past_performance',
@@ -23,11 +24,12 @@ const TEMPLATE_TYPES = [
 
 interface Ctx { params: Promise<{ templateId: string }> }
 
-function authz(session: unknown): boolean {
-  const u = (session as { user?: { id?: string; role?: unknown } } | null)?.user;
-  if (!u?.id) return false;
+function authz(session: unknown): { userId: string; email: string | null } | null {
+  const u = (session as { user?: { id?: string; email?: string; role?: unknown } } | null)?.user;
+  if (!u?.id) return null;
   const role = isRole(u.role) ? u.role : null;
-  return !!role && hasRoleAtLeast(role, 'rfp_admin');
+  if (!role || !hasRoleAtLeast(role, 'rfp_admin')) return null;
+  return { userId: u.id, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, ctx: Ctx) {
@@ -64,7 +66,8 @@ export async function GET(_request: Request, ctx: Ctx) {
 
 export async function PATCH(request: Request, ctx: Ctx) {
   try {
-    if (!authz(await auth())) {
+    const who = authz(await auth());
+    if (!who) {
       return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
     const { templateId } = await ctx.params;
@@ -103,7 +106,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
     // COALESCE-style partial update: only provided fields change. node_count is
     // recomputed when canvas_document is supplied.
-    const nameVal = typeof body.name === 'string' ? body.name.trim() : null;
+    // Empty/whitespace name must NOT blank the column (POST rejects empty names) —
+    // coerce '' to null so the COALESCE below preserves the existing name.
+    const nameVal = typeof body.name === 'string' ? (body.name.trim() || null) : null;
     const descVal = typeof body.description === 'string' ? body.description : null;
     const typeVal = typeof body.templateType === 'string' ? body.templateType : null;
     const agencyVal = typeof body.agency === 'string' ? body.agency : null;
@@ -137,9 +142,62 @@ export async function PATCH(request: Request, ctx: Ctx) {
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
     }
 
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.updated',
+      actor: userActor(who.userId, who.email ?? undefined),
+      tenantId: null,
+      payload: { templateId },
+    });
+
     return NextResponse.json({ data: { templateId, updated: true } });
   } catch (e) {
     console.error('[admin/templates/:id] PATCH failed:', e);
+    return NextResponse.json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/admin/templates/[templateId] — remove a non-system template.
+ * Unlinks any required-items that pointed at it (they fall back to the registry).
+ */
+export async function DELETE(_request: Request, ctx: Ctx) {
+  try {
+    const who = authz(await auth());
+    if (!who) {
+      return NextResponse.json({ error: 'rfp_admin role required', code: 'FORBIDDEN' }, { status: 403 });
+    }
+    const { templateId } = await ctx.params;
+    if (!isValidUUID(templateId)) {
+      return NextResponse.json({ error: 'Invalid templateId', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+    let existing;
+    try {
+      [existing] = await sql<{ id: string; is_system: boolean }[]>`
+        SELECT id, is_system FROM document_templates WHERE id = ${templateId}::uuid LIMIT 1`;
+    } catch (e) {
+      console.error('[admin/templates/:id] DELETE existence check failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    if (!existing) return NextResponse.json({ error: 'Template not found', code: 'NOT_FOUND' }, { status: 404 });
+    if (existing.is_system) return NextResponse.json({ error: 'System templates cannot be deleted', code: 'FORBIDDEN' }, { status: 403 });
+    try {
+      await sql`UPDATE volume_required_items SET template_id = NULL WHERE template_id = ${templateId}::uuid`;
+      await sql`DELETE FROM document_templates WHERE id = ${templateId}::uuid AND is_system = false`;
+    } catch (e) {
+      console.error('[admin/templates/:id] delete failed:', e);
+      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+    await emitEventSingle({
+      namespace: 'library',
+      type: 'template.deleted',
+      actor: userActor(who.userId, who.email ?? undefined),
+      tenantId: null,
+      payload: { templateId },
+    });
+    return NextResponse.json({ data: { deleted: true } });
+  } catch (e) {
+    console.error('[admin/templates/:id] DELETE failed:', e);
     return NextResponse.json({ error: 'Internal server error', code: 'INTERNAL_ERROR' }, { status: 500 });
   }
 }

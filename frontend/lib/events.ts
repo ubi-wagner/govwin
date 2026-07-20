@@ -219,7 +219,7 @@ export async function emitEventEnd(
  */
 export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
   try {
-    await sql`
+    const [row] = await sql<{ id: string }[]>`
       INSERT INTO system_events (
         namespace, type, phase, actor_type, actor_id, actor_email,
         tenant_id, payload
@@ -233,7 +233,20 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
         ${params.tenantId ?? null},
         ${jsonParam(params.payload ?? {})}
       )
+      RETURNING id
     `;
+    // #107: fire any automation rules watching this event. Best-effort + gated out
+    // of the test env so it never touches unit-test expectations on the emit path.
+    if (process.env.NODE_ENV !== 'test') {
+      const { evaluateAutomationRules } = await import('@/lib/automation/triggers');
+      await evaluateAutomationRules({
+        eventId: row?.id ?? null,
+        namespace: params.namespace,
+        type: params.type,
+        tenantId: params.tenantId ?? null,
+        payload: (params.payload ?? {}) as Record<string, unknown>,
+      });
+    }
   } catch (err) {
     log.error(
       { err: serializeError(err), namespace: params.namespace, type: params.type },

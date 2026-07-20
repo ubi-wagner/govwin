@@ -104,6 +104,59 @@ class OnProposalCreated(Workflow):
         # publish_section_draft BEFORE the human review gate. Guarded: only
         # empty/ai_drafted sections are touched, and it is a safe no-op if the
         # fabric / API key is unavailable.
+        # AI actor (#117): the proposal_architect reviews the just-provisioned skeleton and
+        # suggests structure/organization improvements — ADVISORY. Independent of drafting
+        # (no depends_on), so a failure/skip never blocks the loop; the fabric treats agent
+        # output as advisory (never auto-writes). Tenant-bound via payload.tenantId.
+        Step(
+            name="architect_review",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.architect",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
+        # AI actor (#117): the capture_strategist develops win themes, competitive positioning,
+        # teaming recommendations, and a risk register for the just-created proposal — ADVISORY.
+        # The go/no-go is already settled (portal purchased), but the strategic frame seeds the
+        # build. Independent (no depends_on) so a failure/skip never blocks drafting; the fabric
+        # treats agent output as advisory (never auto-writes). Tenant-bound via payload.tenantId;
+        # the ContextAssembler resolves the solicitation from proposal_id and injects it.
+        Step(
+            name="ai_capture_strategy",
+            step_type=StepType.AI_INVOKE,
+            action="tool.capture.generate_strategy",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
+        # AI actors (#129, Batch C): cost_estimator seeds cost-volume realism guidance;
+        # pp_matcher surfaces relevant past performance + flags teaming gaps. Both ADVISORY,
+        # tenant-bound, and independent of draft_sections so a skip never blocks the loop.
+        Step(
+            name="ai_cost_estimator",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.cost_estimate",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
+        Step(
+            name="ai_pp_matcher",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.match_past_performance",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=10,
+        ),
         Step(
             name="draft_sections",
             step_type=StepType.ACTION,
@@ -124,7 +177,10 @@ class OnProposalCreated(Workflow):
                 "template": '"admin_proposal_review_required"',
                 "tenant_id": "payload.tenantId",
                 "proposal_id": "payload.proposalId",
-                "proposal_title": "payload.proposalTitle",
+                # LOW-10: the proposal.created:end payload carries `title` (see
+                # proposals/create/route.ts emitEventEnd result), not `proposalTitle` —
+                # the old ref resolved to None, blanking the title in the admin email.
+                "proposal_title": "payload.title",
             },
         ),
     ]

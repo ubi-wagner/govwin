@@ -198,35 +198,17 @@ Output a structured JSON outline that the customer can review, edit, and approve
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "query": {
+                        # Tenant-discretion: NO tenant_id — bound to the assigned tenant.
+                        "query": {"type": "string", "description": "Search query for relevant content"},
+                        "vol": {
                             "type": "string",
-                            "description": "Search query for relevant content",
+                            "enum": ["technical", "cost", "past_performance", "key_personnel",
+                                     "commercialization", "cover", "supporting"],
+                            "description": "Optional vol taxonomy value to narrow",
                         },
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant",
-                        },
-                        "category": {
-                            "type": "string",
-                            "enum": [
-                                "technical_approach",
-                                "past_performance",
-                                "key_personnel",
-                                "management_plan",
-                                "cost_pricing",
-                                "company_overview",
-                                "certifications",
-                                "commercialization",
-                            ],
-                            "description": "Category of content to search",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of results",
-                            "default": 5,
-                        },
+                        "limit": {"type": "integer", "description": "Maximum number of results", "default": 5},
                     },
-                    "required": ["query", "tenant_id"],
+                    "required": ["query"],
                 },
             },
             {
@@ -239,19 +221,8 @@ Output a structured JSON outline that the customer can review, edit, and approve
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query for structural memories",
-                        },
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant",
-                        },
-                        "limit": {
-                            "type": "integer",
-                            "description": "Maximum number of memories",
-                            "default": 5,
-                        },
+                        "query": {"type": "string", "description": "Search query for structural memories"},
+                        "limit": {"type": "integer", "description": "Maximum number of memories", "default": 5},
                     },
                     "required": ["query"],
                 },
@@ -582,62 +553,34 @@ Then provide the outline as JSON:
             return {"error": str(e)}
 
     async def _search_library(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
-        """Search the content library for reusable content."""
+        """Search the tenant's library_atoms for reusable content (greenfield spine)."""
         query = tool_input.get("query", "")
-        category = tool_input.get("category")
-        limit = tool_input.get("limit", 5)
-
+        vol = tool_input.get("vol")
+        limit = int(tool_input.get("limit", 5))
         if not tenant_id:
             return {"results": [], "note": "No tenant context available"}
-
         try:
-            escaped_query = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-            if category:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, heading_text, content, category, tags
-                    FROM library_units
-                    WHERE tenant_id = $1
-                      AND status != 'archived'
-                      AND category = $2
-                      AND (content ILIKE $3 OR heading_text ILIKE $3)
-                    ORDER BY updated_at DESC
-                    LIMIT $4
-                    """,
-                    uuid.UUID(tenant_id),
-                    category,
-                    f"%{escaped_query}%",
-                    limit,
-                )
-            else:
-                rows = await conn.fetch(
-                    """
-                    SELECT id, heading_text, content, category, tags
-                    FROM library_units
-                    WHERE tenant_id = $1
-                      AND status != 'archived'
-                      AND (content ILIKE $2 OR heading_text ILIKE $2)
-                    ORDER BY updated_at DESC
-                    LIMIT $3
-                    """,
-                    uuid.UUID(tenant_id),
-                    f"%{escaped_query}%",
-                    limit,
-                )
-
-            return {
-                "results": [
-                    {
-                        "id": str(row["id"]),
-                        "title": row["heading_text"],
-                        "content": row["content"][:1000] if row["content"] else "",
-                        "category": row["category"],
-                        "tags": row["tags"] if row["tags"] else [],
-                    }
-                    for row in rows
-                ],
-            }
+            esc = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            params: list = [uuid.UUID(tenant_id), f"%{esc}%"]
+            sql = """
+                SELECT a.id, a.title, a.content, a.grain,
+                       COALESCE(array_agg(DISTINCT t.dimension || ':' || t.value)
+                                FILTER (WHERE t.dimension IS NOT NULL), '{}') AS tags
+                FROM library_atoms a
+                LEFT JOIN atom_tags t ON t.atom_id = a.id
+                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                  AND (a.content ILIKE $2 OR a.title ILIKE $2)
+            """
+            if vol:
+                params.append(vol)
+                sql += f" AND EXISTS (SELECT 1 FROM atom_tags tv WHERE tv.atom_id = a.id AND tv.dimension = 'vol' AND tv.value = ${len(params)})"
+            params.append(limit)
+            sql += f" GROUP BY a.id ORDER BY a.updated_at DESC LIMIT ${len(params)}"
+            rows = await conn.fetch(sql, *params)
+            return {"results": [
+                {"id": str(r["id"]), "title": r["title"], "content": (r["content"] or "")[:1000],
+                 "grain": r["grain"], "tags": list(r["tags"]) if r["tags"] else []}
+                for r in rows]}
         except Exception as e:
             logger.warning("search_library failed: %s", e)
             return {"results": [], "error": str(e)}

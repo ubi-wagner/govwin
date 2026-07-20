@@ -54,38 +54,68 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 
 import anthropic
 
 from .archetypes import (
+    AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    ContentCuratorArchetype,
+    ContentGeneratorArchetype,
+    CostEstimatorArchetype,
+    CurationQaArchetype,
+    IngestAnalystArchetype,
     LibrarianArchetype,
+    MatrixStagerArchetype,
+    OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
+    OpportunityScoutArchetype,
+    OpsDigestArchetype,
+    OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
+    PpMatcherArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
+    SkeletonArchitectArchetype,
+    SocialSchedulerArchetype,
 )
 from .context import ContextAssembler
+from .guardrails import enforce_guardrails, load_guardrail_config
 from .memory import MemoryStore
 from .tools import ToolRegistry, create_default_registry
 
 # All archetype classes to auto-register on fabric init
 _ARCHETYPE_CLASSES = [
+    AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
+    ContentCuratorArchetype,
+    ContentGeneratorArchetype,
+    CostEstimatorArchetype,
+    CurationQaArchetype,
+    IngestAnalystArchetype,
     LibrarianArchetype,
+    MatrixStagerArchetype,
+    OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
+    OpportunityScoutArchetype,
+    OpsDigestArchetype,
+    OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
+    PpMatcherArchetype,
     ProposalArchitectArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
+    SkeletonArchitectArchetype,
+    SocialSchedulerArchetype,
 ]
 
 logger = logging.getLogger("pipeline.agents")
@@ -140,6 +170,11 @@ class AgentFabric:
         self.context_assembler = ContextAssembler()
         self.tool_registry = create_default_registry()
         self._archetypes: dict[str, object] = {}
+        # Optional dedicated NOBYPASSRLS agent connection pool (#120). Lazily created
+        # only when AGENT_DATABASE_URL is configured; otherwise the fabric runs every
+        # tenant-scoped query on the caller's connection (unchanged behaviour).
+        self._agent_pool = None
+        self._agent_pool_lock = asyncio.Lock()
         self._register_all_archetypes()
 
     def _register_all_archetypes(self) -> None:
@@ -166,6 +201,31 @@ class AgentFabric:
                 raise RuntimeError("ANTHROPIC_API_KEY not set")
             self.client = anthropic.AsyncAnthropic(api_key=api_key)
         return self.client
+
+    # ------------------------------------------------------------------
+    # Dedicated NOBYPASSRLS agent pool (#120) — optional RLS backstop
+    # ------------------------------------------------------------------
+
+    async def _get_agent_pool(self):
+        """Lazily create the dedicated NOBYPASSRLS agent connection pool when
+        AGENT_DATABASE_URL is configured; return None otherwise.
+
+        When present, the fabric runs each agent's tenant-scoped queries on a
+        connection from this pool with `app.tenant_id` set — so RLS (mig 117) denies
+        a cross-tenant row at the engine, not just at the explicit WHERE. When absent,
+        the fabric falls back to the caller's connection (unchanged behaviour); the
+        GUC is still set/reset there (inert under a bypass role, correct once switched).
+        """
+        dsn = os.getenv("AGENT_DATABASE_URL")
+        if not dsn:
+            return None
+        if self._agent_pool is None:
+            async with self._agent_pool_lock:
+                if self._agent_pool is None:
+                    import asyncpg  # local import: only needed on the configured path
+                    self._agent_pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4)
+                    logger.info("[invoke_agent] NOBYPASSRLS agent pool active (RLS backstop on)")
+        return self._agent_pool
 
     # ------------------------------------------------------------------
     # Archetype management
@@ -291,7 +351,32 @@ class AgentFabric:
         # Resolve archetype
         archetype = self._archetypes.get(archetype_name)
         if not archetype:
-            return {"status": "error", "reason": f"Unknown archetype: {archetype_name}"}
+            # NO silent failure: an unknown archetype is still an observable invocation.
+            # Emit a tool:agent.invoked start→end (error) pair + a terminal agent_task_log
+            # row before returning, so the attempt is reconstructable from the DB (was a
+            # silent early return with no event and no audit row).
+            reason = f"Unknown archetype: {archetype_name}"
+            try:
+                sid = await self._emit_event(
+                    conn, namespace="tool", event_type="agent.invoked", phase="start",
+                    tenant_id=tenant_id,
+                    payload={"archetype": archetype_name, "tenantId": tenant_id,
+                             "taskType": context.get("type", "unknown")},
+                )
+                await self._emit_event(
+                    conn, namespace="tool", event_type="agent.invoked", phase="end",
+                    parent_event_id=sid or None, tenant_id=tenant_id,
+                    payload={"archetype": archetype_name, "status": "error",
+                             "stage": "resolve", "error": reason},
+                )
+                await self._log_task(
+                    conn, tenant_id=tenant_id, agent_role=archetype_name,
+                    task_type=context.get("type", "unknown"),
+                    status="error", error=reason,
+                )
+            except Exception as exc:
+                logger.error("[invoke_agent] unknown-archetype audit failed: %s", exc)
+            return {"status": "error", "reason": reason}
 
         # 1. Emit start event
         start_event_id = await self._emit_event(
@@ -312,7 +397,30 @@ class AgentFabric:
         tool_calls_count = 0
         model = DEFAULT_MODEL  # resolved from archetype below; default for error paths
 
+        # #120: `db` is the connection the agent's TENANT-SCOPED queries run on, with
+        # app.tenant_id set so RLS (mig 117) is the backstop. `conn` stays the caller's
+        # connection for PLATFORM-scope audit (events, task log, cost/rate config) — that
+        # audit must record even cross-tenant/rejected calls, so it is never tenant-fenced.
+        agent_db = None  # a pooled NOBYPASSRLS conn, when AGENT_DATABASE_URL is configured
+        db = conn
+
         try:
+            # #120: bind a TENANT agent to its tenant for the duration. Prefer the dedicated
+            # NOBYPASSRLS pool (RLS actually enforces); else set the GUC on the caller conn
+            # (inert under a bypass role, correct the moment the role is switched). Always
+            # reset in `finally` so a shared/pooled connection is never left tenant-scoped.
+            #
+            # PLATFORM-scope agents (tenant_id is None — scout/ingest/matrix/skeleton/amendment/
+            # curation_qa/ops_digest) run at OUR authority on master + cross-tenant aggregate data;
+            # they must NOT use the NOBYPASS pool, because an empty app.tenant_id would make RLS
+            # deny every tenant row. They stay on the caller (bypass) connection.
+            if tenant_id:
+                pool = await self._get_agent_pool()
+                if pool is not None:
+                    agent_db = await pool.acquire()
+                    db = agent_db
+                await db.execute("SELECT set_config('app.tenant_id', $1, false)", str(tenant_id))
+
             # 2-3. Cost-control guard. Effective limits resolve as:
             #   tenant override -> platform default -> hardcoded constant.
             # Load the pipeline-wide config once and pass it to both checks.
@@ -364,9 +472,9 @@ class AgentFabric:
                 )
                 effective_ceiling = PER_CALL_CEILING_USD
 
-            # 4. Assemble context
+            # 4. Assemble context (tenant-scoped reads → db / RLS backstop)
             assembled = await self.context_assembler.assemble(
-                conn, archetype, tenant_id, context,
+                db, archetype, tenant_id, context,
             )
 
             # 5. Claude API call with tool-use loop
@@ -436,7 +544,7 @@ class AgentFabric:
                             try:
                                 if self.tool_registry.has_tool(block.name):
                                     result = await self.tool_registry.execute(
-                                        conn,
+                                        db,
                                         tenant_id,
                                         block.name,
                                         block.input,
@@ -444,7 +552,7 @@ class AgentFabric:
                                     )
                                 elif hasattr(archetype, "execute_tool"):
                                     result = await archetype.execute_tool(
-                                        conn, block.name, block.input,
+                                        db, block.name, block.input,
                                         {**context, "tenant_id": tenant_id},
                                     )
                                 else:
@@ -531,7 +639,7 @@ class AgentFabric:
             memories_written = 0
             if tenant_id:
                 try:
-                    mem_id = await self.memory.store(conn, tenant_id, archetype_name, {
+                    mem_id = await self.memory.store(db, tenant_id, archetype_name, {
                         "input_summary": str(context.get("type", ""))[:200],
                         "output_summary": summary[:200],
                         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -561,6 +669,20 @@ class AgentFabric:
                 error=None,
             )
 
+            # 8b. #120 guardrail gate — *advisory → guardrail → land-or-review*. The fabric
+            # never lands output itself; this verdict tells the consumer whether to auto-apply
+            # the bounded value or route to HITL review. Fail SAFE: any error → review.
+            try:
+                gcfg = await load_guardrail_config(conn, tenant_id)
+                guardrail = enforce_guardrails(
+                    archetype_name,
+                    {"text": response_text, "summary": summary, "cost_usd": float(cost_usd)},
+                    gcfg,
+                )
+            except Exception as gexc:
+                logger.warning("[invoke_agent] guardrail check failed, defaulting to review: %s", gexc)
+                guardrail = {"decision": "review", "bounded": {}, "reasons": [f"guardrail_error:{str(gexc)[:100]}"]}
+
             # 9. Emit end event
             await self._emit_event(
                 conn,
@@ -579,6 +701,8 @@ class AgentFabric:
                     "rounds": rounds,
                     "cost_usd": float(cost_usd),
                     "status": "completed",
+                    "guardrail": guardrail["decision"],
+                    "guardrail_reasons": guardrail["reasons"],
                 },
                 parent_event_id=start_event_id,
             )
@@ -587,6 +711,7 @@ class AgentFabric:
             return {
                 "status": "completed",
                 "archetype": archetype_name,
+                "guardrail": guardrail,
                 "result": {
                     "text": response_text,
                     "summary": summary,
@@ -695,6 +820,19 @@ class AgentFabric:
                 "archetype": archetype_name,
                 "error": error_msg,
             }
+
+        finally:
+            # #120: ALWAYS clear the tenant GUC so a shared/pooled connection is never
+            # left scoped to a tenant; release the pooled agent conn if one was acquired.
+            try:
+                await db.execute("SELECT set_config('app.tenant_id', '', false)")
+            except Exception as reset_exc:
+                logger.warning("[invoke_agent] app.tenant_id reset failed: %s", reset_exc)
+            if agent_db is not None:
+                try:
+                    await self._agent_pool.release(agent_db)
+                except Exception as rel_exc:
+                    logger.warning("[invoke_agent] agent conn release failed: %s", rel_exc)
 
     # ------------------------------------------------------------------
     # Task queue processing
@@ -1108,13 +1246,23 @@ class AgentFabric:
         cost_usd: float = 0.0,
         memories_written: int = 0,
         error: str | None = None,
+        status: str | None = None,
+        guardrail_decision: str | None = None,
     ) -> None:
         """Insert a row into agent_task_log for audit and billing.
 
         G1: platform/system invocations (tenant_id is None) ARE logged now —
         with a NULL tenant_id — so platform_monthly_cap and the admin usage views
         account for their spend (previously they were silently skipped).
+
+        #149: the row carries the outcome lifecycle (status + started_at + completed_at +
+        guardrail_decision, mig 120) so an invocation's terminal state — and its guardrail
+        verdict — is reconstructable from the DB, not just implied by `error IS NULL`.
+        status defaults from `error` when not passed (completed / failed).
         """
+        resolved_status = status or ("failed" if error else "completed")
+        completed = datetime.now(timezone.utc)
+        started = completed - timedelta(milliseconds=max(duration_ms, 0))
         try:
             await conn.execute(
                 """
@@ -1122,12 +1270,14 @@ class AgentFabric:
                     (id, tenant_id, agent_role, task_type, trigger_event,
                      proposal_id, section_id, input_tokens, output_tokens,
                      tool_calls_count, duration_ms, cost_usd,
-                     memories_written, error, created_at)
+                     memories_written, error, status, guardrail_decision,
+                     started_at, completed_at, created_at)
                 VALUES
                     ($1, $2, $3, $4, $5,
                      $6, $7, $8, $9,
                      $10, $11, $12,
-                     $13, $14, now())
+                     $13, $14, $15, $16,
+                     $17, $18, $18)
                 """,
                 uuid.uuid4(),
                 uuid.UUID(tenant_id) if tenant_id else None,
@@ -1143,6 +1293,10 @@ class AgentFabric:
                 cost_usd,
                 memories_written,
                 error,
+                resolved_status,
+                guardrail_decision,
+                started,
+                completed,
             )
         except Exception as exc:
             logger.error("[_log_task] failed to log agent task: %s", exc)

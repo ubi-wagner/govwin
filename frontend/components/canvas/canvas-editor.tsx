@@ -11,11 +11,14 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, NodeStyle, CanvasRules } from '@/lib/types/canvas-document';
 import type { LibraryAtomCandidate } from './library-picker';
-import { createNode, getNodeText } from '@/lib/types/canvas-document';
+import { createNode, getNodeText, toEditableFlat } from '@/lib/types/canvas-document';
+import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { CanvasRenderer } from './canvas-renderer';
 import { SlideEditor } from './slide-editor';
 import { SheetEditor } from './sheet-editor';
 import { CanvasSidebar } from './canvas-sidebar';
+import { CanvasToolbar } from './canvas-toolbar';
+import { LibraryInsertPanel, type InsertAtom } from './library-insert-panel';
 import { AtomBubbleRail, type AtomBubble } from '@/components/atomization/atom-bubble-rail';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 
@@ -44,8 +47,16 @@ interface Props {
   initialDocument: CanvasDocument;
   onSave: (doc: CanvasDocument) => Promise<void>;
   onExport?: (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => Promise<void>;
+  /** Called after a successful Complete & Lock, so the host can refresh (the
+   *  server then re-renders the now-locked section read-only). */
+  onLocked?: () => void;
   variables?: Record<string, string>;
   readOnly?: boolean;
+  /** The live tool set (role × stage × permission). When present, gates the
+   *  fine tools (atomize / insert-from-library); falls back to !readOnly. */
+  capabilities?: CanvasCapabilities;
+  /** Process stage — orders the sidebar toolbox card list. */
+  stage?: string;
   actorId: string;
   actorName: string;
   /** Proposal ID — enables AI revision and comments when present */
@@ -73,11 +84,15 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
 }
 
 export function CanvasEditor(props: Props) {
+  // Normalize a v2 (section-layer) doc into a flat, editable doc so its content
+  // is visible + editable in the canvas — every editor surface edits `nodes`.
+  const initialDocument = toEditableFlat(props.initialDocument);
+
   // Delegate to SheetEditor for spreadsheet format
-  if (props.initialDocument.canvas.format === 'spreadsheet') {
+  if (initialDocument.canvas.format === 'spreadsheet') {
     return (
       <SheetEditor
-        initialDocument={props.initialDocument}
+        initialDocument={initialDocument}
         onSave={props.onSave}
         onExport={props.onExport}
         actorId={props.actorId}
@@ -87,7 +102,7 @@ export function CanvasEditor(props: Props) {
     );
   }
 
-  return <CanvasEditorInner {...props} />;
+  return <CanvasEditorInner {...props} initialDocument={initialDocument} />;
 }
 
 function CanvasEditorInner({
@@ -96,6 +111,9 @@ function CanvasEditorInner({
   onExport,
   variables,
   readOnly = false,
+  capabilities,
+  stage,
+  onLocked,
   actorId,
   actorName,
   proposalId,
@@ -111,9 +129,12 @@ function CanvasEditorInner({
   const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
-  // ── Atomization rail: accept library-eligible nodes into the tenant library ──
-  const canAtomize = Boolean(tenantSlug && proposalId && sectionId && !readOnly);
+  // ── Fine tools gated by the resolved capabilities (role × stage), falling back
+  //    to !readOnly when the caller hasn't resolved them yet. ──
+  const canAtomize = Boolean(tenantSlug && proposalId && sectionId && (capabilities?.canAtomize ?? !readOnly));
+  const canInsertLibrary = Boolean(tenantSlug && (capabilities?.canInsertLibrary ?? !readOnly));
   const [showAtomRail, setShowAtomRail] = useState(false);
+  const [showInsert, setShowInsert] = useState(false);
   const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);
   const [atomBusyId, setAtomBusyId] = useState<string | null>(null);
   const [acceptedNodeIds, setAcceptedNodeIds] = useState<Set<string>>(new Set());
@@ -351,6 +372,23 @@ function CanvasEditorInner({
     }));
   }, [updateDoc, actorId, actorName]);
 
+  /** Insert hand-picked library atoms as new canvas nodes (heading + paragraphs). */
+  const handleInsertAtoms = useCallback((atoms: InsertAtom[]) => {
+    if (atoms.length === 0) return;
+    lastRevisionMetaRef.current = { source: 'library_import', aiInstruction: `Inserted ${atoms.length} atom(s) from library` };
+    updateDoc((prev) => {
+      const nodes = [...prev.nodes];
+      for (const a of atoms) {
+        if (a.title) nodes.push(createNode({ type: 'heading', content: { level: 2, text: a.title }, source: 'library', actorId, actorName }));
+        for (const para of a.content.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean)) {
+          nodes.push(createNode({ type: 'text_block', content: { text: para }, source: 'library', actorId, actorName }));
+        }
+      }
+      return { ...prev, nodes };
+    });
+    setShowInsert(false);
+  }, [updateDoc, actorId, actorName]);
+
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
     setRedoStack(stack => [...stack, doc]);
@@ -414,6 +452,57 @@ function CanvasEditorInner({
       setSaving(false);
     }
   }, [doc, onSave]);
+
+  // ── Complete & Lock (finish the ToDo) — save, then POST the section lock
+  //    route (admin-gated server-side). On success, refresh so the server
+  //    re-renders the now-locked section read-only. ──
+  const handleCompleteLock = useCallback(async () => {
+    if (!tenantSlug || !proposalId || !sectionId) return;
+    setSaving(true); setSaveError(null);
+    try {
+      if (dirty) await onSave(doc);
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/lock`, { method: 'POST' });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Lock failed'); }
+      setDirty(false);
+      onLocked?.();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Lock failed');
+    } finally {
+      setSaving(false);
+    }
+  }, [doc, dirty, onSave, onLocked, tenantSlug, proposalId, sectionId]);
+
+  // ── Save this canvas as a reusable template (skeleton). Admin-gated route. ──
+  const handleSaveTemplate = useCallback(async () => {
+    if (!tenantSlug) return;
+    const name = typeof window !== 'undefined' ? window.prompt('Template name', doc.metadata.title || 'Template') : null;
+    if (!name?.trim()) return;
+    const fmt = doc.canvas.format;
+    const templateType = fmt.startsWith('slide') ? 'slide_deck' : fmt === 'spreadsheet' ? 'cost_volume' : 'custom';
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/templates/extract`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canvas: doc, name: name.trim(), templateType }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || 'Save template failed'); }
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save template failed');
+    }
+  }, [doc, tenantSlug]);
+
+  // ── One dispatch the sidebar toolbox cards call for editor-hosted tools. ──
+  const handleToolAction = useCallback((id: string) => {
+    if (id === 'library') setShowInsert((v) => !v);
+    else if (id === 'atomize') setShowAtomRail((v) => !v);
+    else if (id === 'template') handleSaveTemplate();
+    else if (id === 'lock') handleCompleteLock();
+    else if (id === 'export' && onExport) {
+      const fmt = doc.canvas.format.startsWith('slide') ? 'pptx' : doc.canvas.format === 'spreadsheet' ? 'xlsx' : 'docx';
+      onExport(doc, fmt).catch((err) => setSaveError(err instanceof Error ? err.message : 'Export failed'));
+    }
+  }, [doc, onExport, handleSaveTemplate, handleCompleteLock]);
 
   // ── Atomization rail wiring ──
   const atomItems: AtomBubble[] = useMemo(
@@ -554,9 +643,15 @@ function CanvasEditorInner({
                   Export .docx
                 </button>
                 <button
-                  disabled
-                  title="Coming soon"
-                  className="px-3 py-1.5 text-xs border rounded bg-gray-100 text-gray-400 cursor-not-allowed"
+                  onClick={async () => {
+                    try {
+                      await onExport(doc, 'pdf');
+                    } catch (err) {
+                      setSaveError(err instanceof Error ? err.message : 'Export failed');
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs border rounded hover:bg-gray-50"
+                  title="Export this section as PDF"
                 >
                   Export .pdf
                 </button>
@@ -590,22 +685,37 @@ function CanvasEditorInner({
                 Export .xlsx
               </button>
             )}
-            <button
-              onClick={handleUndo}
-              disabled={undoStack.length === 0}
-              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
-            >
-              Undo
-            </button>
-            <button
-              onClick={handleRedo}
-              disabled={redoStack.length === 0}
-              className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
-            >
-              Redo
-            </button>
+            {!readOnly && (
+              <>
+                <button
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={`Undo (Ctrl+Z) — ${undoStack.length} step${undoStack.length !== 1 ? 's' : ''}`}
+                >
+                  Undo
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={redoStack.length === 0}
+                  className="px-2 py-1.5 text-xs border rounded hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={`Redo (Ctrl+Shift+Z) — ${redoStack.length} step${redoStack.length !== 1 ? 's' : ''}`}
+                >
+                  Redo
+                </button>
+              </>
+            )}
+            {canInsertLibrary && (
+              <button
+                onClick={() => setShowInsert((v) => !v)}
+                className={`px-3 py-1.5 text-xs border rounded ${
+                  showInsert ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'hover:bg-gray-50'
+                }`}
+                title="Insert atoms from your library into this section"
+              >
+                + From Library
+              </button>
+            )}
             {canAtomize && (
               <button
                 onClick={() => setShowAtomRail((v) => !v)}
@@ -617,15 +727,42 @@ function CanvasEditorInner({
                 Library{atomItems.length > 0 ? ` (${atomItems.length})` : ''}
               </button>
             )}
-            <button
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+            {readOnly ? (
+              <span className="px-2 py-1.5 text-xs text-gray-400 italic" title="You have view access to this section">read-only</span>
+            ) : (
+              <>
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !dirty}
+                  className="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                {capabilities?.canLock && (
+                  <button
+                    onClick={handleCompleteLock}
+                    disabled={saving}
+                    title="Save + accept & lock this section (complete the ToDo)"
+                    className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded font-medium"
+                  >
+                    Complete &amp; Lock
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
+
+        {/* Formatting toolbar — insert blocks + format the selected one */}
+        {!readOnly && (
+          <CanvasToolbar
+            format={doc.canvas.format}
+            selectedNode={selectedNode}
+            onAddNode={handleAddNode}
+            onUpdateNodeStyle={handleUpdateNodeStyle}
+            readOnly={readOnly}
+          />
+        )}
 
         {isSlideFormat ? (
           <SlideEditor
@@ -651,6 +788,19 @@ function CanvasEditorInner({
         )}
       </div>
 
+      {/* Insert from library — hand-pick canonical atoms into this section's canvas */}
+      {canInsertLibrary && showInsert && tenantSlug && (
+        <div className="border border-indigo-200 rounded-lg p-3 bg-white shadow-sm">
+          <LibraryInsertPanel
+            tenantSlug={tenantSlug}
+            sectionTitle={doc.metadata.title || 'Section'}
+            sectionId={sectionId}
+            onInsert={handleInsertAtoms}
+            onClose={() => setShowInsert(false)}
+          />
+        </div>
+      )}
+
       {/* Atomization rail — accept library-eligible nodes into the tenant library */}
       {canAtomize && showAtomRail && (
         <AtomBubbleRail
@@ -672,6 +822,10 @@ function CanvasEditorInner({
       <CanvasSidebar
         document={doc}
         selectedNode={selectedNode}
+        readOnly={readOnly}
+        capabilities={capabilities}
+        stage={stage}
+        onToolAction={handleToolAction}
         onAddNode={handleAddNode}
         onDeleteNode={handleDeleteNode}
         onMoveNode={handleMoveNode}

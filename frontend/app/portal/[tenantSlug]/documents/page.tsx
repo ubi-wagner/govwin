@@ -23,6 +23,13 @@ const MIME_ICONS: Record<string, string> = {
   'image/jpeg': 'JPG',
 };
 
+const DOC_TYPE_LABELS: Record<string, string> = {
+  technical_volume: 'Technical', cost_volume: 'Cost', slide_deck: 'Slides',
+  past_performance: 'Past Perf', key_personnel: 'Key Personnel',
+  commercialization: 'Commercialization', abstract: 'Abstract',
+  cover_sheet: 'Cover', supporting_docs: 'Supporting', custom: 'Custom',
+};
+
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   empty: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Empty' },
   ai_drafted: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'AI Drafted' },
@@ -78,6 +85,29 @@ export default async function DocumentsPage({ params }: Props) {
   }
 
   const basePath = `/portal/${tenantSlug}`;
+
+  // ── 0. Standalone Documents (from tenant_documents) ────────────────
+  interface StandaloneDocRow {
+    id: string;
+    title: string;
+    docType: string;
+    status: string;
+    nodeCount: number;
+    updatedAt: Date;
+  }
+
+  let standaloneDocs: StandaloneDocRow[] = [];
+  try {
+    standaloneDocs = await sql<StandaloneDocRow[]>`
+      SELECT id, title, doc_type, status, node_count, updated_at
+      FROM tenant_documents
+      WHERE tenant_id = ${tenantId}
+      ORDER BY updated_at DESC
+      LIMIT 100
+    `;
+  } catch (e) {
+    console.error('[portal/documents] standalone documents query failed', e);
+  }
 
   // ── 1. Proposal Sections (from proposal_sections) ─────────────────
   interface SectionRow {
@@ -143,7 +173,7 @@ export default async function DocumentsPage({ params }: Props) {
     console.error('[portal/documents] supporting docs query failed', e);
   }
 
-  // ── 3. Library Items (from library_units WHERE source_type = 'upload') ─
+  // ── 3. Library Items (from library_atoms WHERE source = 'upload') ─
   interface LibraryRow {
     id: string;
     title: string | null;
@@ -156,10 +186,11 @@ export default async function DocumentsPage({ params }: Props) {
   let libraryItems: LibraryRow[] = [];
   try {
     libraryItems = await sql<LibraryRow[]>`
-      SELECT id, heading_text AS title, source_type, source_type AS content_type, source_storage_key AS storage_key, created_at
-      FROM library_units
+      SELECT id, title, source AS source_type, source AS content_type,
+             source_anchor->>'storageKey' AS storage_key, created_at
+      FROM library_atoms
       WHERE tenant_id = ${tenantId}
-        AND source_type = 'upload'
+        AND source = 'upload'
       ORDER BY created_at DESC
       LIMIT 100
     `;
@@ -207,7 +238,7 @@ export default async function DocumentsPage({ params }: Props) {
 
   const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
 
-  const totalCount = sections.length + supportingDocs.length + libraryItems.length + solDocs.length;
+  const totalCount = standaloneDocs.length + sections.length + supportingDocs.length + libraryItems.length + solDocs.length;
 
   return (
     <div>
@@ -218,13 +249,78 @@ export default async function DocumentsPage({ params }: Props) {
             {totalCount} document{totalCount !== 1 ? 's' : ''} across your workspace
           </p>
         </div>
-        <Link
-          href={`${basePath}/library/upload`}
-          className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Upload Document
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`${basePath}/library/upload`}
+            className="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Upload Document
+          </Link>
+          <Link
+            href={`${basePath}/documents/new`}
+            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            + New Document
+          </Link>
+        </div>
       </div>
+
+      {/* Your Documents (standalone tenant_documents) */}
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">Your Documents</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Documents you created from a template or scratch — fliers, letters, decks, workbooks
+            </p>
+          </div>
+        </div>
+        {standaloneDocs.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <p className="text-sm text-gray-500">No documents yet.</p>
+            <Link href={`${basePath}/documents/new`} className="text-sm text-blue-600 hover:underline mt-1 inline-block">
+              Create your first document
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Title</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Type</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Blocks</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Modified</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {standaloneDocs.map((d) => (
+                  <tr key={d.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
+                      <Link href={`${basePath}/documents/${d.id}`} className="text-blue-600 hover:underline">
+                        {d.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">
+                        {DOC_TYPE_LABELS[d.docType] ?? d.docType}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={d.status === 'final' ? 'completed' : 'in_progress'} />
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-500">{d.nodeCount}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                      {new Date(d.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Proposal Sections */}
       <section className="mb-10">

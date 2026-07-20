@@ -13,6 +13,7 @@ import { auth } from '@/auth';
 import { isValidUUID } from '@/lib/validation';
 import type { Role } from '@/lib/rbac';
 import { backfillTenant } from '@/lib/opportunity-bridge';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export async function POST(
   _request: Request,
@@ -23,7 +24,7 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-    const user = session.user as { id?: string; role?: Role };
+    const user = session.user as { id?: string; email?: string; role?: Role };
     if (user.role !== 'master_admin' && user.role !== 'rfp_admin') {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -32,6 +33,13 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid tenant id', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
     const applied = await backfillTenant(tenantId);
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'tenant.cards_backfilled',
+      actor: userActor(user.id ?? '', user.email ?? undefined),
+      tenantId,
+      payload: { tenantId, applied },
+    });
     return NextResponse.json({ data: { applied } });
   } catch (err) {
     console.error('[admin/tenants/backfill-cards] error', err);

@@ -116,6 +116,20 @@ async function upsertUser({ email, name, role, tenantId, password }) {
           temp_password = false,
           updated_at    = now()
   `;
+  // The PORTAL resolves the active workspace from user_memberships (the canonical
+  // multi-membership path, #110/#115) — NOT users.tenant_id (which login reads for the
+  // JWT). A tenant user without a membership hits "No workspace assigned", so mirror the
+  // fused columns into a membership here (the real onboarding routes already do this).
+  if (tenantId) {
+    const [u] = await sql`SELECT id FROM users WHERE email = ${e} LIMIT 1`;
+    if (u) {
+      await sql`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status)
+        VALUES (${u.id}::uuid, ${tenantId}::uuid, ${role}, 'active')
+        ON CONFLICT (user_id, tenant_id) DO UPDATE SET role = EXCLUDED.role, status = 'active'
+      `;
+    }
+  }
 }
 
 async function run() {

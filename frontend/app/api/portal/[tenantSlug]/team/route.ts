@@ -60,11 +60,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
     }[];
     try {
       members = await sql<typeof members>`
-        SELECT id, email, name, role, is_active, last_login_at, created_at
-        FROM users
-        WHERE tenant_id = ${tenantId}
-          AND is_active = true
-        ORDER BY created_at ASC
+        SELECT u.id, u.email, u.name, m.role, (m.status = 'active') AS is_active,
+               u.last_login_at, u.created_at
+        FROM user_memberships m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')
+        ORDER BY u.created_at ASC
       `;
     } catch (dbErr) {
       console.error('[api/portal/team] GET query failed:', dbErr);
@@ -199,6 +200,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       console.error('[api/portal/team] POST user insert failed:', dbErr);
       await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
       return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    }
+
+    // Materialize the login-selectable HOME membership (multi-membership identity) so
+    // every user is membership-backed, not only reachable via the legacy users.tenant_id
+    // read-through. ON CONFLICT reactivates a previously-deactivated one (never-delete).
+    try {
+      await sql`
+        INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
+        VALUES (${newUser.id}, ${tenantId}, ${memberRole}, 'active', 'home', ${sessionUser.id})
+        ON CONFLICT (user_id, tenant_id) DO UPDATE
+          SET status = 'active', role = EXCLUDED.role
+          WHERE user_memberships.status <> 'active'
+      `;
+    } catch (dbErr) {
+      // Non-fatal — the user exists; legacy read-through still grants access in transition.
+      console.error('[api/portal/team] membership insert failed:', dbErr);
     }
 
     // Send invite email with credentials

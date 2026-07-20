@@ -1,8 +1,28 @@
 # Agent Fabric Design — RFP Pipeline
 
-**Status:** Design document. Pre-implementation.
-**Last updated:** 2026-04-24.
-**Author:** Claude (Opus 4.7) + Eric Wagner
+**Status:** As-built. The fabric + **10 archetypes are implemented and ALL AWAKE as workflow actors (#117
+complete)**. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
+plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the next batches (master-side, onboarding,
+additional tenant-side) are in `docs/AGENT_ROADMAP.md`. This file is the original design rationale plus the
+as-built summary in §0 below.**
+
+> **AS-BUILT (#117 COMPLETE, 2026-07-19):** all 10 archetypes awake. Pre-live = section_drafter,
+> compliance_reviewer (inline + `tool.proposal.check_compliance`), color_team_reviewer (advance queue).
+> Woken this run onto the current spine (`library_atoms`/`atom_tags`, tenant-discretion, injection-fenced,
+> each locked by `test_<agent>_wiring.py` — **42 green**): librarian (producer in atomize-package),
+> scoring_strategist + opportunity_analyst (**per-tenant producers on the pin route**), proposal_architect +
+> capture_strategist (`AI_INVOKE` in `OnProposalCreated`), packaging_specialist (`AI_INVOKE` in
+> `OnProposalAdvancedToFinal`), partner_coordinator (`AI_INVOKE` in the new `OnCollaboratorInvited`).
+> Two producer shapes: **per-tenant producer** (fan-out agents) and declarative **`AI_INVOKE` `Step`**
+> (single-entity; `TOOL_ACTION_TO_ARCHETYPE` maps every agent). Invariants: tenant-space agents are
+> **tenant-bound** (tenant_user; no `tenant_id` in tool schemas); output is **advisory → guardrail →
+> land-or-review** (never auto-writes business tables); untrusted content **injection-fenced**; runtime
+> bounds **runaway** (MAX_TOOL_ROUNDS=20, $0.50/call, 50/hr, $50/mo) and never **dead-ends** a workflow
+> (safe-skip). RLS: mig 116 forced RLS on `episodic_memories`; central `SET app.tenant_id` + a `NOBYPASSRLS`
+> agent role are the next step (`AGENT_WORKFORCE.md §7–8`, tracked as #120). Oversight: `/admin/agents` →
+> Agent Workforce (roster + per-tenant usage rollup, forward-only bridge).
+**Last updated:** 2026-07-19.
+**Author:** Claude (Opus 4.7 / 4.8) + Eric Wagner
 
 This document defines how Claude agents are deployed, provisioned,
 scoped, and controlled across the RFP Pipeline platform. It covers
@@ -10,6 +30,71 @@ cost optimization, security guardrails, the prompt architecture,
 and the specific agent archetypes at each layer.
 
 > **⚠ Superseded in part (as-built 2026-07-15).** This is the original pre-implementation design. The as-built agent system is documented in `docs/AGENT_FRAMEWORK.md` (source of truth: `pipeline/src/agents/`) — 10 archetypes are registered in `fabric.py` under the names Section Drafter / Compliance Reviewer / Color Team Reviewer / Opportunity Analyst / Scoring Strategist / Capture Strategist / Proposal Architect / Librarian / Partner Coordinator / Packaging Specialist (not the "Review Agent / Compliance Checker / Color Team Simulator" names used below). Current wiring: **Section Drafter is wired** (the V0-strawman `draft_v0` on proposal creation + the `ai/draft` route); **Compliance Reviewer is partial** (runs inline in the Next `ai/compliance` route, not the fabric archetype); **Color Team Reviewer** runs only via the advance-path `agent_task_queue`; the rest are ⚠ future (registered-but-dormant or unbuilt). The cost/status tables below are design estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+
+---
+
+## 0. As-built workforce summary (#117 complete)
+
+> The canonical roster + safety detail is `docs/AGENT_WORKFORCE.md`; the forward plan is
+> `docs/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
+
+### 0.1 The 10 agents (skills · job · tools · trigger)
+
+| Agent | Scope | Job | Own tools | Wakes on | Lands as |
+|---|---|---|---|---|---|
+| Section Drafter | 🔒 tenant | Draft a section grounded on the tenant's atoms | draft_section, publish_section_draft | section draft requested (build) | draft → review/lock |
+| Compliance Reviewer | 🔒 tenant | Check a draft vs the compliance matrix | get_compliance, check | inline `ai/compliance` + `tool.proposal.check_compliance` | advisory gaps |
+| Color Team Reviewer | 🔒 tenant | Red/gold-team review before advance | get_sections, review | advance queue (`agent_task_queue`) | advisory review |
+| Librarian | 🔒 tenant | Catalog/score/dedupe/freshness new atoms | search_atoms, tag, assess | package atomized / doc locked (producer) | catalog → admin review queue |
+| Scoring Strategist | 🔒 tenant | Score & rank opps into buckets (±15) | get_tenant_profile, get_opportunity, search_library, search_memory | card **pinned** (per-tenant producer) | ±15 into `tenant_bucket_scores.factors` **beside** algo score |
+| Opportunity Analyst | 🔒 tenant | Assess fit of a new opportunity | get_tenant_profile, get_opportunity, search_past_awards, search_memory | card **pinned** (per-tenant producer) | advisory fit report |
+| Proposal Architect | 🔒 tenant | Shape/review the response skeleton | get_opportunity_detail, get_compliance, search_library, search_memory | proposal created (`AI_INVOKE`) | advisory outline |
+| Capture Strategist | 🔒 tenant | Win themes, positioning, teaming, risk register | get_tenant_profile, get_opportunity_detail, search_library, search_memory | proposal created (`AI_INVOKE`) | advisory strategy |
+| Packaging Specialist | 🔒 tenant | Review final submission package | get_sections, get_compliance, search_memory | advanced to final (`AI_INVOKE`) | advisory package review |
+| Partner Coordinator | 🔒 tenant | Draft partner welcome + flag teaming risks | get_sections, get_compliance, search_memory | collaborator invited (`AI_INVOKE`, `OnCollaboratorInvited`) | draft → human-gated send |
+
+### 0.2 Integration — two producer shapes (both funnel into `AgentFabric.invoke_agent`)
+
+- **Per-tenant producer** (fan-out agents): a frontend route calls `requestAgentTask({tenantId, agentRole,
+  taskType, input})` (`lib/agent-client.ts`) → row in **`agent_task_queue`** → pipeline `process_task_queue`
+  dequeues → fabric. *Bounded on purpose* — scoring + analyst fire on the **pin** action (one task per pinned
+  card), never per-(tenant×opp), so there is no fan-out runaway.
+- **Declarative `AI_INVOKE` `Step`** (single-entity agents): a step sits in a workflow beside the human/action
+  steps; `TOOL_ACTION_TO_ARCHETYPE` maps its `action` → archetype; the `ContextAssembler` resolves the entity
+  from `proposal_id` (auto-injects the solicitation), so steps pass only `proposal_id`+`tenant_id`.
+
+As-built placement: `OnProposalCreated` → architect_review + ai_capture_strategy (both independent of
+draft_sections) · `OnProposalAdvancedToFinal` → ai_package_review (independent of export) ·
+`OnProposalAdvancedToReview` → ai_compliance_review · `OnCollaboratorInvited` (new) → ai_partner_welcome +
+independent notify · pin route → scoring_strategist + opportunity_analyst · atomize-package route → librarian.
+
+### 0.3 Monitoring & updating
+
+- **Oversight:** `/admin/agents` → **Agent Workforce** — roster (scope/trigger/live-status + 30-day queue
+  stats) + **usage-by-tenant** rollup (who's using agents, where failures cluster).
+- **Bridge invariant:** usage **metadata** rolls **forward** to the admin (counts/status/timing, never tenant
+  content); **control** is bidirectional (tune/pause down); to see an agent's actual **output** for a company
+  the admin **descends into the tenant's RLS shadow** — the only backflow.
+- **Updating/waking** = the two moves in §0.2 (realign to spine + wire producer/step). Prompt/guardrail/model
+  live per-archetype in the pipeline; an inline per-agent tuning editor is the next oversight increment.
+
+### 0.4 Safety contract (enforced) + the two open flags
+
+Enforced: injection fence on all 10 (per-agent test) · runaway caps (`MAX_TOOL_ROUNDS=20`, `$0.50`/call,
+`50`/hr/tenant, `$50`/mo) · never dead-ends (unmapped/failed `AI_INVOKE` = safe skip; advisory-only; fabric
+returns error dicts, never raises) · tenant-discretion (no `tenant_id` in any schema). **Open (#120):**
+(1) RLS is bypassed for the agent role (`rolbypassrls=true`) → needs a `NOBYPASSRLS` agent role + central
+`SET app.tenant_id` in the fabric; (2) guardrail-gated landing helper (advisory → guardrail → land-or-review).
+
+### 0.5 Next batches (see `docs/AGENT_ROADMAP.md`)
+
+Master → bridge → mirror: *"agents build the master, the bridge fans it, agents work the mirror."* Batch A
+(**platform-scope**, admin build loop): `opportunity_scout`, `ingest_analyst`, `matrix_stager`,
+`skeleton_architect`. Batch B (**tenant-scope, highest leverage**): `onboarding_agent` (Concierge — cold-start
+profile/buckets/first-atomize/ToDos). Batch C (tenant): `outcome_analyst` (workflow exists — cheapest),
+`amendment_monitor`, `cost_estimator`, `pp_matcher`. **Sequence:** foundation #120 → Concierge → master
+pipeline → Batch C. Master-side agents skip tenant-discretion (no tenant) but **keep the injection fence** —
+they read the most untrusted text in the system.
 
 ---
 

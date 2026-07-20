@@ -114,6 +114,7 @@ export async function POST(request: Request) {
       email: string;
       proposalId: string;
       acceptedAt: string | null;
+      revokedAt: string | null;
     } | undefined;
     try {
       [collaborator] = await sql<{
@@ -122,8 +123,9 @@ export async function POST(request: Request) {
         email: string;
         proposalId: string;
         acceptedAt: string | null;
+        revokedAt: string | null;
       }[]>`
-        SELECT id, user_id, email, proposal_id, accepted_at
+        SELECT id, user_id, email, proposal_id, accepted_at, revoked_at
         FROM proposal_collaborators
         WHERE id = ${token}
         LIMIT 1
@@ -135,6 +137,11 @@ export async function POST(request: Request) {
 
     if (!collaborator) {
       return NextResponse.json({ error: 'Invalid invite token', code: 'NOT_FOUND' }, { status: 404 });
+    }
+
+    // A revoked collaborator's invite link is dead — access was removed.
+    if (collaborator.revokedAt) {
+      return NextResponse.json({ error: 'This invitation is no longer valid', code: 'NOT_FOUND' }, { status: 404 });
     }
 
     if (collaborator.acceptedAt) {

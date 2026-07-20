@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import type { WorkflowInstance, WorkflowStats } from './page';
+import { WorkflowCatalog } from './workflow-catalog';
 
 // ─── Status styles ─────────────────────────────────────────────────
 
@@ -346,6 +347,9 @@ export function WorkflowMonitorClient({
           <span className="font-bold text-lg">{stats.failedLast24h}</span>
         </div>
       </section>
+
+      {/* ── Workflow Catalog (all templates + activation switch) ─────── */}
+      <WorkflowCatalog />
 
       {/* ── Active Workflows ───────────────────────────────────────── */}
       <section>

@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import type { Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export async function GET() {
   try {
@@ -35,7 +36,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
-    const user = session.user as { role?: Role };
+    const user = session.user as { id?: string; email?: string; role?: Role };
     if (user.role !== 'master_admin' && user.role !== 'rfp_admin') {
       return NextResponse.json({ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }, { status: 403 });
     }
@@ -57,6 +58,13 @@ export async function PATCH(request: Request) {
         RETURNING config
       `;
       if (!row) return NextResponse.json({ error: 'Default template not found', code: 'NOT_FOUND' }, { status: 404 });
+      await emitEventSingle({
+        namespace: 'finder',
+        type: 'guardrail_defaults.updated',
+        actor: userActor(user.id ?? '', user.email ?? undefined),
+        tenantId: null,
+        payload: { patchedKeys: Object.keys(patch) },
+      });
       return NextResponse.json({ data: { defaults: row.config } });
     } catch (e) {
       console.error('[admin/guardrail-defaults] PATCH query failed', e);

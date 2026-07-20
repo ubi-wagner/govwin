@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import { list as listTools } from '@/lib/tools';
 import type { Tool } from '@/lib/tools';
 import { AgentUsageSummary } from '@/components/admin/agent-usage-summary';
+import { AgentWorkforce } from '@/components/admin/agent-workforce';
 import { PlatformAiConfigCard } from '@/components/admin/platform-ai-config-card';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,12 @@ export default async function AgentsPage() {
           {tools.length} registered tool{tools.length !== 1 ? 's' : ''} across {namespaces.length} namespace{namespaces.length !== 1 ? 's' : ''}
         </p>
       </header>
+
+      {/* Agent workforce — RFP-admin oversight (#117) */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-4">Agent Workforce</h2>
+        <AgentWorkforce />
+      </section>
 
       {/* Usage Summary */}
       <section className="mb-10">

@@ -13,7 +13,7 @@
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coarseStatus, isSubmissionStage, type SubmissionStage, type BridgeEventType } from '@/lib/lifecycle';
-import { autoScoreCard, type CardFields } from '@/lib/bucket-ranking';
+import { emitEventSingle, systemActor } from '@/lib/events';
 
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
@@ -200,14 +200,6 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
           THEN true ELSE tenant_opportunity_cards.pin_update_available END,
         updated_at = now()
     `;
-    // Auto-rank the arriving card against the tenant's active spotlight buckets so
-    // the pipeline is ranked on arrival (the automated scoring producer for the new
-    // spine). Best-effort — a scoring failure must not fail the card fan-out.
-    try {
-      await autoScoreCard(tx, tenantId, ev.opportunityId, ev.card as CardFields, Date.now());
-    } catch (scoreErr) {
-      console.error('[bridge] auto-score on fan-out failed (non-fatal)', tenantId, scoreErr);
-    }
   });
   // System cursor (not tenant-RLS'd) — records forward-only progress.
   await sql`
@@ -215,6 +207,23 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
     VALUES (${tenantId}::uuid, now(), ${ev.id}::uuid, now())
     ON CONFLICT (tenant_id) DO UPDATE SET last_event_id = EXCLUDED.last_event_id, last_applied_at = now()
   `;
+  // Scoring is TENANT-SIDE + EVENT-DRIVEN now — NOT baked into this admin-push fan-out.
+  // Announce the card landed/updated in the tenant's mirror; the pipeline OnCardApplied
+  // workflow deterministically rescores it against the tenant's buckets (the
+  // scoring_strategist agent overlays this later, with memory + pin/purchase levers).
+  // "One brain, two spines, a bridge": the bridge DELIVERS, the tenant spine SCORES.
+  // Best-effort — an emit failure must not fail the fan-out (the rescore can be re-driven).
+  try {
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'card.applied',
+      actor: systemActor('bridge'),
+      tenantId,
+      payload: { tenantId, opportunityId: ev.opportunityId, version: ev.version },
+    });
+  } catch (emitErr) {
+    console.error('[bridge] card.applied emit failed (non-fatal)', tenantId, emitErr);
+  }
 }
 
 /** Fan a published card version out to every subscribed tenant (all-opps replication). */

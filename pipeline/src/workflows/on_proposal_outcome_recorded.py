@@ -59,4 +59,20 @@ class OnProposalOutcomeRecorded(Workflow):
             },
             timeout_minutes=10,
         ),
+        # AI actor (#129, Batch C): the outcome_analyst writes a win/loss lesson to the tenant's
+        # agent memory so scoring/capture calibrate over time — closes the learning loop. ADVISORY
+        # (memory-only, never business tables). Tenant-bound via payload.tenantId. Independent (no
+        # depends_on) so it never blocks the attribution action.
+        Step(
+            name="ai_outcome_analysis",
+            step_type=StepType.AI_INVOKE,
+            action="tool.outcome.analyze",
+            input_map={
+                "tenant_id": "payload.tenantId",
+                "proposal_id": "payload.proposalId",
+                "outcome": "payload.outcome",
+                "notes": "payload.notes",
+            },
+            timeout_minutes=10,
+        ),
     ]

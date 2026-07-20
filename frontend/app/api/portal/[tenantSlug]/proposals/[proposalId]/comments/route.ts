@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole } from '@/lib/rbac';
+import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { isRole, isTenantWideMember } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -47,9 +47,9 @@ export async function GET(request: Request, ctx: RouteContext) {
     }
 
     const tenantId = tenant.id as string;
-    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Verify proposal belongs to tenant ────────────────────────────
@@ -200,9 +200,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const tenantId = tenant.id as string;
-    const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+    const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
+      return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
     // ── Input validation ─────────────────────────────────────────────
@@ -265,9 +265,12 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Section not found for this proposal', code: 'NOT_FOUND' }, { status: 404 });
     }
 
-    // ── Partner scoping: partners may only comment on granted sections ─
-    // Tenant staff (tenant_user+) keep tenant-wide access.
-    if (role === 'partner_user') {
+    // ── Collaborator scoping: anyone WITHOUT tenant-wide access (a partner_user,
+    // OR a cross-company collaborator such as an admin at their own company) may
+    // only comment on their granted sections. Home tenant staff (tenant_user+)
+    // keep tenant-wide access. Keyed on tenant-wide membership, NOT the global
+    // role, so a tenant_admin of another company is correctly scoped here.
+    if (!isTenantWideMember(role, sessionUser.tenantId, tenantId)) {
       const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
       const canComment =
         access.commentableSections.includes(nodeId) ||

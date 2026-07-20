@@ -79,9 +79,12 @@ export async function GET(request: Request, ctx: RouteContext) {
         WHERE tenant_id = ${tenantId}::uuid
       `;
 
-      // Pipeline items count
+      // Opportunity-card count — the canonical per-tenant opportunity surface
+      // (tenant_opportunity_cards). Was tenant_pipeline_items, the RETIRED legacy
+      // Spotlight/Pipeline table; the response key stays `pipeline_items` for API
+      // stability but the number is now the tenant's live card count.
       const [pipelineCount] = await sql<{ count: string }[]>`
-        SELECT count(*)::text AS count FROM tenant_pipeline_items
+        SELECT count(*)::text AS count FROM tenant_opportunity_cards
         WHERE tenant_id = ${tenantId}::uuid
       `;
 

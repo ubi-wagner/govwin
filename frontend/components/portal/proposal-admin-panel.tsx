@@ -4,6 +4,8 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeamManager } from './team-manager';
 import { ProposalDropbox } from './proposal-dropbox';
+import { VolumeLayoutGauge } from './volume-layout-gauge';
+import { SaveAsTemplate } from './save-as-template';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -25,6 +27,7 @@ interface SectionItem {
   isLocked?: boolean;
   volumeName?: string | null;
   volumeNumber?: number | null;
+  artifactId?: string | null;
 }
 
 interface Collaborator {
@@ -37,6 +40,8 @@ interface Collaborator {
   dropboxEnabled: boolean;
   invitedAt: string;
   acceptedAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
   stageAccess: {
     collaboratorId: string;
     stage: string;
@@ -186,14 +191,14 @@ export function ProposalAdminPanel({
   );
 
   // ── Export Package handler ───────────────────────────────────
-  const handleExport = useCallback(async () => {
+  // format=docx → one assembled Word doc; format=zip → each volume in its NATIVE
+  // format (docx/pptx/xlsx/pdf) bundled into a .zip (lossless for mixed proposals).
+  const handleExport = useCallback(async (fmt: 'docx' | 'zip' = 'docx') => {
     setExportLoading(true);
     setExportMessage(null);
     try {
-      // Request the assembled Word document (the package route builds a real .docx
-      // from every section); download the binary blob rather than a JSON manifest.
       const res = await fetch(
-        `/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=docx`,
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/package?format=${fmt}`,
         { method: 'POST' },
       );
       if (!res.ok) {
@@ -205,10 +210,10 @@ export function ProposalAdminPanel({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `proposal-${proposalId.slice(0, 8)}.docx`;
+      a.download = `proposal-${proposalId.slice(0, 8)}.${fmt}`;
       a.click();
       URL.revokeObjectURL(url);
-      setExportMessage({ type: 'success', text: 'Proposal exported (.docx)' });
+      setExportMessage({ type: 'success', text: `Proposal exported (.${fmt})` });
     } catch {
       setExportMessage({ type: 'error', text: 'Network error' });
     } finally {
@@ -350,6 +355,32 @@ export function ProposalAdminPanel({
     }
   }, [tenantSlug, proposalId, router]);
 
+  // Hierarchical push — lock every lockable canvas in a scope (volume / artifact /
+  // whole proposal) via the lock-scope route. Each canvas STILL locks + audits per
+  // the per-section stricture (server loops lockSectionCore); the artifact/volume/
+  // proposal roll-ups fire as the last canvas in each scope locks.
+  const [scopeBusy, setScopeBusy] = useState<string | null>(null);
+  const lockScope = useCallback(
+    async (scope: 'volume' | 'artifact' | 'proposal', key?: number | string) => {
+      if (scopeBusy) return;
+      setScopeBusy(`${scope}:${key ?? 'all'}`);
+      try {
+        const body: Record<string, unknown> = { scope };
+        if (scope === 'volume') body.volumeNumber = key;
+        if (scope === 'artifact') body.artifactId = key;
+        const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/lock-scope`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) router.refresh();
+      } finally {
+        setScopeBusy(null);
+      }
+    },
+    [scopeBusy, tenantSlug, proposalId, router],
+  );
+
   // Bulk "Accept & Lock All" — locks every unlocked, draftable section so the
   // whole document can advance in one click. Reuses the per-section lock route,
   // so each lock emits section.locked + harvests + (on the last) document.locked
@@ -462,11 +493,60 @@ export function ProposalAdminPanel({
             <div key={volume.label} className="mb-5">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg">
                 <h3 className="text-sm font-semibold text-gray-700">{volume.label}</h3>
-                <span className="text-xs text-gray-500">
-                  {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
-                  {volume.sections.length} locked
-                  {volume.totalPages > 0 && ` • ${volume.usedPages}/${volume.totalPages} pages`}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">
+                    {volume.sections.filter((s) => isSectionLocked(s)).length} of{' '}
+                    {volume.sections.length} locked
+                  </span>
+                  {(() => {
+                    const gaugeArtifactId = volume.sections.find((s) => s.artifactId)?.artifactId;
+                    return gaugeArtifactId ? (
+                      <>
+                        <VolumeLayoutGauge tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} />
+                        <SaveAsTemplate tenantSlug={tenantSlug} proposalId={proposalId} artifactId={gaugeArtifactId} volumeName={volume.label} />
+                      </>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const vnum = volume.sections[0]?.volumeNumber ?? null;
+                    const allLocked = volume.sections.length > 0 && volume.sections.every((s) => isSectionLocked(s));
+                    if (allLocked) {
+                      // Locked → offer download in the artifact's native format (auto)
+                      // + PDF. The export route resolves narrative→docx, slides→pptx,
+                      // cost→xlsx; PDF needs Chromium.
+                      const artifactId = volume.sections.find((s) => s.artifactId)?.artifactId;
+                      const base = artifactId
+                        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/artifacts/${artifactId}/export`
+                        : null;
+                      return (
+                        <span className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-green-700">✓ Volume locked</span>
+                          {base && (
+                            <span className="flex items-center gap-1.5 text-gray-400">
+                              <span>·</span>
+                              <a href={`${base}?format=auto`} className="font-medium text-blue-600 hover:underline" title="Download this volume in its native format">Download</a>
+                              <a href={`${base}?format=pdf`} className="text-blue-600 hover:underline" title="Download as PDF (requires Chromium)">PDF</a>
+                            </span>
+                          )}
+                        </span>
+                      );
+                    }
+                    const lockableCount = volume.sections.filter(
+                      (s) => !isSectionLocked(s) && s.status !== 'empty' && s.nodeCount > 0,
+                    ).length;
+                    if (lockableCount === 0 || vnum == null) return null;
+                    return (
+                      <button
+                        onClick={() => lockScope('volume', vnum)}
+                        disabled={scopeBusy != null || lockingAll || advancing}
+                        title="Lock every drafted canvas in this volume — each still locks + audits per canvas, then rolls up to the volume"
+                        className="px-2.5 py-1 text-xs font-semibold bg-gray-700 text-white rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                      >
+                        {scopeBusy === `volume:${vnum}` ? 'Locking…' : `Lock Volume (${lockableCount})`}
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
               <div className="border border-gray-200 border-t-0 rounded-b-lg">
                 {volume.sections.map((section) => {
@@ -576,11 +656,19 @@ export function ProposalAdminPanel({
           {/* Export Package */}
           <div className="mt-4 flex items-center gap-3">
             <button
-              onClick={handleExport}
+              onClick={() => handleExport('docx')}
               disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {exportLoading ? 'Exporting...' : 'Download Proposal (.docx)'}
+            </button>
+            <button
+              onClick={() => handleExport('zip')}
+              disabled={exportLoading || (!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived')}
+              className="px-4 py-2 text-sm font-medium text-indigo-700 bg-white border border-indigo-300 rounded-md hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Every volume in its native format (docx/pptx/xlsx/pdf), bundled as a .zip"
+            >
+              Download all (.zip)
             </button>
             {(!isLocked && proposalStage !== 'submitted' && proposalStage !== 'archived') && (
               <span className="text-xs text-gray-400">Lock the proposal or advance to submitted stage to export</span>

@@ -1,6 +1,17 @@
 # ARCHITECTURE_V10.md — RFP Pipeline Portal: Greenfield-Canonical As-Built
 
 **Date:** 2026-07-03
+
+> **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19).** The pipeline `AgentFabric` (10 archetypes) is a
+> **tenant-bound advisory workforce** being woken one at a time. Each tenant-space agent runs with
+> **tenant_user authority** scoped to its assigned tenant (the trusted task context; tool schemas expose no
+> `tenant_id`), produces **advisory** output that goes **through guardrails to land-or-review** (never
+> auto-writes business tables), fences untrusted content against injection, and is bounded so it can't run
+> away or dead-end a workflow. Two producer shapes: **per-tenant producers** (fan-out: scoring, opportunity
+> analysis) and declarative **`AI_INVOKE` workflow steps** (single-entity: architect/package/capture/partner).
+> Oversight rolls **usage** up to the RFP admin (`/admin/agents` → Agent Workforce, per-tenant) — **forward
+> only; tenant data stays in the tenant** (the same bridge invariant as the OPP spine). Canonical detail:
+> **`docs/AGENT_WORKFORCE.md`** + `docs/AGENT_FABRIC_DESIGN.md`.
 **Status:** As-built successor to ARCHITECTURE_V9.md. V9 remains the baseline for the retained
 core (proposal workspace, canvas, stages/gates, auth, provisioning, admin curation, CMS, pipeline
 ingest/shred/score, memory). **This document records the greenfield refactor that converged the

@@ -3,8 +3,8 @@
  * POST /api/portal/[tenantSlug]/uploads — Upload a file to S3 + create library_unit
  *
  * Handles file uploads for tenant library. Files are stored in S3 under
- * customers/{tenantSlug}/uploads/ and a library_units row is created with
- * source_type='upload'.
+ * customers/{tenantSlug}/uploads/ and a library_atoms 'reference' atom is created
+ * with source='upload' (filename/storage key/category in source_anchor).
  *
  * Auth: tenant_user or above with tenant access.
  */
@@ -14,6 +14,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { createAtom } from '@/lib/atoms';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -71,18 +72,20 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Business logic ───────────────────────────────────────────
     try {
+      // Uploaded files register as 'reference' atoms in the canonical library
+      // (library_atoms); filename/storage key/category live in source_anchor.
       const uploads = await sql`
         SELECT
           id,
-          source_filename AS filename,
-          category,
-          source_type,
+          title AS filename,
+          source_anchor->>'category' AS category,
+          source AS source_type,
           status,
-          source_storage_key AS storage_key,
+          source_anchor->>'storageKey' AS storage_key,
           created_at
-        FROM library_units
+        FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
-          AND source_type = 'upload'
+          AND source = 'upload'
         ORDER BY created_at DESC
         LIMIT 200
       `;
@@ -212,23 +215,25 @@ export async function POST(request: Request, ctx: RouteContext) {
         metadata: { 'uploaded-by': sessionUser.id },
       });
 
-      // ── Create library_unit row ──────────────────────────────────
+      // ── Create the reference atom (canonical library_atoms) ──────────
+      // The uploaded file registers as a 'reference' atom (the registered source
+      // document); its storage key, original filename, and category live in
+      // source_anchor so the GET listing above can surface them.
       const content = `Uploaded file: ${file.name}`;
-      const [unit] = await sql<{ id: string }[]>`
-        INSERT INTO library_units (
-          tenant_id, content, category, source_type, status,
-          source_filename, source_storage_key
-        ) VALUES (
-          ${tenantId}::uuid,
-          ${content},
-          ${category},
-          'upload',
-          'draft',
-          ${file.name},
-          ${storageKey}
-        )
-        RETURNING id
-      `;
+      const { atomId } = await createAtom(
+        tenantId,
+        {
+          grain: 'reference',
+          title: file.name,
+          content,
+          source: 'upload',
+          creatorKind: 'import',
+          status: 'draft',
+          sourceAnchor: { storageKey, filename: file.name, category },
+        },
+        { id: sessionUser.id, kind: 'import' },
+      );
+      const unit = { id: atomId };
 
       // ── Emit event ─────────────────────────────────────────────────
       await emitEventSingle({

@@ -34,8 +34,9 @@ export function AssignTaskForm({
   // assignee select value: 'role:tenant_user' | 'role:partner_user' | 'user:<id>'
   const [assignee, setAssignee] = useState('role:tenant_user');
   // how the assignee completes it (W-M typed completer): a plain review
-  // (approve/dismiss), an upload (go do it then mark done), or a small form.
-  const [completion, setCompletion] = useState<'review' | 'upload' | 'form'>('review');
+  // (approve/dismiss), an upload (go do it then mark done), a small form, or a
+  // broadcast note (read + acknowledge — the atomic ToDo).
+  const [completion, setCompletion] = useState<'review' | 'upload' | 'form' | 'broadcast'>('review');
   // for completion='form': comma-separated field names → params.spec.fields.
   const [formFieldsRaw, setFormFieldsRaw] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -54,7 +55,13 @@ export function AssignTaskForm({
     // matching completer). 'review' is the default — send no params so the task
     // uses the plain approve/dismiss completer.
     let params: Record<string, unknown> | undefined;
-    if (completion === 'upload') {
+    // A broadcast note is its own defined workflow (read + acknowledge); the
+    // others are delegated_task variants selected by params.kind.
+    let taskType = 'delegated_task';
+    if (completion === 'broadcast') {
+      taskType = 'broadcast';
+      params = { kind: 'acknowledge' };
+    } else if (completion === 'upload') {
       params = { kind: 'upload' };
     } else if (completion === 'form') {
       const fields = formFieldsRaw
@@ -69,7 +76,7 @@ export function AssignTaskForm({
       params = { kind: 'form', spec: { fields } };
     }
     const body: Record<string, unknown> = {
-      taskType: 'delegated_task',
+      taskType,
       title: title.trim(),
       description: description.trim() || undefined,
       assigneeRole: kind === 'role' ? value : undefined,
@@ -150,12 +157,13 @@ export function AssignTaskForm({
           <label className="block text-xs font-medium text-gray-500 mb-1">Completion</label>
           <select
             value={completion}
-            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form')}
+            onChange={(e) => setCompletion(e.target.value as 'review' | 'upload' | 'form' | 'broadcast')}
             className="w-full border border-gray-300 rounded px-2 py-1.5 bg-white"
           >
             <option value="review">Review &amp; approve</option>
             <option value="upload">Upload a file</option>
             <option value="form">Fill a form</option>
+            <option value="broadcast">Broadcast note (acknowledge)</option>
           </select>
         </div>
         <div>

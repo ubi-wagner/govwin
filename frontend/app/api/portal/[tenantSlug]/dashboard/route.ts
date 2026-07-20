@@ -97,7 +97,7 @@ export async function GET(request: Request, ctx: RouteContext) {
 
       // Library units count
       const [libraryCount] = await sql<{ count: string }[]>`
-        SELECT count(*)::text AS count FROM library_units
+        SELECT count(*)::text AS count FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
       `;
 

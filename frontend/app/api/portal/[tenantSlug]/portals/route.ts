@@ -14,11 +14,12 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { createPortal, assumeShadowAdmin } from '@/lib/portal-launch';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 async function gate(tenantSlug: string, minRole: Role) {
   const session = await auth();
   if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
-  const u = session.user as { id?: string; role?: unknown };
+  const u = session.user as { id?: string; email?: string; role?: unknown };
   const role: Role | null = isRole(u.role) ? u.role : null;
   if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
   if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
@@ -26,7 +27,7 @@ async function gate(tenantSlug: string, minRole: Role) {
   if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
-  return { tenantId, userId: u.id };
+  return { tenantId, userId: u.id, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -66,6 +67,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     }
     // T&C: RFP admins may act on this portal (role-based grant) until the customer accepts guardrails.
     await assumeShadowAdmin(g.tenantId, created.portalId, { source: 't_and_c', grantedBy: g.userId });
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'portal.created',
+      actor: userActor(g.userId, g.email ?? undefined),
+      tenantId: g.tenantId,
+      payload: { portalId: created.portalId, opportunityId: body.opportunityId, proposalId: body.proposalId ?? null, status: 'guardrails_pending' },
+    });
     return NextResponse.json({ data: { portalId: created.portalId, label, status: 'guardrails_pending' } });
   } catch (err) {
     console.error('[portal/portals] POST error', err);

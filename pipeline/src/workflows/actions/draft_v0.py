@@ -136,6 +136,20 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         log.warning("draft_v0: AgentFabric unavailable — skipping: %s", exc)
         return {"drafted": 0, "skipped": True, "reason": f"no_fabric:{exc}"}
 
+    # :start — the multi-section V0 draft run is now reconstructable in-flight, linked to
+    # the :end below (the malformed `proposal:v0_completed` type is fixed to the dotted
+    # entity.action form `proposal:draft.completed`). Emitted once we're committed to draft.
+    draft_start_id = ""
+    try:
+        from events import emit_event as _emit_start
+        draft_start_id = await _emit_start(
+            conn, namespace="proposal", type="draft.completed", phase="start",
+            payload={"proposalId": str(proposal_id), "sections": len(rows)},
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("draft_v0: draft.completed:start emit failed (non-fatal): %s", exc)
+
     drafted = 0
     skipped = 0
     for s in rows:
@@ -195,12 +209,13 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
     try:
         from events import emit_event
         await emit_event(
-            conn, namespace="proposal", type="v0_completed",
+            conn, namespace="proposal", type="draft.completed", phase="end",
+            parent_event_id=draft_start_id or None,
             payload={"proposalId": str(proposal_id), "drafted": drafted, "skipped": skipped},
             tenant_id=tenant_id,
         )
     except Exception as exc:  # noqa: BLE001
-        log.warning("draft_v0: v0_completed emit failed (non-fatal): %s", exc)
+        log.warning("draft_v0: draft.completed:end emit failed (non-fatal): %s", exc)
 
     log.info("draft_v0: proposal %s — drafted %d, skipped %d", proposal_id, drafted, skipped)
     return {"drafted": drafted, "skipped_sections": skipped}

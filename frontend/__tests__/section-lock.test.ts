@@ -24,7 +24,9 @@ vi.mock('@/lib/db', () => ({
   verifyTenantAccess: verifyTenantAccessMock,
 }));
 vi.mock('@/lib/proposal-access', () => ({ resolveUserAccess: resolveUserAccessMock }));
-vi.mock('@/lib/proposal-harvest', () => ({ harvestSectionToLibrary: harvestMock }));
+// Section accept harvests to the CANONICAL atom library only (the legacy library_units
+// harvest was removed in the P0-1 cutover). harvestMock stands in for the atom harvest.
+vi.mock('@/lib/proposal-atom-harvest', () => ({ harvestSectionToAtomLibrary: harvestMock }));
 vi.mock('@/lib/proposal-advance', () => ({ advanceProposalStage: advanceProposalStageMock }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,

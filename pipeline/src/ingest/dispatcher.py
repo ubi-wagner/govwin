@@ -15,6 +15,11 @@ from typing import Any, Optional
 
 import asyncpg
 
+# The platform runs on UTC end-to-end — schedules, cron computation, and audit timestamps
+# are all UTC (one canonical clock; audit is exact to the microsecond). Each admin (RFP or
+# tenant) picks a DISPLAY timezone preference (users.timezone) that the UI renders times in;
+# a schedule an admin sets in their local time is converted to a UTC cron on save.
+
 from ingest.sam_gov import SamGovIngester
 from ingest.sbir_gov import SbirGovIngester
 from ingest.grants_gov import GrantsGovIngester
@@ -58,6 +63,8 @@ def compute_next_run(
                 return now + timedelta(hours=n)
         if minute.isdigit() and hour.isdigit() and month == "*":
             mm, hh = int(minute), int(hour)
+            # UTC canonical: cron hour/minute are UTC (an admin's local schedule is converted
+            # to a UTC cron on save; the UI renders back in the admin's display timezone).
             # daily "<m> <h> * * *"
             if dom == "*" and dow == "*":
                 nxt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
@@ -105,6 +112,47 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
 
     for sched in schedules:
         source = sched["source"]
+
+        # Event-emitting schedules (run_type='event', source='namespace:type') bridge the
+        # SHARED cron to the workflow processor: emit the system_event on its cadence, and the
+        # normal event→workflow→agent path takes over. This is how our-org scheduled work
+        # (ops digest, solicitation update-scan, content resurface, social scheduling) runs on
+        # the same cron + processor as everything else — no bespoke scheduler. Audit timestamp
+        # is the DB clock (now(), one system time, microsecond precision).
+        if sched["run_type"] == "event" and ":" in source:
+            try:
+                ns, etype = source.split(":", 1)
+                next_run = compute_next_run(sched["cron_expression"], sched["run_type"], now)
+                # CAS: atomically CLAIM the tick by advancing next_run_at BEFORE emitting.
+                # The WHERE re-checks the schedule is still due, so a crash between claim and
+                # emit (at-most-once — a missed digest is fine, a double is not) and a second
+                # replica racing the same tick both resolve safely: only the UPDATE that still
+                # sees the row due wins (RETURNING id); the loser gets NULL and does nothing.
+                claimed = await conn.fetchval(
+                    """
+                    UPDATE pipeline_schedules
+                    SET next_run_at = $1, last_run_at = now()
+                    WHERE id = $2 AND (next_run_at IS NULL OR next_run_at <= $3)
+                    RETURNING id
+                    """,
+                    next_run, sched["id"], now,
+                )
+                if claimed is None:
+                    continue  # another worker/tick already claimed this schedule
+                await conn.execute(
+                    """
+                    INSERT INTO system_events
+                        (id, namespace, type, phase, actor_type, actor_id, payload, created_at)
+                    VALUES (gen_random_uuid(), $1, $2, 'single', 'system', 'cron', $3::jsonb, now())
+                    """,
+                    ns, etype, json.dumps({"triggeredBy": "cron", "schedule": source}),
+                )
+                inserted += 1
+                log.info("cron emitted event %s (next %s)", source, next_run.isoformat())
+            except Exception as e:
+                log.error("failed to emit cron event for %s: %s", source, e)
+            continue
+
         if source not in INGESTERS:
             # Skip non-ingester schedules (scoring, memory_decay, etc.)
             continue

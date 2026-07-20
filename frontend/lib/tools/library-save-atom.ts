@@ -4,7 +4,7 @@
  *
  * This is the write-side of the library feedback loop. When a user
  * accepts a node in the canvas editor, the node's content + metadata
- * + provenance becomes a library_units row tagged for future retrieval
+ * + provenance becomes a library_atoms row tagged for future retrieval
  * by the Librarian agent.
  *
  * The original node in the canvas is IMMUTABLE after acceptance —
@@ -13,11 +13,11 @@
  */
 
 import { z } from 'zod';
-import { sql } from '@/lib/db';
+import { createAtom } from '@/lib/atoms';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
-import { ToolAuthorizationError, ToolExecutionError } from './errors';
+import { ToolAuthorizationError } from './errors';
 
 const InputSchema = z.object({
   tenantId: z.string().uuid(),
@@ -51,54 +51,33 @@ export const librarySaveAtomTool = defineTool<Input, Output>({
     const tenantId = ctx.tenantId;
     if (!tenantId) throw new ToolAuthorizationError('tenant context required');
 
-    // Dedupe: if an atom with the same hash already exists for this
-    // tenant, skip (don't create duplicates of the same paragraph).
-    if (input.atomHash) {
-      try {
-        const existing = await sql<{ id: string }[]>`
-          SELECT id FROM library_units
-          WHERE tenant_id = ${tenantId}::uuid
-            AND atom_hash = ${input.atomHash}
-          LIMIT 1
-        `;
-        if (existing.length > 0) {
-          return { libraryUnitId: existing[0].id, category: input.category, isNew: false };
-        }
-      } catch (err) {
-        console.error('[library.save_atom] dedupe check failed:', err);
-        throw err;
-      }
-    }
-
+    // Repointed to the canonical library (library_atoms). The accepted node becomes
+    // one primitive atom; the source document/objects it was cut from are recorded
+    // in source_anchor. NOTE: the legacy atom_hash dedupe is dropped — library_atoms
+    // has no atom_hash column — so this tool now always crystallizes a fresh atom
+    // (isNew is always true). Tool schema + return shape are unchanged.
     const contentJson = JSON.stringify(input.content);
 
-    let rows: { id: string }[];
+    let id: string;
     try {
-      rows = await sql<{ id: string }[]>`
-        INSERT INTO library_units
-          (tenant_id, content, category, tags, status, source_type, source_id,
-           original_proposal_id, original_node_id, atom_hash)
-        VALUES
-          (${tenantId}::uuid,
-           ${contentJson},
-           ${input.category},
-           ${input.tags}::text[],
-           'approved',
-           'ai',
-           ${JSON.stringify(input.sourceAnchor ?? null)},
-           ${input.proposalId}::uuid,
-           ${input.nodeId},
-           ${input.atomHash ?? null})
-        RETURNING id
-      `;
+      const { atomId } = await createAtom(
+        tenantId,
+        {
+          grain: 'primitive',
+          content: contentJson,
+          source: 'harvest',
+          creatorKind: 'ai',
+          status: 'approved',
+          originProposalId: input.proposalId,
+          sourceAnchor: input.sourceAnchor ?? null,
+        },
+        { id: ctx.actor.id, kind: 'ai' },
+      );
+      id = atomId;
     } catch (err) {
-      console.error('[library.save_atom] insert failed:', err);
+      console.error('[library.save_atom] atom creation failed:', err);
       throw err;
     }
-    if (!rows.length) {
-      throw new ToolExecutionError('Failed to save library atom — INSERT returned no rows');
-    }
-    const id = rows[0].id;
 
     await emitEventSingle({
       namespace: 'library',

@@ -11,6 +11,7 @@ import { customerProposalPath } from '@/lib/storage/paths';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
+import { isProposalPaywallBypassed } from '@/lib/paywall';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
 
 interface RouteContext {
@@ -94,14 +95,16 @@ export async function POST(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    // Stripe gate — founding cohort.
-    // V1: proposal creation is admin-granted (no Stripe). The paywall is OFF by
-    // default so the founding cohort can convert opportunities → workspaces;
-    // set FOUNDING_COHORT_BYPASS=false to require a purchase/subscription once
-    // billing is live. (When enforced, this is where the purchase/subscription
-    // check belongs.)
-    const paywallEnforced = process.env.FOUNDING_COHORT_BYPASS === 'false';
-    if (paywallEnforced) {
+    // Stripe gate — founding cohort. FAIL-SAFE: the paywall is ENFORCED by default; a
+    // founding-cohort deploy must EXPLICITLY set FOUNDING_COHORT_BYPASS=true to allow free
+    // proposal creation. (The real product flow provisions proposals via portal release —
+    // provisionProposalForPortal — which never hits this route; this is the future billing
+    // hook.) When enforced, the purchase/subscription check belongs here.
+    if (isProposalPaywallBypassed()) {
+      console.warn(
+        '[paywall] FOUNDING_COHORT_BYPASS=true — proposal creation paywall BYPASSED (founding-cohort mode)',
+      );
+    } else {
       return NextResponse.json(
         { error: 'Active subscription required to create proposals', code: 'PAYMENT_REQUIRED' },
         { status: 402 },

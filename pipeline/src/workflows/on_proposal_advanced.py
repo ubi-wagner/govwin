@@ -163,6 +163,13 @@ class OnProposalAdvancedToReview(Workflow):
     )
 
     steps = [
+        # AI actor (#117): the compliance_reviewer runs an advisory pink-team pass —
+        # INDEPENDENT (no dependents) so its failure/skip can never gate the human review.
+        # (Was on the critical path: notify_reviewers + the review ToDo depended on it, so a
+        # hard-failing agent would have stranded the entire review gate — a latent dead-end
+        # that contradicted this workflow's own docstring, "still notify reviewers ... they
+        # can review manually". Decoupled: the compliance result lands as advisory context,
+        # never as a gate.)
         Step(
             name="ai_compliance_review",
             step_type=StepType.AI_INVOKE,
@@ -174,7 +181,6 @@ class OnProposalAdvancedToReview(Workflow):
             name="notify_reviewers",
             step_type=StepType.NOTIFY,
             action="system.notify",
-            depends_on="ai_compliance_review",
             input_map={
                 "channel": '"email"',
                 "template": '"review_ready"',
@@ -227,6 +233,16 @@ class OnProposalAdvancedToFinal(Workflow):
     )
 
     steps = [
+        # AI actor (#117): the packaging_specialist reviews the final submission package —
+        # volume completeness, required attachments/forms, formatting — ADVISORY. Independent
+        # (no depends_on) so a failure/skip never blocks the export/notify loop. Tenant-bound.
+        Step(
+            name="ai_package_review",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.package",
+            input_map={"proposal_id": "payload.proposalId", "tenant_id": "payload.tenantId"},
+            timeout_minutes=10,
+        ),
         Step(
             name="generate_export_preview",
             action="workflows.actions.generate_preview.generate_preview",

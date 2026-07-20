@@ -8,6 +8,7 @@ import {
   canForceAdvanceInstance,
   requiredRoleForPath,
   getLandingPath,
+  isTenantWideMember,
 } from '@/lib/rbac';
 
 describe('isRole', () => {
@@ -165,5 +166,34 @@ describe('getLandingPath', () => {
     expect(getLandingPath('tenant_admin', null)).toBeNull();
     expect(getLandingPath('tenant_user', null)).toBeNull();
     expect(getLandingPath('partner_user', null)).toBeNull();
+  });
+});
+
+describe('isTenantWideMember', () => {
+  const A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+  it('platform admins get tenant-wide access to any tenant', () => {
+    expect(isTenantWideMember('master_admin', null, A)).toBe(true);
+    expect(isTenantWideMember('rfp_admin', null, A)).toBe(true);
+    expect(isTenantWideMember('rfp_admin', B, A)).toBe(true);
+  });
+
+  it('tenant_admin/tenant_user are tenant-wide ONLY for their own tenant', () => {
+    expect(isTenantWideMember('tenant_admin', A, A)).toBe(true);
+    expect(isTenantWideMember('tenant_user', A, A)).toBe(true);
+    // cross-company: an admin/user of B is NOT tenant-wide over A (must be scoped)
+    expect(isTenantWideMember('tenant_admin', B, A)).toBe(false);
+    expect(isTenantWideMember('tenant_user', B, A)).toBe(false);
+  });
+
+  it('partner_user is NEVER tenant-wide, even in their own tenant', () => {
+    expect(isTenantWideMember('partner_user', A, A)).toBe(false);
+    expect(isTenantWideMember('partner_user', B, A)).toBe(false);
+  });
+
+  it('null/undefined home tenant is never tenant-wide for non-admins', () => {
+    expect(isTenantWideMember('tenant_admin', null, A)).toBe(false);
+    expect(isTenantWideMember('tenant_user', undefined, A)).toBe(false);
   });
 });

@@ -164,6 +164,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       // RFP expert releases a PURCHASED workspace (curation_pending → launched) after
       // finishing the skeleton curation: flip live, then provision the build UNLOCKED so
       // the customer can pick atoms + draft. rfp_admin acts here via global tenant access.
+      // AUTHZ: release is the EXPERT curation gate — a buying tenant_admin must NOT be able
+      // to self-release (via raw API) and skip the 72h curation. Require rfp_admin+; the
+      // outer gate() only floors at tenant_admin for the customer-owned accept/revoke controls.
+      if (!hasRoleAtLeast(g.role, 'rfp_admin')) {
+        return NextResponse.json({ error: 'Only an RFP expert can release a workspace from curation', code: 'FORBIDDEN' }, { status: 403 });
+      }
       let body: { guardrailConfig?: GuardrailConfig } = {};
       try { body = await request.json(); } catch { /* body optional — default guardrails */ }
       const config = (body.guardrailConfig ?? DEFAULT_RELEASE_GUARDRAILS) as GuardrailConfig;

@@ -627,9 +627,20 @@ class WorkflowManager:
                     },
                 )
 
-                # Step failure is fatal — stop the workflow
+                # HIGH-3 (launch-readiness): continue-on-INDEPENDENT-failure, do NOT
+                # fail-fast. A failed step no longer halts the whole instance. The
+                # depends_on guard above already cascades a failure to DEPENDENT steps
+                # (a failed/skipped dependency skips the dependent, which in turn skips
+                # ITS dependents), while INDEPENDENT downstream steps still run. This
+                # aligns the managed engine with the fire-and-forget path
+                # (processor._run_workflow) and every workflow docstring ("continue to
+                # the next independent step; still notify the curator on shred failure").
+                # The instance is still marked `failed`, so the audit trail and the admin
+                # retry affordance (retry_instance skips completed, resumes from failed)
+                # are preserved. (Was: `break` → skipped independent steps like the
+                # curator alert — the workflow HIGH-2/HIGH-3 launch-readiness finding.)
                 final_status = "failed"
-                break
+                # NO break — fall through to run independent downstream steps.
 
             # Heartbeat after each step
             await conn.execute(
@@ -1384,8 +1395,13 @@ class WorkflowManager:
         return resumed
 
     # Entity keys that disambiguate WHICH parked instance an event belongs to.
+    # tenantId (MED-6) is the tenant-scope guard: without it a future tenant-scoped
+    # `wait_for` that shares no other entity key with the resuming event would fall
+    # through to the "no shared key ⇒ True" branch and resume a DIFFERENT tenant's
+    # parked instance. Including it only ever TIGHTENS matching (never loosens).
     _CORRELATION_KEYS = (
         "proposalId", "userId", "sourceId", "opportunityId", "sectionId", "contentId",
+        "tenantId",
     )
 
     @classmethod

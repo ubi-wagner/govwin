@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
-import { isRole, type Role } from '@/lib/rbac';
+import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
 import { getProposalCard } from '@/lib/cards/card';
@@ -34,7 +34,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   if (!tenant) redirect('/portal');
 
   const tenantId = tenant.id as string;
-  const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
+  // Proposal-scoped gate: a tenant member OR an accepted collaborator on THIS
+  // proposal (cross-company collaborators pass here). resolveUserAccess below
+  // scopes what they can actually see/edit.
+  const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
   if (!hasAccess) redirect('/portal');
 
   // ── Load proposal with opportunity + solicitation context ───────────
@@ -140,11 +143,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     };
   }
 
-  // Partner scoping: a partner_user with no grant on THIS proposal must not see
-  // the workspace shell (title, collaborator roster + emails, compliance,
-  // stage history). Tenant staff (tenant_user+) retain tenant-wide access.
+  // Scoped-collaborator guard: a user WITHOUT tenant-wide access (a partner_user,
+  // OR a cross-company collaborator) who has no section grant on THIS proposal must
+  // not see the workspace shell (title, collaborator roster + emails, compliance,
+  // stage history). Home tenant staff (tenant_user+) retain tenant-wide access.
   if (
-    role === 'partner_user' &&
+    !isTenantWideMember(role, sessionUser.tenantId, tenantId) &&
     access.editableSections.length === 0 &&
     access.commentableSections.length === 0 &&
     access.viewableSections.length === 0
@@ -169,6 +173,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     isLocked: boolean;
     volumeName: string | null;
     volumeNumber: number | null;
+    artifactId: string | null;
     expertNotes: string | null;
   }[] = [];
 
@@ -188,6 +193,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         ps.is_locked,
         ps.volume_name,
         ps.volume_number,
+        ps.artifact_id,
         ps.meta->>'expertNotes' AS expert_notes,
         u.name AS accepted_by_name,
         CASE
@@ -249,6 +255,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
     dropboxEnabled: boolean;
     invitedAt: string;
     acceptedAt: string | null;
+    revokedAt: string | null;
   }[] = [];
 
   try {
@@ -256,7 +263,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       SELECT
         id, user_id, email, name, role,
         assigned_sections, dropbox_enabled,
-        invited_at, accepted_at
+        invited_at, accepted_at, revoked_at
       FROM proposal_collaborators
       WHERE proposal_id = ${proposalId}
       ORDER BY invited_at ASC
@@ -293,6 +300,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
 
   const collaboratorsWithAccess = collaborators.map((c) => ({
     ...c,
+    active: c.revokedAt == null,
     stageAccess: stageAccessByCollab.get(c.id) || [],
   }));
 
@@ -435,10 +443,22 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       isLocked: s.isLocked,
       volumeName: s.volumeName ?? null,
       volumeNumber: s.volumeNumber ?? null,
+      artifactId: s.artifactId ?? null,
       expertNotes: s.expertNotes ?? null,
       isEditable: !s.isLocked && (s.completedStage === null || s.completedStage === proposal.stage),
     };
   });
+
+  // Defense in depth: a SCOPED collaborator (NOT a tenant-wide member) must never
+  // even RECEIVE metadata for sections they weren't granted — withhold unassigned
+  // sections here so nothing leaks client-side (e.g. a pricing section's title in
+  // the "All" tab). A collaborator sees ONLY what the company admin assigned. Home
+  // staff / admins (tenant-wide) keep the full section set. (Identity: collaborators
+  // work across companies; scope is enforced off the grant, never assumed.)
+  const tenantWide = isTenantWideMember(role, sessionUser.tenantId, tenantId);
+  const visibleSections = tenantWide
+    ? sectionsWithPermission
+    : sectionsWithPermission.filter((s) => s.permission !== 'none');
 
   return (
     <div>
@@ -510,7 +530,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
         proposalId={proposalId}
         tenantSlug={tenantSlug}
         contextSlugs={opportunityContextSlugs({ agency: proposal.agency, program: proposal.programType })}
-        sections={sectionsWithPermission}
+        sections={visibleSections}
         hasEmptySections={hasEmptySections}
         proposalStage={proposal.stage}
         isLocked={proposal.isLocked}

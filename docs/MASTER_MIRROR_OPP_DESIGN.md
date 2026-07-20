@@ -1,5 +1,14 @@
 # Design — Master OPP → Mirrored Cards → Purchase → Curation → Proposal V0→V1
 
+> **AS-BUILT UPDATE (#117, 2026-07-19) — agents on the bridge.** The tenant-space AI agents (scoring,
+> analysis, drafting, packaging, …) are **part of the forward-only bridge**: they act **inside a single
+> tenant's mirror** (tenant-bound, tenant_user authority — the trusted task tenant, never model-chosen), and
+> their **usage** rolls **up** to the RFP admin for oversight (`/admin/agents`, per-tenant) while their
+> **outputs and the tenant's data stay in the tenant** — exactly the bridge invariant (info/control forward
+> + up, tenant data never flows out; the only backflow is an admin descending into the tenant's RLS shadow
+> to inspect). Agent output is advisory → guardrail → land-or-review, never an auto-write across the
+> boundary. Canonical detail: **`docs/AGENT_WORKFORCE.md`** (§4 bridge invariant, §7–8 isolation + safety).
+
 **Status:** design of record for the customer-facing opportunity lifecycle. Describes the
 **intended architecture** and grounds every stage in the **as-built** code (file:line refs).
 Anything not yet wired is marked **⚠ future** with the intended shape — the doc is honest about

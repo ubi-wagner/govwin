@@ -21,15 +21,15 @@ type Outcome = (typeof VALID_OUTCOMES)[number];
  * Records a win/loss/withdrawn outcome for a proposal.
  *
  * When outcome = 'awarded':
- *   - All library_units harvested from this proposal get elevated:
- *     outcome_score = 1.0, confidence = 1.0, tagged 'winning_proposal'
- *   - These atoms will rank highest in future library searches
+ *   - All library_atoms harvested from this proposal (origin_proposal_id) get
+ *     elevated: outcome_score = 1.0, confidence = 1.0
+ *   - These atoms will rank highest in future library selection
  *
  * When outcome = 'rejected':
- *   - Library_units get outcome_score = 0.3 (still usable but deprioritized)
+ *   - library_atoms get outcome_score = 0.3 (still usable but deprioritized)
  *
  * When outcome = 'withdrawn':
- *   - Library_units get outcome_score = 0.4 (neutral — content was valid, just not submitted)
+ *   - library_atoms get outcome_score = 0.4 (neutral — content was valid, just not submitted)
  *
  * This creates the learning loop: atoms from winning proposals surface
  * first in future drafts, improving quality over time.
@@ -173,10 +173,14 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     // ── Record outcome in a transaction ────────────────────────────
-    // Wrap proposal archive + library_units update in transaction
+    // Wrap proposal archive + library_atoms outcome update in transaction
     let atomsUpdated: number;
     try {
     atomsUpdated = await sql.begin(async (tx: any) => {
+      // Scope this transaction to the tenant so the FORCE-RLS library_atoms writes
+      // below pass the per-tenant policy (mirrors withTenant). Harmless for the
+      // proposals/stage-history writes under the current owner connection.
+      await tx`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
       // The proposals table doesn't have an 'outcome' column, so we
       // store it in the stage field (archive the proposal) and record
       // in stage_history with detailed notes.
@@ -205,61 +209,46 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
 
       // ── Update library atoms based on outcome ───────────────────────
+      // Elevate/deprioritize the derivative atoms harvested from this proposal,
+      // matched by origin_proposal_id. outcome_score drives future selection
+      // ranking (selectForSection). library_atoms has no `tags` column, so the
+      // 'winning_proposal' tag the legacy library_units path appended is dropped —
+      // outcome_score = 1.0 is what actually surfaces winners.
       let updated = 0;
 
       if (outcome === 'awarded') {
-        // Elevate all library atoms harvested from this proposal
         const result = await tx`
-          UPDATE library_units
+          UPDATE library_atoms
           SET outcome = 'awarded',
               outcome_score = 1.0,
-              confidence = 1.0,
-              tags = array_append(
-                array_remove(tags, 'winning_proposal'),
-                'winning_proposal'
-              )
-          WHERE original_proposal_id = ${proposalId}::uuid
+              confidence = 1.0
+          WHERE origin_proposal_id = ${proposalId}::uuid
             AND tenant_id = ${tenantId}::uuid
         `;
         updated = result.count;
       } else if (outcome === 'rejected') {
         const result = await tx`
-          UPDATE library_units
+          UPDATE library_atoms
           SET outcome = 'rejected',
               outcome_score = 0.3
-          WHERE original_proposal_id = ${proposalId}::uuid
+          WHERE origin_proposal_id = ${proposalId}::uuid
             AND tenant_id = ${tenantId}::uuid
         `;
         updated = result.count;
       } else if (outcome === 'withdrawn') {
         const result = await tx`
-          UPDATE library_units
+          UPDATE library_atoms
           SET outcome = 'withdrawn',
               outcome_score = 0.4
-          WHERE original_proposal_id = ${proposalId}::uuid
+          WHERE origin_proposal_id = ${proposalId}::uuid
             AND tenant_id = ${tenantId}::uuid
         `;
         updated = result.count;
       }
 
-      // Also record in library_atom_outcomes for audit trail
-      // Map to the existing check constraint values
-      const atomOutcomeValue = outcome === 'awarded' ? 'win' : outcome === 'rejected' ? 'loss' : 'pending';
-
-      // Get all library unit IDs for this proposal
-      const units = await tx<Array<{ id: string }>>`
-        SELECT id FROM library_units
-        WHERE original_proposal_id = ${proposalId}::uuid
-          AND tenant_id = ${tenantId}::uuid
-      `;
-
-      for (const unit of units) {
-        await tx`
-          INSERT INTO library_atom_outcomes (unit_id, proposal_id, outcome)
-          VALUES (${unit.id}, ${proposalId}::uuid, ${atomOutcomeValue})
-          ON CONFLICT (unit_id, proposal_id) DO NOTHING
-        `;
-      }
+      // NOTE: the legacy library_atom_outcomes audit-trail INSERT (a library_units
+      // satellite keyed on unit_id) is retired with this cutover — that satellite is
+      // dropped separately. outcome + outcome_score on library_atoms is the record.
 
       return updated;
     });

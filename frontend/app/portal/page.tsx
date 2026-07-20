@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
-import { getLandingPath, isRole, type Role } from '@/lib/rbac';
+import { getLandingPath, isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { getActiveMemberships } from '@/lib/memberships';
 
 /**
  * /portal — post-login traffic cop.
@@ -58,32 +59,29 @@ export default async function PortalDispatcher() {
     redirect('/login?error=session');
   }
 
+  // Multi-membership + landing (identity P2/P4). For a NON-ADMIN the landing company
+  // must be one where they hold an ACTIVE membership at a non-archived tenant — the JWT
+  // tenantSlug is only a hint (getActiveMemberships is authoritative, filtering revoked
+  // memberships AND archived companies). This is what keeps a DEACTIVATED or archived
+  // user out of a redirect loop: no active membership → no landing → the friendly
+  // message below. A not-yet-committed multi-membership user picks which company first.
+  // Admins land on the platform regardless of slug. See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
+  const dispatchUserId = (sessionUser as { id?: string }).id;
+  const dispatchPinned = (sessionUser as { membershipPinned?: boolean }).membershipPinned === true;
   let tenantSlug = sessionUser.tenantSlug ?? null;
 
-  // Validate the tenant still exists — the JWT may carry a stale slug
-  // from a deleted tenant (e.g., after a DB wipe for HITL testing).
-  if (tenantSlug) {
+  if (dispatchUserId && !hasRoleAtLeast(role, 'rfp_admin')) {
     try {
-      const [t] = await sql`SELECT slug FROM tenants WHERE slug = ${tenantSlug} AND status != 'suspended' LIMIT 1`;
-      if (!t) tenantSlug = null; // Tenant gone — treat as no workspace
-    } catch {
+      const memberships = await getActiveMemberships(dispatchUserId);
+      if (!dispatchPinned && memberships.length > 1) redirect('/select-company');
+      // Land at the JWT company iff it's still an active membership, else the first
+      // active one, else nothing (→ no-workspace / paused message).
+      const match = memberships.find((m) => m.tenantSlug === tenantSlug) ?? memberships[0] ?? null;
+      tenantSlug = match ? match.tenantSlug : null;
+    } catch (e) {
+      if ((e as { digest?: string } | null)?.digest?.startsWith('NEXT_REDIRECT')) throw e;
       tenantSlug = null;
     }
-  }
-
-  // If JWT has no tenant but user has one in DB (stale JWT), refresh
-  if (!tenantSlug && role !== 'master_admin' && role !== 'rfp_admin') {
-    try {
-      const userId = (sessionUser as { id?: string }).id;
-      if (userId) {
-        const [u] = await sql<{ slug: string }[]>`
-          SELECT t.slug FROM users u
-          JOIN tenants t ON t.id = u.tenant_id
-          WHERE u.id = ${userId}::uuid AND t.status != 'suspended'
-        `;
-        if (u) tenantSlug = u.slug;
-      }
-    } catch { /* best effort */ }
   }
 
   const target = getLandingPath(role, tenantSlug);
@@ -92,16 +90,34 @@ export default async function PortalDispatcher() {
     redirect(target);
   }
 
-  // No valid landing path — user is authenticated but has no tenant
-  // assigned. Render a message instead of looping.
+  // No valid landing path. Distinguish a company in license SLUMBER (archived) from a
+  // genuinely unlinked account, so the message is accurate. Render (never redirect from
+  // /portal to /portal) to stay loop-safe.
+  let companyArchived = false;
+  const jwtSlug = sessionUser.tenantSlug ?? null;
+  if (jwtSlug) {
+    try {
+      const [t] = await sql`SELECT 1 FROM tenants WHERE slug = ${jwtSlug} AND archived_at IS NOT NULL LIMIT 1`;
+      companyArchived = !!t;
+    } catch { /* fall back to the generic message */ }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900">No workspace assigned</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {companyArchived ? 'Access paused' : 'No workspace assigned'}
+        </h1>
         <p className="mt-3 text-sm text-gray-600">
-          You&apos;re signed in but your account isn&apos;t linked to a tenant
-          yet. Ask your administrator to grant you access, or contact
-          support if you think this is an error.
+          {companyArchived ? (
+            <>Your company&apos;s access is paused while its license is renewed. Your work
+            is safe and will be exactly where you left it once access is restored. Contact
+            your administrator or RFP Pipeline to reactivate.</>
+          ) : (
+            <>You&apos;re signed in but your account isn&apos;t linked to a tenant
+            yet. Ask your administrator to grant you access, or contact
+            support if you think this is an error.</>
+          )}
         </p>
         <div className="mt-6">
           <SignOutButton className="w-full rounded-md bg-gray-100 hover:bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-700" />

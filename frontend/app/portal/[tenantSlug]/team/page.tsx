@@ -4,6 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { TeamInviteForm } from '@/components/portal/team-invite-form';
+import { TeamMemberActions } from '@/components/portal/team-member-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,16 +58,21 @@ export default async function TeamPage({ params }: Props) {
 
   let members: TeamMember[] = [];
   try {
+    // Team members are the tenant's home/manual memberships (employees). isActive comes
+    // from the MEMBERSHIP status now, so a deactivated member still shows (badged), and
+    // their access follows the membership (verifyTenantAccess is membership-based).
     members = await sql<TeamMember[]>`
-      SELECT id, name, email, role, is_active, last_login_at, created_at
-      FROM users
-      WHERE tenant_id = ${tenantId}
+      SELECT u.id, u.name, u.email, m.role, (m.status = 'active') AS is_active,
+             u.last_login_at, u.created_at
+      FROM user_memberships m
+      JOIN users u ON u.id = m.user_id
+      WHERE m.tenant_id = ${tenantId} AND m.source IN ('home', 'manual')
       ORDER BY
-        CASE role WHEN 'tenant_admin' THEN 0 WHEN 'tenant_user' THEN 1 ELSE 2 END,
-        created_at ASC
+        CASE m.role WHEN 'tenant_admin' THEN 0 WHEN 'tenant_user' THEN 1 ELSE 2 END,
+        u.created_at ASC
     `;
   } catch (e) {
-    console.error('[portal/team] users query failed', e);
+    console.error('[portal/team] members query failed', e);
   }
 
   // ── Collaborators on active proposals ─────────────────────────────
@@ -137,6 +143,7 @@ export default async function TeamPage({ params }: Props) {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Last Login</th>
+                  {isAdmin && <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -165,6 +172,13 @@ export default async function TeamPage({ params }: Props) {
                           ? new Date(m.lastLoginAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                           : 'Never'}
                       </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-right">
+                          {m.id !== sessionUser.id && (
+                            <TeamMemberActions tenantSlug={tenantSlug} userId={m.id} active={m.isActive} />
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

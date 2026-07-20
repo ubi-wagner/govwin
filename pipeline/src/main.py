@@ -194,6 +194,11 @@ async def main() -> None:
             fabric=fabric,
             shutdown_event=shutdown_event,
         ),
+        # NOTE: scheduled (cron) triggers are handled by the SHARED cron manager
+        # (ingest.dispatcher.tick_schedules, run inside run_consumer_loop above) — one
+        # pipeline_schedules table, one processor, Eastern-baselined. Our-org scheduled
+        # work (ops digest, solicitation update-scan, content resurface, social scheduling)
+        # is seeded there as run_type='event' rows; no bespoke scheduler loop.
     )
 
     log.info("Pipeline worker stopped.")

@@ -65,12 +65,14 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
     const tenantId = ctx.tenantId;
     if (!tenantId) throw new ToolAuthorizationError('tenant context required');
 
+    // category/tags are no longer columns on the canonical library_atoms — the
+    // taxonomy lives in the atom_tags satellite, so both filters become EXISTS.
     const categoryFilter = input.category
-      ? sql`AND category = ${input.category}`
+      ? sql`AND EXISTS (SELECT 1 FROM atom_tags t WHERE t.atom_id = library_atoms.id AND t.value = ${input.category})`
       : sql``;
 
     const tagsFilter = input.tags && input.tags.length > 0
-      ? sql`AND tags && ${input.tags}::text[]`
+      ? sql`AND EXISTS (SELECT 1 FROM atom_tags t WHERE t.atom_id = library_atoms.id AND t.value = ANY(${input.tags}::text[]))`
       : sql``;
 
     const queryFilter = input.query
@@ -117,18 +119,18 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       SELECT
         id,
         content,
-        category,
-        subcategory,
-        tags,
+        NULL AS category,
+        NULL AS subcategory,
+        '{}'::text[] AS tags,
         confidence,
         outcome_score,
         outcome,
         status,
         usage_count,
-        source_type,
+        source AS source_type,
         created_at,
         updated_at
-      FROM library_units
+      FROM library_atoms
       WHERE tenant_id = ${tenantId}::uuid
         AND status = 'approved'
         ${categoryFilter}
@@ -141,7 +143,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       // Count query (same filters, no limit)
       const countRows = await sql<Array<{ count: string }>>`
         SELECT COUNT(*)::text AS count
-        FROM library_units
+        FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
           AND status = 'approved'
           ${categoryFilter}

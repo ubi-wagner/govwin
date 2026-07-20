@@ -1847,10 +1847,6 @@
                 "label": "Apply for Founding Cohort",
                 "href": "/apply"
               },
-              "ctaSecondary": {
-                "label": "Subscriber Login",
-                "href": "/login"
-              },
               "copyright": "© 2026 RFP Pipeline. All rights reserved."
             }
           }

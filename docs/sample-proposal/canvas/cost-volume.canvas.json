@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "document_id": "2cb4f834-e55b-4d35-ac15-6599083364e5",
+  "canvas": {
+    "format": "spreadsheet",
+    "width": 1200,
+    "height": 800,
+    "margins": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "header": null,
+    "footer": null,
+    "font_default": {
+      "family": "Calibri",
+      "size": 11
+    },
+    "line_spacing": 1,
+    "max_pages": null,
+    "max_slides": null
+  },
+  "nodes": [
+    {
+      "id": "0703d5f8-cbba-43eb-ba35-203d6bf9a273",
+      "type": "table",
+      "content": {
+        "sheet_name": "Direct Labor",
+        "headers": [
+          "Role / Name",
+          "Hourly rate",
+          "Hours",
+          "Amount"
+        ],
+        "rows": [
+          [
+            "Principal Investigator — Dr. Ellison",
+            {
+              "text": "95",
+              "cell_type": "currency",
+              "value": 95
+            },
+            {
+              "text": "360",
+              "cell_type": "number",
+              "value": 360
+            },
+            {
+              "text": "34200",
+              "cell_type": "currency",
+              "value": 34200
+            }
+          ],
+          [
+            "Senior Systems Engineer — Reyes",
+            {
+              "text": "78",
+              "cell_type": "currency",
+              "value": 78
+            },
+            {
+              "text": "440",
+              "cell_type": "number",
+              "value": 440
+            },
+            {
+              "text": "34320",
+              "cell_type": "currency",
+              "value": 34320
+            }
+          ],
+          [
+            "ML Engineer — Nandakumar",
+            {
+              "text": "62",
+              "cell_type": "currency",
+              "value": 62
+            },
+            {
+              "text": "312",
+              "cell_type": "number",
+              "value": 312
+            },
+            {
+              "text": "19340",
+              "cell_type": "currency",
+              "value": 19340
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — Direct Labor",
+              "style": {
+                "bold": true
+              }
+            },
+            "",
+            {
+              "text": "1112",
+              "cell_type": "number",
+              "value": 1112,
+              "style": {
+                "bold": true
+              }
+            },
+            {
+              "text": "87860",
+              "cell_type": "currency",
+              "value": 87860,
+              "style": {
+                "bold": true,
+                "bg": "#e0e7ff"
+              }
+            }
+          ]
+        ],
+        "header_style": {
+          "bg": "#1e293b",
+          "bold": true
+        }
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    },
+    {
+      "id": "34b10a7e-80fe-4095-9166-591c8af49ecb",
+      "type": "table",
+      "content": {
+        "sheet_name": "Budget Summary",
+        "headers": [
+          "Cost Category",
+          "Basis",
+          "Amount"
+        ],
+        "rows": [
+          [
+            "Direct Labor",
+            "PI + 2 engineers (1,112 hrs)",
+            {
+              "text": "87860",
+              "cell_type": "currency",
+              "value": 87860
+            }
+          ],
+          [
+            "Fringe Benefits",
+            "25% of direct labor",
+            {
+              "text": "21965",
+              "cell_type": "currency",
+              "value": 21965
+            }
+          ],
+          [
+            "Materials & Supplies",
+            "Edge compute kits (×2), hydrophones",
+            {
+              "text": "8000",
+              "cell_type": "currency",
+              "value": 8000
+            }
+          ],
+          [
+            "Travel",
+            "Kickoff + Phase I review (2 trips)",
+            {
+              "text": "4000",
+              "cell_type": "currency",
+              "value": 4000
+            }
+          ],
+          [
+            "Consultant",
+            "Acoustics SME (40 hrs @ $150)",
+            {
+              "text": "6000",
+              "cell_type": "currency",
+              "value": 6000
+            }
+          ],
+          [
+            {
+              "text": "Subtotal — Direct Costs",
+              "style": {
+                "bold": true
+              }
+            },
+            "",
+            {
+              "text": "127825",
+              "cell_type": "currency",
+              "value": 127825,
+              "style": {
+                "bold": true
+              }
+            }
+          ],
+          [
+            "Indirect (Overhead)",
+            "17.3% of modified total",
+            {
+              "text": "22175",
+              "cell_type": "currency",
+              "value": 22175
+            }
+          ],
+          [
+            {
+              "text": "TOTAL",
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "",
+              "style": {
+                "bg": "#dcfce7"
+              }
+            },
+            {
+              "text": "150000",
+              "cell_type": "currency",
+              "value": 150000,
+              "style": {
+                "bold": true,
+                "bg": "#dcfce7"
+              }
+            }
+          ]
+        ],
+        "header_style": {
+          "bg": "#1e293b",
+          "bold": true
+        }
+      },
+      "style": {},
+      "provenance": {
+        "source": "manual"
+      },
+      "history": [],
+      "library_eligible": false
+    }
+  ],
+  "metadata": {
+    "title": "Aerivio Cost Volume",
+    "volume_id": "",
+    "required_item_id": "",
+    "proposal_id": "",
+    "solicitation_id": "",
+    "created_at": "",
+    "last_modified_at": "",
+    "last_modified_by": "",
+    "version_number": 1,
+    "status": "ai_drafted"
+  }
+}
