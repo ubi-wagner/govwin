@@ -1,0 +1,120 @@
+{
+  "slug": "customer-admin",
+  "title": "Customer Admin Guide — Build a Winning Proposal",
+  "nav_title": "Proposal Build Guide",
+  "audience": "Customer Admin · tenant_admin",
+  "eyebrow": "govwin role guide · Customer Admin",
+  "hero": {
+    "h1": "Build a Winning Proposal, End-to-End",
+    "lede": [
+      "The customer's eight-step journey through the govwin proposal portal — from a ranked opportunity to a submission-ready, downloadable proposal.",
+      "Every step below was verified on a real effort: the <b>Immobileyes NAVAIR/NAVSEA Counter-UAS SBIR</b> (topic DON26BX03-NP002). The screenshots are that live run."
+    ],
+    "badge": "Verified end-to-end · every step through the platform's real tools & agents"
+  },
+  "footer": "govwin — RFP Pipeline Portal · Customer Admin role. Under-the-hood references (routes, tools, cores) are shown so the guide doubles as living documentation. Companion guides: RFP-Admin Operations, Collaborator.",
+  "sections": [
+    {
+      "id": "signin",
+      "toc": "1 · Sign in & your portal",
+      "heading": "Sign in & your portal",
+      "where": "/portal/<company>/dashboard",
+      "body": "<p>Sign in with the credentials your RFP-Pipeline admin issued. Your <b>dashboard</b> is role-aware: it opens on your company's workspace and surfaces your live <b>ToDos</b> — opportunities to review, proposals in progress, and anything waiting on you.</p>",
+      "img": "docs/manuals/img/tenant/portal-dashboard.png",
+      "caption": "The customer-admin landing: your workspace + role-aware ToDos."
+    },
+    {
+      "id": "cards",
+      "toc": "2 · Find your opportunity",
+      "heading": "Find your opportunity (ranked cards)",
+      "where": "/portal/<company>/cards",
+      "body": [
+        "<p>The <b>Opportunity Pipeline</b> shows every opportunity the platform has pushed to you, <b>ranked by your Spotlight buckets</b>. Each card carries the agency, program, and close date. <b>Pin</b> copies the solicitation's documents into your workspace; <b>Build</b> opens the proposal workspace.</p>",
+        "<p class='eg'>In the verified run, the NAVAIR/NAVSEA Counter-UAS topic <b>DON26BX03-NP002</b> ranks <b>#1</b> for Immobileyes — the best fit for a counter-drone optics company.</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/01-cards.png",
+      "caption": "The DON26BX03-NP002 C-UAS card ranked #1 in the Immobileyes pipeline."
+    },
+    {
+      "id": "buckets",
+      "toc": "3 · Set your scoring criteria",
+      "heading": "Set your scoring criteria (buckets)",
+      "where": "/portal/<company>/buckets",
+      "body": "<p><b>Spotlight buckets</b> are your scoring criteria — the themes you care about (e.g. “Counter-UAS”, “AI sensor fusion”). Every card is scored against each bucket, and editing a bucket <b>re-ranks your pipeline</b> automatically. This is deterministic today; an optional scoring agent overlays it later.</p>",
+      "img": "docs/manuals/img/tenant/portal-buckets.png",
+      "caption": "Buckets define what ranks to the top of your pipeline."
+    },
+    {
+      "id": "library",
+      "toc": "4 · Build your content library",
+      "heading": "Build your content library (upload → atomize)",
+      "where": "/portal/<company>/atoms  ·  Upload package → atomize-package",
+      "body": [
+        "<p>Your library is the raw material every draft is built from. On <b>Library → Upload package</b>, drop your past proposals, capability docs, résumés, and data (PDF, DOCX, PPTX, XLSX). The <b>atomizer</b> deconstructs each file into a <b>reference atom</b> (the whole doc) plus one <b>primitive atom</b> per substantive block, and <b>auto-tags</b> them against the shared taxonomy (volume, kind, agency, program, phase).</p>",
+        "<p class='eg'>Verified: five Immobileyes documents (GHOST draft, TACFI Technical Volume, résumés, foreign affiliations, cost proposal) atomized into <b>24 atoms</b> — tagged <span class='tag'>vol:technical</span> <span class='tag'>vol:cost</span> <span class='tag'>vol:key_personnel</span> <span class='tag'>kind:bio</span> and more. Each uploaded package also gets a <b>“Save as template”</b> button (templify) to reuse its winning structure.</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/faithful/A-atoms-real-atomizer.png",
+      "caption": "The real atomizer: 24 tagged atoms from five uploaded Immobileyes documents."
+    },
+    {
+      "id": "group",
+      "toc": "5 · Group & arrange atoms",
+      "heading": "Group atoms & arrange the canvas",
+      "where": "/portal/<company>/atoms  ·  section canvas → “+ From Library”",
+      "body": [
+        "<p>Atoms aren't just a flat list. In the library, <b>select</b> several primitives and <b>Group into new atom</b> to compose a reusable bundle — a “Team for Navy” group, a past-performance set. Inside a section, <b>“+ From Library”</b> inserts atoms straight into the canvas as nodes, and you <b>drag to reorder</b> them into the flow you want.</p>",
+        "<p class='eg'>Verified: three GHOST past-performance & partner primitives composed into one group, inserted into the <b>Related Work</b> section, then reordered on the canvas.</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/faithful/31-library-group-created.png",
+      "caption": "Composing primitives into a reusable group in the library."
+    },
+    {
+      "id": "matrix",
+      "toc": "6 · Open the proposal & matrix",
+      "heading": "Open the proposal & compliance matrix",
+      "where": "/portal/<company>/proposals/<id>",
+      "body": [
+        "<p>Opening a proposal provisions the full <b>compliance matrix</b> — every required volume and item the solicitation demands, each linked to a section “mold” that carries the format rules (page limit, margins, font). The specific agency <b>template</b> is built into the matrix, so the structure is correct before you write a word.</p>",
+        "<p class='eg'>Verified: the DON <b>6-volume CSO structure</b> (Cover · Technical · Cost · CCR · Supporting · FWA), with <b>Volume 2</b> aligned to the DON Phase-I Open-Topic <b>Technical Volume 2 template</b> (8 sections).</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/21-proposal-workspace.png",
+      "caption": "The 6-volume matrix; Volume 2 aligned to the DON TV2 template, ready to draft."
+    },
+    {
+      "id": "draft",
+      "toc": "7 · Draft with the AI agent",
+      "heading": "Draft each section with the AI agent",
+      "where": "proposal.draft_section  (“Draft all sections”)",
+      "body": [
+        "<p>Open a section and click <b>Draft</b> (or <b>Draft all sections</b>). The <b>drafting agent</b> reads the RFP context and the section's compliance mold, pulls the most relevant <b>atoms from your library</b>, and writes canvas content sized to the page budget — you review, pick atoms, and revise in the canvas editor. Nothing auto-commits: it's advisory until you accept.</p>",
+        "<p class='eg'>Verified: the <code>proposal.draft_section</code> agent tool ran on all <b>8 Technical-Volume sections</b>, grounded in the atomized library, applying its budget/fit check (≈ a 2-page, ~1,090-word target per section).</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/22-canvas-section.png",
+      "caption": "The canvas editor — draft, pick atoms, and revise each section."
+    },
+    {
+      "id": "lock",
+      "toc": "8 · Accept & Lock",
+      "heading": "Accept & Lock → the matrix turns green",
+      "where": "lockSectionCore  (Accept & Lock)",
+      "body": [
+        "<p>When a section is right, <b>Accept &amp; Lock</b> it. Locking flips its <b>compliance row to “satisfied,”</b> snapshots the version, harvests reusable content back into your library, and rolls the volume up. When every section of a volume is locked, the volume shows <b>✓ Volume locked</b> and downloads unlock.</p>",
+        "<p class='eg'>Verified: locking via <code>lockSectionCore</code> turned <b>10 matrix rows green</b> (8 Technical + 2 Cost). Volume 2 reads <b>“8/8 locked · 9/10 pages · ✓ Volume locked.”</b></p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/faithful/CD-workspace-cost-locked.png",
+      "caption": "Volumes locked; matrix satisfied; the Cost Volume built from a live-formula canvas."
+    },
+    {
+      "id": "export",
+      "toc": "9 · Export your downloadables",
+      "heading": "Export your downloadables",
+      "where": "Download Proposal (.docx) · Cost Volume (.xlsx)",
+      "body": [
+        "<p>With the volume locked, <b>Download</b> your deliverables. The <b>Technical Volume</b> exports to a submission-ready <b>.docx</b> (US-Letter, 1″ margins, the agency's fonts, figures inline and captioned). The <b>Cost Volume</b> exports to an <b>.xlsx</b> with <b>live formulas</b>.</p>",
+        "<p class='eg'>Verified deliverables: a <b>10-page Technical Volume .docx</b> (6 figures, 5 tables, all 8 DON TV2 sections) and a <b>Cost Volume .xlsx</b> — Base <b>$199,502 ≤ $200k</b>, Option <b>$114,464 ≤ $115k</b>, formulas live.</p>"
+      ],
+      "img": "docs/manuals/img/deliverable/tvp_1.png",
+      "caption": "Page 1 of the exported Technical Volume — rendered by the system from your locked canvas."
+    }
+  ]
+}

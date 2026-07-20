@@ -1,5 +1,13 @@
 # Role Guides — Build Notes (prep for the morning)
 
+> **BUILT.** The three guides are live and data-driven. Content lives in
+> `docs/manuals/guides/{rfp-admin,customer-admin,collaborator}.json` (+ `_manifest.json`);
+> `python3 docs/manuals/build_guides.py` regenerates each `<slug>.html` (indexed, screenshots
+> embedded), its `<slug>.pdf` (Chromium print), the `index.html` landing page, and a combined
+> single-file `manuals.html` (the shareable web view). **Edit the JSON, re-run the builder** —
+> nobody hand-edits the HTML. Entry point: `docs/manuals/index.html`. The pre-session
+> `ADMIN_OPERATIONS_MANUAL.html` / `CUSTOMER_PORTAL_MANUAL.html` are superseded (kept for history).
+
 Planning artifact for the three indexed, clickable, screenshot-rich help files. Ground truth:
 route list captured from `frontend/app/**`, and the capabilities we shipped this session
 (see "What changed this session"). Build the guides against the CURRENT system, not the

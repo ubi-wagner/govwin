@@ -1,0 +1,32 @@
+{
+  "title": "govwin Role Guides",
+  "eyebrow": "govwin — RFP Pipeline Portal",
+  "lede": "Three indexed, screenshot-grounded walkthroughs — one per role. Every step is anchored to a real route and a real tool, captured from a live end-to-end run (the Immobileyes NAVAIR/NAVSEA Counter-UAS SBIR, topic DON26BX03-NP002).",
+  "footer": "Each guide is generated from an editable JSON content file in docs/manuals/guides/ — change the data, re-run docs/manuals/build_guides.py, and the HTML + PDF regenerate. govwin, 2026.",
+  "guides": [
+    {
+      "slug": "rfp-admin",
+      "nav_label": "RFP-Admin Operations",
+      "role": "master_admin · rfp_admin",
+      "blurb": "Run the platform: monitor sources, ingest and curate RFPs, push opportunities, release purchases, and oversee every workflow and agent.",
+      "chips": ["Ingest & curate", "Release & provision", "Workflows & agents", "Shadow-descend"],
+      "cover": "docs/manuals/img/admin/admin-dashboard.png"
+    },
+    {
+      "slug": "customer-admin",
+      "nav_label": "Customer-Admin Proposal Build",
+      "role": "tenant_admin",
+      "blurb": "Your company's journey: rank opportunities, build a content library, draft a proposal from your atoms, lock the matrix, and export submission-ready files.",
+      "chips": ["Ranked cards", "Library & atoms", "Draft & lock", "Export docx / xlsx"],
+      "cover": "docs/manuals/img/tenant/portal-cards.png"
+    },
+    {
+      "slug": "collaborator",
+      "nav_label": "Collaborator Guide",
+      "role": "partner_user",
+      "blurb": "Invited to a single proposal, scoped to what you're granted: open the workspace, contribute in the canvas, comment, and track your assignments.",
+      "chips": ["Scoped access", "Canvas contribute", "Comment & suggest", "My ToDos"],
+      "cover": "docs/manuals/img/collab/collab-dashboard.png"
+    }
+  ]
+}

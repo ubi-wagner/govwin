@@ -1,0 +1,164 @@
+{
+  "slug": "rfp-admin",
+  "title": "RFP-Admin Operations Guide — Run the Platform",
+  "nav_title": "RFP-Admin Operations",
+  "audience": "RFP Admin · master_admin / rfp_admin",
+  "eyebrow": "govwin role guide · RFP Admin",
+  "hero": {
+    "h1": "Run the Platform, End-to-End",
+    "lede": [
+      "The operator's journey: monitor sources, ingest and curate RFPs, push opportunities to customers, release their purchases, and oversee every workflow and agent from one console.",
+      "Screenshots are the live admin console. Where a customer's work needs a hand, you <b>shadow-descend</b> into their portal, do the work, and rise back up to ingest more — all as one account."
+    ],
+    "badge": "master_admin holds global access · every action is audited"
+  },
+  "footer": "govwin — RFP Pipeline Portal · RFP-Admin role. Canonical automation surface is /admin/workflows; /admin/process (event monitor) and /admin/processes (instance ledger) are legacy views of the same runs. Companion guides: Customer-Admin, Collaborator.",
+  "sections": [
+    {
+      "id": "signin",
+      "toc": "1 · Sign in & admin landing",
+      "heading": "Sign in & the admin landing",
+      "where": "/admin  ·  sign in as eric@rfppipeline.com",
+      "body": [
+        "<p>Sign in as your RFP-admin account. The landing is <b>role-aware</b>: it opens the operations console with your live <b>ToDos</b> — purchases awaiting curation, RFPs mid-triage, and workflows parked on a human gate.</p>",
+        "<p class='eg'>The seeded operator <code>eric@rfppipeline.com</code> is a <b>master_admin</b>: global access to every tenant plus the full admin surface. No per-tenant grant needed — it can dip into any company and rise back up to ingest.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-dashboard.png",
+      "caption": "The admin operations landing with role-aware ToDos."
+    },
+    {
+      "id": "sources",
+      "toc": "2 · Setup: source monitoring",
+      "heading": "Setup — source monitoring & scouts",
+      "where": "/admin/sources · /admin/sources/<id> · /admin/scouts",
+      "body": [
+        "<p>Before anything is ingested, point the platform at where opportunities live. <b>Sources</b> defines the sites and feeds to watch; <b>Scouts</b> is the worker pool that visits them on a schedule, diffs the results, and surfaces new or changed solicitations. Configure regions to watch, run a scout on demand, and review the diffs.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-sources.png",
+      "caption": "Source monitoring profiles — the watched feeds that scouts sweep."
+    },
+    {
+      "id": "scouts",
+      "toc": "3 · Scout worker pool",
+      "heading": "The scout worker pool",
+      "where": "/admin/scouts",
+      "body": "<p>The <b>scout pool</b> shows each worker, its schedule, last run, and yield. Scouts run managed and audited — a run that fails on one source continues on the others. Newly discovered solicitations land in the intake queue for triage.</p>",
+      "img": "docs/manuals/img/admin/admin-scouts.png",
+      "caption": "The scout worker pool — scheduled discovery across all sources."
+    },
+    {
+      "id": "upload",
+      "toc": "4 · Ingest an RFP",
+      "heading": "Ingest — upload an RFP",
+      "where": "/admin/rfp-curation/upload",
+      "body": [
+        "<p>To bring a solicitation in by hand, use <b>Upload</b>. Drop the solicitation PDF(s); the ingestor extracts text (with an ingest-assist pass), de-duplicates against existing solicitations, and stages the documents in object storage. It handles multi-document packages and marks a primary.</p>",
+        "<p class='note'>Malformed source PDFs (odd fonts, embedded control characters) are sanitized on the way in — the atomizer and ingestor strip invalid bytes so a bad file can't poison downstream text.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-rfp-upload.png",
+      "caption": "Uploading a solicitation package into curation."
+    },
+    {
+      "id": "curate",
+      "toc": "5 · Curate: triage → topics → matrix",
+      "heading": "Curate — triage, topics, compliance, skeleton",
+      "where": "/admin/rfp-curation · /admin/rfp-curation/<solId> · .../topic/<topicId>",
+      "body": [
+        "<p>Curation is the heart of the operator's work. Open a solicitation to <b>triage</b> it, extract its <b>topics</b> (umbrella + every sub-topic), attach the <b>compliance</b> requirements (from a preset or suggested), and build the section <b>skeleton</b> that becomes each proposal's matrix. Apply a preset to one topic or fan it to all.</p>",
+        "<p class='eg'>Verified on DON26BX03-NP002: triaged, topics extracted, the DON 6-volume CSO compliance attached, and the Technical Volume 2 skeleton linked to its template mold.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-rfp-curation.png",
+      "caption": "The curation workspace — triage, topics, compliance, and skeleton."
+    },
+    {
+      "id": "templates",
+      "toc": "6 · Templates & molds studio",
+      "heading": "Templates & molds studio",
+      "where": "/admin/templates · /admin/templates/<id>/edit",
+      "body": [
+        "<p>The <b>Template Studio</b> is where section molds live — the format contracts (page limit, margins, font, required structure) a required item points at. Author a template on the canvas, or <b>templify</b> a winning past proposal into a reusable skeleton, then attach it to a compliance item so every provisioned proposal inherits the right shape.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-templates.png",
+      "caption": "The Template Studio — section molds and templified skeletons."
+    },
+    {
+      "id": "push",
+      "toc": "7 · Push to Spotlight",
+      "heading": "Push opportunities to customers",
+      "where": "/admin/opportunities · /admin/cards",
+      "body": [
+        "<p>When a solicitation is curated, <b>push</b> it. The push fans <b>every activated opportunity</b> (umbrella + all topics) across the forward-only opportunity bridge into a denormalized card for every tenant, auto-scored against each tenant's buckets on arrival. This is the discovery release — customers now see the opportunity ranked in their pipeline.</p>",
+        "<p class='eg'>Verified: the C-UAS topic pushed to Immobileyes ranked #1 in their pipeline within the same run.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-opportunities.png",
+      "caption": "Activated opportunities — the push fans them onto every tenant's cards."
+    },
+    {
+      "id": "purchases",
+      "toc": "8 · Purchases → release",
+      "heading": "Purchases & the curation release (72h SLA)",
+      "where": "/admin/purchases · /admin/applications",
+      "body": [
+        "<p>When a customer buys a proposal portal with a comp code, it lands in <b>Purchases</b> as <code>curation_pending</code> with a <b>72-hour SLA</b>. You <b>release</b> it from the shadow account: releasing provisions the build <b>unlocked</b> and instantiates the compliance matrix + molds from the master solicitation. This is the second release over the bridge — the proposal-portal build.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-purchases.png",
+      "caption": "The purchase queue — comp-code buys awaiting curation release."
+    },
+    {
+      "id": "workflows",
+      "toc": "9 · Monitor: workflows",
+      "heading": "Monitor — the workflow catalog & instances",
+      "where": "/admin/workflows",
+      "body": [
+        "<p>Every automation runs as a <b>managed workflow</b> — no fire-and-forget. <b>Workflows</b> is the canonical control surface: the roster of templates with an activation toggle, plus live instances with a per-step progress bar, transition timeline, and outcomes. A step that fails continues on independent branches; a <b>human gate</b> (HITL / ToDo) parks the instance until you advance it.</p>",
+        "<p>From an instance you can <b>advance</b>, <b>retry</b>, or <b>cancel</b>. A paused instance shows exactly which gate it's waiting on and who it's assigned to.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-workflows.png",
+      "caption": "The workflow catalog + live instances — see and control every automation."
+    },
+    {
+      "id": "agents",
+      "toc": "10 · Monitor: agent workforce",
+      "heading": "Monitor — the agent workforce",
+      "where": "/admin/agents · /admin/guardrail-defaults",
+      "body": [
+        "<p><b>Agents</b> is the workforce roster: each archetype, whether it's awake, and its per-tenant usage over the forward-only bridge. Tenant-space agents are <b>tenant-bound</b> and <b>advisory</b> — they propose, a guardrail checks, and a human accepts; they never auto-write business tables. <b>Guardrail defaults</b> sets the safety envelope (round/cost/rate/budget caps) every agent runs inside.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-agents.png",
+      "caption": "The agent workforce roster with per-tenant usage."
+    },
+    {
+      "id": "observability",
+      "toc": "11 · Monitor: events & automation",
+      "heading": "Monitor — events, automation, processes",
+      "where": "/admin/events · /admin/automation · /admin/process · /admin/processes",
+      "body": [
+        "<p>Cross-board observability: <b>Events</b> is the immutable stream (every state-changing action emits start→end); <b>Automation</b> is the rules engine with its run logs; <b>Process</b> / <b>Processes</b> are event-based monitors of active instances. Use these to answer “what happened, when, and did it finish?” for any run on either side of the bridge.</p>",
+        "<p class='note'>Naming overlap to know: <code>/admin/process</code> (event monitor), <code>/admin/processes</code> (instance ledger), and <code>/admin/workflows</code> (canonical) view the same runs. Treat <b>/admin/workflows</b> as primary.</p>"
+      ],
+      "img": "docs/manuals/img/admin/admin-automation.png",
+      "caption": "The automation rules engine and its run logs."
+    },
+    {
+      "id": "system",
+      "toc": "12 · Monitor: system & analytics",
+      "heading": "Monitor — system state & analytics",
+      "where": "/admin/system-state · /admin/analytics · /admin/storage",
+      "body": "<p><b>System state</b> is the health board (services, storage, migrations); <b>Analytics</b> rolls up usage across tenants and opportunities. Together they tell you the platform is healthy and where the activity is.</p>",
+      "img": "docs/manuals/img/admin/admin-system-state.png",
+      "caption": "The system-state health board."
+    },
+    {
+      "id": "tenants",
+      "toc": "13 · Tenants & shadow-descend",
+      "heading": "Tenants oversight & shadow-descend",
+      "where": "/admin/tenants · /admin/tenants/<id>",
+      "body": [
+        "<p><b>Tenants</b> is the roster of every company on the platform. From a tenant you can review its state, backfill its cards, and — the operator's superpower — <b>shadow-descend</b> into its portal to do work on its behalf (build a library, draft a section, unstick a proposal), then rise back up to the admin surface to ingest more. The session rewrites to <b>tenant_admin</b> inside the portal and a shadow banner marks the descent; every action stays audited.</p>",
+        "<p class='eg'>Verified: <code>eric@rfppipeline.com</code> descends into <code>/portal/immobileyes/*</code> (shadow banner shown), works the proposal, and returns to <code>/admin</code>. One account, both jobs.</p>"
+      ],
+      "img": "docs/manuals/img/hitl/shadow-descend.png",
+      "caption": "Shadow-descend: the RFP admin working inside the Immobileyes portal, banner shown."
+    }
+  ]
+}

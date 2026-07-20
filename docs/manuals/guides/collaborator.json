@@ -1,0 +1,93 @@
+{
+  "slug": "collaborator",
+  "title": "Collaborator Guide — Contribute to a Proposal",
+  "nav_title": "Collaborator Guide",
+  "audience": "Collaborator · partner_user",
+  "eyebrow": "govwin role guide · Collaborator",
+  "hero": {
+    "h1": "Contribute to a Proposal, Scoped to You",
+    "lede": [
+      "You've been invited to help on one proposal. This guide is your whole world in the platform: what you can open, how you contribute in the canvas, and where your assignments live.",
+      "Collaborators are <b>stage-scoped</b> — your grant is per-proposal and per-permission (view, comment, or edit). You see exactly what you were invited to, and nothing else."
+    ],
+    "badge": "Scoped access · your grant is enforced by the platform"
+  },
+  "footer": "govwin — RFP Pipeline Portal · Collaborator role. Your access is granted per proposal by that company's admin and can be adjusted or revoked at any time. Companion guides: Customer-Admin, RFP-Admin Operations.",
+  "sections": [
+    {
+      "id": "invite",
+      "toc": "1 · Accept your invite",
+      "heading": "Accept your invite & sign in",
+      "where": "deep-linked invite email → /login",
+      "body": [
+        "<p>You'll receive a <b>deep-linked invite email</b> from the company that wants your help. Following it sets up your account and drops you at sign-in. Once in, your identity is tied to that company as a <b>collaborator</b> on the specific proposal(s) you were added to.</p>",
+        "<p class='note'>An invite is per-proposal. If you're invited to more than one, you'll pick which company/workspace is active when you sign in (one email can hold several memberships).</p>"
+      ],
+      "img": "docs/manuals/img/collab/collab-landing.png",
+      "caption": "The collaborator landing after accepting an invite."
+    },
+    {
+      "id": "landing",
+      "toc": "2 · Your scoped landing",
+      "heading": "Your landing — only your assigned work",
+      "where": "/portal/<company>/proposals",
+      "body": [
+        "<p>Unlike a customer admin, your home is the <b>proposals list scoped to you</b> — the platform redirects you straight to the work you were invited to. You won't see the company's full dashboard, its whole pipeline, or its library; you see your assignments.</p>",
+        "<p class='eg'>Captured behavior: a collaborator opening the dashboard or activity is redirected to <code>/portal/&lt;company&gt;/proposals</code>. If nothing's assigned yet, you'll see the empty assigned-work state until an admin adds you to a proposal.</p>"
+      ],
+      "img": "docs/manuals/img/collab/collab-dashboard.png",
+      "caption": "The scoped landing — the proposals you're invited to, and only those."
+    },
+    {
+      "id": "open",
+      "toc": "3 · Open the workspace",
+      "heading": "Open the proposal workspace",
+      "where": "/portal/<company>/proposals/<id>",
+      "body": "<p>Open a proposal to see its <b>compliance matrix</b> and sections. What's actionable depends on your grant: with <b>view</b> you can read the state and the drafts; with <b>comment</b> or <b>edit</b>, the section canvas opens for you to contribute. Locked sections are read-only for everyone.</p>",
+      "img": "docs/manuals/img/collab/collab-activity.png",
+      "caption": "Inside a proposal — sections and activity, scoped to your grant."
+    },
+    {
+      "id": "contribute",
+      "toc": "4 · Contribute in the canvas",
+      "heading": "Contribute in the canvas",
+      "where": "/portal/<company>/proposals/<id>/sections/<sectionId>",
+      "body": [
+        "<p>If your grant includes <b>edit</b>, open an unlocked section and work in the same <b>canvas editor</b> the customer uses — headings, text, lists, tables, and images as structured nodes. Your edits save to the shared draft; the section owner reviews and, when it's right, <b>Accept &amp; Locks</b> it.</p>",
+        "<p class='note'>You contribute to drafts — you don't lock volumes or export the final package. Those are the customer admin's controls. Once a section is locked it's read-only.</p>"
+      ],
+      "img": "docs/proposals/immobileyes-cuas/img/22-canvas-section.png",
+      "caption": "The canvas editor — the same surface you contribute in, per your edit grant."
+    },
+    {
+      "id": "comment",
+      "toc": "5 · Comment & suggest",
+      "heading": "Comment & suggest",
+      "where": "section canvas → comments",
+      "body": "<p>With a <b>comment</b> grant (or alongside edit), leave <b>comments</b> on a section to raise questions, suggest changes, or sign off. Comments thread against the section and can be resolved by the owner. This is how a reviewer contributes without changing the draft directly.</p>",
+      "img": "docs/manuals/img/collab/collab-activity.png",
+      "caption": "Comments and activity thread against the section you're helping on."
+    },
+    {
+      "id": "todos",
+      "toc": "6 · Your ToDos",
+      "heading": "Track your assignments",
+      "where": "/portal/<company>/proposals  (assigned work)",
+      "body": "<p>Your assignments surface as <b>ToDos</b> on your scoped landing — sections waiting on your edit, comments awaiting your reply, reviews assigned to you. Work them down; when a section you own is accepted and locked, it drops off your list.</p>",
+      "img": "docs/manuals/img/collab/collab-dashboard.png",
+      "caption": "Your assignments and ToDos, scoped to the proposals you're on."
+    },
+    {
+      "id": "scope",
+      "toc": "7 · What you can't see",
+      "heading": "Scope boundaries — what's out of reach",
+      "where": "redirects / access checks",
+      "body": [
+        "<p>By design, a collaborator <b>cannot</b> see the company's library and atoms, its Spotlight buckets, its billing, or opportunities it hasn't invited you to. Navigating to those routes redirects you back to your proposals. This keeps the company's book of business private while still letting you do the work you were brought in for.</p>",
+        "<p class='note'>Access is a living grant: an admin can widen it (view → comment → edit), narrow it, or <b>revoke</b> it. If your access to a company ends, your collaborator membership there is removed — cleanly, without touching any other company you collaborate with.</p>"
+      ],
+      "img": "docs/manuals/img/collab/collab-landing.png",
+      "caption": "Scope enforced: collaborators are redirected to their assigned work."
+    }
+  ]
+}
