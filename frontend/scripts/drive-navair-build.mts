@@ -140,6 +140,17 @@ function sections() {
         ['Eye-safety and FAA constraints on CONUS employment', 'FAA-aware graduated escalation (warn/deter first); OSHA laser-safety controls; non-kinetic-first doctrine'],
         ['Integration risk with Navy sensors and C2', 'MOSA / detection-agnostic interfaces; reuse of fielded STORM sensor integrations'],
       ], 'Risks'),
+      H(2, 'Phase I Schedule & Milestones'),
+      TBL(['Milestone / Deliverable', 'Month', 'Task'], [
+        ['Kick-Off Briefing', 'M1', 'Task 1'],
+        ['System architecture + STORM/DEXTER interface defined', 'M3', 'Task 2'],
+        ['Progress Report', 'M3', 'Task 2'],
+        ['EO-camera optical-effects bench data + comparison analysis', 'M5', 'Task 3'],
+        ['Final Technical Report', 'M6', 'Task 4'],
+        ['Initial Phase II Proposal', 'M6', 'Task 4'],
+        ['Breadboard optical-effects demonstration (Option)', 'M10', 'Task 5'],
+        ['Phase II prototype + NAVAIR/NAVSEA transition package (Option)', 'M12', 'Task 6'],
+      ], 'Milestones'),
     ]},
     { key: 'Related Work', nodes: [
       H(1, '1.3  Related Work'),
@@ -151,6 +162,7 @@ function sections() {
         B('Demonstrated effect. A 450 nm blue optical effect was demonstrated against a drone camera at 200 m in prior work—direct evidence for the Phase I optical-perturbation hypothesis (Figure 3).'),
         B('Intellectual property. Immobileyes holds issued U.S. Patents 11,519,701 and 11,686,560 (plus international application WO2025122941A1), extending the Navy seeker-confusion patents (8,305,252; 8,212,709) this effort applies.'),
       ]),
+      P('This lineage means GHOST does not start at a blank sheet: the STORM detection/tracking stack, the DEXTER liquid-crystal beam router, and the graduated-escalation engagement doctrine are already integrated and field-demonstrated at TRL 5 against Group 1–2 UAS. Phase I therefore concentrates the effort where the technical risk actually is—characterizing and quantifying the optical-perturbation effect against EO-guided fiber-optic seekers—rather than re-developing mature subsystems, which is why a 6-month feasibility effort can credibly retire the key uncertainty and hand a defined prototype baseline to Phase II.'),
     ]},
     { key: 'Defense Need', nodes: [
       H(1, '1.4  Defense Need'),
