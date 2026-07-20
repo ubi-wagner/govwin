@@ -44,3 +44,6 @@ services/cms/static/
 .idea/
 *.swp
 .claude/
+
+# Local scratch/working directory (transient: logs, figure crops, working notes)
+scratchpad/
