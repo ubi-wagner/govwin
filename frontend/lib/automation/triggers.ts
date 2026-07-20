@@ -53,10 +53,13 @@ export async function evaluateAutomationRules(event: AutomationEvent): Promise<E
     `;
     if (rules.length === 0) return out;
 
+    const evId = event.eventId ?? null;
     for (const rule of rules) {
       try {
-        if (!conditionsMatch(rule.conditions, event.payload)) { out.skipped++; continue; }
-
+        // Every decision is now recorded — suppression is observable, not silent.
+        if (!conditionsMatch(rule.conditions, event.payload)) {
+          out.skipped++; await logSkip(rule.id, evId, rule.actionType, 'condition_unmet'); continue;
+        }
         // Cooldown: a recent successful fire within the window suppresses this one.
         if (rule.cooldownMinutes > 0) {
           const [recent] = await sql<Array<{ one: number }>>`
@@ -64,7 +67,7 @@ export async function evaluateAutomationRules(event: AutomationEvent): Promise<E
             WHERE rule_id = ${rule.id}::uuid AND status = 'success'
               AND executed_at > now() - (${rule.cooldownMinutes} || ' minutes')::interval
             LIMIT 1`;
-          if (recent) { out.skipped++; continue; }
+          if (recent) { out.skipped++; await logSkip(rule.id, evId, rule.actionType, 'cooldown'); continue; }
         }
         // Hourly rate limit.
         if (rule.maxFiresPerHour > 0) {
@@ -72,24 +75,37 @@ export async function evaluateAutomationRules(event: AutomationEvent): Promise<E
             SELECT count(*)::int AS n FROM automation_log
             WHERE rule_id = ${rule.id}::uuid AND status = 'success'
               AND executed_at > now() - interval '1 hour'`;
-          if (n >= rule.maxFiresPerHour) { out.skipped++; continue; }
+          if (n >= rule.maxFiresPerHour) { out.skipped++; await logSkip(rule.id, evId, rule.actionType, 'rate_limit'); continue; }
         }
 
-        const cfg = (rule.actionConfig ?? {}) as Record<string, unknown>;
-        if (EXECUTABLE.has(rule.actionType)) {
-          await executeTodoAction(rule.actionType, cfg, event);
-          out.fired++;
-          await logAutomation(rule.id, event.eventId ?? null, rule.actionType, 'success', 'fired', { name: rule.name });
-        } else {
-          // Recorded so the automation is observable, but not executed here.
-          out.deferred++;
-          await logAutomation(rule.id, event.eventId ?? null, rule.actionType, 'deferred', 'recorded', { name: rule.name });
+        // START-ROW: the rule execution is now observable IN-FLIGHT. A crash between
+        // here and finalize leaves a durable status='running' row (a reconciler sweep
+        // can find it), instead of a committed action with no record. (automation_log is
+        // the durable audit — written directly, NOT via emitEventSingle, so evaluating a
+        // rule never recursively re-enters the automation engine.)
+        const logId = await logStart(rule.id, evId, rule.actionType);
+        try {
+          const cfg = (rule.actionConfig ?? {}) as Record<string, unknown>;
+          if (EXECUTABLE.has(rule.actionType)) {
+            await executeTodoAction(rule.actionType, cfg, event);
+            out.fired++;
+            await logFinalize(logId, 'success', 'fired', { name: rule.name });
+          } else {
+            // Recorded so the automation is observable, but not executed here.
+            out.deferred++;
+            await logFinalize(logId, 'deferred', 'recorded', { name: rule.name });
+          }
+        } catch (execErr) {
+          out.skipped++;
+          await logFinalize(logId, 'error', 'failed', {
+            error: execErr instanceof Error ? execErr.message : String(execErr),
+          }).catch(() => {});
         }
       } catch (ruleErr) {
+        // The rule bookkeeping itself failed (e.g. logStart) — best-effort record.
         out.skipped++;
-        await logAutomation(rule.id, event.eventId ?? null, rule.actionType, 'error', 'failed', {
-          error: ruleErr instanceof Error ? ruleErr.message : String(ruleErr),
-        }).catch(() => {});
+        await logSkip(rule.id, evId, rule.actionType,
+          ruleErr instanceof Error ? `bookkeeping_error:${ruleErr.message}` : 'bookkeeping_error').catch(() => {});
       }
     }
   } catch {
@@ -121,16 +137,32 @@ async function executeTodoAction(
   `;
 }
 
-async function logAutomation(
-  ruleId: string,
-  triggerEventId: string | null,
-  actionType: string,
-  status: string,
-  actionTaken: string,
-  result: Record<string, unknown>,
+/** START-ROW: record the execution as 'running' and return its id to finalize later. */
+async function logStart(ruleId: string, triggerEventId: string | null, actionType: string): Promise<string> {
+  const [row] = await sql<Array<{ id: string }>>`
+    INSERT INTO automation_log (rule_id, trigger_event_id, action_type, status, action_taken, result)
+    VALUES (${ruleId}::uuid, ${triggerEventId}::uuid, ${actionType}, 'running', 'started', ${sql.json({})})
+    RETURNING id`;
+  return row.id;
+}
+
+/** Finalize a started execution to its terminal state (success / deferred / error). */
+async function logFinalize(
+  logId: string, status: string, actionTaken: string, result: Record<string, unknown>,
+): Promise<void> {
+  await sql`
+    UPDATE automation_log
+    SET status = ${status}, action_taken = ${actionTaken}, result = ${sql.json(result as JsonArg)}, executed_at = now()
+    WHERE id = ${logId}::uuid`;
+}
+
+/** Log a SKIPPED execution (condition/cooldown/rate-limit) with its reason — suppression
+ *  is now observable instead of silently dropped. One terminal row, no start needed. */
+async function logSkip(
+  ruleId: string, triggerEventId: string | null, actionType: string, reason: string,
 ): Promise<void> {
   await sql`
     INSERT INTO automation_log (rule_id, trigger_event_id, action_type, status, action_taken, result)
-    VALUES (${ruleId}::uuid, ${triggerEventId}::uuid, ${actionType}, ${status}, ${actionTaken}, ${sql.json(result as JsonArg)})
+    VALUES (${ruleId}::uuid, ${triggerEventId}::uuid, ${actionType}, 'skipped', 'skipped', ${sql.json({ reason })})
   `;
 }
