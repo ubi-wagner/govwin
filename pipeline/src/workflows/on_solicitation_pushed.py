@@ -6,24 +6,24 @@ Workflow: OnSolicitationPushed
 TRIGGER:    finder:solicitation.pushed:single
             Condition: None (fires for all pushes)
 
-PURPOSE:    After an rfp_admin curates and pushes a solicitation to the
-            customer Spotlight pipeline, this workflow scores the solicitation
-            against all tenants with active subscriptions and notifies
-            matching tenants that new opportunities are available. This is
-            the bridge between admin curation and customer discovery — it
-            ensures every relevant customer sees new RFPs promptly.
+PURPOSE:    After an rfp_admin curates and pushes a solicitation, the frontend
+            opportunity-bridge has already created a tenant_opportunity_card per
+            tenant and auto-scored it (tenant_bucket_scores) on arrival. This
+            workflow READS those canonical scores to resolve which tenants have a
+            strong (priority) card and emails them the "new opportunities" digest.
+            It is the email nudge layered over the in-app cards surface — scoring
+            itself is owned by the bridge, not this workflow.
 
 STEPS:
     1. find_matching_tenants (ACTION)
-       Action: pipeline.scoring.match_tenants
+       Action: workflows.actions.score_tenants.match_tenants
        Input: solicitation_id, topic_count from event payload
-       Output: tenantIds[], tenantsScored, tenantsNotified, avgScore
+       Output: tenantIds[], opportunitiesConsidered, tenantsNotified
        Retry: 0
        Timeout: 5 minutes
-       On Failure: If tenant scoring fails for one tenant, the action
-                   continues with remaining tenants (per-tenant error
-                   handling in score_tenants.py). If entire step fails,
-                   log error and skip notification.
+       On Failure: Reads canonical scores only; a DB error returns status=error
+                   (audited via scoring.completed:end) and the digest simply has
+                   no recipients — never a dead-end.
        Event Emitted: system:workflow.step_completed (single)
 
     2. send_spotlight_digest (NOTIFY)
@@ -44,19 +44,18 @@ HITL GATES:
 ERROR HANDLING:
     - Step failure: Log error, emit system:workflow.step_failed event,
       continue to next independent step
-    - Per-tenant scoring failure: Handled inside score_tenants.py — one
-      tenant failing does not block scoring for others
-    - Notification failure: Logged but does not affect scoring data already
-      written to tenant_pipeline_items
+    - Recipient resolution: match_tenants reads canonical tenant_bucket_scores;
+      it writes nothing, so there is no partial-write to recover.
+    - Notification failure: Logged; the tenant still sees the opportunity in
+      their in-app cards surface (the digest is a supplementary email).
     - Workflow failure: Emit system:workflow.failed event with full context
     - Database failure: Retry once, then fail step with error event
 
 FAULT TOLERANCE:
-    - Idempotent: YES — score_tenants uses ON CONFLICT (tenant_id,
-      opportunity_id) DO UPDATE, so re-scoring overwrites rather than
-      duplicates. Spotlight items are upserted safely.
-    - Partial completion: If scoring succeeds but notification fails,
-      tenants still see the opportunity in their pipeline (just no email).
+    - Idempotent: YES — read-only. Re-running just re-resolves the same recipient
+      list from the current canonical scores; no rows are written or duplicated.
+    - Partial completion: N/A (no writes). If notification fails the tenant still
+      sees the opportunity in their cards surface (just no email).
     - Duplicate detection: Processor-level dedup by trigger_event_id.
     - Batch processing: Large tenant sets processed in batches (DB query
       returns all at once, but scoring loops are per-tenant with individual
