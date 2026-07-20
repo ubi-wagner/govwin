@@ -123,3 +123,45 @@ the lifecycle.
 3. Customer Admin guide (extend CUSTOMER_PORTAL_MANUAL.html + buckets/scoring + cards spine).
 4. Collaborator guide (new, from scratch — smallest).
 5. Cross-link the three + a shared index page; embed the gap map.
+
+---
+
+## Screenshot capture — DONE (overnight run), reproducible recipe
+
+Captured **36** authenticated full-page PNGs to `docs/manuals/img/{admin,tenant,collab}/`
+(20 admin + 13 tenant + 3 collab), app served on :3000 by the heartbeat. Recipe:
+
+```bash
+export DATABASE_URL='postgresql://claude@127.0.0.1:5433/govtech_intel'
+export NODE_PATH=/home/user/govwin/frontend/node_modules
+# 1. Seed accounts (admin + Lighthouse/Ubihere tenants + backfill 48 cards)
+node scripts/seed_dev_accounts.mjs
+# 2. Refresh Playwright auth state (personas: admin / lighthouse / collaborator)
+cd frontend && npx playwright test --project=setup
+# 3. Capture (skip the setup dep once auth is fresh)
+npx playwright test e2e/zzscreens.admin.spec.ts  --project=admin  --no-deps
+npx playwright test e2e/zzscreens.tenant.spec.ts --project=tenant --no-deps
+npx playwright test e2e/zzcollab.tenant.spec.ts  --project=tenant --no-deps
+```
+
+### ⚠️ Two seed/onboarding gaps found + fixed in the sandbox (flag for the morning + #143)
+1. **`seed_dev_accounts.mjs` creates tenant_admins with `users.tenant_id` (fused, for login)
+   but NO `user_memberships` row** — the PORTAL resolves the workspace from
+   `user_memberships` (the canonical multi-membership path, #110/#115), so a seeded
+   tenant_admin hits **"No workspace assigned"** on every `/portal/*` route. Fixed in-sandbox
+   by inserting the membership. The seed script (and possibly the real tenant-admin onboarding
+   path) should create the membership alongside the fused columns. **Worth verifying the live
+   signup flow doesn't have the same gap.**
+2. **Collaborator login needs the fused `users.role` + `users.tenant_id`** set (auth.ts's
+   `findUserByEmail` reads them for the JWT) in addition to the membership — a membership
+   alone isn't enough to log in.
+
+### Collaborator scope (captured behavior)
+A `partner_user` is redirected to `/portal/<slug>/proposals` from `/dashboard` and `/activity`
+— i.e. the scope boundary is enforced by redirect. The 3 collab captures document that
+scoped landing (Lighthouse has 0 proposals, so it shows the empty assigned-work state — a
+fuller walkthrough needs a seeded proposal + an accepted invite).
+
+### Capture spec files (keepers, in frontend/e2e/)
+`zzscreens.admin.spec.ts`, `zzscreens.tenant.spec.ts`, `zzcollab.tenant.spec.ts` — re-runnable
+to refresh shots after UI changes.
