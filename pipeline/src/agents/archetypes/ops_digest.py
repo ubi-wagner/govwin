@@ -13,8 +13,9 @@ SCOPE:      PLATFORM (master_admin ops). Reads CROSS-TENANT AGGREGATES
             authority — tenant_id is None, so the fabric runs it on the bypass
             connection (NOT the NOBYPASS pool, which would deny cross-tenant rows).
 
-TRIGGERS:   system.ops.digest_requested  (emitted on a schedule by the pipeline
-            main loop — see run_ops_digest_scheduler in main.py)
+TRIGGERS:   system.ops.digest_requested  (emitted on a schedule by the SHARED cron
+            manager — a run_type='event' row in pipeline_schedules, ticked by
+            ingest.dispatcher.tick_schedules, Eastern-baselined)
 
 INJECTION:  Reads AGGREGATE COUNTS/METRICS only — no untrusted free text enters
             the prompt — so there is no prompt-injection surface. (If a future

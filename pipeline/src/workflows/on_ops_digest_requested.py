@@ -4,9 +4,11 @@ Workflow: OnOpsDigestRequested  (POD 4 — first SCHEDULED admin automation)
 ================================================================================
 
 TRIGGER:    system:ops.digest_requested:single
-            Emitted on a schedule by run_ops_digest_scheduler (pipeline main loop)
-            — NOT by a user action. The workflow engine is otherwise event-only;
-            this is the bridge from "on a schedule" to "an event fires".
+            Emitted on a schedule by the SHARED cron manager (a run_type='event' row
+            in pipeline_schedules, ticked by ingest.dispatcher.tick_schedules,
+            Eastern-baselined) — NOT by a user action. The workflow engine is
+            otherwise event-only; the cron manager is the bridge from "on a
+            schedule" to "an event fires", used for every scheduled workflow.
 
 PURPOSE:    Compile and deliver the periodic ops health digest to the master_admin:
             agent-workforce usage, pipeline health (triage backlog, curation-pending,
@@ -29,8 +31,9 @@ SAFETY:
     - No dead-end: unmapped/failed AI_INVOKE = safe skip; notify is independent.
 
 ADMIN NOTES:
-    - Cadence tunable via OPS_DIGEST_INTERVAL_HOURS (default 24h). Single-replica
-      assumption; the processor dedups by trigger_event_id.
+    - Cadence is the `cron_expression` on the pipeline_schedules row
+      (source='system:ops.digest_requested', run_type='event'), Eastern-baselined.
+      Single-replica assumption; the processor dedups by trigger_event_id.
 
 CHANGE LOG:
     #131 (POD 4) — Initial implementation: scheduled ops digest.

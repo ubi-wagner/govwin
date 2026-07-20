@@ -58,13 +58,17 @@ def test_pre_release_qa_gate_workflow():
     assert steps["notify_reviewer"].depends_on is None
 
 
-def test_scheduled_ops_digest_workflow_and_scheduler():
+def test_scheduled_ops_digest_workflow_and_shared_cron():
     t = OnOpsDigestRequested.trigger
     assert t.namespace == "system" and t.type == "ops.digest_requested" and t.phase == "single"
     steps = {s.name: s for s in OnOpsDigestRequested.steps}
     assert steps["ai_ops_digest"].step_type == StepType.AI_INVOKE
     assert steps["ai_ops_digest"].action == "tool.ops.digest"
     assert steps["notify_master_admin"].depends_on is None
-    # the scheduled trigger emitter exists in the pipeline main loop
-    import main
-    assert hasattr(main, "run_ops_digest_scheduler")
+    # The scheduled trigger runs on the SHARED cron manager (ingest.dispatcher.tick_schedules)
+    # — run_type='event' schedules emit the event → the workflow processor runs the workflow.
+    # No bespoke scheduler loop; UTC canonical.
+    from ingest import dispatcher
+    import inspect
+    src = inspect.getsource(dispatcher.tick_schedules)
+    assert 'run_type"] == "event"' in src and "system_events" in src
