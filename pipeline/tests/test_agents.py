@@ -59,6 +59,9 @@ EXPECTED_ARCHETYPES = {
     "amendment_monitor",
     "cost_estimator",
     "pp_matcher",
+    # POD 4 (#130-131) — our-org RFP-admin ops
+    "curation_qa",
+    "ops_digest",
 }
 
 

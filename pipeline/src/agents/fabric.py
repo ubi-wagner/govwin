@@ -65,12 +65,14 @@ from .archetypes import (
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
     CostEstimatorArchetype,
+    CurationQaArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
     OpportunityScoutArchetype,
+    OpsDigestArchetype,
     OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
@@ -92,12 +94,14 @@ _ARCHETYPE_CLASSES = [
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
     CostEstimatorArchetype,
+    CurationQaArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
     OpportunityScoutArchetype,
+    OpsDigestArchetype,
     OutcomeAnalystArchetype,
     PackagingSpecialistArchetype,
     PartnerCoordinatorArchetype,
@@ -370,18 +374,21 @@ class AgentFabric:
         db = conn
 
         try:
-            # #120: bind the agent to its tenant for the duration. Prefer the dedicated
+            # #120: bind a TENANT agent to its tenant for the duration. Prefer the dedicated
             # NOBYPASSRLS pool (RLS actually enforces); else set the GUC on the caller conn
             # (inert under a bypass role, correct the moment the role is switched). Always
             # reset in `finally` so a shared/pooled connection is never left tenant-scoped.
-            pool = await self._get_agent_pool()
-            if pool is not None:
-                agent_db = await pool.acquire()
-                db = agent_db
-            await db.execute(
-                "SELECT set_config('app.tenant_id', $1, false)",
-                str(tenant_id) if tenant_id else "",
-            )
+            #
+            # PLATFORM-scope agents (tenant_id is None — scout/ingest/matrix/skeleton/amendment/
+            # curation_qa/ops_digest) run at OUR authority on master + cross-tenant aggregate data;
+            # they must NOT use the NOBYPASS pool, because an empty app.tenant_id would make RLS
+            # deny every tenant row. They stay on the caller (bypass) connection.
+            if tenant_id:
+                pool = await self._get_agent_pool()
+                if pool is not None:
+                    agent_db = await pool.acquire()
+                    db = agent_db
+                await db.execute("SELECT set_config('app.tenant_id', $1, false)", str(tenant_id))
 
             # 2-3. Cost-control guard. Effective limits resolve as:
             #   tenant override -> platform default -> hardcoded constant.

@@ -126,6 +126,71 @@ async def run_agent_task_consumer(
     log.info("agent task queue consumer stopped")
 
 
+# ---------------------------------------------------------------------------
+# POD 4: Ops-digest scheduler — the first SCHEDULED (cron-shaped) trigger
+# ---------------------------------------------------------------------------
+
+async def run_ops_digest_scheduler(
+    database_url: str,
+    shutdown_event: asyncio.Event,
+    interval_hours: float | None = None,
+) -> None:
+    """Periodically emit ``system:ops.digest_requested:single`` so the workflow processor
+    runs OnOpsDigestRequested → the ops_digest agent → NOTIFY master_admin.
+
+    The workflow engine is otherwise EVENT-ONLY (EventTrigger has no cron); this scheduler
+    is the bridge from "on a schedule" to "an event fires". Sleeps the interval FIRST so a
+    deploy restart never spams an immediate digest. Single-replica assumption, like the other
+    schedulers (the processor dedups by trigger_event_id regardless). Configurable via
+    OPS_DIGEST_INTERVAL_HOURS (default 24; floored at 5 min for safety)."""
+    import asyncpg as _asyncpg
+    import uuid as _uuid
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz
+
+    try:
+        hours = interval_hours if interval_hours is not None else float(
+            os.getenv("OPS_DIGEST_INTERVAL_HOURS", "24")
+        )
+    except ValueError:
+        hours = 24.0
+    interval = max(300.0, hours * 3600.0)
+    log.info("ops digest scheduler started (every %.1fh)", hours)
+
+    while not shutdown_event.is_set():
+        # Sleep the interval BEFORE emitting (no digest storm on restart).
+        try:
+            await asyncio.wait_for(shutdown_event.wait(), timeout=interval)
+            break  # shutdown requested
+        except asyncio.TimeoutError:
+            pass
+
+        conn = None
+        try:
+            conn = await _asyncpg.connect(database_url)
+            await conn.execute(
+                """
+                INSERT INTO system_events
+                    (id, namespace, type, phase, actor_type, actor_id, payload, created_at)
+                VALUES ($1, 'system', 'ops.digest_requested', 'single', 'system', 'scheduler', $2::jsonb, $3)
+                """,
+                _uuid.uuid4(),
+                _json.dumps({"correlationId": str(_uuid.uuid4()), "scheduled": True}),
+                _dt.now(_tz.utc),
+            )
+            log.info("emitted system:ops.digest_requested")
+        except Exception as exc:
+            log.error("ops digest scheduler emit failed: %s", exc)
+        finally:
+            if conn is not None:
+                try:
+                    await conn.close()
+                except Exception:
+                    pass
+
+    log.info("ops digest scheduler stopped")
+
+
 def handle_signal(sig: signal.Signals) -> None:
     log.info("Received %s, shutting down...", sig.name)
     shutdown_event.set()
@@ -192,6 +257,11 @@ async def main() -> None:
         run_agent_task_consumer(
             database_url=DATABASE_URL,
             fabric=fabric,
+            shutdown_event=shutdown_event,
+        ),
+        # POD 4: scheduled (cron-shaped) trigger for the ops_digest agent.
+        run_ops_digest_scheduler(
+            database_url=DATABASE_URL,
             shutdown_event=shutdown_event,
         ),
     )

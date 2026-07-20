@@ -6,12 +6,14 @@ from .capture_strategist import CaptureStrategistArchetype
 from .color_team_reviewer import ColorTeamReviewerArchetype
 from .compliance_reviewer import ComplianceReviewerArchetype
 from .cost_estimator import CostEstimatorArchetype
+from .curation_qa import CurationQaArchetype
 from .ingest_analyst import IngestAnalystArchetype
 from .librarian import LibrarianArchetype
 from .matrix_stager import MatrixStagerArchetype
 from .onboarding_agent import OnboardingAgentArchetype
 from .opportunity_analyst import OpportunityAnalystArchetype
 from .opportunity_scout import OpportunityScoutArchetype
+from .ops_digest import OpsDigestArchetype
 from .outcome_analyst import OutcomeAnalystArchetype
 from .packaging_specialist import PackagingSpecialistArchetype
 from .partner_coordinator import PartnerCoordinatorArchetype
@@ -28,12 +30,14 @@ __all__ = [
     "ColorTeamReviewerArchetype",
     "ComplianceReviewerArchetype",
     "CostEstimatorArchetype",
+    "CurationQaArchetype",
     "IngestAnalystArchetype",
     "LibrarianArchetype",
     "MatrixStagerArchetype",
     "OnboardingAgentArchetype",
     "OpportunityAnalystArchetype",
     "OpportunityScoutArchetype",
+    "OpsDigestArchetype",
     "OutcomeAnalystArchetype",
     "PackagingSpecialistArchetype",
     "PartnerCoordinatorArchetype",
