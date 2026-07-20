@@ -61,12 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         VALUES (${g.tenantId}::uuid, ${body.name!}, ${body.description ?? null}, ${sql.json(criteria as Parameters<typeof sql.json>[0])}, ${g.userId}::uuid)
         RETURNING id`,
     );
+    // A new bucket changes the tenant's OPP list → the pipeline OnBucketsUpdated
+    // workflow deterministically rescores every open card against all active buckets
+    // (tenant-side, event-driven). tenantId in the payload keys the rescore.
     await emitEventSingle({
       namespace: 'capture',
-      type: 'bucket.created',
+      type: 'buckets.updated',
       actor: userActor(g.userId, g.email ?? undefined),
       tenantId: g.tenantId,
-      payload: { bucketId: row.id, name: body.name },
+      payload: { tenantId: g.tenantId, bucketId: row.id, action: 'created', name: body.name },
     });
     return NextResponse.json({ data: { id: row.id } });
   } catch (err) {

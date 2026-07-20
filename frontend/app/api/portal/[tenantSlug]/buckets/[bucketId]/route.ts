@@ -13,7 +13,6 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { rankBucket } from '@/lib/bucket-ranking';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 async function gate(tenantSlug: string, bucketId: string, minRole: Role) {
@@ -63,8 +62,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     if (new URL(request.url).searchParams.get('action') !== 'rank') {
       return NextResponse.json({ error: 'Unknown action (use ?action=rank)', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    const { ranked } = await rankBucket(g.tenantId, bucketId, Date.now());
-    return NextResponse.json({ data: { ranked } });
+    // Manual "rank now" → emit buckets.updated; the pipeline OnBucketsUpdated workflow
+    // does the deterministic rescore tenant-side (scoring is no longer inline here).
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'buckets.updated',
+      actor: userActor(g.userId, g.email ?? undefined),
+      tenantId: g.tenantId,
+      payload: { tenantId: g.tenantId, bucketId, action: 'ranked' },
+    });
+    return NextResponse.json({ data: { queued: true } });
   } catch (err) {
     console.error('[portal/buckets/:id] rank error', err);
     return NextResponse.json({ error: 'Rank failed', code: 'DB_ERROR' }, { status: 500 });
@@ -87,16 +94,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
         WHERE tenant_id = ${g.tenantId}::uuid AND id = ${bucketId}::uuid
       `;
     });
-    // Re-rank against the (possibly) new criteria.
-    const { ranked } = await rankBucket(g.tenantId, bucketId, Date.now());
+    // The criteria changed → emit buckets.updated; the pipeline OnBucketsUpdated
+    // workflow rescores every open card against all active buckets (tenant-side,
+    // event-driven — scoring is no longer inline here).
     await emitEventSingle({
       namespace: 'capture',
-      type: 'bucket.updated',
+      type: 'buckets.updated',
       actor: userActor(g.userId, g.email ?? undefined),
       tenantId: g.tenantId,
-      payload: { bucketId },
+      payload: { tenantId: g.tenantId, bucketId, action: 'edited' },
     });
-    return NextResponse.json({ data: { updated: true, ranked } });
+    return NextResponse.json({ data: { updated: true } });
   } catch (err) {
     console.error('[portal/buckets/:id] PATCH error', err);
     return NextResponse.json({ error: 'Update failed', code: 'DB_ERROR' }, { status: 500 });

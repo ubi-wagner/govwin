@@ -247,18 +247,11 @@ export const solicitationPushTool = defineTool<Input, Output>({
       throw err;
     }
 
-    await emitEventSingle({
-      namespace: 'finder',
-      type: 'solicitation.pushed',
-      actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
-      payload: {
-        correlationId: randomUUID(),
-        solicitationId,
-        opportunityId: r.opportunityId,
-        namespace: r.namespace,
-        topicCount,
-      },
-    });
+    // NOTE: finder:solicitation.pushed is emitted AFTER the bridge fan-out below, not
+    // here. The fan-out emits capture:card.applied per tenant, which the pipeline's
+    // OnCardApplied workflow turns into a tenant-side rescore. Emitting the push event
+    // last gives card.applied an EARLIER created_at, so the sequential managed-poll
+    // scores every card BEFORE OnSolicitationPushed's digest reads tenant_bucket_scores.
 
     // 5b. Publish EVERY activated opportunity to the forward-only bridge + fan out
     // a thin card to every subscribed tenant (greenfield opportunity-card spine,
@@ -288,6 +281,21 @@ export const solicitationPushTool = defineTool<Input, Output>({
     } catch (bridgeErr) {
       ctx.log?.warn?.({ msg: 'bridge publish/fan-out failed (non-fatal)', solicitationId, err: bridgeErr instanceof Error ? bridgeErr.message : String(bridgeErr) });
     }
+
+    // 5c. Emit finder:solicitation.pushed LAST (after the fan-out's card.applied events)
+    // so the OnSolicitationPushed digest reads freshly-scored tenant_bucket_scores.
+    await emitEventSingle({
+      namespace: 'finder',
+      type: 'solicitation.pushed',
+      actor: { type: 'user', id: actorId, email: ctx.actor.email ?? undefined },
+      payload: {
+        correlationId: randomUUID(),
+        solicitationId,
+        opportunityId: r.opportunityId,
+        namespace: r.namespace,
+        topicCount,
+      },
+    });
 
     // 6. HITL memory write — the BIG one. Push is the final curation
     // signal; file it as a curator memory so §H's read side picks up
