@@ -55,7 +55,7 @@ import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import anthropic
 
@@ -351,7 +351,32 @@ class AgentFabric:
         # Resolve archetype
         archetype = self._archetypes.get(archetype_name)
         if not archetype:
-            return {"status": "error", "reason": f"Unknown archetype: {archetype_name}"}
+            # NO silent failure: an unknown archetype is still an observable invocation.
+            # Emit a tool:agent.invoked start→end (error) pair + a terminal agent_task_log
+            # row before returning, so the attempt is reconstructable from the DB (was a
+            # silent early return with no event and no audit row).
+            reason = f"Unknown archetype: {archetype_name}"
+            try:
+                sid = await self._emit_event(
+                    conn, namespace="tool", event_type="agent.invoked", phase="start",
+                    tenant_id=tenant_id,
+                    payload={"archetype": archetype_name, "tenantId": tenant_id,
+                             "taskType": context.get("type", "unknown")},
+                )
+                await self._emit_event(
+                    conn, namespace="tool", event_type="agent.invoked", phase="end",
+                    parent_event_id=sid or None, tenant_id=tenant_id,
+                    payload={"archetype": archetype_name, "status": "error",
+                             "stage": "resolve", "error": reason},
+                )
+                await self._log_task(
+                    conn, tenant_id=tenant_id, agent_role=archetype_name,
+                    task_type=context.get("type", "unknown"),
+                    status="error", error=reason,
+                )
+            except Exception as exc:
+                logger.error("[invoke_agent] unknown-archetype audit failed: %s", exc)
+            return {"status": "error", "reason": reason}
 
         # 1. Emit start event
         start_event_id = await self._emit_event(
@@ -1221,13 +1246,23 @@ class AgentFabric:
         cost_usd: float = 0.0,
         memories_written: int = 0,
         error: str | None = None,
+        status: str | None = None,
+        guardrail_decision: str | None = None,
     ) -> None:
         """Insert a row into agent_task_log for audit and billing.
 
         G1: platform/system invocations (tenant_id is None) ARE logged now —
         with a NULL tenant_id — so platform_monthly_cap and the admin usage views
         account for their spend (previously they were silently skipped).
+
+        #149: the row carries the outcome lifecycle (status + started_at + completed_at +
+        guardrail_decision, mig 120) so an invocation's terminal state — and its guardrail
+        verdict — is reconstructable from the DB, not just implied by `error IS NULL`.
+        status defaults from `error` when not passed (completed / failed).
         """
+        resolved_status = status or ("failed" if error else "completed")
+        completed = datetime.now(timezone.utc)
+        started = completed - timedelta(milliseconds=max(duration_ms, 0))
         try:
             await conn.execute(
                 """
@@ -1235,12 +1270,14 @@ class AgentFabric:
                     (id, tenant_id, agent_role, task_type, trigger_event,
                      proposal_id, section_id, input_tokens, output_tokens,
                      tool_calls_count, duration_ms, cost_usd,
-                     memories_written, error, created_at)
+                     memories_written, error, status, guardrail_decision,
+                     started_at, completed_at, created_at)
                 VALUES
                     ($1, $2, $3, $4, $5,
                      $6, $7, $8, $9,
                      $10, $11, $12,
-                     $13, $14, now())
+                     $13, $14, $15, $16,
+                     $17, $18, $18)
                 """,
                 uuid.uuid4(),
                 uuid.UUID(tenant_id) if tenant_id else None,
@@ -1256,6 +1293,10 @@ class AgentFabric:
                 cost_usd,
                 memories_written,
                 error,
+                resolved_status,
+                guardrail_decision,
+                started,
+                completed,
             )
         except Exception as exc:
             logger.error("[_log_task] failed to log agent task: %s", exc)
