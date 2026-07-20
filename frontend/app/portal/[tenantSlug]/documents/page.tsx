@@ -173,7 +173,7 @@ export default async function DocumentsPage({ params }: Props) {
     console.error('[portal/documents] supporting docs query failed', e);
   }
 
-  // ── 3. Library Items (from library_units WHERE source_type = 'upload') ─
+  // ── 3. Library Items (from library_atoms WHERE source = 'upload') ─
   interface LibraryRow {
     id: string;
     title: string | null;
@@ -186,10 +186,11 @@ export default async function DocumentsPage({ params }: Props) {
   let libraryItems: LibraryRow[] = [];
   try {
     libraryItems = await sql<LibraryRow[]>`
-      SELECT id, heading_text AS title, source_type, source_type AS content_type, source_storage_key AS storage_key, created_at
-      FROM library_units
+      SELECT id, title, source AS source_type, source AS content_type,
+             source_anchor->>'storageKey' AS storage_key, created_at
+      FROM library_atoms
       WHERE tenant_id = ${tenantId}
-        AND source_type = 'upload'
+        AND source = 'upload'
       ORDER BY created_at DESC
       LIMIT 100
     `;

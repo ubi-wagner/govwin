@@ -145,3 +145,46 @@ export async function harvestSectionToAtomLibrary(
   );
   return atomId;
 }
+
+/**
+ * Return EVERY accepted section of a locked proposal to the greenfield atom
+ * library (`library_atoms`) — the whole-proposal counterpart to
+ * harvestSectionToAtomLibrary, called on first lock. Loads the proposal's
+ * sections and returns each via harvestSectionToAtomLibrary (best-effort per
+ * section — one section's failure never aborts the rest). Returns
+ * harvested/skipped counts, shape-compatible with the legacy
+ * `harvestProposalToLibrary` the lock route previously used.
+ */
+export async function harvestProposalToAtomLibrary(
+  tenantId: string,
+  proposalId: string,
+  actorId: string,
+): Promise<{ atomsHarvested: number; atomsSkipped: number }> {
+  let sections: Array<{ id: string }>;
+  try {
+    sections = await withTenant<Array<{ id: string }>>(tenantId, async (tx) =>
+      tx`
+        SELECT id FROM proposal_sections
+        WHERE proposal_id = ${proposalId}::uuid
+        ORDER BY section_number
+      `,
+    );
+  } catch (err) {
+    console.error('[atom-harvest] failed to load proposal sections:', err);
+    return { atomsHarvested: 0, atomsSkipped: 0 };
+  }
+
+  let atomsHarvested = 0;
+  let atomsSkipped = 0;
+  for (const s of sections) {
+    try {
+      const atomId = await harvestSectionToAtomLibrary(tenantId, proposalId, s.id, actorId);
+      if (atomId) atomsHarvested += 1;
+      else atomsSkipped += 1;
+    } catch (err) {
+      console.error(`[atom-harvest] section ${s.id} return failed (non-fatal):`, err);
+      atomsSkipped += 1;
+    }
+  }
+  return { atomsHarvested, atomsSkipped };
+}

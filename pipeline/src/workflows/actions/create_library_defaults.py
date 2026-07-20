@@ -33,9 +33,8 @@ ERROR HANDLING:
     - DB connection errors: Propagate to processor for step-level handling
 
 TENANT ISOLATION:
-    - Strictly tenant-scoped: all library_units rows include tenant_id
-    - Reads existing categories only for the target tenant
-    - Creates new rows only for the target tenant
+    - Retired no-op: writes nothing (the legacy per-tenant library_units
+      category-seed rows are gone; the canonical library is library_atoms)
     - No cross-tenant data access
 
 EVENT EMISSIONS:
@@ -121,12 +120,17 @@ async def create_default_categories(
 
     # Validate tenant_id format
     try:
-        tenant_uuid = uuid.UUID(tenant_id)
+        uuid.UUID(tenant_id)
     except (ValueError, TypeError):
         log.error("create_default_categories: invalid tenant_id: %s", tenant_id)
         return {"status": "skipped", "reason": "invalid_tenant_id"}
 
-    # Emit start event
+    # RETIRED (library cutover): the legacy per-tenant library_units category-seed
+    # rows are gone. The canonical library is library_atoms, whose taxonomy lives in
+    # the atom_tags satellite (dimension/value) rather than a per-row `category`
+    # column — so there is nothing to seed here. This action is now a safe no-op so
+    # the OnApplicationAccepted workflow step never dead-ends; the library.defaults
+    # events are still emitted (with zero counts) for continuity/observability.
     start_event_id = ""
     try:
         start_event_id = await emit_event(
@@ -137,69 +141,18 @@ async def create_default_categories(
     except Exception as exc:
         log.error("create_default_categories: failed to emit start event: %s", exc)
 
-    # 1. Verify tenant exists
-    try:
-        tenant_row = await conn.fetchval(
-            "SELECT id FROM tenants WHERE id = $1",
-            tenant_uuid,
-        )
-    except Exception as exc:
-        log.error("create_default_categories: failed to verify tenant: %s", exc)
-        return {"status": "skipped", "reason": f"db_error: {exc}"}
-
-    if tenant_row is None:
-        return {"status": "skipped", "reason": "tenant_not_found"}
-
-    # 2. Check existing categories for this tenant
-    try:
-        existing_rows = await conn.fetch(
-            "SELECT DISTINCT category FROM library_units WHERE tenant_id = $1",
-            tenant_uuid,
-        )
-        existing_categories = {row["category"] for row in existing_rows}
-    except Exception as exc:
-        log.error("create_default_categories: failed to fetch existing categories: %s", exc)
-        existing_categories = set()
-
-    # 3. For each default category not already present, insert a seed
-    #    library_unit. source_type='ai' is the closest valid option for
-    #    system-generated content (CHECK constraint allows: manual, upload,
-    #    harvest, ai). The seed unit acts as a category marker -- users
-    #    add real content units into these categories over time.
-    created = 0
-    skipped = 0
-    for cat in DEFAULT_CATEGORIES:
-        if cat["name"] in existing_categories:
-            skipped += 1
-            continue
-        try:
-            await conn.execute(
-                """INSERT INTO library_units
-                     (id, tenant_id, category, content,
-                      source_type, status, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, 'ai', 'approved', now(), now())""",
-                uuid.uuid4(),
-                tenant_uuid,
-                cat["name"],
-                cat["description"],
-            )
-            created += 1
-        except Exception as e:
-            log.warning(
-                "failed to create default category '%s' for tenant %s: %s",
-                cat["name"], tenant_id, e,
-            )
-
     duration_ms = int((time.monotonic() - start_ms) * 1000)
     try:
         await emit_event(
             conn, namespace="library", type="defaults.created", phase="end",
             parent_event_id=start_event_id,
             tenant_id=tenant_id,
-            payload={"tenantId": tenant_id, "categoriesCreated": created,
-                     "categoriesSkipped": skipped, "durationMs": duration_ms},
+            payload={"tenantId": tenant_id, "categoriesCreated": 0,
+                     "categoriesSkipped": 0, "durationMs": duration_ms,
+                     "reason": "library_units_retired"},
         )
     except Exception as exc:
         log.error("create_default_categories: failed to emit end event: %s", exc)
 
-    return {"categoriesCreated": created, "categoriesSkipped": skipped}
+    return {"status": "skipped", "reason": "library_units_retired",
+            "categoriesCreated": 0, "categoriesSkipped": 0}

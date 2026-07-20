@@ -476,7 +476,7 @@ class ContextAssembler:
     async def _load_library_atoms(
         self, conn, tenant_id: str, *, task_data: dict | None = None,
     ) -> str:
-        """Load top-N relevant library_units atoms for the tenant.
+        """Load top-N relevant library_atoms for the tenant.
 
         When EMBEDDINGS_PROVIDER is active, ranks atoms by cosine similarity
         to the task/proposal context text extracted from task_data.
@@ -503,8 +503,9 @@ class ContextAssembler:
                 vec_str = "[" + ",".join(str(v) for v in query_vec) + "]"
                 rows = await conn.fetch(
                     """
-                    SELECT id, content, category, subcategory, usage_count, updated_at
-                    FROM library_units
+                    SELECT id, content, NULL AS category, NULL AS subcategory,
+                           usage_count, updated_at
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
                     ORDER BY embedding <=> $2::vector
@@ -518,8 +519,9 @@ class ContextAssembler:
                 # DEFAULT-OFF: recency path (unchanged from original)
                 rows = await conn.fetch(
                     """
-                    SELECT id, content, category, subcategory, usage_count, updated_at
-                    FROM library_units
+                    SELECT id, content, NULL AS category, NULL AS subcategory,
+                           usage_count, updated_at
+                    FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
                     ORDER BY usage_count DESC, updated_at DESC

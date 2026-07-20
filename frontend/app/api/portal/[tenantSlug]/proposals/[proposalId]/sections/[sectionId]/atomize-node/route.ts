@@ -16,7 +16,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
-import { harvestNodeToLibrary } from '@/lib/proposal-harvest';
+import { createAtom, type AtomTagInput } from '@/lib/atoms';
 
 export async function POST(
   request: Request,
@@ -97,27 +97,35 @@ export async function POST(
     if (!body.text || typeof body.text !== 'string' || body.text.trim().length < 20) {
       return NextResponse.json({ error: 'text is required (min 20 chars of content)', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
-    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => typeof t === 'string') : [];
-
-    // ---------- Harvest the node ----------
+    // ---------- Create an atom from the accepted node ----------
+    // Node-level accept crystallizes ONE primitive atom in the canonical library
+    // (library_atoms), tagged so it is immediately selectable for the next mold.
     let result: { unitId: string | null; deduped: boolean };
     try {
-      result = await harvestNodeToLibrary(
+      const nodeTags: AtomTagInput[] = [
+        { dimension: 'kind', value: 'narrative', source: 'auto', confirmed: true },
+        ...(body.sectionType
+          ? [{ dimension: 'vol', value: body.sectionType, source: 'auto', confirmed: true } as AtomTagInput]
+          : []),
+      ];
+      const { atomId } = await createAtom(
         tenantId,
-        proposalId,
-        sectionId,
         {
-          nodeId: body.nodeId,
-          heading: body.heading ?? null,
-          text: body.text,
-          sectionType: body.sectionType ?? null,
-          tags,
-          parentUnitId: body.parentUnitId && isValidUUID(body.parentUnitId) ? body.parentUnitId : null,
+          grain: 'primitive',
+          title: body.heading ?? null,
+          content: body.text,
+          source: 'harvest',
+          creatorKind: 'collaborator',
+          status: 'approved',
+          originProposalId: proposalId,
+          originSectionId: sectionId,
+          tags: nodeTags,
         },
-        sessionUser.id,
+        { id: sessionUser.id, kind: 'collaborator' },
       );
+      result = { unitId: atomId, deduped: false };
     } catch (e) {
-      console.error('[atomize-node] harvest failed', e);
+      console.error('[atomize-node] atom creation failed', e);
       return NextResponse.json({ error: 'Failed to accept node into library', code: 'DB_ERROR' }, { status: 500 });
     }
 

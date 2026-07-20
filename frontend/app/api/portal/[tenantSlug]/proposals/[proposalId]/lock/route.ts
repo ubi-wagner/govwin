@@ -4,7 +4,7 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
-import { harvestProposalToLibrary } from '@/lib/proposal-harvest';
+import { harvestProposalToAtomLibrary } from '@/lib/proposal-atom-harvest';
 import { isValidUUID } from '@/lib/validation';
 
 interface RouteContext {
@@ -193,13 +193,13 @@ export async function POST(_request: Request, ctx: RouteContext) {
       console.error('[api/portal/proposals/lock] activity log failed', logErr);
     }
 
-    // Harvest accepted content to library on first lock only.
-    // This populates the tenant's library with atoms from the submitted
-    // proposal, enabling the learning loop for future drafts.
+    // Harvest accepted content to the canonical atom library on first lock only.
+    // This populates the tenant's library_atoms with derivative atoms from the
+    // submitted proposal, enabling the learning loop for future drafts.
     let harvestResult: { atomsHarvested: number; atomsSkipped: number } | null = null;
     if (newLockCount === 1) {
       try {
-        harvestResult = await harvestProposalToLibrary(tenantId, proposalId, sessionUser.id);
+        harvestResult = await harvestProposalToAtomLibrary(tenantId, proposalId, sessionUser.id);
       } catch (err) {
         console.error('[lock] harvest failed (non-fatal)', err);
       }

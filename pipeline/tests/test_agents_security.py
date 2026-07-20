@@ -285,7 +285,7 @@ class TestContextAssemblerContextBinding:
                 return []
             if "proposal_sections" in sql:  # proposal sections
                 return []
-            if "library_units" in sql:
+            if "library_atoms" in sql:
                 return []
             return []
 
@@ -337,7 +337,7 @@ class TestContextAssemblerContextBinding:
         async def _fetch(sql, *args):
             conn._fetch_calls.append((sql, args))
             idx = fi[0]; fi[0] += 1
-            if "library_units" in sql:
+            if "library_atoms" in sql:
                 return [atom_row]
             return []
 
@@ -411,9 +411,9 @@ class TestContextAssemblerContextBinding:
         assembler = ContextAssembler()
         await assembler.assemble(conn, _make_archetype(), TENANT_A, {})
 
-        # Find the library_units fetch call
-        lib_calls = [(sql, args) for sql, args in conn._fetch_calls if "library_units" in sql]
-        assert lib_calls, "library_units should be queried"
+        # Find the library_atoms fetch call
+        lib_calls = [(sql, args) for sql, args in conn._fetch_calls if "library_atoms" in sql]
+        assert lib_calls, "library_atoms should be queried"
         lib_sql, lib_args = lib_calls[0]
         # First arg must be the ctx tenant_id (as UUID)
         assert lib_args[0] == uuid.UUID(TENANT_A), (
@@ -489,7 +489,7 @@ class TestContextAssemblerInjectionDefense:
             [],  # semantic
             [],  # procedural
             [section_row],  # proposal_sections
-            [atom_row],  # library_units
+            [atom_row],  # library_atoms
         ]
 
         async def _fetchrow(sql, *args):
@@ -587,7 +587,7 @@ class TestContextAssemblerInjectionDefense:
             [epi_row],  # episodic
             [sem_row],  # semantic
             [],  # procedural
-            [],  # library_units
+            [],  # library_atoms
         ]
 
         async def _fetchrow(sql, *args):

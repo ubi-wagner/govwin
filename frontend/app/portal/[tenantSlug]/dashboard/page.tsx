@@ -82,7 +82,7 @@ export default async function DashboardPage({
 
   try {
     const [libRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM library_units WHERE tenant_id = ${tenantId}
+      SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}
     `;
     libraryCount = parseInt(libRow?.count ?? '0', 10);
   } catch (e) {

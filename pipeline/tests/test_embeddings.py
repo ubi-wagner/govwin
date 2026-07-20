@@ -251,7 +251,8 @@ class TestCosinePathWithActiveProvider:
 
         sql, args = conn._fetch_calls[0]
         assert "embedding <=>" in sql
-        assert "category ILIKE" in sql  # category filter still applied
+        # category filter still applied — now via the atom_tags satellite EXISTS
+        assert "atom_tags" in sql and "t.value ILIKE" in sql
 
     @pytest.mark.asyncio
     async def test_a9_load_library_atoms_cosine(self):
