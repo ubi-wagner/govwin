@@ -32,6 +32,34 @@ const CATEGORY_TO_KIND: Record<string, string> = {
 const FMT_OF: Record<string, string> = { docx: 'doc', pptx: 'slide', pdf: 'doc', txt: 'doc', md: 'doc', xlsx: 'table' };
 
 export const slug = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+/**
+ * Strip bytes Postgres text/jsonb reject — NUL + other C0 control chars (except tab /
+ * newline / CR) and lone UTF-16 surrogates — which malformed PDFs (e.g. Type-3 fonts)
+ * emit during extraction. Without this the atom INSERT throws 22021 and the doc is lost.
+ */
+export function cleanText(s: string): string {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) continue; // drop C0 controls (keep tab/newline/CR)
+    if (c >= 0xd800 && c <= 0xdbff) { // high surrogate
+      const n = s.charCodeAt(i + 1);
+      if (n >= 0xdc00 && n <= 0xdfff) { out += s[i] + s[i + 1]; i++; continue; } // valid pair
+      continue; // lone high surrogate
+    }
+    if (c >= 0xdc00 && c <= 0xdfff) continue; // lone low surrogate
+    out += s[i];
+  }
+  return out;
+}
+const deepCleanStrings = (v: unknown): unknown =>
+  typeof v === 'string' ? cleanText(v)
+  : Array.isArray(v) ? v.map(deepCleanStrings)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, deepCleanStrings(x)]))
+  : v;
+/** Deep-clean every string inside a node's content (canvasNodes jsonb path). */
+const cleanNodes = (nodes: CanvasNode[]): CanvasNode[] => nodes.map((n) => ({ ...n, content: deepCleanStrings(n.content) }) as CanvasNode);
 /** Coerce an unknown (from JSON.parse) to a trimmed string — never throws on a number/array/object. */
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -74,7 +102,7 @@ export async function atomizeDocumentIntoLibrary(
 
   const fmt = FMT_OF[parsed.sourceFormat] ?? 'doc';
   const allNodes = parsed.atoms.flatMap((a) => a.nodes);
-  const fullText = parsed.atoms.map((a) => textOfNodes(a.nodes)).join('\n\n');
+  const fullText = cleanText(parsed.atoms.map((a) => textOfNodes(a.nodes)).join('\n\n'));
 
   // 1) Foundational document cocoon.
   let cocoonId: string | null = null;
@@ -90,7 +118,7 @@ export async function atomizeDocumentIntoLibrary(
   let referenceId: string | null = null;
   try {
     const ref = await createAtom(tenantId, {
-      grain: 'reference', title: filename, content: fullText || null, canvasNodes: allNodes.length ? allNodes : null,
+      grain: 'reference', title: filename, content: fullText || null, canvasNodes: allNodes.length ? cleanNodes(allNodes) : null,
       summary: `Uploaded ${parsed.sourceFormat} · ${parsed.atoms.length} objects${packageName ? ` · ${packageName}` : ''}`,
       source: 'upload', status: 'approved', cocoonId,
       tags: [{ dimension: 'fmt', value: fmt, source: 'auto', confirmed: true }, ...ctxTags],
@@ -102,7 +130,7 @@ export async function atomizeDocumentIntoLibrary(
   let made = 0;
   for (let i = 0; i < parsed.atoms.length && made < MAX_ATOMS_PER_DOC; i++) {
     const a = parsed.atoms[i];
-    const text = textOfNodes(a.nodes).trim();
+    const text = cleanText(textOfNodes(a.nodes)).trim();
     if (!text || text.split(/\s+/).length < MIN_ATOM_WORDS) continue;
     const vol = CATEGORY_TO_VOL[a.suggestedCategory];
     const kind = CATEGORY_TO_KIND[a.suggestedCategory] ?? 'narrative';
@@ -115,8 +143,8 @@ export async function atomizeDocumentIntoLibrary(
     try {
       await createAtom(tenantId, {
         grain: 'primitive',
-        title: (a.headingText || text.slice(0, 60)).slice(0, 120),
-        content: text, canvasNodes: a.nodes.length ? (a.nodes as CanvasNode[]) : null,
+        title: cleanText(a.headingText || text.slice(0, 60)).slice(0, 120),
+        content: text, canvasNodes: a.nodes.length ? cleanNodes(a.nodes as CanvasNode[]) : null,
         summary: null, source: 'upload', status: 'approved', cocoonId,
         sourceAnchor: referenceId ? [{ sourceAtomId: referenceId, blockIds: [`b${i}`] }] : undefined,
         tags,
