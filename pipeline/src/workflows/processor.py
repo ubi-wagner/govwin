@@ -248,6 +248,10 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     # POD 4 — our-org RFP-admin ops (pre-release QA gate + scheduled ops digest)
     "tool.curation.qa": "curation_qa",
     "tool.ops.digest": "ops_digest",
+    # Our-org CMS — content generation, social curation (repost scout), social scheduling
+    "tool.content.generate": "content_generator",
+    "tool.content.curate": "content_curator",
+    "tool.social.schedule": "social_scheduler",
 }
 
 

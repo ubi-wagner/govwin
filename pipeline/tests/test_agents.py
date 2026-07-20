@@ -62,6 +62,10 @@ EXPECTED_ARCHETYPES = {
     # POD 4 (#130-131) — our-org RFP-admin ops
     "curation_qa",
     "ops_digest",
+    # Our-org CMS — content generation + social curation/scheduling
+    "content_generator",
+    "content_curator",
+    "social_scheduler",
 }
 
 

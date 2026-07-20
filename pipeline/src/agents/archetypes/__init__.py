@@ -5,6 +5,8 @@ from .amendment_monitor import AmendmentMonitorArchetype
 from .capture_strategist import CaptureStrategistArchetype
 from .color_team_reviewer import ColorTeamReviewerArchetype
 from .compliance_reviewer import ComplianceReviewerArchetype
+from .content_curator import ContentCuratorArchetype
+from .content_generator import ContentGeneratorArchetype
 from .cost_estimator import CostEstimatorArchetype
 from .curation_qa import CurationQaArchetype
 from .ingest_analyst import IngestAnalystArchetype
@@ -22,6 +24,7 @@ from .proposal_architect import ProposalArchitectArchetype
 from .scoring_strategist import ScoringStrategistArchetype
 from .section_drafter import SectionDrafterArchetype
 from .skeleton_architect import SkeletonArchitectArchetype
+from .social_scheduler import SocialSchedulerArchetype
 
 __all__ = [
     "BaseArchetype",
@@ -29,6 +32,8 @@ __all__ = [
     "CaptureStrategistArchetype",
     "ColorTeamReviewerArchetype",
     "ComplianceReviewerArchetype",
+    "ContentCuratorArchetype",
+    "ContentGeneratorArchetype",
     "CostEstimatorArchetype",
     "CurationQaArchetype",
     "IngestAnalystArchetype",
@@ -46,4 +51,5 @@ __all__ = [
     "ScoringStrategistArchetype",
     "SectionDrafterArchetype",
     "SkeletonArchitectArchetype",
+    "SocialSchedulerArchetype",
 ]
