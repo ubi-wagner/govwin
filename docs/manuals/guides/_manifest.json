@@ -8,7 +8,8 @@
       "slug": "rfp-admin",
       "nav_label": "RFP-Admin Operations",
       "role": "master_admin · rfp_admin",
-      "blurb": "Run the platform: monitor sources, ingest and curate RFPs, push opportunities, release purchases, and oversee every workflow and agent.",
+      "pages": "46 pp",
+      "blurb": "Every screen in the admin console, step by step: monitor sources, ingest and curate RFPs, push opportunities, release purchases, and oversee every workflow and agent.",
       "chips": ["Ingest & curate", "Release & provision", "Workflows & agents", "Shadow-descend"],
       "cover": "docs/manuals/img/admin/admin-dashboard.png"
     },
@@ -16,16 +17,18 @@
       "slug": "customer-admin",
       "nav_label": "Customer-Admin Proposal Build",
       "role": "tenant_admin",
-      "blurb": "Your company's journey: rank opportunities, build a content library, draft a proposal from your atoms, lock the matrix, and export submission-ready files.",
-      "chips": ["Ranked cards", "Library & atoms", "Draft & lock", "Export docx / xlsx"],
+      "pages": "35 pp",
+      "blurb": "Every feature of your portal, step by step: rank opportunities, build a content library, draft from your atoms in the canvas, lock the matrix, and export submission-ready files.",
+      "chips": ["Ranked cards", "Library & atoms", "Canvas & lock", "Export docx / xlsx"],
       "cover": "docs/manuals/img/tenant/portal-cards.png"
     },
     {
       "slug": "collaborator",
       "nav_label": "Collaborator Guide",
       "role": "partner_user",
-      "blurb": "Invited to a single proposal, scoped to what you're granted: open the workspace, contribute in the canvas, comment, and track your assignments.",
-      "chips": ["Scoped access", "Canvas contribute", "Comment & suggest", "My ToDos"],
+      "pages": "7 pp",
+      "blurb": "Invited to a single proposal, scoped to what you're granted: accept, contribute in the canvas, comment, and see exactly what each grant unlocks (full permission matrix).",
+      "chips": ["Scoped access", "Canvas contribute", "Comment & suggest", "Permission matrix"],
       "cover": "docs/manuals/img/collab/collab-dashboard.png"
     }
   ]
