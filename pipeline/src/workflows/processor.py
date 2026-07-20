@@ -837,7 +837,12 @@ async def run_workflow_processor(
                            tenant_id, parent_event_id, payload, error, created_at
                     FROM system_events
                     WHERE created_at >= $1
-                      AND namespace != 'system'
+                      -- Exclude only the processor's OWN lifecycle emissions
+                      -- (system:workflow.*) to avoid self-triggering — NOT all of the
+                      -- system namespace. Scheduled workflows legitimately trigger on
+                      -- system:* (e.g. system:ops.digest_requested, social.schedule_requested);
+                      -- the old `namespace != 'system'` filtered those out → they never fired.
+                      AND NOT (namespace = 'system' AND type LIKE 'workflow.%')
                     ORDER BY created_at ASC
                     LIMIT 100
                     """,

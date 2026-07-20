@@ -122,6 +122,23 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
         if sched["run_type"] == "event" and ":" in source:
             try:
                 ns, etype = source.split(":", 1)
+                next_run = compute_next_run(sched["cron_expression"], sched["run_type"], now)
+                # CAS: atomically CLAIM the tick by advancing next_run_at BEFORE emitting.
+                # The WHERE re-checks the schedule is still due, so a crash between claim and
+                # emit (at-most-once — a missed digest is fine, a double is not) and a second
+                # replica racing the same tick both resolve safely: only the UPDATE that still
+                # sees the row due wins (RETURNING id); the loser gets NULL and does nothing.
+                claimed = await conn.fetchval(
+                    """
+                    UPDATE pipeline_schedules
+                    SET next_run_at = $1, last_run_at = now()
+                    WHERE id = $2 AND (next_run_at IS NULL OR next_run_at <= $3)
+                    RETURNING id
+                    """,
+                    next_run, sched["id"], now,
+                )
+                if claimed is None:
+                    continue  # another worker/tick already claimed this schedule
                 await conn.execute(
                     """
                     INSERT INTO system_events
@@ -131,11 +148,6 @@ async def tick_schedules(conn: asyncpg.Connection) -> int:
                     ns, etype, json.dumps({"triggeredBy": "cron", "schedule": source}),
                 )
                 inserted += 1
-                next_run = compute_next_run(sched["cron_expression"], sched["run_type"], now)
-                await conn.execute(
-                    "UPDATE pipeline_schedules SET next_run_at = $1, last_run_at = now() WHERE id = $2",
-                    next_run, sched["id"],
-                )
                 log.info("cron emitted event %s (next %s)", source, next_run.isoformat())
             except Exception as e:
                 log.error("failed to emit cron event for %s: %s", source, e)
