@@ -1,12 +1,15 @@
 import { AdminNavLink } from '@/components/admin/admin-nav-link';
 import { AdminNavProvider } from '@/components/admin/admin-nav-context';
 import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
+import { NavShell } from '@/components/ui/nav-shell';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AdminNavProvider>
-    <div className="min-h-screen flex">
-      <aside className="w-64 bg-navy-900 text-white p-6 flex flex-col">
+    <NavShell
+      brand="RFP Admin"
+      mainClassName="flex-1 min-w-0 p-8 bg-gray-50 min-h-screen"
+      rail={<>
         <AdminNavLink href="/admin/dashboard">
           <span className="text-lg font-bold">RFP Admin</span>
         </AdminNavLink>
@@ -56,12 +59,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="text-xs text-gray-600 mt-4">
           <a href="/portal" className="hover:text-gray-400">Portal &rarr;</a>
         </div>
-      </aside>
-      <main className="flex-1 p-8 bg-gray-50 min-h-screen">
-        <AdminNavTrail />
-        {children}
-      </main>
-    </div>
+      </>}
+    >
+      <AdminNavTrail />
+      {children}
+    </NavShell>
     </AdminNavProvider>
   );
 }
