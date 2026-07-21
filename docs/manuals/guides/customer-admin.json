@@ -542,6 +542,10 @@
             {
               "kind": "tip",
               "html": "Invite grants are <b>per section</b> and <b>per permission</b> (view / comment / edit). A collaborator only ever sees the sections you assign — see the Collaborator guide for the full picture."
+            },
+            {
+              "kind": "note",
+              "html": "<b>R&D — Research Scout</b> (advisory): you can ask the AI to <b>research this opportunity</b> — market research, prior art, the competitor landscape. It reads the open web through a controlled browser, returns a <b>cited brief for you to accept</b>, and never changes your proposal by itself. Every source it reads is treated as untrusted data, and its usage counts against your AI budget (visible in AI Usage)."
             }
           ]
         },

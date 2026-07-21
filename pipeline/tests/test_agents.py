@@ -56,6 +56,7 @@ EXPECTED_ARCHETYPES = {
     "opportunity_scout",
     # Batch C (#129) — outcome / amendment / cost / PP
     "outcome_analyst",
+    "research_scout",
     "amendment_monitor",
     "cost_estimator",
     "pp_matcher",

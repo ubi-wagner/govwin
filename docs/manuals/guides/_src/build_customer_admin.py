@@ -259,7 +259,11 @@ sec(id="matrix", toc="7 · Proposal workspace", heading="The proposal workspace 
            "(Won/Lost/Withdrawn, once submitted) feeds the result back into your library so winning content ranks higher next time."),
        ],
        "callouts":[{"kind":"tip","html":"Invite grants are <b>per section</b> and <b>per permission</b> (view / comment / "
-         "edit). A collaborator only ever sees the sections you assign — see the Collaborator guide for the full picture."}]},
+         "edit). A collaborator only ever sees the sections you assign — see the Collaborator guide for the full picture."},
+         {"kind":"note","html":"<b>R&D — Research Scout</b> (advisory): you can ask the AI to <b>research this opportunity</b> "
+           "— market research, prior art, the competitor landscape. It reads the open web through a controlled browser, "
+           "returns a <b>cited brief for you to accept</b>, and never changes your proposal by itself. Every source it reads "
+           "is treated as untrusted data, and its usage counts against your AI budget (visible in AI Usage)."}]},
       {"id":"opp-card","heading":"Opportunity origin & compliance","toc":"7.4 · Origin & compliance",
        "body":"<p>The collapsible <b>Opportunity origin &amp; compliance</b> card has three tabs — <b>Overview</b> "
          "(build stage, lock count, deadlines), <b>Origin</b> (frozen-at-purchase: opportunity, agency, program, topic #, "

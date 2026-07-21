@@ -820,6 +820,12 @@
           "w": "full"
         }
       ],
+      "callouts": [
+        {
+          "kind": "note",
+          "html": "<b>New — Research Scout</b> (status <b>wired</b>): a tenant-bound R&D agent that finds cited market research / prior art for a proposal through the controlled server-side browser. It follows the same safety contract as every agent here — <b>web results are injection-fenced</b> (treated as data, never instructions), <b>budget/rate/cost-capped</b> via the Pipeline AI Controls, and <b>human-gated</b> (findings land as a draft brief for acceptance, never auto-written). Its usage shows in this roster and the tool-invocation audit like any other agent."
+        }
+      ],
       "subs": [
         {
           "id": "guardrails",
