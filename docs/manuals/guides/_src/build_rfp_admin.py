@@ -380,11 +380,12 @@ sec(id="agents", toc="13 · Agent Workforce", heading="Agents — the AI workfor
         "Tool Invocations</b> give you the full audit of what the agents actually called.",
         CROP+"agents-usage.png","The tool registry + recent invocations — the agent audit trail.","full"),
     ],
-    callouts=[{"kind":"note","html":"<b>New — Research Scout</b> (status <b>wired</b>): a tenant-bound R&D agent that finds "
-      "cited market research / prior art for a proposal through the controlled server-side browser. It follows the same "
-      "safety contract as every agent here — <b>web results are injection-fenced</b> (treated as data, never instructions), "
-      "<b>budget/rate/cost-capped</b> via the Pipeline AI Controls, and <b>human-gated</b> (findings land as a draft brief for "
-      "acceptance, never auto-written). Its usage shows in this roster and the tool-invocation audit like any other agent."}],
+    callouts=[{"kind":"note","html":"<b>Research Scout</b> (status <b>live</b>): a tenant-bound R&D agent a customer triggers "
+      "from a proposal’s <b>AI &amp; Library</b> tab (“Research this opportunity”). It browses the web — including DoD sources "
+      "(SAM.gov, SBIR.gov, DSIP) — through a controlled, SSRF-guarded server-side browser and returns a cited brief. Same "
+      "safety contract as every agent here: <b>web results injection-fenced</b> (data, never instructions), "
+      "<b>budget/rate/cost-capped</b> via Pipeline AI Controls, and <b>human-gated</b> (advisory brief, never auto-written). "
+      "Usage shows in this roster and the tool-invocation audit — the “use more, pay more” model applies."}],
     subs=[
       {"id":"guardrails","heading":"Guardrail defaults","toc":"13.1 · Guardrail defaults",
        "lead":"<p><code>/admin/guardrail-defaults</code> sets the hard limits every customer portal launches inside.</p>",

@@ -1,6 +1,10 @@
 # Controlled Capture + R&D Scout — Build Plan
 
-**Status:** approved for build (1 → 2 → 3). One-pager; the contract, not the code.
+**Status: BUILT (1 · 2 · 3).** Capture→annotate→atomize shipped; the `research_scout` is wired end-to-end —
+web-egress provider (`pipeline/src/agents/web.py`, SSRF-guarded, gov/mil-biased), tenant trigger
+(`/api/portal/.../ai/research` + the "Research this opportunity" panel in the AI &amp; Library tab), and the
+injection-fenced, budget-capped, human-gated archetype. Deferred: browser extension (#1b) and social (#4).
+Live web egress needs open outbound (prod pipeline); the sandbox's agent proxy blocks it (provider safe-skips).
 **Prime directive:** capture happens in the *user's* trust context; only the artifact crosses
 to us; everything lands **advisory + human-gated**. Same philosophy as the forward-only bridge
 and the `advisory → guardrail → land-or-review` agent contract (`docs/AGENT_WORKFORCE.md`).

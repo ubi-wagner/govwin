@@ -260,11 +260,22 @@ sec(id="matrix", toc="7 · Proposal workspace", heading="The proposal workspace 
        ],
        "callouts":[{"kind":"tip","html":"Invite grants are <b>per section</b> and <b>per permission</b> (view / comment / "
          "edit). A collaborator only ever sees the sections you assign — see the Collaborator guide for the full picture."},
-         {"kind":"note","html":"<b>R&D — Research Scout</b> (advisory): you can ask the AI to <b>research this opportunity</b> "
-           "— market research, prior art, the competitor landscape. It reads the open web through a controlled browser, "
-           "returns a <b>cited brief for you to accept</b>, and never changes your proposal by itself. Every source it reads "
-           "is treated as untrusted data, and its usage counts against your AI budget (visible in AI Usage)."}]},
-      {"id":"opp-card","heading":"Opportunity origin & compliance","toc":"7.4 · Origin & compliance",
+         {"kind":"note","html":"<b>AI &amp; Library</b> also hosts <b>Research this opportunity</b> — the R&D scout (see 7.5)."}]},
+      {"id":"research","heading":"Research this opportunity (R&D scout)","toc":"7.5 · Research this opportunity",
+       "lead":"<p>In the <b>AI &amp; Library</b> tab, the <b>Research Scout</b> does your R&D — market research, prior art, "
+         "and the competitor landscape, including DoD sources (SAM.gov, SBIR.gov, DSIP) — and returns a <b>cited brief</b>.</p>",
+       "img":TC+"research-scout.png","caption":"Research this opportunity — the R&D scout, in the AI & Library tab.",
+       "steps":[
+         S("Type (or refine) the research question, then click <b>🔎 Research this opportunity</b>. The scout runs in the "
+           "background: it browses the web through a controlled server-side browser, then synthesizes the findings."),
+         S("When it finishes, the <b>cited brief</b> appears inline — findings with <b>[source]</b> links and confidence, "
+           "plus the competitor list. It’s <b>advisory</b>: review it and pull the useful bits into your Library / sections; "
+           "it never changes your proposal by itself."),
+       ],
+       "callouts":[{"kind":"note","html":"<b>Safe by design:</b> every page the scout reads is treated as <b>untrusted "
+         "data</b> (never instructions), the run is <b>budget/rate-capped</b> (usage shows in AI Usage), and it <b>safe-skips</b> "
+         "— returning no sources rather than inventing them — if web access is unavailable. Use more, get more."}]},
+      {"id":"opp-card","heading":"Opportunity origin & compliance","toc":"7.6 · Origin & compliance",
        "body":"<p>The collapsible <b>Opportunity origin &amp; compliance</b> card has three tabs — <b>Overview</b> "
          "(build stage, lock count, deadlines), <b>Origin</b> (frozen-at-purchase: opportunity, agency, program, topic #, "
          "solicitation #, bought-from bucket), and <b>Compliance</b> (a live “{x}/{y} mandatory satisfied — {pct}%” bar and a "
