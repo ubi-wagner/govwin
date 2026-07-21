@@ -188,6 +188,9 @@ sec(id="curation", toc="6 · RFP Curation cockpit", heading="RFP Curation — th
            "Filenames auto-fill empty fields."),
          S("Drag documents into the <b>Documents</b> zone (PDF/DOCX/XLSX/PPTX/TXT, max 30 MB total). Pick the <b>primary</b> "
            "with the radio; others become attachments."),
+         S("<b>Multi-topic BAA?</b> Drop the individual topic files into the <b>Topic files</b> zone on the same form — each "
+           "becomes a topic opportunity under this solicitation in one submit (the button shows <b>Upload + N topics</b>). "
+           "Leave it empty for a single-topic solicitation, or add topic files later from the workspace drop-zone."),
          S("Leave <b>✨ Run Ingest Assist after upload</b> ticked — it parses the docs, auto-builds the compliance matrix, "
            "volumes and section molds, and publishes the card(s). Click <b>Upload &amp; Ingest Assist</b>."),
        ],
