@@ -208,7 +208,18 @@ function PasteTopicsModal({ profileId, sourceName, onClose, onImported }: PasteM
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Import failed (HTTP ${res.status})`);
+        // /api/admin/extract-topics only extracts topics from a STORED
+        // solicitation's document text (keyed by solicitationId); it does not
+        // consume pasted rows, and no raw-row ingestion backend exists yet — so
+        // a paste always 400s here. Surface an honest message instead of the
+        // route's misleading "solicitationId required".
+        // TODO(paste-topics): wire this to a real raw-topic ingestion endpoint,
+        // or retire the Paste Topics action in favour of Bulk Import.
+        throw new Error(
+          body.code === 'VALIDATION_ERROR'
+            ? 'Pasted-topic import isn’t supported yet — this endpoint extracts topics from an uploaded solicitation document, not pasted rows. Use Bulk Import or +Add Topic instead.'
+            : (body.error ?? `Import failed (HTTP ${res.status})`),
+        );
       }
 
       const result = await res.json();
