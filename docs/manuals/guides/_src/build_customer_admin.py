@@ -174,6 +174,25 @@ sec(id="library", toc="5 · Library & atoms", heading="Library — build your co
          "extracts a proposal’s structure into a reusable skeleton (pick a template type → <b>Extract structure</b>); once "
          "templated, <b>New draft</b> spins up a fresh document from that skeleton. This is how a winning structure becomes "
          "the starting point for the next bid.</p>"},
+      {"id":"lib-capture","heading":"Capture from screen (box → tag → atomize)","toc":"5.5 · Capture from screen",
+       "lead":"<p>The <b>Capture</b> tab pulls content from anywhere on your screen — a Google Doc, a data sheet, a web "
+         "page — <b>without connecting an account</b>. It’s the box-and-tag Atomize flow applied to a screenshot.</p>",
+       "img":TC+"capture-tab.png","caption":"The Capture tab — grab from any window/tab/screen, one-way in.",
+       "steps":[
+         S("Click <b>▣ Capture from screen</b> and pick a window, tab, or screen. The frame freezes on the canvas and the "
+           "screen-share stops immediately — no lingering access."),
+         S("<b>Drag boxes</b> over the parts worth keeping. Give each region a title and tag it with the same vocabulary as "
+           "the Atomize tab (<span class='tag'>vol</span> <span class='tag'>kind</span> <span class='tag'>fmt</span> …); "
+           "add a source URL + note for provenance."),
+         S("Optionally name a <b>section</b> to group the regions, then <b>Atomize N region(s) → library</b>. Each region "
+           "becomes a <b>draft image atom</b> (anchored to a reference of the whole frame), ready to review and insert into a "
+           "section canvas."),
+       ],
+       "callouts":[{"kind":"note","html":"<b>One-way by design:</b> only the crops you send ever leave your screen — the "
+         "platform never receives your Google/social credentials and holds no connection back to the source. Captures land as "
+         "<b>draft</b> atoms with a <i>“Screen capture from &lt;host&gt; · &lt;time&gt;”</i> provenance stamp."},
+         {"kind":"tip","html":"Verified end-to-end: a captured frame boxed into two regions produced a reference atom + two "
+           "tagged region atoms + a section group — all draft, provenance-stamped, insertable into the canvas."}]},
     ])
 
 # ── 6. Proposals list ─────────────────────────────────────────────────────────
