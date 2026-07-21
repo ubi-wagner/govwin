@@ -18,7 +18,8 @@ export default async function TemplateEditPage({ params }: { params: Promise<{ t
   const role = (session.user as { role?: string }).role;
   if (role !== 'master_admin' && role !== 'rfp_admin') redirect('/admin/dashboard');
 
-  let tpl: { id: string; name: string; canvas_document: CanvasDocument | null; canvas_preset: CanvasRules | null; is_system: boolean } | undefined;
+  // NOTE: @/lib/db camelCases result columns — read canvasDocument/canvasPreset/isSystem, not snake_case.
+  let tpl: { id: string; name: string; canvasDocument: CanvasDocument | null; canvasPreset: CanvasRules | null; isSystem: boolean } | undefined;
   try {
     [tpl] = await sql`
       SELECT id, name, canvas_document, canvas_preset, is_system
@@ -29,11 +30,11 @@ export default async function TemplateEditPage({ params }: { params: Promise<{ t
   if (!tpl) redirect('/admin/templates');
 
   const now = new Date().toISOString();
-  let doc = tpl.canvas_document;
+  let doc = tpl.canvasDocument;
   if (!doc || !Array.isArray(doc.nodes)) {
     doc = createEmptyCanvas({
       documentId: tpl.id,
-      canvas: tpl.canvas_preset ?? CANVAS_PRESETS.letter_sbir_phase1,
+      canvas: tpl.canvasPreset ?? CANVAS_PRESETS.letter_sbir_phase1,
       metadata: {
         title: tpl.name, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '',
         created_at: now, last_modified_at: now, last_modified_by: '', version_number: 1, status: 'ai_drafted',
@@ -47,7 +48,7 @@ export default async function TemplateEditPage({ params }: { params: Promise<{ t
       initialDocument={doc}
       actorId={u.id}
       actorName={u.name ?? 'Admin'}
-      readOnly={tpl.is_system}
+      readOnly={tpl.isSystem}
     />
   );
 }

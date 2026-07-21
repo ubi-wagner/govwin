@@ -199,10 +199,9 @@ Output your compliance matrix as a JSON array where each element contains:
                             "type": "string",
                             "description": "Search query for relevant memories",
                         },
-                        "tenant_id": {
-                            "type": "string",
-                            "description": "UUID of the tenant",
-                        },
+                        # Tenant-bound invariant: NO tenant_id in the schema — the agent is
+                        # bound to the assigned tenant from the trusted task context; the handler
+                        # ignores any model-supplied tenant and filters on the bound tenant only.
                         "limit": {
                             "type": "integer",
                             "description": "Maximum number of memories to return",

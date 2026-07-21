@@ -336,6 +336,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         nodeId,
         text,
         resolved: false,
+        userId: sessionUser.id,
         createdAt: comment.createdAt,
       },
     });

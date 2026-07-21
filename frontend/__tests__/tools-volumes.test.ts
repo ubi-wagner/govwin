@@ -7,7 +7,7 @@
 
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
-const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
+const { sqlMock } = vi.hoisted(() => ({ sqlMock: Object.assign(vi.fn(), { json: (v: unknown) => v }) }));
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
 vi.mock('@/lib/db', () => ({ sql: sqlMock }));

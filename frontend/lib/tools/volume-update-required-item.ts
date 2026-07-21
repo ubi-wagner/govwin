@@ -64,7 +64,7 @@ export const volumeUpdateRequiredItemTool = defineTool<Input, Output>({
         footer_format = CASE WHEN ${input.footerFormat !== undefined}
                              THEN ${input.footerFormat ?? null} ELSE footer_format END,
         custom_fields = CASE WHEN ${input.customFields !== undefined}
-                             THEN ${input.customFields ? JSON.stringify(input.customFields) : '{}'}::jsonb
+                             THEN ${sql.json((input.customFields ?? {}) as Parameters<typeof sql.json>[0])}
                              ELSE custom_fields END,
         applies_to_phase = CASE WHEN ${input.appliesToPhase !== undefined}
                                 THEN ${input.appliesToPhase ?? null}::text[]

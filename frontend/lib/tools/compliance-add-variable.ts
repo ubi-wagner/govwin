@@ -54,7 +54,7 @@ export const complianceAddVariableTool = defineTool<Input, Output>({
           (name, label, category, data_type, options, is_system)
         VALUES
           (${name}, ${label}, ${category}, ${dataType},
-           ${options ? JSON.stringify(options) : null}::jsonb,
+           ${options ? sql.json(options) : null},
            false)
         RETURNING id
       `;
