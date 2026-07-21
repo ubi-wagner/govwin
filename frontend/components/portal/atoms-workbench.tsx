@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Atomizer } from './atomizer';
 import { AtomLibrary } from './atom-library';
 import { PackageAtomizer } from './package-atomizer';
@@ -8,10 +8,16 @@ import { CaptureAtomizer } from './capture-atomizer';
 
 type Tab = 'library' | 'package' | 'atomize' | 'capture';
 const LABELS: Record<Tab, string> = { library: 'Library', package: 'Upload package', atomize: 'Atomize', capture: 'Capture' };
+const TABS: readonly Tab[] = ['library', 'package', 'atomize', 'capture'];
 
-/** Tabbed home for the atom library: browse · bulk-atomize a package · hand-shred · capture from screen. */
+/** Tabbed home for the atom library: browse · bulk-atomize a package · hand-shred · capture from screen.
+ *  Deep-linkable via ?tab= (the cockpit Library drawer launches straight into capture/atomize). */
 export function AtomsWorkbench({ tenantSlug }: { tenantSlug: string }) {
   const [tab, setTab] = useState<Tab>('library');
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab);
+  }, []);
   return (
     <div className="space-y-4">
       <div className="flex gap-1 border-b border-gray-200 text-sm">

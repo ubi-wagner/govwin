@@ -1,23 +1,19 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { AgentUsagePanel } from '@/components/portal/agent-usage-panel';
-import { TaskQueue } from '@/components/tasks/task-queue';
-import { UploadAtomizeCard } from '@/components/portal/upload-atomize-card';
 import { describeEvent } from '@/lib/event-labels';
+import { Cockpit } from '@/components/portal/cockpit';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Customer dashboard — the first page a newly-accepted customer sees.
+ * Customer landing — the permission-adaptive cockpit.
  *
- * Shows:
- *   - Welcome message with company name
- *   - Quick stats: library units, active proposals, pinned pipeline items
- *   - Recent system_events for this tenant
- *   - "Get Started" onboarding checklist
+ * Center = the company's active proposals (→ canvas), or the Get Started
+ * checklist when there are none. Right = an IndicatorRail whose tiles adapt to
+ * the user's grants (ToDos/Library always; Opportunities/Buckets only with the
+ * BD grant — which a descended shadow admin also carries).
  */
 export default async function DashboardPage({
   params,
@@ -31,11 +27,7 @@ export default async function DashboardPage({
     redirect('/login');
   }
 
-  const sessionUser = session.user as {
-    id?: string;
-    role?: unknown;
-    tenantId?: string | null;
-  };
+  const sessionUser = session.user as { id?: string; role?: unknown; tenantId?: string | null };
   const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
   if (!role || !sessionUser.id) {
     redirect('/login?error=session');
@@ -51,7 +43,6 @@ export default async function DashboardPage({
   if (!hasAccess) {
     redirect('/portal');
   }
-
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     redirect(`/portal/${tenantSlug}/proposals`);
   }
@@ -59,7 +50,7 @@ export default async function DashboardPage({
   const companyName = (tenant.name as string) ?? tenantSlug;
   const basePath = `/portal/${tenantSlug}`;
 
-  // ── Trial expiration check ──
+  // ── Trial expiration ──
   let trialEndsAt: Date | null = null;
   try {
     const [tenantRow] = await sql<{ trialEndsAt: Date | null }[]>`
@@ -69,97 +60,87 @@ export default async function DashboardPage({
   } catch (e) {
     console.error('[dashboard] trial check failed', e);
   }
-
   const trialDaysRemaining = trialEndsAt
     ? Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
   const showTrialBanner = trialDaysRemaining !== null && trialDaysRemaining > 0;
 
-  // ---------- Quick stats ----------
-  let libraryCount = 0;
-  let proposalCount = 0;
-  let pinnedCount = 0;
+  // ── Counts + onboarding signals ──
+  const count = async (label: string, q: Promise<{ count: string }[]>): Promise<number> => {
+    try { const [r] = await q; return parseInt(r?.count ?? '0', 10); }
+    catch (e) { console.error(`[dashboard] ${label} count failed`, e); return 0; }
+  };
+  const libraryCount = await count('library', sql`SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}`);
+  const proposalCount = await count('proposal', sql`SELECT COUNT(*)::text AS count FROM proposals WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')`);
+  const oppsCount = await count('opps', sql`SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived'`);
+  const todosCount = await count('todos', sql`SELECT COUNT(*)::text AS count FROM tasks WHERE tenant_id = ${tenantId} AND status IN ('open','in_progress')`);
+  const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId}`);
+  const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
 
+  // ── Accessible active proposals (the cockpit center) ──
+  let proposals: { id: string; title: string; stage: string; isLocked: boolean }[] = [];
   try {
-    const [libRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM library_atoms WHERE tenant_id = ${tenantId}
+    proposals = await sql<{ id: string; title: string; stage: string; isLocked: boolean }[]>`
+      SELECT id, title, stage, is_locked FROM proposals
+      WHERE tenant_id = ${tenantId} AND stage <> 'archived'
+      ORDER BY updated_at DESC LIMIT 6
     `;
-    libraryCount = parseInt(libRow?.count ?? '0', 10);
   } catch (e) {
-    console.error('[dashboard] library count query failed', e);
+    console.error('[dashboard] proposals query failed', e);
   }
 
-  try {
-    const [propRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM proposals
-      WHERE tenant_id = ${tenantId} AND stage NOT IN ('archived','submitted')
-    `;
-    proposalCount = parseInt(propRow?.count ?? '0', 10);
-  } catch (e) {
-    console.error('[dashboard] proposal count query failed', e);
-  }
-
-  try {
-    const [pinRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards
-      WHERE tenant_id = ${tenantId} AND is_pinned = true
-    `;
-    pinnedCount = parseInt(pinRow?.count ?? '0', 10);
-  } catch (e) {
-    console.error('[dashboard] pinned count query failed', e);
-  }
-
-  // ── Onboarding checklist data ──
-  let hasProfile = false;
-  let spotlightCount = 0;
-  try {
-    const [profileRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}
-    `;
-    hasProfile = parseInt(profileRow?.count ?? '0', 10) > 0;
-  } catch (e) {
-    console.error('[dashboard] profile check failed', e);
-  }
-  try {
-    const [spotRow] = await sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM tenant_opportunity_cards
-      WHERE tenant_id = ${tenantId} AND lifecycle_status <> 'archived'
-    `;
-    spotlightCount = parseInt(spotRow?.count ?? '0', 10);
-  } catch (e) {
-    console.error('[dashboard] spotlight check failed', e);
-  }
-
-  // ---------- Recent activity ----------
-  interface EventRow {
-    id: string;
-    namespace: string;
-    type: string;
-    phase: string;
-    createdAt: string;
-    payload: Record<string, unknown>;
-  }
-
+  // ── Recent activity ──
+  interface EventRow { id: string; namespace: string; type: string; phase: string; createdAt: string; payload: Record<string, unknown> }
   let recentEvents: EventRow[] = [];
   try {
     recentEvents = await sql<EventRow[]>`
       SELECT id, namespace, type, phase, created_at, payload
-      FROM system_events
-      WHERE tenant_id = ${tenantId}
-      ORDER BY created_at DESC
-      LIMIT 10
+      FROM system_events WHERE tenant_id = ${tenantId}
+      ORDER BY created_at DESC LIMIT 10
     `;
   } catch (e) {
     console.error('[dashboard] events query failed', e);
   }
+  const activity = recentEvents.map((evt) => ({
+    id: evt.id,
+    label: describeEvent({ namespace: evt.namespace, type: evt.type, phase: evt.phase, payload: evt.payload }),
+    at: new Date(evt.createdAt).toLocaleString(),
+  }));
+
+  // OPP visibility + BD actions (pin/purchase) are delegated authority. Proxy on
+  // tenant_admin for now; per-user grant is the intended seam. A descended shadow
+  // admin is tenant_admin-in-session, so it inherits the OPP indicators.
+  const canSeeOpps = hasRoleAtLeast(role, 'tenant_admin');
+  const grants = { canSeeOpps, canManageBuckets: canSeeOpps };
 
   const docsChecked = libraryCount > 0;
-  const profileChecked = hasProfile;
-  const spotlightChecked = spotlightCount > 0;
+  const getStarted = (
+    <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
+      <h2 className="text-lg font-semibold mb-1">Get started</h2>
+      <p className="text-sm text-gray-500 mb-4">You don&apos;t have an active build yet. A few steps to get rolling:</p>
+      <ul className="space-y-3 text-sm">
+        <li className="flex items-start gap-2">
+          <span className={`mt-0.5 ${docsChecked ? 'text-emerald-500' : 'text-gray-400'}`}>{docsChecked ? '☑' : '☐'}</span>
+          <a href={`${basePath}/atoms`} className={docsChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Upload company documents</a>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className={`mt-0.5 ${hasProfile ? 'text-emerald-500' : 'text-gray-400'}`}>{hasProfile ? '☑' : '☐'}</span>
+          <a href={`${basePath}/profile`} className={hasProfile ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Set up your company profile</a>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className={`mt-0.5 ${oppsCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{oppsCount > 0 ? '☑' : '☐'}</span>
+          <a href={`${basePath}/cards`} className={oppsCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Review your matched opportunities</a>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className={`mt-0.5 ${proposalCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{proposalCount > 0 ? '☑' : '☐'}</span>
+          <a href={`${basePath}/proposals`} className={proposalCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Start your first proposal build</a>
+        </li>
+      </ul>
+    </div>
+  );
 
   return (
-    <div>
-      {/* Trial expiration banner */}
+    <>
       {showTrialBanner && (
         <div className={`mb-6 rounded-lg px-4 py-3 text-sm font-medium ${
           trialDaysRemaining! <= 7
@@ -167,120 +148,20 @@ export default async function DashboardPage({
             : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
         }`}>
           Your trial expires in {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''}.
-          <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">
-            Subscribe to keep your data.
-          </a>
+          <a href={`${basePath}/billing`} className="ml-2 underline font-semibold">Subscribe to keep your data.</a>
         </div>
       )}
-
-      <h1 className="text-2xl font-bold">Welcome, {companyName}</h1>
-      <p className="text-gray-500 mt-1 text-sm">
-        Your GovWin portal dashboard
-      </p>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <Link href={`/portal/${tenantSlug}/library`}><StatCard label="Library Units" value={libraryCount} /></Link>
-        <Link href={`/portal/${tenantSlug}/proposals`}><StatCard label="Active Proposals" value={proposalCount} /></Link>
-        <Link href={`/portal/${tenantSlug}/pipeline`}><StatCard label="Pinned Topics" value={pinnedCount} /></Link>
-      </div>
-
-      {/* To-Do queue + in-app deadline nudges (reads the unified tasks ledger) */}
-      <div className="mt-6">
-        <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
-      </div>
-
-      {/* Add content — upload + atomize on the landing, for anyone in this company. */}
-      <div className="mt-6">
-        <UploadAtomizeCard tenantSlug={tenantSlug} />
-      </div>
-
-      {/* Get Started checklist */}
-      <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Get Started</h2>
-        <ul className="space-y-3 text-sm">
-          <li className="flex items-start gap-2">
-            <span className={`mt-0.5 ${docsChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
-              {docsChecked ? '☑' : '☐'}
-            </span>
-            <a
-              href={`${basePath}/library/upload`}
-              className={docsChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
-            >
-              Upload company documents
-            </a>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className={`mt-0.5 ${profileChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
-              {profileChecked ? '☑' : '☐'}
-            </span>
-            <a
-              href={`${basePath}/profile`}
-              className={profileChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
-            >
-              Set up your company profile
-            </a>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className={`mt-0.5 ${spotlightChecked ? 'text-emerald-500' : 'text-gray-400'}`}>
-              {spotlightChecked ? '☑' : '☐'}
-            </span>
-            <a
-              href={`${basePath}/spotlights`}
-              className={spotlightChecked ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
-            >
-              Create your first Spotlight
-            </a>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className={`mt-0.5 ${proposalCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
-              {proposalCount > 0 ? '☑' : '☐'}
-            </span>
-            <a
-              href={`${basePath}/proposals`}
-              className={proposalCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}
-            >
-              Purchase your first proposal portal
-            </a>
-          </li>
-        </ul>
-      </div>
-
-      {/* Recent activity */}
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-        {recentEvents.length === 0 ? (
-          <p className="text-gray-400 text-sm">No recent activity yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
-            {recentEvents.map((evt) => (
-              <li key={evt.id} className="px-4 py-3 text-sm flex justify-between">
-                <span className="text-gray-700">
-                  {describeEvent({ namespace: evt.namespace, type: evt.type, phase: evt.phase, payload: evt.payload })}
-                </span>
-                <span className="text-gray-400 text-xs">
-                  {new Date(evt.createdAt).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      {/* Agent Usage (admin only) */}
-      {(role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin') && (
-        <div className="mt-8">
-          <AgentUsagePanel tenantSlug={tenantSlug} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-2xl font-bold mt-1">{value}</p>
-    </div>
+      <Cockpit
+        tenantSlug={tenantSlug}
+        companyName={companyName}
+        basePath={basePath}
+        role={role}
+        grants={grants}
+        proposals={proposals}
+        counts={{ opps: oppsCount, todos: todosCount, buckets: bucketsCount, library: libraryCount }}
+        activity={activity}
+        getStarted={getStarted}
+      />
+    </>
   );
 }
