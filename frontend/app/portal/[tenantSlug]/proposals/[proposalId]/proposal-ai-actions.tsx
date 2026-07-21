@@ -43,9 +43,12 @@ export function ProposalAiActions({
 
   // AI Draft: available for admin when not locked
   const canDraft = isAdmin && !isLocked;
-  // Outcome: available for admin when proposal is submitted or archived
+  // Outcome: available for admin only when the proposal is in a stage the
+  // outcome route accepts as a precondition (submitted | final). It 409s on
+  // 'archived' (outcome already recorded) and 400s on any other stage, so
+  // those must not surface the panel.
   const canRecordOutcome =
-    isAdmin && ['submitted', 'archived'].includes(stage);
+    isAdmin && ['submitted', 'final'].includes(stage);
 
   const handleDraft = useCallback(async () => {
     if (!canDraft || draftLoading) return;

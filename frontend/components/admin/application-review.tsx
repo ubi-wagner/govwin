@@ -589,7 +589,10 @@ export function ApplicationReview({ applications }: Props) {
                           className="border border-gray-300 rounded px-2 py-1.5 text-sm"
                         >
                           <option value="">Select...</option>
-                          {['pending', 'under_review', 'accepted', 'rejected', 'withdrawn']
+                          {/* 'accepted' is intentionally excluded — the status route
+                              rejects it (422); acceptance runs only through the /accept
+                              action, which provisions the tenant + sends the welcome email. */}
+                          {['pending', 'under_review', 'rejected', 'withdrawn']
                             .filter((s) => s !== app.status)
                             .map((s) => (
                               <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
@@ -620,8 +623,8 @@ export function ApplicationReview({ applications }: Props) {
                       </button>
                     </div>
                     <p className="text-xs text-gray-400">
-                      Status changes are audited. Changing to &ldquo;pending&rdquo; re-enables the Accept/Reject buttons.
-                      Changing to &ldquo;accepted&rdquo; will NOT re-send the welcome email or create a new tenant.
+                      Status changes are audited. Changing to &ldquo;pending&rdquo; re-enables the Accept/Reject buttons,
+                      which is the only path that accepts an application (provisioning a tenant + welcome email).
                     </p>
                   </div>
                 )}

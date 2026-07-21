@@ -532,9 +532,13 @@ export function CurationWorkspace({
         setExpandStatus(srcJson.error ?? 'Could not load source profiles.');
         return;
       }
-      const sources: Array<{ id: string; site_type: string }> =
+      // /api/admin/sources does `SELECT sp.*`, and @/lib/db camelCases every
+      // result column — so the JSON key is `siteType`, not `site_type`. Reading
+      // the snake_case key returns undefined for every row and the find() below
+      // silently fails ("No source profile configured" even when one exists).
+      const sources: Array<{ id: string; siteType: string }> =
         srcJson.data?.sources ?? [];
-      const profile = sources.find((s) => s.site_type === sol.source);
+      const profile = sources.find((s) => s.siteType === sol.source);
       if (!profile) {
         setExpandStatus(
           `No source profile configured for "${sol.source}". Add one under Sources to enable topic import.`,

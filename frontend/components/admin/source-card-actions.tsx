@@ -408,8 +408,10 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
         formData.append('agency', source.agency || 'Unknown');
         formData.append('programType', source.programType || 'other');
 
+        // Route collects files via formData.getAll('files') — the key MUST be
+        // 'files' (not 'files[]'), or getAll returns [] and the upload 422s.
         for (const file of Array.from(files)) {
-          formData.append('files[]', file);
+          formData.append('files', file);
         }
 
         const res = await fetch('/api/admin/rfp-upload', {
