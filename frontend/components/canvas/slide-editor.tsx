@@ -12,6 +12,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { CanvasDocument, CanvasNode, NodeType, HeadingContent } from '@/lib/types/canvas-document';
 import { CanvasRenderer } from './canvas-renderer';
+import { useContainerScale } from '@/lib/hooks/use-container-scale';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -102,6 +103,11 @@ export function SlideEditor({
 
   const is16x9 = doc.canvas.format === 'slide_16_9';
   const aspectRatio = is16x9 ? 16 / 9 : 4 / 3;
+  // Scale the 700px reference slide to the actual center-area width so it fits
+  // any pane (including a Chrome split-screen half) instead of overflowing.
+  const [slideAreaRef, slideScale] = useContainerScale(700, { min: 0.3, pad: 64 });
+  const slideW = Math.round(700 * slideScale);
+  const slideH = Math.round((700 / aspectRatio) * slideScale);
 
   // Thumbnail dimensions
   const thumbWidth = 164; // px (inside the w-48 panel with padding)
@@ -236,14 +242,14 @@ export function SlideEditor({
       </div>
 
       {/* ── Current slide editing area ── */}
-      <div className="flex-1 bg-gray-700 flex items-center justify-center overflow-auto p-8">
+      <div ref={slideAreaRef} className="flex-1 min-w-0 bg-gray-700 flex items-center justify-center overflow-auto p-8">
         <div className="flex flex-col items-center gap-4">
           {/* Slide surface */}
           <div
             className="bg-white shadow-2xl relative overflow-hidden"
             style={{
-              width: 700,
-              height: Math.round(700 / aspectRatio),
+              width: slideW,
+              height: slideH,
             }}
           >
             {/* Render current slide nodes using CanvasRenderer internals */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 
@@ -14,6 +14,26 @@ interface Card {
   pursuitStatus: string;
   isPinned: boolean;
   pinUpdateAvailable: boolean;
+}
+
+type SortKey = 'pinned' | 'close' | 'agency' | 'title';
+const SORT_LABELS: Record<SortKey, string> = { pinned: 'Pinned first', close: 'Close date', agency: 'Agency', title: 'Title' };
+
+const str = (c: Card, k: string) => (c.card && typeof c.card[k] === 'string' ? (c.card[k] as string) : null);
+
+/** Pinned cards always float to the top; then by the chosen key. */
+function sortCards(cards: Card[], sortBy: SortKey): Card[] {
+  return [...cards].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (sortBy === 'close') {
+      const da = str(a, 'closeDate'); const db = str(b, 'closeDate');
+      if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+      return new Date(da).getTime() - new Date(db).getTime();
+    }
+    if (sortBy === 'agency') return (str(a, 'agency') ?? '').localeCompare(str(b, 'agency') ?? '');
+    if (sortBy === 'title') return (str(a, 'title') ?? '').localeCompare(str(b, 'title') ?? '');
+    return 0;
+  });
 }
 
 const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
@@ -30,6 +50,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [busy, setBusy] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
   const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>('pinned');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +70,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
     } catch { /* ignore */ } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
-  const str = (c: Card, k: string) => (c.card && typeof c.card[k] === 'string' ? (c.card[k] as string) : null);
+  const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
 
   return (
     <div>
@@ -59,6 +80,14 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
         </label>
         <button onClick={load} className="text-blue-600 hover:underline">Refresh</button>
         <span className="text-gray-400">· {cards.length} cards</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          aria-label="Sort opportunities"
+          className="ml-auto text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-600"
+        >
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABELS[k]}</option>)}
+        </select>
       </div>
 
       {loading && <p className="text-gray-400 text-sm py-8 text-center">Loading…</p>}
@@ -70,7 +99,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cards.map((c) => (
+        {sorted.map((c) => (
           <div key={c.id} className={`border rounded-xl p-4 bg-white ${c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="text-sm font-semibold text-gray-800">{str(c, 'title') ?? 'Untitled opportunity'}</h3>
