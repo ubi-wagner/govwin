@@ -203,8 +203,10 @@ sec(id="curation", toc="6 · RFP Curation cockpit", heading="RFP Curation — th
            CROP+"curation-tabs.png","The workspace quick-nav tabs.","half"),
          S("<b>Tag compliance variables on the PDF.</b> Select text in the viewer to open <i>Tag as Compliance Variable</i>, "
            "pick or add a variable, and save its value — provenance (doc + page) is recorded."),
-         S("<b>Extract & manage Topics.</b> <b>Extract Topics</b>, <b>Import all topics from source</b>, <b>Bulk Import</b>, "
-           "or <b>+ Add Topic</b>. Then <b>Manage Compliance</b> to set per-topic overrides (phase-grouped, with presets)."),
+         S("<b>Extract & manage Topics.</b> For a multi-topic BAA, <b>drop the individual topic files</b> into the topic "
+           "drop-zone — <b>each file becomes its own topic opportunity</b> under this umbrella (text extracted, deduped, "
+           "linked back to its file). Or <b>Extract Topics</b> (scan the umbrella text), <b>Import all topics from source</b>, "
+           "<b>Bulk Import</b>, or <b>+ Add Topic</b>. Then <b>Manage Compliance</b> to set per-topic overrides (phase-grouped, with presets)."),
          S("<b>Build Response Volumes.</b> <b>+ Add Volume</b>, then per volume <b>+ Add required item</b> — each item points "
            "at a <b>starter template (mold)</b> and carries its format rules (page limit, font, margins)."),
          S("<b>Advance the state machine.</b> The action bar shows only the valid next steps: <b>Claim → Release → Start "
@@ -219,12 +221,16 @@ sec(id="curation", toc="6 · RFP Curation cockpit", heading="RFP Curation — th
          ["Submission","Submission Format · Slides Allowed · Slide Limit · TABA Allowed"],
          ["Eligibility","PI Must Be Employee · Partner Max % · Clearance Required · ITAR Required"]]},
        "callouts":[{"kind":"eg","html":"Each matrix field carries a source pill — <b>Verified</b> (green, you confirmed it) "
-         "or <b>AI</b> (yellow, suggested). Click <b>p.N</b> on a field to jump the PDF viewer to where it was found."}]},
+         "or <b>AI</b> (yellow, suggested). Click <b>p.N</b> on a field to jump the PDF viewer to where it was found."},
+         {"kind":"note","html":"<b>One solicitation + N topic files → N opportunities.</b> Upload the umbrella solicitation, then "
+          "drop its topic files into the drop-zone — each becomes a topic opportunity under the umbrella (deduped, text-extracted, "
+          "linked to its file). <b>Push</b> then fans the umbrella + every topic to all tenants, so 20 topic files land 21 cards."}]},
       {"id":"cur-modals","heading":"The curation modals","toc":"6.4 · Curation modals",
        "lead":"<p>Curation uses a family of modals; here is what each one captures.</p>",
        "table":{"title":"Curation workspace modals","headers":["Modal","Opened by","Key fields"],"rows":[
          ["Add Topic","<b>+ Add Topic</b>","Topic Number · Status · Title · Description · Branch · Tech Focus Areas"],
          ["Bulk Import Topics","<b>Bulk Import</b>","Default branch · a topics textarea (auto-detects delimiter, live preview)"],
+         ["Topic files → opportunities","<b>topic drop-zone</b>","drag/drop N topic files · each becomes a topic opportunity (text extracted, deduped, file-linked)"],
          ["Add Volume","<b>+ Add Volume</b>","# · Format · Volume Name · Description · Special Requirements · Applies to Phase"],
          ["Add/Edit Required Item","<b>+ Add required item</b>","# · Type · Name · Required · limits/format · <b>Starter template (mold)</b> · Expert notes"],
          ["Tag as Compliance Variable","select text in the PDF","variable name · category · value (with memory suggestions)"]]},

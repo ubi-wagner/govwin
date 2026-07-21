@@ -279,6 +279,14 @@ Two RFP-side passes around the customer; **manual/shadow-assisted today**, autom
 **A — RFP admin, ingestor (master, Release 1):**
 1. **Ingest minimums** — `/admin/rfp-upload` (hardened: `content_hash` includes the oppId → no
    dup-title 500; S3 failure rolls back the orphan).
+1b. **Topic files → topic opportunities (multi-topic BAAs).** In the curation workspace, drop the
+   individual topic files into the topic drop-zone → `POST /api/admin/upload-topic-files` →
+   `ingestTopicFilesForSolicitation` (`frontend/lib/ingest/ingest-topic-files.ts`) creates **one
+   topic `opportunities` row per file** — deduped (content-hash + `(solicitation_id, topic_number)`),
+   text-extracted, and linked to its file via `opportunities.origin_document_id` (mig 122). The
+   umbrella flips to `solicitation_type='multi_topic'`. Nothing is customer-visible yet; **Push**
+   (step 4) fans umbrella + every topic over the existing `WHERE solicitation_id = <sol> OR id =
+   <landing>` activation set — so 1 solicitation + 20 topic files → **21 bridge cards**.
 2. Shred → the OPP is **recommended** to the rfp_admin (triage).
 3. Write the **first pass: spotlight summary** (the push gate).
 4. **Approve + push** → `solicitation.push` → Opportunity Pipeline → auto-ranked → **mirrored to all
