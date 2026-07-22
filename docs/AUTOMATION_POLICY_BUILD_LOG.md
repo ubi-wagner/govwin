@@ -80,3 +80,36 @@ backstop), ③ (priority predicate), ⑥ (DB-first, cron delivery deferred), §1
 the ToDos appearing + nudging is F1 (the drive + screenshots).
 
 ---
+
+## Phase D — the three editing surfaces + backfill ✅
+
+**D1 — backfill (mig 129, commit `accf4e4`).** Lossless: each configured tenant's 6 booleans → policy rows
+(4 notify triggers), un-configured tenants ride the framework. Idempotent. Verified: 1 tenant → 4 rows, 0
+on re-run.
+
+**D2 — tenant grammar editor (`accf4e4`).** `lib/automation/catalog.ts` (6 governable triggers; framework-hard
+gates excluded) · `app/api/portal/[slug]/automation-policies/route.ts` (GET catalog-merge + PATCH validated
+upsert, RLS-scoped via withTenant) · `components/portal/automation-policies-card.tsx` (per-trigger Who/nudge/
+channel + the **locked admin-floor chip**, decision ①), swapped in at both mounts. Tests:
+`automation-policies.test.ts` (**8**).
+
+**D3 — framework control plane (`25889fe`).** `app/api/admin/automation-framework/route.ts` (GET+PATCH the
+singleton, RFP-admin only, bounded validation, `system:automation_framework.updated`) ·
+`app/admin/automation-framework/page.tsx` (SLA, buckets, nudges, agent budget **ceiling** — decision ⑨).
+Tests: `automation-framework.test.ts` (**8**).
+
+**D4 — portal-build wizard (this commit).** `components/portal/guardrail-editor.tsx` gains the **Agent-first**
+checkbox (default ON — sets `guardrail_config.agentFirst`, which C3's prestage-todos reads) and the
+**RFP-Pipeline oversight** toggle (**pre-checked**; unchecking pops an explicit **opt-out modal**, decision
+§13). Managers + ≤3-nudge cadence + phases already existed. `acceptGuardrails` writes the raw config, so both
+flags persist to `guardrail_config`. **Pipeline honors the opt-out:** `manager._final_notice_user_ids`
+suppresses the RFP-Pipeline backstop when `rfpOversight === false`. *Templated-from-last* rides the existing
+`GuardrailEditor.initial` prop (pass the tenant's last completed portal config to seed it — a parent
+data-fetch, follow-on).
+
+**Tests / verify:** tsc 0 · vitest **752/752** (+16: policies 8, framework 8) · guardrail-authoring 7 ·
+pipeline workflow 18/13 · manager.py parses. Decisions honored: ① (floor + opt-out), ⑦ (3 levels: framework
+control plane / tenant grammar / portal wizard), ⑨ (budget ceiling), §13 (agent-first + RFP-shadow pre-checked
++ opt-out modal).
+
+---

@@ -31,6 +31,10 @@ export interface GuardrailInitial {
   nudgeDays?: number[];
   collaborators?: { email: string; role: string }[];
   stages?: { key: string; label?: string; todos?: { type: string; title?: string; assigneeRole?: string | null; dueDays?: number }[] }[];
+  /** #190 §13 — let AI agents draft the first version (you review). Defaults ON. */
+  agentFirst?: boolean;
+  /** #190 §13/① — RFP-Pipeline shadow oversight on this build. Pre-checked. */
+  rfpOversight?: boolean;
 }
 
 export function GuardrailEditor({
@@ -57,6 +61,10 @@ export function GuardrailEditor({
   );
   const [nudges, setNudges] = useState<number[]>(initial.nudgeDays ?? [5, 2, 1]);
   const [newManager, setNewManager] = useState('');
+  // #190 §13: agents draft first (you review); RFP-Pipeline oversight pre-checked.
+  const [agentFirst, setAgentFirst] = useState<boolean>(initial.agentFirst ?? true);
+  const [rfpOversight, setRfpOversight] = useState<boolean>(initial.rfpOversight ?? true);
+  const [showOptOut, setShowOptOut] = useState(false);
 
   const included = stages.filter((s) => s.included);
   const valid = included.length >= 1 && included.every((s) => s.todos.length >= 1);
@@ -74,6 +82,8 @@ export function GuardrailEditor({
     const inc = stages.filter((s) => s.included);
     const config = {
       nudgeDays: nudges,
+      agentFirst,
+      rfpOversight,
       collaborators: managers.filter((e) => e.trim()).map((email) => ({ email: email.trim(), role: 'manager', stages: inc.map((s) => s.key) })),
       stages: inc.map((s) => ({
         key: s.key,
@@ -85,6 +95,7 @@ export function GuardrailEditor({
   }
 
   return (
+    <>
     <Modal open={open} onClose={onClose} maxWidth="max-w-3xl" ariaLabel="Configure the build workflow">
       <div className="p-5">
         <div className="flex items-start justify-between mb-1">
@@ -92,6 +103,17 @@ export function GuardrailEditor({
           <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
         </div>
         <p className="text-xs text-gray-500 mb-4">Purchase → close → +30 days. Pick the phases, tune the ToDos, and set who gets nudged. Recommended defaults are filled in.</p>
+
+        {/* AI agents — first draft */}
+        <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" checked={agentFirst} onChange={(e) => setAgentFirst(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-violet-300 text-violet-600" />
+            <span>
+              <span className="block text-sm font-semibold text-violet-900">Agent-first — AI drafts the first version</span>
+              <span className="block text-[11px] text-violet-700">Agents draft a V0 of every section on release, and the compliance + color-team reviewers make a first pass. Your team&apos;s ToDos become <em>review &amp; confirm</em>, not write-from-scratch. Recommended.</span>
+            </span>
+          </label>
+        </div>
 
         {/* Phases */}
         <div className="space-y-3">
@@ -131,6 +153,16 @@ export function GuardrailEditor({
         <div className="mt-5">
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Managers</h3>
           <p className="text-[11px] text-gray-400 mb-2">Your admins always get the final (3rd) nudge. Delegate it to more people per portal — a teammate or one of our experts (e.g. Econ-dev) — added or not, as many as you want.</p>
+          {/* RFP-Pipeline shadow oversight — pre-checked; unchecking requires explicit opt-out (§13). */}
+          <label className="mb-2 flex items-start gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 cursor-pointer">
+            <input type="checkbox" checked={rfpOversight}
+              onChange={(e) => { if (!e.target.checked) { setShowOptOut(true); } else { setRfpOversight(true); } }}
+              className="mt-0.5 h-4 w-4 rounded border-indigo-300 text-indigo-600" />
+            <span>
+              <span className="block text-xs font-semibold text-indigo-900">RFP Pipeline oversight (recommended)</span>
+              <span className="block text-[11px] text-indigo-700">We stay on the escalation path for this build — the ultimate backstop if no one on your side is active.</span>
+            </span>
+          </label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {managers.map((m, i) => (
               <span key={i} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs text-indigo-700">
@@ -184,5 +216,22 @@ export function GuardrailEditor({
         </div>
       </div>
     </Modal>
+
+    {/* Explicit opt-out confirmation for declining RFP-Pipeline oversight (§13). */}
+    <Modal open={showOptOut} onClose={() => setShowOptOut(false)} maxWidth="max-w-md" ariaLabel="Decline RFP Pipeline oversight">
+      <div className="p-5">
+        <h3 className="text-base font-bold text-gray-900 mb-1">Decline RFP Pipeline oversight?</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          You&apos;re turning off RFP Pipeline as the escalation backstop for this build. If no one on your
+          side is active when a gate is overdue, the final notice may not reach anyone who can act. You can
+          re-enable this anytime.
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={() => setShowOptOut(false)} className="text-sm font-medium text-gray-600 px-3 py-1.5 rounded hover:bg-gray-50">Keep oversight</button>
+          <button onClick={() => { setRfpOversight(false); setShowOptOut(false); }} className="text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded px-4 py-1.5">Decline oversight</button>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }

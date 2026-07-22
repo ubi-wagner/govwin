@@ -1165,6 +1165,7 @@ class WorkflowManager:
             logger.error("[_final_notice] admin default lookup failed: %s", e)
 
         # A portal task ALSO notifies its delegated managers (added or not).
+        portal_opted_out = False  # rfpOversight explicitly declined for this portal (§13)
         if t.get("entity_type") == "portal" and t.get("entity_id"):
             cfg = None
             try:
@@ -1179,6 +1180,9 @@ class WorkflowManager:
                     cfg = json.loads(cfg or "{}")
                 except Exception:
                     cfg = None
+            # If the tenant explicitly declined RFP-Pipeline oversight on this portal
+            # (guardrail-editor opt-out), suppress the platform backstop below.
+            portal_opted_out = (cfg or {}).get("rfpOversight") is False
             emails = [
                 c.get("email")
                 for c in ((cfg or {}).get("collaborators") or [])
@@ -1205,8 +1209,9 @@ class WorkflowManager:
         # RFP-Pipeline shadow backstop (AUTOMATION_POLICY_DESIGN decision ①): if the
         # tenant has NO active admin/manager to receive the final notice, route it to us
         # — the oldest active rfp_admin/master_admin — so an escalation never lands on
-        # nobody. The floor is admin-always + managers + THIS platform backstop.
-        if not out:
+        # nobody. The floor is admin-always + managers + THIS platform backstop —
+        # UNLESS the portal explicitly opted out of RFP-Pipeline oversight (§13).
+        if not out and not portal_opted_out:
             try:
                 backstop = await conn.fetchrow(
                     """
