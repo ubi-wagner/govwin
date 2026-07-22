@@ -41,7 +41,10 @@ function Tile({ label, value, sub, tone }: { label: string; value: number; sub?:
 
 export function AutomationHealth({ logStatus, openTodos, instances, agent, firings }: AutomationHealthProps) {
   const errCount = logStatus.error + logStatus.deferred;
-  const spendPct = agent.ceiling && agent.ceiling > 0 ? Math.min(100, Math.round((agent.spend / agent.ceiling) * 100)) : null;
+  // A ceiling of 0 is "no ceiling", same as null — the bar text and the label must agree, or the
+  // header reads "/ $0.00 ceiling" while the bar below says "No ceiling set" (sweep, HIGH).
+  const hasCeiling = agent.ceiling != null && agent.ceiling > 0;
+  const spendPct = hasCeiling ? Math.min(100, Math.round((agent.spend / (agent.ceiling as number)) * 100)) : null;
 
   return (
     <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5">
@@ -59,7 +62,7 @@ export function AutomationHealth({ logStatus, openTodos, instances, agent, firin
         <div className="flex items-center justify-between text-xs mb-1">
           <span className="font-semibold uppercase tracking-wide text-gray-400">Agent spend this month</span>
           <span className="text-gray-600">
-            ${agent.spend.toFixed(2)}{agent.ceiling != null ? ` / $${agent.ceiling.toFixed(2)} ceiling` : ''}
+            ${agent.spend.toFixed(2)}{hasCeiling ? ` / $${(agent.ceiling as number).toFixed(2)} ceiling` : ''}
           </span>
         </div>
         {spendPct != null ? (

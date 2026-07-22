@@ -14,6 +14,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { getGuardrailLimits, validateGuardrailConfig, type GuardrailConfig } from '@/lib/portal-workflow';
@@ -51,16 +52,21 @@ export async function GET(_request: Request, ctx: RouteContext) {
   const r = await resolveCtx(ctx);
   if (!r.ok) return r.res;
   try {
-    // Platform library (tenant_id NULL) + this tenant's saved templates. Default first, then
-    // most-recent — so "extend the last" naturally lands on the freshest.
-    const templates = await sql<TemplateRow[]>`
+    // Startable, editor-shaped templates only: the platform library (tenant_id NULL) + this
+    // tenant's saved ones, EXCLUDING the is_default row — that row is the framework
+    // limits/defaults document ({limits,defaults}), not an editor guardrail config, so picking it
+    // would wipe the editor (sweep D2/HIGH). Most-recent first — "extend the last".
+    // Runs through withTenant so the platform∪tenant read stays correct under the NOBYPASSRLS
+    // cutover (the explicit tenant_id predicate is today's load-bearing belt; RLS is inert).
+    const templates = await withTenant(r.tenantId, async (tx) => tx<TemplateRow[]>`
       SELECT id, name, description, config, is_default AS "isDefault",
              CASE WHEN tenant_id IS NULL THEN 'platform' ELSE 'tenant' END AS scope,
              updated_at AS "updatedAt"
       FROM guardrail_templates
-      WHERE tenant_id IS NULL OR tenant_id = ${r.tenantId}::uuid
-      ORDER BY is_default DESC, updated_at DESC
-    `;
+      WHERE (tenant_id IS NULL OR tenant_id = ${r.tenantId}::uuid)
+        AND is_default = false
+      ORDER BY updated_at DESC
+    `);
     return NextResponse.json({ data: { templates } });
   } catch (e) {
     console.error('[guardrail-templates] GET failed:', e);
@@ -93,12 +99,16 @@ export async function POST(request: Request, ctx: RouteContext) {
 
   try {
     // Tenant-scoped save (the tenant's own named library); platform templates are seeded separately.
-    const [row] = await sql<TemplateRow[]>`
-      INSERT INTO guardrail_templates (tenant_id, name, description, config, is_default, created_by)
-      VALUES (${r.tenantId}::uuid, ${name}, ${description}, ${sql.json(config as JsonArg)}, false, ${r.userId}::uuid)
-      RETURNING id, name, description, config, is_default AS "isDefault",
-                'tenant' AS scope, updated_at AS "updatedAt"
-    `;
+    // Wrapped in withTenant so the INSERT satisfies the RLS WITH CHECK once govtech_app is NOBYPASSRLS.
+    const row = await withTenant(r.tenantId, async (tx) => {
+      const [r0] = await tx<TemplateRow[]>`
+        INSERT INTO guardrail_templates (tenant_id, name, description, config, is_default, created_by)
+        VALUES (${r.tenantId}::uuid, ${name}, ${description}, ${sql.json(config as JsonArg)}, false, ${r.userId}::uuid)
+        RETURNING id, name, description, config, is_default AS "isDefault",
+                  'tenant' AS scope, updated_at AS "updatedAt"
+      `;
+      return r0;
+    });
     try {
       await emitEventSingle({
         namespace: 'capture', type: 'guardrail_template.saved',

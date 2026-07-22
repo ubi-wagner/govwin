@@ -98,15 +98,24 @@ export function GuardrailEditor({
   // Reseed the whole editor from a picked template's config (same shape as `initial`) — so an
   // admin can start from a matching prior template instead of the misaligned default.
   function applyConfig(cfg: unknown) {
-    const c = (cfg ?? {}) as GuardrailInitial;
-    setStages((c.stages ?? []).map((s) => ({
-      key: s.key, label: s.label ?? s.key, included: true,
-      todos: (s.todos ?? []).map((t) => ({ type: t.type, title: t.title ?? '', assigneeRole: t.assigneeRole ?? 'tenant_user', dueDays: t.dueDays ?? 7 })),
-    })));
-    setManagers((c.collaborators ?? []).filter((cc) => cc.role === 'manager').map((cc) => cc.email));
-    setNudges(c.nudgeDays ?? [5, 2, 1]);
-    setAgentFirst(c.agentFirst ?? true);
-    setRfpOversight(c.rfpOversight ?? true);
+    // Defensive reseed. The config is JSON from a saved template. Normalize the nested
+    // {defaults:{…}} shape, and NEVER wipe the editor: if a picked config has no usable stages,
+    // keep the current phases rather than emptying them and disabling Launch (sweep D2/HIGH).
+    // Only overlay fields that are actually present + well-typed.
+    const raw = (cfg ?? {}) as Record<string, unknown>;
+    const c = ((raw.stages || raw.collaborators || raw.nudgeDays) ? raw : ((raw.defaults as Record<string, unknown>) ?? raw)) as GuardrailInitial;
+    const srcStages = Array.isArray(c.stages) ? c.stages : [];
+    if (srcStages.length > 0) {
+      setStages(srcStages.map((s) => ({
+        key: s.key, label: s.label ?? s.key, included: true,
+        todos: (Array.isArray(s.todos) ? s.todos : []).map((t) => ({ type: t.type, title: t.title ?? '', assigneeRole: t.assigneeRole ?? 'tenant_user', dueDays: t.dueDays ?? 7 })),
+      })));
+    }
+    setManagers((Array.isArray(c.collaborators) ? c.collaborators : []).filter((cc) => cc && cc.role === 'manager').map((cc) => cc.email));
+    if (Array.isArray(c.nudgeDays) && c.nudgeDays.length > 0) setNudges(c.nudgeDays);
+    if (typeof c.agentFirst === 'boolean') setAgentFirst(c.agentFirst);
+    if (typeof c.rfpOversight === 'boolean') setRfpOversight(c.rfpOversight);
+    setNewManager('');
   }
 
   function launch() {
@@ -115,7 +124,7 @@ export function GuardrailEditor({
 
   return (
     <>
-    <Modal open={open} onClose={onClose} maxWidth="max-w-3xl" ariaLabel="Configure the build workflow">
+    <Modal open={open} onClose={onClose} maxWidth="max-w-3xl" ariaLabel="Configure the build workflow" disableEsc={showOptOut}>
       <div className="p-5">
         <div className="flex items-start justify-between mb-1">
           <h2 className="text-lg font-bold text-gray-900">Configure the build workflow</h2>

@@ -71,3 +71,46 @@ describe('validateGuardrailConfig — delegated managers', () => {
     expect(res.errors.join()).toMatch(/invalid todo type/);
   });
 });
+
+// Bug 2 (proven, this sweep): config arrives from JSON (a saved template, a launch/save body),
+// so a mistyped field must fall through to a VALIDATION ERROR, never throw an un-iterable — the
+// guardrail-templates POST route relies on this returning {ok:false} (422), not a bare 500. These
+// call the REAL validator (unmocked); the earlier route test mocked it and missed the throw.
+describe('validateGuardrailConfig — malformed shapes never throw (Bug 2)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bad = (config: any) => () => validateGuardrailConfig(config, LIMITS);
+
+  it('non-array stages (number / object) → {ok:false}, no throw', () => {
+    for (const stages of [5, {}, 'nope', true]) {
+      const call = bad({ stages });
+      expect(call).not.toThrow();
+      const res = call();
+      expect(res.ok).toBe(false);
+      expect(res.errors.join()).toMatch(/at least one stage/);
+    }
+  });
+
+  it('non-array collaborators → {ok:false}, no throw (the .filter would have crashed)', () => {
+    const call = bad({ stages: [{ key: 'k', todos: [{ type: 'acknowledge' }] }], collaborators: 'x' });
+    expect(call).not.toThrow();
+    expect(call().ok).toBe(true); // collaborators ignored when unusable; stages are valid
+  });
+
+  it('non-array nudgeDays → {ok:false path}, no throw', () => {
+    const call = bad({ stages: [{ key: 'k', todos: [{ type: 'acknowledge' }] }], nudgeDays: 3 });
+    expect(call).not.toThrow();
+    expect(call().ok).toBe(true); // nudgeDays ignored when unusable
+  });
+
+  it('non-array todos on a stage → no throw, stage still validates', () => {
+    const call = bad({ stages: [{ key: 'k', todos: 'nope' }], nudgeDays: [] });
+    expect(call).not.toThrow();
+    expect(call().ok).toBe(true); // a stage with no (usable) todos is allowed by the validator
+  });
+
+  it('empty object config → {ok:false} (needs a stage), no throw', () => {
+    const call = bad({});
+    expect(call).not.toThrow();
+    expect(call().ok).toBe(false);
+  });
+});

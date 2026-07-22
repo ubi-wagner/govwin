@@ -67,17 +67,20 @@ export async function getGuardrailLimits(): Promise<GuardrailLimits> {
 /** Validate a customer's guardrail config against the RFP-admin limits. */
 export function validateGuardrailConfig(config: GuardrailConfig, limits: GuardrailLimits): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  const stages = config.stages ?? [];
-  const collaborators = config.collaborators ?? [];
-  const nudgeDays = config.nudgeDays ?? [];
+  // Runtime-shape guards: config arrives from JSON (a saved template, a launch body), so a
+  // mistyped field (stages: 5, collaborators: {}) must NOT throw an un-iterable error — it must
+  // fall through to a validation error. `?? []` alone doesn't catch a non-null non-array.
+  const stages = Array.isArray(config.stages) ? config.stages : [];
+  const collaborators = Array.isArray(config.collaborators) ? config.collaborators : [];
+  const nudgeDays = Array.isArray(config.nudgeDays) ? config.nudgeDays : [];
   if (stages.length < 1) errors.push('at least one stage is required');
   if (stages.length > limits.maxStages) errors.push(`too many stages (max ${limits.maxStages})`);
   if (collaborators.length > limits.maxCollaborators) errors.push(`too many collaborators (max ${limits.maxCollaborators})`);
-  const managers = collaborators.filter((c) => c.role === 'manager').length;
+  const managers = collaborators.filter((c) => c && c.role === 'manager').length;
   if (managers > limits.maxManagers) errors.push(`too many managers (max ${limits.maxManagers})`);
   if (nudgeDays.length > limits.maxNudges) errors.push(`too many nudges (max ${limits.maxNudges})`);
   for (const s of stages) {
-    for (const t of s.todos ?? []) {
+    for (const t of (Array.isArray(s?.todos) ? s.todos : [])) {
       if (!TODO_TYPES.has(t.type)) errors.push(`invalid todo type "${t.type}" (allowed: ${[...TODO_TYPES].join(', ')})`);
     }
   }

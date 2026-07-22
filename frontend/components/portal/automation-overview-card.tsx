@@ -18,7 +18,7 @@ interface OverviewPortal {
   id: string; label: string; status: string; currentStageIndex: number;
   agentFirst: boolean; rfpOversight: boolean; stageCount: number; nudgeDays: number[]; managerCount: number;
 }
-interface Overview { coverage: Coverage[]; tasks: OverviewTask[]; portals: OverviewPortal[] }
+interface Overview { coverage: Coverage[]; tasks: OverviewTask[]; portals: OverviewPortal[]; openTotal: number; escalatedTotal: number }
 
 function relDue(iso: string | null): { text: string; overdue: boolean } {
   if (!iso) return { text: 'no due date', overdue: false };
@@ -60,11 +60,10 @@ export function AutomationOverviewCard({ tenantSlug }: { tenantSlug: string }) {
   if (error) return <div className="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3 mb-6">{error}</div>;
   if (!data) return null;
 
-  const openCount = data.tasks.length;
-  const escalated = data.tasks.filter((t) => {
-    const { overdue } = relDue(t.dueAt);
-    return overdue || (t.nudgeSchedule.length > 0 && t.nudgesSent >= t.nudgeSchedule.length);
-  }).length;
+  // TRUE totals over ALL open tasks (the board list below caps at 30) — the "across your team"
+  // tiles must count everything, not just the rendered slice (sweep D2/D3).
+  const openTotal = data.openTotal;
+  const escalated = data.escalatedTotal;
 
   return (
     <div className="space-y-4 mb-8">
@@ -81,7 +80,7 @@ export function AutomationOverviewCard({ tenantSlug }: { tenantSlug: string }) {
         ))}
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Open ToDos</div>
-          <div className="mt-1 text-2xl font-bold text-gray-900">{openCount}</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{openTotal}</div>
           <div className="text-[11px] text-gray-500">across your team</div>
         </div>
         <div className={`rounded-lg border p-4 ${escalated > 0 ? 'border-rose-200 bg-rose-50' : 'border-gray-200 bg-white'}`}>
@@ -94,7 +93,9 @@ export function AutomationOverviewCard({ tenantSlug }: { tenantSlug: string }) {
       {/* Team ToDo / nudge / escalation board */}
       <div className="bg-white border border-gray-200 rounded-lg p-5">
         <h2 className="text-sm font-semibold text-gray-900">Team ToDos &amp; nudges</h2>
-        <p className="text-xs text-gray-500 mb-3">Every open automation task across your company, with its nudge stage and escalation state.</p>
+        <p className="text-xs text-gray-500 mb-3">
+          {openTotal > data.tasks.length ? `Top ${data.tasks.length} of ${openTotal} open tasks (soonest-due first)` : 'Your open automation tasks (soonest-due first)'}, with nudge stage and escalation state.
+        </p>
         {data.tasks.length === 0 ? (
           <div className="text-sm text-gray-400 py-3">No open automation ToDos right now.</div>
         ) : (

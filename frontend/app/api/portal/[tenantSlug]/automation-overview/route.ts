@@ -56,22 +56,42 @@ export async function GET(_request: Request, ctx: RouteContext) {
   if (!r.ok) return r.res;
   try {
     const data: {
-      policyRows: Array<{ scope: string; enabled: number; total: number }>;
+      policyRows: Array<{ scope: string; enabled: number; disabled: number; total: number }>;
       taskRows: RawTask[];
       portalRows: RawPortal[];
+      totals: { openTotal: number; escalatedTotal: number } | undefined;
     } = await withTenant(r.tenantId, async (tx) => {
-      const policyRows = await tx<Array<{ scope: string; enabled: number; total: number }>>`
-        SELECT scope, count(*) FILTER (WHERE enabled)::int AS enabled, count(*)::int AS total
+      // enabled/disabled/total: a trigger with NO row defaults ON (the resolver's base is
+      // enabled:true), so "on" = catalog total − explicit disables, NOT the enabled-row count
+      // (sweep D3/F3 — the old count read 0/N-on for un-configured tenants while defaults fire).
+      const policyRows = await tx<Array<{ scope: string; enabled: number; disabled: number; total: number }>>`
+        SELECT scope, count(*) FILTER (WHERE enabled)::int AS enabled,
+               count(*) FILTER (WHERE NOT enabled)::int AS disabled, count(*)::int AS total
         FROM tenant_automation_policies WHERE tenant_id = ${r.tenantId}::uuid GROUP BY scope
       `;
       const taskRows = await tx<RawTask[]>`
         SELECT id, title, task_type AS "taskType", status, assignee_role AS "assigneeRole",
-               due_at AS "dueAt", nudge_schedule AS "nudgeSchedule", nudges_sent AS "nudgesSent",
+               due_at AS "dueAt", nudge_schedule AS "nudgeSchedule",
+               -- nudges_sent is a jsonb ARRAY of fired markers, not a count (sweep D1) → count it.
+               CASE WHEN jsonb_typeof(nudges_sent) = 'array' THEN jsonb_array_length(nudges_sent) ELSE 0 END AS "nudgesSent",
                entity_type AS "entityType", entity_id AS "entityId", step_name AS "stepName"
         FROM tasks
         WHERE tenant_id = ${r.tenantId}::uuid AND status IN ('open', 'in_progress')
         ORDER BY due_at ASC NULLS LAST
         LIMIT 30
+      `;
+      // TRUE totals over ALL open tasks — the list above caps at 30, but the headline tiles say
+      // "across your team" so they must count everything (sweep D2). Escalated = overdue OR the
+      // final nudge has fired (all scheduled nudges sent).
+      const [totals] = await tx<Array<{ openTotal: number; escalatedTotal: number }>>`
+        SELECT count(*)::int AS "openTotal",
+               count(*) FILTER (
+                 WHERE due_at < now()
+                    OR (jsonb_typeof(nudge_schedule) = 'array' AND jsonb_array_length(nudge_schedule) > 0
+                        AND jsonb_typeof(nudges_sent) = 'array'
+                        AND jsonb_array_length(nudges_sent) >= jsonb_array_length(nudge_schedule))
+               )::int AS "escalatedTotal"
+        FROM tasks WHERE tenant_id = ${r.tenantId}::uuid AND status IN ('open', 'in_progress')
       `;
       const portalRows = await tx<RawPortal[]>`
         SELECT id, label, status, current_stage_index AS "currentStageIndex",
@@ -79,7 +99,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         FROM proposal_portals WHERE tenant_id = ${r.tenantId}::uuid
         ORDER BY created_at DESC LIMIT 25
       `;
-      return { policyRows, taskRows, portalRows };
+      return { policyRows, taskRows, portalRows, totals };
     });
 
     // Coverage: enabled/configured (from tenant rows) vs the governable total (from the catalog).
@@ -87,12 +107,17 @@ export async function GET(_request: Request, ctx: RouteContext) {
       acc[t.scope] = (acc[t.scope] ?? 0) + 1; return acc;
     }, {});
     const byScope = new Map(data.policyRows.map((p) => [p.scope, p]));
-    const coverage = (['discovery', 'build'] as const).map((scope) => ({
-      scope,
-      enabled: byScope.get(scope)?.enabled ?? 0,
-      configured: byScope.get(scope)?.total ?? 0,
-      total: catalogTotals[scope] ?? 0,
-    }));
+    const coverage = (['discovery', 'build'] as const).map((scope) => {
+      const total = catalogTotals[scope] ?? 0;
+      const row = byScope.get(scope);
+      return {
+        scope,
+        // Default-ON semantics: un-configured triggers are on; only explicit disables turn off.
+        enabled: Math.max(0, total - (row?.disabled ?? 0)),
+        configured: row?.total ?? 0,
+        total,
+      };
+    });
 
     // Tasks: raw nudge schedule coerced; the component computes stage/escalated/overdue badges.
     const tasks = data.taskRows.map((t) => ({
@@ -118,7 +143,11 @@ export async function GET(_request: Request, ctx: RouteContext) {
       };
     });
 
-    return NextResponse.json({ data: { coverage, tasks, portals } });
+    return NextResponse.json({ data: {
+      coverage, tasks, portals,
+      openTotal: data.totals?.openTotal ?? tasks.length,
+      escalatedTotal: data.totals?.escalatedTotal ?? 0,
+    } });
   } catch (e) {
     console.error('[automation-overview] GET failed:', e);
     return NextResponse.json({ error: 'Failed to load automation overview', code: 'DB_ERROR' }, { status: 500 });
