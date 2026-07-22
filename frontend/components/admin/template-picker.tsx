@@ -20,12 +20,14 @@ export function TemplatePicker({
   listUrl, saveUrl, onApply, currentConfig, label, saveHint,
 }: {
   listUrl: string;
-  saveUrl: string;
+  /** Omit to render a pick-only picker (e.g. scouts, where the source itself is the config). */
+  saveUrl?: string;
   onApply: (config: unknown) => void;
-  currentConfig: () => unknown;
+  currentConfig?: () => unknown;
   label?: string;
   saveHint?: string;
 }) {
+  const canSave = Boolean(saveUrl && currentConfig);
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [picked, setPicked] = useState('');
   const [showSave, setShowSave] = useState(false);
@@ -51,6 +53,7 @@ export function TemplatePicker({
   }, [templates, onApply]);
 
   const save = useCallback(async () => {
+    if (!saveUrl || !currentConfig) return;
     const name = saveName.trim();
     if (!name) { setMsg('Give the template a name first.'); return; }
     setSaving(true); setMsg(null);
@@ -87,13 +90,15 @@ export function TemplatePicker({
             </option>
           ))}
         </select>
-        <button type="button" onClick={() => setShowSave((s) => !s)}
-          className="text-xs text-indigo-700 hover:underline ml-auto">
-          {showSave ? 'Cancel' : 'Save current as template'}
-        </button>
+        {canSave && (
+          <button type="button" onClick={() => setShowSave((s) => !s)}
+            className="text-xs text-indigo-700 hover:underline ml-auto">
+            {showSave ? 'Cancel' : 'Save current as template'}
+          </button>
+        )}
       </div>
 
-      {showSave && (
+      {canSave && showSave && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             value={saveName}
