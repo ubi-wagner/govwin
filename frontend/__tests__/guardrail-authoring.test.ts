@@ -113,4 +113,28 @@ describe('validateGuardrailConfig — malformed shapes never throw (Bug 2)', () 
     expect(call).not.toThrow();
     expect(call().ok).toBe(false);
   });
+
+  // Sweep DEFECT#1/#2 (proven, real DB): a null/degenerate stage ELEMENT passes Array.isArray but
+  // later crashes createStageTodos (null.todos, AFTER the portal advanced → gate-bypass) and the
+  // editor's applyConfig (null.key). The validator must reject it so it can never be saved.
+  it('rejects a null / non-object / keyless stage element (no throw)', () => {
+    const good = { key: 's0', todos: [{ type: 'acknowledge' }] };
+    for (const badStages of [
+      [good, null],                       // null element (the exact crash input)
+      [good, 5],                          // number element
+      [good, 'nope'],                     // string element
+      [good, []],                         // array element
+      [good, { label: 'no key' }],        // object with no key
+      [good, { key: '' }],                // empty-string key (breaks the gate match)
+      [good, { key: '   ' }],             // whitespace key
+    ]) {
+      const call = bad({ stages: badStages, nudgeDays: [] });
+      expect(call).not.toThrow();
+      const res = call();
+      expect(res.ok).toBe(false);
+      expect(res.errors.join()).toMatch(/each stage must be an object with a non-empty key/);
+    }
+    // A clean two-stage config still passes (the guard doesn't over-reject).
+    expect(validateGuardrailConfig({ stages: [good, { key: 's1', todos: [] }], nudgeDays: [] }, LIMITS).ok).toBe(true);
+  });
 });

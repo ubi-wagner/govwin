@@ -142,7 +142,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       VALUES (
         ${r.tenantId}::uuid, ${scope}, ${triggerKey}, ${enabled},
         ${tx.array(recipientRoles)}, ${tx.array(recipientUsers)}::uuid[], ${tx.array(recipientFlags)},
-        ${dueInMinutes}, ${tx.array(nudgeDays)}, ${channel}, ${cooldownMinutes}, ${maxFiresPerHour}, now()
+        ${dueInMinutes}, ${tx.array(nudgeDays)}::int[], ${channel}, ${cooldownMinutes}, ${maxFiresPerHour}, now()
       )
       ON CONFLICT (tenant_id, scope, trigger_key) DO UPDATE SET
         enabled = EXCLUDED.enabled, recipient_roles = EXCLUDED.recipient_roles,

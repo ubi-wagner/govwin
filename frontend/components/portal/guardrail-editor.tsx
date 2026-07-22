@@ -104,7 +104,10 @@ export function GuardrailEditor({
     // Only overlay fields that are actually present + well-typed.
     const raw = (cfg ?? {}) as Record<string, unknown>;
     const c = ((raw.stages || raw.collaborators || raw.nudgeDays) ? raw : ((raw.defaults as Record<string, unknown>) ?? raw)) as GuardrailInitial;
-    const srcStages = Array.isArray(c.stages) ? c.stages : [];
+    // Filter out any null/non-object stage element before mapping — a saved template can carry
+    // one (the API accepts arbitrary JSON), and `s.key` on a null would crash the editor on pick
+    // (sweep DEFECT#2). The validator now rejects these on save; this guards already-saved rows.
+    const srcStages = (Array.isArray(c.stages) ? c.stages : []).filter((s) => !!s && typeof s === 'object' && !Array.isArray(s));
     if (srcStages.length > 0) {
       setStages(srcStages.map((s) => ({
         key: s.key, label: s.label ?? s.key, included: true,
