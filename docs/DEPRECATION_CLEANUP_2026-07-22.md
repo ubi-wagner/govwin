@@ -63,6 +63,32 @@ utilities}`), `@tanstack/react-query`, `lucide-react`, `recharts`, `clsx`, `date
 - Remaining doc nits: `docs/API_REFERENCE.md` endpoint table, `STORAGE_LAYOUT.md`,
   `CLAUDE_CLIFFNOTES.md §731` (tenant_pipeline_items.total_score) — minor, self-correcting.
 
+## Frontend dead code (orphaned modules — verified 0 importers, deleted)
+`components/admin/metadata-editor.tsx`, `components/admin/volume-artifact-preview.tsx`,
+`lib/auth.ts` (back-compat shim for `@/lib/auth` — nothing imports it; the real export is
+root `auth.ts`), `types/index.ts` (a `@/types` barrel nothing imports), and the two
+self-labeled "V1 TODO" stub routes `portal/[t]/agents/{memories,performance}`. tsc 0 / vitest 729.
+
+## Frontend rot CATALOGED (verified dead, but NOT auto-deleted — deliberate follow-up)
+Deleting these blind is how you break an ops script or external integration a grep can't
+see, so they're recorded for a per-item decision rather than swept:
+
+- **~28 "no internal caller" API routes.** Many are legitimately the REST surface, ops/
+  maintenance endpoints (`admin/tenants/[id]/backfill-cards`, `admin/sbir-data/ingest`),
+  documented-public (`api/content/[slug]` is in `PUBLIC_PATHS`), or duplicates the UI bypasses
+  via `invoke()` tools (the `rfp-curation/[solId]/{claim,push,start-curation,…}` wrappers) /
+  server-side rendering (`admin/{dashboard,analytics,pipeline,processes,purchases,waitlist}`,
+  `portal/[t]/{dashboard,purchases,proposals/[id]/{reviews,ai/review,compliance,activity}}`).
+  Several may be wired by the automation phase — decide then.
+- **8 confirmed-dead exports** in live files (safe to remove, low harm): `auditLog` (db.ts),
+  `getSiteAnalytics` (analytics-admin.ts), `portalAdminAccess` (portal-launch.ts),
+  `objectExists` (s3-client.ts), `getSolicitationNamespace` (curation-memory.ts),
+  `formatAnchorProvenance`/`findCharOffset` (source-anchor.ts), `ICON_NAMES` (icons.tsx).
+- **4 needs-review lib modules:** `atom-tags.ts` (atoms UI has its own `parseTag`), `crypto.ts`
+  + its `API_KEY_ENCRYPTION_SECRET` flag (no per-tenant key storage today), `bucket-ranking.ts`
+  (TS scorer superseded by the pipeline; only the backfill script imports it), `source-url.ts`
+  (referenced only by its own test).
+
 The spines (opportunity_bridge → tenant_opportunity_cards, library_atoms, system_events
 audit river) are now clean of retired-table reads end-to-end — which is exactly what makes
 the automation layer a straightforward wiring job on top.
