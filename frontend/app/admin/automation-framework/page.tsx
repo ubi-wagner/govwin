@@ -18,9 +18,12 @@ interface Framework {
   agentAutoRunDefault: boolean;
 }
 
+// Only the LIVE framework knobs the resolver actually enforces are editable here
+// (curation SLA pin, tenant caps). default_due_in_minutes / default_nudge_days exist in the
+// schema as the reserved lowest-tier fallback but are shadowed by per-gate defaults today, so
+// they are deliberately NOT exposed as editable controls (adversarial-sweep MEDIUM-2).
 const NUM_FIELDS: { key: keyof Framework; label: string; help: string; unit: string }[] = [
   { key: 'curationSlaMinutes', label: 'Curation SLA', help: 'RFP-admin window to review + build the matrix + release. Framework-hard: a tenant cannot move it.', unit: 'minutes' },
-  { key: 'defaultDueInMinutes', label: 'Default gate due window', help: 'Fallback due window for a human gate when a tenant hasn’t tuned it.', unit: 'minutes' },
   { key: 'maxBucketsPerTenant', label: 'Max buckets / tenant', help: 'Cap on the number of spotlight buckets a tenant may create.', unit: 'count' },
   { key: 'maxNudgesPerGate', label: 'Max nudges / gate', help: 'Cap on the nudge cadence length (a tenant can shorten, never exceed).', unit: 'count' },
 ];
@@ -49,9 +52,8 @@ export default function AutomationFrameworkPage() {
       const res = await fetch('/api/admin/automation-framework', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          curationSlaMinutes: fw.curationSlaMinutes, defaultDueInMinutes: fw.defaultDueInMinutes,
+          curationSlaMinutes: fw.curationSlaMinutes,
           maxBucketsPerTenant: fw.maxBucketsPerTenant, maxNudgesPerGate: fw.maxNudgesPerGate,
-          defaultNudgeDays: fw.defaultNudgeDays,
           agentMonthlyBudgetCeilingUsd: Number(fw.agentMonthlyBudgetCeilingUsd),
           agentAutoRunDefault: fw.agentAutoRunDefault,
         }),
@@ -90,18 +92,6 @@ export default function AutomationFrameworkPage() {
             </div>
           </div>
         ))}
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium text-gray-800">Default nudge cadence (days)</div>
-              <div className="text-xs text-gray-500">Fallback escalation cadence, e.g. 1, 3.</div>
-            </div>
-            <input type="text" value={fw.defaultNudgeDays.join(', ')}
-              onChange={(e) => { setFw({ ...fw, defaultNudgeDays: e.target.value.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 5) }); setSaved(false); }}
-              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none" />
-          </div>
-        </div>
 
         <div className="rounded-lg border border-violet-200 bg-violet-50 p-4">
           <div className="flex items-center justify-between gap-4">

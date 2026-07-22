@@ -93,8 +93,11 @@ export async function PATCH(request: Request) {
   }
   if ('agentMonthlyBudgetCeilingUsd' in body) {
     const v = Number(body.agentMonthlyBudgetCeilingUsd);
-    if (!Number.isFinite(v) || v < 0) {
-      return NextResponse.json({ error: 'agentMonthlyBudgetCeilingUsd must be a non-negative number', code: 'VALIDATION_ERROR' }, { status: 422 });
+    // Must be > 0: a 0 ceiling would cap every tenant's budget to $0 and silently
+    // disable ALL agents platform-wide (found by the #190 adversarial sweep). To turn
+    // agents off, use agentAutoRunDefault / the per-trigger enable, not the ceiling.
+    if (!Number.isFinite(v) || v <= 0) {
+      return NextResponse.json({ error: 'agentMonthlyBudgetCeilingUsd must be greater than 0 (use the auto-run toggle to disable agents)', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
     sets.push(sql`agent_monthly_budget_ceiling_usd = ${v}`);
   }

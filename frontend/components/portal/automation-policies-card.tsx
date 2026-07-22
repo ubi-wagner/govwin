@@ -53,6 +53,9 @@ function defaults(item: CatalogItem): PolicyRow {
 export function AutomationPoliciesCard({ tenantSlug }: { tenantSlug: string }) {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [draft, setDraft] = useState<Record<string, PolicyRow>>({});
+  // Raw nudge-days text per trigger, so typing "1, 3" isn't stripped by re-deriving the
+  // input value from the parsed array on every keystroke (adversarial-sweep LOW-2).
+  const [nudgeText, setNudgeText] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export function AutomationPoliciesCard({ tenantSlug }: { tenantSlug: string }) {
         if (cancelled) return;
         setItems(list);
         setDraft(Object.fromEntries(list.map((i) => [i.triggerKey, defaults(i)])));
+        setNudgeText(Object.fromEntries(list.map((i) => [i.triggerKey, defaults(i).nudgeDays.join(', ')])));
       } catch {
         if (!cancelled) setError('Network error loading automation policies');
       } finally {
@@ -182,8 +186,11 @@ export function AutomationPoliciesCard({ tenantSlug }: { tenantSlug: string }) {
                         </div>
                         <div>
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Escalate — nudge days</div>
-                          <input type="text" value={row.nudgeDays.join(', ')}
-                            onChange={(e) => update(item.triggerKey, { nudgeDays: e.target.value.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 3) })}
+                          <input type="text" value={nudgeText[item.triggerKey] ?? ''}
+                            onChange={(e) => {
+                              setNudgeText((m) => ({ ...m, [item.triggerKey]: e.target.value }));
+                              update(item.triggerKey, { nudgeDays: e.target.value.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 3) });
+                            }}
                             placeholder="1, 3"
                             className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none" />
                           <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">How</div>

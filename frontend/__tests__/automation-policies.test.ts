@@ -91,6 +91,12 @@ describe('PATCH automation-policies', () => {
     expect(res.status).toBe(422);
   });
 
+  it('422 for a non-UUID recipient user (not a 500 on the uuid[] bind)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    const res = await PATCH(patchReq({ scope: 'build', triggerKey: 'proposal:document.locked', recipientUsers: ['not-a-uuid'] }), ctx);
+    expect(res.status).toBe(422);
+  });
+
   it('upserts a valid policy and emits the audit event', async () => {
     authMock.mockResolvedValue(session('tenant_admin'));
     txMock.mockResolvedValueOnce([

@@ -24,6 +24,7 @@
  * cadence, timing, and notify recipients; the floor is layered on the terminal nudge.
  */
 import { sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('automation-policy');
@@ -121,11 +122,14 @@ export async function resolveGatePolicy(opts: ResolveGateOptions): Promise<Resol
   let policy: TenantPolicyRow | null = null;
   if (tenantId) {
     try {
-      const [row] = await sql<TenantPolicyRow[]>`
+      // withTenant sets app.tenant_id so this stays correct AFTER the NOBYPASSRLS cutover
+      // (mig 127 FORCE-RLS); the explicit WHERE is the belt today. Fail-safe: a throw here
+      // is caught below → gate defaults.
+      const [row] = await withTenant(tenantId, async (tx) => tx<TenantPolicyRow[]>`
         SELECT enabled, nudge_days, due_in_minutes, channel, cooldown_minutes, max_fires_per_hour
         FROM tenant_automation_policies
         WHERE tenant_id = ${tenantId}::uuid AND scope = ${scope} AND trigger_key = ${triggerKey}
-      `;
+      `);
       policy = row ?? null;
     } catch (e) {
       log.warn?.({ msg: 'tenant policy read failed — using gate/framework defaults', tenantId, triggerKey, err: e instanceof Error ? e.message : String(e) });

@@ -12,6 +12,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { emitEventSingle, userActor } from '@/lib/events';
 import {
   TRIGGER_CATALOG, isCatalogTrigger, VALID_CHANNELS,
@@ -64,6 +65,9 @@ export async function GET(_request: Request, ctx: RouteContext) {
   const r = await resolveCtx(ctx);
   if (!r.ok) return r.res;
   try {
+    // Explicit tenant predicate (the BELT) + withTenant RLS (the suspenders, once the
+    // app runs as govtech_app). RLS is inert under today's bypass role, so the WHERE is
+    // load-bearing — without it this leaks every tenant's rows (adversarial-sweep HIGH-1).
     const rows: PolicyRow[] = await withTenant(r.tenantId, async (tx) => tx<PolicyRow[]>`
       SELECT scope, trigger_key AS "triggerKey", enabled,
              recipient_roles AS "recipientRoles", recipient_users AS "recipientUsers",
@@ -71,6 +75,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
              nudge_days AS "nudgeDays", channel, cooldown_minutes AS "cooldownMinutes",
              max_fires_per_hour AS "maxFiresPerHour", configured_at AS "configuredAt"
       FROM tenant_automation_policies
+      WHERE tenant_id = ${r.tenantId}::uuid
     `);
     const byKey = new Map(rows.map((p) => [`${p.scope}:${p.triggerKey}`, p]));
     // Merge the catalog with the tenant's configured rows so the editor renders every
@@ -112,6 +117,10 @@ export async function PATCH(request: Request, ctx: RouteContext) {
   }
   if (recipientFlags.some((x) => !VALID_RECIPIENT_FLAGS.has(x))) {
     return NextResponse.json({ error: 'Invalid recipient flag', code: 'VALIDATION_ERROR' }, { status: 422 });
+  }
+  // Validate UUID format up front so a bad id is a 422, not a 500 on the uuid[] bind.
+  if (recipientUsers.some((x) => !isValidUUID(x))) {
+    return NextResponse.json({ error: 'Invalid recipient user id (must be a UUID)', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
   const channel = body.channel === undefined ? 'email' : String(body.channel);
   if (!VALID_CHANNELS.has(channel)) {

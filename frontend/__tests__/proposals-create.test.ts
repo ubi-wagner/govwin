@@ -59,6 +59,7 @@ vi.mock('@/auth', () => ({
   auth: authMock,
 }));
 
+vi.mock('@/lib/rls', () => ({ withTenant: (_t, fn) => fn(sqlMock) }));
 vi.mock('@/lib/db', () => ({
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,

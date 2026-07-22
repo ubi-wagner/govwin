@@ -41,6 +41,7 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+vi.mock('@/lib/rls', () => ({ withTenant: (_t, fn) => fn(sqlMock) }));
 vi.mock('@/lib/db', () => ({
   sql: sqlMock,
 }));
