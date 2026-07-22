@@ -3,7 +3,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
-import { PdfViewer, type TextSelection } from './pdf-viewer';
+import dynamic from 'next/dynamic';
+import type { TextSelection } from './pdf-viewer';
+// react-pdf / pdf.js sets its worker at module-eval (import) time and touches browser
+// globals, which crashes SSR of this client component ("Object.defineProperty called on
+// non-object"). Load it client-only so the module never evaluates on the server.
+const PdfViewer = dynamic(() => import('./pdf-viewer').then((m) => m.PdfViewer), { ssr: false });
 import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
