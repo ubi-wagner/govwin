@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Bucket { id: string; name: string; description: string | null; criteria: Record<string, unknown> }
 interface RankedRow { opportunityId: string; score: number; factors: Record<string, number>; card: Record<string, unknown> | null; isPinned: boolean }
@@ -11,6 +12,9 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reranking, setReranking] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
   // Tracks which bucket the pipeline poll should still write to, so switching
   // buckets (or deleting the open one) cancels stale in-flight refreshes.
   const activeRef = useRef<string | null>(null);
@@ -26,7 +30,8 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/buckets`);
       if (res.ok) setBuckets((await res.json()).data?.buckets ?? []);
-    } catch { /* keep */ }
+      else setErr('Could not load your buckets.');
+    } catch { setErr('Could not load your buckets.'); } finally { setLoading(false); }
   }, [tenantSlug]);
   useEffect(() => { load(); }, [load]);
 
@@ -41,21 +46,24 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
       includeClosed,
       useTimeline: true,
     };
+    setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, criteria }) });
+      const res = await fetch(`/api/portal/${tenantSlug}/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, criteria }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not create the bucket.'); return; }
       setName(''); setKeywords(''); setAgencies(''); setProgramTypes(''); setNaics(''); setIncludeClosed(false);
-      await load();
-    } catch { /* ignore */ } finally { setBusy(false); }
-  }, [tenantSlug, name, keywords, agencies, programTypes, naics, includeClosed, load]);
+      await load(); router.refresh(); // refresh the console's bucket count
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
+  }, [tenantSlug, name, keywords, agencies, programTypes, naics, includeClosed, load, router]);
 
   const del = useCallback(async (id: string) => {
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not delete the bucket.'); return; }
       if (openId === id) { setRanked(null); setOpenId(null); activeRef.current = null; setReranking(false); }
-      await load();
-    } catch { /* ignore */ } finally { setBusy(false); }
-  }, [tenantSlug, openId, load]);
+      await load(); router.refresh();
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
+  }, [tenantSlug, openId, load, router]);
 
   const rank = useCallback(async (id: string) => {
     setBusy(true);
@@ -117,7 +125,8 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
               </div>
             </div>
           ))}
-          {buckets.length === 0 && <p className="text-xs text-gray-400">No buckets yet.</p>}
+          {err && <p className="text-xs text-rose-600">{err}</p>}
+          {buckets.length === 0 && !err && <p className="text-xs text-gray-400">{loading ? 'Loading buckets…' : 'No buckets yet.'}</p>}
         </div>
       </div>
 

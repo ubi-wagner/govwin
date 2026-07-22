@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { GuardrailEditor } from './guardrail-editor';
 import { recommendedGuardrails } from '@/lib/guardrail-defaults';
 
@@ -32,6 +33,9 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
   const [label, setLabel] = useState('primary');
   const [now, setNow] = useState(0); // 0 until mounted (avoids SSR hydration mismatch)
   const [editorPortal, setEditorPortal] = useState<string | null>(null); // portal being configured before launch
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     setNow(Date.now());
@@ -43,7 +47,8 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/portals`);
       if (res.ok) setPortals((await res.json()).data?.portals ?? []);
-    } catch { /* keep */ }
+      else setErr('Could not load your portals.');
+    } catch { setErr('Could not load your portals.'); } finally { setLoading(false); }
   }, [tenantSlug]);
 
   useEffect(() => {
@@ -54,23 +59,26 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
 
   const create = useCallback(async () => {
     if (!newOpp.trim()) return;
-    setBusy('new');
+    setBusy('new'); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/portals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opportunityId: newOpp.trim(), label: label.trim() || 'primary' }) });
+      const res = await fetch(`/api/portal/${tenantSlug}/portals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ opportunityId: newOpp.trim(), label: label.trim() || 'primary' }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not open the portal.'); return; }
       setNewOpp(''); setLabel('primary');
-      await load();
-    } catch { /* ignore */ } finally { setBusy(null); }
-  }, [tenantSlug, newOpp, label, load]);
+      await load(); router.refresh(); // refresh the console's portal count
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
+  }, [tenantSlug, newOpp, label, load, router]);
 
-  const portalAction = useCallback(async (id: string, action: string, body?: unknown) => {
-    setBusy(id);
+  const portalAction = useCallback(async (id: string, action: string, body?: unknown): Promise<boolean> => {
+    setBusy(id); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/portals/${id}?action=${action}`, {
+      const res = await fetch(`/api/portal/${tenantSlug}/portals/${id}?action=${action}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}),
       });
-      await load();
-    } catch { /* ignore */ } finally { setBusy(null); }
-  }, [tenantSlug, load]);
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'That action could not be completed.'); return false; }
+      await load(); router.refresh();
+      return true;
+    } catch { setErr('Network error — please try again.'); return false; } finally { setBusy(null); }
+  }, [tenantSlug, load, router]);
 
   return (
     <div className="space-y-6">
@@ -87,6 +95,8 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
           <button disabled={busy === 'new' || !newOpp.trim()} onClick={create} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-1.5 disabled:opacity-50">Open portal</button>
         </div>
       )}
+
+      {err && <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{err}</div>}
 
       <div className="space-y-3">
         {portals.map((p) => (
@@ -141,7 +151,10 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
                     <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'advance-stage', { force: true })} className="text-xs text-gray-500 border border-gray-200 rounded px-3 py-1 hover:bg-gray-50">Force advance</button>
                   </>
                 )}
-                <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'revoke-shadow')} className="text-xs text-rose-600 border border-rose-200 rounded px-2.5 py-1 hover:bg-rose-50 ml-auto">Revoke shadow admin</button>
+                {/* The T&C shadow grant auto-revokes at launch, so only offer it pre-launch. */}
+                {(p.status === 'guardrails_pending' || p.status === 'curation_pending') && (
+                  <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'revoke-shadow')} className="text-xs text-rose-600 border border-rose-200 rounded px-2.5 py-1 hover:bg-rose-50 ml-auto">Revoke shadow admin</button>
+                )}
               </div>
             )}
             {p.status !== 'curation_pending' && (
@@ -153,7 +166,7 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
             )}
           </div>
         ))}
-        {portals.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No portals yet. Open one from a pinned opportunity.</p>}
+        {portals.length === 0 && <p className="text-sm text-gray-400 text-center py-10">{loading ? 'Loading your portals…' : 'No portals yet. Open one from a pinned opportunity.'}</p>}
       </div>
 
       {/* Author the build workflow before launch (keyed so each portal gets fresh defaults). */}
@@ -166,8 +179,8 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
         onLaunch={async (config) => {
           const id = editorPortal;
           if (!id) return;
-          await portalAction(id, 'accept', { guardrailConfig: config });
-          setEditorPortal(null);
+          const ok = await portalAction(id, 'accept', { guardrailConfig: config });
+          if (ok) setEditorPortal(null); // on failure keep the editor open with the error
         }}
       />
     </div>

@@ -139,6 +139,10 @@ export default async function ManagePage({
           status: p.status, createdAt: p.createdAt, opportunityId: p.opportunityId,
         })),
         canEdit,
+        // Stripe checkout/portal act on the SESSION's tenant; only the company's own
+        // admin (session tenant === this tenant) may drive them. A descended shadow
+        // admin sees the state read-only. (Comp-code purchase is the live path anyway.)
+        canManageBilling: sessionUser.tenantId === tenantId,
         productTier: tenantInfo?.productTier ?? 'trial',
         memberSince,
         tenantInfo: tenantInfo ? {

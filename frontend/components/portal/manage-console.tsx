@@ -42,6 +42,7 @@ export interface ManageAccount {
   hasStripeCustomer: boolean;
   purchases: ManagePurchase[];
   canEdit: boolean;
+  canManageBilling: boolean;
   productTier: string;
   memberSince: string | null;
   tenantInfo: { name: string; legalName: string | null; website: string | null; billingEmail: string | null } | null;
@@ -93,13 +94,14 @@ export function ManageConsole({
     { key: 'aiusage', icon: '🤖', label: 'AI usage', count: null },
   ];
 
-  // The spine — subscribe → spotlight → buy → build → close out.
-  const spine: { key: string; label: string; value: string; open?: string }[] = [
+  // The spine — subscribe → spotlight → buy → build → close out. Each card either opens a
+  // drawer (open) or links to the full page (href).
+  const spine: { key: string; label: string; value: string; open?: string; href?: string }[] = [
     { key: 'subscribe', label: 'Subscribe', value: account.subscriptionStatus, open: 'account' },
     { key: 'spotlight', label: 'Spotlight', value: `${counts.buckets} bucket${counts.buckets === 1 ? '' : 's'} · ${counts.opps} OPP${counts.opps === 1 ? '' : 's'}`, open: 'buckets' },
     { key: 'buy', label: 'Buy', value: `${counts.portals} portal${counts.portals === 1 ? '' : 's'}`, open: 'portals' },
-    { key: 'build', label: 'Build', value: `${counts.proposals} active`, open: undefined },
-    { key: 'closeout', label: 'Close out', value: `${counts.tasks} to-do${counts.tasks === 1 ? '' : 's'}`, open: undefined },
+    { key: 'build', label: 'Build', value: `${counts.proposals} active`, href: `/portal/${tenantSlug}/proposals` },
+    { key: 'closeout', label: 'Close out', value: `${counts.tasks} to-do${counts.tasks === 1 ? '' : 's'}`, href: `/portal/${tenantSlug}/processes` },
   ];
 
   const subCls = SUB_STYLE[account.subscriptionStatus] ?? SUB_STYLE.none;
@@ -130,14 +132,11 @@ export function ManageConsole({
                 <p className="text-sm font-semibold text-gray-900 mt-1 capitalize truncate">{s.value}</p>
               </>
             );
+            const cardCls = 'text-left rounded-xl border border-gray-200 bg-white p-3 hover:border-indigo-300 hover:shadow-sm transition';
             return s.open ? (
-              <button
-                key={s.key}
-                onClick={() => setActive(s.open!)}
-                className="text-left rounded-xl border border-gray-200 bg-white p-3 hover:border-indigo-300 hover:shadow-sm transition"
-              >
-                {inner}
-              </button>
+              <button key={s.key} onClick={() => setActive(s.open!)} className={cardCls}>{inner}</button>
+            ) : s.href ? (
+              <Link key={s.key} href={s.href} className={`block ${cardCls}`}>{inner}</Link>
             ) : (
               <div key={s.key} className="rounded-xl border border-gray-200 bg-white p-3">{inner}</div>
             );
@@ -186,6 +185,7 @@ export function ManageConsole({
             subscriptionStatus={account.subscriptionStatus}
             hasStripeCustomer={account.hasStripeCustomer}
             purchases={account.purchases}
+            canManageBilling={account.canManageBilling}
           />
           <div className="mt-4">
             <ProfileEditor
@@ -248,7 +248,7 @@ export function ManageConsole({
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-3">
-            Per-surface access (bucket pinning, library editing, workflow actors) is granted in those admins. Change-role and tenant-level collaborator management arrive next.
+            Per-surface access (bucket pinning, library editing, workflow actors) is granted in those admins. Tenant-level collaborator management arrives next.
             {' '}<Link href={`/portal/${tenantSlug}/team`} className="text-indigo-600 hover:underline">Full team page →</Link>
           </p>
         </DrawerShell>
