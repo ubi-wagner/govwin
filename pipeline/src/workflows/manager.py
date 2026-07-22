@@ -1022,7 +1022,7 @@ class WorkflowManager:
             rows = await conn.fetch(
                 """
                 SELECT id, tenant_id, assignee_role, assignee_user_id, title, due_at,
-                       nudge_schedule, nudges_sent
+                       nudge_schedule, nudges_sent, entity_type, entity_id
                 FROM tasks
                 WHERE status IN ('open', 'in_progress') AND due_at IS NOT NULL
                   AND nudge_schedule <> '[]'::jsonb
@@ -1121,7 +1121,37 @@ class WorkflowManager:
         await self._emit_event(conn, "system", "notification.requested", tenant_str, ctx)
 
         if is_final and t["tenant_id"]:
-            mgr = await conn.fetchrow(
+            # The FINAL nudge escalates to the task's manager(s). For a portal task these
+            # are the portal's DELEGATED managers (guardrail_config); otherwise it's the
+            # tenant's oldest admin (see _final_notice_user_ids).
+            for uid in await self._final_notice_user_ids(conn, t):
+                await self._emit_event(
+                    conn, "system", "notification.requested", tenant_str,
+                    {
+                        "channel": "email",
+                        "template": "task_nudge_manager",
+                        "user_id": str(uid),
+                        "title": t["title"],
+                        "due_at": t["due_at"].isoformat(),
+                        "login_url": login_url,
+                        "task_id": str(t["id"]),
+                    },
+                )
+
+    async def _final_notice_user_ids(self, conn: asyncpg.Connection, t: Any) -> list:
+        """Recipients of a task's FINAL (escalation) nudge.
+
+        The tenant's admin is the DEFAULT recipient on EVERY task — the customer always
+        sees the escalation. A PORTAL task ALSO notifies its DELEGATED managers: the
+        guardrail_config collaborators with role='manager', resolved by email to active
+        users (which may include one of our experts in another tenant, so resolve globally
+        by email). Delegates are added ON TOP of the admin, deduped; a portal may have none.
+        """
+        ids: list = []
+
+        # Default on all: the tenant's (primary) admin always gets the final notice.
+        try:
+            admin = await conn.fetchrow(
                 """
                 SELECT id FROM users
                 WHERE tenant_id = $1 AND role = 'tenant_admin' AND is_active = true
@@ -1129,19 +1159,49 @@ class WorkflowManager:
                 """,
                 t["tenant_id"],
             )
-            if mgr:
-                await self._emit_event(
-                    conn, "system", "notification.requested", tenant_str,
-                    {
-                        "channel": "email",
-                        "template": "task_nudge_manager",
-                        "user_id": str(mgr["id"]),
-                        "title": t["title"],
-                        "due_at": t["due_at"].isoformat(),
-                        "login_url": login_url,
-                        "task_id": str(t["id"]),
-                    },
+            if admin:
+                ids.append(admin["id"])
+        except Exception as e:
+            logger.error("[_final_notice] admin default lookup failed: %s", e)
+
+        # A portal task ALSO notifies its delegated managers (added or not).
+        if t.get("entity_type") == "portal" and t.get("entity_id"):
+            cfg = None
+            try:
+                prow = await conn.fetchrow(
+                    "SELECT guardrail_config FROM proposal_portals WHERE id = $1", t["entity_id"]
                 )
+                cfg = prow["guardrail_config"] if prow else None
+            except Exception as e:
+                logger.error("[_final_notice] portal lookup failed for %s: %s", t.get("entity_id"), e)
+            if isinstance(cfg, str):
+                try:
+                    cfg = json.loads(cfg or "{}")
+                except Exception:
+                    cfg = None
+            emails = [
+                c.get("email")
+                for c in ((cfg or {}).get("collaborators") or [])
+                if isinstance(c, dict) and c.get("role") == "manager" and c.get("email")
+            ]
+            if emails:
+                try:
+                    urows = await conn.fetch(
+                        "SELECT id FROM users WHERE lower(email) = ANY($1::text[]) AND is_active = true",
+                        [e.lower() for e in emails],
+                    )
+                    ids.extend(u["id"] for u in urows)
+                except Exception as e:
+                    logger.error("[_final_notice] manager email resolve failed: %s", e)
+
+        # Dedup, preserving order (admin first).
+        seen: set = set()
+        out: list = []
+        for i in ids:
+            if i not in seen:
+                seen.add(i)
+                out.append(i)
+        return out
 
     async def _sweep_date_anchored_tasks(self, conn: asyncpg.Connection) -> int:
         """Materialize date-ANCHORED tasks from a proposal's deadline (J2).

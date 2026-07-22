@@ -130,7 +130,7 @@ export function GuardrailEditor({
         {/* Managers */}
         <div className="mt-5">
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Managers</h3>
-          <p className="text-[11px] text-gray-400 mb-2">Delegated per portal — a teammate or one of our experts to oversee this build. As many as you want.</p>
+          <p className="text-[11px] text-gray-400 mb-2">Your admins always get the final (3rd) nudge. Delegate it to more people per portal — a teammate or one of our experts (e.g. Econ-dev) — added or not, as many as you want.</p>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {managers.map((m, i) => (
               <span key={i} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs text-indigo-700">
@@ -138,7 +138,7 @@ export function GuardrailEditor({
                 <button onClick={() => setManagers((cur) => cur.filter((_, j) => j !== i))} aria-label={`Remove ${m}`} className="text-indigo-300 hover:text-rose-600">✕</button>
               </span>
             ))}
-            {managers.length === 0 && <span className="text-[11px] text-gray-400">No managers yet — the final notice goes to your admins.</span>}
+            {managers.length === 0 && <span className="text-[11px] text-gray-400">No delegates yet — the final notice still goes to your admins.</span>}
           </div>
           <div className="flex gap-1.5">
             <input
@@ -155,7 +155,7 @@ export function GuardrailEditor({
         {/* Nudges */}
         <div className="mt-5">
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Nudges</h3>
-          <p className="text-[11px] text-gray-400 mb-2">Up to 3 reminders (days before due, at least 1). The last is the final notice (to your admins today; manager-routing ships next). Leave empty for none.</p>
+          <p className="text-[11px] text-gray-400 mb-2">Up to 3 reminders (days before due, at least 1). The last is the final notice — it goes to your admins plus any delegated managers. Leave empty for none.</p>
           <div className="flex items-center gap-1.5">
             {nudges.map((d, i) => (
               <span key={i} className="inline-flex items-center gap-1">
