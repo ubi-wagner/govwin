@@ -112,7 +112,8 @@ export function Cockpit({
 
       {/* Drawers — pure overlays; content mounts (and self-loads) only when open. */}
       <Drawer open={active === 'todos'} onClose={close} side="right" width="w-96" ariaLabel="To-dos">
-        <DrawerShell title="To-dos" onClose={close}>
+        {/* TaskQueue renders its own "Your To-Dos" heading — leave the shell title empty. */}
+        <DrawerShell title="" onClose={close}>
           <TaskQueue apiBase={`/api/portal/${tenantSlug}/tasks`} tenantSlug={tenantSlug} />
         </DrawerShell>
       </Drawer>
@@ -177,7 +178,7 @@ function DrawerShell({ title, onClose, children }: { title: string; onClose: () 
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        {title ? <h2 className="text-base font-semibold text-gray-900">{title}</h2> : <span />}
         <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
       </div>
       {children}

@@ -69,6 +69,7 @@ export default async function ProposalsListPage({ params }: Props) {
           (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
         FROM proposals p
         INNER JOIN proposal_collaborators pc ON pc.proposal_id = p.id AND pc.user_id = ${sessionUser.id}::uuid
+          AND pc.accepted_at IS NOT NULL AND pc.revoked_at IS NULL
         JOIN opportunities o ON o.id = p.opportunity_id
         WHERE p.tenant_id = ${tenantId}::uuid
         ORDER BY p.created_at DESC

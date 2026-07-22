@@ -103,17 +103,20 @@ export default async function PortalLayout({
         <div className="flex-1 min-h-0">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-lg font-bold truncate">{companyName}</h2>
-            <NotificationBell tenantSlug={tenantSlug} />
+            {!isPartner && <NotificationBell tenantSlug={tenantSlug} />}
           </div>
           <p className="text-xs text-gray-400 mb-6 truncate">{userName}</p>
           <nav className="flex flex-col gap-1 text-sm">
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>
-                <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>
-                <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>
+                {/* BD surfaces — delegated authority, gated to tenant_admin to
+                    match the cockpit's grant model (a base tenant_user does not
+                    see Opportunities/Buckets/Builds). */}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
                 <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>
-                <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
               </>
             )}
             <PortalNavLink href={`${basePath}/proposals`}>Proposals</PortalNavLink>
@@ -123,7 +126,7 @@ export default async function PortalLayout({
                 <PortalNavLink href={`${basePath}/activity`}>Activity</PortalNavLink>
                 <PortalNavLink href={`${basePath}/team`}>Team</PortalNavLink>
                 <PortalNavLink href={`${basePath}/documents`}>Documents</PortalNavLink>
-                <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/billing`}>Billing</PortalNavLink>}
                 {isTenantAdmin && (
                   <PortalNavLink href={`${basePath}/agents`}>AI Usage</PortalNavLink>
                 )}
