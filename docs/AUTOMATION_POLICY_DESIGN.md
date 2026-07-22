@@ -66,10 +66,11 @@ VIA  <channel>                email (today) | in-app todo | both
 ```
 
 - **Recipients (who).** A resolved user set from: `roles` (e.g. `tenant_admin`, `tenant_user`), explicit
-  `user_ids`, the sentinel `delegated_managers` (portal `guardrail_config` managers), and
-  `collaborators_at_stage` (the `proposal_collaborators` for the gate's stage). **The admin final-notice
-  invariant is NOT a recipient — it is a floor** (§7): recipients are *added on top of* the admin, never
-  instead of.
+  `user_ids`, the sentinel `delegated_managers` (portal `guardrail_config` managers — who carry admin
+  authority on that portal, decision ②), and `collaborators_at_stage` (the `proposal_collaborators` for the
+  gate's stage). **The escalation floor is NOT a recipient — it is a floor** (decision ①): recipients are
+  *added on top of* the floor. The floor itself is **delegated managers, then the RFP-Pipeline shadow
+  admin** if no manager is active — never removable.
 - **Trigger (which event).** A `trigger_key` = a namespaced lifecycle event (`capture:card.applied`,
   `proposal:proposal.advanced`, `proposal:document.locked`, `finder:solicitation.pushed`, …). Optional
   `condition` predicate over the event payload (reuses `conditionsMatch()` from `lib/automation/match`).
@@ -77,7 +78,9 @@ VIA  <channel>                email (today) | in-app todo | both
   set up", "5 business days to draft"), or a **relative** anchor `relative_to: {anchor: 'close_date',
   offset_minutes: -20160}` (discovery-side: "nudge 2 weeks before the solicitation closes"). The anchor
   reads a real column on the entity (`opportunities.close_date`, `tenant_opportunity_cards`,
-  `proposals`). Resolves to `due_at` on the `tasks` row.
+  `proposals`). Resolves to `due_at` on the `tasks` row. **The `close_date` anchor is guaranteed present**
+  (decision ⑤): a card can't be created without open+close dates — estimated (`is_estimated`) if
+  unpublished, upgraded to official on publish — so there is no null-anchor case.
 - **Escalation (how it climbs).** `nudge_days: int[]` relative cadence (already the `nudge_schedule` on
   `tasks`). The **last entry always adds the admin(+managers)** via the existing `_final_notice_user_ids`
   — the policy can lengthen/shorten the cadence and add earlier recipients, but the terminal beat is a
@@ -144,11 +147,16 @@ CREATE TABLE tenant_automation_policies (
 -- proposal_portals (mig 097). Cross-tenant admin reads go through a BYPASS/owner-view (§7 gotcha 4).
 ```
 
-**Defaults are a system row, not per-tenant seeding.** A tenant with no row for a trigger falls back to a
-**platform-default policy** (a code constant = today's hardcoded values: `[1,3]`, 72h, the canonical
-assignee). So an un-configured tenant behaves exactly as today — the policy is **override-on-top**, never
-a prerequisite. (This is the crucial de-risking property: shipping the table changes nothing until a
-tenant edits a rule.)
+**Defaults are the platform framework row, not per-tenant seeding.** A tenant with no row for a trigger
+falls back to the **platform framework** (decision ⑦/§12 — the RFP-admin-tunable defaults: `[1,3]`, 72h,
+the canonical assignee, max buckets, agent budget ceiling). So an un-configured tenant behaves exactly as
+today — the policy is **override-on-top**, never a prerequisite. (This is the crucial de-risking property:
+shipping the table changes nothing until a tenant edits a rule.)
+
+> **This table is the *tenant* level.** The full model has **three** levels (§12): the **platform
+> framework** (RFP-admin, the control-plane defaults + the hard-to-tenant values), this **tenant** table,
+> and the **portal** config (per-build, on `proposal_portals.guardrail_config`, templated from the last
+> portal — §13). The resolver (§4) merges them by precedence.
 
 ---
 
@@ -158,10 +166,11 @@ tenant edits a rule.)
 resolveAutomationPolicy(tenantId, triggerKey, ctx) → ResolvedOverlay | null
 ```
 
-- **Precedence (highest wins):** explicit per-launch override (a bridge that *must* pin a value) →
-  tenant policy row → platform-default constant. A launch site passes only what it must pin; everything
-  else comes from policy/default. This keeps the 72h curation SLA pinnable by the release path while
-  letting a tenant tune its *build* nudges.
+- **Precedence (highest wins, §12):** explicit per-launch override → **portal** config → **tenant** policy
+  → **platform** framework default. A launch site passes only what it must pin; everything else resolves
+  down the chain. **Framework-hard values** (72h SLA, max buckets, overlay frameworks, agent skills/tools)
+  are settable **only** at the platform level — a tenant/portal attempt to move them is refused, so the 72h
+  curation SLA can't be tuned down by a tenant while per-portal *build* nudges stay tenant-owned.
 - **Returns** `{ enabled, assigneeRole, assigneeUser?, recipientUserIds[], nudgeDays[], dueMinutes | dueAt,
   channel, cooldownMinutes, maxFiresPerHour }` — i.e. exactly the `ProjectCollaboration` overlay fields
   plus the resolved recipient set for NOTIFY beats.
@@ -179,6 +188,11 @@ resolveAutomationPolicy(tenantId, triggerKey, ctx) → ResolvedOverlay | null
 
 ## 5. UI — the Automation tab grows from 6 toggles to the grammar
 
+> **This is the tenant surface — one of three (decision ⑦ / §12).** The RFP-Pipeline **control-plane** page
+> owns the framework (SLA, max buckets, overlay frameworks, agent settings + monitors); the **portal-build
+> wizard** (§13) owns per-portal actors/timelines/nudges. This section is the middle one: the company
+> admin's tenant tab.
+
 `/portal/[slug]/manage` → **Automation** (today `automation-preferences-card.tsx`, 6 checkboxes) becomes a
 per-trigger policy editor, still `tenant_admin`-gated, still emitting `capture:automation_preferences.updated`.
 
@@ -186,8 +200,8 @@ per-trigger policy editor, still `tenant_admin`-gated, still emitting `capture:a
 - Each row: an **on/off** (the old boolean, preserved), then **Who** (role chips + user picker +
   "delegated managers"), **When** (a due window or a "before close date" offset), **Escalate** (a nudge
   cadence builder, e.g. `[1,3,5]`), **How** (email / todo / both).
-- **The admin final-notice is shown as a locked, non-removable chip** ("Your admin always gets the final
-  notice") so the invariant is visible, not hidden (§7 gotcha 1).
+- **The escalation floor is shown as a locked, non-removable chip** ("Your managers — and RFP-Pipeline if
+  none — always get the final notice") so the invariant is visible, not hidden (decision ①).
 - RFP-admin sees the **same editor in shadow** (already how `/manage` works) plus a platform-default
   view under `/admin/automation`.
 
@@ -209,9 +223,10 @@ There are **two** evaluators and they must never both fire on one trigger (CLIFF
 **Rule:** a trigger_key is owned by exactly one of them. Discovery/build lifecycle triggers → policy;
 admin-ops triggers → automation_rules. The policy layer **reuses** the rules engine's proven machinery —
 `automation_log` (start/finalize rows), `cooldown_minutes`, `max_fires_per_hour`, `conditionsMatch()` —
-so policy-driven notifies are observable and rate-limited exactly like admin rules. (Implementation
-option: the policy resolver *emits synthetic `automation_rules`-shaped rows* the same evaluator consumes,
-vs. a parallel evaluator. Open decision — §10.)
+so policy-driven notifies are observable and rate-limited exactly like admin rules. **Decision ② (settled):
+keep the two engines** — federated by the single-owner rule, not merged. Managers-being-admins is a
+recipient/authority fact and doesn't blur the trigger-ownership split (a manager tunes via the tenant/portal
+policy editor, never the RFP-ops console).
 
 ---
 
@@ -228,10 +243,11 @@ same four dimensions, plus two agent-specific ones:
   notified / whose review queue* the advisory routes to.
 - **Escalation.** If the agent safe-skips (budget/round/guardrail stop), the policy's escalation still
   fires the human beat — the workflow never dead-ends.
-- **Budget as a policy dimension (new).** The per-tenant policy carries the agent's **budget ceiling /
-  rate** for auto-runs, enforced by the fabric's existing runaway caps (round/cost/rate/budget in
-  `fabric.invoke_agent`). A permissive policy can raise cadence but the caps still bind
-  (`RATE_MONITORING.md` §2/§3).
+- **Budget as a policy dimension, under a platform ceiling (decision ⑨).** The per-tenant policy sets the
+  agent's auto-run budget/rate — but can only **lower** it below the **platform ceiling**, which is itself
+  **RFP-admin-tunable** in the control plane (§12). The fabric's runaway caps (round/cost/rate/budget in
+  `fabric.invoke_agent`) still bind regardless (`RATE_MONITORING.md` §2/§3) — a permissive policy raises
+  cadence but never the ceiling.
 - **RLS.** Agent auto-runs go through the `rfp_agent` NOBYPASSRLS path with `SET app.tenant_id` (mig 117);
   the policy is read tenant-scoped. No new isolation surface.
 
@@ -266,60 +282,135 @@ they may spend — one grammar for humans and agents.
 
 ---
 
-## 10. Open decisions & GOTCHAS (for review — look here first)
+## 10. Resolved decisions (review 2026-07-22) — supersedes the prior gotchas
 
-1. **Admin final-notice floor is non-negotiable.** Recipients are **additive**; the policy UI must render
-   the admin(+managers) terminal beat as a **locked** chip. A tenant must not be able to configure a gate
-   whose escalation never reaches a human who can act. *Decision needed: is the floor admin-only, or
-   admin-OR-any-active-tenant_admin if the primary is inactive?* (`_final_notice_user_ids` picks the
-   oldest active admin — confirm that's the desired tie-break.)
-2. **Supersession vs. parallel-run.** Do we (a) generalize `automation_rules` to carry a `tenant_id` +
-   the extra dimensions and have ONE evaluator, or (b) keep two tables/evaluators federated by the
-   single-owner rule (§6)? (b) is less refactor and keeps admin vs. tenant scopes clean; (a) is one
-   engine but risks the double-fire class. **Leaning (b).**
-3. **"New priority opportunity" needs a definition.** The discovery trigger `notify_on_new_priority_opp`
-   is a boolean today; as a policy it needs a *predicate*: top-N by `rank_score`? a score threshold?
-   focus-agency match? entered a named bucket? This sub-grammar can balloon — **scope it to a small,
-   fixed predicate set v1** (threshold + focus-agency), extensible later.
-4. **RLS-cutover.** The resolver reads `tenant_automation_policies` (RLS-forced). Tenant-scoped launches
-   are fine (they set `app.tenant_id`). But any **cross-tenant admin read** of policy (the `/admin`
-   platform view) must run on a BYPASS connection / owner-view — same caveat as the retired-table
-   repoints (launch-readiness item #9, `DEPRECATION_CLEANUP_2026-07-22.md`).
-5. **Timing anchor data availability.** `relative_to: close_date` requires the card/opp to carry a
-   reliable `close_date`; some sources don't. Fallback: if the anchor column is null, degrade to a
-   sensible absolute window and **log the degradation** (no silent "never nudged").
-6. **Cooldown/rate on discovery notifies.** A tenant watching many buckets could be spammed on a busy
-   push. Policy rows carry `cooldown_minutes`/`max_fires_per_hour` (reused) — but we need a sane default
-   so a fresh policy isn't a firehose.
-7. **Per-launch override precedence.** The 72h curation SLA is a **business rule**, not a tenant knob —
-   the release path pins it via the explicit-override tier (§4). We must enumerate which values are
-   **tenant-tunable** vs **platform-pinned** so a tenant can't, e.g., set the admin curation gate to
-   30 days.
-8. **Frozen-at-launch vs. live policy.** Portal `guardrail_config` is **frozen at accept-launch** (mig
-   097). If a tenant edits policy mid-build, does the running portal pick up new nudges? **Proposal:**
-   policy edits affect **future** launches + **future** nudge computations, but a running instance's
-   already-written `nudge_schedule` stays as launched (consistency with the frozen guardrail). Confirm.
-9. **Agent budget in policy vs. fabric default.** If policy carries a per-tenant agent budget, reconcile
-   it with the fabric's platform default (`monthly_budget`) — policy can only **lower** below the
-   platform ceiling, never raise above it (fail-safe).
+All nine review items are decided; the rest of this doc is updated to match. §12 (three-level tunability)
+and §13 (portal-build & templating) carry the structural decisions from ⑦.
+
+**① Escalation floor = delegated managers, then the RFP-Pipeline shadow admin.** The terminal nudge goes
+to the portal's **delegated managers** (who carry admin authority — see ②); if none are active it falls
+back to the **RFP-Pipeline shadow admin** ("us") as the ultimate backstop. So the floor is "a manager who
+can act, else the platform" — never the void, and not hostage to one tenant admin being active.
+`_final_notice_user_ids` is updated: managers first, platform-shadow fallback.
+
+**② Two engines — CONFIRMED, and it holds even though managers are admins.** Managers-as-admins is a
+*recipient / authority* fact (a delegated manager resolves with tenant_admin authority **on that portal**),
+not a *trigger-ownership* fact. The federation splits by trigger owner (tenant lifecycle → policy engine;
+RFP-ops → `automation_rules`), which who-counts-as-admin doesn't touch. It actually reinforces two: a
+manager tunes automation through the **tenant/portal policy editor**, never the RFP-ops console. The
+resolver just treats `delegated_managers` as carrying admin authority for "who may satisfy an admin gate."
+**Still two.**
+
+**③ "Priority OPP" = the bucket's parameters (extensible), else company-match + time-to-close.** When the
+OPP sits in a bucket, that bucket's parameters (which we expand over time) define priority — the bucket IS
+the predicate. With **no** bucket, priority = a match against the tenant's **company profile** + proximity
+to the **close date**. No separate fixed predicate table.
+
+**④ RLS cutover — IN SCOPE, via shadow-down. Concur, with one addition.** Access model:
+- RFP admin **shadows down** into a tenant portal (sets `app.tenant_id` to that tenant).
+- Tenant admin shadows down into **their own** proposals.
+- Everyone else lives at the **company (tenant) level** or as a **collaborator on a specific portal**.
+Every actor is tenant-scoped, so the resolver's reads are correct under `NOBYPASSRLS`. **Addition (the one
+thing shadow-down doesn't cover):** aggregate **cross-tenant** reads — the RFP-Pipeline platform dashboards
+and the CMS `matched_opportunities` bridge — can't shadow down to one tenant; they run on an
+**owner-view / BYPASS** connection. So: shadow-down for per-tenant work, owner-views for platform-wide
+reporting. With that, concur — and this promotes the RLS cutover from "item #9, later" to in-scope.
+
+**⑤ No card without dates — the null anchor is designed out.** An OPP card **cannot be created without an
+open AND a close date**, and **may never pass its expected open date without an expected close date**
+(enforced RFP-admin-side at ingest). If the org hasn't published, the RFP admin enters **ESTIMATED** dates
+(`is_estimated=true`); when the org publishes, they upgrade to **OFFICIAL**. So `relative_to: close_date`
+always has an anchor — the degrade path is deleted.
+
+**⑥ Regulator — build it, low priority; delivery is cron digests; the DB is sacrosanct.** Build the
+cooldown/rate regulator but it's not urgent. Delivery is **cron-based**: a batched **summary update +
+ToDo notifications**, not a per-event firehose. **Hard rule: everything lands in the DB first** — the
+ToDo/notification rows exist regardless of delivery cadence; nothing is ever dropped.
+
+**⑦ Everything is tunable — at three levels** (platform / tenant / portal). This replaces "tunable vs
+pinned": the 72h SLA, max #buckets, workflow-overlay frameworks, and agent skills/tools/budget-ceiling are
+*hard to the tenant* but **RFP-admin-tunable** in a special control-plane page; the tenant tunes buckets +
+roles + nudges; the portal tunes per-build actors/timelines/nudges. Full model in **§12**; the portal
+build wizard + templating in **§13**.
+
+**⑧ Frozen-vs-live = the gate model. Sound.** Anything **ahead of the active build phase** is tunable;
+the **current phase and previously-locked phases are frozen**. You change things by **setting up the next
+phase and force-advancing** — exactly what the gates already enforce. Policy edits therefore land on future
+phases; an in-flight phase keeps its launched `nudge_schedule`.
+
+**⑨ Agent budget — tenant lowers within a platform ceiling the RFP admin tunes.** A tenant policy can only
+**lower** an agent's budget below the platform ceiling (fail-safe), and the **ceiling itself is
+RFP-admin-tunable** in the same control plane (⑦/§12).
 
 ---
 
 ## 11. Build order (once the design is signed off)
 
-1. Migration + table + RLS + platform-default constant (ships inert — no behavior change).
-2. `resolveAutomationPolicy()` + unit tests; repoint `launchProjectCollaboration` callers to it
-   (behavior identical while every tenant rides the default).
-3. Discovery NOTIFY beats + build TODO gates read the resolver.
-4. Backfill the 6 booleans → policy rows; dual-read.
-5. The Automation-tab editor (grammar UI) + the locked admin-floor chip.
-6. Agent-fabric dimensions (auto-run enable + advisory recipients + budget) on the same rows.
-7. Retire `tenant_automation_preferences` (drop rule) once zero refs.
-8. Verify: `tsc`/`vitest`/`pytest wiring` + a live drive of one discovery + one build policy end-to-end
-   (edit policy → trigger event → correct recipients/timing/escalation in the `tasks` row + `system_events`).
+1. Migration + tables + RLS + the **platform framework** row (§12) seeded from today's constants
+   (72h SLA, max buckets, overlay frameworks, agent skills/tools/budget-ceiling). Ships inert.
+2. **Card-creation date guard (⑤):** require open+close (estimated or official, `is_estimated` flag) at
+   card creation, RFP-admin-side; block a create that passes expected-open without expected-close.
+3. `resolveAutomationPolicy()` + unit tests; repoint `launchProjectCollaboration` callers to it
+   (behavior identical while every tenant rides the framework default). Precedence per §12.
+4. Discovery NOTIFY beats + build TODO gates read the resolver; escalation floor → managers-then-platform (①).
+5. Backfill the 6 booleans → tenant policy rows; dual-read.
+6. The three editing surfaces (§12): RFP-Pipeline **control-plane** page (framework + agent settings +
+   monitors), the tenant **Automation** tab (buckets/roles/nudges), the **portal-build wizard** (§13).
+7. Agent-fabric dimensions (auto-run enable + advisory recipients + budget-within-ceiling) on the rows.
+8. Retire `tenant_automation_preferences` (drop rule) once zero refs.
+9. Verify: `tsc`/`vitest`/`pytest wiring` + a live drive of one discovery + one build policy end-to-end,
+   incl. the gate rule (⑧: edit a future phase = takes; edit the active phase = refused).
 
 ---
 
-*This design adds a config table, a resolver, and an editor on top of the existing start→end engine —
-no new workflow infrastructure. The gate, the reconcilers, the escalation floor, and the templates are
-all already built and proven; #190 is where the tenant's voice enters the machine.*
+## 12. The three-level tunability model (⑦)
+
+Everything is tunable — the question is *by whom*. Three levels, most-specific-wins **within what each
+level is allowed to set**:
+
+| Level | Who tunes it | What's tunable | Surface | Overridable below? |
+|---|---|---|---|---|
+| **Platform (framework)** | **RFP-Pipeline admin** | 72h review SLA · max #buckets · standard workflow-overlay frameworks · agent settings (skills · tools · **budget ceiling**) | a special **"this changes the framework"** control-plane page (same surface as the system-state / operations monitors) | **No** — these read as *hard* to tenant + portal; only the RFP admin moves them |
+| **Tenant** | **company admin** | bucket creation + simple report/nudge rules (ToDo + email, **≤3 nudges timed off the OPP dates** on the mirror card) · which roles may **update / view / pin** OPPs · who may **purchase** a portal | the tenant **Automation** tab in `/manage` | overrides framework *defaults* where the framework allows |
+| **Portal** | **company admin at build** (RFP admin in shadow) | per-portal **actors · timelines · nudge cycles** + first-draft mode (§13) | the **portal-build wizard** | most specific; **templated from the last portal** (§13) |
+
+**Resolution precedence (high → low):** explicit launch override ▸ **portal** config ▸ **tenant** policy ▸
+**platform** framework default. Framework-hard values (SLA, max buckets, overlay frameworks, agent
+skills/tools) are set **only** at the platform level — a tenant/portal edit that tries to move them is
+refused, not silently applied. This is the enumeration ⑦ asked for: *hard-to-tenant / RFP-tunable* =
+{SLA, max buckets, overlay frameworks, agent skills·tools·budget-ceiling}; *tenant-tunable* =
+{buckets, their nudge/report rules, OPP roles, purchase rights}; *portal-tunable* =
+{actors, timelines, nudge cycles, first-draft mode}.
+
+**Release note (from ⑦):** the 72h is the **RFP-admin** window to review + build the matrix + release,
+at the RFP-Pipeline level — and a build may be released **as soon as** the matrix + skeleton are ready
+(not forced to wait), or updated later by the RFP admin (which **pushes updates down the secondary
+spines**). Once released to a purchasing tenant, the release is **pushed to all tenant OPP cards**, so a
+**later purchaser gets the build immediately**.
+
+---
+
+## 13. Portal-build configuration & templating (⑦)
+
+At portal build (company-admin level; an RFP admin can do it in shadow), a wizard sets — **per portal**:
+
+1. **First-draft mode** — an **"Agent first"** checkbox (agents draft V0), else the RFP admin / company
+   admin drafts the first copy by moving down into the tenant portal. (All three paths already exist; this
+   is the selector.)
+2. **Manager setup** — assign the portal's managers (they carry admin authority, ②). The **RFP-Pipeline
+   shadow admin is PRE-CHECKED**; unchecking it raises an **explicit opt-out modal** ("you're declining
+   RFP-Pipeline oversight on this build") so the decline is deliberate and audited.
+3. **Actors · timelines · nudge cycles** — the per-portal build cadence that feeds the guardrail
+   workflow's TODO gates (≤3 nudges → the floor in ①).
+
+**Templating:** the **first** portal is **clean and must be completed**; **every subsequent portal is
+templated from the last** — the prior portal's config carries forward as editable defaults. A tenant
+configures once and thereafter refines. (Mechanically: the wizard seeds the new `guardrail_config` +
+portal policy rows from the most recent completed portal for that tenant.)
+
+---
+
+*This design adds config tables, a resolver, and three editing surfaces on top of the existing start→end
+engine — no new workflow infrastructure. The gate, the reconcilers, the escalation floor, and the templates
+are all already built and proven; #190 is where the tenant's — and the RFP admin's — voice enters the
+machine, at the right level.*
