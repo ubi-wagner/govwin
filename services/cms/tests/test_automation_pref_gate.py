@@ -9,13 +9,30 @@ prefs, missing rows, and lookup errors all proceed). All DB calls are mocked.
 from unittest.mock import AsyncMock, patch
 
 
-def _event_pool(pref_value):
-    """Fake shared/event pool whose fetchrow returns a one-column pref row.
-    pref_value=None simulates a tenant with no tenant_automation_preferences row."""
+def _acm(value):
+    """An async-context-manager mock whose __aenter__ yields `value`."""
+    cm = AsyncMock()
+    cm.__aenter__ = AsyncMock(return_value=value)
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return cm
+
+
+def _event_pool(pref_value, *, raise_on_fetch=False):
+    """Fake shared/event pool. Since sweep A1 the gate reads tenant_automation_policies via
+    pool.acquire() -> conn.transaction() -> SET app.tenant_id -> conn.fetchrow. The connection's
+    fetchrow returns a one-column {'v': enabled} row; pref_value=None simulates a tenant with no
+    policy row for that trigger. `pool._conn` is exposed for call assertions."""
+    conn = AsyncMock()
+    if raise_on_fetch:
+        conn.fetchrow = AsyncMock(side_effect=Exception('relation does not exist'))
+    else:
+        conn.fetchrow = AsyncMock(return_value=(None if pref_value is None else {'v': pref_value}))
+    conn.execute = AsyncMock()
+    conn.transaction = lambda *a, **k: _acm(None)
     pool = AsyncMock()
-    pool.fetchrow = AsyncMock(return_value=(None if pref_value is None else {'v': pref_value}))
-    pool.execute = AsyncMock()
+    pool.acquire = lambda *a, **k: _acm(conn)
     pool.fetch = AsyncMock(return_value=[])
+    pool._conn = conn
     return pool
 
 
@@ -53,7 +70,7 @@ class TestAutomationPrefAllows:
         pool = _event_pool(False)
         with patch('src.event_listener.get_event_pool', return_value=pool):
             assert await _automation_pref_allows({'template': 'x'}, {'tenantId': 't1'}) is True
-        pool.fetchrow.assert_not_called()
+        pool._conn.fetchrow.assert_not_called()
 
     async def test_unknown_pref_allows_without_lookup(self):
         from src.event_listener import _automation_pref_allows
@@ -62,7 +79,7 @@ class TestAutomationPrefAllows:
             assert await _automation_pref_allows(
                 {'tenant_pref': 'drop_table_students'}, {'tenantId': 't1'}
             ) is True
-        pool.fetchrow.assert_not_called()  # never reaches SQL — allowlist guard
+        pool._conn.fetchrow.assert_not_called()  # never reaches SQL — allowlist guard
 
     async def test_no_tenant_in_payload_allows(self):
         from src.event_listener import _automation_pref_allows
@@ -71,7 +88,7 @@ class TestAutomationPrefAllows:
             assert await _automation_pref_allows(
                 {'tenant_pref': 'notify_on_stage_advanced'}, {}
             ) is True
-        pool.fetchrow.assert_not_called()
+        pool._conn.fetchrow.assert_not_called()
 
     async def test_pref_on_allows(self):
         from src.event_listener import _automation_pref_allows
@@ -99,8 +116,7 @@ class TestAutomationPrefAllows:
 
     async def test_lookup_error_allows(self):
         from src.event_listener import _automation_pref_allows
-        pool = AsyncMock()
-        pool.fetchrow = AsyncMock(side_effect=Exception('relation does not exist'))
+        pool = _event_pool(None, raise_on_fetch=True)
         with patch('src.event_listener.get_event_pool', return_value=pool):
             assert await _automation_pref_allows(
                 {'tenant_pref': 'notify_on_stage_advanced'}, {'tenantId': 't1'}
@@ -141,9 +157,9 @@ class TestExecuteRuleGate:
              patch('src.event_listener._do_action', new=AsyncMock()) as do_action:
             await _execute_rule(_RULE, _COLS, _doc_locked_event())
         do_action.assert_not_called()  # suppressed before dispatch
-        pool.fetchrow.assert_awaited_once()
-        # the gate resolved tenant scope from the event's tenant_id column
-        assert pool.fetchrow.call_args[0][1] == 'tenant-xyz'
+        pool._conn.fetchrow.assert_awaited_once()
+        # the gate resolved tenant scope from the event's tenant_id column (arg after the SQL)
+        assert pool._conn.fetchrow.call_args[0][1] == 'tenant-xyz'
 
     async def test_pref_on_dispatches_action(self):
         from src.event_listener import _execute_rule

@@ -246,17 +246,19 @@ def _rule_matches(
     return phase != 'start'
 
 
-# ── Tenant automation-preference gate (C3 Increment 3) ───────────────
-# A tenant-scoped rule opts into a customer toggle by naming a column in its
-# action_config.tenant_pref. The listener consults tenant_automation_preferences
-# (shared DB, reachable via the event pool) and skips the action when the tenant
-# has that toggle off. Default-on: a tenant with no preferences row uses the
-# column default. The pref name is allowlisted before it touches SQL.
-_GATED_PREFS: set[str] = {
-    'notify_team_on_document_locked',
-    'notify_collaborators_get_ready',
-    'notify_on_stage_advanced',
-    'notify_on_new_priority_opp',
+# ── Tenant automation gate (#190 single source of truth) ─────────────
+# A tenant-scoped rule opts into a customer toggle by naming a legacy column in its
+# action_config.tenant_pref. Since #190 the tenant edits its choices in the grammar editor,
+# which writes tenant_automation_policies — so this gate now reads THAT table (mapping each
+# legacy pref → the policy's (scope, trigger_key)) instead of the retired
+# tenant_automation_preferences. Previously the two diverged: the editor wrote the new table
+# while this gate read the old one, so a tenant's on/off choice had NO effect (sweep A1).
+# Default-on: a tenant with no policy row for that trigger uses the documented default.
+_PREF_TO_POLICY: dict[str, tuple[str, str]] = {
+    'notify_team_on_document_locked': ('build', 'proposal:document.locked'),
+    'notify_collaborators_get_ready': ('build', 'proposal:collaborator.get_ready'),
+    'notify_on_stage_advanced': ('build', 'proposal:proposal.advanced'),
+    'notify_on_new_priority_opp': ('discovery', 'capture:card.applied'),
 }
 _PREF_DEFAULTS: dict[str, bool] = {
     'notify_team_on_document_locked': True,
@@ -286,7 +288,7 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
     pref = _extract_tenant_pref(config)
     if not pref:
         return True  # rule is not preference-gated
-    if pref not in _GATED_PREFS:
+    if pref not in _PREF_TO_POLICY:
         logger.warning('automation rule names unknown tenant_pref %r — not gating', pref)
         return True
     tenant_id = payload.get('tenantId') or payload.get('tenant_id')
@@ -295,17 +297,24 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
     pool = get_event_pool()
     if not pool:
         return True
+    scope, trigger_key = _PREF_TO_POLICY[pref]
     try:
-        # pref is allowlisted against _GATED_PREFS above, so this interpolation is safe.
-        row = await pool.fetchrow(
-            f'SELECT {pref} AS v FROM tenant_automation_preferences WHERE tenant_id = $1::uuid',
-            str(tenant_id),
-        )
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # Set app.tenant_id so the read stays correct after the NOBYPASSRLS cutover
+                # (tenant_automation_policies is FORCE-RLS, mig 127); the explicit WHERE is the
+                # belt today while the app connects as the RLS-bypassing owner role.
+                await conn.execute("SELECT set_config('app.tenant_id', $1, true)", str(tenant_id))
+                row = await conn.fetchrow(
+                    'SELECT enabled AS v FROM tenant_automation_policies '
+                    'WHERE tenant_id = $1::uuid AND scope = $2 AND trigger_key = $3',
+                    str(tenant_id), scope, trigger_key,
+                )
     except Exception as e:
-        logger.warning('tenant preference lookup failed for %s (tenant %s): %s — allowing', pref, tenant_id, e)
+        logger.warning('tenant policy lookup failed for %s (tenant %s): %s — allowing', pref, tenant_id, e)
         return True  # best-effort: a lookup error must not block notifications
     if row is None:
-        return _PREF_DEFAULTS.get(pref, True)  # lazy row — use the documented default
+        return _PREF_DEFAULTS.get(pref, True)  # tenant hasn't configured this trigger → default on
     return bool(row['v'])
 
 
