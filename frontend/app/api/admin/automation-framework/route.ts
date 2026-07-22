@@ -82,10 +82,12 @@ export async function PATCH(request: Request) {
   for (const [field, col] of Object.entries(INT_FIELDS)) {
     if (field in body) {
       const v = body[field];
-      if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || v > 525600) {
-        return NextResponse.json({ error: `${field} must be a positive integer (minutes/count)`, code: 'VALIDATION_ERROR' }, { status: 422 });
+      // Number.isInteger rejects NaN/Infinity AND fractionals — a fractional was silently
+      // floored before, contradicting the "must be a positive integer" contract (sweep LOW).
+      if (typeof v !== 'number' || !Number.isInteger(v) || v <= 0 || v > 525600) {
+        return NextResponse.json({ error: `${field} must be a positive integer ≤ 525600 (minutes/count)`, code: 'VALIDATION_ERROR' }, { status: 422 });
       }
-      sets.push(sql`${sql(col)} = ${Math.floor(v)}`);
+      sets.push(sql`${sql(col)} = ${v}`);
     }
   }
   if ('agentMonthlyBudgetCeilingUsd' in body) {
@@ -93,8 +95,11 @@ export async function PATCH(request: Request) {
     // Must be > 0: a 0 ceiling would cap every tenant's budget to $0 and silently
     // disable ALL agents platform-wide (found by the #190 adversarial sweep). To turn
     // agents off, use agentAutoRunDefault / the per-trigger enable, not the ceiling.
-    if (!Number.isFinite(v) || v <= 0) {
-      return NextResponse.json({ error: 'agentMonthlyBudgetCeilingUsd must be greater than 0 (use the auto-run toggle to disable agents)', code: 'VALIDATION_ERROR' }, { status: 422 });
+    // Upper bound = the column's NUMERIC(10,2) ceiling (10^8 − 0.01). Without it a fat-fingered
+    // value ≥ 1e8 passed validation then threw PG 22003 on the UPDATE → an opaque 500 instead of a
+    // 422 with guidance (sweep MEDIUM, UI-reachable via the unbounded budget input).
+    if (!Number.isFinite(v) || v <= 0 || v > 99999999.99) {
+      return NextResponse.json({ error: 'agentMonthlyBudgetCeilingUsd must be between 0 and 99,999,999.99 (use the auto-run toggle to disable agents)', code: 'VALIDATION_ERROR' }, { status: 422 });
     }
     sets.push(sql`agent_monthly_budget_ceiling_usd = ${v}`);
   }

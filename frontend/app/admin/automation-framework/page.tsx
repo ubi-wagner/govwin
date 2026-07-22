@@ -99,7 +99,7 @@ export default function AutomationFrameworkPage() {
               <div className="text-sm font-medium text-violet-900">Agent monthly budget ceiling (USD)</div>
               <div className="text-xs text-violet-700">The hard ceiling. A tenant policy may only lower below it, never raise (decision ⑨).</div>
             </div>
-            <input type="number" min={0} step="0.01" value={fw.agentMonthlyBudgetCeilingUsd}
+            <input type="number" min={0} max={99999999.99} step="0.01" value={fw.agentMonthlyBudgetCeilingUsd}
               onChange={(e) => { setFw({ ...fw, agentMonthlyBudgetCeilingUsd: e.target.value }); setSaved(false); }}
               className="w-28 rounded border border-violet-300 px-2 py-1 text-sm text-right focus:border-violet-500 focus:outline-none" />
           </div>

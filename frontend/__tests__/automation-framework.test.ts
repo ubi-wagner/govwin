@@ -58,6 +58,25 @@ describe('PATCH automation-framework', () => {
     authMock.mockResolvedValue(session('master_admin'));
     expect((await PATCH(patchReq({ agentMonthlyBudgetCeilingUsd: -5 }))).status).toBe(422);
   });
+  // Sweep DEFECT 1: a budget above NUMERIC(10,2)'s ceiling used to pass validation then throw
+  // PG 22003 on the UPDATE → an opaque 500. Must be a 422 at validation, and the max stays valid.
+  it('422 (not 500) for an over-precision agent budget ceiling', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    expect((await PATCH(patchReq({ agentMonthlyBudgetCeilingUsd: 1_000_000_000 }))).status).toBe(422);
+  });
+  it('200 at the exact NUMERIC(10,2) max budget (99999999.99)', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    expect((await PATCH(patchReq({ agentMonthlyBudgetCeilingUsd: 99999999.99 }))).status).toBe(200);
+  });
+  // Sweep DEFECT 2: a fractional int field used to be silently floored (200); now rejected.
+  it('422 for a non-integer int field (no silent floor)', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    expect((await PATCH(patchReq({ curationSlaMinutes: 10.7 }))).status).toBe(422);
+  });
+  it('200 for a clean integer int field', async () => {
+    authMock.mockResolvedValue(session('master_admin'));
+    expect((await PATCH(patchReq({ curationSlaMinutes: 10 }))).status).toBe(200);
+  });
   it('400 when no valid fields provided', async () => {
     authMock.mockResolvedValue(session('rfp_admin'));
     expect((await PATCH(patchReq({ bogus: 1 }))).status).toBe(400);
