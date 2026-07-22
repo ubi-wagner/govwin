@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { GuardrailEditor } from './guardrail-editor';
+import { recommendedGuardrails } from '@/lib/guardrail-defaults';
 
 interface Portal {
   id: string;
@@ -23,23 +25,13 @@ function remainingUntil(iso: string, nowMs: number): { text: string; overdue: bo
   return { text: `${d > 0 ? `${d}d ` : ''}${h}h ${min}m`, overdue: false };
 }
 
-/** A minimal valid guardrail config (within the RFP-admin limits: 3 stages, ≤3 nudges). */
-const DEFAULT_GUARDRAILS = {
-  nudgeDays: [2, 5, 9],
-  collaborators: [{ email: 'me@tenant', role: 'manager', stages: ['draft', 'review', 'final'] }],
-  stages: [
-    { key: 'draft', label: 'Draft', todos: [{ type: 'complete_sections', assigneeRole: 'tenant_user', dueDays: 7, title: 'Draft: complete the sections' }] },
-    { key: 'review', label: 'Review', todos: [{ type: 'acknowledge', assigneeRole: 'tenant_admin', title: 'Review: acknowledge the draft' }] },
-    { key: 'final', label: 'Final', todos: [{ type: 'upload_documents', assigneeRole: 'tenant_admin', title: 'Final: upload the submission docs' }] },
-  ],
-};
-
 export default function ProposalPortals({ tenantSlug, canManage, isExpert = false }: { tenantSlug: string; canManage: boolean; isExpert?: boolean }) {
   const [portals, setPortals] = useState<Portal[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [newOpp, setNewOpp] = useState('');
   const [label, setLabel] = useState('primary');
   const [now, setNow] = useState(0); // 0 until mounted (avoids SSR hydration mismatch)
+  const [editorPortal, setEditorPortal] = useState<string | null>(null); // portal being configured before launch
 
   useEffect(() => {
     setNow(Date.now());
@@ -133,7 +125,7 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
             {canManage && (
               <div className="flex flex-wrap items-center gap-2">
                 {p.status === 'guardrails_pending' && (
-                  <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'accept', { guardrailConfig: DEFAULT_GUARDRAILS })} className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-1 disabled:opacity-50">Accept guardrails &amp; launch</button>
+                  <button disabled={busy === p.id} onClick={() => setEditorPortal(p.id)} className="text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded px-3 py-1 disabled:opacity-50">Configure &amp; launch</button>
                 )}
                 {isExpert && p.status === 'curation_pending' && (
                   <button disabled={busy === p.id} onClick={() => portalAction(p.id, 'release')} className="text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded px-3 py-1 disabled:opacity-50" title="Finish curation, provision the build, and unlock it for the customer">
@@ -163,6 +155,21 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
         ))}
         {portals.length === 0 && <p className="text-sm text-gray-400 text-center py-10">No portals yet. Open one from a pinned opportunity.</p>}
       </div>
+
+      {/* Author the build workflow before launch (keyed so each portal gets fresh defaults). */}
+      <GuardrailEditor
+        key={editorPortal ?? 'none'}
+        open={!!editorPortal}
+        onClose={() => setEditorPortal(null)}
+        initial={recommendedGuardrails()}
+        launching={busy === editorPortal}
+        onLaunch={async (config) => {
+          const id = editorPortal;
+          if (!id) return;
+          await portalAction(id, 'accept', { guardrailConfig: config });
+          setEditorPortal(null);
+        }}
+      />
     </div>
   );
 }

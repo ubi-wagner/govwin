@@ -18,7 +18,10 @@ export interface GuardrailLimits {
   maxManagers: number;
   maxNudges: number;
 }
-const FALLBACK_LIMITS: GuardrailLimits = { maxStages: 3, maxCollaborators: 10, maxManagers: 1, maxNudges: 3 };
+// Managers are a delegated, per-portal role (mig 123) — as many as the admin wants; only
+// stages (3) and nudges (3) stay bounded. maxCollaborators tracks maxManagers since a
+// manager IS a collaborator (role='manager').
+const FALLBACK_LIMITS: GuardrailLimits = { maxStages: 3, maxCollaborators: 25, maxManagers: 25, maxNudges: 3 };
 
 const TODO_TYPES = new Set(['acknowledge', 'complete_sections', 'upload_documents']);
 const TODO_KIND: Record<string, 'review' | 'form' | 'upload'> = {
@@ -42,7 +45,7 @@ export interface GuardrailConfig {
   nudgeDays?: number[];
 }
 
-/** Read the RFP-admin-settable limits from the global default template (fallback: 3/10/1/3). */
+/** Read the RFP-admin-settable limits from the global default template (fallback: 3/25/25/3). */
 export async function getGuardrailLimits(): Promise<GuardrailLimits> {
   try {
     const [row] = await sql<Array<{ limits: Partial<GuardrailLimits> | null }>>`
