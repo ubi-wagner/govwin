@@ -20,7 +20,13 @@ import { provisionProposalForPortal } from '@/lib/provision-proposal';
 import { emitEventSingle } from '@/lib/events';
 import { randomUUID } from 'crypto';
 
-const STATUSES = ['guardrails_pending', 'curation_pending', 'launched', 'executing', 'closeout', 'archived', 'abandoned'];
+// Statuses a tenant_admin may set via PATCH — POST-LAUNCH lifecycle only. The pre-launch ENTRY
+// states (curation_pending, guardrails_pending, launched) are owned by the purchase / release /
+// accept flows and must NOT be settable here: otherwise a buyer could PATCH curation_pending →
+// guardrails_pending and then self-provision an UNLOCKED build via ?action=accept, skipping the
+// paid rfp_admin curation + 72h SLA (adversarial-sweep B4). setPortalStatus additionally CAS-guards
+// the SOURCE state, so even an allowed target can only move an already-live portal.
+const CUSTOMER_ADVANCE_STATUSES = ['executing', 'closeout', 'archived', 'abandoned'];
 
 /** Minimal single-operator guardrails used when an admin releases a purchased workspace
  *  (no collaborators/nudges — the customer just builds). Passes the guardrail limits. */
@@ -221,10 +227,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     if ('error' in g) return g.error;
     let body: { status?: string };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }, { status: 400 }); }
-    if (!body.status || !STATUSES.includes(body.status)) {
-      return NextResponse.json({ error: `status must be one of: ${STATUSES.join(', ')}`, code: 'VALIDATION_ERROR' }, { status: 400 });
+    if (!body.status || !CUSTOMER_ADVANCE_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: `status must be one of: ${CUSTOMER_ADVANCE_STATUSES.join(', ')} (pre-launch states are set by purchase/release/accept)`, code: 'VALIDATION_ERROR' }, { status: 400 });
     }
-    await setPortalStatus(g.tenantId, portalId, body.status);
+    const { changed } = await setPortalStatus(g.tenantId, portalId, body.status);
+    if (!changed) {
+      return NextResponse.json({ error: 'Portal is not in an advanceable state (must be launched, executing, or closeout)', code: 'CONFLICT' }, { status: 409 });
+    }
     return NextResponse.json({ data: { status: body.status } });
   } catch (err) {
     console.error('[portal/portals/:id] PATCH error', err);
