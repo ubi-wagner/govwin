@@ -6,23 +6,21 @@ Workflow Action: create_default_categories (create_library_defaults.py)
 WHO:    Called by workflow processor when OnApplicationAccepted workflow
         executes the create_library_defaults step.
 
-WHAT:   Creates 8 default library categories for a newly accepted tenant.
-        These categories match the typical volume structure of DoD
-        SBIR/STTR/BAA proposals: Technical Approach, Past Performance,
-        Key Personnel, Management Plan, Cost & Pricing, Company Overview,
-        Certifications & Compliance, and Commercialization. Each category
-        is represented by a seed library_unit row that acts as a category
-        marker — users add real content units into these categories over
-        time.
+WHAT:   RETIRED no-op (kept so the OnApplicationAccepted workflow never dead-ends).
+        The legacy per-tenant library_units category-seed rows are gone; the
+        canonical library is library_atoms, whose taxonomy lives in the atom_tags
+        satellite (dimension/value) rather than a per-row `category` column — so
+        there is nothing to seed. This action still emits the library.defaults
+        start/end events (with zero counts) for continuity/observability.
 
 INPUTS:
         - tenant_id: str — tenants.id (UUID string) of the newly accepted
           tenant
 
 OUTPUTS:
-        - categoriesCreated: int — number of new categories inserted
-        - categoriesSkipped: int — categories that already existed
-        - status: str — "skipped" if tenant not found (with reason)
+        - categoriesCreated: int — always 0 (retired no-op)
+        - categoriesSkipped: int — always 0
+        - status: str — "skipped" if tenant_id is invalid (with reason)
 
 ERROR HANDLING:
     - Tenant not found: Returns status="skipped", reason="tenant_not_found"
@@ -61,43 +59,6 @@ import asyncpg
 from events import emit_event
 
 log = logging.getLogger("pipeline.workflows.actions.create_library_defaults")
-
-# Standard library categories for government contracting proposals.
-# These match the typical volume structure of DoD SBIR/STTR/BAA proposals.
-DEFAULT_CATEGORIES = [
-    {
-        "name": "Technical Approach",
-        "description": "Technical methodology, innovation, and approach narratives",
-    },
-    {
-        "name": "Past Performance",
-        "description": "Prior contract performance narratives and references",
-    },
-    {
-        "name": "Key Personnel",
-        "description": "Resumes, bios, and qualifications for key team members",
-    },
-    {
-        "name": "Management Plan",
-        "description": "Project management approach, org charts, schedules",
-    },
-    {
-        "name": "Cost & Pricing",
-        "description": "Cost volume narratives, basis of estimate, rate justifications",
-    },
-    {
-        "name": "Company Overview",
-        "description": "Company capabilities, facilities, certifications",
-    },
-    {
-        "name": "Certifications & Compliance",
-        "description": "Small business certs, ITAR/EAR, security clearances",
-    },
-    {
-        "name": "Commercialization",
-        "description": "Commercialization plans, market analysis, transition strategy",
-    },
-]
 
 
 async def create_default_categories(

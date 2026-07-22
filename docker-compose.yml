@@ -47,7 +47,6 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
-      STORAGE_ROOT: /data
     volumes:
       - storage:/data
       - ./docs:/app/docs
@@ -71,7 +70,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
       AUTH_SECRET: ${AUTH_SECRET:-dev-secret-change-in-production}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
-      STORAGE_ROOT: /data
       CMS_SERVICE_URL: http://cms:8000
     volumes:
       - storage:/data

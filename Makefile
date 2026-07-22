@@ -101,7 +101,6 @@ railway-vars:
 	@echo "  ANTHROPIC_API_KEY        from console.anthropic.com"
 	@echo "  CLAUDE_MODEL             claude-sonnet-4-20250514"
 	@echo "  API_KEY_ENCRYPTION_SECRET  must match the frontend value"
-	@echo "  STORAGE_ROOT             /data (pipeline volume mount)"
 	@echo ""
 	@echo "BOTH services (auto-injected by Railway when the bucket is linked):"
 	@echo "  AWS_ACCESS_KEY_ID        bucket credentials"

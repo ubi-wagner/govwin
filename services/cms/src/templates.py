@@ -489,7 +489,7 @@ async def resolve_profile_variables(
       - contact_name, contact_email: from users table
       - application_date: from tenants table
       - active_proposals: count from proposals table (by stage)
-      - matched_opportunities: count from tenant_pipeline_items table
+      - matched_opportunities: count from tenant_opportunity_cards table
 
     Args:
         profile_variables: list of field names to resolve
@@ -567,8 +567,8 @@ async def resolve_profile_variables(
         if 'matched_opportunities' in profile_variables and _tenant_uuid:
             try:
                 count = await shared_pool.fetchval(
-                    '''SELECT COUNT(*) FROM tenant_pipeline_items
-                       WHERE tenant_id = $1''',
+                    '''SELECT COUNT(*) FROM tenant_opportunity_cards
+                       WHERE tenant_id = $1 AND lifecycle_status <> 'archived' ''',
                     _tenant_uuid,
                 )
                 result['matched_opportunities'] = str(count or 0)
