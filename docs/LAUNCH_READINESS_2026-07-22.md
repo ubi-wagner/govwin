@@ -120,6 +120,15 @@ purchase-audit row, **0** `submitted`-but-unlocked proposals, **0** stranded pro
 builds. RLS confirmed inert-by-owner (`claude` role `rolbypassrls=t`); the `rfp_agent` NOBYPASSRLS
 role exists but is unused by the app — single-layer isolation via `WHERE tenant_id` stands (item 9).
 
+**Live click-through** (Playwright against a seeded instance, `frontend/e2e/zzblockers.tenant.spec.ts`,
+5/5 green; shots in `frontend/blocker-shots/`): (1) the RFP-Admin "approve a free portal" form —
+approving minted a `guardrails_pending` portal AND a real `amount_cents=0, status=completed,
+metadata.grant=admin` purchases row + a `capture:purchase.completed` event (audited-as-purchased,
+proven end-to-end through the UI); (2/2b) admin sees the actionable checklist, a base `tenant_user`
+sees the honest "you're on the team / ask your admin" card; (3) the post-submit "Unlock for Edit"
+button renders at `stage=submitted`; (4) the purchase modal shows "Card checkout is not available
+yet — use an access code below." instead of a 500.
+
 **Still open (deferred with automation/agents next):** (5) launch-env assertion + "paid portal, no
 ToDo" monitor; (8) invite-token model; (9) RLS enforcement via the app using `rfp_agent`; (10)
 repoint the retired-table admin panel; (11) value-honesty items (live cost formulas, `countWords`
