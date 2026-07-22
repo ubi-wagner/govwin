@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Bucket { id: string; name: string; description: string | null; criteria: Record<string, unknown> }
 interface RankedRow { opportunityId: string; score: number; factors: Record<string, number>; card: Record<string, unknown> | null; isPinned: boolean }
@@ -10,6 +10,10 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
   const [ranked, setRanked] = useState<RankedRow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reranking, setReranking] = useState(false);
+  // Tracks which bucket the pipeline poll should still write to, so switching
+  // buckets (or deleting the open one) cancels stale in-flight refreshes.
+  const activeRef = useRef<string | null>(null);
   // create form
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -48,18 +52,35 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
     setBusy(true);
     try {
       await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
-      if (openId === id) { setRanked(null); setOpenId(null); }
+      if (openId === id) { setRanked(null); setOpenId(null); activeRef.current = null; setReranking(false); }
       await load();
     } catch { /* ignore */ } finally { setBusy(false); }
   }, [tenantSlug, openId, load]);
 
   const rank = useCallback(async (id: string) => {
     setBusy(true);
+    setReranking(true);
+    activeRef.current = id;
+    setOpenId(id);
+    const loadRanked = async () => {
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`);
+        if (res.ok && activeRef.current === id) setRanked((await res.json()).data?.ranked ?? []);
+      } catch { /* ignore */ }
+    };
     try {
+      // Ranking is async — the POST emits buckets.updated and the pipeline
+      // OnBucketsUpdated workflow rescores tenant-side. Show what's there now,
+      // then poll a few times to pick up the fresh scores as they land.
       await fetch(`/api/portal/${tenantSlug}/buckets/${id}?action=rank`, { method: 'POST' });
-      const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`);
-      if (res.ok) { setRanked((await res.json()).data?.ranked ?? []); setOpenId(id); }
+      await loadRanked();
     } catch { /* ignore */ } finally { setBusy(false); }
+    for (const delay of [1500, 2000, 2500]) {
+      await new Promise((r) => setTimeout(r, delay));
+      if (activeRef.current !== id) return; // user switched buckets — abandon this poll
+      await loadRanked();
+    }
+    if (activeRef.current === id) setReranking(false);
   }, [tenantSlug]);
 
   const str = (c: Record<string, unknown> | null, k: string) => (c && typeof c[k] === 'string' ? (c[k] as string) : null);
@@ -101,8 +122,16 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
       </div>
 
       <div className="lg:col-span-2">
+        {reranking && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" aria-hidden />
+            Rescore queued — scores refresh as the pipeline processes.
+          </div>
+        )}
         {ranked == null ? (
-          <p className="text-sm text-gray-400 py-8 text-center">Rank a bucket to see your pipeline ordered.</p>
+          <p className="text-sm text-gray-400 py-8 text-center">
+            {reranking ? 'Ranking…' : 'Rank a bucket to see your pipeline ordered.'}
+          </p>
         ) : (
           <div className="space-y-1.5">
             <p className="text-xs text-gray-400 mb-2">{ranked.length} opportunities ranked{openId ? ` · bucket ${buckets.find((b) => b.id === openId)?.name}` : ''}</p>

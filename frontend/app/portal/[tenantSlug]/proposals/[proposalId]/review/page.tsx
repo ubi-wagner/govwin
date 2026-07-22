@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
-import { resolveUserAccess } from '@/lib/proposal-access';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -72,15 +71,14 @@ export default async function ReviewPage({ params }: Props) {
     redirect(`${basePath}/proposals`);
   }
 
-  // Partner scoping: the full-proposal compliance view is collaborator-scoped
-  // for partners. Tenant staff (tenant_user+) keep tenant-wide access.
+  // The compliance review is a whole-proposal readiness roll-up — the full section
+  // list, the entire compliance matrix, and a "Ready for Final" verdict. That is a
+  // tenant-staff view. A stage-scoped external partner never gets the aggregate
+  // (it would leak sections and requirements beyond their grant); send them back to
+  // their own section-scoped workspace. There is no partner-facing link here — this
+  // page is reachable only by direct URL — so this creates no dead link.
   if (role === 'partner_user') {
-    const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
-    const hasAny =
-      access.editableSections.length > 0 ||
-      access.commentableSections.length > 0 ||
-      access.viewableSections.length > 0;
-    if (!hasAny) redirect(`${basePath}/proposals`);
+    redirect(`${basePath}/proposals/${proposalId}`);
   }
 
   // ── Load sections with content stats ──────────────────────────────

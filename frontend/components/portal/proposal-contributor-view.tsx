@@ -146,8 +146,9 @@ export function ProposalContributorView({
       </div>
 
       {/* Offer content up — a collaborator can atomize their own material into the
-          company's library for the company to review and use. */}
-      <UploadAtomizeCard tenantSlug={tenantSlug} />
+          company's library for the company to review and use. An external partner
+          can contribute but can't browse the company library, so hide those links. */}
+      <UploadAtomizeCard tenantSlug={tenantSlug} canBrowseLibrary={!isExternal} />
 
       {/* Comment-only sections */}
       {commentSections.length > 0 && (

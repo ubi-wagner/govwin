@@ -77,6 +77,28 @@ export async function GET(request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Invalid nodeId format', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
+    // ── Collaborator read-scoping (mirror POST) ──────────────────────
+    // A viewer WITHOUT tenant-wide access (a partner_user, or a cross-company
+    // collaborator such as an admin at their own company) may only READ comments
+    // on the sections they were granted — never the whole proposal. Home-tenant
+    // staff (tenant_user+) keep tenant-wide read. Keyed on tenant-wide membership,
+    // NOT the global role, so a tenant_admin of another company is scoped here too.
+    // Without this, a scoped partner could omit ?nodeId (all comments) or pass a
+    // ?nodeId= outside their grant and read comments beyond their scope.
+    let scopedSectionIds: string[] | null = null;
+    if (!isTenantWideMember(role, sessionUser.tenantId, tenantId)) {
+      const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
+      const visible = Array.from(new Set([
+        ...access.editableSections,
+        ...access.commentableSections,
+        ...access.viewableSections,
+      ]));
+      if (nodeId && !visible.includes(nodeId)) {
+        return NextResponse.json({ error: 'No access to this section', code: 'FORBIDDEN' }, { status: 403 });
+      }
+      scopedSectionIds = visible;
+    }
+
     let comments: {
       id: string;
       proposalId: string;
@@ -110,6 +132,27 @@ export async function GET(request: Request, ctx: RouteContext) {
         LEFT JOIN users u ON u.id = pc.user_id
         WHERE pc.proposal_id = ${proposalId}
           AND pc.section_id = ${nodeId}
+        ORDER BY pc.created_at ASC
+        LIMIT 200
+      `;
+    } else if (scopedSectionIds) {
+      comments = await sql<typeof comments>`
+        SELECT
+          pc.id,
+          pc.proposal_id,
+          pc.section_id,
+          pc.user_id,
+          pc.content,
+          pc.resolved,
+          pc.created_at,
+          pc.recommendation_type,
+          pc.category,
+          u.name AS user_name,
+          u.email AS user_email
+        FROM proposal_comments pc
+        LEFT JOIN users u ON u.id = pc.user_id
+        WHERE pc.proposal_id = ${proposalId}
+          AND pc.section_id = ANY(${scopedSectionIds}::uuid[])
         ORDER BY pc.created_at ASC
         LIMIT 200
       `;

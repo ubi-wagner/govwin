@@ -87,9 +87,11 @@ interface CommentThreadProps {
   comments: NodeComment[];
   onAddComment: (text: string) => void;
   onResolve: (commentId: string) => void;
+  /** Hide the composer when the viewer can't comment (view-only). */
+  canComment?: boolean;
 }
 
-export function CommentThread({ comments, onAddComment, onResolve }: CommentThreadProps) {
+export function CommentThread({ comments, onAddComment, onResolve, canComment = true }: CommentThreadProps) {
   const [newComment, setNewComment] = useState('');
   const [showResolved, setShowResolved] = useState(false);
 
@@ -141,6 +143,7 @@ export function CommentThread({ comments, onAddComment, onResolve }: CommentThre
         </div>
       ))}
 
+      {canComment && (
       <div className="flex gap-1">
         <input
           value={newComment}
@@ -166,6 +169,7 @@ export function CommentThread({ comments, onAddComment, onResolve }: CommentThre
           Add
         </button>
       </div>
+      )}
     </div>
   );
 }
