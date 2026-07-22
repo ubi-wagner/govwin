@@ -103,6 +103,8 @@ export function ManageConsole({
   ];
 
   const subCls = SUB_STYLE[account.subscriptionStatus] ?? SUB_STYLE.none;
+  // Guards the role control: the last active admin can't be demoted.
+  const activeAdmins = members.filter((m) => m.isActive && m.role === 'tenant_admin').length;
 
   return (
     <div className="flex gap-6">
@@ -232,7 +234,9 @@ export function ManageConsole({
                       <td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${badge.color}`}>{badge.label}</span></td>
                       <td className="px-3 py-2.5"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${m.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{m.isActive ? 'Active' : 'Inactive'}</span></td>
                       <td className="px-3 py-2.5 text-right">
-                        {m.id !== currentUserId && <TeamMemberActions tenantSlug={tenantSlug} userId={m.id} active={m.isActive} />}
+                        {m.id !== currentUserId
+                          ? <TeamMemberActions tenantSlug={tenantSlug} userId={m.id} active={m.isActive} role={m.role} isLastAdmin={m.role === 'tenant_admin' && activeAdmins <= 1} />
+                          : <span className="text-xs text-gray-400">You</span>}
                       </td>
                     </tr>
                   );

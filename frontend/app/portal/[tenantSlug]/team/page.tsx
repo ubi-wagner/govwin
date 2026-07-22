@@ -109,6 +109,8 @@ export default async function TeamPage({ params }: Props) {
 
   const basePath = `/portal/${tenantSlug}`;
   const isAdmin = role === 'tenant_admin' || role === 'master_admin' || role === 'rfp_admin';
+  // Guards the role control: the last active admin can't be demoted.
+  const activeAdmins = members.filter((m) => m.isActive && m.role === 'tenant_admin').length;
 
   return (
     <div>
@@ -175,7 +177,13 @@ export default async function TeamPage({ params }: Props) {
                       {isAdmin && (
                         <td className="px-4 py-3 text-right">
                           {m.id !== sessionUser.id && (
-                            <TeamMemberActions tenantSlug={tenantSlug} userId={m.id} active={m.isActive} />
+                            <TeamMemberActions
+                              tenantSlug={tenantSlug}
+                              userId={m.id}
+                              active={m.isActive}
+                              role={m.role}
+                              isLastAdmin={m.role === 'tenant_admin' && activeAdmins <= 1}
+                            />
                           )}
                         </td>
                       )}
