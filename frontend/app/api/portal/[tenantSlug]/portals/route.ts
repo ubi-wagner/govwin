@@ -12,7 +12,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
@@ -70,6 +70,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const proposalId = body.proposalId ?? null;
     const label = (body.label ?? 'primary').slice(0, 80);
     const productType = 'proposal_phase1';
+
+    // proposal_portals.opportunity_id has NO FK (soft ref), but purchases.opportunity_id has a
+    // hard FK to opportunities(id). Validate the opportunity exists BEFORE creating the portal —
+    // otherwise a bad UUID commits the portal + shadow grant, then the audit INSERT throws the
+    // FK violation, orphaning an un-audited build and wedging the label. (opportunities is global.)
+    try {
+      const [opp] = await sql<Array<{ id: string }>>`SELECT id FROM opportunities WHERE id = ${opportunityId}::uuid`;
+      if (!opp) {
+        return NextResponse.json({ error: 'That opportunity does not exist', code: 'NOT_FOUND' }, { status: 404 });
+      }
+    } catch (oppErr) {
+      console.error('[portal/portals] opportunity lookup failed', oppErr);
+      return NextResponse.json({ error: 'Could not verify the opportunity', code: 'DB_ERROR' }, { status: 500 });
+    }
+
     const created = await createPortal(g.tenantId, opportunityId, proposalId, label, g.userId);
     if (!created) {
       return NextResponse.json({ error: 'A portal with that label already exists for this opportunity', code: 'CONFLICT' }, { status: 409 });

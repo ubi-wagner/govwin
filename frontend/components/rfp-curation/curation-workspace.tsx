@@ -799,7 +799,7 @@ export function CurationWorkspace({
                 </span>
               </div>
               <PdfViewer
-                ref={pdfViewerRef}
+                innerRef={pdfViewerRef}
                 documentId={sourcePdf.id}
                 onTextSelect={handleTextSelect}
                 highlights={annotations.map((a) => ({

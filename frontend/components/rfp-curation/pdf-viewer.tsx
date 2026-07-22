@@ -24,6 +24,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type Ref,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -75,10 +76,13 @@ interface Props {
   width?: number;
   /** Pre-extracted text by page (1-indexed). Falls back to text layer. */
   extractedText?: Record<number, string>;
+  /** next/dynamic (ssr:false) drops `ref`, so a dynamically-loaded caller passes the
+   *  imperative handle here as a normal prop instead. Preferred over `ref` in that case. */
+  innerRef?: Ref<PdfViewerHandle>;
 }
 
 export const PdfViewer = forwardRef<PdfViewerHandle, Props>(
-  function PdfViewer({ documentId, onTextSelect, highlights = [], width = 700, extractedText }, ref) {
+  function PdfViewer({ documentId, onTextSelect, highlights = [], width = 700, extractedText, innerRef }, ref) {
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [numPages, setNumPages] = useState<number>(0);
     const [loading, setLoading] = useState(true);
@@ -102,7 +106,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, Props>(
     // --- Page text cache (for search) ---
     const pageTextCache = useRef<Record<number, string>>({});
 
-    useImperativeHandle(ref, () => ({
+    useImperativeHandle(innerRef ?? ref, () => ({
       goToPage(page: number) {
         setCurrentPage(Math.max(1, Math.min(page, numPages)));
       },

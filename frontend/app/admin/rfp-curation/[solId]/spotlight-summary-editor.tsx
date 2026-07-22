@@ -63,7 +63,7 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
       </p>
       <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => { setValue(e.target.value); setErr(null); }}
         rows={4}
         placeholder={loaded
           ? 'e.g. Navy computer-vision property-intelligence SBIR; agencies: Navy/DoD; tech: CV, edge inference; keywords: maritime, ISR, autonomy…'

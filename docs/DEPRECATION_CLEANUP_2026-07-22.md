@@ -89,6 +89,23 @@ see, so they're recorded for a per-item decision rather than swept:
   (TS scorer superseded by the pipeline; only the backfill script imports it), `source-url.ts`
   (referenced only by its own test).
 
+## ⚠ RLS-cutover checklist (latent — added by the retired-table repoints, NOT a current bug)
+
+An adversarial pass flagged this and it's worth recording where the change is: the two
+retired-table repoints — `app/admin/rfp-curation/[solId]/page.tsx` (Customer Interest) and
+`services/cms/src/templates.py` (`matched_opportunities`) — swapped `tenant_pipeline_items`
+(RLS **off**) for `tenant_opportunity_cards` (RLS **forced**, predicate
+`tenant_id = current_setting('app.tenant_id')`). Both are **direct cross-tenant admin/CMS
+reads** (they aggregate across all tenants) and neither runs through `withTenant`/sets
+`app.tenant_id`. **Today this is fine** — the app connects as the RLS-bypassing owner role, so
+the readiness doc's "RLS inert in prod" holds and both return correct data. **But** when the app
+cuts over to the non-owner `govtech_app` role (the stated plan; `rolbypassrls=f`), these two
+direct reads would silently return **empty/0** (predicate `tenant_id = NULL`). The
+`v_opportunity_rollup` view is safe (owned by a BYPASSRLS role, non-`security_invoker`) — it's
+only the two *direct* `toc` reads that need attention. **Cutover fix:** run cross-tenant admin/CMS
+reads on a BYPASSRLS connection (or route them through owner-views like the rollup). Belongs on
+the `govtech_app`-cutover checklist (launch-readiness item #9), not before launch.
+
 The spines (opportunity_bridge → tenant_opportunity_cards, library_atoms, system_events
 audit river) are now clean of retired-table reads end-to-end — which is exactly what makes
 the automation layer a straightforward wiring job on top.
