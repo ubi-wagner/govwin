@@ -44,8 +44,39 @@ The single injection point. Every tenant rides the framework default, so no user
 `automation_rules`), ⑨ (framework ceiling read here; enforced on agents in Phase E), fail-safe = the inert
 guarantee.
 
-**Not yet (lands in later phases):** recipient-set resolution + the admin-always escalation floor
-(pipeline, Phase C), relative-timing anchor (Phase C), the three editing surfaces (Phase D), agent
-auto-run + budget dims (Phase E).
+**Not yet (lands in later phases):** the three editing surfaces (Phase D), agent auto-run + budget dims
+(Phase E).
+
+---
+
+## Phase C — the value-driver core: escalation floor + agents-do-most + pre-staged ToDos ✅
+
+**C1 — escalation floor backstop (commit `c9f9774`).** `pipeline manager._final_notice_user_ids` now
+appends the oldest active `rfp_admin`/`master_admin` as the **RFP-Pipeline shadow backstop** when a tenant
+has no active admin/manager — so a final nudge never lands on nobody (decision ①: floor = admin-always +
+managers + platform backstop). The build TODO gates already read the resolver via the Phase-B launch
+overlays. Verify: workflow tests 18 passed / 13 skipped.
+
+**C3 — pre-staged review ToDos, agents-do-most (this commit).** The section_drafter already drafts a V0 on
+provision (`proposal.created` → `draft_v0`), so the human's job is to REVIEW. `lib/automation/prestage-todos.ts`
+`preStageProposalReviewTodos()` pre-stages two **policy-resolved** review gates at provision — a **draft
+review** (`section_review`, 7d default) and an **agent-assisted final review** (`final_review`, 14d,
+`agentAssisted=true`) — as `tasks` rows (assignee/nudge/due from `resolveGatePolicy`, `entity=proposal`,
+`params.kind='review'`). **Agent-first aware:** when the portal's `guardrail_config.agentFirst` is set, the
+copy becomes "Review the AI-drafted sections" / "confirm the AI compliance + color-team pass". Wired into
+`provisionProposalForPortal` (best-effort, non-fatal). Emits `proposal:review_todos.prestaged`. This is the
+"agents do most — including an agent-assisted final review" model (the user's value driver).
+
+**C2 — discovery NOTIFY (scoped per decision ⑥).** The resolver already serves the discovery side
+(`resolveGatePolicy({ scope: 'discovery', … })`); the "new priority OPP" predicate = the bucket's own
+parameters else company-match + time-to-close (decision ③). Per decision ⑥ the notify **delivery is
+cron-digest, low-priority** ("build the regulator but not a big deal yet; just don't let anything not make
+it into the DB") — so the DB-of-record ToDos land now (C3), and the batched digest delivery rides the cron
+sweep in Phase F. The hook is in place; no per-event firehose.
+
+**Tests / verify:** tsc 0 · vitest **736/736** · pipeline workflow tests 18/13 · SQL smoke of the pre-stage
+insert shape (interval + jsonb params + tasks columns) green on the sandbox. Decisions honored: ① (floor
+backstop), ③ (priority predicate), ⑥ (DB-first, cron delivery deferred), §13 (agent-first). Live proof of
+the ToDos appearing + nudging is F1 (the drive + screenshots).
 
 ---

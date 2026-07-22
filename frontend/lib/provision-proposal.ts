@@ -15,6 +15,7 @@
 
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
+import { preStageProposalReviewTodos } from '@/lib/automation/prestage-todos';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
@@ -177,6 +178,13 @@ export async function provisionProposalForPortal(opts: {
     });
 
     await emitEventEnd(eventId, { result: { tenantId, tenantSlug, proposalId: out.proposalId, sectionCount: out.sectionCount, title: proposalTitle } });
+    // #190 C3: pre-stage the review-gate ToDos (agent drafts V0 → human reviews),
+    // policy-parameterized + agent-first aware. Best-effort: never fails provisioning.
+    try {
+      await preStageProposalReviewTodos({ tenantId, proposalId: out.proposalId, opportunityId, label, actorId, actorEmail });
+    } catch (e) {
+      console.error('[provision-proposal] prestage review todos failed (non-fatal)', e);
+    }
     return out;
   } catch (e) {
     console.error('[provision-proposal] transaction failed', e);
