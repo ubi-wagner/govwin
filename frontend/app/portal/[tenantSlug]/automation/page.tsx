@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { AutomationPreferencesCard } from '@/components/portal/automation-preferences-card';
+import { AutomationPoliciesCard } from '@/components/portal/automation-policies-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +36,7 @@ export default async function PortalAutomationPage({
           You can change these anytime.
         </p>
       </header>
-      <AutomationPreferencesCard tenantSlug={tenantSlug} />
+      <AutomationPoliciesCard tenantSlug={tenantSlug} />
     </div>
   );
 }

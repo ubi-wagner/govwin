@@ -22,7 +22,7 @@ import BillingPanel from './billing-panel';
 import { ProfileEditor } from './profile-editor';
 import SpotlightBuckets from './spotlight-buckets';
 import ProposalPortals from './proposal-portals';
-import { AutomationPreferencesCard } from './automation-preferences-card';
+import { AutomationPoliciesCard } from './automation-policies-card';
 import { AgentUsagePanel } from './agent-usage-panel';
 import { TeamInviteForm } from './team-invite-form';
 import { TeamMemberActions } from './team-member-actions';
@@ -267,7 +267,7 @@ export function ManageConsole({
           <p className="text-xs text-gray-500 mb-3">
             Global, tenant-level rules: who on the team gets ToDos, notifications, and nudges — and on what logic. Not per bucket.
           </p>
-          <AutomationPreferencesCard tenantSlug={tenantSlug} />
+          <AutomationPoliciesCard tenantSlug={tenantSlug} />
         </DrawerShell>
       </Drawer>
 
