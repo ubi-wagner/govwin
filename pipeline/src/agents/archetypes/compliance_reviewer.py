@@ -337,14 +337,16 @@ Output a JSON object with:
             return {"error": "proposal_id required"}
 
         try:
-            # Verify tenant access
-            if tenant_id:
-                owner = await conn.fetchval(
-                    "SELECT tenant_id FROM proposals WHERE id = $1",
-                    uuid.UUID(proposal_id),
-                )
-                if owner and str(owner) != tenant_id:
-                    return {"error": "Access denied", "code": "FORBIDDEN"}
+            # Verify tenant access — fail CLOSED: a null tenant must not read any proposal's
+            # sections (RLS is inert under the bypass role, so this check is the sole guard).
+            if not tenant_id:
+                return {"error": "tenant context required", "code": "FORBIDDEN"}
+            owner = await conn.fetchval(
+                "SELECT tenant_id FROM proposals WHERE id = $1",
+                uuid.UUID(proposal_id),
+            )
+            if owner and str(owner) != tenant_id:
+                return {"error": "Access denied", "code": "FORBIDDEN"}
 
             rows = await conn.fetch(
                 """
@@ -489,9 +491,13 @@ Output a JSON object with:
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if tenant_id:
-                sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(tenant_id))
+            # Fail CLOSED on a missing tenant — a tenant-scoped agent must never widen the
+            # memory search to every tenant (RLS is inert under the bypass role, so this
+            # predicate is the sole guard). Matches the registry's fail-closed contract.
+            if not tenant_id:
+                return {"memories": []}
+            sql += " AND tenant_id = $3"
+            params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 
