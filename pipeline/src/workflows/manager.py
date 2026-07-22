@@ -1201,6 +1201,25 @@ class WorkflowManager:
             if i not in seen:
                 seen.add(i)
                 out.append(i)
+
+        # RFP-Pipeline shadow backstop (AUTOMATION_POLICY_DESIGN decision ①): if the
+        # tenant has NO active admin/manager to receive the final notice, route it to us
+        # — the oldest active rfp_admin/master_admin — so an escalation never lands on
+        # nobody. The floor is admin-always + managers + THIS platform backstop.
+        if not out:
+            try:
+                backstop = await conn.fetchrow(
+                    """
+                    SELECT id FROM users
+                    WHERE role IN ('rfp_admin', 'master_admin') AND is_active = true
+                    ORDER BY created_at ASC LIMIT 1
+                    """
+                )
+                if backstop:
+                    out.append(backstop["id"])
+            except Exception as e:
+                logger.error("[_final_notice] RFP-Pipeline backstop lookup failed: %s", e)
+
         return out
 
     async def _sweep_date_anchored_tasks(self, conn: asyncpg.Connection) -> int:
