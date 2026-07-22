@@ -86,6 +86,10 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       LEFT JOIN users ub ON ub.id = o.built_by
       LEFT JOIN users ur ON ur.id = o.released_by
       WHERE o.id = ${opportunityId}::uuid
+      -- Deterministic tiebreak if an opportunity matches TWO curated_solicitations (one via each
+      -- join arm): prefer the direct solicitation_id (topic) arm, then stable by cs.id, so the
+      -- snapshot's namespace/compliance/volume_count can't flip between runs (sweep F6).
+      ORDER BY (cs.id = o.solicitation_id) DESC NULLS LAST, cs.id
       LIMIT 1
     `;
     if (!o) return null;

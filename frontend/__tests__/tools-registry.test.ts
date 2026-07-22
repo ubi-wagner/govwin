@@ -350,7 +350,8 @@ describe('invoke() — audit + metrics integration', () => {
     expect(events.emitEventStart).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'tool',
-        type: 'invoke.start',
+        // Action-only type; the phase (start/end) lives in the phase column (SOP §events).
+        type: 'invoke',
       }),
     );
     expect(events.emitEventEnd).toHaveBeenCalled();

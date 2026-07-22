@@ -56,7 +56,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
   if (!r.ok) return r.res;
   try {
     const data: {
-      policyRows: Array<{ scope: string; enabled: number; disabled: number; total: number }>;
+      policyRows: Array<{ scope: string; disabled: number; total: number }>;
       taskRows: RawTask[];
       portalRows: RawPortal[];
       totals: { openTotal: number; escalatedTotal: number } | undefined;
@@ -64,9 +64,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
       // enabled/disabled/total: a trigger with NO row defaults ON (the resolver's base is
       // enabled:true), so "on" = catalog total − explicit disables, NOT the enabled-row count
       // (sweep D3/F3 — the old count read 0/N-on for un-configured tenants while defaults fire).
-      const policyRows = await tx<Array<{ scope: string; enabled: number; disabled: number; total: number }>>`
-        SELECT scope, count(*) FILTER (WHERE enabled)::int AS enabled,
-               count(*) FILTER (WHERE NOT enabled)::int AS disabled, count(*)::int AS total
+      const policyRows = await tx<Array<{ scope: string; disabled: number; total: number }>>`
+        SELECT scope, count(*) FILTER (WHERE NOT enabled)::int AS disabled, count(*)::int AS total
         FROM tenant_automation_policies WHERE tenant_id = ${r.tenantId}::uuid GROUP BY scope
       `;
       const taskRows = await tx<RawTask[]>`
