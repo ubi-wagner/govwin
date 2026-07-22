@@ -261,6 +261,7 @@ function nodeToDocx(
       const level = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 }[c.level] ?? HeadingLevel.HEADING_2;
       return [new Paragraph({
         ...paraOpts,
+        keepNext: true, // a heading never sits alone at the foot of a page
         heading: level,
         children: [new TextRun({
           text: (c.numbering ? `${c.numbering} ` : '') + c.text,
@@ -463,17 +464,22 @@ function nodeToDocx(
       const aspect = natW > 0 && natH > 0 ? natW / natH : 1;
       let dispW = Math.min(natW, 470);
       let dispH = Math.round(dispW / aspect);
+      // Keep the figure atomic: the image never splits from its caption, and the
+      // image+caption block never orphans across a page break (keepNext/keepLines).
       const out: Paragraph[] = [new Paragraph({
         ...paraOpts,
+        keepLines: true,
+        keepNext: !!ic.caption,
         alignment: AlignmentType.CENTER,
-        spacing: { before: 60, after: 40 },
+        spacing: { before: 140, after: ic.caption ? 20 : 140 },
         children: [new ImageRun({ type: 'png', data: r.buffer, transformation: { width: dispW, height: dispH } })],
       })];
       if (ic.caption) {
         out.push(new Paragraph({
           ...paraOpts,
+          keepLines: true,
           alignment: AlignmentType.CENTER,
-          spacing: { after: 80 },
+          spacing: { after: 150 },
           children: [new TextRun({ text: ic.caption, italics: true, color: '666666', font, size: size - 2 })],
         }));
       }

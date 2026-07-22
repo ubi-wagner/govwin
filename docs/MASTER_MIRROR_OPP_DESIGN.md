@@ -12,7 +12,7 @@
 **Status:** design of record for the customer-facing opportunity lifecycle. Describes the
 **intended architecture** and grounds every stage in the **as-built** code (file:line refs).
 Anything not yet wired is marked **⚠ future** with the intended shape — the doc is honest about
-now-vs-later so it can double as the build backlog. Supersedes `CUSTOMER_PURCHASE_TO_V1_FLOW.md`
+now-vs-later so it can double as the build backlog. Supersedes `archive/CUSTOMER_PURCHASE_TO_V1_FLOW.md`
 (folded in) and is the source the HITL click-plans derive from.
 
 Verified against the tree on branch `claude/nice-hamilton-kBqtD` (migrations 001→108).
@@ -279,6 +279,14 @@ Two RFP-side passes around the customer; **manual/shadow-assisted today**, autom
 **A — RFP admin, ingestor (master, Release 1):**
 1. **Ingest minimums** — `/admin/rfp-upload` (hardened: `content_hash` includes the oppId → no
    dup-title 500; S3 failure rolls back the orphan).
+1b. **Topic files → topic opportunities (multi-topic BAAs).** In the curation workspace, drop the
+   individual topic files into the topic drop-zone → `POST /api/admin/upload-topic-files` →
+   `ingestTopicFilesForSolicitation` (`frontend/lib/ingest/ingest-topic-files.ts`) creates **one
+   topic `opportunities` row per file** — deduped (content-hash + `(solicitation_id, topic_number)`),
+   text-extracted, and linked to its file via `opportunities.origin_document_id` (mig 122). The
+   umbrella flips to `solicitation_type='multi_topic'`. Nothing is customer-visible yet; **Push**
+   (step 4) fans umbrella + every topic over the existing `WHERE solicitation_id = <sol> OR id =
+   <landing>` activation set — so 1 solicitation + 20 topic files → **21 bridge cards**.
 2. Shred → the OPP is **recommended** to the rfp_admin (triage).
 3. Write the **first pass: spotlight summary** (the push gate).
 4. **Approve + push** → `solicitation.push` → Opportunity Pipeline → auto-ranked → **mirrored to all

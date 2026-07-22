@@ -75,6 +75,13 @@ export async function POST() {
     return NextResponse.json({ data: { url: portalSession.url } });
   } catch (err) {
     console.error('[stripe/portal] Error:', err);
+    // Card billing is descoped for the founding cohort — surface that clearly instead of a scary 500.
+    if (err instanceof Error && /not configured/i.test(err.message)) {
+      return NextResponse.json(
+        { error: 'Billing management is not available yet — contact support to change your plan.', code: 'STRIPE_NOT_CONFIGURED' },
+        { status: 400 },
+      );
+    }
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

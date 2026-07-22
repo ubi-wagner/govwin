@@ -17,7 +17,8 @@ export default async function BucketsPage({ params }: { params: Promise<{ tenant
   const tenant = await getTenantBySlug(tenantSlug);
   if (!tenant) redirect('/portal');
   if (!(await verifyTenantAccess(su.id, role, tenant.id as string))) redirect('/portal');
-  if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
+  // BD surface — delegated authority, tenant_admin only (matches the cockpit + nav).
+  if (!hasRoleAtLeast(role, 'tenant_admin')) redirect(`/portal/${tenantSlug}/proposals`);
 
   return (
     <div>

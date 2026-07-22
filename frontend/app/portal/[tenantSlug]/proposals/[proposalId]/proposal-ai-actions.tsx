@@ -25,6 +25,12 @@ export function ProposalAiActions({
     text: string;
   } | null>(null);
 
+  // Research (R&D scout) state
+  const [researchQ, setResearchQ] = useState('market research, prior art, and the competitor landscape for this opportunity');
+  const [researching, setResearching] = useState(false);
+  const [brief, setBrief] = useState<any | null>(null);
+  const [researchErr, setResearchErr] = useState<string | null>(null);
+
   // Outcome state
   const [outcomeLoading, setOutcomeLoading] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<
@@ -37,9 +43,12 @@ export function ProposalAiActions({
 
   // AI Draft: available for admin when not locked
   const canDraft = isAdmin && !isLocked;
-  // Outcome: available for admin when proposal is submitted or archived
+  // Outcome: available for admin only when the proposal is in a stage the
+  // outcome route accepts as a precondition (submitted | final). It 409s on
+  // 'archived' (outcome already recorded) and 400s on any other stage, so
+  // those must not surface the panel.
   const canRecordOutcome =
-    isAdmin && ['submitted', 'archived'].includes(stage);
+    isAdmin && ['submitted', 'final'].includes(stage);
 
   const handleDraft = useCallback(async () => {
     if (!canDraft || draftLoading) return;
@@ -78,6 +87,40 @@ export function ProposalAiActions({
       setDraftLoading(false);
     }
   }, [canDraft, draftLoading, tenantSlug, proposalId]);
+
+  const handleResearch = useCallback(async () => {
+    if (researching || !researchQ.trim()) return;
+    setResearching(true); setResearchErr(null); setBrief(null);
+    try {
+      const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai/research`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: researchQ.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setResearchErr(json.error || 'Research failed'); setResearching(false); return; }
+      const taskId = json.data?.taskId;
+      // Poll for the brief (the scout runs in the pipeline: browse → fence → synthesize).
+      const started = Date.now();
+      const poll = async () => {
+        try {
+          const r = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/ai/research?taskId=${taskId}`);
+          const j = await r.json();
+          const st = j.data?.status;
+          if (st && st !== 'running' && st !== 'queued') {
+            let result = j.data?.result;
+            if (typeof result === 'string') { try { result = JSON.parse(result); } catch { /* keep string */ } }
+            setBrief(result ?? { summary: 'The scout returned no result.' });
+            setResearching(false); return;
+          }
+        } catch { /* keep polling */ }
+        if (Date.now() - started > 90_000) { setResearchErr('Research is taking longer than expected — check back shortly (it keeps running in the background).'); setResearching(false); return; }
+        setTimeout(poll, 4000);
+      };
+      setTimeout(poll, 3000);
+    } catch {
+      setResearchErr('Network error'); setResearching(false);
+    }
+  }, [researching, researchQ, tenantSlug, proposalId]);
 
   const handleOutcome = useCallback(async () => {
     if (!selectedOutcome || outcomeLoading) return;
@@ -185,6 +228,59 @@ export function ProposalAiActions({
             AI Review (coming soon)
           </button>
         </div>
+      </div>
+
+      {/* ── R&D — Research this opportunity (Research Scout) ─────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Research this opportunity</h3>
+        <p className="text-sm text-gray-500 mb-3">
+          The Research Scout browses the web—including DoD sources (SAM.gov, SBIR.gov, DSIP)—for market
+          research, prior art, and the competitor landscape, then returns a <b>cited brief for your review</b>.
+          Web results are treated as untrusted data, and the run counts against your AI budget.
+        </p>
+        <textarea
+          value={researchQ}
+          onChange={(e) => setResearchQ(e.target.value)}
+          rows={2}
+          disabled={researching}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 disabled:opacity-60"
+        />
+        <button
+          onClick={handleResearch}
+          disabled={researching || !researchQ.trim()}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-blue-200 rounded-lg bg-white text-blue-700 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+        >
+          {researching ? (
+            <><span className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" /> Researching…</>
+          ) : (<><span className="text-blue-400">&#x1F50E;</span> Research this opportunity</>)}
+        </button>
+
+        {researchErr && <div className="mt-3 rounded-lg px-3 py-2 text-sm bg-amber-50 border border-amber-200 text-amber-800">{researchErr}</div>}
+
+        {brief && (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+            {brief.web_access === false && (
+              <div className="mb-2 text-amber-700">No web sources were available for this run — nothing was fabricated.</div>
+            )}
+            {brief.topic && <div className="font-semibold text-slate-800">{brief.topic}</div>}
+            {brief.summary && <p className="mt-1 text-slate-600">{brief.summary}</p>}
+            {Array.isArray(brief.findings) && brief.findings.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {brief.findings.map((f: any, i: number) => (
+                  <li key={i} className="border-l-2 border-blue-300 pl-3">
+                    <span className="text-slate-700">{f.claim}</span>
+                    {f.source_url && <a href={f.source_url} target="_blank" rel="noreferrer" className="ml-1 text-blue-600 hover:underline">[source]</a>}
+                    {f.confidence && <span className="ml-1 text-xs text-slate-400">· {f.confidence}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {Array.isArray(brief.competitors) && brief.competitors.length > 0 && (
+              <div className="mt-3 text-slate-600"><b>Competitors:</b> {brief.competitors.join(', ')}</div>
+            )}
+            <div className="mt-3 text-xs text-slate-400">Advisory — review before use. Add relevant findings to your Library as atoms.</div>
+          </div>
+        )}
       </div>
 
       {/* ── Outcome Recording ──────────────────────────────────────── */}

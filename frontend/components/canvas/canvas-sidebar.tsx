@@ -51,8 +51,9 @@ interface Props {
 
 // ─── Self-contained comments section with data fetching ─────────────
 
-function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; proposalId: string; tenantSlug: string }) {
+function CommentsSection({ nodeId, proposalId, tenantSlug, canComment = true }: { nodeId: string; proposalId: string; tenantSlug: string; canComment?: boolean }) {
   const [comments, setComments] = useState<NodeComment[]>([]);
+  const [postError, setPostError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchComments = useCallback(async () => {
@@ -93,6 +94,7 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
         body: JSON.stringify({ nodeId, text }),
       });
       if (res.ok) {
+        setPostError(null);
         const json = await res.json();
         if (json.data) {
           setComments((prev) => [...prev, {
@@ -104,9 +106,12 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
             resolved: false,
           }]);
         }
+      } else {
+        // Surface instead of silently dropping the typed comment.
+        setPostError('Could not post your comment — you may not have permission to comment on this section.');
       }
     } catch {
-      // swallow
+      setPostError('Could not post your comment. Please try again.');
     }
   }, [nodeId, proposalId, tenantSlug]);
 
@@ -134,7 +139,9 @@ function CommentsSection({ nodeId, proposalId, tenantSlug }: { nodeId: string; p
         comments={comments}
         onAddComment={handleAddComment}
         onResolve={handleResolve}
+        canComment={canComment}
       />
+      {postError && <p className="text-[11px] text-red-600 mt-1">{postError}</p>}
     </div>
   );
 }
@@ -751,11 +758,15 @@ export function CanvasSidebar({
                 nodeId={sectionId}
                 proposalId={proposalId}
                 tenantSlug={tenantSlug}
+                canComment={capabilities?.canComment ?? true}
               />
             )}
 
-            {/* AI Revision — only for text-bearing nodes in portal context */}
-            {onReviseNode && proposalId && (selectedNode.type === 'text_block' || selectedNode.type === 'heading') && (
+            {/* AI Revision — only for text-bearing nodes in portal context, and
+                only when the resolved capabilities allow AI drafting (the
+                proposal.draft_section tool requires tenant_user; a partner
+                without the grant would see buttons that 403). */}
+            {onReviseNode && proposalId && (capabilities?.canDraftAI ?? true) && (selectedNode.type === 'text_block' || selectedNode.type === 'heading') && (
               <AIRevisionPanel
                 node={selectedNode}
                 proposalId={proposalId}

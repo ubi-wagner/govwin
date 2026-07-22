@@ -325,3 +325,91 @@ async def test_nudge_sweep_skips_already_sent():
     fired = await mgr._sweep_task_nudges(_NudgeConn(rows))
     assert fired == 0
     mgr._emit_event.assert_not_awaited()
+
+
+# ── (e) FINAL nudge escalates to the portal's DELEGATED managers ─────────────
+
+def _portal_task(now):
+    """A user-assigned portal ToDo whose single nudge threshold is already past,
+    so the sweep fires it as the FINAL nudge (is_final)."""
+    return {
+        "id": uuid.uuid4(),
+        "tenant_id": uuid.uuid4(),
+        "assignee_role": None,
+        "assignee_user_id": uuid.uuid4(),   # user-assigned → the EMAIL path runs
+        "title": "Draft every section",
+        "due_at": now + timedelta(hours=12),  # 0.5d out
+        "nudge_schedule": [1],                # 1d-before threshold already past → is_final
+        "nudges_sent": [],
+        "entity_type": "portal",
+        "entity_id": uuid.uuid4(),
+    }
+
+
+def _manager_emails(calls):
+    """user_ids of the task_nudge_manager (final-notice) escalation emails."""
+    return [
+        c.args[4]["user_id"]
+        for c in calls
+        if c.args[2] == "notification.requested" and c.args[4].get("template") == "task_nudge_manager"
+    ]
+
+
+async def test_final_nudge_notifies_admin_default_plus_delegated_managers(monkeypatch):
+    monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:3000")
+    admin_id, m1, m2 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    task = _portal_task(datetime.now(timezone.utc))
+    cfg = {"collaborators": [
+        {"email": "expert@rfppipeline.com", "role": "manager"},   # our cross-tenant expert
+        {"email": "boss@acme.test", "role": "manager"},
+        {"email": "helper@acme.test", "role": "collaborator"},    # NOT a manager → excluded
+    ]}
+
+    class _Conn:
+        async def fetch(self, q, *a):
+            if "FROM tasks" in q:
+                return [task]
+            if "FROM users" in q:  # resolve managers by email
+                return [{"id": m1}, {"id": m2}]
+            return []
+        async def fetchrow(self, q, *a):
+            if "guardrail_config FROM proposal_portals" in q:
+                return {"guardrail_config": cfg}
+            if "role = 'tenant_admin'" in q:
+                return {"id": admin_id}   # the default recipient
+            return None
+        async def execute(self, q, *a):
+            return "UPDATE 1"
+
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    fired = await mgr._sweep_task_nudges(_Conn())
+
+    assert fired == 1
+    # Admin is the default on every portal; the two delegated managers are added on top.
+    assert set(_manager_emails(mgr._emit_event.await_args_list)) == {str(admin_id), str(m1), str(m2)}
+
+
+async def test_final_nudge_is_admin_only_when_no_managers(monkeypatch):
+    monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:3000")
+    admin_id = uuid.uuid4()
+    task = _portal_task(datetime.now(timezone.utc))
+
+    class _Conn:
+        async def fetch(self, q, *a):
+            return [task] if "FROM tasks" in q else []
+        async def fetchrow(self, q, *a):
+            if "guardrail_config FROM proposal_portals" in q:
+                return {"guardrail_config": {"collaborators": []}}   # no delegates
+            if "role = 'tenant_admin'" in q:
+                return {"id": admin_id}
+            return None
+        async def execute(self, q, *a):
+            return "UPDATE 1"
+
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    fired = await mgr._sweep_task_nudges(_Conn())
+
+    assert fired == 1
+    assert _manager_emails(mgr._emit_event.await_args_list) == [str(admin_id)]

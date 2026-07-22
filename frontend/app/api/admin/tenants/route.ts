@@ -257,7 +257,8 @@ export async function POST(request: Request) {
       namespace: 'finder',
       type: 'tenant.created',
       actor: userActor(sessionUser.id ?? '', (session.user as { email?: string }).email ?? undefined),
-      tenantId: created.tenantId,
+      // Admin (finder) event: tenantId stays null; the new tenant's UUID rides in the payload.
+      tenantId: null,
       payload: { tenantId: created.tenantId, slug: created.slug, name, adminEmail, source: 'admin_manual', cardsBackfilled },
     });
 

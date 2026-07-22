@@ -140,6 +140,17 @@ function sections() {
         ['Eye-safety and FAA constraints on CONUS employment', 'FAA-aware graduated escalation (warn/deter first); OSHA laser-safety controls; non-kinetic-first doctrine'],
         ['Integration risk with Navy sensors and C2', 'MOSA / detection-agnostic interfaces; reuse of fielded STORM sensor integrations'],
       ], 'Risks'),
+      H(2, 'Phase I Schedule & Milestones'),
+      TBL(['Milestone / Deliverable', 'Month', 'Task'], [
+        ['Kick-Off Briefing', 'M1', 'Task 1'],
+        ['System architecture + STORM/DEXTER interface defined', 'M3', 'Task 2'],
+        ['Progress Report', 'M3', 'Task 2'],
+        ['EO-camera optical-effects bench data + comparison analysis', 'M5', 'Task 3'],
+        ['Final Technical Report', 'M6', 'Task 4'],
+        ['Initial Phase II Proposal', 'M6', 'Task 4'],
+        ['Breadboard optical-effects demonstration (Option)', 'M10', 'Task 5'],
+        ['Phase II prototype + NAVAIR/NAVSEA transition package (Option)', 'M12', 'Task 6'],
+      ], 'Milestones'),
     ]},
     { key: 'Related Work', nodes: [
       H(1, '1.3  Related Work'),
@@ -151,6 +162,7 @@ function sections() {
         B('Demonstrated effect. A 450 nm blue optical effect was demonstrated against a drone camera at 200 m in prior work—direct evidence for the Phase I optical-perturbation hypothesis (Figure 3).'),
         B('Intellectual property. Immobileyes holds issued U.S. Patents 11,519,701 and 11,686,560 (plus international application WO2025122941A1), extending the Navy seeker-confusion patents (8,305,252; 8,212,709) this effort applies.'),
       ]),
+      P('This lineage means GHOST does not start at a blank sheet: the STORM detection/tracking stack, the DEXTER liquid-crystal beam router, and the graduated-escalation engagement doctrine are already integrated and field-demonstrated at TRL 5 against Group 1–2 UAS. Phase I therefore concentrates the effort where the technical risk actually is—characterizing and quantifying the optical-perturbation effect against EO-guided fiber-optic seekers—rather than re-developing mature subsystems, which is why a 6-month feasibility effort can credibly retire the key uncertainty and hand a defined prototype baseline to Phase II.'),
     ]},
     { key: 'Defense Need', nodes: [
       H(1, '1.4  Defense Need'),
@@ -188,6 +200,72 @@ function sections() {
       FIG('fig5_mfg.jpg', 'Manufacturing and assembly floor', 360, 203, 'Figure 6.  In-house manufacturing and assembly capacity (AlphaMicron co-location) supporting Phase II transition.'),
       P('The facility maintains NIST SP 800-171 controls (the basis for the topic\'s projected CMMC Level 2 (Self)), ITAR registration, and OSHA laser-safety compliance—sufficient to execute all Phase I laboratory tasks without new capital equipment. Firm identifiers: UEI KL3MJVGD9XZ9; CAGE 8KQ82; Woman-Owned Small Business (WOSB).'),
     ]},
+  ];
+}
+
+// ── Cost Volume (Vol 3) canvas — formula/value/number_format-aware cost tables ──
+// The upgraded xlsx exporter honors TableCell.formula/value/number_format, so these
+// export as a live-formula, currency-formatted workbook straight from the cost canvas.
+const CUR = '$#,##0.00';
+const lbl = (t: string, bold = false, bg?: string) => ({ text: t, style: { ...(bold ? { bold: true } : {}), ...(bg ? { bg } : {}) } });
+const mt = () => ({ text: '' });
+const rate = (v: number) => ({ text: '$' + v.toFixed(2), value: v, cell_type: 'currency', number_format: CUR });
+const hrs = (v: number, o: { formula?: string; bold?: boolean } = {}) => ({ text: String(v), value: v, ...(o.formula ? { formula: o.formula } : {}), cell_type: 'number', number_format: '#,##0', style: o.bold ? { bold: true } : {} });
+const money = (v: number, o: { formula?: string; bold?: boolean; bg?: string } = {}) => ({ text: '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), value: v, ...(o.formula ? { formula: o.formula } : {}), cell_type: 'currency', number_format: CUR, style: { ...(o.bold ? { bold: true } : {}), ...(o.bg ? { bg: o.bg } : {}) } });
+
+function costArtifactSections() {
+  // Base — labor rows land on sheet rows 2..6; buildup 7..19 (header is row 1).
+  const baseTable = TBL(['Cost Element', 'Rate ($/hr)', 'Hours', 'Amount ($)'], [
+    [lbl('Principal Investigator — Dr. Bahman Taheri'), rate(63), hrs(250), money(15750, { formula: 'B2*C2' })],
+    [lbl('Senior Optical Engineer — optical-effects lead'), rate(50), hrs(320), money(16000, { formula: 'B3*C3' })],
+    [lbl('Electrical Engineer — beam-router electronics'), rate(45), hrs(200), money(9000, { formula: 'B4*C4' })],
+    [lbl('Software Engineer — STORM tracking / control'), rate(45), hrs(140), money(6300, { formula: 'B5*C5' })],
+    [lbl('Program Manager — Atossa Alavi'), rate(50), hrs(90), money(4500, { formula: 'B6*C6' })],
+    [lbl('Total Direct Labor', true), mt(), hrs(1000, { formula: 'SUM(C2:C6)', bold: true }), money(51550, { formula: 'SUM(D2:D6)', bold: true })],
+    [lbl('Fringe Benefits (35% of direct labor)'), mt(), mt(), money(18042.5, { formula: 'D7*0.35' })],
+    [lbl('Labor Overhead (77% of labor + fringe)'), mt(), mt(), money(53586.225, { formula: '(D7+D8)*0.77' })],
+    [lbl('Total Burdened Labor', true), mt(), mt(), money(123178.725, { formula: 'D7+D8+D9', bold: true })],
+    [lbl('Materials & Supplies (EO/FPV cameras, optics, laser diodes, LC samples)'), mt(), mt(), money(7000)],
+    [lbl('Travel / ODC (kick-off @ NAVAIR/NAVSEA; Tinker coordination)'), mt(), mt(), money(3000)],
+    [lbl('G&A Base (burdened labor + materials + ODC)'), mt(), mt(), money(133178.725, { formula: 'D10+D11+D12' })],
+    [lbl('G&A (40%)'), mt(), mt(), money(53271.49, { formula: 'D13*0.4' })],
+    [lbl('Total Cost', true), mt(), mt(), money(186450.215, { formula: 'D13+D14', bold: true })],
+    [lbl('Fee / Profit (7% of total cost)'), mt(), mt(), money(13051.51505, { formula: 'D15*0.07' })],
+    [lbl('TOTAL PROPOSED PRICE — BASE', true, '#D9E1F2'), mt(), mt(), money(199501.73005, { formula: 'D15+D16', bold: true, bg: '#D9E1F2' })],
+    [lbl('Topic ceiling (NTE)'), mt(), mt(), money(200000)],
+    [lbl('Margin under ceiling'), mt(), mt(), money(498.26995, { formula: 'D18-D17' })],
+  ], 'Base');
+  // Option — labor rows 2..7; buildup 8..20.
+  const optTable = TBL(['Cost Element', 'Rate ($/hr)', 'Hours', 'Amount ($)'], [
+    [lbl('Principal Investigator — Dr. Bahman Taheri'), rate(63), hrs(110), money(6930, { formula: 'B2*C2' })],
+    [lbl('Senior Optical Engineer — optical-effects lead'), rate(50), hrs(200), money(10000, { formula: 'B3*C3' })],
+    [lbl('Electrical Engineer — breadboard electronics'), rate(45), hrs(110), money(4950, { formula: 'B4*C4' })],
+    [lbl('Mechanical Engineer — breadboard fabrication'), rate(35), hrs(90), money(3150, { formula: 'B5*C5' })],
+    [lbl('Machine-shop Operator — fabrication'), rate(30), hrs(60), money(1800, { formula: 'B6*C6' })],
+    [lbl('Software Engineer — test automation'), rate(45), hrs(40), money(1800, { formula: 'B7*C7' })],
+    [lbl('Total Direct Labor', true), mt(), hrs(610, { formula: 'SUM(C2:C7)', bold: true }), money(28630, { formula: 'SUM(D2:D7)', bold: true })],
+    [lbl('Fringe Benefits (35% of direct labor)'), mt(), mt(), money(10020.5, { formula: 'D8*0.35' })],
+    [lbl('Labor Overhead (77% of labor + fringe)'), mt(), mt(), money(29760.885, { formula: '(D8+D9)*0.77' })],
+    [lbl('Total Burdened Labor', true), mt(), mt(), money(68411.385, { formula: 'D8+D9+D10', bold: true })],
+    [lbl('Materials & Supplies (breadboard optics, LC beam-router cells, laser, mounts)'), mt(), mt(), money(6000)],
+    [lbl('Travel / ODC (Phase II transition review)'), mt(), mt(), money(2000)],
+    [lbl('G&A Base (burdened labor + materials + ODC)'), mt(), mt(), money(76411.385, { formula: 'D11+D12+D13' })],
+    [lbl('G&A (40%)'), mt(), mt(), money(30564.554, { formula: 'D14*0.4' })],
+    [lbl('Total Cost', true), mt(), mt(), money(106975.939, { formula: 'D14+D15', bold: true })],
+    [lbl('Fee / Profit (7% of total cost)'), mt(), mt(), money(7488.31573, { formula: 'D16*0.07' })],
+    [lbl('TOTAL PROPOSED PRICE — OPTION', true, '#D9E1F2'), mt(), mt(), money(114464.25473, { formula: 'D16+D17', bold: true, bg: '#D9E1F2' })],
+    [lbl('Topic ceiling (NTE)'), mt(), mt(), money(115000)],
+    [lbl('Margin under ceiling'), mt(), mt(), money(535.74527, { formula: 'D19-D18' })],
+  ], 'Option');
+  // Summary — cross-sheet refs (Base!D17, Option!D18); cached results shown without recalc.
+  const summaryTable = TBL(['Period', 'Proposed Price', 'Topic Ceiling (NTE)'], [
+    [lbl('Phase I Base (6 months)'), money(199501.73005, { formula: "'Base'!D17" }), money(200000)],
+    [lbl('Phase I Option (6 months)'), money(114464.25473, { formula: "'Option'!D18" }), money(115000)],
+    [lbl('Phase I TOTAL (Base + Option)', true), money(313965.98478, { formula: "'Base'!D17+'Option'!D18", bold: true }), money(315000)],
+  ], 'Summary');
+  return [
+    { key: 'Phase I Base Cost Proposal', nodes: [summaryTable, baseTable] },
+    { key: 'Phase I Option Cost Proposal', nodes: [optTable] },
   ];
 }
 
@@ -330,6 +408,42 @@ try {
   const outPath = path.join(OUTDIR, 'Immobileyes_DON26BX03-NP002_Technical_Volume.docx');
   writeFileSync(outPath, buf as any);
   ok('exported Technical Volume .docx (system exporter)', (buf as any).length > 20000, `${(buf as any).length} bytes → ${outPath}`);
+
+  // ── Phase 7 — Cost Volume: draft the cost canvas, lock, export .xlsx via the SYSTEM exporter ──
+  const costSecs = costArtifactSections();
+  let costDrafted = 0;
+  let costArtifactId: string | null = null;
+  for (const s of costSecs) {
+    const [row] = await sql<{ id: string; artifactId: string }[]>`
+      SELECT id, artifact_id FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid AND title = ${s.key} LIMIT 1`;
+    if (!row) { ok(`cost section "${s.key}"`, false); continue; }
+    costArtifactId = row.artifactId;
+    const cdoc = doc(s.nodes, s.key);
+    (cdoc.metadata as any).proposal_id = proposalId;
+    await sql`UPDATE proposal_sections SET content = ${JSON.stringify(cdoc)}, status = 'complete', version = version + 1, last_modified_by = ${usr.id}::uuid, updated_at = now()
+              WHERE id = ${row.id}::uuid AND proposal_id = ${proposalId}::uuid`;
+    costDrafted++;
+  }
+  ok('drafted Cost Volume canvas (Base + Option + Summary tables)', costDrafted === costSecs.length, `${costDrafted}/${costSecs.length}`);
+
+  const costRows = await sql<{ id: string }[]>`SELECT id FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid AND volume_number = 3`;
+  for (const s of costRows) {
+    await sql`UPDATE proposal_sections SET status = 'approved', accepted_by = ${usr.id}::uuid, accepted_at = now(), completed_stage = 'draft', completed_at = now(), is_locked = true, locked_at = now(), locked_by = ${usr.id}::uuid WHERE id = ${s.id}::uuid AND is_locked = false`;
+    await sql`UPDATE proposal_compliance_matrix SET status = 'satisfied' WHERE section_id = ${s.id}::uuid AND status <> 'not_applicable'`;
+  }
+  if (costArtifactId) await sql`UPDATE proposal_artifacts SET is_locked = true, status = 'locked' WHERE id = ${costArtifactId}::uuid`;
+
+  if (costArtifactId) {
+    const cxSecs = await sql<{ title: string | null; content: string | null }[]>`
+      SELECT title, content FROM proposal_sections WHERE proposal_id = ${proposalId}::uuid AND artifact_id = ${costArtifactId}::uuid ORDER BY section_number`;
+    const [cArt] = await sql<{ artifactType: string | null; volumeName: string | null }[]>`SELECT artifact_type, volume_name FROM proposal_artifacts WHERE id = ${costArtifactId}::uuid`;
+    const cCanvas = assembleArtifactCanvas(cxSecs as any, cArt.artifactType as any, cArt.volumeName ?? 'Cost Volume');
+    const xbuf = await renderCanvas('xlsx', cCanvas as any, vars);
+    const xpath = path.join(OUTDIR, 'Immobileyes_DON26BX03-NP002_Cost_Volume.xlsx');
+    writeFileSync(xpath, xbuf as any);
+    ok('exported Cost Volume .xlsx (system canvas→xlsx exporter)', (xbuf as any).length > 5000, `${(xbuf as any).length} bytes → ${xpath}`);
+    console.log(`COST_ARTIFACT_ID=${costArtifactId}`);
+  }
 
   console.log(`\nPROPOSAL_ID=${proposalId}\nTV_ARTIFACT_ID=${tvArtifactId}`);
 } finally {

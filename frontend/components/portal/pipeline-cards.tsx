@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 
@@ -16,6 +16,26 @@ interface Card {
   pinUpdateAvailable: boolean;
 }
 
+type SortKey = 'pinned' | 'close' | 'agency' | 'title';
+const SORT_LABELS: Record<SortKey, string> = { pinned: 'Pinned first', close: 'Close date', agency: 'Agency', title: 'Title' };
+
+const str = (c: Card, k: string) => (c.card && typeof c.card[k] === 'string' ? (c.card[k] as string) : null);
+
+/** Pinned cards always float to the top; then by the chosen key. */
+function sortCards(cards: Card[], sortBy: SortKey): Card[] {
+  return [...cards].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (sortBy === 'close') {
+      const da = str(a, 'closeDate'); const db = str(b, 'closeDate');
+      if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+      return new Date(da).getTime() - new Date(db).getTime();
+    }
+    if (sortBy === 'agency') return (str(a, 'agency') ?? '').localeCompare(str(b, 'agency') ?? '');
+    if (sortBy === 'title') return (str(a, 'title') ?? '').localeCompare(str(b, 'title') ?? '');
+    return 0;
+  });
+}
+
 const STAGE_BADGE: Record<string, { label: string; cls: string }> = {
   nofo: { label: 'NOFO', cls: 'bg-slate-100 text-slate-600' },
   pre_release: { label: 'Pre-Release', cls: 'bg-indigo-100 text-indigo-700' },
@@ -28,37 +48,56 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
   const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>('pinned');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/cards${includeClosed ? '?includeClosed=true' : ''}`);
-      if (res.ok) setCards((await res.json()).data?.cards ?? []);
-    } catch { /* keep */ } finally { setLoading(false); }
+      if (res.ok) { setCards((await res.json()).data?.cards ?? []); setErr(null); }
+      else setErr('Could not load your opportunity cards.');
+    } catch { setErr('Could not load your opportunity cards.'); } finally { setLoading(false); }
   }, [tenantSlug, includeClosed]);
 
   useEffect(() => { load(); }, [load]);
 
   const act = useCallback(async (opp: string, method: 'POST' | 'DELETE', qs = '') => {
-    setBusy(opp);
+    setBusy(opp); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pin${qs}`, { method });
+      const res = await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pin${qs}`, { method });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || 'That action could not be completed — please try again.');
+        return;
+      }
       await load();
-    } catch { /* ignore */ } finally { setBusy(null); }
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
-  const str = (c: Card, k: string) => (c.card && typeof c.card[k] === 'string' ? (c.card[k] as string) : null);
+  const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
 
   return (
     <div>
+      {err && (
+        <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{err}</div>
+      )}
       <div className="flex items-center gap-3 mb-4 text-sm">
         <label className="flex items-center gap-1.5 text-gray-600">
           <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} /> Include closed
         </label>
         <button onClick={load} className="text-blue-600 hover:underline">Refresh</button>
         <span className="text-gray-400">· {cards.length} cards</span>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          aria-label="Sort opportunities"
+          className="ml-auto text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-600"
+        >
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABELS[k]}</option>)}
+        </select>
       </div>
 
       {loading && <p className="text-gray-400 text-sm py-8 text-center">Loading…</p>}
@@ -70,7 +109,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {cards.map((c) => (
+        {sorted.map((c) => (
           <div key={c.id} className={`border rounded-xl p-4 bg-white ${c.isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="text-sm font-semibold text-gray-800">{str(c, 'title') ?? 'Untitled opportunity'}</h3>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Bucket { id: string; name: string; description: string | null; criteria: Record<string, unknown> }
 interface RankedRow { opportunityId: string; score: number; factors: Record<string, number>; card: Record<string, unknown> | null; isPinned: boolean }
@@ -10,6 +11,13 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
   const [ranked, setRanked] = useState<RankedRow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reranking, setReranking] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
+  // Tracks which bucket the pipeline poll should still write to, so switching
+  // buckets (or deleting the open one) cancels stale in-flight refreshes.
+  const activeRef = useRef<string | null>(null);
   // create form
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -22,7 +30,8 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/buckets`);
       if (res.ok) setBuckets((await res.json()).data?.buckets ?? []);
-    } catch { /* keep */ }
+      else setErr('Could not load your buckets.');
+    } catch { setErr('Could not load your buckets.'); } finally { setLoading(false); }
   }, [tenantSlug]);
   useEffect(() => { load(); }, [load]);
 
@@ -37,29 +46,49 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
       includeClosed,
       useTimeline: true,
     };
+    setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, criteria }) });
+      const res = await fetch(`/api/portal/${tenantSlug}/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, criteria }) });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not create the bucket.'); return; }
       setName(''); setKeywords(''); setAgencies(''); setProgramTypes(''); setNaics(''); setIncludeClosed(false);
-      await load();
-    } catch { /* ignore */ } finally { setBusy(false); }
-  }, [tenantSlug, name, keywords, agencies, programTypes, naics, includeClosed, load]);
+      await load(); router.refresh(); // refresh the console's bucket count
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
+  }, [tenantSlug, name, keywords, agencies, programTypes, naics, includeClosed, load, router]);
 
   const del = useCallback(async (id: string) => {
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
-      if (openId === id) { setRanked(null); setOpenId(null); }
-      await load();
-    } catch { /* ignore */ } finally { setBusy(false); }
-  }, [tenantSlug, openId, load]);
+      const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`, { method: 'DELETE' });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); setErr(j.error ?? 'Could not delete the bucket.'); return; }
+      if (openId === id) { setRanked(null); setOpenId(null); activeRef.current = null; setReranking(false); }
+      await load(); router.refresh();
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
+  }, [tenantSlug, openId, load, router]);
 
   const rank = useCallback(async (id: string) => {
     setBusy(true);
+    setReranking(true);
+    activeRef.current = id;
+    setOpenId(id);
+    const loadRanked = async () => {
+      try {
+        const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`);
+        if (res.ok && activeRef.current === id) setRanked((await res.json()).data?.ranked ?? []);
+      } catch { /* ignore */ }
+    };
     try {
+      // Ranking is async — the POST emits buckets.updated and the pipeline
+      // OnBucketsUpdated workflow rescores tenant-side. Show what's there now,
+      // then poll a few times to pick up the fresh scores as they land.
       await fetch(`/api/portal/${tenantSlug}/buckets/${id}?action=rank`, { method: 'POST' });
-      const res = await fetch(`/api/portal/${tenantSlug}/buckets/${id}`);
-      if (res.ok) { setRanked((await res.json()).data?.ranked ?? []); setOpenId(id); }
+      await loadRanked();
     } catch { /* ignore */ } finally { setBusy(false); }
+    for (const delay of [1500, 2000, 2500]) {
+      await new Promise((r) => setTimeout(r, delay));
+      if (activeRef.current !== id) return; // user switched buckets — abandon this poll
+      await loadRanked();
+    }
+    if (activeRef.current === id) setReranking(false);
   }, [tenantSlug]);
 
   const str = (c: Record<string, unknown> | null, k: string) => (c && typeof c[k] === 'string' ? (c[k] as string) : null);
@@ -96,13 +125,22 @@ export default function SpotlightBuckets({ tenantSlug, canEdit }: { tenantSlug: 
               </div>
             </div>
           ))}
-          {buckets.length === 0 && <p className="text-xs text-gray-400">No buckets yet.</p>}
+          {err && <p className="text-xs text-rose-600">{err}</p>}
+          {buckets.length === 0 && !err && <p className="text-xs text-gray-400">{loading ? 'Loading buckets…' : 'No buckets yet.'}</p>}
         </div>
       </div>
 
       <div className="lg:col-span-2">
+        {reranking && (
+          <div className="mb-3 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" aria-hidden />
+            Rescore queued — scores refresh as the pipeline processes.
+          </div>
+        )}
         {ranked == null ? (
-          <p className="text-sm text-gray-400 py-8 text-center">Rank a bucket to see your pipeline ordered.</p>
+          <p className="text-sm text-gray-400 py-8 text-center">
+            {reranking ? 'Ranking…' : 'Rank a bucket to see your pipeline ordered.'}
+          </p>
         ) : (
           <div className="space-y-1.5">
             <p className="text-xs text-gray-400 mb-2">{ranked.length} opportunities ranked{openId ? ` · bucket ${buckets.find((b) => b.id === openId)?.name}` : ''}</p>

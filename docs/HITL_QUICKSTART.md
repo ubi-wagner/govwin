@@ -1,7 +1,7 @@
 # HITL Test Quick-Start Guide
 
 **Last updated:** 2026-07-15
-**Full test plan:** [HITL_TEST_PLAN_V2.md](./HITL_TEST_PLAN_V2.md)
+**Full test plan:** [HITL_TEST_PLAN_V2.md](./archive/HITL_TEST_PLAN_V2.md)
 
 > **Current canonical end-to-end.** The up-to-date single-operator HITL script is
 > [`ALPHA_HITL_RUNBOOK.md`](./ALPHA_HITL_RUNBOOK.md) + [`HITL_IMMOBILEYES_CLICKPLAN.md`](./HITL_IMMOBILEYES_CLICKPLAN.md)

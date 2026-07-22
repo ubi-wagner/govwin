@@ -31,6 +31,16 @@ function resolveTableCell(cell: string | CanvasTableCell): CanvasTableCell {
   return typeof cell === 'string' ? { text: cell } : cell;
 }
 
+/** Default Excel number format for a TableCell.cell_type when none is explicit. */
+function defaultNumFmt(cellType?: string): string | undefined {
+  switch (cellType) {
+    case 'currency': return '$#,##0.00';
+    case 'percent': return '0.0%';
+    case 'number': return '#,##0';
+    default: return undefined;
+  }
+}
+
 /**
  * Convert a CanvasDocument to an .xlsx Buffer suitable for download.
  *
@@ -111,9 +121,22 @@ export async function exportToXlsx(
       }
     });
 
-    // Write data rows
+    // Write data rows. Resolve each cell to a live value — an ExcelJS formula
+    // object (with a cached result), a number, or text — so cost/budget canvases
+    // export as a real spreadsheet model (formulas + currency formats), not just
+    // static strings. A plain string / text-only TableCell is unchanged.
     for (const row of tc.rows) {
-      const rowValues = row.map((cell) => cellText(cell));
+      const rowValues = row.map((cell) => {
+        const r = resolveTableCell(cell);
+        if (r.formula) {
+          const f = r.formula.replace(/^=/, '');
+          return (typeof r.value === 'number'
+            ? { formula: f, result: r.value }
+            : { formula: f }) as ExcelJS.CellFormulaValue;
+        }
+        if (typeof r.value === 'number') return r.value;
+        return r.text;
+      });
       const dataRow = ws.addRow(rowValues);
 
       dataRow.eachCell((excelCell, colNumber) => {
@@ -126,8 +149,19 @@ export async function exportToXlsx(
           right: { style: 'thin' },
         };
 
-        // Apply per-cell style overrides from the canvas data
+        // Apply per-cell number format + style overrides from the canvas data.
         const resolved = resolveTableCell(row[colNumber - 1]);
+        const numFmt = resolved.number_format ?? defaultNumFmt(resolved.cell_type);
+        if (numFmt) excelCell.numFmt = numFmt;
+        const isNumeric =
+          resolved.formula != null ||
+          typeof resolved.value === 'number' ||
+          resolved.cell_type === 'number' ||
+          resolved.cell_type === 'currency' ||
+          resolved.cell_type === 'percent';
+        if (isNumeric && !resolved.style?.alignment) {
+          excelCell.alignment = { ...excelCell.alignment, horizontal: 'right', wrapText: false };
+        }
         if (resolved.style?.bold) {
           excelCell.font = { ...excelCell.font, bold: true };
         }

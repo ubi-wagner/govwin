@@ -82,15 +82,21 @@ with the email just the prompt.
 
 After signing in you're on your **Dashboard** — a snapshot of your workspace.
 
-![The portal dashboard — stats, to-dos with workflow trails, get-started checklist, recent activity, AI usage](./img/portal-dashboard-todos.png)
+![The portal dashboard cockpit — active builds (or the get-started checklist), count tiles, to-dos with workflow trails, and recent activity](./img/portal-dashboard-todos.png)
 
-- **Top stats:** Library Units, Active Proposals, Pinned Topics.
-- **Your To-Dos:** anything waiting on you (a section to finish, a portal to
-  release). Empty means you're clear.
-- **Get Started checklist:** the four first steps — upload company documents, set
-  up your profile, review your spotlight, purchase your first proposal portal.
-- **Recent Activity** and **AI Agent Usage** (calls used vs. your hourly
-  allocation).
+- **Center:** your **active proposal builds** — click one to open its canvas. When you have no
+  active build, its place is taken by the **Get started** checklist (admins) or a *"You're on
+  the team"* card (base team members) — see below.
+- **Right-rail count tiles:** **To-dos**, **Library** (your content atoms), and — for admins —
+  **Opportunities** and **Buckets**; each opens a drawer. **Activity** lists recent events.
+- **Your To-Dos:** anything waiting on you (a section to finish, a portal to release) — open the
+  **To-dos** tile. Empty means you're clear.
+- **Get started checklist (admins):** the first steps — upload company documents, set up your
+  company profile, review your matched opportunities, start your first proposal build — each
+  ticking off as you finish it. It shows only to those who can act on it.
+- **"You're on the team" card (base team member):** if nothing's assigned to you yet, you get an
+  honest *"Nothing is assigned to you yet — ask your admin to add you to a build"* card and a
+  link to your to-dos, **not** a checklist that leads nowhere.
 
 ### Your To-Dos are steps in defined workflows
 

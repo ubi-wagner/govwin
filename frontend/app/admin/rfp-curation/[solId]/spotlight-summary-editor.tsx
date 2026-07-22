@@ -14,6 +14,7 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,7 +33,7 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
   }, [solId]);
 
   const save = async () => {
-    setBusy(true);
+    setBusy(true); setErr(null);
     try {
       const res = await fetch(`/api/admin/rfp-curation/${solId}`, {
         method: 'PATCH',
@@ -40,7 +41,8 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
         body: JSON.stringify({ spotlightSummary: value }),
       });
       if (res.ok) setSaved(value);
-    } catch { /* ignore */ } finally {
+      else { const j = await res.json().catch(() => ({})); setErr(j.error || 'Could not save the summary.'); }
+    } catch { setErr('Network error — please try again.'); } finally {
       setBusy(false);
     }
   };
@@ -61,7 +63,7 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
       </p>
       <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => { setValue(e.target.value); setErr(null); }}
         rows={4}
         placeholder={loaded
           ? 'e.g. Navy computer-vision property-intelligence SBIR; agencies: Navy/DoD; tech: CV, edge inference; keywords: maritime, ISR, autonomy…'
@@ -77,7 +79,8 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
           {busy ? 'Saving…' : 'Save summary'}
         </button>
         {!value.trim() && <span className="text-[11px] text-rose-600">Empty — push will be blocked.</span>}
-        {value.trim() && !dirty && <span className="text-[11px] text-green-600">Saved</span>}
+        {value.trim() && !dirty && !err && <span className="text-[11px] text-green-600">Saved</span>}
+        {err && <span className="text-[11px] text-rose-600" role="alert">{err}</span>}
       </div>
     </div>
   );

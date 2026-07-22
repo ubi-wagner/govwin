@@ -47,6 +47,7 @@ export default function SourceDetailClient({
   const [editingInstructions, setEditingInstructions] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
   const [savingInstructions, setSavingInstructions] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // ── Refresh helpers ────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ export default function SourceDetailClient({
   // ── Save notes ─────────────────────────────────────────────────────
 
   const saveAdminNotes = useCallback(async () => {
-    setSavingNotes(true);
+    setSavingNotes(true); setSaveError(null);
     try {
       const res = await fetch(`/api/admin/sources/${profile.id}`, {
         method: 'PATCH',
@@ -86,16 +87,19 @@ export default function SourceDetailClient({
       });
       if (res.ok) {
         setEditingNotes(false);
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setSaveError(j.error || 'Could not save the notes — please try again.');
       }
     } catch {
-      // Fail silently
+      setSaveError('Network error saving the notes — please try again.');
     } finally {
       setSavingNotes(false);
     }
   }, [profile.id, adminNotes]);
 
   const saveVisitInstructions = useCallback(async () => {
-    setSavingInstructions(true);
+    setSavingInstructions(true); setSaveError(null);
     try {
       const res = await fetch(`/api/admin/sources/${profile.id}`, {
         method: 'PATCH',
@@ -104,9 +108,12 @@ export default function SourceDetailClient({
       });
       if (res.ok) {
         setEditingInstructions(false);
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setSaveError(j.error || 'Could not save the instructions — please try again.');
       }
     } catch {
-      // Fail silently
+      setSaveError('Network error saving the instructions — please try again.');
     } finally {
       setSavingInstructions(false);
     }
@@ -114,6 +121,9 @@ export default function SourceDetailClient({
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
+      {saveError && (
+        <div className="lg:col-span-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{saveError}</div>
+      )}
       {/* Left column: crawl settings + notes */}
       <div className="lg:col-span-1 space-y-6">
         {/* Crawl Settings */}

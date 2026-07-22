@@ -177,6 +177,7 @@ export function ProposalAdminPanel({
   const [lockPending, setLockPending] = useState<string | null>(null);
   const [lockingAll, setLockingAll] = useState(false);
   const [gateError, setGateError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [newGateLabel, setNewGateLabel] = useState('');
   const [newGateStage, setNewGateStage] = useState('');
   const [addingGate, setAddingGate] = useState(false);
@@ -331,6 +332,7 @@ export function ProposalAdminPanel({
   // Accept + lock / unlock a section (admin action; server-enforced + audited).
   const handleToggleLock = useCallback(async (sectionId: string, currentlyLocked: boolean) => {
     setLockPending(sectionId);
+    setActionError(null);
     try {
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/lock`,
@@ -347,9 +349,12 @@ export function ProposalAdminPanel({
         } catch {
           /* no/again non-JSON body — nothing to react to */
         }
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || `Could not ${currentlyLocked ? 'unlock' : 'accept & lock'} the section.`);
       }
     } catch {
-      /* network error — leave UI state unchanged */
+      setActionError('Network error — please try again.');
     } finally {
       setLockPending(null);
     }
@@ -364,6 +369,7 @@ export function ProposalAdminPanel({
     async (scope: 'volume' | 'artifact' | 'proposal', key?: number | string) => {
       if (scopeBusy) return;
       setScopeBusy(`${scope}:${key ?? 'all'}`);
+      setActionError(null);
       try {
         const body: Record<string, unknown> = { scope };
         if (scope === 'volume') body.volumeNumber = key;
@@ -373,7 +379,14 @@ export function ProposalAdminPanel({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.ok) router.refresh();
+        if (res.ok) {
+          router.refresh();
+        } else {
+          const j = await res.json().catch(() => ({}));
+          setActionError(j.error || 'Could not lock this scope — some sections may not be ready.');
+        }
+      } catch {
+        setActionError('Network error — please try again.');
       } finally {
         setScopeBusy(null);
       }
@@ -392,13 +405,23 @@ export function ProposalAdminPanel({
     );
     if (targets.length === 0) return;
     setLockingAll(true);
+    setActionError(null);
+    let failed = 0;
     try {
       for (const s of targets) {
-        const res = await fetch(
-          `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${s.id}/lock`,
-          { method: 'POST' },
-        );
-        if (res.ok) setLockOverrides((prev) => ({ ...prev, [s.id]: true }));
+        try {
+          const res = await fetch(
+            `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${s.id}/lock`,
+            { method: 'POST' },
+          );
+          if (res.ok) setLockOverrides((prev) => ({ ...prev, [s.id]: true }));
+          else failed += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      if (failed > 0) {
+        setActionError(`${failed} of ${targets.length} section${targets.length > 1 ? 's' : ''} could not be locked — try again or lock them individually.`);
       }
       router.refresh();
     } finally {
@@ -413,13 +436,21 @@ export function ProposalAdminPanel({
     if (advancing) return;
     if (!window.confirm('Force-advance this proposal to V1 (complete)? Sections that are not locked will be advanced as-is and recorded.')) return;
     setAdvancing(true);
+    setActionError(null);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/proposals/${proposalId}/advance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetStage: 'final', force: true }),
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setActionError(j.error || 'Could not force-advance the proposal.');
+      }
+    } catch {
+      setActionError('Network error — please try again.');
     } finally {
       setAdvancing(false);
     }
@@ -465,6 +496,9 @@ export function ProposalAdminPanel({
       {/* ─── Artifacts Tab ────────────────────────────────────────── */}
       {activeTab === 'artifacts' && (
         <div>
+          {actionError && (
+            <p className="text-xs text-red-500 mb-3 px-4 py-2 bg-red-50 border border-red-200 rounded-md" role="alert">{actionError}</p>
+          )}
           {unlockedLockable.length > 0 && (
             <div className="flex items-center justify-between mb-4 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg">
               <p className="text-xs text-indigo-800">

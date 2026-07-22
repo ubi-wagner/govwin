@@ -1,38 +1,25 @@
 /**
  * POST /api/admin/upload-topic-files
  *
- * Accepts one or more individual topic PDFs for a solicitation.
- * Each file is stored in the bucket under the solicitation's path,
- * a solicitation_documents row is created with document_type='topic',
- * and best-effort metadata is extracted from the filename.
+ * Ingest one or more individual topic files for a solicitation. Each file is
+ * stored, its text extracted, recorded as solicitation_documents(document_type
+ * ='topic'), and — the point of this route — turned into a TOPIC OPPORTUNITY
+ * (an `opportunities` row under the umbrella, linked via origin_document_id).
+ * Upload 20 topic files → 20 topic opportunities, ready for the existing
+ * `solicitation.push` fan-out (umbrella + every topic → N+1 tenant cards).
  *
- * Returns: { data: { uploaded: [{ documentId, topicNumber, title, filename }] } }
- *
- * Does NOT create opportunity rows — the admin confirms each topic
- * via the staged-review UI, which calls opportunity.add_topic per
- * confirmed file.
+ * Returns: { data: { created:[{opportunityId,documentId,topicNumber,title,textExtracted}],
+ *                     skipped:[{filename,reason}], failed:[{filename,error}], totalFiles } }
  */
 
-import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
-import { putObject } from '@/lib/storage/s3-client';
-import { emitEventSingle } from '@/lib/events';
+import {
+  ingestTopicFilesForSolicitation,
+  SolicitationNotFoundError,
+  type TopicFileInput,
+} from '@/lib/ingest/ingest-topic-files';
 import { isValidUUID } from '@/lib/validation';
-
-// Common topic-number patterns in filenames
-const TOPIC_RE = /([A-Z]{1,5}\d{2,3}[._-]\w{1,10})/i;
-
-function parseTopicFromFilename(filename: string): { topicNumber: string | null; title: string } {
-  const base = filename.replace(/\.[^.]+$/, '').replace(/_/g, ' ').replace(/-/g, ' ');
-  const m = filename.match(TOPIC_RE);
-  const topicNumber = m ? m[1].replace(/_/g, '-') : null;
-  const title = topicNumber
-    ? base.replace(m![0], '').replace(/^\s*[-_:]\s*/, '').trim() || topicNumber
-    : base.trim();
-  return { topicNumber, title };
-}
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -43,7 +30,7 @@ export async function POST(request: Request) {
   if (role !== 'rfp_admin' && role !== 'master_admin') {
     return NextResponse.json({ error: 'rfp_admin required', code: 'FORBIDDEN' }, { status: 403 });
   }
-  const userId = (session.user as { id?: string }).id;
+  const userId = (session.user as { id?: string }).id ?? null;
 
   let formData: FormData;
   try {
@@ -57,129 +44,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'A valid solicitationId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
-  // Verify solicitation exists + get its primary opportunity for path generation
-  let oppId: string;
-  try {
-    const solRows = await sql<{ id: string; opportunityId: string | null }[]>`
-      SELECT id, opportunity_id FROM curated_solicitations WHERE id = ${solicitationId}::uuid
-    `;
-    if (solRows.length === 0) {
-      return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
-    }
-    oppId = solRows[0].opportunityId ?? solicitationId;
-  } catch (err) {
-    console.error('[upload-topic-files] solicitation lookup failed', err);
-    return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
-  }
-
-  const files: File[] = [];
+  const files: TopicFileInput[] = [];
   for (const entry of formData.getAll('files')) {
-    if (entry instanceof File) files.push(entry);
+    if (entry instanceof File) {
+      files.push({
+        name: entry.name,
+        type: entry.type,
+        size: entry.size,
+        buffer: Buffer.from(await entry.arrayBuffer()),
+      });
+    }
   }
   if (files.length === 0) {
     return NextResponse.json({ error: 'At least one file required', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
 
-  const uploaded: Array<{ documentId: string; topicNumber: string | null; title: string; filename: string }> = [];
-
-  for (const file of files) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const hash = createHash('sha256').update(buffer).digest('hex');
-    const displayName = (file.name.replace(/\\/g, '/').split('/').pop() ?? file.name).slice(0, 255);
-
-    // Check for global duplicate
-    let dupeCheck: { id: string }[];
-    try {
-      dupeCheck = await sql<{ id: string }[]>`
-        SELECT id FROM solicitation_documents WHERE content_hash = ${hash}
-      `;
-    } catch (err) {
-      console.error('[upload-topic-files] duplicate check failed', err);
-      return NextResponse.json({ error: 'Database query failed', code: 'DB_ERROR' }, { status: 500 });
+  try {
+    const result = await ingestTopicFilesForSolicitation({ solicitationId, files, userId });
+    return NextResponse.json({ data: { ...result, totalFiles: files.length } }, { status: 201 });
+  } catch (err) {
+    if (err instanceof SolicitationNotFoundError) {
+      return NextResponse.json({ error: 'Solicitation not found', code: 'NOT_FOUND' }, { status: 404 });
     }
-    if (dupeCheck.length > 0) {
-      // Skip silently — already uploaded
-      continue;
-    }
-
-    // Parse topic info from filename
-    const { topicNumber, title } = parseTopicFromFilename(displayName);
-
-    // Storage key: rfp-pipeline/{oppId}/topics/{slug}.pdf
-    const slug = displayName
-      .replace(/\.[^.]+$/, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 60) || 'topic';
-    const ext = (displayName.match(/\.([a-zA-Z0-9]+)$/) ?? [])[1]?.toLowerCase() ?? 'pdf';
-    const storageKey = `rfp-pipeline/${oppId}/topics/${slug}.${ext}`;
-
-    try {
-      await putObject({
-        key: storageKey,
-        body: buffer,
-        contentType: file.type || 'application/pdf',
-        metadata: { 'original-filename': displayName, 'topic-number': topicNumber ?? '' },
-      });
-    } catch (err) {
-      console.error('[upload-topic-files] S3 put failed', { key: storageKey, err: err instanceof Error ? err.message : String(err) });
-      return NextResponse.json(
-        { error: 'File storage failed', code: 'STORAGE_ERROR' },
-        { status: 500 },
-      );
-    }
-
-    let docRows: { id: string }[];
-    try {
-      docRows = await sql<{ id: string }[]>`
-        INSERT INTO solicitation_documents
-          (solicitation_id, document_type, original_filename, storage_key,
-           file_size, content_type, content_hash, uploaded_by,
-           metadata)
-        VALUES
-          (${solicitationId}::uuid, 'topic', ${displayName}, ${storageKey},
-           ${file.size}, ${file.type || null}, ${hash}, ${userId ?? null}::uuid,
-           ${sql.json({ parsed_topic_number: topicNumber, parsed_title: title })})
-        ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
-        RETURNING id
-      `;
-    } catch (err) {
-      console.error('[upload-topic-files] document insert failed', err);
-      return NextResponse.json({ error: 'Failed to record document', code: 'DB_ERROR' }, { status: 500 });
-    }
-    // A concurrent upload of the same file won the dedup race — skip silently
-    // (matches the SELECT-based skip above) instead of 500-ing on the partial
-    // unique violation. The ON CONFLICT must restate the index's partial predicate.
-    if (docRows.length === 0) {
-      continue;
-    }
-    uploaded.push({
-      documentId: docRows[0].id,
-      topicNumber,
-      title,
-      filename: displayName,
-    });
+    console.error('[upload-topic-files] ingest failed', err);
+    return NextResponse.json({ error: 'Topic ingest failed', code: 'DB_ERROR' }, { status: 500 });
   }
-
-  if (uploaded.length > 0) {
-    try {
-      await emitEventSingle({
-        namespace: 'finder',
-        type: 'topic_file.uploaded',
-        actor: { type: 'user', id: userId ?? 'unknown' },
-        tenantId: null,
-        payload: {
-          correlationId: randomUUID(),
-          solicitationId,
-          fileCount: uploaded.length,
-          documentIds: uploaded.map(u => u.documentId),
-        },
-      });
-    } catch (evtErr) {
-      console.error('[upload-topic-files] event emission failed', evtErr);
-    }
-  }
-
-  return NextResponse.json({ data: { uploaded, totalFiles: files.length } }, { status: 201 });
 }

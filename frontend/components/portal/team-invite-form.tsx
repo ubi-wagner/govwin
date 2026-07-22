@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface TeamInviteFormProps {
   tenantSlug: string;
 }
 
 export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('tenant_user');
@@ -54,13 +56,14 @@ export function TeamInviteForm({ tenantSlug }: TeamInviteFormProps) {
         setEmail('');
         setName('');
         setRole('tenant_user');
+        router.refresh(); // surface the new member in the console table + count
       } catch {
         setMessage({ type: 'error', text: 'Network error' });
       } finally {
         setSubmitting(false);
       }
     },
-    [tenantSlug],
+    [tenantSlug, router],
   );
 
   return (

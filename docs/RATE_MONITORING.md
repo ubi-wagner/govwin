@@ -1,10 +1,11 @@
 # Rate Limiting, Monitoring & Cost Model Reference
 
 > Complete reference for rate limiting, cost estimation, usage tracking, and monitoring
-> across the platform.
+> across the platform — AI **and** system.
 > Source of truth: `frontend/lib/rate-limit.ts`, `pipeline/src/agents/fabric.py`,
-> `docs/agent-fabric/07-COST-MODEL.md`.
-> Last updated: 2026-05-23.
+> `docs/agent-fabric/07-COST-MODEL.md`; the observability model is `system_events` +
+> `process_instances`/`_transitions`/`tasks` (see EVENT_CONTRACT_V3 §2/§6).
+> Last updated: 2026-07-22.
 
 ---
 
@@ -384,6 +385,46 @@ ORDER BY error_rate_pct DESC;
 
 ## 6. Admin Monitoring Views
 
+### The observability model (as-built)
+
+Monitoring is **derived from the event ledger, not a separate metrics store.** Three primitives:
+
+- **`system_events` is the audit river.** Every state-changing action posts a `start`/`end`
+  pair (or a `single`); the `end` row carries `duration_ms` + a dedicated `error` column. AI/tool
+  calls emit under `namespace='tool'`; workflow Jobs stamp `correlationId` + `processInstanceId`.
+  The river is append-only — you read it forward (EVENT_CONTRACT_V3 §2).
+- **Workflow state is derivable, not stored twice.** `process_instances` (current_step, status,
+  deadline, `last_heartbeat_at`) + `process_instance_transitions` (one row per state change) +
+  `tasks` give the live picture of every running Process Instance. The engine is stateless
+  between polls — state lives in these tables, reconstructable from the river.
+- **A missing `end` past the deadline IS the alert.** Because every Job posts start→end, an
+  unpaired `start` older than the Job's `default_timeout` (or a parked instance past its
+  `wait_deadline`) is the signal that something stuck. The time-sweeper reconciler
+  (EVENT_CONTRACT_V3 §6) turns "no end row" into an escalation rather than a silent hang — no
+  heartbeat table beyond `last_heartbeat_at` is required.
+
+### The three admin surfaces
+
+| Surface | Route | Shows |
+|---------|-------|-------|
+| **Agent Workforce** | `/admin/agents` | Agent roster (**25 archetypes, all auto-registered**; wired/dormant status per archetype) + tool registry + **per-tenant AI usage** (calls, cost, budget %) + recent tool invocations. Pipeline AI Controls (platform default budget/rate + master switch). |
+| **Workflows** | `/admin/workflows` | Live **Process Instance** state off `process_instances`/`_transitions`/`tasks` — current step, status, deadline, force-advance (the sanctioned HITL override). Cross-tenant, tenant-filterable. |
+| **Events** | `/admin/events` | The raw **audit river** — a live `system_events` stream (namespace/type/phase/actor/duration/error), the ground truth the other two are derived from. |
+
+### Runaway caps — the four bounds every agent invocation clears
+
+The agent runtime is bounded on four axes; a breach on any one halts the call (fail-closed) and
+routes to safe-skip rather than dead-ending the workflow (EVENT_CONTRACT_V3 §3.1; the safety
+contract is docs/AGENT_WORKFORCE.md). All four are visible/settable from `/admin/agents`
+(platform) + the admin account profile (per-tenant):
+
+| Cap | Bound (default) | Enforced in | §ref |
+|-----|-----------------|-------------|------|
+| **Round** | 20 tool-use rounds / invocation | `fabric.invoke_agent` loop | §10.8 (V3) |
+| **Cost** (per-call) | $0.50 (tenant/platform overridable) | tool-loop accumulator | §3 |
+| **Rate** | 50 calls / hour / tenant (overridable) | `_check_rate_limit` (durable, `agent_task_log`) | §2 |
+| **Budget** (monthly) | $50 / month / tenant + optional platform cap | `_check_budget` (SUM `cost_usd`) | §3 |
+
 ### Current: /admin/agents Page
 
 The existing admin agents page (`frontend/app/admin/agents/page.tsx`) shows:
@@ -420,6 +461,10 @@ comprehensive usage data:
 - Weekly cost trend emails to master_admin
 - Per-archetype quality metrics (acceptance rate, edit percentage)
 - Agent queue depth monitoring with auto-scaling triggers
+- **Total-cost-of-ownership rollup per tenant:** the planned budget view combines the live
+  Claude spend (`SUM(cost_usd)` from `agent_task_log`) with Railway Postgres + Cloudflare R2 (S3)
+  infra-cost estimates, for a true per-tenant margin picture. Today only the Claude leg is metered;
+  infra is the flat estimate baked into §4's break-even, not yet a live per-tenant rollup.
 
 ---
 

@@ -17,7 +17,7 @@ const ACCEPT = ALLOWED.map((e) => `.${e}`).join(',');
 
 type Result = { filesProcessed?: number; totalAtoms?: number } | null;
 
-export function UploadAtomizeCard({ tenantSlug }: { tenantSlug: string }) {
+export function UploadAtomizeCard({ tenantSlug, canBrowseLibrary = true }: { tenantSlug: string; canBrowseLibrary?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,11 @@ export function UploadAtomizeCard({ tenantSlug }: { tenantSlug: string }) {
     <div className="bg-white border border-gray-200 rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">Add content</h2>
-        <Link href={`/portal/${tenantSlug}/atoms`} className="text-xs text-blue-600 hover:underline">Open Library →</Link>
+        {/* External collaborators can atomize INTO the company library (offer content
+            up) but can't browse it — /atoms is tenant-staff only and redirects them. */}
+        {canBrowseLibrary && (
+          <Link href={`/portal/${tenantSlug}/atoms`} className="text-xs text-blue-600 hover:underline">Open Library →</Link>
+        )}
       </div>
 
       <div
@@ -83,7 +87,9 @@ export function UploadAtomizeCard({ tenantSlug }: { tenantSlug: string }) {
         <p className="mt-2 text-xs text-green-700">
           Atomized{typeof result.filesProcessed === 'number' ? ` ${result.filesProcessed} file${result.filesProcessed === 1 ? '' : 's'}` : ''}
           {typeof result.totalAtoms === 'number' ? ` into ${result.totalAtoms} atom${result.totalAtoms === 1 ? '' : 's'}` : ''}
-          . <Link href={`/portal/${tenantSlug}/atoms`} className="underline">Review in Library</Link>.
+          {canBrowseLibrary ? (
+            <>. <Link href={`/portal/${tenantSlug}/atoms`} className="underline">Review in Library</Link>.</>
+          ) : ' — added to the company library.'}
         </p>
       )}
     </div>

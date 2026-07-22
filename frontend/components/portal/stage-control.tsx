@@ -96,8 +96,12 @@ export function StageControl({
   const isAdmin = userRole === 'admin';
 
   const currentIndex = gateConfig.indexOf(currentStage);
-  const isAtFinal = currentStage === 'final';
-  const isAtLastGate = currentIndex >= gateConfig.length - 1;
+  // Advancing to the 'final' gate auto-locks and stores the stage as 'submitted' (which is
+  // NOT a member of gate_config). Treat both as the terminal gate — otherwise, post-submit,
+  // the "Unlock for Edit" button (gated on isAtFinal) never renders and the customer dead-ends
+  // with no way to self-unlock and fix a typo (comb finding: post-submit dead-end).
+  const isAtFinal = currentStage === 'final' || currentStage === 'submitted';
+  const isAtLastGate = isAtFinal || currentIndex >= gateConfig.length - 1;
 
   // Format deadline
   const deadlineStr = unlockDeadline

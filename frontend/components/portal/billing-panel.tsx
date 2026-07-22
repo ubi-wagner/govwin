@@ -18,6 +18,12 @@ interface BillingPanelProps {
   subscriptionStatus: string;
   hasStripeCustomer: boolean;
   purchases: Purchase[];
+  /**
+   * The Stripe checkout/portal routes act on the SESSION's tenant, not the viewed
+   * slug. When the acting session isn't this company (a descended RFP shadow admin),
+   * disable the actions so they can't charge/manage the wrong account. Default true.
+   */
+  canManageBilling?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -78,6 +84,7 @@ export default function BillingPanel({
   subscriptionStatus,
   hasStripeCustomer,
   purchases,
+  canManageBilling = true,
 }: BillingPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [isCheckoutPending, startCheckoutTransition] = useTransition();
@@ -203,7 +210,7 @@ export default function BillingPanel({
             <button
               type="button"
               onClick={handleSubscribe}
-              disabled={isCheckoutPending}
+              disabled={isCheckoutPending || !canManageBilling}
               className="px-4 py-2 text-sm rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
               {isCheckoutPending ? 'Redirecting...' : 'Subscribe to Spotlight ($499/mo)'}
@@ -214,7 +221,7 @@ export default function BillingPanel({
             <button
               type="button"
               onClick={handleManageBilling}
-              disabled={isPortalPending}
+              disabled={isPortalPending || !canManageBilling}
               className="px-4 py-2 text-sm rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 transition-colors disabled:opacity-50"
             >
               {isPortalPending ? 'Opening...' : 'Manage Billing'}
@@ -222,6 +229,12 @@ export default function BillingPanel({
           )}
         </div>
 
+        {!canManageBilling && (
+          <p className="mt-3 text-xs text-amber-600">
+            Billing is managed from this company&apos;s own account — the buttons act on your
+            session&apos;s tenant, so sign in as the company to change its subscription.
+          </p>
+        )}
         {error && (
           <p className="mt-3 text-sm text-red-600">{error}</p>
         )}
@@ -241,7 +254,7 @@ export default function BillingPanel({
             <span className="text-sm text-blue-800 font-medium">
               {totalConsultingHours} hour{totalConsultingHours !== 1 ? 's' : ''} purchased
             </span>
-            <span className="text-xs text-blue-600 ml-2">Schedule via your dashboard</span>
+            <span className="text-xs text-blue-600 ml-2">We&apos;ll email you to schedule.</span>
           </div>
         )}
 
@@ -259,7 +272,7 @@ export default function BillingPanel({
           <button
             type="button"
             onClick={handlePurchaseConsulting}
-            disabled={isConsultingPending || !isActive}
+            disabled={isConsultingPending || !isActive || !canManageBilling}
             className="px-4 py-1.5 text-sm rounded-lg font-medium bg-navy-900 text-white hover:bg-navy-800 transition-colors disabled:opacity-50"
           >
             {isConsultingPending ? 'Redirecting...' : `Purchase ${consultingHours} Hour${consultingHours > 1 ? 's' : ''}`}

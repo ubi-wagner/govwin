@@ -86,17 +86,25 @@ export const complianceExtractFromTextTool = defineTool<Input, Output>({
         );
       }
 
-      const data = (await resp.json()) as {
-        matches?: Array<{
-          variable_name: string;
-          value: unknown;
-          source_excerpt: string;
-          page: number | null;
-          confidence: number;
-        }>;
+      // The /internal/shred/sync handler is not yet in-repo, so its exact
+      // envelope is unfixed. Tolerate the three plausible shapes — a bare list,
+      // { matches: [...] }, or { data: { matches: [...] } } — so a bare-list
+      // return can never silently degrade to zero suggestions.
+      const raw = (await resp.json()) as unknown;
+      type Match = {
+        variable_name: string;
+        value: unknown;
+        source_excerpt: string;
+        page: number | null;
+        confidence: number;
       };
+      const matches: Match[] = Array.isArray(raw)
+        ? (raw as Match[])
+        : ((raw as { matches?: Match[]; data?: { matches?: Match[] } })?.matches
+            ?? (raw as { data?: { matches?: Match[] } })?.data?.matches
+            ?? []);
 
-      const suggestions: Suggestion[] = (data.matches ?? []).map((m) => ({
+      const suggestions: Suggestion[] = matches.map((m) => ({
         variableName: m.variable_name,
         value: m.value,
         sourceExcerpt: m.source_excerpt,

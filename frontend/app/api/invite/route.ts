@@ -207,6 +207,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       data: {
         accepted: true,
+        // Returned so the client can establish a session (sign in) right after
+        // setting the password — otherwise the redirect below bounces to /login.
+        email: collaborator.email,
+        hasAccount: !!collaborator.userId,
         redirectTo: proposalTenant
           ? `/portal/${proposalTenant.tenantSlug}/proposals/${collaborator.proposalId}`
           : '/portal',

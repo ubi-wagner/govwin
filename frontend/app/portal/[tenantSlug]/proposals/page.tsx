@@ -69,6 +69,7 @@ export default async function ProposalsListPage({ params }: Props) {
           (SELECT COUNT(*)::int FROM proposal_sections ps WHERE ps.proposal_id = p.id) AS section_count
         FROM proposals p
         INNER JOIN proposal_collaborators pc ON pc.proposal_id = p.id AND pc.user_id = ${sessionUser.id}::uuid
+          AND pc.accepted_at IS NOT NULL AND pc.revoked_at IS NULL
         JOIN opportunities o ON o.id = p.opportunity_id
         WHERE p.tenant_id = ${tenantId}::uuid
         ORDER BY p.created_at DESC
@@ -95,6 +96,18 @@ export default async function ProposalsListPage({ params }: Props) {
     console.error('[portal/proposals] query error:', e);
   }
 
+  // Empty-state copy is role-aware: only a company admin (or platform staff)
+  // purchases topics; a base team member waits for the admin, and a partner is
+  // added to a specific build by their inviter. The old copy told everyone to
+  // "purchase a topic," which is wrong for the two roles that can't.
+  const canPurchase = role === 'tenant_admin' || role === 'rfp_admin' || role === 'master_admin';
+  const emptyStateCopy =
+    role === 'partner_user'
+      ? 'You haven’t been added to any proposals yet. Whoever invited you can grant you access to sections of a build.'
+      : canPurchase
+        ? 'Proposals are created when you purchase a topic from the pipeline.'
+        : 'No builds yet. Your company admin can purchase a topic to start one.';
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -110,7 +123,7 @@ export default async function ProposalsListPage({ params }: Props) {
         <div className="text-center py-16 bg-gray-50 rounded-lg border border-dashed border-gray-300">
           <h3 className="text-lg font-medium text-gray-600">No proposals yet</h3>
           <p className="text-sm text-gray-500 mt-1">
-            Proposals are created when you purchase a topic from the pipeline.
+            {emptyStateCopy}
           </p>
         </div>
       ) : (

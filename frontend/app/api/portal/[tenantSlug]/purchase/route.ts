@@ -83,7 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
 
         // Open the portal in curation_pending with the 72h SLA clock. ON CONFLICT
         // (already a portal for this opp+label) → treat as already purchased.
-        const portalRows = await tx<Array<{ id: string; curation_due_at: string }>>`
+        const portalRows = await tx<Array<{ id: string; curationDueAt: string }>>`
           INSERT INTO proposal_portals
             (tenant_id, opportunity_id, label, status, paid_at, curation_due_at, created_by)
           VALUES (
@@ -112,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
           VALUES (${g.tenantId}::uuid, ${portalId}::uuid, NULL, NULL, 't_and_c', ${g.userId}::uuid)
         `;
 
-        return { ok: true, portalId, curationDueAt: portalRows[0].curation_due_at, comp: true };
+        return { ok: true, portalId, curationDueAt: portalRows[0].curationDueAt, comp: true };
       });
     } catch (dbErr) {
       console.error('[portal/purchase] transaction failed', dbErr);

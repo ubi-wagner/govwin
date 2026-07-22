@@ -26,7 +26,7 @@ landing, and the 72h `admin_review` gate (reachable in the admin queue). **No ha
 The two previously-open notes are now closed: the **typed completers are exercised** (the "Assign a
 task" form picks Review / Upload / Form, setting `params.kind`), and ops can **launch a
 `ProjectCollaboration` review gate by hand** from the admin **Launch Review Gate** form. See §HITL in
-`../V1_SWEEP_FINDINGS_2026-06-29.md` and the full picture in `../V1_END_TO_END_AUTOMATION.md`.
+`../archive/V1_SWEEP_FINDINGS_2026-06-29.md` and the full picture in `../archive/V1_END_TO_END_AUTOMATION.md`.
 
 ### Fixed in this release (previously test-affecting)
 - **Partner onboarding** — the invite email now routes a **new** collaborator to the `/invite/<token>`
@@ -40,4 +40,4 @@ task" form picks Review / Upload / Form, setting `params.kind`), and ops can **l
 Library "Split", admin "CRM Console" + "Templates" viewer. **Live self-serve Stripe checkout is
 descoped** — the founding cohort buys with the comp code `rfppipelinetest` (purchase → curation → release).
 
-Full engineering finding list: `../V1_SWEEP_FINDINGS_2026-06-29.md`.
+Full engineering finding list: `../archive/V1_SWEEP_FINDINGS_2026-06-29.md`.

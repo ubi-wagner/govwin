@@ -13,6 +13,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { selectForSection, viewerFromRole } from '@/lib/atoms';
 import { withTenant } from '@/lib/rls';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 
 export async function GET(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
@@ -20,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const { tenantSlug } = await params;
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
-    const u = session.user as { id?: string; role?: unknown };
+    const u = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     if (!hasRoleAtLeast(role, 'partner_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
@@ -77,7 +78,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
-    const u = session.user as { id?: string; role?: unknown };
+    const u = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
@@ -112,6 +113,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       recorded = owned.length;
     });
     if (!found) return NextResponse.json({ error: 'Section not found', code: 'NOT_FOUND' }, { status: 404 });
+    try {
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'section.atoms_selected',
+        actor: userActor(u.id!, u.email ?? undefined),
+        tenantId,
+        payload: { sectionId, recorded },
+      });
+    } catch (evtErr) {
+      console.error('[atoms/select] section.atoms_selected emit failed (non-fatal)', evtErr);
+    }
     return NextResponse.json({ data: { recorded } });
   } catch (err) {
     console.error('[portal/atoms/select] POST error', err);

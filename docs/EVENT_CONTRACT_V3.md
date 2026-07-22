@@ -313,20 +313,53 @@ no logic — only ordering, binding kinds, bounds, and the events it waits on.
 Phases (unchanged): **`start`+`end`** (multi-step) / **`single`** (atomic). Every payload
 carries `correlationId`; instance postings add `processInstanceId` and set `parent_event_id`.
 
-Namespaces (binding): `finder, capture, identity, proposal, library, system, tool`.
-**Forbidden:** `admin, cms, spotlight, pipeline`. (Note: tool-registry namespaces like
-`solicitation`, `volume`, `compliance`, `opportunity`, `memory`, `ingest` are tool names, not
-event namespaces — keep that distinction; do not emit events under them.)
+### 9.1 Binding namespace rules (canonical — this IS the contract)
 
-The full as-built **event** catalog is EVENT_CONTRACT_V2.md §2.
+- **Seven allowed namespaces:** `finder, capture, identity, proposal, library, system, tool`.
+- **Forbidden as namespaces:** `admin, cms, spotlight` (the CLAUDE.md trio) — **plus** `pipeline`,
+  which is an `actor_type`, never a namespace. Admin actions emit under `finder`; CMS under
+  `system`; the retired Spotlight surface has no namespace of its own. (Tool-registry names like
+  `solicitation`, `volume`, `compliance`, `opportunity`, `memory`, `ingest` are tool names, not
+  event namespaces — never emit under them.)
+- **Type format:** `entity.action_past_tense` (snake_case) — e.g. `atom.created`,
+  `section.atoms_selected`, `purchase.completed`, `tenant.created`.
+- **Admin-event `tenantId` is NULL:** an event fired from an admin (finder) surface sets
+  `tenant_id = null`; the affected tenant's UUID rides in the payload. Portal (tenant) events
+  carry the real tenant UUID. (See `finder:tenant.created` below.)
 
-**New event types this cycle (2026-07-15), catalogued in EVENT_CONTRACT_V2.md §2:**
+V3 is canonical for these binding rules + how work is composed; **EVENT_CONTRACT_V2.md §2 remains
+the authoritative as-built event catalog** (what fires, from where) and is *not* superseded — the
+two are complementary, and V2's own header says so. The full enumerated catalog lives there.
+
+### 9.2 New event types
+
+**2026-07-22 (auditability sweep) — all namespace-valid `entity.action_past_tense`:**
+- **`library:atom.created`** (`single`) — now emitted from **three** producers: the direct atom
+  create (`portal/[t]/atoms`), the upload→reference path (`portal/[t]/atoms/upload`), and the
+  in-canvas harvest (`…/sections/[id]/atomize-node`). Payload carries `atomId` + `grain`/`source`.
+  Every path an atom can enter the unified `library_atoms` library now audits (previously only the
+  direct create did).
+- **`library:section.atoms_selected`** (`single`, `portal/[t]/atoms/select`) — records
+  `{ sectionId, recorded }` when a drafter binds library atoms to a section.
+- **`finder:tenant.created`** — the admin company-create emit was **fixed to `tenantId: null`**
+  (admin-event convention §9.1); the new tenant's UUID rides in the payload
+  (`{ tenantId, slug, source:'admin_manual', cardsBackfilled }`).
+- **`capture:purchase.completed`** is now **also** emitted for the **RFP-Admin comp free-portal**
+  (`POST /portal/[t]/portals`, gated rfp_admin+): a $0 `purchases` row (`metadata.grant='admin'`)
+  is written and the event fires with `payload.grant='admin'` + `comp:true`, so an admin-approved
+  free portal **audits exactly as a paid purchase** (and drives the same `notify_admin` automation).
+
+**Audit coverage:** every state-changing route emits start/end (or `single`) into `system_events`
+— **97/97 on the checked paths** (up from 94/97; the three fixes above closed the gap). Spine
+health: all 7 allowed namespaces active, 0 forbidden, every type a valid `entity.action_past_tense`.
+
+**2026-07-15 (catalogued in EVENT_CONTRACT_V2.md §2):**
 `capture:purchase.completed` (comp-code purchase — now consumed via mig 106 `notify_admin`),
 `capture:workspace.released` (RFP-expert release-from-curation), `capture:tenant.cards_backfilled`
 (signup card mirror), `proposal:proposal.ready_for_customer` (proposal handed back for customer
 input), `finder:solicitation.pushed` (curation push fan-out), and
 `system:content.document_archived` / `system:content.document_restored` (postings retire/restore,
-start/end). All obey the binding namespace list above.
+start/end). All obey §9.1.
 
 ---
 
@@ -402,6 +435,16 @@ before 10.2 kills it.
   — empty TODO stubs).
 
 ### 10.8 🟡 Agents — written but dormant (V2, not today)
+> ⚠️ **SUPERSEDED (2026-07-22) — this section describes the pre-#117 snapshot and is now FALSE.**
+> As-built: **25 archetypes** auto-register and **are wired as workflow actors** (#117 + batches A/B/C +
+> POD4/CMS); `AgentFabric` is passed into `run_workflow_processor()` (not discarded), AI_INVOKE routes via
+> `fabric.invoke_agent()`, and guardrails ARE reached (advisory → guardrail → land-or-review). **RLS now
+> has policies** — mig 117 FORCEs RLS + defines `tenant_isolation` on the tenant tables and adds the
+> `rfp_agent` NOBYPASSRLS role (inert only because the app connects as the RLS-bypassing owner today; the
+> non-owner cutover is launch-readiness item #9). Canonical current state:
+> **docs/AGENT_WORKFORCE.md** + **docs/AGENT_FABRIC_DESIGN.md §0** + **docs/AUTOMATION_SPINE_MAP.md**. The
+> original text is retained below only as the historical audit snapshot.
+
 ~4,800 LOC, 10 archetypes auto-register, full tool-use loop + budgets + rate-limits coded —
 but **orphaned**: producer `requestAgentTask` has zero callers; consumer `AgentFabric` is
 instantiated then discarded (`main.py:70`); AI_INVOKE deliberately skips. Guardrails (120s

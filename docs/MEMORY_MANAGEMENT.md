@@ -532,7 +532,7 @@ accuracy.
 |------|-------------|
 | `docs/agent-fabric/03-MEMORY-ARCHITECTURE.md` | Full memory schema, indexes, RLS, retrieval queries, lifecycle SQL |
 | `docs/agent-fabric/07-COST-MODEL.md` | Cost analysis, scaling projections, break-even calculations |
-| `docs/AGENT_FRAMEWORK.md` | Agent system architecture, all 10 archetypes, tool registry |
+| `docs/archive/AGENT_FRAMEWORK.md` | Agent system architecture, all 10 archetypes, tool registry |
 | `docs/AGENT_FABRIC_DESIGN.md` | High-level agent fabric design document |
 
 ### Database Schema

@@ -1,5 +1,24 @@
 # Role Guides — Build Notes (prep for the morning)
 
+> **BUILT + EXPANDED (comprehensive pass).** Three data-driven guides, now covering **every
+> feature** of each surface, step by step, with cropped visuals. Page counts:
+> **RFP-Admin 46pp · Customer-Admin 35pp · Collaborator 7pp**.
+>
+> - **Content** lives in `docs/manuals/guides/{rfp-admin,customer-admin,collaborator}.json`
+>   (+ `_manifest.json`). The big two are authored via ergonomic Python builders in
+>   `docs/manuals/guides/_src/build_*.py` (they `json.dump` the spec) so HTML-in-JSON stays
+>   error-free; edit the `_src` builder → run it → the JSON regenerates.
+> - **Render:** `python3 docs/manuals/build_guides.py` → each `<slug>.html` (indexed, sticky
+>   nested TOC, screenshots embedded), `<slug>.pdf` (Chromium print), `index.html`, and the
+>   combined theme-aware `manuals.html` (the shareable web view). Section schema supports
+>   `steps` (numbered walkthrough w/ inline crops), `figures` (galleries), `table` (reference
+>   tables), `subs` (subsections), and `callouts` (eg/note/tip/warn).
+> - **Screenshots:** captured by `frontend/scripts/capture-{admin,tenant}.mjs` (full pages →
+>   `img/shots/<role>/`, element crops → `img/crops/<role>/`) against the seeded HITL accounts;
+>   `guides/_src/crop_bands.py` slices focused feature-crops out of the full pages.
+> - **Entry point:** `docs/manuals/index.html`. Pre-session `ADMIN_OPERATIONS_MANUAL.html` /
+>   `CUSTOMER_PORTAL_MANUAL.html` are superseded (kept for history).
+
 Planning artifact for the three indexed, clickable, screenshot-rich help files. Ground truth:
 route list captured from `frontend/app/**`, and the capabilities we shipped this session
 (see "What changed this session"). Build the guides against the CURRENT system, not the

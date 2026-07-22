@@ -251,7 +251,7 @@ export default async function DocumentsPage({ params }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href={`${basePath}/library/upload`}
+            href={`${basePath}/atoms?tab=atomize`}
             className="px-4 py-2 text-sm font-medium border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
           >
             Upload Document
@@ -457,7 +457,7 @@ export default async function DocumentsPage({ params }: Props) {
         {libraryItems.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
             <p className="text-sm text-gray-500">No library uploads yet.</p>
-            <Link href={`${basePath}/library/upload`} className="text-sm text-blue-600 hover:underline mt-1 inline-block">
+            <Link href={`${basePath}/atoms?tab=atomize`} className="text-sm text-blue-600 hover:underline mt-1 inline-block">
               Upload your first document
             </Link>
           </div>
@@ -482,7 +482,7 @@ export default async function DocumentsPage({ params }: Props) {
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">
                       <Link
-                        href={`${basePath}/library`}
+                        href={`${basePath}/atoms`}
                         className="text-blue-600 hover:underline"
                       >
                         {li.title ?? 'Untitled'}

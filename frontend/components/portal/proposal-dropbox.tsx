@@ -82,8 +82,8 @@ export function ProposalDropbox({
         );
         if (!res.ok) return;
         const json = await res.json();
-        if (!cancelled && Array.isArray(json.data)) {
-          setFiles(json.data);
+        if (!cancelled && Array.isArray(json.data?.files)) {
+          setFiles(json.data.files);
         }
       } catch {
         // Silently fail — files will just show empty

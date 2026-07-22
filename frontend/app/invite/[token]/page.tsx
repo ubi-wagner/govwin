@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 interface InviteInfo {
   inviterName: string | null;
@@ -22,6 +23,7 @@ export default function AcceptInvitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [landing, setLanding] = useState<'workspace' | 'login'>('workspace');
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(true);
 
@@ -77,11 +79,30 @@ export default function AcceptInvitePage() {
 
         setSuccess(true);
 
-        // Redirect to the proposal workspace after a short delay
-        if (json.data?.redirectTo) {
-          setTimeout(() => router.push(json.data.redirectTo), 2000);
+        // Establish a session before redirecting. The accept only set a password;
+        // without signing in, pushing to the workspace bounces straight to /login.
+        // The collaborator just typed their password, so sign them in silently.
+        const workspace: string = json.data?.redirectTo ?? '/portal';
+        const acctEmail: string | undefined = json.data?.email ?? inviteInfo?.email;
+        const hasAccount: boolean = json.data?.hasAccount !== false; // default true when unknown
+        let signedIn = false;
+        if (hasAccount && acctEmail) {
+          try {
+            const r = await signIn('credentials', { email: acctEmail, password, redirect: false });
+            signedIn = !!r && !r.error;
+          } catch {
+            signedIn = false;
+          }
+        }
+
+        if (signedIn) {
+          setLanding('workspace');
+          setTimeout(() => router.push(workspace), 1200);
         } else {
-          setTimeout(() => router.push('/login'), 2000);
+          // Couldn't auto-sign-in — send them to login, carrying `from` so the
+          // dispatcher lands them on the workspace once they authenticate.
+          setLanding('login');
+          setTimeout(() => router.push(`/login?from=${encodeURIComponent(workspace)}`), 1800);
         }
       } catch {
         setError('Network error');
@@ -89,7 +110,7 @@ export default function AcceptInvitePage() {
         setSubmitting(false);
       }
     },
-    [token, password, confirmPassword, submitting, router],
+    [token, password, confirmPassword, submitting, router, inviteInfo],
   );
 
   if (success) {
@@ -101,7 +122,9 @@ export default function AcceptInvitePage() {
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Invite Accepted</h1>
           <p className="text-sm text-gray-500">
-            Your account has been set up. Redirecting to the proposal workspace...
+            {landing === 'workspace'
+              ? 'Your account is ready. Taking you to the proposal workspace…'
+              : 'Your password is set. Redirecting you to sign in…'}
           </p>
         </div>
       </div>

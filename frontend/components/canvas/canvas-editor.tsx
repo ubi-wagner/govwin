@@ -138,6 +138,20 @@ function CanvasEditorInner({
   const [standards, setStandards] = useState<Array<{ key: string; label: string }>>([]);
   const [atomBusyId, setAtomBusyId] = useState<string | null>(null);
   const [acceptedNodeIds, setAcceptedNodeIds] = useState<Set<string>>(new Set());
+  // Right panel (properties/AI/versions/tools): inline column on wide screens,
+  // a toggleable overlay drawer when narrow (e.g. a Chrome split-screen half) so
+  // it never starves the canvas. Default open on wide, collapsed on narrow.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    // Follow the breakpoint on mount AND on resize, so entering a Chrome
+    // split-screen half (viewport crosses below 1024) auto-collapses the panel
+    // and leaving it re-opens — the manual toggle still works within a breakpoint.
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setSidebarOpen(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   // Sync the editor's dirty flag to the admin nav guard (no-op outside /admin).
   useUnsavedChanges(dirty);
@@ -607,7 +621,7 @@ function CanvasEditorInner({
   return (
     <div className="flex h-full">
       {/* Canvas area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-w-0 overflow-y-auto">
         {/* Toolbar */}
         <div className="sticky top-0 z-10 flex items-center justify-between bg-white border-b px-4 py-2">
           <div className="flex items-center gap-3">
@@ -727,6 +741,15 @@ function CanvasEditorInner({
                 Library{atomItems.length > 0 ? ` (${atomItems.length})` : ''}
               </button>
             )}
+            <button
+              onClick={() => setSidebarOpen((v) => !v)}
+              className={`px-3 py-1.5 text-xs border rounded ${
+                sidebarOpen ? 'bg-gray-100 border-gray-300 text-gray-700' : 'hover:bg-gray-50'
+              }`}
+              title={sidebarOpen ? 'Hide the properties panel (more room for the page)' : 'Show the properties panel'}
+            >
+              {sidebarOpen ? 'Hide panel' : 'Panel'}
+            </button>
             {readOnly ? (
               <span className="px-2 py-1.5 text-xs text-gray-400 italic" title="You have view access to this section">read-only</span>
             ) : (
@@ -818,7 +841,15 @@ function CanvasEditorInner({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — inline column on wide screens, overlay drawer when narrow */}
+      {sidebarOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/30 z-20 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden
+          />
+          <div className="fixed right-0 top-0 bottom-0 z-30 flex shadow-2xl lg:static lg:z-auto lg:shadow-none">
       <CanvasSidebar
         document={doc}
         selectedNode={selectedNode}
@@ -839,6 +870,9 @@ function CanvasEditorInner({
         tenantSlug={tenantSlug}
         sectionId={sectionId}
       />
+          </div>
+        </>
+      )}
     </div>
   );
 }

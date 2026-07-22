@@ -78,14 +78,26 @@ export async function resolveUserAccess(
     LIMIT 1
   `;
 
-  const isAdmin =
-    user &&
-    (user.role === 'master_admin' ||
-      user.role === 'rfp_admin' ||
-      (user.role === 'tenant_admin' && user.tenantId === tenantId));
+  // Tenant-wide access via the canonical membership ledger (NOT the retired
+  // users.tenant_id column). Home staff — tenant_admin AND tenant_user — get
+  // full proposal access (edit current-stage sections, comment/view all,
+  // upload, export). Team management + stage advance stay admin-only so the UI
+  // never offers a tenant_user an action the API will 403.
+  const [membership] = await sql<{ role: string }[]>`
+    SELECT role FROM user_memberships
+    WHERE user_id = ${userId}::uuid AND tenant_id = ${tenantId}::uuid
+      AND status = 'active' AND role IN ('tenant_admin', 'tenant_user')
+    LIMIT 1
+  `;
+  const isPlatformAdmin = user?.role === 'master_admin' || user?.role === 'rfp_admin';
+  const isTenantAdmin =
+    isPlatformAdmin ||
+    membership?.role === 'tenant_admin' ||
+    (user?.role === 'tenant_admin' && user?.tenantId === tenantId);
+  const isTenantWide = isTenantAdmin || membership?.role === 'tenant_user';
 
-  if (isAdmin) {
-    // Admin gets full access to all sections in ALL stages
+  if (isTenantWide) {
+    // Full access to all sections; edit is restricted to current-stage sections.
     const sections = await sql<{ id: string; completedStage: string | null }[]>`
       SELECT id, completed_stage FROM proposal_sections
       WHERE proposal_id = ${proposalId}
@@ -109,13 +121,13 @@ export async function resolveUserAccess(
     }
 
     return {
-      role: 'admin',
+      role: isTenantAdmin ? 'admin' : 'contributor',
       editableSections: proposal.isLocked ? [] : editableIds,
       commentableSections: allIds,
       viewableSections: allIds,
       canUpload: !proposal.isLocked,
-      canAdvance: true,
-      canManageTeam: true,
+      canAdvance: isTenantAdmin,
+      canManageTeam: isTenantAdmin,
       canExport: proposal.lockCount >= 1,
       lockCount: proposal.lockCount,
       isLocked: proposal.isLocked,

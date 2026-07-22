@@ -28,7 +28,7 @@ const OFFICES = [
   'DARPA/I2O', 'DARPA/DSO', 'DARPA/MTO', 'DARPA/STO',
 ];
 
-type Status = 'idle' | 'uploading' | 'assisting' | 'success' | 'error';
+type Status = 'idle' | 'uploading' | 'assisting' | 'topics' | 'success' | 'error';
 
 const PROGRAM_TYPES = [
   { value: 'sbir_phase_1', label: 'SBIR Phase I' },
@@ -56,6 +56,10 @@ export function UploadForm() {
   const [office, setOffice] = useState('');
   const [dupeLink, setDupeLink] = useState<string | null>(null);
   const [runAssist, setRunAssist] = useState(true);
+  // Optional topic files uploaded alongside the umbrella (multi-topic BAAs) —
+  // each becomes a topic opportunity in one flow after the umbrella is created.
+  const [topicFiles, setTopicFiles] = useState<File[]>([]);
+  const [topicDragOver, setTopicDragOver] = useState(false);
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
   const totalMb = totalBytes / 1024 / 1024;
@@ -169,6 +173,19 @@ export function UploadForm() {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ publish: true }),
           });
         } catch { /* non-fatal */ }
+      }
+      // Topic files → topic opportunities (single-flow: 1 umbrella + N topic
+      // files → N topic OPPs). Best-effort: on failure the workspace drop-zone
+      // still creates them. Dedup by (solicitation_id, topic_number) protects
+      // against overlap with any topics ingest-assist derived from the umbrella.
+      if (topicFiles.length > 0 && solId) {
+        setStatus('topics');
+        try {
+          const td = new FormData();
+          td.set('solicitationId', solId);
+          for (const tf of topicFiles) td.append('files', tf);
+          await fetch('/api/admin/upload-topic-files', { method: 'POST', body: td });
+        } catch { /* non-fatal — the workspace drop-zone still works */ }
       }
       setStatus('success');
       router.push(`/admin/rfp-curation/${solId}`);
@@ -351,6 +368,47 @@ export function UploadForm() {
         )}
       </fieldset>
 
+      <fieldset className="space-y-3">
+        <legend className="font-semibold text-lg text-gray-800">
+          Topic files <span className="text-sm font-normal text-gray-500">(optional — multi-topic BAAs)</span>
+        </legend>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setTopicDragOver(true); }}
+          onDragLeave={() => setTopicDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setTopicDragOver(false);
+            if (e.dataTransfer.files.length) setTopicFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)]);
+          }}
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            topicDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 bg-gray-50'
+          }`}
+        >
+          <p className="text-sm text-gray-600">
+            Drop the individual topic files here, or{' '}
+            <label className="text-blue-600 hover:text-blue-800 cursor-pointer underline">
+              browse
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.docx,.doc,.txt,.md"
+                className="sr-only"
+                onChange={(e) => e.target.files && setTopicFiles((prev) => [...prev, ...Array.from(e.target.files!)])}
+              />
+            </label>
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
+            Each file becomes a <b>topic opportunity</b> under this solicitation. Leave empty for a single-topic solicitation.
+          </p>
+        </div>
+        {topicFiles.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-gray-600 bg-indigo-50/60 border border-indigo-100 rounded px-3 py-2">
+            <span>{topicFiles.length} topic file{topicFiles.length > 1 ? 's' : ''} → {topicFiles.length} opportunit{topicFiles.length > 1 ? 'ies' : 'y'} on upload</span>
+            <button type="button" onClick={() => setTopicFiles([])} className="text-red-600 hover:text-red-800">Clear</button>
+          </div>
+        )}
+      </fieldset>
+
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
           {error}
@@ -385,11 +443,13 @@ export function UploadForm() {
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={status === 'uploading' || status === 'assisting' || files.length === 0}
+          disabled={status === 'uploading' || status === 'assisting' || status === 'topics' || files.length === 0}
           className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded"
         >
           {status === 'uploading' ? 'Uploading…'
             : status === 'assisting' ? 'Building matrix & skeleton…'
+            : status === 'topics' ? 'Creating topic opportunities…'
+            : topicFiles.length > 0 ? `Upload + ${topicFiles.length} topic${topicFiles.length > 1 ? 's' : ''}`
             : runAssist ? 'Upload & Ingest Assist' : 'Upload & Create Solicitation'}
         </button>
         <a

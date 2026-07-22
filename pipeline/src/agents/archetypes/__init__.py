@@ -21,6 +21,7 @@ from .packaging_specialist import PackagingSpecialistArchetype
 from .partner_coordinator import PartnerCoordinatorArchetype
 from .pp_matcher import PpMatcherArchetype
 from .proposal_architect import ProposalArchitectArchetype
+from .research_scout import ResearchScoutArchetype
 from .scoring_strategist import ScoringStrategistArchetype
 from .section_drafter import SectionDrafterArchetype
 from .skeleton_architect import SkeletonArchitectArchetype
@@ -48,6 +49,7 @@ __all__ = [
     "PartnerCoordinatorArchetype",
     "PpMatcherArchetype",
     "ProposalArchitectArchetype",
+    "ResearchScoutArchetype",
     "ScoringStrategistArchetype",
     "SectionDrafterArchetype",
     "SkeletonArchitectArchetype",

@@ -124,6 +124,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { url: checkoutSession.url } });
   } catch (err) {
     console.error('[stripe/checkout] Error:', err);
+    // Card checkout is descoped for the founding cohort — surface that clearly so the
+    // modal shows its "use an access code below" path instead of a scary 500.
+    if (err instanceof Error && /not configured/i.test(err.message)) {
+      return NextResponse.json(
+        { error: 'Card checkout is not available yet — use an access code below.', code: 'STRIPE_NOT_CONFIGURED' },
+        { status: 400 },
+      );
+    }
     return NextResponse.json({ error: 'Internal server error', code: 'DB_ERROR' }, { status: 500 });
   }
 }

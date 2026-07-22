@@ -11,10 +11,13 @@ fans EVERY activated opportunity (umbrella + all topics) onto the forward-only
 `opportunity_bridge` → a denormalized `tenant_opportunity_cards` row per tenant, ranked by
 `tenant_spotlight_buckets`/`tenant_bucket_scores` (auto-scored on arrival), and drafted from
 the unified `library_atoms` library (visibility-enforced, taxonomy-tagged, upload→atomize→select).
-The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED — `/spotlights` +
-`/pipeline` redirect to `/cards`. The compliance matrix (`proposal_compliance_matrix`) populates
-at provision and advances on section lock. Verified end-to-end (Playwright 17/17 + the live Python
-workflow engine creating `process_instances` that carry `opportunity_id`).
+The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and now **DROPPED**
+(mig 125, alongside 11 other superseded tables; the `library_units` family went in mig 121) —
+`/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
+`tenant_opportunity_cards` (including the rebuilt `v_opportunity_rollup` view + the CMS
+`matched_opportunities` variable). The compliance matrix (`proposal_compliance_matrix`) populates
+at provision and advances on section lock. Verified end-to-end (Playwright + the live Python workflow
+engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 729 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -22,23 +25,30 @@ the build UNLOCKED and instantiating the compliance matrix + molds from the mast
 OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md** (migrations
-at 108). Self-serve Stripe checkout is still descoped — the comp code stands in.
+at 125). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+`purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
+exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
+descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, 10 archetypes) is being woken one at a time — **canonical
-plan + safety contract in `docs/AGENT_WORKFORCE.md` (read it before touching agents)**. Live: `section_drafter`
-(`draft_v0` → `markdown_to_canvas` → `publish_section_draft`, on release/provision, gated on the pipeline
-`ANTHROPIC_API_KEY`); `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance
-`agent_task_queue`. #117 in progress: `librarian` greenfielded onto `library_atoms` + producer
-(atomize→`agent_task_queue`) + injection-fenced; `scoring_strategist` greenfielded (tenant-discretion).
-The other 4 are dormant. Wiring pattern: realign to the current spine, then either a **per-tenant producer**
-(fan-out agents) or a declarative **`AI_INVOKE` `Step`** (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE`
-maps them). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
+The pipeline agent workforce (`AgentFabric`, **25 archetypes, all auto-registered — dormant ≠ dead**)
+is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
+(read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
+`publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
+`compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance `agent_task_queue`;
+plus the greenfielded `librarian` (onto `library_atoms`, atomize→`agent_task_queue`, injection-fenced) and
+`scoring_strategist` (tenant-discretion) producers. The rest are greenfielded + registry-wired, pending the
+**global automation-policy wiring — the phase we are starting**. Wiring pattern: realign to the current
+spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
+(single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`
+at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
 authority; tool schemas expose NO `tenant_id`); output is **advisory → guardrail → land-or-review** (never
 auto-writes business tables); untrusted tenant content is **injection-fenced**; runtime bounds **runaway**
 (round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop pending a
 `NOBYPASSRLS` agent role (mig 116 forced RLS on `episodic_memories`; `SET app.tenant_id` wiring specified in
 the doc). Oversight: `/admin/agents` → Agent Workforce (roster + per-tenant usage, forward-only bridge).
-`opportunity_id` keys the spine (mig 088); docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
+`opportunity_id` keys the spine (mig 088). **The workflow engine the agents plug into — the declarative
+trigger+step templates, the start→end event gate, and the two stateless reconcilers — is mapped in
+`docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
 orchestration pattern.
 
 ## Services
@@ -48,8 +58,8 @@ orchestration pattern.
 
 Frontend + Pipeline share one PostgreSQL database (govtech_intel); CMS/CRM has its own (govtech_cms)
 and bridges via the shared `system_events` table. Object storage is S3-compatible (Cloudflare R2) —
-there is no `/data` business-data volume (the `STORAGE_ROOT=/data` constant in pipeline config is dead;
-the only local volume is CMS media).
+there is no `/data` business-data volume (the dead pipeline `STORAGE_ROOT=/data` env was removed this
+cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS media).
 
 ## Roles
 - `master_admin`: Full system access, migrations, Railway management
@@ -78,6 +88,10 @@ the only local volume is CMS media).
 - Portal routes MUST verify tenant access — never query by ID alone
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
+- **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
+  (729 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
+  (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 
 ## SOP: Data Layer (postgres.js + constraints) — bug classes, see CLIFFNOTES §4b
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
@@ -89,6 +103,15 @@ the only local volume is CMS media).
 - **CHECK columns:** confirm a literal is in the column's CHECK (`\d table`) before writing it.
 - **Workflow status writes:** force-fail a paused instance only with `… WHERE id=$1 AND status='paused'`
   (compare-and-swap) and expire its sibling task; resume HITL only after entity correlation.
+- **`next/dynamic({ssr:false})` drops `ref`** (Next 15 sets `ref.current={retry}`, a truthy non-handle):
+  pass an imperative handle via a normal prop (`innerRef`), not `ref`. And load browser-only libs
+  (react-pdf / pdfjs) via `next/dynamic({ssr:false})` — a static import into a `'use client'` component
+  still SSRs and crashes at module-eval time.
+- **FK-before-audit ordering:** validate an FK target exists BEFORE a paired non-FK soft-ref write, or a
+  bad id orphans the earlier writes and 500s on the FK throw (`purchases.opportunity_id` has a FK;
+  `proposal_portals.opportunity_id` does not).
+- **Dropping tables:** drop ONLY when superseded-with-a-successor AND zero live code refs. "Empty in the
+  sandbox" is NOT a drop signal — most empty tables are live-but-unused.
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
@@ -112,6 +135,12 @@ See CLAUDE_CLIFFNOTES.md for:
 - Row-Level Security on all tenant-scoped agent memory tables
 - Agent tools enforce tenant_id — agents never construct SQL directly
 - User content clearly delimited in agent prompts (prompt injection defense)
+- No committed production credentials — mig 124 rotated master_admin off the committed seed
+  (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
+- RLS is ENABLE/FORCE'd but **single-layer today** (the app runs as the RLS-bypassing owner role); the
+  `NOBYPASSRLS` `govtech_app` cutover is the backstop (pending). Cross-tenant admin/CMS reads on
+  RLS-forced tables must run on a BYPASS connection / owner-view — RLS-cutover checklist in
+  docs/DEPRECATION_CLEANUP_2026-07-22.md. Full posture: **docs/SECURITY_AND_SAFETY.md**.
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and

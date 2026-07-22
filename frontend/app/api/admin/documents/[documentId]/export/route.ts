@@ -60,9 +60,9 @@ export async function POST(
         { status: 400 },
       );
     }
-    if (!format || !['docx', 'pptx', 'xlsx'].includes(format)) {
+    if (!format || !['docx', 'pptx', 'xlsx', 'pdf'].includes(format)) {
       return NextResponse.json(
-        { error: 'format must be one of: docx, pptx, xlsx', code: 'VALIDATION_ERROR' },
+        { error: 'format must be one of: docx, pptx, xlsx, pdf', code: 'VALIDATION_ERROR' },
         { status: 400 },
       );
     }
@@ -81,6 +81,17 @@ export async function POST(
       buffer = await exportToPptx(document, variables ?? {});
       contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
       extension = 'pptx';
+    } else if (format === 'pdf') {
+      // PDF needs Chromium (infra dep) — surface a clear 503 when unavailable, not a 500.
+      try {
+        const { exportToPdf } = await import('@/lib/export/pdf-exporter');
+        buffer = await exportToPdf(document, variables ?? {});
+      } catch (pdfErr) {
+        console.error('[admin/documents/[id]/export] PDF render failed (Chromium unavailable?):', pdfErr);
+        return NextResponse.json({ error: 'PDF export is temporarily unavailable. Use .docx.', code: 'EXPORT_ERROR' }, { status: 503 });
+      }
+      contentType = 'application/pdf';
+      extension = 'pdf';
     } else {
       const { exportToXlsx } = await import('@/lib/export/xlsx-exporter');
       buffer = await exportToXlsx(document, variables ?? {});

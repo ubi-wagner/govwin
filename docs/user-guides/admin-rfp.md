@@ -31,6 +31,12 @@ Two ways in, both under **Opportunities**:
 
 New solicitations land in the **RFP Triage Queue**.
 
+> **Also under Sources.** Each source card ingests notices via **Upload PDFs** (drag-drop) and
+> **Scout Now**. The old source-card **"Paste Topics"** action was **retired** (pasted rows had
+> no solicitation to attach to, so it could never succeed) — add topics *inside* a solicitation
+> with **Extract Topics**, **+ Add Topic**, **Bulk Import**, or by dropping individual topic
+> files in the curation workspace.
+
 ![The RFP triage queue — live DoD SBIR (DSIP) solicitations awaiting curation](./img/admin-rfp-curation.png)
 
 Each row shows the title, **source** (here `dsip`), agency (DARPA, Navy, …),
@@ -72,6 +78,11 @@ skeleton's grounding is visible at a glance:
 > from this skeleton — each item's section seeded from its linked template and
 > grounded by its expert notes.
 
+> **Gauge demand while you curate.** The workspace's **Customer Interest** tab shows the real
+> tenants who have **pinned** this solicitation's topics — with pin date, whether they've
+> **purchased** a portal, and the build stage — so you can prioritize the solicitations
+> customers are actually waiting on. (It's empty until topics are pushed to Spotlight.)
+
 ---
 
 ## 4. Author templates (Template Studio)
@@ -108,6 +119,14 @@ skeleton and the customer [Documents](./documents.md) browser draw from.
 > **Friction note:** the Release button lives on the tenant's portal page — use
 > **Portal →** / navigate to the tenant URL to click it (no `/admin` deep-link
 > yet).
+
+> **Comp a build (RFP-Admin lever).** Instead of releasing a comp-code purchase, you can *comp*
+> a build outright: on the tenant's **`/portal/[tenant]/portals`** page (the expert view) use
+> **"Approve free portal"** — enter the opportunity ID and a label, then **Approve free portal**.
+> It records a **$0 audited purchase** (it audits exactly like a paid one) and opens the
+> workspace for configuration. The opportunity must already exist — a bad ID is rejected rather
+> than orphaning a build. This is the **only** "create a portal" form, and it's RFP-Admin-only;
+> customers never see it — they buy through the purchase flow.
 
 The customer can now build (see [Proposal build](./proposal-build.md)).
 
@@ -179,7 +198,8 @@ company can be archived (license slumber) and restored losslessly.
 | Area | Use it to… |
 |---|---|
 | **Intake / RFP Curation** | Bring in and curate solicitations |
-| **Opportunity Cards** | See what's being spotlighted to tenants |
+| **Opportunity Cards** | The master cards + how many tenant cards each has fanned out to (replicant + **pinned** counts) |
+| **Opportunity Rollup** (`/admin/opportunities`) | Cross-portal status per opportunity — **ranked** & **pinned** tenant counts and every proposal's build stage (now real, read from the card spine) |
 | **Sources / Pipeline Jobs** | Manage ingestion sources and runs |
 | **Templates** | Author the shared template library |
 | **Tenants / Applications / Waitlist** | Manage customer accounts and access |
@@ -202,3 +222,7 @@ promise customers the dormant archetypes yet.*
   + release; the 72-hour SLA is counting down on the customer's card.
 - **Self-serve checkout isn't available.** Stripe checkout is descoped — customers
   purchase with a comp code; you release from the shadow account.
+- **PDF export says "temporarily unavailable."** The PDF renderer (Chromium) is an infra
+  dependency; when it's down, document/section PDF export returns a friendly *"PDF export is
+  temporarily unavailable — use .docx"* (HTTP 503) instead of failing. **DOCX / PPTX / XLSX
+  always work** — retry the PDF later.

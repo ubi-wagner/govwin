@@ -56,8 +56,23 @@ export function CanvasRenderer({
   const { canvas, nodes, metadata } = doc;
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
 
+  // Scale the page to the ACTUAL available column width (measured), so it fits
+  // any viewport — including a Chrome split-screen half — instead of overflowing
+  // a hardcoded 750px reference. Never upscale past 1; floor so it stays legible.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [availWidth, setAvailWidth] = useState(750);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => setAvailWidth(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const contentWidth = canvas.width - canvas.margins.left - canvas.margins.right;
-  const scale = Math.min(1, 750 / canvas.width);
+  const scale = Math.min(1, Math.max(0.25, (availWidth - 32) / canvas.width));
 
   const fontStyle = {
     fontFamily: canvas.font_default.family,
@@ -66,7 +81,7 @@ export function CanvasRenderer({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 py-4 bg-gray-200 min-h-[600px]">
+    <div ref={containerRef} className="flex flex-col items-center gap-4 py-4 bg-gray-200 min-h-[600px] overflow-x-hidden">
       {/* Page */}
       <div
         className="bg-white shadow-lg relative"

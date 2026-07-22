@@ -1,8 +1,11 @@
 # The Agent Workforce — wiring, oversight, tenant-discretion (#117)
 
 **Audience:** RFP-admin ops (setup + monitoring), engineering (wiring), marketing (how to talk about it).
-**As-built:** the pipeline `AgentFabric` registers **10 archetypes**. This doc is the pattern for
-waking the dormant ones, the tenant-isolation rules they run under, and the RFP-admin oversight surface.
+**As-built:** the pipeline `AgentFabric` auto-registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
+`fabric.py`) — **dormant ≠ dead**: all are registry-wired and invocable; "dormant" means only that no
+producer/step fires one yet. This doc is the pattern for waking them, the tenant-isolation rules they run
+under, and the RFP-admin oversight surface. The fabric mechanics + how to add an archetype are in
+`docs/AGENT_FABRIC_DESIGN.md §0`; the automation spine they plug into is `docs/AUTOMATION_SPINE_MAP.md`.
 
 ---
 
@@ -28,7 +31,7 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
-**Then the fabric grew to 19 (#127–#129, see `docs/AGENT_ROADMAP.md`)** — 9 new agents on the same
+**Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
 
 | Agent | Scope | Wakes on | What it does |
@@ -43,9 +46,22 @@ pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a
 | **Cost Estimator** (`cost_estimator`) | 🔒 tenant | Proposal created | Cost-volume realism guidance. |
 | **PP Matcher** (`pp_matcher`) | 🔒 tenant | Proposal created | Surfaces PP atoms + flags teaming gaps. |
 
-🌐 **platform-scope** agents run at our authority on master data (no tenant to bind to), so tenant-discretion
-is N/A — but they keep the **mandatory injection fence** (they read the most untrusted text in the system)
-and land into the RFP-admin curation review. **Full suite: 332 agent/workflow/guardrail/security tests green.**
+**And now the fabric registers 25** — a further 6 on the same pattern (our-org RFP-admin ops + the CMS
+content loop), so the whole platform runs on one fabric:
+
+| Agent | Scope | Wakes on | What it does |
+|---|---|---|---|
+| **Curation QA** (`curation_qa`) | 🌐 platform (our-org) | Solicitation triaged (pre-release) | Pre-release QA gate on a curated solicitation — ready / blocking issues for the admin. |
+| **Ops Digest** (`ops_digest`) | 🌐 platform (our-org) | Ops digest requested (scheduled) | Rolls the ops river into an admin digest (`AI_INVOKE` in `OnOpsDigestRequested`). |
+| **Content Generator** (`content_generator`) | 🌐 our-org CMS | Content requested | Drafts marketing/content-pipeline copy. |
+| **Content Curator** (`content_curator`) | 🌐 our-org CMS | Content resurface requested | Selects/repurposes existing content for resurfacing. |
+| **Social Scheduler** (`social_scheduler`) | 🌐 our-org CMS | Social schedule requested | Schedules social posts across the content calendar. |
+| **Research Scout** (`research_scout`) | 🌐 our-org | Research requested (`handle_event` only) | Produces research briefs; **not yet in `TOOL_ACTION_TO_ARCHETYPE`** (can't back an `AI_INVOKE` step until mapped). |
+
+🌐 **platform-scope** agents (incl. the our-org ops/CMS set) run at our authority on master/our-org data (no
+tenant to bind to), so tenant-discretion is N/A — but they keep the **mandatory injection fence** (they read
+the most untrusted text in the system) and land into an admin review. **Full suite: 332
+agent/workflow/guardrail/security tests green.**
 
 ---
 
@@ -108,6 +124,9 @@ Agent oversight is part of the **master + mirror forward-only bridge** (see
   and 30-day queue stats (pending·running·done·failed + last run).
 - **Usage by tenant** — per-company totals (agents used, runs, done, active, failed, last activity) — who
   is working the agents and where failures cluster.
+- **Spend** — Claude cost per archetype/tenant/instance from `agent_task_log` (tokens × per-model pricing,
+  `cost_usd`), the input to the runaway caps (§8). **Budget rollups** that fold the wider run cost
+  (Claude ± Railway DB / S3) into a per-tenant/per-instance total are the next increment (spine gap #5).
 
 ![Agent Workforce roster](./user-guides/img/admin-agent-workforce.png)
 ![Usage by tenant rollup](./user-guides/img/admin-agent-usage-by-tenant.png)
@@ -156,7 +175,7 @@ the trusted tenant, and — for the step actors — it is an independent `AI_INV
 the workflow). LLM reasoning runs live on deploy (Railway key).
 
 **Next:** the two foundation items in §7 (NOBYPASSRLS agent role + `app.tenant_id`; guardrail-gated landing),
-then the **master-side + onboarding batch** — see `docs/AGENT_ROADMAP.md`.
+then the **master-side + onboarding batch** — see `docs/archive/AGENT_ROADMAP.md`.
 
 ## 7. Landing + security (CONFIRMED — applies to all agents)
 
@@ -172,22 +191,20 @@ auto-applied* by the fabric. Each agent needs an explicit **land-or-review** ste
 **7b. Tenant isolation for the Python agents — 🚩 BIG FLAG (verified against the live DB).**
 1. **Tenant-discretion (done):** tool schemas expose no `tenant_id`; the trusted tenant comes from the task
    context; the model can never reference another tenant. This is the guarantee **today**.
-2. **RLS is currently BYPASSED for the agents — must be fixed before agents are trusted with auto-landing.**
-   `library_atoms` / `tenant_bucket_scores` / `tenant_opportunity_cards` are `FORCE ROW LEVEL SECURITY`,
-   BUT the connecting role (`claude` in sandbox; whatever prod uses) has **`rolbypassrls = true`**, so RLS
-   never fires and `SET app.tenant_id` is a **no-op**. Also `episodic_memories` is NOT FORCE'd and
-   `proposals` has **no RLS policy at all**. Remediation (an infra task, do before relying on RLS):
-   - Introduce a dedicated **agent DB role with `NOBYPASSRLS`** and connect the pipeline/agents as it.
-   - Add RLS policy + `FORCE ROW LEVEL SECURITY` to `episodic_memories` and `proposals` (and audit every
-     tenant-scoped table an agent touches).
-   - Then set `app.tenant_id` centrally in the fabric per invocation → RLS becomes the real backstop over
-     the explicit `WHERE`. **Exact wiring:** in `fabric.invoke_agent` (`pipeline/src/agents/fabric.py`),
-     right after `tenant_id = tenant_id or context.get("tenant_id")`, inside the `try`, run
-     `await conn.execute("SELECT set_config('app.tenant_id', $1, false)", str(tenant_id) if tenant_id else '')`;
-     add a `finally` that resets it (`set_config('app.tenant_id', '', false)`) so the shared/pooled conn
-     isn't left scoped. Add a test that a query on that conn after invoke sees the GUC cleared. Inert under
-     today's bypass role; do it **with** the NOBYPASSRLS role change. Until then, **tenant-discretion +
-     explicit `WHERE tenant_id` is the ONLY isolation** — every agent query MUST carry it (reviewed per agent).
+2. **RLS backstop — BUILT in code (mig 117 + fabric), one deploy step from live.** The as-built state
+   (supersedes the pre-117 "must be fixed" flag): `library_atoms` / `tenant_bucket_scores` /
+   `tenant_opportunity_cards` are `FORCE ROW LEVEL SECURITY`; **mig 117** adds the missing policies +
+   `FORCE ROW LEVEL SECURITY` on `proposals` / `proposal_sections` / `tenant_profiles` / `atom_tags`, and
+   **mig 116/119** cover `episodic_memories`. **mig 117** also creates the dedicated **`rfp_agent`
+   `NOBYPASSRLS`** role. `fabric.invoke_agent` (`pipeline/src/agents/fabric.py`) acquires a NOBYPASSRLS pool
+   when `AGENT_DATABASE_URL` is set and runs `SELECT set_config('app.tenant_id', $1, false)` per invocation
+   for tenant-scoped agents, resetting it in `finally` so a pooled conn is never left scoped (platform-scope
+   agents stay on the caller/bypass conn — an empty GUC would deny every row). **Proven in sandbox:** as
+   `rfp_agent`, a cross-tenant / unset read returns 0 rows. It is **inert under today's bypass role**, so the
+   one **pending step is the deploy CUTOVER** — provision the `rfp_agent` login member + `AGENT_DATABASE_URL`
+   so the agent path connects as it; then RLS becomes the real backstop over the explicit `WHERE tenant_id`.
+   Until cutover, **tenant-discretion + explicit `WHERE tenant_id` is the isolation** — every agent query
+   MUST carry it (reviewed per agent).
 3. **Writes through the registry:** agent write/landing actions call the RLS+role+audited frontend tools,
    never DB-direct — one `tool.invoke.start`/`end` audit pair per action.
 
@@ -202,7 +219,7 @@ registry) is where the guardrail check runs — so "advisory → guardrail → l
 
 | Property | Status | How |
 |---|---|---|
-| **No prompt injection** | ✅ all 10 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
+| **No prompt injection** | ✅ all 25 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
 | **No runaway** | ✅ enforced by the runtime | `MAX_TOOL_ROUNDS=20` + `PER_CALL_CEILING_USD=$0.50` mid-loop + rate limit 50 calls/hr/tenant + $50/mo budget (fabric). Producers stay **bounded** — one task per package / per tenant, never per-atom; and an agent's output event must **not re-trigger the same agent** (no self-loop); task enqueue is idempotent. |
 | **No dead-ending a workflow/automation** | ✅ enforced by the runtime | The processor catches/logs/continues (never crashes the poll loop); an unmapped or failed `AI_INVOKE` action is a **safe skip** (no fabric call, no DB write); agent output is **advisory** (never writes business tables directly); the fabric returns an error status dict, **never raises**. So a failing agent-actor degrades gracefully — the human loop continues. `AI_INVOKE` steps also carry `on_failure`/`on_timeout`/`retry_count`. |
 | **Tenant isolation** | discretion ✅; RLS ✅ **built** (deploy-gated) | §7b: tenant-discretion holds today; **RLS backstop built** — mig 117 adds the `rfp_agent` NOBYPASSRLS role + FORCE-RLS on the gap tables (proposals/proposal_sections/tenant_profiles/atom_tags), and `fabric.invoke_agent` sets/resets `app.tenant_id` per call. **Proven in sandbox**: as `rfp_agent`, a cross-tenant / unset read returns 0 rows. Deploy step: provision a login member + `AGENT_DATABASE_URL`. |

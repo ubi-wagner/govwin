@@ -3,7 +3,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
-import { PdfViewer, type TextSelection } from './pdf-viewer';
+import dynamic from 'next/dynamic';
+import type { TextSelection } from './pdf-viewer';
+// react-pdf / pdf.js sets its worker at module-eval (import) time and touches browser
+// globals, which crashes SSR of this client component ("Object.defineProperty called on
+// non-object"). Load it client-only so the module never evaluates on the server.
+const PdfViewer = dynamic(() => import('./pdf-viewer').then((m) => m.PdfViewer), { ssr: false });
 import { TagPopover, type TagAction } from './tag-popover';
 import { Autocomplete } from '@/components/ui/autocomplete';
 import { TopicComplianceManager } from './topic-compliance-manager';
@@ -532,9 +537,13 @@ export function CurationWorkspace({
         setExpandStatus(srcJson.error ?? 'Could not load source profiles.');
         return;
       }
-      const sources: Array<{ id: string; site_type: string }> =
+      // /api/admin/sources does `SELECT sp.*`, and @/lib/db camelCases every
+      // result column — so the JSON key is `siteType`, not `site_type`. Reading
+      // the snake_case key returns undefined for every row and the find() below
+      // silently fails ("No source profile configured" even when one exists).
+      const sources: Array<{ id: string; siteType: string }> =
         srcJson.data?.sources ?? [];
-      const profile = sources.find((s) => s.site_type === sol.source);
+      const profile = sources.find((s) => s.siteType === sol.source);
       if (!profile) {
         setExpandStatus(
           `No source profile configured for "${sol.source}". Add one under Sources to enable topic import.`,
@@ -790,7 +799,7 @@ export function CurationWorkspace({
                 </span>
               </div>
               <PdfViewer
-                ref={pdfViewerRef}
+                innerRef={pdfViewerRef}
                 documentId={sourcePdf.id}
                 onTextSelect={handleTextSelect}
                 highlights={annotations.map((a) => ({
@@ -924,15 +933,16 @@ export function CurationWorkspace({
             {/* Topic file drop zone */}
             <TopicFileDropZone
               solicitationId={sol.id}
-              onUploaded={(results) => {
-                if (results.length > 0) {
-                  // Pre-fill bulk import with the uploaded files' parsed info
-                  const pasteText = results
-                    .map((r) => [r.topicNumber ?? '', r.title].filter(Boolean).join(' | '))
-                    .join('\n');
-                  setExtractedPasteText(pasteText);
-                  setShowBulkAddTopics(true);
-                }
+              onUploaded={(result) => {
+                // Topic files now create topic opportunities directly (each file
+                // → one topic OPP under this umbrella). Surface the count and
+                // refresh so the new topics appear in the list below.
+                const total = result.created.length + result.skipped.length + result.failed.length;
+                const bits = [`Created ${result.created.length} topic${result.created.length === 1 ? '' : 's'} from ${total} file${total === 1 ? '' : 's'}`];
+                if (result.skipped.length) bits.push(`${result.skipped.length} skipped (duplicate)`);
+                if (result.failed.length) bits.push(`${result.failed.length} failed`);
+                setExpandStatus(bits.join(' · '));
+                if (result.created.length > 0) router.refresh();
               }}
             />
 
@@ -3004,12 +3014,18 @@ function AISuggestionsPanel({
 
 // ─── TopicFileDropZone ─────────────────────────────────────────────
 
+interface TopicIngestResult {
+  created: Array<{ opportunityId: string; documentId: string; topicNumber: string; title: string; textExtracted: boolean }>;
+  skipped: Array<{ filename: string; reason: string }>;
+  failed: Array<{ filename: string; error: string }>;
+}
+
 function TopicFileDropZone({
   solicitationId,
   onUploaded,
 }: {
   solicitationId: string;
-  onUploaded: (results: Array<{ documentId: string; topicNumber: string | null; title: string; filename: string }>) => void;
+  onUploaded: (result: TopicIngestResult) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -3038,7 +3054,7 @@ function TopicFileDropZone({
       if (!resp.ok) {
         throw new Error(json.error ?? `Upload failed (HTTP ${resp.status})`);
       }
-      onUploaded(json.data?.uploaded ?? []);
+      onUploaded(json.data ?? { created: [], skipped: [], failed: [] });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -3060,7 +3076,8 @@ function TopicFileDropZone({
       ) : (
         <>
           <p className="text-xs text-gray-500">
-            Drop individual topic PDFs here to auto-parse and stage for review
+            Drop individual topic files here — each becomes a topic opportunity
+            under this solicitation (ready to push to the pipeline)
           </p>
           <label className="mt-1 text-xs text-blue-600 hover:text-blue-800 cursor-pointer underline">
             or browse files
@@ -3080,7 +3097,7 @@ function TopicFileDropZone({
                   const resp = await fetch('/api/admin/upload-topic-files', { method: 'POST', body: data });
                   const json = await resp.json();
                   if (!resp.ok) throw new Error(json.error ?? 'Upload failed');
-                  onUploaded(json.data?.uploaded ?? []);
+                  onUploaded(json.data ?? { created: [], skipped: [], failed: [] });
                 } catch (err) {
                   setUploadError(err instanceof Error ? err.message : String(err));
                 } finally {

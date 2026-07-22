@@ -13,12 +13,12 @@
 **Date:** 2026-06-23
 **Status:** As-built baseline; supersedes ARCHITECTURE_V7.md (master) and ARCHITECTURE_V8.md (content-subsystem delta).
 **Verification method:** File-by-file analysis of all 908 tracked files.  
-**Evidence location:** `docs/baseline/inventory/` (8 subsystem inventories) + `docs/baseline/BASELINE_FINDINGS.md` (reconciled synthesis)
+**Evidence location:** `docs/archive/baseline/inventory/` (8 subsystem inventories) + `docs/archive/baseline/BASELINE_FINDINGS.md` (reconciled synthesis)
 
 **Lifecycle addendum (current push):** the proposal **open-to-close** process — AI draft/regen
 → per-section accept/lock → document-close → lock-state advance gate (+ force-advance marking)
 → submit → library harvest — and the **settable AI cost-control** substrate are specified in
-`docs/PROPOSAL_LIFECYCLE_V1.md`. Remaining Red→Green work: `docs/PROPOSAL_LIFECYCLE_TODO.md`.
+`docs/PROPOSAL_LIFECYCLE_V1.md`. Remaining Red→Green work: `docs/archive/PROPOSAL_LIFECYCLE_TODO.md`.
 Schema since this baseline: migrations **072** (agent config), **073** (atom-outcome unique),
 **074** (`proposal_sections` lock columns).
 
@@ -40,7 +40,7 @@ Schema since this baseline: migrations **072** (agent config), **073** (atom-out
 >   index (every launch threw on a fresh deploy); the `gate_config` jsonb-string corruption (broke stage advance +
 >   collaborator access); paused-sweep clobber race; cross-entity HITL resume; managed-path `fabric` drop;
 >   CMS disabled-rule firing. **Full sweep report + remaining P2/P3 + the unfinished-code inventory:
->   `docs/V1_SWEEP_FINDINGS_2026-06-29.md`.**
+>   `docs/archive/V1_SWEEP_FINDINGS_2026-06-29.md`.**
 > - **§9 correction:** the AI workforce is no longer "built but not wired" — `AgentFabric` is live and
 >   `color_team_reviewer` runs end-to-end; the other archetypes are 🟦 dormant and the 3-source strawman
 >   generation (behind the shipped `publish_section_draft` landing primitive) is the open AI-integration gap.
@@ -1090,7 +1090,7 @@ Highest-risk untested paths:
 
 ## 16. Appendix
 
-### A. Inventory Files (docs/baseline/inventory/)
+### A. Inventory Files (docs/archive/baseline/inventory/)
 
 | File | Subsystem | Lines |
 |------|-----------|-------|
@@ -1127,13 +1127,13 @@ Highest-risk untested paths:
 | Topic | File |
 |-------|------|
 | System architecture (this doc) | `ARCHITECTURE_V9.md` |
-| Content management delta | `ARCHITECTURE_V8.md` (folded into V9) |
+| Content management delta | `docs/archive/ARCHITECTURE_V8.md` (folded into V9) |
 | Engineering SOPs (session guide) | `CLAUDE_CLIFFNOTES.md` (root) |
-| DB schema (full column listing) | `docs/DB_SCHEMAS.md` |
+| DB schema (full column listing) | `docs/archive/DB_SCHEMAS.md` |
 | Event type catalog | `docs/EVENT_CONTRACT_V2.md` |
 | Automation execution model | `docs/EVENT_CONTRACT_V3.md` |
 | Workflow/process template definitions | `docs/WORKFLOW_REFERENCE.md` |
-| Agent architecture | `docs/AGENT_FRAMEWORK.md` |
+| Agent architecture | `docs/archive/AGENT_FRAMEWORK.md` |
 | Memory system | `docs/MEMORY_MANAGEMENT.md` |
 | S3 storage layout | `docs/STORAGE_LAYOUT.md` |
 | Deployment (Railway) | `RAILWAY.md` |
@@ -1146,7 +1146,7 @@ Highest-risk untested paths:
 
 | File | Problem |
 |------|---------|
-| `CLAUDE.md` (root) | ~~Points to `ARCHITECTURE_V5.md`~~ — fixed (now points to V9); says "one Postgres + one /data volume"; says "CMS dormant V1" |
+| `CLAUDE.md` (root) | ~~Points to `docs/archive/ARCHITECTURE_V5.md`~~ — fixed (now points to V9); says "one Postgres + one /data volume"; says "CMS dormant V1" |
 | `docs/CLAUDE_CLIFFNOTES.md` (in docs/) | OLDER version (2026-04-27) of the root CLIFFNOTES; navigation hazard — delete or rename |
 | `scripts/migrate.sh` | No tracking — marked "NEVER USE" in CLIFFNOTES; delete or rename to `_DANGEROUS_NO_TRACKING.sh` |
 | `docker-compose.yml` | CMS section comment says "V1 dormant" — stale |
@@ -1155,7 +1155,7 @@ Highest-risk untested paths:
 
 ---
 
-*This document was generated 2026-06-23 as part of the Phase 2 baseline exercise. Source of truth for all facts is `docs/baseline/BASELINE_FINDINGS.md` and the 8 inventory files in `docs/baseline/inventory/`. When facts conflict between this document and the inventories, the inventories win.*
+*This document was generated 2026-06-23 as part of the Phase 2 baseline exercise. Source of truth for all facts is `docs/archive/baseline/BASELINE_FINDINGS.md` and the 8 inventory files in `docs/archive/baseline/inventory/`. When facts conflict between this document and the inventories, the inventories win.*
 
 ---
 
@@ -1163,7 +1163,7 @@ Highest-risk untested paths:
 
 The V1 feature build is underway on `claude/nice-hamilton-kBqtD`. Schema/runtime changes shipped so
 far (migration chain validated 001→085 on live PG 16). Authoritative live journal:
-`docs/V1_TASKING.md` §11.
+`docs/archive/V1_TASKING.md` §11.
 
 ### New / changed schema
 - **`proposal_artifacts`** (mig 083) — NEW. The lockable/downloadable **document unit**; a proposal

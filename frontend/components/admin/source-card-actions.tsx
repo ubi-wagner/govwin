@@ -208,7 +208,18 @@ function PasteTopicsModal({ profileId, sourceName, onClose, onImported }: PasteM
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Import failed (HTTP ${res.status})`);
+        // /api/admin/extract-topics only extracts topics from a STORED
+        // solicitation's document text (keyed by solicitationId); it does not
+        // consume pasted rows, and no raw-row ingestion backend exists yet — so
+        // a paste always 400s here. Surface an honest message instead of the
+        // route's misleading "solicitationId required".
+        // TODO(paste-topics): wire this to a real raw-topic ingestion endpoint,
+        // or retire the Paste Topics action in favour of Bulk Import.
+        throw new Error(
+          body.code === 'VALIDATION_ERROR'
+            ? 'Pasted-topic import isn’t supported yet — this endpoint extracts topics from an uploaded solicitation document, not pasted rows. Use Bulk Import or +Add Topic instead.'
+            : (body.error ?? `Import failed (HTTP ${res.status})`),
+        );
       }
 
       const result = await res.json();
@@ -408,8 +419,10 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
         formData.append('agency', source.agency || 'Unknown');
         formData.append('programType', source.programType || 'other');
 
+        // Route collects files via formData.getAll('files') — the key MUST be
+        // 'files' (not 'files[]'), or getAll returns [] and the upload 422s.
         for (const file of Array.from(files)) {
-          formData.append('files[]', file);
+          formData.append('files', file);
         }
 
         const res = await fetch('/api/admin/rfp-upload', {
@@ -542,12 +555,9 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
           >
             Open Site
           </button>
-          <button
-            onClick={() => setShowPasteModal(true)}
-            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm font-medium hover:bg-amber-500"
-          >
-            Paste Topics
-          </button>
+          {/* "Paste Topics" retired: pasted rows have no solicitation to attach to (topics
+              belong to an ingested solicitation), so the flow could never succeed. Use
+              "Upload PDFs" → the solicitation ingest, or +Add Topic on a solicitation. */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}

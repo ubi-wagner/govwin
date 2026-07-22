@@ -71,13 +71,16 @@ closer look.
 
 When a card fits, **purchase** its proposal portal:
 
-1. On the card, choose **Purchase** and enter your **comp code**
-   (`rfppipelinetest`).
-2. The purchase creates a proposal portal in **`curation_pending`** with a
-   **72-hour SLA**, and notifies the RFP team.
+1. On the card, choose **Purchase** to open the purchase modal. It shows a **Pay by card**
+   button up top and an **Access / discount code** box at the bottom.
+2. Card checkout isn't wired yet, so **Pay by card** just returns *"Card checkout is not
+   available yet — use an access code below."* Enter your **comp code** (`rfppipelinetest`) in
+   the code box and choose **Complete purchase**.
+3. The purchase opens a proposal portal in **`curation_pending`** with a **72-hour SLA**, and
+   notifies the RFP team.
 
 > **Self-serve checkout is not available yet** — Stripe is descoped for now, so the
-> comp code is how you buy. Don't look for a credit-card flow.
+> comp code is how you buy. The card button stays visible until Stripe is enabled.
 
 ---
 
@@ -94,6 +97,10 @@ You'll then find it under **Proposals** / **Builds** — continue in
 > **What just happened end-to-end:** card → purchase (comp code) → `curation_pending`
 > (72h) → RFP admin releases → unlocked build provisioned from the master
 > skeleton. See [RFP admin](./admin-rfp.md) for the other side of this handshake.
+
+> **You can reopen after submitting.** Even once you finalize and **submit** the build, an
+> **"Unlock for Edit"** button stays on the stage control — so you can fix a typo and re-lock
+> rather than being dead-ended. The first unlock is free; further unlocks may need admin help.
 
 ---
 

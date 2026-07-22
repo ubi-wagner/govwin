@@ -88,7 +88,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
       },
     });
 
-    return NextResponse.json({ data: { saved: true, versionNumber } });
+    return NextResponse.json({ data: { saved: true, version: versionNumber } });
   } catch (err) {
     console.error('[admin/canvas-save] failed', err);
     return NextResponse.json({ error: 'Failed to save section', code: 'DB_ERROR' }, { status: 500 });

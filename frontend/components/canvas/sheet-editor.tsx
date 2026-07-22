@@ -588,7 +588,7 @@ export function SheetEditor({
   return (
     <div className="flex flex-col h-full bg-white">
       {/* ── Toolbar ── */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-white flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b bg-white flex-shrink-0">
         {/* Document title */}
         <h2 className="font-semibold text-sm text-gray-800 truncate max-w-xs">
           {doc.metadata.title}
@@ -704,7 +704,7 @@ export function SheetEditor({
 
       {/* ── Format bar ── */}
       {!readOnly && (
-        <div className="flex items-center gap-1 px-3 py-1 border-b bg-gray-50 flex-shrink-0 text-xs">
+        <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b bg-gray-50 flex-shrink-0 text-xs">
           {/* Bold */}
           <button
             onClick={() => toggleCellBold()}

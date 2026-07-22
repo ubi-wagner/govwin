@@ -103,6 +103,7 @@ export default async function BillingPage({
         tenantSlug={tenantSlug}
         subscriptionStatus={subscriptionStatus}
         hasStripeCustomer={hasStripeCustomer}
+        canManageBilling={sessionUser.tenantId === tenantId}
         purchases={purchases.map((p) => ({
           id: p.id,
           productType: p.productType,

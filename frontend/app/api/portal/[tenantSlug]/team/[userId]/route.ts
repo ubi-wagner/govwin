@@ -108,3 +108,68 @@ export async function POST(_request: Request, ctx: Ctx) {
     return NextResponse.json({ error: 'Failed to reactivate', code: 'DB_ERROR' }, { status: 500 });
   }
 }
+
+/**
+ * PATCH /api/portal/[tenantSlug]/team/[userId]  → change a member's role.
+ *
+ * Body: { role: 'tenant_admin' | 'tenant_user' }. Promotes/demotes a home/manual member
+ * (a partner_user member can be promoted into the team this way too). tenant_admin only.
+ * Guards: you can't change your own role (no self-lockout), and you can't demote the last
+ * active admin (never leave a company adminless).
+ */
+export async function PATCH(request: Request, ctx: Ctx) {
+  try {
+    const g = await gate(ctx);
+    if (g.error) return g.error;
+    const { actor, tenantId, targetUserId } = g;
+
+    let body: { role?: unknown };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
+    const ALLOWED = ['tenant_admin', 'tenant_user'];
+    const newRole = typeof body.role === 'string' ? body.role : '';
+    if (!ALLOWED.includes(newRole)) {
+      return NextResponse.json({ error: 'role must be tenant_admin or tenant_user', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    if (targetUserId === actor.id) {
+      return NextResponse.json({ error: 'You cannot change your own role', code: 'VALIDATION_ERROR' }, { status: 400 });
+    }
+
+    // Current role of the target's team (home/manual) membership.
+    const [cur] = await sql<{ role: string }[]>`
+      SELECT role FROM user_memberships
+      WHERE user_id = ${targetUserId} AND tenant_id = ${tenantId} AND source IN ('home', 'manual')
+      LIMIT 1`;
+    if (!cur) return NextResponse.json({ error: 'Team member not found', code: 'NOT_FOUND' }, { status: 404 });
+    if (cur.role === newRole) return NextResponse.json({ data: { role: newRole, changed: false } });
+
+    // Never demote the last active admin.
+    if (cur.role === 'tenant_admin' && newRole !== 'tenant_admin') {
+      const [{ admins }] = await sql<{ admins: number }[]>`
+        SELECT count(*)::int AS admins FROM user_memberships
+        WHERE tenant_id = ${tenantId} AND role = 'tenant_admin' AND status = 'active'
+          AND source IN ('home', 'manual') AND user_id <> ${targetUserId}`;
+      if (admins === 0) {
+        return NextResponse.json({ error: 'Cannot demote the last active admin', code: 'VALIDATION_ERROR' }, { status: 400 });
+      }
+    }
+
+    const [row] = await sql<{ role: string }[]>`
+      UPDATE user_memberships SET role = ${newRole}
+      WHERE user_id = ${targetUserId} AND tenant_id = ${tenantId} AND source IN ('home', 'manual')
+      RETURNING role`;
+    if (!row) return NextResponse.json({ error: 'Team member not found', code: 'NOT_FOUND' }, { status: 404 });
+
+    await emitEventSingle({
+      namespace: 'capture',
+      type: 'team_member.role_changed',
+      actor: userActor(actor.id ?? '', actor.email ?? undefined),
+      tenantId,
+      payload: { userId: targetUserId, fromRole: cur.role, toRole: newRole },
+    });
+    return NextResponse.json({ data: { role: newRole, changed: true } });
+  } catch (err) {
+    console.error('[portal/team/role] error', err);
+    return NextResponse.json({ error: 'Failed to change role', code: 'DB_ERROR' }, { status: 500 });
+  }
+}

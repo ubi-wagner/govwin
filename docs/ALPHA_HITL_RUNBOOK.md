@@ -6,7 +6,7 @@ customer signs up & sees mirrored cards → customer library (upload→atomize�
 provision → release → build (draft→lock) → download** — plus the admin scout/source surface and
 the event/automation audit. Every step lists the **action**, the **expected result**, and a
 **PASS/FAIL** box. "⚠ known-issue" marks a step that will visibly not work yet (descoped for Alpha,
-tracked in `docs/ALPHA_TODO_BACKLOG.md`) so it doesn't read as a regression.
+tracked in `docs/archive/ALPHA_TODO_BACKLOG.md`) so it doesn't read as a regression.
 
 Driven-verified in the sandbox before writing this: onboarding (accept→temp-password→cards mirror),
 provision→release, skeleton-template→mold interpolation, docx download, per-card-per-bucket scoring,
@@ -59,7 +59,7 @@ cd pipeline && python src/main.py
 ```
 
 ### Option B — Railway (prod-like)
-Follow the corrected env list in the **launch config checklist** (`docs/LAUNCH_READINESS_AND_10DAY_PLAN_2026-07-04.md` §5).
+Follow the corrected env list in the **launch config checklist** (`docs/archive/LAUNCH_READINESS_AND_10DAY_PLAN_2026-07-04.md` §5).
 **Pre-flight:** target Postgres has **pgvector** + the role can `CREATE EXTENSION`; set `NEXTAUTH_URL`
 (else post-login/Stripe/invite links go to localhost); set the frontend `ANTHROPIC_API_KEY` and
 `AWS_S3_BUCKET_NAME` (its absence 500s any storage route at import); set the Stripe price IDs under the
@@ -194,4 +194,4 @@ dropdb govtech_alpha && createdb govtech_alpha && node db/migrations/migrate.mjs
 ```
 
 *Every PASS/FAIL that FAILS: capture the URL, the network response (status + body `error`/`code`), and the
-server log line — file it against `docs/ALPHA_TODO_BACKLOG.md`.*
+server log line — file it against `docs/archive/ALPHA_TODO_BACKLOG.md`.*

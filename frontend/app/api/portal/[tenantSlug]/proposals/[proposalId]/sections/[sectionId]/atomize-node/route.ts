@@ -17,6 +17,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 export async function POST(
   request: Request,
@@ -30,7 +31,7 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
     }
-    const sessionUser = session.user as { id?: string; role?: unknown };
+    const sessionUser = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(sessionUser.role) ? sessionUser.role : null;
     if (!role || !sessionUser.id) {
       return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
@@ -131,6 +132,17 @@ export async function POST(
 
     if (!result.unitId) {
       return NextResponse.json({ error: 'Node could not be atomized', code: 'NO_ATOM' }, { status: 422 });
+    }
+    try {
+      await emitEventSingle({
+        namespace: 'library',
+        type: 'atom.created',
+        actor: userActor(sessionUser.id!, sessionUser.email ?? undefined),
+        tenantId,
+        payload: { atomId: result.unitId, grain: 'primitive', source: 'harvest', originProposalId: proposalId, originSectionId: sectionId },
+      });
+    } catch (evtErr) {
+      console.error('[atomize-node] atom.created emit failed (non-fatal)', evtErr);
     }
     return NextResponse.json({ data: result });
   } catch (err) {

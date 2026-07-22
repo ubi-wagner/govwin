@@ -123,7 +123,7 @@ export async function verifyProposalAccess(
 
 export async function auditLog(params: { tenantId?: string; userId?: string; action: string; entityType?: string; entityId?: string; metadata?: Record<string, unknown> }) {
   try {
-    await sql`INSERT INTO audit_log (tenant_id, user_id, action, entity_type, entity_id, metadata) VALUES (${params.tenantId ?? null}, ${params.userId ?? null}, ${params.action}, ${params.entityType ?? null}, ${params.entityId ?? null}, ${JSON.stringify(params.metadata ?? {})})`;
+    await sql`INSERT INTO audit_log (tenant_id, user_id, action, entity_type, entity_id, metadata) VALUES (${params.tenantId ?? null}, ${params.userId ?? null}, ${params.action}, ${params.entityType ?? null}, ${params.entityId ?? null}, ${sql.json((params.metadata ?? {}) as Parameters<typeof sql.json>[0])})`;
   } catch (e) {
     console.error('[auditLog] Error:', e);
   }
