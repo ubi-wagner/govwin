@@ -27,8 +27,8 @@ try {
   // ── Tenant admin: the Automation grammar editor ──
   const ctxT = await browser.newContext({ viewport: { width: 1280, height: 1400 } });
   const t = await ctxT.newPage();
-  await login(t, 'expert@beacon-labs.test', 'DrivePass123!');
-  await t.goto(`${BASE}/portal/beacon-labs/automation`, { waitUntil: 'networkidle' });
+  await login(t, 'admin@acme-navy.test', 'DrivePass123!');
+  await t.goto(`${BASE}/portal/acme-navy-systems/automation`, { waitUntil: 'networkidle' });
   await t.waitForTimeout(2000);
   await t.screenshot({ path: `${OUT}/01-tenant-automation-grammar.png`, fullPage: true });
   shots.push('01-tenant-automation-grammar.png');

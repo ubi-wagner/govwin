@@ -113,3 +113,22 @@ control plane / tenant grammar / portal wizard), ⑨ (budget ceiling), §13 (age
 + opt-out modal).
 
 ---
+
+## Phase E + F — agent budget + the finale ✅
+
+**E1 (commit `7665c6b`)** — the fabric now reads `automation_framework.agent_monthly_budget_ceiling_usd`
+and caps a tenant's effective budget at it (decision ⑨); auto-run rides the resolver's `enabled`.
+Agent tests 130/46.
+
+**F — adversarial sweep + screenshots + retire (commits `1e5b2db`, `76f2c77`).** Two subagents hunted the
+whole diff. Pipeline: clean. Frontend: **1 HIGH cross-tenant leak** (GET automation-policies had no
+`WHERE tenant_id`; RLS is inert under the bypass role → returned every tenant's rows) + 2 MEDIUM (resolver
+cutover-correctness via withTenant; dead framework knobs removed from the editor) + 2 LOW (recipientUsers
+UUID→422; nudge-days raw-text input) + a 0-ceiling footgun (now requires >0). All fixed + tested. Retired
+the orphaned prefs card. **Live screenshots** (`scratchpad/shots-190/`): the tenant grammar editor (locked
+admin-floor chip, AI-capable triggers, the pre-staged draft/final review gates) and the RFP framework
+control plane (SLA/buckets/nudges/agent ceiling).
+
+**Final tally:** ~17 commits · tsc 0 · **vitest 753/753** · `next build` EXIT 0 · pipeline workflow 18/13 +
+agents 130/46 · migrations 126–129 idempotent · adversarial-sweep-clean (the one live leak fixed).
+Everything ships inert until a tenant edits a policy. #190 is complete.
