@@ -12,7 +12,7 @@
 **Status:** design of record for the customer-facing opportunity lifecycle. Describes the
 **intended architecture** and grounds every stage in the **as-built** code (file:line refs).
 Anything not yet wired is marked **⚠ future** with the intended shape — the doc is honest about
-now-vs-later so it can double as the build backlog. Supersedes `CUSTOMER_PURCHASE_TO_V1_FLOW.md`
+now-vs-later so it can double as the build backlog. Supersedes `archive/CUSTOMER_PURCHASE_TO_V1_FLOW.md`
 (folded in) and is the source the HITL click-plans derive from.
 
 Verified against the tree on branch `claude/nice-hamilton-kBqtD` (migrations 001→108).

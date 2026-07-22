@@ -331,7 +331,10 @@ preview + notify all collaborators.
 > open piece — **the global per-tenant automation policy layer** (`recipients × trigger × timing ×
 > escalation`, the customer grammar that feeds `nudge_days`/`assignee_role`/`due_in_minutes` into instances,
 > for both the discovery notify-beats and the build nudge cadence) — is the one genuinely-open item; the
-> UI exists, landing it as the per-tenant config that parameterizes instances is the work. The
+> UI exists, landing it as the per-tenant config that parameterizes instances is the work. **Full design
+> spec: `docs/AUTOMATION_POLICY_DESIGN.md` (#190)** — schema (`tenant_automation_policies`), the
+> `resolveAutomationPolicy()` injection point at every launch/notify site, federation with the admin
+> `automation_rules` engine, the agent-fabric dimensions, and the open gotchas. The
 > mechanism-level gaps below still hold.
 
 1. **`fabric.handle_event` is wired but secondary.** The **primary** agent wiring is now the two producer

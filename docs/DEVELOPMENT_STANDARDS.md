@@ -255,8 +255,8 @@ Note: **No DB migration check runs in CI** -- migrations are applied manually vi
 applies cleanly against production state.
 
 For the full test-run command reference, CI job inventory, and per-subsystem coverage gaps, see:
-- `docs/baseline/TESTING_PROCESS.md` — how to run tests for frontend, pipeline, and CMS
-- `docs/baseline/TEST_COVERAGE_MATRIX.md` — what is and is not covered, highest-risk untested paths
+- `docs/archive/baseline/TESTING_PROCESS.md` — how to run tests for frontend, pipeline, and CMS
+- `docs/archive/baseline/TEST_COVERAGE_MATRIX.md` — what is and is not covered, highest-risk untested paths
 
 ---
 

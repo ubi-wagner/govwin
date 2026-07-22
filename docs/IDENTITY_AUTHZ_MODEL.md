@@ -7,7 +7,7 @@ customer admins, internal collaborators, external collaborators, RFP-Engine shad
 and EconDev appointed expert-admins.
 
 > **Companion docs:** `docs/MASTER_MIRROR_OPP_DESIGN.md` (the two-spine OPP model + shadow/ToDo
-> flow), `docs/API_REFERENCE.md` (route contracts), `docs/DB_SCHEMAS.md` (full schema).
+> flow), `docs/archive/API_REFERENCE.md` (route contracts), `docs/archive/DB_SCHEMAS.md` (full schema).
 
 ---
 
@@ -20,7 +20,7 @@ and EconDev appointed expert-admins.
   password = **one** home company (`users.tenant_id`, a single nullable FK) + **one** global role.
 - There is **no** `(email, tenant_id)` composite unique and **no** membership/junction table.
   (An earlier "phantom `tenant_memberships`" table was deliberately collapsed to `users.tenant_id`
-  — see `docs/SESSION_HANDOFF_NEXT.md:61`, `docs/LAUNCH_READINESS_AND_10DAY_PLAN_2026-07-04.md:385`.)
+  — see `docs/archive/SESSION_HANDOFF_NEXT.md:61`, `docs/archive/LAUNCH_READINESS_AND_10DAY_PLAN_2026-07-04.md:385`.)
 
 So "**email + company is the unique key**" is *not* how login works — but the **outcome it's
 meant to guarantee is still the design**: one person can be **admin at their own company AND an
@@ -154,7 +154,7 @@ proposal's tenant is bounced at step (1)-of-layer-2, so the resolver that *would
 access is never reached. **Scope:** of 32 proposal-scoped route/page files, **25 gate on tenant
 membership only**; only **7** already also call `resolveUserAccess` (and even those run the tenant
 gate *first*, so they carry the same ordering bug). This is a known gap cluster
-(`docs/baseline/UI_UX_V1_AUDIT.md:93,148`, `docs/baseline/GAP_ANALYSIS.md`).
+(`docs/archive/baseline/UI_UX_V1_AUDIT.md:93,148`, `docs/archive/baseline/GAP_ANALYSIS.md`).
 
 ---
 

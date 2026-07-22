@@ -5,7 +5,7 @@ dead** — every archetype is registry-wired and invocable, and "dormant" means 
 fires it yet. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
 plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine those agents plug into is
 `docs/AUTOMATION_SPINE_MAP.md`; the next batches (master-side, onboarding, additional tenant-side) are in
-`docs/AGENT_ROADMAP.md`. This file is the fabric definition + the how-to for ADDING/UPDATING an archetype
+`docs/archive/AGENT_ROADMAP.md`. This file is the fabric definition + the how-to for ADDING/UPDATING an archetype
 (§0), plus the original design rationale (§1–8, archived).**
 
 > **AS-BUILT (2026-07-22):** the fabric registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
@@ -54,7 +54,7 @@ and the specific agent archetypes at each layer.
 ## 0. As-built workforce summary (#117 complete)
 
 > The canonical roster + safety detail is `docs/AGENT_WORKFORCE.md`; the forward plan is
-> `docs/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
+> `docs/archive/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
 
 ### 0.1 The 25 archetypes (registry-wired · dormant ≠ dead)
 
@@ -158,7 +158,7 @@ provision the NOBYPASSRLS login member + `AGENT_DATABASE_URL`, then the agent pa
 RLS becomes the real backstop over the explicit `WHERE tenant_id`. Until cutover, tenant-discretion + the
 explicit `WHERE` is the isolation (`AGENT_WORKFORCE.md §7–8`).
 
-### 0.5 Batches landed (see `docs/AGENT_ROADMAP.md`)
+### 0.5 Batches landed (see `docs/archive/AGENT_ROADMAP.md`)
 
 Master → bridge → mirror: *"agents build the master, the bridge fans it, agents work the mirror."* All three
 batches are now **registered + greenfielded onto the current spine** (roster/status in `AGENT_WORKFORCE.md §1`):

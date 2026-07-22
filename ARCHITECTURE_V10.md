@@ -23,8 +23,8 @@ customer-facing surface onto the opportunity-card spine** and the drive-verifica
 seeded scratch DB, the Python workflow engine on `:8080`, Postgres — with the full Playwright suite
 (**17/17 green**) and a live workflow-engine run (12 templates registered, `process_instances` created
 carrying `opportunity_id`). Not a code-read.
-**Evidence location:** `docs/HITL_WIRING_AUDIT_2026-07-03.md` (finish-out + live-verification block),
-`docs/HITL_WIRING_AUDIT_RUNBOOK.md` (method), `frontend/e2e/` (the suite).
+**Evidence location:** `docs/archive/HITL_WIRING_AUDIT_2026-07-03.md` (finish-out + live-verification block),
+`docs/archive/HITL_WIRING_AUDIT_RUNBOOK.md` (method), `frontend/e2e/` (the suite).
 
 > **Update (2026-07-15) — schema now at migration 108; the purchase→curation→release flow landed.**
 > Since this doc's 2026-07-03 drive-verify (mig 103), the customer **comp-code purchase → curation →
@@ -614,7 +614,7 @@ landing primitive is shipped; `OnProposalCreated → draft_v0` fires only when t
 
 ## 10. As-Built Verification
 
-This refactor was **driven**, not code-read. Method + verdict scale: `docs/HITL_WIRING_AUDIT_RUNBOOK.md`.
+This refactor was **driven**, not code-read. Method + verdict scale: `docs/archive/HITL_WIRING_AUDIT_RUNBOOK.md`.
 
 ### 10.1 Playwright suite — 17/17 green
 
@@ -645,7 +645,7 @@ the engine **registered 12 templates** and **created `process_instances` carryin
 the frozen event overlay — witnessed for `ProjectCollaboration` (carries opp), `OnSolicitationPushed`
 (carries opp), `OnProposalCreated`, and `OnProposalSectionEdited`. The §6.1 payload fix is what made the
 `opportunity_id` correlation possible (a string-scalar payload returned null on `payload->>'opportunityId'`).
-Evidence: `docs/HITL_WIRING_AUDIT_2026-07-03.md` finish-out block.
+Evidence: `docs/archive/HITL_WIRING_AUDIT_2026-07-03.md` finish-out block.
 
 ### 10.3 Verdict
 
@@ -658,7 +658,7 @@ and the workflow engine runs live keyed to the opportunity spine.
 
 ## 11. Known Gaps & Remaining Work
 
-From the driven audit (`docs/HITL_WIRING_AUDIT_2026-07-03.md`) — feature-completeness and cleanup, not
+From the driven audit (`docs/archive/HITL_WIRING_AUDIT_2026-07-03.md`) — feature-completeness and cleanup, not
 core-spine breaks:
 
 | Item | Status | Note |
@@ -696,5 +696,5 @@ core-spine breaks:
 
 *This document records the greenfield-canonical refactor shipped on `claude/nice-hamilton-kBqtD` and its
 drive-verification. It is a delta over ARCHITECTURE_V9.md, which remains canonical for the retained core.
-Source of truth for the verification claims is `docs/HITL_WIRING_AUDIT_2026-07-03.md` and the
+Source of truth for the verification claims is `docs/archive/HITL_WIRING_AUDIT_2026-07-03.md` and the
 `frontend/e2e/` suite; for the greenfield schema, `CLAUDE_CLIFFNOTES.md` and `db/migrations/094–103`.*

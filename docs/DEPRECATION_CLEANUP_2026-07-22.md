@@ -45,7 +45,7 @@ utilities}`), `@tanstack/react-query`, `lucide-react`, `recharts`, `clsx`, `date
 `dom-serializer`, `domutils` — 16 packages. (The canvas editor + icons are custom.)
 
 ## Misleading docs fixed (engineers are pointed here)
-- `docs/DB_SCHEMAS.md` — self-labeled "Authoritative" but frozen at mig 108 and listing
+- `docs/archive/DB_SCHEMAS.md` — self-labeled "Authoritative" but frozen at mig 108 and listing
   dropped tables → added a strong ⚠ stale-snapshot banner (source of truth is `db/migrations/`).
 - `docs/DEVELOPMENT_STANDARDS.md` — repointed the "authoritative architecture" ref from
   ARCHITECTURE_V9 to V10.
@@ -60,7 +60,7 @@ utilities}`), `@tanstack/react-query`, `lucide-react`, `recharts`, `clsx`, `date
   release path), `shredder/sync_extract.py` (backs a frontend tool whose `/internal/shred/
   sync` HTTP endpoint isn't in-repo yet). **Pending-wiring for the automation phase** — a
   product decision, not a blind delete.
-- Remaining doc nits: `docs/API_REFERENCE.md` endpoint table, `STORAGE_LAYOUT.md`,
+- Remaining doc nits: `docs/archive/API_REFERENCE.md` endpoint table, `STORAGE_LAYOUT.md`,
   `CLAUDE_CLIFFNOTES.md §731` (tenant_pipeline_items.total_score) — minor, self-correcting.
 
 ## Frontend dead code (orphaned modules — verified 0 importers, deleted)

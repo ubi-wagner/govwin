@@ -3,7 +3,7 @@
 **Status:** authoritative design for the open-to-close proposal process and the cost-control
 substrate shipped in the current development push. Integrates with `ARCHITECTURE_V9.md`
 (system as-built), `CLAUDE.md` (SOPs), and `CLAUDE_CLIFFNOTES.md` (schema/route quick-ref).
-Companion: `docs/PROPOSAL_LIFECYCLE_TODO.md` (Red→Green task tracker).
+Companion: `docs/archive/PROPOSAL_LIFECYCLE_TODO.md` (Red→Green task tracker).
 
 **Verification baseline (this push):** tsc clean · 429 frontend tests · 524 pipeline tests ·
 lint clean on changed files. RBAC, volume identity, and schema independently re-verified

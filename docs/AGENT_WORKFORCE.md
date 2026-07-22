@@ -31,7 +31,7 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
-**Then the fabric grew to 19 (#127–#129, see `docs/AGENT_ROADMAP.md`)** — 9 new agents on the same
+**Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
 
 | Agent | Scope | Wakes on | What it does |
@@ -175,7 +175,7 @@ the trusted tenant, and — for the step actors — it is an independent `AI_INV
 the workflow). LLM reasoning runs live on deploy (Railway key).
 
 **Next:** the two foundation items in §7 (NOBYPASSRLS agent role + `app.tenant_id`; guardrail-gated landing),
-then the **master-side + onboarding batch** — see `docs/AGENT_ROADMAP.md`.
+then the **master-side + onboarding batch** — see `docs/archive/AGENT_ROADMAP.md`.
 
 ## 7. Landing + security (CONFIRMED — applies to all agents)
 

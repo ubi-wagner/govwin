@@ -10,7 +10,7 @@ that have been caught and fixed.
 **Proposal lifecycle + AI cost controls (current push):** `docs/PROPOSAL_LIFECYCLE_V1.md` is the
 authoritative design for the open-to-close proposal process (per-section accept/lock, lock-state
 advance gate, document-close, per-section library harvest) and settable AI limits;
-`docs/PROPOSAL_LIFECYCLE_TODO.md` tracks remaining Red→Green work. Schema since the 067 baseline:
+`docs/archive/PROPOSAL_LIFECYCLE_TODO.md` tracks remaining Red→Green work. Schema since the 067 baseline:
 mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library_atom_outcomes`
 `UNIQUE(unit_id, proposal_id)`), **074** (`proposal_sections`: `is_locked`, `locked_at`,
 `locked_by`, `volume_name`, `volume_number`), **075** (`section_standards` taxonomy +
@@ -26,7 +26,7 @@ mig **072** (`tenant_agent_config` / `platform_agent_config`), **073** (`library
 The schema is defined across **69 migrations (000–067, plus the interleaved
 `030a_ensure_full_schema.sql`)** — highest numbered file is `067`. This
 produces **72 live tables across 14 domains**. Full per-table detail:
-`docs/baseline/inventory/DB_SCHEMA_CURRENT.md`.
+`docs/archive/baseline/inventory/DB_SCHEMA_CURRENT.md`.
 (Prior docs said "53 / 051" or "40 / 039" — both stale/wrong.)
 > **⚠ high-water is now `108`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
 > dated deltas below: §1b (migs 088–092), §1c (migs 094–103), and **As-built delta — 2026-07-15**
@@ -1217,7 +1217,7 @@ the **human edge** was broken in several places. The durable truths:
 ## V1 build — schema deltas (2026-06-27, migrations 083–085)
 
 New tables/columns from the V1 build (chain validated 001→085 on live PG). Verify column names here
-before writing SQL against them. Full journal: `docs/V1_TASKING.md` §11.
+before writing SQL against them. Full journal: `docs/archive/V1_TASKING.md` §11.
 
 - **`proposal_artifacts`** (mig 083): `id, proposal_id (FK CASCADE), volume_id, volume_number,
   volume_name, artifact_type (narrative|cost|form|matrix|other), format_spec JSONB, compliance_spec
@@ -1236,7 +1236,7 @@ before writing SQL against them. Full journal: `docs/V1_TASKING.md` §11.
 
 ---
 
-## 4b. Common Mistakes — hidden-bug sweep, 2026-06-29 (full report: docs/V1_SWEEP_FINDINGS_2026-06-29.md)
+## 4b. Common Mistakes — hidden-bug sweep, 2026-06-29 (full report: docs/archive/V1_SWEEP_FINDINGS_2026-06-29.md)
 
 ### Mistake 18: jsonb written `JSON.stringify(x)::jsonb` reads back as a STRING
 **The single most damaging class found.** A jsonb column written `${JSON.stringify(x)}::jsonb`
@@ -1370,7 +1370,7 @@ opportunity_lifecycle_actions.action CHECK += 'set_stage'
 library_atoms  (RLS FORCE — the greenfield atom store; the SOLE customer library.
                The atomize→mold→draft→return loop runs entirely on this table; the legacy
                `library_units` family was DROPPED in mig 121 — no library_units reads/writes
-               remain anywhere. History: docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
+               remain anywhere. History: docs/archive/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
   id, tenant_id (FK), grain CHECK IN ('primitive','group','reference'),
   title, content (TEXT), canvas_nodes (JSONB — CanvasNode[]), summary,
   word_count, char_count, member_summary (JSONB — count-by-kind for groups),
@@ -1461,8 +1461,8 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
 2026-07-15 delta at the end of this file.* (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
 index). The greenfield spine (ingest → skeleton → push → signup-mirror → provision-with-template → release →
 build → lock → download) is **driven-green end-to-end** — verified as RFP-admin→shadow→**Immobileyes**
-(`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/ALPHA_ARCHITECTURE_ASBUILT.md`,
-`docs/ALPHA_TODO_BACKLOG.md`, `docs/ALPHA_HITL_RUNBOOK.md`.
+(`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/archive/ALPHA_ARCHITECTURE_ASBUILT.md`,
+`docs/archive/ALPHA_TODO_BACKLOG.md`, `docs/ALPHA_HITL_RUNBOOK.md`.
 
 ### Two verified bug-class lessons (definitively reproduced, not reasoned)
 - **Mistake 39 — `${JSON.stringify(x)}::jsonb` is ALWAYS a jsonb STRING SCALAR here** (objects AND arrays):
@@ -1477,7 +1477,7 @@ build → lock → download) is **driven-green end-to-end** — verified as RFP-
 ### Manager/anti-lie protocol
 Dispatched verifier agents contradicted each other on identical code; the main loop reproduced in the sandbox
 to settle it. Standard: a finding is trusted only after (a) an adversarial verifier that reproduces AND
-(b) a sandbox reproduction. Encoded in the bug-hunt workflow + `docs/ALPHA_TODO_BACKLOG.md` Tier 3.5.
+(b) a sandbox reproduction. Encoded in the bug-hunt workflow + `docs/archive/ALPHA_TODO_BACKLOG.md` Tier 3.5.
 
 ---
 

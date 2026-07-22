@@ -13,7 +13,7 @@ enumerated in §6 as the generalization delta.
 
 Canonical companions: `ARCHITECTURE_V10.md` (as-built spine), `docs/MASTER_MIRROR_OPP_DESIGN.md`
 (opp → purchase → curation → proposal), `docs/CANVAS_DOCUMENT_ARCHITECTURE.md` (mold),
-`docs/CRM_CMS_PHASE1.md` (the CMS/CRM engine), `docs/AGENT_FABRIC_DESIGN.md` (workforce),
+`docs/archive/CRM_CMS_PHASE1.md` (the CMS/CRM engine), `docs/AGENT_FABRIC_DESIGN.md` (workforce),
 `docs/AUTOMATION_DESIGN.md` (events/rules).
 
 ---
@@ -143,7 +143,7 @@ ship. That sentence has nothing to do with proposals.**
 
 The columns differ only in **vocabulary and producers**. Every *row* is the same code.
 The MARCOM column is the closest to shipping because the **CMS/CRM engine already exists**
-(`services/cms/`, `docs/CRM_CMS_PHASE1.md`): email, content pipeline, social, campaigns,
+(`services/cms/`, `docs/archive/CRM_CMS_PHASE1.md`): email, content pipeline, social, campaigns,
 page-block editor, its own `govtech_cms` DB, bridged by `system_events`. The delta there is
 not "build a portal" — it is "route the CMS content pipeline through P1/P2" so marketing
 collateral flows the same atomize→mold→draft→lock→harvest loop instead of a parallel one.

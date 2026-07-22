@@ -221,7 +221,10 @@ The spine is built; these are the wiring jobs on top of clean rivers:
 1. **Global automation policy layer (customer grammar → real trigger config).** The
    `recipients × trigger × timing × escalation` UI exists; land it as the per-tenant config
    that feeds `nudge_days`/`assignee_role`/`due_in_minutes` into instances (discovery notify
-   beats + build nudge cadence). *(The one genuinely-open piece.)*
+   beats + build nudge cadence). *(The one genuinely-open piece.)* **→ Full spec:
+   `docs/AUTOMATION_POLICY_DESIGN.md` (#190) — the `tenant_automation_policies` table, the
+   `resolveAutomationPolicy()` injection point, supersession of the 6-boolean prefs, the
+   agent-fabric integration, and the open gotchas.**
 2. **Cron dispatch** for the scheduled sweeper (nudge sweep + `OnSolicitationUpdateScan` +
    `OnOpsDigestRequested`) — confirm the cron cadence + the fail-safe (a missed tick just
    re-derives next tick; no state lost).
