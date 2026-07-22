@@ -24,8 +24,9 @@ Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest`
 the build UNLOCKED and instantiating the compliance matrix + molds from the master solicitation. The
 OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight discovery vs
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
-into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md** (migrations
-at 125). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
+as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 129). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.

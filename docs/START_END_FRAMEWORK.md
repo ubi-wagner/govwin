@@ -470,7 +470,7 @@ billing/team events, most `proposal`/`library` events, every `system:workflow.*`
 | `system:automation_framework.updated` | `automation-framework/route.ts:127` (tenantId ∅) | none — pure audit |
 | `proposal:review_todos.prestaged` | `prestage-todos.ts:117` (tenantId T) | none static |
 
-**⚠ The split-brain (§9/F-B):** the CMS listener’s notification gates read the **OLD**
+**⚠ The split-brain (§9/F-B — FIXED this pass; the CMS gate now reads `tenant_automation_policies`, see the §9 STATUS banner):** as-found, the CMS listener’s notification gates read the **OLD**
 `tenant_automation_preferences` *table* (`event_listener.py:255,282` — `notify_team_on_document_locked`,
 `notify_collaborators_get_ready`, `notify_on_stage_advanced`, `notify_on_new_priority_opp`), while #190’s
 grammar editor writes the **NEW** `tenant_automation_policies` table. mig 129 seeded NEW from OLD **once**;
@@ -515,7 +515,23 @@ re-deriving §1–§6:
 
 ---
 
-## 9. Known gaps & doc-vs-code drift (as-built truth)
+## 9. Findings from the deepest-review sweep — resolved + residual
+
+> **STATUS (post-refactor).** The mapping + adversarial sweep below was executed and acted on.
+> **Fixed & verified:** **B1/B2** (bridge made forward-only + race-safe version allocation), **C1/C2**
+> (agent RFP-injection fence + guardrail actually enforced at the draft-landing site), **F-B/A1** (the
+> split-brain — CMS notifier repointed to `tenant_automation_policies` as the single source of truth, old
+> route retired 410; **sandbox-proven**), **A2/A3** (dead framework knobs no longer persisted; tenant "Who"
+> now drives the review-ToDo assignee), **C5** (agent memory/section reads fail *closed* on a null tenant),
+> **B3** (timeout escalation fires only on a real fail), **F-A** (dead `autoScoreCard` removed), and the
+> **D-Engine-1/2/3 + CLAUDE.md** doc corrections. **Not a bug:** **F-D** — the live seed is already 25/25
+> (mig **123** lifted it; the mapper read mig 098 alone). **Residual (deferred + documented, not
+> regressions):** **C3** (agent rate/budget TOCTOU — small concurrent overshoot; needs an atomic
+> reserve-at-claim, the hard caps still bind), **C4** (±15 clamp sidecar — advisory-only, latent), and the
+> by-design Phase-C gaps (discovery NOTIFY beats, the no-bucket fallback ③, cron delivery ⑥, the ④ bridge
+> conversation). The as-found detail is retained below as the record.
+
+### 9a. As-found detail (the record)
 
 Proven findings from the mapping sweep — carried into the refactor. **F-** = code finding; **D-** = doc drift.
 

@@ -1,5 +1,12 @@
 # The Agent Workforce — wiring, oversight, tenant-discretion (#117)
 
+> **As-built correction (deepest-review sweep).** See **docs/START_END_FRAMEWORK.md** §4 for the verified
+> agent×scope map. Corrections: every one of the 25 archetypes now has a concrete invocation site (a
+> producer or an `AI_INVOKE` step) — the "15 dormant" framing is stale; `research_scout` is invocable via a
+> queue producer (`ai/research/route.ts`), just not as an `AI_INVOKE` step. The injection fence was hardened
+> this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
+> `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
+
 **Audience:** RFP-admin ops (setup + monitoring), engineering (wiring), marketing (how to talk about it).
 **As-built:** the pipeline `AgentFabric` auto-registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
 `fabric.py`) — **dormant ≠ dead**: all are registry-wired and invocable; "dormant" means only that no

@@ -1,5 +1,12 @@
 # Design — Master OPP → Mirrored Cards → Purchase → Curation → Proposal V0→V1
 
+> **As-built correction (deepest-review sweep).** The verified bridge map (both directions, every message)
+> is **docs/START_END_FRAMEWORK.md** §3. Two corrections to this design doc: (1) card scoring is **NOT**
+> done inside the fan-out transaction — it is tenant-side + event-driven (`applyToTenant` emits
+> `capture:card.applied` → pipeline `OnCardApplied` → `rescore.py`); the former in-tx `autoScoreCard` was
+> dead code and has been removed. (2) The fan-out apply is now genuinely forward-only (a stale out-of-order
+> apply no longer regresses a tenant card) and version allocation is race-safe.
+
 > **AS-BUILT UPDATE (#117, 2026-07-19) — agents on the bridge.** The tenant-space AI agents (scoring,
 > analysis, drafting, packaging, …) are **part of the forward-only bridge**: they act **inside a single
 > tenant's mirror** (tenant-bound, tenant_user authority — the trusted task tenant, never model-chosen), and
