@@ -69,8 +69,8 @@ VIA  <channel>                email (today) | in-app todo | both
   `user_ids`, the sentinel `delegated_managers` (portal `guardrail_config` managers — who carry admin
   authority on that portal, decision ②), and `collaborators_at_stage` (the `proposal_collaborators` for the
   gate's stage). **The escalation floor is NOT a recipient — it is a floor** (decision ①): recipients are
-  *added on top of* the floor. The floor itself is **delegated managers, then the RFP-Pipeline shadow
-  admin** if no manager is active — never removable.
+  *added on top of* the floor. The floor is the **tenant admin (always, non-removable) + delegated managers
+  + the RFP-Pipeline shadow backstop** — an admin can add managers but can never delegate themselves off it.
 - **Trigger (which event).** A `trigger_key` = a namespaced lifecycle event (`capture:card.applied`,
   `proposal:proposal.advanced`, `proposal:document.locked`, `finder:solicitation.pushed`, …). Optional
   `condition` predicate over the event payload (reuses `conditionsMatch()` from `lib/automation/match`).
@@ -200,8 +200,8 @@ per-trigger policy editor, still `tenant_admin`-gated, still emitting `capture:a
 - Each row: an **on/off** (the old boolean, preserved), then **Who** (role chips + user picker +
   "delegated managers"), **When** (a due window or a "before close date" offset), **Escalate** (a nudge
   cadence builder, e.g. `[1,3,5]`), **How** (email / todo / both).
-- **The escalation floor is shown as a locked, non-removable chip** ("Your managers — and RFP-Pipeline if
-  none — always get the final notice") so the invariant is visible, not hidden (decision ①).
+- **The escalation floor is shown as a locked, non-removable chip** ("You (admin) always get the final
+  notice — add managers to share it") so the invariant is visible, not hidden (decision ①).
 - RFP-admin sees the **same editor in shadow** (already how `/manage` works) plus a platform-default
   view under `/admin/automation`.
 
@@ -287,11 +287,14 @@ they may spend — one grammar for humans and agents.
 All nine review items are decided; the rest of this doc is updated to match. §12 (three-level tunability)
 and §13 (portal-build & templating) carry the structural decisions from ⑦.
 
-**① Escalation floor = delegated managers, then the RFP-Pipeline shadow admin.** The terminal nudge goes
-to the portal's **delegated managers** (who carry admin authority — see ②); if none are active it falls
-back to the **RFP-Pipeline shadow admin** ("us") as the ultimate backstop. So the floor is "a manager who
-can act, else the platform" — never the void, and not hostage to one tenant admin being active.
-`_final_notice_user_ids` is updated: managers first, platform-shadow fallback.
+**① Escalation floor = the tenant admin (ALWAYS) + delegated managers + the RFP-Pipeline shadow backstop.**
+The tenant admin is the **non-removable default on every final nudge** — they may *add* managers but can
+**never offload accountability** and drop themselves (an admin who delegates duties to managers is *still*
+notified). Delegated managers are **additive** on top; the **RFP-Pipeline shadow admin** ("us") is the
+ultimate backstop when a tenant has no active admin/manager. So the floor is **admin-always ∪ managers ∪
+platform-backstop** — never removable, never the void. (`_final_notice_user_ids` already always includes
+the tenant admin + portal managers; the only change is adding the RFP-Pipeline-shadow backstop for the
+no-active-recipient case.)
 
 **② Two engines — CONFIRMED, and it holds even though managers are admins.** Managers-as-admins is a
 *recipient / authority* fact (a delegated manager resolves with tenant_admin authority **on that portal**),
@@ -306,15 +309,24 @@ OPP sits in a bucket, that bucket's parameters (which we expand over time) defin
 the predicate. With **no** bucket, priority = a match against the tenant's **company profile** + proximity
 to the **close date**. No separate fixed predicate table.
 
-**④ RLS cutover — IN SCOPE, via shadow-down. Concur, with one addition.** Access model:
+**④ RLS cutover — IN SCOPE, via shadow-down; cross-tenant goes over the BRIDGE, not a content-BYPASS.**
+Access model:
 - RFP admin **shadows down** into a tenant portal (sets `app.tenant_id` to that tenant).
 - Tenant admin shadows down into **their own** proposals.
 - Everyone else lives at the **company (tenant) level** or as a **collaborator on a specific portal**.
-Every actor is tenant-scoped, so the resolver's reads are correct under `NOBYPASSRLS`. **Addition (the one
-thing shadow-down doesn't cover):** aggregate **cross-tenant** reads — the RFP-Pipeline platform dashboards
-and the CMS `matched_opportunities` bridge — can't shadow down to one tenant; they run on an
-**owner-view / BYPASS** connection. So: shadow-down for per-tenant work, owner-views for platform-wide
-reporting. With that, concur — and this promotes the RLS cutover from "item #9, later" to in-scope.
+Every actor is tenant-scoped, so the resolver's reads are correct under `NOBYPASSRLS`. **Cross-tenant is a
+bridge conversation, never a cross-tenant SELECT of tenant data.** The platform ↔ tenant exchange runs over
+the forward-only bridge as one of two shapes, and carries **system + solution information only — never
+content** (the master-mirror invariant, generalized):
+- **(a) information: request DOWN → response UP** — cron or on-demand (e.g. "how many active cards / open
+  gates?"). The tenant scope answers with counts/status; the platform aggregates the **answers**, not the rows.
+- **(b) control-tuning: update DOWN → ACK/NAK UP** — a framework/control change from the RFP-admin control
+  plane (§12) pushed down; the tenant scope applies it and returns ACK/NAK.
+So platform dashboards aggregate **bridge system-info** the tenant pushed up (no BYPASS read of tenant
+tables), and genuinely per-tenant reads (e.g. CMS `matched_opportunities`, already `WHERE tenant_id=$1`)
+run tenant-scoped. **Net: no content-reading BYPASS connection is needed at all** — cleaner than owner-views,
+RLS stays pure, and it's the same "system/solution info up, no customer data" rule the OPP bridge already
+enforces. Concur — and this makes the RLS cutover a bridge-wiring job, not a BYPASS-carve-out.
 
 **⑤ No card without dates — the null anchor is designed out.** An OPP card **cannot be created without an
 open AND a close date**, and **may never pass its expected open date without an expected close date**
