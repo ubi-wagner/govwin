@@ -48,6 +48,7 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [includeClosed, setIncludeClosed] = useState(false);
   const [purchaseCard, setPurchaseCard] = useState<Card | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>('pinned');
@@ -56,24 +57,33 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
     setLoading(true);
     try {
       const res = await fetch(`/api/portal/${tenantSlug}/cards${includeClosed ? '?includeClosed=true' : ''}`);
-      if (res.ok) setCards((await res.json()).data?.cards ?? []);
-    } catch { /* keep */ } finally { setLoading(false); }
+      if (res.ok) { setCards((await res.json()).data?.cards ?? []); setErr(null); }
+      else setErr('Could not load your opportunity cards.');
+    } catch { setErr('Could not load your opportunity cards.'); } finally { setLoading(false); }
   }, [tenantSlug, includeClosed]);
 
   useEffect(() => { load(); }, [load]);
 
   const act = useCallback(async (opp: string, method: 'POST' | 'DELETE', qs = '') => {
-    setBusy(opp);
+    setBusy(opp); setErr(null);
     try {
-      await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pin${qs}`, { method });
+      const res = await fetch(`/api/portal/${tenantSlug}/cards/${opp}/pin${qs}`, { method });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setErr(j.error || 'That action could not be completed — please try again.');
+        return;
+      }
       await load();
-    } catch { /* ignore */ } finally { setBusy(null); }
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(null); }
   }, [tenantSlug, load]);
 
   const sorted = useMemo(() => sortCards(cards, sortBy), [cards, sortBy]);
 
   return (
     <div>
+      {err && (
+        <div className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{err}</div>
+      )}
       <div className="flex items-center gap-3 mb-4 text-sm">
         <label className="flex items-center gap-1.5 text-gray-600">
           <input type="checkbox" checked={includeClosed} onChange={(e) => setIncludeClosed(e.target.checked)} /> Include closed

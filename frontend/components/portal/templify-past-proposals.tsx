@@ -193,8 +193,7 @@ function TemplifyForm({
   if (done !== null) {
     return (
       <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-800">
-        Template saved — {done} section skeleton. Find it under <span className="font-medium">Templates</span>,
-        or use <span className="font-medium">New draft</span> to start from it.
+        Template saved — {done} section skeleton. Use <span className="font-medium">New draft</span> to start a document from it.
       </div>
     );
   }

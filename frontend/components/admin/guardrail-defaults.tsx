@@ -9,6 +9,7 @@ export default function GuardrailDefaults() {
   const [defaults, setDefaults] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -23,11 +24,12 @@ export default function GuardrailDefaults() {
   useEffect(() => { load(); }, [load]);
 
   const save = useCallback(async () => {
-    setBusy(true); setSaved(false);
+    setBusy(true); setSaved(false); setErr(null);
     try {
       const res = await fetch('/api/admin/guardrail-defaults', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limits }) });
       if (res.ok) setSaved(true);
-    } catch { /* ignore */ } finally { setBusy(false); }
+      else { const j = await res.json().catch(() => ({})); setErr(j.error || 'Could not save the limits.'); }
+    } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
   }, [limits]);
 
   const field = (k: keyof Limits, label: string) => (
@@ -48,6 +50,7 @@ export default function GuardrailDefaults() {
       <div className="flex items-center gap-3">
         <button disabled={busy} onClick={save} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-2 disabled:opacity-50">{busy ? 'Saving…' : 'Save limits'}</button>
         {saved && <span className="text-sm text-green-700">Saved ✓</span>}
+        {err && <span className="text-sm text-red-500" role="alert">{err}</span>}
       </div>
       {defaults && (
         <div className="pt-2 border-t border-gray-100">

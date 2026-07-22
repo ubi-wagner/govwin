@@ -248,7 +248,7 @@ export function ManageConsole({
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-3">
-            Per-surface access (bucket pinning, library editing, workflow actors) is granted in those admins. Tenant-level collaborator management arrives next.
+            Per-surface access (bucket pinning, library editing, workflow actors) is granted in those admins.
             {' '}<Link href={`/portal/${tenantSlug}/team`} className="text-indigo-600 hover:underline">Full team page →</Link>
           </p>
         </DrawerShell>

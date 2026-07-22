@@ -15,6 +15,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { readDocument } from '@/lib/import';
 import { textOfNodes } from '@/lib/atom-size';
 import { createAtom } from '@/lib/atoms';
+import { emitEventSingle, userActor } from '@/lib/events';
 
 // The import readers use the legacy 18-value category vocab; map the obvious ones to a
 // vol: value so the atomizer can pre-suggest a (confirmable) tag. Unknown → no suggestion.
@@ -31,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const session = await auth();
     if (!session?.user) return NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 });
-    const u = session.user as { id?: string; role?: unknown };
+    const u = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
     if (!hasRoleAtLeast(role, 'tenant_user')) return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
@@ -69,6 +70,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         // 'collaborator', not 'admin'. createAtom stamps owner_user_id = uploader.
       }, { id: u.id, kind: hasRoleAtLeast(role, 'tenant_admin') || role === 'rfp_admin' || role === 'master_admin' ? 'admin' : 'collaborator' });
       referenceAtomId = ref.atomId;
+      try {
+        await emitEventSingle({
+          namespace: 'library',
+          type: 'atom.created',
+          actor: userActor(u.id!, u.email ?? undefined),
+          tenantId,
+          payload: { atomId: ref.atomId, grain: 'reference', source: 'upload', status: 'approved' },
+        });
+      } catch (evtErr) {
+        console.error('[atoms/upload] atom.created emit failed (non-fatal)', evtErr);
+      }
     } catch (e) {
       console.error('[atoms/upload] reference atom create failed (non-fatal)', e);
     }

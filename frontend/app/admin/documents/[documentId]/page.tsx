@@ -60,10 +60,6 @@ export default function DocumentEditorPage() {
   }, [documentId]);
 
   const handleExport = useCallback(async (doc: CanvasDocument, format: 'docx' | 'pptx' | 'xlsx' | 'pdf') => {
-    if (format === 'pdf') {
-      // PDF export not yet available — no-op instead of confusing alert
-      return;
-    }
     const res = await fetch(`/api/admin/documents/${documentId}/export`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

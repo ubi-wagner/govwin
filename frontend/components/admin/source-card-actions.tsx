@@ -555,12 +555,9 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
           >
             Open Site
           </button>
-          <button
-            onClick={() => setShowPasteModal(true)}
-            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm font-medium hover:bg-amber-500"
-          >
-            Paste Topics
-          </button>
+          {/* "Paste Topics" retired: pasted rows have no solicitation to attach to (topics
+              belong to an ingested solicitation), so the flow could never succeed. Use
+              "Upload PDFs" → the solicitation ingest, or +Add Topic on a solicitation. */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}

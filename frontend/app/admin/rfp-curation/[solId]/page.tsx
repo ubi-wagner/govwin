@@ -331,17 +331,18 @@ export default async function CurationWorkspacePage({ params }: Props) {
         t.slug AS tenant_slug,
         o.topic_number,
         o.title AS topic_title,
-        tpi.is_pinned,
-        tpi.created_at AS pinned_at,
+        toc.is_pinned,
+        COALESCE(toc.pinned_at, toc.created_at) AS pinned_at,
         p.id AS proposal_id,
         p.stage AS proposal_stage,
         p.created_at AS proposal_created_at
       FROM opportunities o
-      JOIN tenant_pipeline_items tpi ON tpi.opportunity_id = o.id AND tpi.is_pinned = true
-      JOIN tenants t ON t.id = tpi.tenant_id
-      LEFT JOIN proposals p ON p.opportunity_id = o.id AND p.tenant_id = tpi.tenant_id
+      JOIN tenant_opportunity_cards toc
+        ON toc.opportunity_id = o.id AND toc.is_pinned = true AND toc.lifecycle_status <> 'archived'
+      JOIN tenants t ON t.id = toc.tenant_id AND t.archived_at IS NULL
+      LEFT JOIN proposals p ON p.opportunity_id = o.id AND p.tenant_id = toc.tenant_id
       WHERE o.solicitation_id = ${solId}::uuid
-      ORDER BY tpi.created_at DESC
+      ORDER BY COALESCE(toc.pinned_at, toc.created_at) DESC
     `;
 
     customerInterest = interestRows.map((row) => ({

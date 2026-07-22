@@ -254,7 +254,7 @@ export default function BillingPanel({
             <span className="text-sm text-blue-800 font-medium">
               {totalConsultingHours} hour{totalConsultingHours !== 1 ? 's' : ''} purchased
             </span>
-            <span className="text-xs text-blue-600 ml-2">Schedule via your dashboard</span>
+            <span className="text-xs text-blue-600 ml-2">We&apos;ll email you to schedule.</span>
           </div>
         )}
 
