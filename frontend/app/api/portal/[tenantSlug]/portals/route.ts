@@ -16,7 +16,6 @@ import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
-import { createPortal, assumeShadowAdmin } from '@/lib/portal-launch';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { randomUUID } from 'crypto';
 
@@ -85,26 +84,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ error: 'Could not verify the opportunity', code: 'DB_ERROR' }, { status: 500 });
     }
 
-    const created = await createPortal(g.tenantId, opportunityId, proposalId, label, g.userId);
-    if (!created) {
-      return NextResponse.json({ error: 'A portal with that label already exists for this opportunity', code: 'CONFLICT' }, { status: 409 });
-    }
-    // T&C: RFP admins may act on this portal (role-based grant) until the customer accepts guardrails.
-    await assumeShadowAdmin(g.tenantId, created.portalId, { source: 't_and_c', grantedBy: g.userId });
-
-    // Audit-as-purchased: a $0 completed purchase so an RFP-Admin-approved free portal lands
-    // in the ledger exactly like a comp-code purchase (amount 0, marked as an admin grant).
-    // Hard part of the operation — we never leave an un-audited free build.
-    await withTenant(g.tenantId, async (tx) => {
+    // Create the portal + T&C shadow grant + $0 audit purchase ATOMICALLY (one transaction), so a
+    // transient failure of the purchase insert can never leave a committed portal/grant with NO
+    // audit row — the "never leave an un-audited free build" invariant (sweep B1-residual, was 3
+    // separate transactions). The opportunity was verified above, so the purchases FK is satisfied.
+    const outcome = await withTenant(g.tenantId, async (tx) => {
+      const [portal] = await tx<Array<{ id: string }>>`
+        INSERT INTO proposal_portals (tenant_id, opportunity_id, proposal_id, label, created_by)
+        VALUES (${g.tenantId}::uuid, ${opportunityId}::uuid, ${proposalId}, ${label}, ${g.userId})
+        ON CONFLICT (tenant_id, opportunity_id, label) DO NOTHING
+        RETURNING id`;
+      if (!portal) return { conflict: true as const };
+      // T&C: RFP admins may act on this portal (role-based grant) until the customer accepts guardrails.
+      await tx`
+        INSERT INTO shadow_admin_grants (tenant_id, portal_id, admin_user_id, admin_email, source, granted_by)
+        VALUES (${g.tenantId}::uuid, ${portal.id}::uuid, NULL, NULL, 't_and_c', ${g.userId})`;
+      // Audit-as-purchased: a $0 completed purchase so an RFP-Admin-approved free portal lands
+      // in the ledger exactly like a comp-code purchase (amount 0, marked as an admin grant).
       await tx`
         INSERT INTO purchases
           (tenant_id, opportunity_id, product_type, amount_cents, status, promo_code, metadata)
         VALUES (
           ${g.tenantId}::uuid, ${opportunityId}::uuid, ${productType}, 0, 'completed',
-          NULL, ${tx.json({ comp: true, grant: 'admin', portalId: created.portalId, approvedBy: g.userId })}
-        )
-      `;
+          NULL, ${tx.json({ comp: true, grant: 'admin', portalId: portal.id, approvedBy: g.userId })}
+        )`;
+      return { portalId: portal.id };
     });
+    if ('conflict' in outcome) {
+      return NextResponse.json({ error: 'A portal with that label already exists for this opportunity', code: 'CONFLICT' }, { status: 409 });
+    }
+    const portalId = outcome.portalId;
 
     // portal.created (lifecycle) + purchase.completed (revenue/audit + the admin automation).
     await emitEventSingle({
@@ -112,7 +121,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       type: 'portal.created',
       actor: userActor(g.userId, g.email ?? undefined),
       tenantId: g.tenantId,
-      payload: { portalId: created.portalId, opportunityId, proposalId, status: 'guardrails_pending' },
+      payload: { portalId: portalId, opportunityId, proposalId, status: 'guardrails_pending' },
     });
     try {
       await emitEventSingle({
@@ -120,12 +129,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         type: 'purchase.completed',
         actor: userActor(g.userId, g.email ?? undefined),
         tenantId: g.tenantId,
-        payload: { correlationId: randomUUID(), productType, opportunityId, portalId: created.portalId, comp: true, grant: 'admin' },
+        payload: { correlationId: randomUUID(), productType, opportunityId, portalId: portalId, comp: true, grant: 'admin' },
       });
     } catch (evtErr) {
       console.error('[portal/portals] purchase.completed emit failed (non-fatal)', evtErr);
     }
-    return NextResponse.json({ data: { portalId: created.portalId, label, status: 'guardrails_pending', comp: true } });
+    return NextResponse.json({ data: { portalId: portalId, label, status: 'guardrails_pending', comp: true } });
   } catch (err) {
     console.error('[portal/portals] POST error', err);
     return NextResponse.json({ error: 'Failed to create portal', code: 'DB_ERROR' }, { status: 500 });
