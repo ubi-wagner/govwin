@@ -728,13 +728,17 @@ visibility rules.
 in the list (tagged `status: 'hidden'`) so admins can see the full structure.
 
 ### Mistake 16: Recomputing scores in the frontend
-The Spotlights page uses `tenant_pipeline_items.total_score` as the
-authoritative score when available. It falls back to lightweight estimation
-(labeled "Est." in the UI) only for items not yet scored by the pipeline.
+⚠️ **REPOINTED (mig 125 dropped `tenant_pipeline_items`).** The authoritative
+per-tenant score now lives on the card spine: `tenant_opportunity_cards.rank_score`
+(overall) + per-bucket `tenant_bucket_scores`, auto-scored on bridge arrival. The
+legacy Spotlights/Pipeline pages `redirect()` to `/cards`. The original guidance —
+"use the stored pipeline score, don't recompute in the frontend" — still holds; only
+the source column moved. See Mistake 38 for the full retirement.
 
 **Rule:** Do NOT recompute opportunity scores from scratch in the frontend.
-Use `tenant_pipeline_items.total_score` when present. Only the pipeline
-scoring engine should compute full scores.
+Read `tenant_opportunity_cards.rank_score` / `tenant_bucket_scores` (never the
+dropped `tenant_pipeline_items.total_score`). Only the pipeline scoring engine
+computes full scores.
 
 ### Mistake 17: Hardcoded instance deadline kills HITL (RESOLVED as of baseline)
 This was a live bug: `manager.create_instance` had a hardcoded 1h deadline. As of the
@@ -819,8 +823,11 @@ BAA (e.g. 65 DSIP topics, each its own `opportunities` row with `solicitation_id
 got pushed once and **zero topics reached customers' Spotlight**. Fixed (M1): push
 activates, and scoring scores, the whole **topic SET** = `opportunities WHERE
 solicitation_id = cs.id OR id = cs.opportunity_id` (scoring additionally filters
-`is_active AND close_date future`); one `tenant_pipeline_items` upsert per
-(tenant, opportunity).
+`is_active AND close_date future`). ⚠️ **Spine update:** the fan-out target is no
+longer `tenant_pipeline_items` (dropped, mig 125) — `solicitation.push` now fans
+every activated topic onto the forward-only `opportunity_bridge` → one
+`tenant_opportunity_cards` row per (tenant, opportunity), auto-scored into
+`tenant_bucket_scores`. The topic-SET rule below is unchanged.
 
 **Rule:** anything that "acts on a solicitation's opportunities" (activation,
 scoring, spotlight reads, counts) must operate on the topic SET, never just
@@ -946,8 +953,52 @@ global buckets).
 - **Rule:** new customer-facing opportunity/ranking reads target `tenant_opportunity_cards` +
   `tenant_bucket_scores` via `withTenant()` (RLS GUC). Do NOT add readers of `tenant_pipeline_items` or
   `spotlight_bucket_scores` on the customer surface — this supersedes Mistake 16's
-  `tenant_pipeline_items.total_score` guidance there. (Admin `v_opportunity_rollup` still joins
-  `tenant_pipeline_items` for the control-tower rollup — that path is untouched.)
+  `tenant_pipeline_items.total_score` guidance there.
+- **UPDATE (mig 125):** `tenant_pipeline_items` is now **DROPPED** — there is no reader left anywhere.
+  The last two live reads were repointed: the admin `v_opportunity_rollup` view was **rebuilt on
+  `tenant_opportunity_cards`** (ranked/pinned tenant counts now come from cards), and the admin
+  rfp-curation "Customer Interest" panel + CMS `matched_opportunities` template var were repointed to
+  cards. ⚠️ Those admin/CMS reads are **direct cross-tenant reads on an RLS-FORCED table** — fine today
+  (app runs as the RLS-bypassing owner) but on the `govtech_app` (NOBYPASSRLS) cutover they must run on a
+  BYPASSRLS connection or through owner-views. See the RLS-cutover checklist in
+  docs/DEPRECATION_CLEANUP_2026-07-22.md.
+
+### Mistake 39: `next/dynamic({ ssr: false })` does NOT forward `ref` (React 19 / Next 15.5)
+The lazy component returned by `next/dynamic` is NOT a `forwardRef` — passing `ref` to it does
+**not** reach your inner component. In Next 15.5 the dynamic wrapper writes its own loader state to
+`ref.current` (`{ retry }`), so a parent that reads `ref.current` gets a **truthy non-handle**: the
+guarded UI (e.g. a "highlight source" button) renders, then throws `TypeError` on click when it calls
+a method the handle was supposed to expose. Discovered live in `pdf-viewer` after the SSR fix (below).
+- **Rule:** when a `next/dynamic({ ssr:false })` child must expose an imperative handle, pass it via a
+  **normal prop** (`innerRef`), NOT `ref`. Inside the child: `useImperativeHandle(innerRef ?? ref, …)`.
+  Never assume `ref.current` on a dynamically-imported component is your handle.
+
+### Mistake 40: react-pdf / pdfjs crash SSR at module-eval → whole surface white-screens
+`react-pdf` (and any lib that touches browser globals or sets `pdfjs.GlobalWorkerOptions.workerSrc` at
+**module top-level**) crashes during SSR. A `'use client'` directive does NOT prevent SSR — Next still
+server-renders client components on the initial request, so a **static** `import { PdfViewer }` inside a
+client component evaluates the pdfjs module server-side and throws, taking down the entire parent tree
+("Something went wrong"). This white-screened the whole curation workspace.
+- **Rule:** load browser-only libs through `next/dynamic(() => import('./x').then(m => m.X), { ssr:false })`,
+  never a static import into a client component. (Then heed Mistake 39 for the ref.)
+
+### Mistake 41: FK-before-audit ordering — a bad id orphans the earlier writes
+A route that writes an FK-constrained column (e.g. `purchases.opportunity_id` → `opportunities`) in the
+same flow as a **non-FK soft-ref** write (`proposal_portals.opportunity_id` has NO FK) will, on a bad id,
+commit the soft-ref rows (portal + shadow account) and THEN 500 on the FK insert — leaving an
+**un-audited, orphaned** build and a wedged label. Found + fixed in `POST /api/portal/[slug]/portals`.
+- **Rule:** validate the FK target EXISTS (`SELECT id FROM opportunities WHERE id = $1::uuid`, 404 if
+  absent) **before** any soft-ref write in the flow. Order writes so the strictest constraint fails first,
+  or wrap the whole flow in one transaction so a late throw rolls back the earlier rows.
+
+### Mistake 42: "empty in the sandbox" is NOT a drop signal (table-retirement rule)
+Most empty tables are **live-but-unused** (no seed data yet), not dead. Dropping one because it's empty
+breaks the first real write. Drop a table ONLY when it is **superseded-with-a-named-successor AND has
+zero live code references** (grep frontend + pipeline + CMS). Mig 125 followed this; it deliberately
+**KEPT** `verification_tokens`, `invitations`, `agent_archetypes`, `rate_limit_state`,
+`system_health_snapshots` (all empty, all forward-live).
+- **Rule:** before any `DROP TABLE`, prove (a) a successor owns the data and (b) zero references across
+  all three services. Record the drop + the kept-but-empty list in the cleanup doc. Empty ≠ dead.
 
 ---
 
@@ -1056,7 +1107,7 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
 
 ### Agent Fabric (pipeline/src/agents/) — WIRED + context-bound + injection-hardened + tenant-isolated (PIPE-12–16); advisory output; real Claude + embeddings activate on-deploy
-- 10 archetypes auto-register; fabric is now passed to `run_workflow_processor()`; AI_INVOKE routes via `fabric.invoke_agent()`; `process_task_queue()` is scheduled as a 5th asyncio task. Two learning workflows wired: `OnProposalSectionEdited` → DiffAnalyzer; `OnProposalOutcomeRecorded` → OutcomeAttributor.
+- **25 archetypes** auto-register (this delta shipped with 10; #117 + batches A/B/C + POD4/CMS took it to 25); fabric is passed to `run_workflow_processor()`; AI_INVOKE routes via `fabric.invoke_agent()`; `process_task_queue()` is scheduled as a 5th asyncio task. Two learning workflows wired: `OnProposalSectionEdited` → DiffAnalyzer; `OnProposalOutcomeRecorded` → OutcomeAttributor.
 - Context-binding: ContextAssembler pre-loads proposal sections + RFP compliance + tenant library atoms before each agent call. User content is delimited by `<untrusted_data>` tags (prompt injection defense). All agent tools enforce `tenant_id`.
 - Output is advisory only — agent output is surfaced via NOTIFY/agent_task_log; never auto-applied to proposals.
 - Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in `fabric.invoke_agent`. Budget column is `monthly_budget` (dollars), NOT `max_cost_per_month_cents`. `human_gate` enforced.
@@ -1243,8 +1294,10 @@ wakes EVERY paused gate of that kind across proposals/users/tenants. Correlate t
   NEVER frozen, renders live) + `source_bucket TEXT`. + `stage` DEFAULT now `'draft'` (was CHECK-invalid `'outline'`).
 - **`contracts`** (mig 091): V2 scope. Keyed by `opportunity_id` (the spine) + `proposal_id` (winning proposal, partial
   unique). Carries `origin_card` forward. CHECK status `active|closed|terminated`.
-- **`v_opportunity_rollup`**: `GROUP BY opportunity_id` over `opportunities ⋈ tenant_pipeline_items ⋈ proposals ⋈ contracts`
-  — all `count(DISTINCT …)` (no fan-out). Counts are bigint → cast `::int` when consumed.
+- **`v_opportunity_rollup`**: `GROUP BY opportunity_id` over `opportunities ⋈ tenant_opportunity_cards ⋈ proposals ⋈ contracts`
+  — all `count(DISTINCT …)` (no fan-out). ⚠️ **Rebuilt by mig 125** — `ranked_tenants`/`pinned_tenants` now count
+  `tenant_opportunity_cards` rows (`lifecycle_status <> 'archived'`, `FILTER (WHERE is_pinned)`), NOT the dropped
+  `tenant_pipeline_items`. Counts are bigint → cast `::int` when consumed.
 - **`tasks`** (mig 053): now also written by HUMAN delegation (`createTask`, `process_instance_id` NULL → completeTask
   closes without resume) + date-anchored generation (`_sweep_date_anchored_tasks`, `task_type='final_due'`). `params.kind`
   (`upload|form|review`) selects the typed completer.
@@ -1314,10 +1367,10 @@ opportunity_lifecycle_actions.action CHECK += 'set_stage'
 
 ### Unified library — atoms + taxonomy + lineage + cocoons (migs 101–102)
 ```
-library_atoms  (RLS FORCE — the greenfield atom store; now the CANONICAL customer library.
+library_atoms  (RLS FORCE — the greenfield atom store; the SOLE customer library.
                The atomize→mold→draft→return loop runs entirely on this table; the legacy
-               `library_units` library is OBSOLETE — deprecate in phases, see
-               docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
+               `library_units` family was DROPPED in mig 121 — no library_units reads/writes
+               remain anywhere. History: docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md)
   id, tenant_id (FK), grain CHECK IN ('primitive','group','reference'),
   title, content (TEXT), canvas_nodes (JSONB — CanvasNode[]), summary,
   word_count, char_count, member_summary (JSONB — count-by-kind for groups),
@@ -1397,8 +1450,8 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
   derivative in place (matched `origin_section_id` + `source`) on re-lock — no duplicate; a parent's
   `usage_count` only bumps on a NEWLY inserted lineage edge. Driven proof: `e2e/fullloop.tenant.spec.ts`
   (whole loop) + `e2e/atomloop.tenant.spec.ts` (return + idempotency). The legacy `library_units`
-  harvest (`harvestSectionToLibrary`) still runs alongside but is obsolete — see
-  docs/LIBRARY_CONVERGENCE_STATUS_2026-07-03.md.
+  harvest (`harvestSectionToLibrary`) was removed with the mig-121 drop — `harvestSectionToAtomLibrary`
+  is now the only lock-time harvest path.
 
 ---
 
@@ -1486,6 +1539,20 @@ Comp-code purchase `POST /api/portal/[slug]/purchase` (code `rfppipelinetest`) �
 Namespaces unchanged (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`; still NEVER
 `admin`/`cms`/`spotlight`). New: `capture:purchase.completed`, `capture:workspace.released`,
 `content.document_archived`, `content.document_restored`, `proposal:proposal.ready_for_customer`.
+
+### Events — additions (2026-07-22 auditability sweep)
+The both-sides emission sweep raised path coverage to **97/97**. New/fixed types, all valid
+`entity.action_past_tense` under the 7 allowed namespaces:
+- `library:atom.created` — now emitted by **all three** atom producers: `POST /atoms` (manual),
+  `atoms/upload` (upload→reference), and `atomize-node` (annotate→atomize). Any new atom-creating path
+  must emit it too.
+- `library:section.atoms_selected` — emitted by `atoms/select` when a section's molding atoms are chosen
+  (records `meta.sourceAtomIds`).
+- `finder:tenant.created` — **fixed to `tenantId: null`** (admin-event convention — the new tenant UUID
+  rides in the payload, not the `tenantId` column). Any admin-side create emits with `tenantId: null`.
+- `capture:purchase.completed` — now ALSO fires for the **RFP-Admin comp free-portal** (`payload.grant='admin'`,
+  `comp:true`; `purchases.metadata.grant='admin'`). An admin-approved $0 portal audits **exactly like a paid
+  purchase** — same event, same `purchases` row.
 
 ### Content/build wiring
 Marketing pages render from `content_pages` (`getPageBlocks`). Re-seed chain: `frontend/scripts/gen-page-seeds.ts`

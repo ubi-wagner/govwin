@@ -31,6 +31,20 @@ Consolidated reference for all code quality rules, security standards, testing r
 - Every new file must have a header comment explaining its purpose and listing its `docs/*.md` reference.
 - No `// TODO` or `// FIXME` without an accompanying issue/PR reference.
 
+**Client-only library bug-classes (Next 15 App Router):**
+
+- **`next/dynamic({ ssr: false })` does NOT forward `ref`.** Next 15.5 assigns the loadable's own
+  object to `ref.current` (a truthy non-handle), so a parent that needs the child's
+  `useImperativeHandle` API gets garbage instead of the handle. Pass the imperative handle through a
+  normal prop (e.g. `innerRef`), never `ref`, when the component is loaded via `next/dynamic`. Fixed
+  in `components/rfp-curation/pdf-viewer.tsx` (the `innerRef` prop) with the dynamic caller in
+  `curation-workspace.tsx`.
+- **`react-pdf` / `pdfjs` crash SSR at module-eval.** They touch browser globals and set up the PDF
+  worker on import, which throws the instant Next server-renders the module — and a static import into
+  a `'use client'` component is *still* SSR'd. Load such client-only libraries via
+  `next/dynamic({ ssr: false })`, never a static import. (A static `react-pdf` import was crashing the
+  entire curation workspace.)
+
 ### Python (Pipeline)
 
 **Build gates:**
@@ -96,7 +110,7 @@ This order prevents information leaks (no `ValidationError` before auth check --
 - New tenant-scoped tables must include `tenant_id UUID NOT NULL REFERENCES tenants(id)` and an index on `tenant_id`.
 - Portal routes MUST verify tenant access -- never query by ID alone.
 
-**Tenant-scoped tables include:** `users`, `proposals`, `proposal_sections`, `proposal_comments`, `proposal_reviews`, `purchases`, `library_units`, `tenant_pipeline_items`, `tenant_profiles`, `spotlights`, `agent_task_queue`, `agent_memories`, `episodic_memories`, `tool_invocation_metrics`.
+**Tenant-scoped tables include:** `users`, `proposals`, `proposal_sections`, `proposal_comments`, `purchases`, `library_atoms`, `tenant_opportunity_cards`, `tenant_profiles`, `agent_task_queue`, `agent_memories`, `episodic_memories`, `tool_invocation_metrics`. (The retired `proposal_reviews`, `library_units`, and `tenant_pipeline_items` were dropped in migrations 121/125 — see the drop rule in §5.)
 
 ### Input Validation
 
@@ -137,6 +151,33 @@ const safeInput = input.replace(/[%_\\]/g, '\\$&');
 ---
 
 ## 3. Testing Matrix
+
+### Verification backbone (the standard change-verification sequence)
+
+Every change is verified through this exact sequence, in order. Each gate must pass before the
+next is meaningful — do not skip ahead:
+
+1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. Non-negotiable first gate.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**729/729** at
+   migration head 125). Run on every change, not just schema changes.
+3. **Migration (schema changes only)** — apply the new migration via the `db/migrations/migrate.mjs`
+   runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner is
+   idempotent (tracks applied files in `_migration_history`); re-running must be a clean no-op.
+4. **Build (risk changes)** — `cd frontend && npx next build` → **exit 0**. Catches ESLint, page-data
+   collection, and edge-runtime errors that `tsc` misses. Required for anything that touches page
+   structure, dynamic imports, the server/client boundary, or config.
+5. **Live drive** — Playwright-drive the changed surface against the running app. Specs live in
+   `frontend/e2e/*.spec.ts`; drive a single self-contained spec with
+   `npx playwright test e2e/<name>.spec.ts --project=tenant --no-deps` (or `--project=admin`). The
+   `--no-deps` flag skips the setup project so one spec runs standalone. A change is not verified
+   until its surface has been driven live.
+6. **Adversarial bug sweep (large changes)** — for large or cross-cutting changes, run an adversarial
+   multi-agent sweep that splits the diff by concern (API / React / SQL). Every reported finding must
+   be **PROVEN** — reproduced against the running app or the sandbox DB — not merely asserted. An
+   unproven "possible bug" is discarded, not filed.
+
+Sandbox DB coordinates: **`postgres://claude:claude@127.0.0.1:5433/govtech_intel`** (local PG16, trust
+auth). Migration head is **125**.
 
 ### Test Pyramid
 
@@ -311,7 +352,26 @@ Before writing SQL, verify column names in `CLAUDE_CLIFFNOTES.md` section 1. Thi
 - Destructive migrations (DROP, TRUNCATE) must be gated by `ALLOW_SCHEMA_RESET` checks.
 - New tables must include `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` and an update trigger.
 - New tenant-scoped tables must include `tenant_id UUID NOT NULL REFERENCES tenants(id)` with an index.
-- Migrations are applied via GitHub Actions workflow (`.github/workflows/migrate.yml`), not by the pipeline worker.
+- Migrations are applied via the `db/migrations/migrate.mjs` runner (GitHub Actions
+  `.github/workflows/migrate.yml` in CI; the same runner against the sandbox for local verification),
+  never by the pipeline worker.
+
+### Table Retirement (the drop rule)
+
+Drop a table ONLY when **both** conditions hold:
+
+1. It is **superseded by a named successor**, and
+2. It has **zero live code references** across every service (frontend + pipeline + CMS).
+
+**"Empty in the sandbox" is NOT a drop signal** — most empty tables are live-but-unused. Tables such
+as `verification_tokens` and `invitations` (auth/invite surface), `agent_archetypes` (agent workforce),
+`rate_limit_state`, and `system_health_snapshots` (monitoring) are intentionally inert and MUST NOT be
+dropped. Before dropping: grep every service for the table name, repoint any last live reads onto the
+successor, and in the same migration drop the orphaned indexes and rebuild any dependent views.
+Migration 125 dropped 12 superseded, zero-referenced tables (incl. `tenant_pipeline_items`,
+`proposal_reviews`, `solicitation_templates`) and rebuilt `v_opportunity_rollup` onto
+`tenant_opportunity_cards`; migration 121 dropped the `library_units` family (superseded by
+`library_atoms`).
 
 ### Pool Management
 
@@ -327,6 +387,12 @@ Before writing SQL, verify column names in `CLAUDE_CLIFFNOTES.md` section 1. Thi
 - Use `FOR UPDATE SKIP LOCKED` for job queue consumption (prevents double-processing).
 - Use `ON CONFLICT ... DO UPDATE SET ... WHERE` for upserts with change detection.
 - Use `RETURNING` to get generated values back from INSERT/UPDATE.
+- **FK-before-audit ordering.** When a route writes a hard-FK column (e.g.
+  `purchases.opportunity_id → opportunities`) alongside a soft-ref column that has NO FK (e.g.
+  `proposal_portals.opportunity_id`), validate the FK target exists BEFORE the soft write. Otherwise a
+  bad UUID commits the soft write, then the audit/FK-bearing INSERT throws the FK violation — orphaning
+  an un-audited row and 500-ing the request. See `app/api/portal/[tenantSlug]/portals/route.ts` (the
+  opportunity-existence check that precedes portal creation).
 
 ---
 

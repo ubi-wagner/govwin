@@ -1,7 +1,80 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-19 (identity COMPLETE + #117 agent workforce COMPLETE + #120 foundation + Batches A/B/C → 19 archetypes)
+**Last updated:** 2026-07-22 (launch-readiness sweep + deprecation cleanup + doc refresh → automation phase next)
 **Branch:** `claude/nice-hamilton-kBqtD`
+
+---
+
+## 0. LATEST — 2026-07-22 (launch-readiness → automation-prep; READ THIS FIRST)
+
+The last several days were a **both-sides launch-readiness pass** on top of the identity/agent work
+below. State entering the automation phase (task **#190**):
+
+**Verification (all green this session):** `tsc --noEmit` 0 · `vitest run` **729/729** · `next build`
+EXIT 0 · migrations apply clean through `migrate.mjs` (head = **125**) · adversarial 3-agent bug sweep
+(API/React/SQL) PROVED + fixed 2 HIGH bugs. This 6-step order IS the verification backbone (now codified
+in DEVELOPMENT_STANDARDS §3 / TESTING_STRATEGY / DEFINITION_OF_DONE).
+
+**Migrations 124–125 (new):**
+- **124 — SECURITY:** rotated `eric.c.wagner@gmail.com` (master_admin) off the committed `GovWin2026!`
+  to a random password (⚠️ **bcrypt hash only in git; the plaintext lives ONLY in chat** — `temp_password=true`
+  forces a reset on first login). Deactivated/hash-invalidated the `.test` seed accounts; archived the
+  `apex-defense` test tenant. Sorts after 041/051 to win any ON-CONFLICT re-apply.
+- **125 — dead-table drop:** dropped **12 superseded, zero-referenced** tables (`tenant_pipeline_items`,
+  `opportunity_events`, `customer_events`, `content_events`, `pipeline_runs`, `proposal_reviews`,
+  `solicitation_templates`, `tenant_uploads`, `tenant_actions`, `legal_document_versions`, `system_config`,
+  `collaborator_library_prefs`) + rebuilt the `v_opportunity_rollup` view onto `tenant_opportunity_cards`.
+  **Drop rule (codified):** superseded-with-a-successor AND zero live refs — "empty in the sandbox" is NOT a
+  drop signal. KEPT (empty but forward-live): `verification_tokens`, `invitations`, `agent_archetypes`,
+  `rate_limit_state`, `system_health_snapshots`.
+
+**UI-UX + auditability sweep (both sides, 17 fixes + 1 SSR crash) — verified live (Playwright):**
+- **Free "Open portal" bypass CLOSED:** `POST /api/portal/[slug]/portals` is gated to rfp_admin+, records a
+  $0 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed` → an **RFP-Admin-approved
+  free portal audits EXACTLY like a purchase**. Validates the opportunity exists first (FK-before-audit).
+- Silent-failure handlers now surface errors (proposal-admin-panel, pipeline-cards, source-detail, guardrail-defaults,
+  spotlight-summary-editor); post-submit unlock renders; honest cold-start card for base tenant_users; Stripe CTA
+  returns a friendly `STRIPE_NOT_CONFIGURED`; admin document PDF export wired.
+- **Auditability:** every state-changing action now emits a namespaced `system_event` (**97/97** on checked paths).
+  New/fixed types: `library:atom.created` (all 3 atom producers), `library:section.atoms_selected`,
+  `finder:tenant.created` fixed to `tenantId:null`, comp `capture:purchase.completed`.
+
+**Two HIGH bugs found+fixed by the adversarial sweep (both bug-classes now in CLIFFNOTES §4 Mistakes 39–42):**
+1. `next/dynamic({ssr:false})` does NOT forward `ref` (Next 15.5 writes `{retry}` to `ref.current`) → pass the
+   imperative handle via a normal `innerRef` prop. (pdf-viewer.)
+2. react-pdf/pdfjs crash SSR at module-eval → load via `next/dynamic({ssr:false})`, never a static import into a
+   client component. (This was white-screening the whole curation workspace.)
+Plus Mistake 41 (FK-before-audit ordering) + Mistake 42 (empty ≠ dead).
+
+**Deprecation/bloat cleanup:** removed 16 unused frontend npm deps (tiptap ×6, dnd-kit ×3, react-query,
+lucide-react, recharts, clsx, date-fns, dom-serializer, domutils); deleted dead code (`pipeline/src/scoring/`,
+`DEFAULT_CATEGORIES`, dead `STORAGE_ROOT` env) + 6 orphaned frontend modules. **Cataloged (NOT blind-deleted):**
+~28 no-caller API routes, 8 dead exports, 4 needs-review libs — a per-item decision in docs/DEPRECATION_CLEANUP_2026-07-22.md.
+
+**⚠️ Latent RLS-cutover item (NOT a current bug):** the retired-table repoints made two **direct cross-tenant
+admin/CMS reads** on `tenant_opportunity_cards` (RLS FORCED) — `app/admin/rfp-curation/[solId]` Customer Interest
++ CMS `matched_opportunities`. Fine today (app = RLS-bypassing owner); on the `govtech_app` NOBYPASSRLS cutover
+they must run on a BYPASSRLS connection / owner-view. On the RLS-cutover checklist (launch-readiness item #9).
+
+**Automation spine — MAPPED, ready to build (the phase we're starting).** The engine is ALREADY the
+start→end gate pattern the user wants: declarative `Workflow` = `trigger` + `steps[]` (DAG via `depends_on`),
+`validate()` hard-rejects bad templates at boot, every step emits start+end into `system_events`, state is
+DERIVED (stateless) from `process_instances`/`_transitions`/`tasks`, two reconcilers (event processor with
+5-min lookback + idempotent spawn; time sweeper for nudges/timeouts) give cold-restart. `ProjectCollaboration`
+= the generic multi-actor gate. 11/12 lifecycle stages wired. **The one genuinely-open piece = the global
+per-tenant automation policy layer (recipients × trigger × timing × escalation)** feeding
+`nudge_days`/`assignee_role`/`due_in_minutes` into instances — that IS task **#190**. Map:
+`docs/AUTOMATION_SPINE_MAP.md` (+ AUTOMATION_DESIGN.md, AGENT_WORKFORCE.md).
+
+**Docs refreshed this session (the "next push"):** CLAUDE.md, CLAUDE_CLIFFNOTES.md, ARCHITECTURE_V10 +
+FOLDER_STRUCTURE, DEVELOPMENT_STANDARDS + TESTING_STRATEGY + DEFINITION_OF_DONE, AGENT_FABRIC_DESIGN +
+AGENT_WORKFORCE + AUTOMATION_DESIGN, EVENT_CONTRACT_V3 + RATE_MONITORING + **new** SECURITY_AND_SAFETY.md,
+the MANAGE_CONSOLE_GUIDE + user-guides. Session audit docs: UI_UX_AUDIT_2026-07-22, DEPRECATION_CLEANUP_2026-07-22,
+AUTOMATION_SPINE_MAP, LAUNCH_READINESS_2026-07-22.
+
+**NEXT:** task **#190** — build the global per-tenant automation policy layer (the grammar) on top of the mapped spine.
+
+---
 
 **AGENT WORKFORCE — COMPLETE + EXPANDED (19 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
 forward plan: `docs/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
@@ -247,6 +320,13 @@ until curl -s -o /dev/null http://localhost:3000/login; do sleep 1; done
 | `admin@acme-navy.test` | tenant_admin @ acme-navy-systems | 1 | acme admin / invites |
 | `teammate@acme-navy.test` | tenant_user @ acme-navy-systems | 1 | single-membership control |
 | `eric@rfppipeline.com` | master_admin (no tenant) | 0 | admin / shadow control |
+
+> ⚠️ **Mig 124 (this session) DEACTIVATED + hash-invalidated every `.test` seed account** (the three
+> `.test` rows above) and archived the `apex-defense` test tenant — so they can't log in on any environment
+> that applies migrations. For a **local sandbox** drive-test, re-enable them with a known hash
+> (`UPDATE users SET is_active=true, password_hash='<bcrypt>' WHERE email LIKE '%.test'`) — never commit that.
+> The real master_admin `eric.c.wagner@gmail.com` was rotated to a random password (mig 124, `temp_password=true`);
+> the plaintext is **chat-only** (git has only the bcrypt hash) — first login forces a reset.
 
 Acme proposal `3b0e7f8b-7ca2-4570-91d9-48326add00ff`; sections
 `dc8a44af-…` (Assigned) / `26a41b25-…` (Unassigned). Comp code `rfppipelinetest`.

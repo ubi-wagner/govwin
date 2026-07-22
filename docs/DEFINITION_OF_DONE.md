@@ -13,10 +13,11 @@ Every single commit must pass all of these. No exceptions for "fix later" commit
 ### Build gates
 
 - [ ] `cd frontend && npx tsc --noEmit` → exit 0
+- [ ] `cd frontend && npx vitest run` → all green (full unit + integration suite; 729/729 at migration head 125)
 - [ ] `cd frontend && npx next build` → exit 0 (catches ESLint rules + page data collection + edge-runtime errors that `tsc` misses)
 - [ ] `python3 -m py_compile <changed pipeline files>` → exit 0 for any pipeline change
 - [ ] `bash -n <changed shell scripts>` → exit 0 for any shell change
-- [ ] If the commit touches a SQL migration: apply against a throwaway PostgreSQL 16 instance and verify with a test query. Re-apply the migration to confirm idempotency.
+- [ ] If the commit touches a SQL migration: apply it through the `db/migrations/migrate.mjs` runner against the sandbox (`postgres://claude:claude@127.0.0.1:5433/govtech_intel`) and verify with a probe query. Re-run to confirm idempotency (the runner tracks `_migration_history`, so a second run must be a clean no-op).
 
 ### Code hygiene
 
@@ -35,10 +36,11 @@ Every single commit must pass all of these. No exceptions for "fix later" commit
 - [ ] API routes use `withHandler` from `lib/api-helpers.ts` (or document the opt-out, e.g. `/api/health`).
 - [ ] Response shapes match [API_CONVENTIONS.md §"Response shape"](./API_CONVENTIONS.md) — `{ data: T }` on success, `{ error, code, details? }` on failure.
 - [ ] Scoped logging via `lib/logger.ts` `createLogger(scope)` with a scope from ARCHITECTURE_V9.md §8.
-- [ ] Significant actions emit start + end events (or a single event) per [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md).
+- [ ] **Every state-changing action emits a namespaced `system_event`** — start + end for a multi-step operation, or a single event — per [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md). A mutation that lands with no audit event is not done (admin grants included: a free "Open portal" audits exactly as a `$0` purchase).
 - [ ] Input validation uses zod, never `typeof` checks. Shared primitives from `lib/validation.ts`.
 - [ ] Errors thrown are `AppError` subclasses from `lib/errors.ts` or `ToolError` subclasses from `lib/tools/errors.ts`. No `throw new Error('...')`.
 - [ ] Tenant-scoped queries include `WHERE tenant_id = ${ctx.actor.tenantId}` (or `ctx.tenantId` inside tools).
+- [ ] No reads or writes against retired/dropped tables (`tenant_pipeline_items`, `proposal_reviews`, `library_units`, and the rest dropped by migrations 121/125). Opportunity reads target `tenant_opportunity_cards`; library reads target `library_atoms`. Drop a table only when it is superseded-with-a-successor AND has zero live references — "empty in the sandbox" is not a drop signal.
 
 ---
 

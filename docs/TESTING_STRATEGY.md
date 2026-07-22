@@ -12,7 +12,7 @@ Three levels, in order of speed and cost:
 
 1. **Unit tests** — pure functions in `frontend/lib/`. No DB. No HTTP. No filesystem. Fast (<50ms per test). Run on every save. Live under `frontend/__tests__/unit/`.
 2. **Integration tests** — API routes + tools exercised against a throwaway PostgreSQL. Medium speed (~100ms-1s per test). Run in CI and before every PR. Live under `frontend/__tests__/integration/`.
-3. **E2E smoke tests** — Playwright against a running `next dev`. Slow (seconds per test). Run on PR and merge-to-main. Live under `frontend/__tests__/e2e/` (or `frontend/e2e/` if Playwright's default).
+3. **E2E smoke tests** — Playwright against the running app. Slow (seconds per test). Run on PR and merge-to-main. Specs live under `frontend/e2e/*.spec.ts` (the Playwright-default location — ~19 specs split across the `admin` and `tenant` projects), NOT under `frontend/__tests__/e2e/`.
 
 Most tests should be unit or integration. E2E is for the critical paths only — "can a user log in, change their password, and see their dashboard" — not for exhaustive coverage.
 
@@ -250,6 +250,36 @@ Commands (defined in `frontend/package.json`):
 Developer loop: run `npm test` on save via vitest watch; run `npm run test:integration` before pushing; let CI run `test:ci`.
 
 `scripts/test-all.sh` at the repo root is the cross-service runner (frontend + pipeline). Use it when making a change that touches both.
+
+---
+
+## Verification backbone (the change-verification sequence)
+
+The test pyramid above is *what* to write; this is the ordered sequence every change is *driven through*
+before it is called done. Each gate must pass before the next is meaningful:
+
+1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. First gate, always.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**729/729** at migration
+   head 125). Run on every change, not only schema changes.
+3. **Migration (schema changes only)** — apply the new migration through the `db/migrations/migrate.mjs`
+   runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner tracks
+   applied files in `_migration_history`, so re-running must be a clean no-op (idempotency proof).
+4. **Build (risk changes)** — `cd frontend && npx next build` → **exit 0**. Catches ESLint, page-data
+   collection, and edge-runtime errors `tsc` misses. Required for any change touching page structure,
+   dynamic imports, the server/client boundary, or config.
+5. **Live drive** — Playwright-drive the changed surface against the running app. Specs live in
+   `frontend/e2e/*.spec.ts`. Drive one self-contained spec with
+   `npx playwright test e2e/<name>.spec.ts --project=tenant --no-deps` (or `--project=admin`); `--no-deps`
+   skips the `setup` project so the spec runs standalone. A change is not verified until its surface has
+   been driven live.
+6. **Adversarial multi-agent bug sweep (large changes)** — for large or cross-cutting changes, fan out an
+   adversarial sweep that splits the diff by concern (API / React / SQL), each agent hunting for defects
+   in its lane. Every reported finding must be **PROVEN** — reproduced against the running app or the
+   sandbox DB — before it is filed. An unproven "possible bug" is discarded, not reported; the sweep's
+   value is that it lands only defects it can demonstrate.
+
+**Sandbox DB coordinates:** `postgres://claude:claude@127.0.0.1:5433/govtech_intel` (local PG16, trust
+auth). This is the target for steps 3, 5, and the SQL lane of step 6.
 
 ---
 

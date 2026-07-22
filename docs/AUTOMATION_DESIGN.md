@@ -1,5 +1,13 @@
 # Design — Automation: Namespaces → Events → Rules → Workflows → Agents → ToDos (end to end)
 
+> **CANONICAL MAP → `docs/AUTOMATION_SPINE_MAP.md`.** That doc is the current end-to-end spine map (the
+> start→end gate, the two stateless reconcilers, the template model, the full lifecycle as chained
+> workflows, the customer automation grammar, and the gap list to zero-day). **This file is its
+> mechanism-level companion** — the same substrate grounded in `file:line` (emit API, the poll loops, the
+> `automation_rules` vs `process_instances` split, HITL resume, the nudge sweep). Where the two overlap, the
+> SPINE_MAP's framing wins; the counts here have been reconciled to it (25 archetypes, ~20 workflows,
+> migrations to 125).
+
 > **AS-BUILT UPDATE (#117, 2026-07-19) — agents as automation actors.** Agents run inside the automation
 > layer two ways: (1) a **declarative `AI_INVOKE` `Step`** in a workflow (single-entity agents — a step
 > actor beside the human `TODO`/`HITL_WAIT` steps; `TOOL_ACTION_TO_ARCHETYPE` in `workflows/processor.py`
@@ -17,7 +25,7 @@ consumer both exist and run) · **PARTIAL** (runs, but via a side path, not the 
 **⚠ DORMANT/FUTURE** (built but no producer, or not built). Companion to
 `docs/MASTER_MIRROR_OPP_DESIGN.md` (the OPP→purchase→proposal spine this automation reacts to).
 
-Verified against branch `claude/nice-hamilton-kBqtD` (migrations 001→108).
+Verified against the current branch (migrations 001→125).
 
 ---
 
@@ -41,7 +49,7 @@ consumers do in response.
                   │  PIPELINE worker              │  │  CMS event_listener           │
                   │  processor.run_workflow_...   │  │  _poll_loop → automation_rules│
                   │  → WorkflowManager (mig 043)  │  │  → send_email/notify/create_  │
-                  │  → AgentFabric (10 archetypes)│  │     todo/publish… (§3)        │
+                  │  → AgentFabric (25 archetypes)│  │     todo/publish… (§3)        │
                   │  → task nudge sweep (60s)     │  └──────────────────────────────┘
                   └──────────────┬───────────────┘
         parks TODO/HITL steps ▼  ▲ completeTask → forceAdvanceProcess (resume)
@@ -141,7 +149,14 @@ The heavy side: durable, multi-step, human-in-the-loop `process_instances`.
   auto-imports every `workflows.*` module at boot. **Step types** (`base.py:84`): `ACTION, API_CALL,
   AI_INVOKE, HITL_WAIT, NOTIFY, CONDITION, TODO`.
 
-### The 12 registered workflows (all WIRED)
+### The core registered workflows (all WIRED)
+
+> The roster has since grown to **~20 workflow classes** — the 12 below plus `OnCollaboratorInvited`,
+> `OnSolicitationReviewRequested` (the 72h curation QA gate), `OnSolicitationUpdateScan` (scheduled
+> amendment watch), `OnOpsDigestRequested` (scheduled ops digest), `OnContentResurfaceRequested`,
+> `OnSocialScheduleRequested`, and `OnCardApplied`/`OnBucketsUpdated` (tenant rescore). The current
+> lifecycle mapping (trigger · actors · gates · nudges · cron-vs-trigger · status) is
+> **`AUTOMATION_SPINE_MAP.md §4`**; the 12 here remain accurate for the mechanisms this doc grounds.
 
 | Workflow | Trigger (`ns:type:phase` + cond) | Steps | 
 |---|---|---|
@@ -196,16 +211,18 @@ only their own copy spine (§1 two-spine model).
 
 ## 5. The agent fabric — the AI execution layer
 
-- `AgentFabric` (`fabric.py:137`) registers **10 archetypes** (`_ARCHETYPE_CLASSES:78`,
-  `archetypes/__init__.py`) at pipeline boot. **Three live entry points:** `invoke_agent(...)` (`:261`,
+- `AgentFabric` (`fabric.py`) registers **25 archetypes** (`_ARCHETYPE_CLASSES`,
+  `archetypes/__init__.py`) at pipeline boot — **dormant ≠ dead** (all registry-wired; see the roster in
+  `AGENT_WORKFORCE.md §1`). **Three live entry points:** `invoke_agent(...)` (`:261`,
   direct — workflow AI_INVOKE steps + `draft_v0`), `process_task_queue` (`:697`, the `agent_task_queue`
   consumer), and — **now wired** — **`handle_event` (`:183`)**, dispatched from the workflow processor
   as a **workflow-first, terminal-phase fallback** (`processor.py`: `elif fabric.has_handler(type)` after
   the workflow match, so an event a workflow owns never double-fires an archetype, and `phase != 'start'`
   so a start/end pair fires once; `invoke_agent`'s rate + budget bound it). It activates any archetype
   whose `handles_event(type)` equals a **real emitted `type`** — today only **`color_team_reviewer` on
-  `proposal.review_requested`** (the "request review" path). The other archetypes stay dormant because
-  their handler strings are a **stale pre-refactor taxonomy** that embeds the namespace the way the admin
+  `proposal.review_requested`** (the "request review" path). The other archetypes are inert **on this `handle_event` path only** (NOT their
+  overall status — #117 wired them via `AI_INVOKE` steps + per-tenant producers, per the table below + Net);
+  their `handle_event` strings are a **stale pre-refactor taxonomy** that embeds the namespace the way the admin
   UI *renders* it (`namespace.type`) rather than how `system_events.type` is *stored* (bare) — e.g.
   `capture.purchase.completed` vs the real `purchase.completed`. Reconciling is a per-archetype fix
   (correct the string + confirm a real producer + vet the agent), tracked in §9.
@@ -215,11 +232,15 @@ only their own copy spine (§1 two-spine model).
 | **section_drafter** | `draft_v0.py:157` direct-invoke (batch V0) **and** `proposal-draft-section.ts:389` `requestAgentTask` (interactive) → `process_task_queue`; chain `section_drafter → markdown_to_canvas → publish_section_draft` | **WIRED** |
 | **compliance_reviewer** | Primary path runs **inline in the frontend** `ai/compliance/route.ts` (Anthropic SDK direct, billed `:510`); the fabric AI_INVOKE `check_compliance` in OnProposalAdvancedToReview is advisory-only | **PARTIAL** |
 | **color_team_reviewer** | Two paths now: `proposal-advance.ts:439` `requestAgentTask` (advance, gated by `tenant_automation_preferences.ai_review_on_advance`) → `process_task_queue`, **and** `proposal.review_requested` → the processor's fabric fallback → `handle_event` (the "request review" path, newly wired) | **WIRED** |
-| capture_strategist · opportunity_analyst · scoring_strategist · packaging_specialist · librarian · partner_coordinator · proposal_architect | Mapped in `TOOL_ACTION_TO_ARCHETYPE` (`processor.py:219`) but **no workflow emits their AI_INVOKE and nothing enqueues them**; handlers depend on the dead `handle_event` | **⚠ DORMANT (×7)** |
+| capture_strategist · opportunity_analyst · scoring_strategist · packaging_specialist · librarian · partner_coordinator · proposal_architect | **Now wired (#117)** — not via `handle_event` but as **`AI_INVOKE` steps** (`OnProposalCreated`/`…AdvancedToFinal`/`OnCollaboratorInvited`) + **per-tenant producers** (pin route, atomize-package). Each mapped in `TOOL_ACTION_TO_ARCHETYPE` and locked by a `test_<agent>_wiring.py`. | **WIRED** |
 
-**Net: 2 WIRED (`section_drafter`, `color_team_reviewer`), 1 PARTIAL (`compliance_reviewer`, inline),
-7 DORMANT** — the dispatcher is now live; the 7 are dormant on **stale handler strings**, not a missing
-caller (§9).
+**Net (as-built #117): the original 10 archetypes are WIRED as workflow actors** — via the two producer
+shapes (`AI_INVOKE` step + per-tenant producer), **not** via `handle_event`. The table above is the
+**`handle_event` dispatch lens** specifically: on that path only `color_team_reviewer` fires (on
+`proposal.review_requested`); the other archetypes' `handle_event` strings remain a **stale
+namespace-prefixed taxonomy** (§9 gap 1), but that no longer gates them because their real wiring is the
+AI_INVOKE/producer path (see `AGENT_WORKFORCE.md §6` + `AUTOMATION_SPINE_MAP.md §4`). The fabric has since
+grown to **25** archetypes; the newer 15 are wired or dormant-awaiting-a-producer per that roster.
 
 - **Queue/logs/memory:** `agent_task_queue` (`001:588`) — producer `requestAgentTask`
   (`agent-client.ts:12`), consumer `main.py::run_agent_task_consumer` → `process_task_queue` claims 5
@@ -306,15 +327,22 @@ preview + notify all collaborators.
 
 ## 9. Gap register (⚠ future / systemic)
 
-1. **`fabric.handle_event` is now wired** (workflow-first, terminal-phase fallback in the processor) →
-   `color_team_reviewer` reacts to `proposal.review_requested`. **Remaining:** the other archetypes'
-   handler strings are a **stale namespace-prefixed taxonomy** — they encode `namespace.type` (how the
-   admin UI renders it) instead of the bare `system_events.type` that is stored — e.g.
-   `capture.purchase.completed` / `finder.scoring.completed` / `finder.opportunity.ingested` vs the real
-   `purchase.completed` / `scoring.completed` / `opportunity.ingested`. Each is a per-archetype
-   reconciliation: correct the string, confirm a real producer, and vet the agent **+ its volume** before
-   enabling (e.g. `opportunity_analyst` on `opportunity.ingested` would fire per ingested opp — it needs
-   throttling, not a blind flip). This is no longer a missing dispatcher.
+> The ranked build list to "zero-day full functionality" is **`AUTOMATION_SPINE_MAP.md §7`**. Its headline
+> open piece — **the global per-tenant automation policy layer** (`recipients × trigger × timing ×
+> escalation`, the customer grammar that feeds `nudge_days`/`assignee_role`/`due_in_minutes` into instances,
+> for both the discovery notify-beats and the build nudge cadence) — is the one genuinely-open item; the
+> UI exists, landing it as the per-tenant config that parameterizes instances is the work. The
+> mechanism-level gaps below still hold.
+
+1. **`fabric.handle_event` is wired but secondary.** The **primary** agent wiring is now the two producer
+   shapes — **`AI_INVOKE` steps + per-tenant producers** (#117, §5) — so the archetypes are WIRED there
+   regardless of `handle_event`. On the `handle_event` fallback path (workflow-first, terminal-phase), only
+   `color_team_reviewer` fires (`proposal.review_requested`); the other archetypes' handler strings remain a
+   **stale namespace-prefixed taxonomy** — they encode `namespace.type` (how the admin UI renders it)
+   instead of the bare `system_events.type` that is stored — e.g. `capture.purchase.completed` /
+   `finder.scoring.completed` vs the real `purchase.completed` / `scoring.completed`. Cleaning those up is a
+   per-archetype nicety (correct the string, confirm a real producer, throttle by volume), **not** a blocker
+   now that the AI_INVOKE/producer path carries the wiring.
 2. **No autonomous V0→V0.5→V1 driver.** `advanceProposalStage` (frontend) is the **sole** stage
    authority and is **human-driven**; every workflow *reads, never writes* the stage. Automation reacts
    *around* the build (auto-draft V0, park review ToDos, notify, nudge) but does not *drive* it — the

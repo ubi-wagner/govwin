@@ -78,14 +78,15 @@ After login, you land at `/portal/[your-company-slug]/dashboard`
 **What you see:**
 
 - **Company name** and welcome message
-- **Quick Stats** — three cards showing:
-  - **Library Units**: How many content atoms are in your library (starts at 0)
-  - **Active Proposals**: How many proposals you're working on (starts at 0)
-  - **Pinned Topics**: How many opportunities you've saved (starts at 0)
-- **Get Started Checklist**:
-  - Upload company documents → link to the upload page
-  - Review your Spotlight feed → link to the Spotlight page
-  - Purchase your first proposal portal → enabled after you pin topics
+- **Count tiles** (right rail) — **To-dos**, **Library** (your content atoms), and — for admins
+  — **Opportunities** and **Buckets**, each opening a drawer (all start at 0)
+- **Center** — your **active proposal builds**, or, when you have none:
+  - **Admins** see a **Get started** checklist: upload company documents, set up your company
+    profile, review your matched opportunities, start your first proposal build (each ticks off
+    as you finish it)
+  - A **base team member** with nothing assigned sees a *"You're on the team"* card instead —
+    *"Nothing is assigned to you yet; ask your admin to add you to a build"* — not a checklist
+    that leads nowhere
 - **Recent Activity** — a feed of events in your workspace
 
 **Your sidebar navigation:**
@@ -229,7 +230,11 @@ The Spotlight feed shows federal opportunities ranked by how well they match you
 1. Browse the feed — highest-scoring topics appear first
 2. Click into topics that interest you to see details
 3. **Pin** the topics you want to pursue
-4. Pinned topics appear in your dashboard stats and are available for proposal creation
+4. Pinned topics count toward your **Opportunities** tile and are available for proposal creation
+
+> **If a pin or refresh fails**, the cards now surface an inline message (*"That action could not
+> be completed — please try again"* or *"Could not load your opportunity cards"*) rather than
+> failing silently — retry, and if it persists, tell your rep.
 
 ---
 
@@ -328,6 +333,9 @@ Click any section from the workspace to open the **WYSIWYG Canvas Editor**.
 - **Letter-format sections** → Export as .docx (Word)
 - **Slide sections** → Export as .pptx (PowerPoint)
 - **Table sections** → Export as .xlsx (Excel)
+- **PDF** → available for letter-format sections and documents when the renderer is up; if it
+  isn't, you'll see *"PDF export is temporarily unavailable. Use .docx."* — the DOCX / PPTX /
+  XLSX exports always work
 
 ### Finalize (V1)
 

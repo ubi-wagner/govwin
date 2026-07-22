@@ -86,11 +86,11 @@ frontend/
     db.ts                        # postgres.js client (the one DB handle)
     rbac.ts                      # role hierarchy + path gates
     crypto.ts                    # AES-256-GCM for API key storage
-    auth.ts                      # NextAuth v5 full config (Node-only)
-    # legacy, slated for deletion in 0.5b B8:
-    # storage.ts                 # DELETED — use storage/ subdirectory
-  types/
-    index.ts                     # shared TypeScript types
+    admin-auth.ts                # admin-side auth/access helpers
+    # DELETED in the launch cleanup — do not recreate:
+    #   auth.ts    — the full NextAuth v5 Node config now lives at frontend/auth.ts (root); lib/ holds no auth module
+    #   storage.ts — use the storage/ subdirectory instead
+  # types/index.ts — DELETED (orphaned barrel; shared types are colocated with their modules)
   __tests__/                     # vitest tests (0.5b)
     setup/pg.ts                  # throwaway PG spin-up
     fixtures/                    # row factories (users, tenants, opportunities, memories)
@@ -98,7 +98,7 @@ frontend/
     scenarios/                   # cross-actor flows
     unit/                        # pure function tests
     integration/                 # API route + tool tests
-  auth.ts                        # re-exports from lib/auth.ts for Node runtime
+  auth.ts                        # NextAuth v5 FULL Node-runtime config (Credentials + lib/db); was a re-export of the now-deleted lib/auth.ts
   auth.config.ts                 # edge-safe NextAuth config (no DB imports)
   middleware.ts                  # path gate + auth enforcement (edge runtime)
   next.config.mjs
@@ -132,8 +132,8 @@ pipeline/
       __init__.py                # dequeues agent_task_queue, POSTs to /api/tools/:name
     ingest/                      # Phase 1 ingesters
       sam_gov.py, sbir_gov.py, grants_gov.py
-    scoring/
-      engine.py                  # curated-pipeline scoring
+    # scoring/ — REMOVED (was an empty/dead package); card ranking now lives in the frontend
+    #   (lib/bucket-ranking.ts scoreCard + autoScoreCard on bridge fan-out)
     workers/                     # Phase 1-3 background workers
       rfp_shredder.py            # AI RFP analysis
       grinder.py                 # document → library units
@@ -190,7 +190,7 @@ These are enforced by code review; violating any of them will break a build.
 2. **`frontend/auth.config.ts` must be edge-safe.** Zero Node-only imports — no `pg`, no `postgres`, no `crypto` module, no `fs`. Use Web Crypto or delegate to `auth.ts` (Node-side).
 3. **`frontend/lib/*.ts` must never import from `frontend/app/*`.** Libraries are lower-level than application code. Crossing this boundary creates circular dependencies and breaks tree-shaking.
 4. **`frontend/components/*.tsx` must never import from `frontend/lib/db` directly.** Client components call API routes; server components may call API helpers but should prefer the same lib functions the API routes use.
-5. **`frontend/lib/tools/*.ts` may import `frontend/lib/db`, `frontend/lib/events`, `frontend/lib/errors`** — but **NOT** `frontend/lib/auth.ts`. Tools receive the session as `ctx`; they never resolve it themselves.
+5. **`frontend/lib/tools/*.ts` may import `frontend/lib/db`, `frontend/lib/events`, `frontend/lib/errors`** — but **NOT** the NextAuth config `frontend/auth.ts` (the former `lib/auth.ts` is deleted). Tools receive the session as `ctx`; they never resolve it themselves.
 6. **`pipeline/src/*.py` must not assume `db/` is in the container.** The Dockerfile only copies `src/`. Migrations are applied via the GitHub Actions workflow, not from the worker.
 7. **Every new file under `frontend/lib/` that is part of a module group must be exported via an index barrel** (e.g., `lib/tools/index.ts`, `lib/storage/index.ts`). Top-level singletons (`lib/db.ts`, `lib/logger.ts`) are imported by path, no barrel needed.
 

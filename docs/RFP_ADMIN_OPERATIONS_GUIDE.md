@@ -290,6 +290,12 @@ Volumes define the structure of the proposal a customer will write.
 > the mold interpolates (`{company_name}` → tenant name) into each tenant's sections. Build it any
 > time in advance; if it is not done when the **first** portal is purchased, the 72h SLA (§8) fires.
 
+> **Customer Interest tab (real demand).** The workspace's **Customer Interest** tab shows the
+> tenants who **pinned** this solicitation's topics — pin date, whether they purchased a portal,
+> and build stage. It reads the opportunity-card spine (`tenant_opportunity_cards`), not the
+> retired pins table, so it **populates again** — use it to prioritize what customers are
+> actually waiting on.
+
 ---
 
 ## 6. Approve and Push to Spotlight
@@ -378,6 +384,14 @@ admin-provision. The authoritative click-by-click sequence is
    tenant name). `OnProposalCreated → draft_v0` then auto-drafts sections via the `section_drafter`
    agent. This is **V0** — the instantiated skeleton. Emits **`capture:workspace.released`**.
 5. **Customer builds V0 → V0.5 → V1** (see the version model below).
+
+> **Comp a build instead of a purchase.** On the tenant's **Portals** page (expert view) the
+> **"Approve free portal"** form comps the paid build for an opportunity: it records a **$0
+> audited `purchases` row** (`metadata.grant='admin'`, emits `capture:purchase.completed`) and
+> opens the workspace — auditing exactly like a real purchase. It **validates the opportunity
+> exists first** (`opportunities` carries the FK; `proposal_portals.opportunity_id` does not), so
+> a bad UUID can't orphan a build. It's the only manual portal-create form and is
+> **rfp_admin-gated** — customers always go through the comp-code purchase.
 
 ### Version model
 
@@ -528,6 +542,15 @@ Correct them. Every correction writes to curation memory with the namespace key 
 1. Check pipeline logs in Railway for errors
 2. The shredder requires: PDF in S3, `pymupdf4llm` installed, valid solicitation record
 3. If the pipeline crashed during extraction, restart the service — jobs will be re-queued
+
+### An action seemed to do nothing
+
+Several admin actions that used to fail **silently** now surface an **inline error** instead — so
+if a click appears to no-op, look for the red message and retry; the write didn't happen. This
+covers **Accept & Lock / Lock volume / Lock all / Force-advance** on a proposal (e.g. *"Could not
+lock this scope — some sections may not be ready"* or *"N of M sections could not be locked"*),
+editing a **spotlight-match summary**, saving **guardrail defaults**, and saving **source notes /
+instructions**. Customer opportunity-card actions (pin / unpin / resync) behave the same way.
 
 ---
 

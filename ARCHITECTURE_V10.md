@@ -2,7 +2,9 @@
 
 **Date:** 2026-07-03
 
-> **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19).** The pipeline `AgentFabric` (10 archetypes) is a
+> **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19; roster count refreshed 2026-07-22).** The pipeline
+> `AgentFabric` (**25 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
+> as workflow actors, since expanded to 25) is a
 > **tenant-bound advisory workforce** being woken one at a time. Each tenant-space agent runs with
 > **tenant_user authority** scoped to its assigned tenant (the trusted task context; tool schemas expose no
 > `tenant_id`), produces **advisory** output that goes **through guardrails to land-or-review** (never
@@ -36,6 +38,20 @@ carrying `opportunity_id`). Not a code-read.
 > (no customer data)**. **Canonical design of record for the opportunity→purchase→proposal flow:
 > `docs/MASTER_MIRROR_OPP_DESIGN.md`.** §4 and §7 are updated inline; the rest of the drive-verify stands
 > as verified at mig 103.
+
+> **Update (2026-07-22) — schema now at migration 125; launch-hardening + as-built cleanup pass.**
+> Since the mig-108 flow above, migrations **109–125** landed the multi-membership identity model and
+> tenant documents (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), the
+> observability lifecycle (120), portal delegated managers (123), and two hardening drops: **mig 124**
+> rotated the committed `master_admin` credential off `GovWin2026!` to a random bcrypt-only hash
+> (`temp_password=true`), deactivated the `.test` seed accounts, and archived the `apex-defense` test
+> tenant; **mig 125** dropped **12 superseded, zero-referenced tables** (§7) and **rebuilt
+> `v_opportunity_rollup`** on `tenant_opportunity_cards`. The last live reads of retired tables were
+> repointed (§7), RLS is documented as a **single enforced layer today** with a `govtech_app`-cutover
+> caveat (§7 "RLS reality"), and a dead-code/dependency trim removed **16 unused frontend deps + 6
+> orphaned modules**. The full ingest→outcome spine and the `system_events` start/end river are traced
+> end to end in **§3.1**; the workflow engine that rides that river has its own canonical map in
+> **`docs/AUTOMATION_SPINE_MAP.md`**. Cleanup ledger: `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
 
 ## Status Legend
 
@@ -165,7 +181,7 @@ grants any admin global access; enforcing the grant + retiring the god-view is a
 
 | Legacy | Fate | Replacement |
 |--------|------|-------------|
-| `tenant_pipeline_items` (per-tenant scoring rows) | Off the customer path | `tenant_opportunity_cards` |
+| `tenant_pipeline_items` (per-tenant scoring rows) | Off the customer path → **DROPPED (mig 125)** | `tenant_opportunity_cards` |
 | `/portal/[t]/spotlights` page | Server `redirect()` → `/cards` | Greenfield Opportunities |
 | `/portal/[t]/pipeline` page | Server `redirect()` → `/cards` | pin state on the card |
 | Spotlight scoring job | Retired for the feed | `autoScoreCard` on fan-out → `tenant_bucket_scores` |
@@ -173,11 +189,70 @@ grants any admin global access; enforcing the grant + retiring the god-view is a
 | Dashboard / origin-bucket reads | Repointed | `tenant_opportunity_cards`, `origin_card` |
 
 Legacy page bodies survive only as one-line redirects (prior implementations in git history). The
-orphaned `/spotlight/pin` API and legacy spotlight components are now dead code (cleanup backlogged).
+`tenant_pipeline_items` table itself was **physically dropped in mig 125** (its last three live reads —
+CMS `matched_opportunities`, the rfp-curation Customer Interest panel, and `v_opportunity_rollup` — were
+first repointed to `tenant_opportunity_cards`; see §7). The orphaned `/spotlight/pin` API and legacy
+spotlight components are cataloged for a per-item cleanup decision in `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
 
 ---
 
-## 3. Data Flow — Ingest → Bridge → Cards → Buckets / Rankings
+## 3. Data Flow — The Spine, End to End
+
+### 3.1 The whole river — admin upload → outcome (one `system_events` spine)
+
+Every state-changing beat on the spine emits a namespaced `system_events` row (start/end pair, or a
+single; §6). That river is simultaneously the **audit log** and the **substrate the workflow engine
+derives state from** — the engine keeps no memory of its own, so the whole lifecycle is replayable from
+the river on a cold restart. Canonical map of the engine + its reconcilers + the per-tenant automation
+grammar: **`docs/AUTOMATION_SPINE_MAP.md`**. The end-to-end trace, admin ingest through outcome/harvest:
+
+```
+ADMIN  (finder namespace)
+  rfp_admin uploads a solicitation ─► rfp_shredder: PDF → Claude → compliance/documents/volumes/matrix
+        │                              finder:rfp.uploaded  ·  finder:opportunities.detected
+        ▼
+  curate + approve ─► solicitation.push (lib/tools/solicitation-push.ts)
+        │   opportunities.is_active=true for the umbrella + EVERY topic
+        ▼   finder:solicitation.pushed ──────────────────────────► [OnSolicitationPushed] carries opportunity_id
+  publishToBridge → opportunity_bridge (append-only) ─► fanOutBridgeEvent
+        │
+        ▼   per active/trial tenant, inside withTenant()
+  tenant_opportunity_cards (denormalized) + autoScoreCard → tenant_bucket_scores   ── the ADMIN→CUSTOMER
+        │                                                                             boundary (the sole crossing)
+════ CUSTOMER  (capture namespace) ═══════════════════════════════════════════════════════════════════
+        ▼
+  card ranked on /cards ─► pin (pulls docs local, re-scores) ─► comp-code purchase  (or a $0 admin grant)
+        │   POST /purchase → proposal_portals @ curation_pending (72h SLA)
+        ▼   capture:purchase.completed ──► automation_rule notify_admin  +  [ProjectCollaboration] (scope=opp)
+  CURATION GATE — a navigational ToDo (no customer data) routes a shadow-admin into the tenant RLS account
+        │   action=release → releaseFromCuration (CAS curation_pending → launched)
+        ▼
+  provision (lib/provision-proposal.ts, UNLOCKED) → proposal_artifacts + proposal_sections
+        │   + proposal_compliance_matrix (one row/required item, not_addressed) + origin_card frozen
+        ▼   proposal:proposal.created ──► [OnProposalCreated] (draft_v0 strawman when ANTHROPIC_API_KEY set)
+════ PROPOSAL  (proposal + library namespaces) ═══════════════════════════════════════════════════════
+        ▼
+  BUILD (canvas) ⇄ atoms library      library:atom.created · library:section.atoms_selected
+        │   proposal:section.saved ──► [OnProposalSectionEdited]
+        ▼
+  section LOCK (CAS) → matrix row → 'satisfied' · harvestSectionToAtomLibrary · artifact roll-up
+        ▼
+  ADVANCE (gated, all sections locked) → review ──► color_team_reviewer (agent_task_queue)
+        │   proposal:proposal.advanced  (targetStage review → final)
+        ▼
+  SUBMIT → stage 'submitted'  (terminal, but "Unlock for Edit" still renders — no dead-end)
+        ▼
+  outcome recorded ──► proposal:outcome.recorded ──► [OnProposalOutcomeRecorded]   ── harvest → library_atoms
+```
+
+Each hop's start/end pair is exactly what the two stateless reconcilers (the event poller and the time
+sweeper) read to answer "what started, and did it finish before its nudge?" — so parking, nudging, and
+escalation are all derived from timestamps in the river, never from engine memory. The bracketed
+`[Template]` labels are the workflow templates that trigger off each event (§6.2); the full template ↔
+trigger ↔ `process_instance` contract, the reconcilers, and the customer automation grammar are in
+**`docs/AUTOMATION_SPINE_MAP.md`**.
+
+### 3.2 Ingest → Bridge → Cards → Buckets / Rankings (detail)
 
 ```
 rfp_admin curates + approves a solicitation (V9 Stage 2–3, retained)
@@ -393,14 +468,18 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 108)
+## 7. New / Changed Schema (migrations 093 → 125)
 
-Highest migration on the branch: **108** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added
-the purchase→curation→release flow). Domains added to V9's 72-table / 14-domain map:
+Highest migration: **125** (was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
+(110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
+the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
+launch credential rotation (124), and the dead-table drop (125). Domains added to V9's 72-table /
+14-domain map (the 093–108 core; the drops that shrank it back are in "Table drops" below):
 
 | Migration | Adds |
 |-----------|------|
-| `093_collaborator_library_scope` | `library_unit_shares`, `collaborator_library_prefs` (per-collaborator scope on legacy `library_units`) |
+| `093_collaborator_library_scope` | `library_unit_shares`, `collaborator_library_prefs` (per-collaborator scope on legacy `library_units` — **all three since dropped**, migs 121/125) |
 | `094_oppcard_bridge_spine` | **`opportunity_bridge`**, **`tenant_opportunity_cards`** (RLS forced), **`tenant_bridge_cursor`**; `govtech_app` role |
 | `095_oppcard_pin_docs` | `tenant_opportunity_cards.pinned_docs` jsonb (pin-pulls-docs-local manifest) |
 | `096_tenant_spotlight_buckets` | **`tenant_spotlight_buckets`**, **`tenant_bucket_scores`** (both RLS forced) |
@@ -432,14 +511,61 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
   parent≠child, **`document_cocoons`**, **`taxonomy_terms`** UNIQUE `(dimension, value)`.
 - **`proposal_compliance_matrix`** (pre-exists mig 001) — now *populated*.
 
-### RLS reality (updated from V9 §7.4)
+### Table drops & the drop rule (migs 121, 125)
 
-The greenfield tenant tables ship with **RLS ENABLE + FORCE and real policies** keyed on the
-`app.tenant_id` GUC. `withTenant()` (`lib/rls.ts`) wraps each tenant operation in a txn that
-`SELECT set_config('app.tenant_id', $1, true)` (SET LOCAL). Enforcement goes live once the app connects
-as the non-owner **`govtech_app`** role (created in mig 094); under the current owner connection the GUC
-is set (harmless) and the explicit `WHERE tenant_id = $1` predicates remain the belt. This is the first
-subsystem with policies (V9's four memory tables had RLS enabled but zero policies).
+The schema is **shrinking as it converges.** Two cleanup migrations removed tables a live successor had
+fully replaced:
+
+- **mig 121** dropped the entire **`library_units` family** — `library_units`, `library_harvest_log`,
+  `library_atom_outcomes`, `library_unit_shares` — plus the `proposal_supporting_docs.library_unit_id`
+  FK column, once every read/write was repointed to `library_atoms` (§5). (`solicitation_topics` was
+  similarly retired earlier, migs 030a/035.)
+- **mig 125** dropped **12 superseded, zero-referenced tables** (+ their orphaned indexes, via CASCADE):
+  `tenant_pipeline_items` (→ `tenant_opportunity_cards`); `opportunity_events` / `customer_events` /
+  `content_events` / `system_config` (→ `system_events` / config); `pipeline_runs` (→ `pipeline_jobs`);
+  `proposal_reviews` (→ `agent_task_queue` + `proposal_activity_log`); `solicitation_templates`
+  (→ `solicitation_outlines` / `document_templates`); `tenant_uploads` (→ `tenant_documents` /
+  `library_atoms`); `tenant_actions` (→ `triage_actions` / `tenant_bucket_scores`);
+  `legal_document_versions` (→ `consent_records`); `collaborator_library_prefs` (sibling of the mig-121
+  shares table). It also **DROPs + REBUILDs `v_opportunity_rollup`** onto `tenant_opportunity_cards` —
+  ranked/pinned tenant counts now come from live cards (`lifecycle_status <> 'archived'`), fixing a view
+  that had been silently reporting **zero** because it still counted off the retired pins table.
+
+**The drop rule (codified).** A table is dropped **only** when it is *superseded-with-a-named-successor
+AND has zero live code references* (frontend + pipeline + CMS, repo-wide audit). **"Empty in the sandbox"
+is NOT a drop signal** — most empty tables are live-but-unused. Five inert-but-intentional tables were
+therefore deliberately **KEPT**: `verification_tokens` + `invitations` (the auth/invite surface),
+`agent_archetypes` (the agent-workforce roster), `rate_limit_state` (code names it a future target), and
+`system_health_snapshots` (monitoring).
+
+**Retired-table repoints (the last live reads, now fixed before the drop).** Three surfaces still read a
+retired table: the CMS `matched_opportunities` email variable (`services/cms/src/templates.py`) read
+`tenant_pipeline_items` (always 0); the rfp-curation **Customer Interest** panel
+(`app/admin/rfp-curation/[solId]`) joined the retired pins table; and `v_opportunity_rollup` counted off
+it. All three now read `tenant_opportunity_cards` (`lifecycle_status <> 'archived'`,
+`COALESCE(pinned_at, created_at)`, archived tenants excluded). Full ledger:
+`docs/DEPRECATION_CLEANUP_2026-07-22.md`.
+
+### RLS reality (updated from V9 §7.4 and migs 116/117)
+
+The greenfield tenant tables (cards, buckets, scores, atoms, portals) ship **RLS ENABLE + FORCE with real
+policies** keyed on the `app.tenant_id` GUC, and mig **116** extended forced RLS to the agent-memory
+tables (`episodic_memories` et al., previously enabled-but-policyless). `withTenant()` (`lib/rls.ts`)
+wraps each tenant operation in a txn that `SELECT set_config('app.tenant_id', $1, true)` (SET LOCAL).
+
+**Today this is effectively a single enforced layer: the explicit `WHERE tenant_id = $1` predicate.** The
+app still connects as the schema **owner**, which **bypasses RLS**, so the FORCE policies are wired but do
+not yet bite — the WHERE predicates are the belt that actually isolates tenants. The policies become the
+second, defense-in-depth layer only on the planned cutover to the non-owner **`govtech_app`** role
+(created mig 094; the `NOBYPASSRLS` agent role is specified in `docs/AGENT_WORKFORCE.md`, wired by
+migs 116/117).
+
+**`govtech_app`-cutover caveat (RLS-cutover checklist, launch-readiness item #9).** The retired-table
+repoints above — the CMS `matched_opportunities` read, the rfp-curation Customer Interest panel, and
+`v_opportunity_rollup` — are **direct cross-tenant reads of `tenant_opportunity_cards` (RLS FORCED)** from
+the admin/CMS side. They work today only because the owner bypasses RLS; after the `govtech_app`
+(`NOBYPASSRLS`) cutover they would return **0** unless run on a BYPASSRLS connection or reframed as
+owner-views. Belongs on the RLS-cutover checklist — see `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
 
 ---
 
@@ -544,7 +670,7 @@ core-spine breaks:
 | Templates → skeleton | 🟡 | nothing sets `volume_required_items.template_id`, so authored templates don't reach provisioning; fix the admin template-list fetch shape |
 | New-customer backfill | 🟡 | `backfillTenant()` runs only via a manual admin route → fresh tenants miss historical opportunities |
 | Fan-out entitlement gate | 🟡 | every active/trial tenant receives every card regardless of Spotlight subscription (confirm intended) |
-| Legacy spotlight dead code | 🧹 | `/spotlight/pin` API + legacy spotlight components are now orphaned — remove |
+| Legacy dead code / deps | 🧹 | `tenant_pipeline_items` + 11 other rot tables **DROPPED** (mig 125) and the `library_units` family (mig 121); **16 unused frontend deps + 6 orphaned modules removed**; ~28 no-caller API routes (incl. `/spotlight/pin`) + confirmed-dead exports **cataloged** for a per-item decision — `docs/DEPRECATION_CLEANUP_2026-07-22.md` |
 | 3-source strawman (`draft_v0`) | 🟦 | wired to `OnProposalCreated`; real Claude activates on deploy (`ANTHROPIC_API_KEY`) — unchanged from V9 |
 
 ---

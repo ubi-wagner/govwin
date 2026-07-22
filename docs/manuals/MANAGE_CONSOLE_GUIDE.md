@@ -34,7 +34,9 @@ split-screen pane the layout reflows (hamburger nav, the spine to 2–3 columns)
 Subscription state, billing, expert-consulting hours, and your company profile.
 
 - **Spotlight Subscription** — subscribe ($499/mo) or **Manage Billing**.
-- **Expert Consulting** — buy 1-on-1 hours (requires an active subscription).
+- **Expert Consulting** — pre-pay 1-on-1 strategy hours ($500/hr, requires an active
+  subscription). After you buy hours the panel notes *"We'll email you to schedule"* — there's
+  no in-app calendar.
 - **Company Profile** — NAICS, keywords, agencies, set-asides, summary (**Edit**).
 
 > If you're one of our experts working inside a customer's console (a *shadow admin*), the
@@ -59,8 +61,16 @@ respective admins.
 
 ## Portals & workflow
 
-Each **portal** is a proposal build for one opportunity. Open one from a pinned OPP, then
-**Configure & launch** to author its workflow before it goes live:
+Each **portal** is a proposal build for one opportunity. As a company admin you get a portal by
+**buying** it (the purchase flow on an opportunity card — a comp code today; see the customer
+guide) — there is **no manual "create a portal" form here**. When the RFP team releases the
+build it appears in this drawer; **Configure & launch** then authors its workflow before it goes
+live:
+
+> **Descended RFP expert?** You (and only an RFP admin) also see an **"Approve free portal"**
+> form at the top of this drawer — a lever that *comps* the paid build for an opportunity. It
+> records a **$0 audited purchase** (a comped build shows up in the books exactly like a real
+> one) and needs the opportunity to already exist. A regular customer admin never sees it.
 
 - **Phases (up to 3, selectable):** Kickoff & Compliance → Draft (V0.5) → Review, Lock &
   Submit — spanning **purchase → close → +30 days**, deadlines anchored to the close date.

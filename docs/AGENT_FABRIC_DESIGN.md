@@ -1,27 +1,38 @@
 # Agent Fabric Design — RFP Pipeline
 
-**Status:** As-built. The fabric + **10 archetypes are implemented and ALL AWAKE as workflow actors (#117
-complete)**. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
-plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the next batches (master-side, onboarding,
-additional tenant-side) are in `docs/AGENT_ROADMAP.md`. This file is the original design rationale plus the
-as-built summary in §0 below.**
+**Status:** As-built. The `AgentFabric` auto-registers **25 archetypes** at pipeline boot; **dormant ≠
+dead** — every archetype is registry-wired and invocable, and "dormant" means only that no producer/step
+fires it yet. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
+plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine those agents plug into is
+`docs/AUTOMATION_SPINE_MAP.md`; the next batches (master-side, onboarding, additional tenant-side) are in
+`docs/AGENT_ROADMAP.md`. This file is the fabric definition + the how-to for ADDING/UPDATING an archetype
+(§0), plus the original design rationale (§1–8, archived).**
 
-> **AS-BUILT (#117 COMPLETE, 2026-07-19):** all 10 archetypes awake. Pre-live = section_drafter,
-> compliance_reviewer (inline + `tool.proposal.check_compliance`), color_team_reviewer (advance queue).
-> Woken this run onto the current spine (`library_atoms`/`atom_tags`, tenant-discretion, injection-fenced,
-> each locked by `test_<agent>_wiring.py` — **42 green**): librarian (producer in atomize-package),
-> scoring_strategist + opportunity_analyst (**per-tenant producers on the pin route**), proposal_architect +
-> capture_strategist (`AI_INVOKE` in `OnProposalCreated`), packaging_specialist (`AI_INVOKE` in
-> `OnProposalAdvancedToFinal`), partner_coordinator (`AI_INVOKE` in the new `OnCollaboratorInvited`).
-> Two producer shapes: **per-tenant producer** (fan-out agents) and declarative **`AI_INVOKE` `Step`**
-> (single-entity; `TOOL_ACTION_TO_ARCHETYPE` maps every agent). Invariants: tenant-space agents are
-> **tenant-bound** (tenant_user; no `tenant_id` in tool schemas); output is **advisory → guardrail →
-> land-or-review** (never auto-writes business tables); untrusted content **injection-fenced**; runtime
-> bounds **runaway** (MAX_TOOL_ROUNDS=20, $0.50/call, 50/hr, $50/mo) and never **dead-ends** a workflow
-> (safe-skip). RLS: mig 116 forced RLS on `episodic_memories`; central `SET app.tenant_id` + a `NOBYPASSRLS`
-> agent role are the next step (`AGENT_WORKFORCE.md §7–8`, tracked as #120). Oversight: `/admin/agents` →
-> Agent Workforce (roster + per-tenant usage rollup, forward-only bridge).
-**Last updated:** 2026-07-19.
+> **AS-BUILT (2026-07-22):** the fabric registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
+> `pipeline/src/agents/fabric.py` — `BaseArchetype` excluded). The original #117 batch of 10 is fully wired
+> as workflow actors: section_drafter (`draft_v0` + interactive), compliance_reviewer (inline `ai/compliance`
+> + `AI_INVOKE`), color_team_reviewer (advance queue + `handle_event`), librarian (producer in
+> atomize-package), scoring_strategist + opportunity_analyst (**per-tenant producers on the pin route**),
+> proposal_architect + capture_strategist (`AI_INVOKE` in `OnProposalCreated`), packaging_specialist
+> (`AI_INVOKE` in `OnProposalAdvancedToFinal`), partner_coordinator (`AI_INVOKE` in `OnCollaboratorInvited`).
+> The remaining 15 (tenant-side onboarding_agent/outcome_analyst/cost_estimator/pp_matcher; platform-side
+> opportunity_scout/ingest_analyst/matrix_stager/skeleton_architect/amendment_monitor; our-org ops
+> curation_qa/ops_digest; CMS content_generator/content_curator/social_scheduler; research_scout) are
+> registered and greenfielded onto the current spine — some producer/step-wired, the rest dormant awaiting a
+> producer (see the roster in `AGENT_WORKFORCE.md §1`). Two producer shapes: **per-tenant producer** (fan-out
+> agents) and declarative **`AI_INVOKE` `Step`** (single-entity; `TOOL_ACTION_TO_ARCHETYPE` maps every mapped
+> agent; `Workflow.validate()` HARD-REJECTS an unmapped `AI_INVOKE` at boot). Invariants: tenant-space agents
+> are **tenant-bound** (tenant_user; no `tenant_id` in tool schemas); output is **advisory → guardrail →
+> land-or-review** (never auto-writes business tables); untrusted content **injection-fenced**; runtime bounds
+> **runaway** (MAX_TOOL_ROUNDS=20, $0.50/call, 50/hr, $50/mo) and never **dead-ends** a workflow (safe-skip).
+> Every step emits a start→end pair into `system_events` (`workflow.step_started` → `step_completed`/
+> `step_failed`), so completion is a query, never held state. RLS backstop is **BUILT** — mig 116/119
+> (memory) + **mig 117** (`rfp_agent` NOBYPASSRLS role + FORCE-RLS on proposals/proposal_sections/
+> tenant_profiles/atom_tags) + `fabric.invoke_agent` sets/resets `app.tenant_id` per call on an optional
+> NOBYPASSRLS pool (`AGENT_DATABASE_URL`); **inert under today's bypass role — the deploy CUTOVER is pending**
+> (`AGENT_WORKFORCE.md §7–8`). Oversight: `/admin/agents` → Agent Workforce (roster + per-tenant usage rollup,
+> forward-only bridge).
+**Last updated:** 2026-07-22.
 **Author:** Claude (Opus 4.7 / 4.8) + Eric Wagner
 
 This document defines how Claude agents are deployed, provisioned,
@@ -29,7 +40,14 @@ scoped, and controlled across the RFP Pipeline platform. It covers
 cost optimization, security guardrails, the prompt architecture,
 and the specific agent archetypes at each layer.
 
-> **⚠ Superseded in part (as-built 2026-07-15).** This is the original pre-implementation design. The as-built agent system is documented in `docs/AGENT_FRAMEWORK.md` (source of truth: `pipeline/src/agents/`) — 10 archetypes are registered in `fabric.py` under the names Section Drafter / Compliance Reviewer / Color Team Reviewer / Opportunity Analyst / Scoring Strategist / Capture Strategist / Proposal Architect / Librarian / Partner Coordinator / Packaging Specialist (not the "Review Agent / Compliance Checker / Color Team Simulator" names used below). Current wiring: **Section Drafter is wired** (the V0-strawman `draft_v0` on proposal creation + the `ai/draft` route); **Compliance Reviewer is partial** (runs inline in the Next `ai/compliance` route, not the fabric archetype); **Color Team Reviewer** runs only via the advance-path `agent_task_queue`; the rest are ⚠ future (registered-but-dormant or unbuilt). The cost/status tables below are design estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
+> **⚠ Superseded in part (as-built).** §1–8 are the original pre-implementation design and the
+> "Review Agent / Compliance Checker / Color Team Simulator" names/tables below are design-era. The as-built
+> source of truth is **`docs/AGENT_WORKFORCE.md`** (roster + safety contract) and **`docs/AUTOMATION_SPINE_MAP.md`**
+> (the spine the agents run on); `pipeline/src/agents/` is the code. As-built: **`fabric.py` now registers 25
+> archetypes** (up from the 10 in the #117 batch) under their real `role_name`s (section_drafter,
+> compliance_reviewer, color_team_reviewer, opportunity_analyst, scoring_strategist, capture_strategist,
+> proposal_architect, librarian, partner_coordinator, packaging_specialist, + the 15 in §0.1). The cost/status
+> tables below are design estimates. For the purchase→proposal spine see `docs/MASTER_MIRROR_OPP_DESIGN.md`.
 
 ---
 
@@ -38,7 +56,14 @@ and the specific agent archetypes at each layer.
 > The canonical roster + safety detail is `docs/AGENT_WORKFORCE.md`; the forward plan is
 > `docs/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
 
-### 0.1 The 10 agents (skills · job · tools · trigger)
+### 0.1 The 25 archetypes (registry-wired · dormant ≠ dead)
+
+All 25 auto-register from `_ARCHETYPE_CLASSES` at fabric boot (`fabric.py::_register_all_archetypes`),
+keyed by their `role_name`. The **canonical per-agent roster (scope · trigger · live/dormant status)
+lives in `AGENT_WORKFORCE.md §1`** — this is the fabric-doc mirror. The core #117 tenant-side ten (fully
+producer/step-wired) are the illustrative set below; the other 15 are grouped after it.
+
+**Core tenant-side ten** (skills · job · tools · trigger):
 
 | Agent | Scope | Job | Own tools | Wakes on | Lands as |
 |---|---|---|---|---|---|
@@ -52,6 +77,21 @@ and the specific agent archetypes at each layer.
 | Capture Strategist | 🔒 tenant | Win themes, positioning, teaming, risk register | get_tenant_profile, get_opportunity_detail, search_library, search_memory | proposal created (`AI_INVOKE`) | advisory strategy |
 | Packaging Specialist | 🔒 tenant | Review final submission package | get_sections, get_compliance, search_memory | advanced to final (`AI_INVOKE`) | advisory package review |
 | Partner Coordinator | 🔒 tenant | Draft partner welcome + flag teaming risks | get_sections, get_compliance, search_memory | collaborator invited (`AI_INVOKE`, `OnCollaboratorInvited`) | draft → human-gated send |
+
+**The other 15** (registered; each greenfielded onto the current spine — wiring/status per `AGENT_WORKFORCE.md §1`):
+
+- **Tenant-scope (🔒) — Batch B/C:** `onboarding_agent` (cold-start profile/buckets/first-atomize/ToDos, on
+  application-accepted) · `outcome_analyst` (win/loss lesson → memory → scoring calibration, on
+  outcome-recorded) · `cost_estimator` (cost-volume realism, on proposal-created) · `pp_matcher` (PP atoms +
+  teaming-gap flags, on proposal-created).
+- **Platform-scope (🌐) — master build loop:** `opportunity_scout` (triage backlog) · `ingest_analyst`
+  (shred → curation draft) · `matrix_stager` (curated → compliance-matrix rows) · `skeleton_architect`
+  (matrix → master skeleton) · `amendment_monitor` (flag compliance-affecting amendments). Platform agents
+  run at OUR authority (no tenant to bind) → tenant-discretion N/A, but they **keep the injection fence**.
+- **Our-org ops / CMS (🌐):** `curation_qa` (pre-release QA gate, on solicitation-triaged) · `ops_digest`
+  (scheduled ops digest, `AI_INVOKE` in `OnOpsDigestRequested`) · `content_generator` /  `content_curator` /
+  `social_scheduler` (CMS content + social loop) · `research_scout` (research briefs; `handle_event` only —
+  **not in `TOOL_ACTION_TO_ARCHETYPE`**, so it can't be dropped into an `AI_INVOKE` step until mapped).
 
 ### 0.2 Integration — two producer shapes (both funnel into `AgentFabric.invoke_agent`)
 
@@ -68,6 +108,23 @@ draft_sections) · `OnProposalAdvancedToFinal` → ai_package_review (independen
 `OnProposalAdvancedToReview` → ai_compliance_review · `OnCollaboratorInvited` (new) → ai_partner_welcome +
 independent notify · pin route → scoring_strategist + opportunity_analyst · atomize-package route → librarian.
 
+**The `AI_INVOKE` boot gate — `TOOL_ACTION_TO_ARCHETYPE` + `validate()`.** The map
+(`workflows/processor.py::TOOL_ACTION_TO_ARCHETYPE`) is the single source that binds a step `action`
+(`tool.proposal.architect`, `tool.opportunity.score`, …) to an archetype `role_name`. `Workflow.validate()`
+(`workflows/base.py`) **HARD-REJECTS at registration** any `AI_INVOKE` step whose `action` is not in the map —
+`register_workflow` then DROPS the whole workflow (an unmapped action would otherwise be a guaranteed silent
+skip). So you cannot ship an agent step without wiring its archetype; the typo is caught at boot, not in prod.
+(An archetype that is `handle_event`-only, e.g. `research_scout`, needs no map entry — but also cannot be used
+in an `AI_INVOKE` step until one is added.)
+
+**Every step emits a start→end pair.** The managed executor (`workflows/manager.py`) emits
+`system:workflow.step_started` before a step and `system:workflow.step_completed` (on success **or** a safe
+skip) / `system:workflow.step_failed` (on failure) after it — all `namespace=system, phase=single, actor=
+workflow_manager`, and excluded from the processor poll (`namespace != 'system'`) so a step's own audit never
+re-triggers a workflow. Agent steps additionally emit their own `tool.invoke.start`/`end` per Claude call.
+Because both beats are rows, "did this agent step complete before its gate/nudge?" is a `system_events` query,
+never held state — the fabric holds no per-invocation memory.
+
 ### 0.3 Monitoring & updating
 
 - **Oversight:** `/admin/agents` → **Agent Workforce** — roster (scope/trigger/live-status + 30-day queue
@@ -78,23 +135,70 @@ independent notify · pin route → scoring_strategist + opportunity_analyst · 
 - **Updating/waking** = the two moves in §0.2 (realign to spine + wire producer/step). Prompt/guardrail/model
   live per-archetype in the pipeline; an inline per-agent tuning editor is the next oversight increment.
 
-### 0.4 Safety contract (enforced) + the two open flags
+### 0.4 Safety contract (enforced) — the invariants + the one pending deploy step
 
-Enforced: injection fence on all 10 (per-agent test) · runaway caps (`MAX_TOOL_ROUNDS=20`, `$0.50`/call,
-`50`/hr/tenant, `$50`/mo) · never dead-ends (unmapped/failed `AI_INVOKE` = safe skip; advisory-only; fabric
-returns error dicts, never raises) · tenant-discretion (no `tenant_id` in any schema). **Open (#120):**
-(1) RLS is bypassed for the agent role (`rolbypassrls=true`) → needs a `NOBYPASSRLS` agent role + central
-`SET app.tenant_id` in the fabric; (2) guardrail-gated landing helper (advisory → guardrail → land-or-review).
+Enforced (per-agent tests): **injection fence** on all 25 (untrusted tenant text fenced `--- BEGIN/END USER
+CONTENT ---` with a treat-as-data guard in `build_messages`) · **runaway caps** (`MAX_TOOL_ROUNDS=20`,
+`$0.50`/call mid-loop, `50`/hr/tenant, `$50`/mo, + a platform master switch & monthly cap) · **never
+dead-ends** (unmapped/failed `AI_INVOKE` = safe skip; advisory-only, never writes business tables; fabric
+returns an error status dict, never raises; the poll loop catches/continues) · **tenant-discretion** (no
+`tenant_id` in any tool schema — the trusted tenant comes from the task context, never the model) ·
+**guardrail-gated landing** — `agents/guardrails.py::enforce_guardrails` runs inside `invoke_agent`; every
+result carries an `apply`/`review` verdict (scoring adjustment clamped ±15, disallowed content → review,
+fail-safe to review on error), so the loop is **advisory → guardrail → land-or-review**, never
+"advisory → land".
 
-### 0.5 Next batches (see `docs/AGENT_ROADMAP.md`)
+**RLS backstop — BUILT, cutover pending.** mig 116/119 (memory) + **mig 117** add the `rfp_agent`
+**NOBYPASSRLS** role and FORCE-RLS on the gap tables (proposals, proposal_sections, tenant_profiles,
+atom_tags); `fabric.invoke_agent` acquires a dedicated NOBYPASSRLS pool when `AGENT_DATABASE_URL` is set and
+runs `SELECT set_config('app.tenant_id', $tenant, false)` per invocation, resetting it in `finally`.
+Platform-scope agents (tenant_id NULL) deliberately stay on the caller/bypass connection (an empty GUC would
+deny every tenant row). **Inert under today's bypass role** — the one pending step is the deploy CUTOVER:
+provision the NOBYPASSRLS login member + `AGENT_DATABASE_URL`, then the agent path connects as `rfp_agent` and
+RLS becomes the real backstop over the explicit `WHERE tenant_id`. Until cutover, tenant-discretion + the
+explicit `WHERE` is the isolation (`AGENT_WORKFORCE.md §7–8`).
 
-Master → bridge → mirror: *"agents build the master, the bridge fans it, agents work the mirror."* Batch A
-(**platform-scope**, admin build loop): `opportunity_scout`, `ingest_analyst`, `matrix_stager`,
-`skeleton_architect`. Batch B (**tenant-scope, highest leverage**): `onboarding_agent` (Concierge — cold-start
-profile/buckets/first-atomize/ToDos). Batch C (tenant): `outcome_analyst` (workflow exists — cheapest),
-`amendment_monitor`, `cost_estimator`, `pp_matcher`. **Sequence:** foundation #120 → Concierge → master
-pipeline → Batch C. Master-side agents skip tenant-discretion (no tenant) but **keep the injection fence** —
-they read the most untrusted text in the system.
+### 0.5 Batches landed (see `docs/AGENT_ROADMAP.md`)
+
+Master → bridge → mirror: *"agents build the master, the bridge fans it, agents work the mirror."* All three
+batches are now **registered + greenfielded onto the current spine** (roster/status in `AGENT_WORKFORCE.md §1`):
+Batch A (**platform-scope**, admin build loop) `opportunity_scout`, `ingest_analyst`, `matrix_stager`,
+`skeleton_architect`; Batch B (**tenant, highest leverage**) `onboarding_agent` (Concierge — cold-start
+profile/buckets/first-atomize/ToDos); Batch C (tenant) `outcome_analyst`, `amendment_monitor`,
+`cost_estimator`, `pp_matcher`; plus the our-org ops/CMS agents (`curation_qa`, `ops_digest`,
+`content_generator`, `content_curator`, `social_scheduler`, `research_scout`). Master-side agents skip
+tenant-discretion (no tenant) but **keep the injection fence** — they read the most untrusted text in the
+system. **Remaining forward work:** the RLS deploy cutover (§0.4) and waking any still-dormant producers.
+
+### 0.6 How to ADD or UPDATE an archetype
+
+Waking or adding an agent is **integration, not reinvention** — the fabric, tools, memory, guardrails, and
+audit already exist. The checklist:
+
+1. **Write/realign the archetype** in `pipeline/src/agents/archetypes/<role>.py` (subclass `BaseArchetype`):
+   set `role_name`, the system prompt, the tool list, and `handles_event(...)`. **Realign to the current
+   spine** — `library_atoms`/`atom_tags`, `proposal_sections`, `tenant_opportunity_cards`,
+   `tenant_bucket_scores`, plain-DB memory (`episodic_memories`, ILIKE — no vector search). **Fence** all
+   untrusted tenant text; expose **no `tenant_id`** in any tool schema (tenant-bound authority).
+2. **Register it:** add the class to `archetypes/__init__.py` and to `_ARCHETYPE_CLASSES` in `fabric.py`.
+   It now auto-registers at boot (`dormant ≠ dead`).
+3. **Pick the wiring shape:**
+   - **Per-tenant producer** (fan-out, acts on *(tenant, entity)*): enqueue at the lifecycle point via
+     `requestAgentTask({ tenantId, agentRole, taskType, input })` (`frontend/lib/agent-client.ts` →
+     `agent_task_queue` → `process_task_queue`). Keep it **bounded** — one task per pin/package, never
+     per-(tenant×opp).
+   - **Declarative `AI_INVOKE` `Step`** (single-entity): add the `Step` to the entity's workflow **and** a
+     `TOOL_ACTION_TO_ARCHETYPE` entry mapping its `action` → `role_name`. Make it an **independent** step
+     (own `on_failure`/`on_timeout`, not a hard dependency of the human path) so it safe-skips without
+     dead-ending. `validate()` rejects the workflow at boot if the action is unmapped.
+4. **Landing:** results are advisory. Land only through the audited frontend tool registry
+   (`POST /api/tools/:name`), gated by `enforce_guardrails` → `apply` (bounded auto) or `review` (HITL).
+5. **Lock it** with a `pipeline/tests/test_<role>_wiring.py`: registered · maps to its action / handles its
+   trigger · modern tools · **no `tenant_id` in schemas** · **injection-fenced** · `execute_tool` binds the
+   trusted tenant · (for steps) it's an independent `AI_INVOKE` that can't dead-end.
+
+LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox the tests verify routing +
+producer/step + tool SQL against the live schema.
 
 ---
 
