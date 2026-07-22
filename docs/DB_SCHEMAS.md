@@ -1,8 +1,17 @@
 # DB_SCHEMAS.md — Complete Database Schema Reference
 
-**Generated:** 2026-07-15 · **Source:** a clean apply of every migration in `db/migrations/`
-(**001 → 108**) onto a throwaway PostgreSQL 16, then dumped from the live catalog.
-**Authoritative** — this is the actual as-built schema, not hand-maintained.
+> ⚠ **STALE SNAPSHOT — frozen at migration 108; migrations now run to 125+.** The
+> **source of truth is `db/migrations/`** (apply it), not this file. Since this snapshot:
+> the `library_units` family was dropped (mig 121), and 12 more superseded tables were
+> dropped (mig 125: `tenant_pipeline_items`, `opportunity_events`, `customer_events`,
+> `content_events`, `pipeline_runs`, `proposal_reviews`, `solicitation_templates`,
+> `tenant_uploads`, `tenant_actions`, `legal_document_versions`, `system_config`,
+> `collaborator_library_prefs`), and the view `v_opportunity_rollup` was repointed to
+> `tenant_opportunity_cards`. Regenerate this dump before relying on it for column names.
+
+**Generated:** 2026-07-15 · **Source:** a clean apply of migrations `001 → 108` onto a
+throwaway PostgreSQL 16, then dumped from the live catalog. This is a **dated snapshot**,
+not a live mirror — see the banner above.
 
 - **112 tables + 2 views** in the main database (`govtech_intel`, shared by the Next.js frontend
   and the Python pipeline).

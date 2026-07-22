@@ -2,7 +2,7 @@
 
 Consolidated reference for all code quality rules, security standards, testing requirements, event naming conventions, database rules, and error handling protocols. Sourced from CLAUDE.md, ERROR_HANDLING.md, API_CONVENTIONS.md, TOOL_CONVENTIONS.md, DEFINITION_OF_DONE.md, and TESTING_STRATEGY.md.
 
-**Architecture reference:** `ARCHITECTURE_V9.md` (root) is the authoritative as-built system design (supersedes V5–V8). All service topology, storage, and CMS facts in this document should be read in light of V9.
+**Architecture reference:** `ARCHITECTURE_V10.md` (root) is the authoritative as-built system design (the as-built successor to V9; supersedes V5–V9). Read this document's service-topology, storage, and CMS facts in light of V10.
 
 ---
 
