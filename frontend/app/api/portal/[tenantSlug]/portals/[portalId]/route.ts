@@ -40,41 +40,54 @@ const DEFAULT_RELEASE_GUARDRAILS = {
   ],
 } as unknown as GuardrailConfig;
 
-/** Shared post-launch/release side effects: provision the build (if unbound) + instantiate ToDos. */
-async function provisionAndInstantiate(
+/**
+ * Provision the build + link it to the portal — the discovery-spine → build-spine hand-off.
+ * Runs BEFORE the launch/release status flip and is NOT best-effort: on failure the caller keeps
+ * the portal in its pre-launch state so the operation is retryable, instead of flipping it live and
+ * wedging a buildless `launched` portal with no recovery path (adversarial-sweep B2). Idempotent:
+ * the proposal is linked to the portal BEFORE the flip, so a retry sees proposal_id already set and
+ * skips re-provisioning (no duplicate proposal). The purchased card always carries enough to
+ * provision — provisionProposalForPortal needs only the portal's opportunity_id (the spine key) and
+ * degrades to a default volume when the master solicitation has no matrix — so the only failure this
+ * guards is a transient DB error or a genuinely-missing opportunity.
+ */
+async function provisionAndLink(
   g: { tenantId: string; tenantName: string; userId: string; userEmail: string | null; role: Role },
   tenantSlug: string,
   portalId: string,
+): Promise<{ proposalId: string } | { error: string }> {
+  const [portalRow] = await withTenant(g.tenantId, async (tx) =>
+    tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
+      SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
+      FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
+  );
+  if (!portalRow) return { error: 'portal not found' };
+  if (portalRow.proposalId) return { proposalId: portalRow.proposalId }; // already provisioned — idempotent
+  const prov = await provisionProposalForPortal({
+    tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
+    opportunityId: portalRow.opportunityId, label: portalRow.label,
+    actorId: g.userId, actorEmail: g.userEmail,
+  });
+  if ('error' in prov) return { error: prov.error };
+  await linkPortalProposal(g.tenantId, portalId, prov.proposalId);
+  return { proposalId: prov.proposalId };
+}
+
+/** Instantiate the portal's workflow ToDos AFTER launch. Best-effort: ToDos are re-creatable and
+ *  must never wedge an already-launched portal. */
+async function instantiateTodosBestEffort(
+  g: { tenantId: string; userId: string; userEmail: string | null; role: Role },
+  portalId: string,
   config: GuardrailConfig,
-): Promise<{ proposalId: string | null; tasksCreated: number }> {
-  let proposalId: string | null = null;
-  let tasksCreated = 0;
+): Promise<number> {
   try {
-    const [portalRow] = await withTenant(g.tenantId, async (tx) =>
-      tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
-        SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
-        FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
-    );
-    proposalId = portalRow?.proposalId ?? null;
-    if (portalRow && !proposalId) {
-      const prov = await provisionProposalForPortal({
-        tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
-        opportunityId: portalRow.opportunityId, label: portalRow.label,
-        actorId: g.userId, actorEmail: g.userEmail,
-      });
-      if ('proposalId' in prov) {
-        proposalId = prov.proposalId;
-        await linkPortalProposal(g.tenantId, portalId, proposalId);
-      } else {
-        console.error('[portal/portals/:id] provision failed', prov.error);
-      }
-    }
     const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
-    ({ tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config));
-  } catch (postErr) {
-    console.error('[portal/portals/:id] post-launch/release side effects failed', postErr);
+    const { tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config);
+    return tasksCreated;
+  } catch (e) {
+    console.error('[portal/portals/:id] instantiate todos failed (non-fatal, portal is launched)', e);
+    return 0;
   }
-  return { proposalId, tasksCreated };
 }
 
 async function gate(tenantSlug: string, portalId: string, minRole: Role) {
@@ -130,41 +143,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const limits = await getGuardrailLimits();
       const v = validateGuardrailConfig(config, limits);
       if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
+      // Provision the build + link it FIRST (the discovery→build hand-off). If it fails, the portal
+      // stays guardrails_pending (retryable) instead of flipping to a wedged buildless launch (B2).
+      const prov = await provisionAndLink(g, tenantSlug, portalId);
+      if ('error' in prov) {
+        return NextResponse.json({ error: `Could not provision the build (please retry): ${prov.error}`, code: 'PROVISION_FAILED' }, { status: 500 });
+      }
+      // Build is ready + linked — NOW flip live (CAS on guardrails_pending). A retry after a
+      // provision success is idempotent (the proposal is already linked). 409 if not pending.
       const { launched } = await acceptGuardrails(g.tenantId, portalId, config, { revokeShadow: body.revokeShadow, acceptedBy: g.userId });
       if (!launched) return NextResponse.json({ error: 'Portal not pending (already launched?)', code: 'CONFLICT' }, { status: 409 });
-      // The portal is now committed as launched. Everything below is BEST-EFFORT:
-      // provision the proposal build (V0→V1 substrate) if not yet bound, and
-      // instantiate the workflow ToDos. A failure here must not 500 — the portal is
-      // already launched, and a retry would hit the guardrails_pending CAS and 409.
-      let proposalId: string | null = null;
-      let tasksCreated = 0;
-      try {
-        const [portalRow] = await withTenant(g.tenantId, async (tx) =>
-          tx<Array<{ opportunityId: string; proposalId: string | null; label: string }>>`
-            SELECT opportunity_id AS "opportunityId", proposal_id AS "proposalId", label
-            FROM proposal_portals WHERE tenant_id = ${g.tenantId}::uuid AND id = ${portalId}::uuid LIMIT 1`,
-        );
-        proposalId = portalRow?.proposalId ?? null;
-        if (portalRow && !proposalId) {
-          const prov = await provisionProposalForPortal({
-            tenantId: g.tenantId, tenantName: g.tenantName, tenantSlug,
-            opportunityId: portalRow.opportunityId, label: portalRow.label,
-            actorId: g.userId, actorEmail: g.userEmail,
-          });
-          if ('proposalId' in prov) {
-            proposalId = prov.proposalId;
-            await linkPortalProposal(g.tenantId, portalId, proposalId);
-          } else {
-            console.error('[portal/portals/:id] provision failed', prov.error);
-          }
-        }
-        // Instantiate the portal's workflow: stage-0 ToDos into the tasks/nudge ledger.
-        const actor = { id: g.userId, email: g.userEmail, role: g.role, tenantId: g.tenantId };
-        ({ tasksCreated } = await instantiatePortalWorkflow(actor, g.tenantId, portalId, config));
-      } catch (postErr) {
-        console.error('[portal/portals/:id] post-launch side effects failed (portal is launched)', postErr);
-      }
-      return NextResponse.json({ data: { launched: true, tasksCreated, proposalId } });
+      // Workflow ToDos are best-effort (re-creatable) — they never wedge an already-launched portal.
+      const tasksCreated = await instantiateTodosBestEffort(g, portalId, config);
+      return NextResponse.json({ data: { launched: true, tasksCreated, proposalId: prov.proposalId } });
     }
     if (action === 'release') {
       // RFP expert releases a PURCHASED workspace (curation_pending → launched) after
@@ -182,21 +173,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const limits = await getGuardrailLimits();
       const v = validateGuardrailConfig(config, limits);
       if (!v.ok) return NextResponse.json({ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }, { status: 422 });
+      // Provision + link the build BEFORE flipping curation_pending → launched, so a hand-off
+      // failure leaves the workspace awaiting-curation (retryable by re-release), never a wedged
+      // buildless launch (B2). The purchased card's opportunity_id is all provisioning needs.
+      const prov = await provisionAndLink(g, tenantSlug, portalId);
+      if ('error' in prov) {
+        return NextResponse.json({ error: `Could not provision the build (please retry): ${prov.error}`, code: 'PROVISION_FAILED' }, { status: 500 });
+      }
       const { released } = await releaseFromCuration(g.tenantId, portalId, config, { releasedBy: g.userId });
       if (!released) return NextResponse.json({ error: 'Portal is not awaiting curation (already released?)', code: 'CONFLICT' }, { status: 409 });
-      const { proposalId, tasksCreated } = await provisionAndInstantiate(g, tenantSlug, portalId, config);
+      const tasksCreated = await instantiateTodosBestEffort(g, portalId, config);
       try {
         await emitEventSingle({
           namespace: 'capture',
           type: 'workspace.released',
           actor: { type: 'user', id: g.userId, email: g.userEmail ?? undefined },
           tenantId: g.tenantId,
-          payload: { correlationId: randomUUID(), portalId, proposalId },
+          payload: { correlationId: randomUUID(), portalId, proposalId: prov.proposalId },
         });
       } catch (evtErr) {
         console.error('[portal/portals/:id] release event emit failed (non-fatal)', evtErr);
       }
-      return NextResponse.json({ data: { released: true, proposalId, tasksCreated } });
+      return NextResponse.json({ data: { released: true, proposalId: prov.proposalId, tasksCreated } });
     }
     if (action === 'advance-stage') {
       let body: { force?: boolean } = {};
