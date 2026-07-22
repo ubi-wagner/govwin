@@ -13,6 +13,7 @@ import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
 import { isProposalPaywallBypassed } from '@/lib/paywall';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -756,24 +757,34 @@ export async function POST(request: Request, ctx: RouteContext) {
     // above stay as the immediate ping; this adds the tracked, nudged queue item.
     // Non-fatal: a launch failure never breaks proposal creation.
     try {
-      const launch = await launchProjectCollaboration({
-        actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+      // #190: the RFP-admin review window is the framework-hard curation SLA.
+      const pol = await resolveGatePolicy({
         tenantId,
-        scope: 'project',
-        opportunityId: topicId,
-        proposalId: proposal.id,
-        stage: 'draft',
-        taskType: 'admin_review',
-        taskTitle: `Review & unlock: ${proposalTitle}`,
-        assigneeRole: 'rfp_admin',
-        entityType: 'proposal',
-        entityRef: proposal.id,
-        nudgeDays: [1, 3],
-        dueMinutes: 4320, // 72h review SLA
-        completeTemplate: 'proposal_unlocked',
+        scope: 'build',
+        triggerKey: 'admin_review',
+        gateDefaults: { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueInMinutes: 4320 },
+        pinnedToCurationSla: true,
       });
-      if (!launch.ok) {
-        console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+      if (pol.enabled) {
+        const launch = await launchProjectCollaboration({
+          actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+          tenantId,
+          scope: 'project',
+          opportunityId: topicId,
+          proposalId: proposal.id,
+          stage: 'draft',
+          taskType: 'admin_review',
+          taskTitle: `Review & unlock: ${proposalTitle}`,
+          assigneeRole: pol.assigneeRole,
+          entityType: 'proposal',
+          entityRef: proposal.id,
+          nudgeDays: pol.nudgeDays,
+          dueMinutes: pol.dueInMinutes, // 72h review SLA (framework-pinned)
+          completeTemplate: 'proposal_unlocked',
+        });
+        if (!launch.ok) {
+          console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+        }
       }
     } catch (launchErr) {
       console.error('[proposals/create] ProjectCollaboration launch failed (non-fatal):', launchErr);

@@ -24,6 +24,7 @@ import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle } from '@/lib/events';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
 
 const CURATION_SLA_HOURS = 72;
@@ -143,20 +144,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       console.error('[portal/purchase] event emit failed (non-fatal)', evtErr);
     }
     try {
-      await launchProjectCollaboration({
-        actor: { id: g.userId, email: g.userEmail, tenantId: g.tenantId },
-        actorType: 'user',
+      // #190: resolve the gate cadence/assignee via the automation-policy layer.
+      // The 72h curation window is framework-HARD (pinnedToCurationSla) — a tenant
+      // cannot move the SLA. Fail-safe: on any error the resolver returns these defaults.
+      const pol = await resolveGatePolicy({
         tenantId: g.tenantId,
-        scope: 'opp',
-        opportunityId,
-        taskType: 'proposal_setup',
-        taskTitle: 'Curate + release the purchased proposal workspace',
-        assigneeRole: 'rfp_admin',
-        entityType: 'opportunity',
-        entityRef: opportunityId,
-        nudgeDays: [1, 3],
-        dueMinutes: CURATION_SLA_HOURS * 60,
+        scope: 'build',
+        triggerKey: 'proposal_setup',
+        gateDefaults: { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueInMinutes: CURATION_SLA_HOURS * 60 },
+        pinnedToCurationSla: true,
       });
+      if (pol.enabled) {
+        await launchProjectCollaboration({
+          actor: { id: g.userId, email: g.userEmail, tenantId: g.tenantId },
+          actorType: 'user',
+          tenantId: g.tenantId,
+          scope: 'opp',
+          opportunityId,
+          taskType: 'proposal_setup',
+          taskTitle: 'Curate + release the purchased proposal workspace',
+          assigneeRole: pol.assigneeRole,
+          entityType: 'opportunity',
+          entityRef: opportunityId,
+          nudgeDays: pol.nudgeDays,
+          dueMinutes: pol.dueInMinutes,
+        });
+      }
     } catch (setupErr) {
       console.error('[portal/purchase] curation-gate launch failed (non-fatal)', setupErr);
     }

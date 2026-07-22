@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 import { coerceOriginCard } from '@/lib/cards/card';
 
 interface RouteContext {
@@ -304,21 +305,30 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
 
         if (contractId) {
-          const launch = await launchProjectCollaboration({
-            actor: { id: sessionUser.id, email: sessionUser.email ?? null, role, tenantId },
+          // #190: tenant-side kickoff gate — fully tenant-tunable (not SLA-pinned).
+          const pol = await resolveGatePolicy({
             tenantId,
-            scope: 'contract',
-            opportunityId: proposal.opportunityId,
-            taskType: 'contract_kickoff',
-            taskTitle: `Kick off contract: ${proposal.title}`,
-            assigneeRole: 'tenant_admin',
-            entityType: 'contract',
-            entityRef: contractId,
-            nudgeDays: [3, 1],
-            dueMinutes: 10080, // 7 days to kick off
+            scope: 'build',
+            triggerKey: 'contract_kickoff',
+            gateDefaults: { assigneeRole: 'tenant_admin', nudgeDays: [3, 1], dueInMinutes: 10080 },
           });
-          if (!launch.ok) {
-            console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+          if (pol.enabled) {
+            const launch = await launchProjectCollaboration({
+              actor: { id: sessionUser.id, email: sessionUser.email ?? null, role, tenantId },
+              tenantId,
+              scope: 'contract',
+              opportunityId: proposal.opportunityId,
+              taskType: 'contract_kickoff',
+              taskTitle: `Kick off contract: ${proposal.title}`,
+              assigneeRole: pol.assigneeRole,
+              entityType: 'contract',
+              entityRef: contractId,
+              nudgeDays: pol.nudgeDays,
+              dueMinutes: pol.dueInMinutes,
+            });
+            if (!launch.ok) {
+              console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+            }
           }
         }
       } catch (contractErr) {
