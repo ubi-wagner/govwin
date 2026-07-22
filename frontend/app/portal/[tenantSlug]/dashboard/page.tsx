@@ -114,7 +114,12 @@ export default async function DashboardPage({
   const grants = { canSeeOpps, canManageBuckets: canSeeOpps };
 
   const docsChecked = libraryCount > 0;
-  const getStarted = (
+  // The "get rolling" checklist points at admin surfaces (/cards redirects a base user,
+  // profile is read-only, only an admin starts a build). Show it only to those who can act
+  // on it; a base team member with nothing assigned gets an honest "waiting for access"
+  // card instead of a redirect-trap that never says "ask your admin".
+  const canAct = hasRoleAtLeast(role, 'tenant_admin');
+  const getStarted = canAct ? (
     <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
       <h2 className="text-lg font-semibold mb-1">Get started</h2>
       <p className="text-sm text-gray-500 mb-4">You don&apos;t have an active build yet. A few steps to get rolling:</p>
@@ -136,6 +141,18 @@ export default async function DashboardPage({
           <a href={`${basePath}/proposals`} className={proposalCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Start your first proposal build</a>
         </li>
       </ul>
+    </div>
+  ) : (
+    <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-xl">
+      <h2 className="text-lg font-semibold mb-1">You&apos;re on the team</h2>
+      <p className="text-sm text-gray-500 mb-3">
+        Nothing is assigned to you yet. Your company admin grants access to specific proposals —
+        as soon as they add you to a build, it shows up right here.
+      </p>
+      <p className="text-sm text-gray-500">
+        In the meantime, check your <a href={`${basePath}/processes`} className="text-blue-600 hover:underline">to-dos</a>.
+        If you were expecting access to a proposal, ask your admin to add you.
+      </p>
     </div>
   );
 

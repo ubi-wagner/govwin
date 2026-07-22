@@ -82,17 +82,23 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
 
   return (
     <div className="space-y-6">
-      {canManage && (
-        <div className="border border-gray-200 rounded-xl p-4 bg-white flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Opportunity ID</label>
-            <input value={newOpp} onChange={(e) => setNewOpp(e.target.value)} placeholder="opportunity uuid" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-80" />
+      {/* Free portals are an RFP-Admin approval (a comp of the paid build), never self-serve —
+          a customer admin buys through the purchase flow. Gated to experts + audited as a $0 purchase. */}
+      {isExpert && (
+        <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/40">
+          <p className="text-xs font-semibold text-indigo-900">RFP-Admin · approve a free portal</p>
+          <p className="text-[11px] text-indigo-700/80 mt-0.5 mb-3">Comps the paid build for this opportunity — records a $0 audited purchase and opens the workspace for configuration. Customers buy through the purchase flow.</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Opportunity ID</label>
+              <input value={newOpp} onChange={(e) => setNewOpp(e.target.value)} placeholder="opportunity uuid" className="border border-gray-300 rounded px-2 py-1.5 text-sm w-80" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Label (multi-proposal)</label>
+              <input value={label} onChange={(e) => setLabel(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-40" />
+            </div>
+            <button disabled={busy === 'new' || !newOpp.trim()} onClick={create} className="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded px-4 py-1.5 disabled:opacity-50">{busy === 'new' ? 'Approving…' : 'Approve free portal'}</button>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Label (multi-proposal)</label>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm w-40" />
-          </div>
-          <button disabled={busy === 'new' || !newOpp.trim()} onClick={create} className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded px-4 py-1.5 disabled:opacity-50">Open portal</button>
         </div>
       )}
 
