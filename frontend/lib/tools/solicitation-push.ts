@@ -144,6 +144,32 @@ export const solicitationPushTool = defineTool<Input, Output>({
       );
     }
 
+    // 2c. Date guard (AUTOMATION_POLICY_DESIGN.md decision ⑤): every OPP that becomes
+    //     a customer card at fan-out MUST carry a close_date — it is the timing anchor
+    //     the automation policy resolver nudges against. The RFP admin sets an expected
+    //     (or official) close date in curation; a card must never exist without one, and
+    //     because open_date is always set (COALESCE below) this also enforces "never an
+    //     expected open date without an expected close date". Dates may be estimates
+    //     (opportunities.dates_estimated), upgraded to official when the org publishes.
+    let undatedCount: number;
+    try {
+      const [dateRow] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM opportunities
+        WHERE (solicitation_id = ${solicitationId}::uuid OR id = ${r.opportunityId}::uuid)
+          AND close_date IS NULL
+      `;
+      undatedCount = dateRow?.n ?? 0;
+    } catch (err) {
+      console.error('[solicitation.push] date-guard query failed:', err);
+      throw err;
+    }
+    if (undatedCount > 0) {
+      throw new ValidationError(
+        `cannot push: ${undatedCount} opportunity/topic(s) have no close date — set an expected (or official) close date in curation before releasing (estimates are allowed)`,
+        { solicitationId, undatedOpportunities: undatedCount, missing: 'close_date' },
+      );
+    }
+
     // 3. Atomic push in transaction — status update + opportunity activation + triage action
     let pushedRows: { pushedAt: Date }[];
     try {
