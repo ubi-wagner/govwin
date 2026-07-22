@@ -1849,19 +1849,10 @@ class WorkflowManager:
                             pt_payload = json.loads(pt_payload)
                         except (json.JSONDecodeError, TypeError):
                             pt_payload = {}
-                    # INC-6: run on_timeout escalation (best-effort) before failing.
-                    if pool:
-                        async with pool.acquire() as esc_conn:
-                            await self._run_on_timeout(
-                                esc_conn, pt_row["workflow_name"],
-                                pt_row["current_step"], pt_payload or {},
-                                tenant_str, pt_id,
-                            )
-                    else:
-                        await self._run_on_timeout(
-                            conn, pt_row["workflow_name"], pt_row["current_step"],
-                            pt_payload or {}, tenant_str, pt_id,
-                        )
+                    # B3 (deepest-review sweep): the on_timeout escalation now runs INSIDE the
+                    # CAS-success branch below — only when the fail actually took effect — so a
+                    # task completed in the SELECT→UPDATE window no longer fires a spurious
+                    # "you missed the deadline" escalation.
                     # COMPARE-AND-SWAP on status='paused': if a human completed the
                     # task in the SELECT→UPDATE window (resume flipped it to
                     # 'retrying'), this UPDATE affects 0 rows and we DON'T clobber the
@@ -1881,6 +1872,11 @@ class WorkflowManager:
                                 pt_row["id"], pt_row["current_step"],
                             )
                             if _tag.endswith(" 1"):
+                                # Escalate only on a real timeout (the fail took effect) — B3.
+                                await self._run_on_timeout(
+                                    u_conn, pt_row["workflow_name"], pt_row["current_step"],
+                                    pt_payload or {}, tenant_str, pt_id,
+                                )
                                 await u_conn.execute(
                                     "UPDATE tasks SET status='expired', updated_at=now() "
                                     "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
@@ -1910,6 +1906,11 @@ class WorkflowManager:
                             pt_row["id"], pt_row["current_step"],
                         )
                         if _tag.endswith(" 1"):
+                            # Escalate only on a real timeout (the fail took effect) — B3.
+                            await self._run_on_timeout(
+                                conn, pt_row["workflow_name"], pt_row["current_step"],
+                                pt_payload or {}, tenant_str, pt_id,
+                            )
                             await conn.execute(
                                 "UPDATE tasks SET status='expired', updated_at=now() "
                                 "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
