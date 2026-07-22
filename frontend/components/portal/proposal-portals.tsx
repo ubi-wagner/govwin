@@ -181,6 +181,7 @@ export default function ProposalPortals({ tenantSlug, canManage, isExpert = fals
         open={!!editorPortal}
         onClose={() => setEditorPortal(null)}
         initial={recommendedGuardrails()}
+        tenantSlug={tenantSlug}
         launching={busy === editorPortal}
         onLaunch={async (config) => {
           const id = editorPortal;

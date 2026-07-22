@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react';
+import { TemplatePicker } from '@/components/admin/template-picker';
 import { Modal } from '@/components/ui/modal';
 
 const TODO_TYPES = [
@@ -38,13 +39,14 @@ export interface GuardrailInitial {
 }
 
 export function GuardrailEditor({
-  open, onClose, initial, onLaunch, launching,
+  open, onClose, initial, onLaunch, launching, tenantSlug,
 }: {
   open: boolean;
   onClose: () => void;
   initial: GuardrailInitial;
   onLaunch: (config: unknown) => void;
   launching: boolean;
+  tenantSlug: string;
 }) {
   const [stages, setStages] = useState<EditStage[]>(() =>
     (initial.stages ?? []).map((s) => ({
@@ -78,9 +80,9 @@ export function GuardrailEditor({
   const removeTodo = (si: number, ti: number) =>
     setStages((cur) => cur.map((s, idx) => idx !== si ? s : { ...s, todos: s.todos.filter((_, j) => j !== ti) }));
 
-  function launch() {
+  function buildConfig() {
     const inc = stages.filter((s) => s.included);
-    const config = {
+    return {
       nudgeDays: nudges,
       agentFirst,
       rfpOversight,
@@ -91,7 +93,24 @@ export function GuardrailEditor({
         todos: s.todos.map((t) => ({ type: t.type, title: t.title || undefined, assigneeRole: t.assigneeRole, dueDays: t.dueDays })),
       })),
     };
-    onLaunch(config);
+  }
+
+  // Reseed the whole editor from a picked template's config (same shape as `initial`) — so an
+  // admin can start from a matching prior template instead of the misaligned default.
+  function applyConfig(cfg: unknown) {
+    const c = (cfg ?? {}) as GuardrailInitial;
+    setStages((c.stages ?? []).map((s) => ({
+      key: s.key, label: s.label ?? s.key, included: true,
+      todos: (s.todos ?? []).map((t) => ({ type: t.type, title: t.title ?? '', assigneeRole: t.assigneeRole ?? 'tenant_user', dueDays: t.dueDays ?? 7 })),
+    })));
+    setManagers((c.collaborators ?? []).filter((cc) => cc.role === 'manager').map((cc) => cc.email));
+    setNudges(c.nudgeDays ?? [5, 2, 1]);
+    setAgentFirst(c.agentFirst ?? true);
+    setRfpOversight(c.rfpOversight ?? true);
+  }
+
+  function launch() {
+    onLaunch(buildConfig());
   }
 
   return (
@@ -103,6 +122,17 @@ export function GuardrailEditor({
           <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
         </div>
         <p className="text-xs text-gray-500 mb-4">Purchase → close → +30 days. Pick the phases, tune the ToDos, and set who gets nudged. Recommended defaults are filled in.</p>
+
+        {/* Start from a saved workflow template (the config-templates capability) — pick a matching
+            prior one (e.g. USAF CSO STTR) instead of forcing this build into the wrong shape. */}
+        <TemplatePicker
+          listUrl={`/api/portal/${tenantSlug}/guardrail-templates`}
+          saveUrl={`/api/portal/${tenantSlug}/guardrail-templates`}
+          onApply={applyConfig}
+          currentConfig={buildConfig}
+          label="Start from a workflow template"
+          saveHint="Reusable next time — pick a matching template rather than forcing a build into a misaligned default."
+        />
 
         {/* AI agents — first draft */}
         <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
