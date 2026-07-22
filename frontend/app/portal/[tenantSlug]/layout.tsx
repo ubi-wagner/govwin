@@ -110,6 +110,10 @@ export default async function PortalLayout({
             {!isPartner && (
               <>
                 <PortalNavLink href={`${basePath}/dashboard`}>Dashboard</PortalNavLink>
+                {/* Admin console ("Page 2") — the setup/governance hub. Same
+                    tenant_admin floor as the other admin surfaces (serves a
+                    descended shadow admin via rank). */}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/manage`}>Manage</PortalNavLink>}
                 {/* BD surfaces — delegated authority, gated to tenant_admin to
                     match the cockpit's grant model (a base tenant_user does not
                     see Opportunities/Buckets/Builds). */}
