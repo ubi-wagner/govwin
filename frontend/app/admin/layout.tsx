@@ -47,6 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/events">Event Stream</AdminNavLink>
           <AdminNavLink href="/admin/agents">Agents</AdminNavLink>
           <AdminNavLink href="/admin/automation">Automation</AdminNavLink>
+          <AdminNavLink href="/admin/automation-framework">Automation Framework</AdminNavLink>
           <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
           <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
           <AdminNavLink href="/admin/processes">Process Ledger</AdminNavLink>
