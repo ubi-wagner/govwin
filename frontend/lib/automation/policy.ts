@@ -76,6 +76,7 @@ interface FrameworkRow {
 
 interface TenantPolicyRow {
   enabled: boolean;
+  recipientRoles: string[] | null;
   nudgeDays: number[] | null;
   dueInMinutes: number | null;
   channel: PolicyChannel | null;
@@ -126,7 +127,7 @@ export async function resolveGatePolicy(opts: ResolveGateOptions): Promise<Resol
       // (mig 127 FORCE-RLS); the explicit WHERE is the belt today. Fail-safe: a throw here
       // is caught below → gate defaults.
       const [row] = await withTenant(tenantId, async (tx) => tx<TenantPolicyRow[]>`
-        SELECT enabled, nudge_days, due_in_minutes, channel, cooldown_minutes, max_fires_per_hour
+        SELECT enabled, recipient_roles, nudge_days, due_in_minutes, channel, cooldown_minutes, max_fires_per_hour
         FROM tenant_automation_policies
         WHERE tenant_id = ${tenantId}::uuid AND scope = ${scope} AND trigger_key = ${triggerKey}
       `);
@@ -140,6 +141,11 @@ export async function resolveGatePolicy(opts: ResolveGateOptions): Promise<Resol
   if (policy) {
     resolved.source.tenantPolicy = true;
     resolved.enabled = policy.enabled;
+    // The tenant's "Who" (recipient_roles) drives the ToDo assignee. The unified `tasks`
+    // ledger carries a single assignee_role, so the first configured role wins (the escalation
+    // FLOOR — admin-always + managers — is added downstream in the pipeline sweeper, decision ①).
+    // Without this, prestage-todos always landed review ToDos on tenant_admin regardless.
+    if (policy.recipientRoles && policy.recipientRoles.length > 0) resolved.assigneeRole = policy.recipientRoles[0];
     if (policy.nudgeDays && policy.nudgeDays.length > 0) resolved.nudgeDays = policy.nudgeDays;
     if (policy.dueInMinutes && policy.dueInMinutes > 0) resolved.dueInMinutes = policy.dueInMinutes;
     if (policy.channel) resolved.channel = policy.channel;

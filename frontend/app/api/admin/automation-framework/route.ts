@@ -58,10 +58,13 @@ export async function GET() {
   }
 }
 
-// Bounded positive-int fields; guards keep the framework sane.
+// Bounded positive-int fields the resolver ACTUALLY enforces; guards keep the framework sane.
+// default_due_in_minutes / default_nudge_days are the reserved lowest-tier fallback columns —
+// shadowed by per-gate defaults today, so the resolver never reads them. They are intentionally
+// NOT accepted here: persisting them was a silent no-op that read as an editable control
+// (adversarial-sweep A2). GET still surfaces them read-only; wiring the tier is a future change.
 const INT_FIELDS: Record<string, string> = {
   curationSlaMinutes: 'curation_sla_minutes',
-  defaultDueInMinutes: 'default_due_in_minutes',
   maxBucketsPerTenant: 'max_buckets_per_tenant',
   maxNudgesPerGate: 'max_nudges_per_gate',
 };
@@ -84,12 +87,6 @@ export async function PATCH(request: Request) {
       }
       sets.push(sql`${sql(col)} = ${Math.floor(v)}`);
     }
-  }
-  if ('defaultNudgeDays' in body) {
-    if (!Array.isArray(body.defaultNudgeDays) || body.defaultNudgeDays.some((n) => typeof n !== 'number' || n < 0)) {
-      return NextResponse.json({ error: 'defaultNudgeDays must be an array of non-negative numbers', code: 'VALIDATION_ERROR' }, { status: 422 });
-    }
-    sets.push(sql`default_nudge_days = ${sql.array((body.defaultNudgeDays as number[]).map((n) => Math.floor(n)).slice(0, 5))}`);
   }
   if ('agentMonthlyBudgetCeilingUsd' in body) {
     const v = Number(body.agentMonthlyBudgetCeilingUsd);

@@ -45,6 +45,22 @@ describe('resolveGatePolicy', () => {
     expect(r.source.tenantPolicy).toBe(true);
   });
 
+  it('tenant recipient_roles drives the assignee — first role wins (A3)', async () => {
+    sqlMock.mockResolvedValueOnce([FRAMEWORK]).mockResolvedValueOnce([
+      { enabled: true, recipientRoles: ['tenant_user', 'partner_user'], nudgeDays: null, dueInMinutes: null, channel: null, cooldownMinutes: 0, maxFiresPerHour: 0 },
+    ]);
+    const r = await resolveGatePolicy({ tenantId: TID, scope: 'build', triggerKey: 'section_review', gateDefaults: GATE });
+    expect(r.assigneeRole).toBe('tenant_user'); // NOT the gate default 'rfp_admin'
+  });
+
+  it('empty recipient_roles leaves the gate-default assignee (regression-safe)', async () => {
+    sqlMock.mockResolvedValueOnce([FRAMEWORK]).mockResolvedValueOnce([
+      { enabled: true, recipientRoles: [], nudgeDays: null, dueInMinutes: null, channel: null, cooldownMinutes: 0, maxFiresPerHour: 0 },
+    ]);
+    const r = await resolveGatePolicy({ tenantId: TID, scope: 'build', triggerKey: 'section_review', gateDefaults: GATE });
+    expect(r.assigneeRole).toBe('rfp_admin');
+  });
+
   it('curation SLA is framework-HARD: tenant due is ignored when pinned (⑦)', async () => {
     sqlMock.mockResolvedValueOnce([FRAMEWORK]).mockResolvedValueOnce([
       { enabled: true, nudgeDays: [5], dueInMinutes: 99999, channel: null, cooldownMinutes: 0, maxFiresPerHour: 0 },
