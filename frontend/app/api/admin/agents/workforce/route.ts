@@ -35,8 +35,8 @@ export async function GET() {
           agent_role AS "agentRole",
           COUNT(*) FILTER (WHERE status = 'pending')::int   AS pending,
           COUNT(*) FILTER (WHERE status = 'running')::int   AS running,
-          COUNT(*) FILTER (WHERE status IN ('done','completed'))::int AS done,
-          COUNT(*) FILTER (WHERE status IN ('failed','error'))::int   AS failed,
+          COUNT(*) FILTER (WHERE status = 'completed')::int AS done,
+          COUNT(*) FILTER (WHERE status = 'failed')::int    AS failed,
           MAX(COALESCE(completed_at, picked_at, created_at)) AS "lastRun"
         FROM agent_task_queue
         WHERE created_at > now() - interval '30 days'
