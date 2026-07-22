@@ -55,6 +55,43 @@ describe('guardrail-templates', () => {
     expect((await POST(post({ config: CONFIG }), ctx)).status).toBe(422);
   });
 
+  it('POST 422 for a whitespace-only name', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    expect((await POST(post({ name: '   ', config: CONFIG }), ctx)).status).toBe(422);
+  });
+
+  it('POST 422 for a name over 120 chars', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    expect((await POST(post({ name: 'x'.repeat(121), config: CONFIG }), ctx)).status).toBe(422);
+  });
+
+  it('POST 422 when config is an array, a string, or null (not a config object)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    for (const bad of [[], 'nope', null, 42]) {
+      expect((await POST(post({ name: 'X', config: bad }), ctx)).status).toBe(422);
+    }
+  });
+
+  it('POST 401 unauthenticated', async () => {
+    authMock.mockResolvedValue(null);
+    expect((await POST(post({ name: 'X', config: CONFIG }), ctx)).status).toBe(401);
+  });
+
+  it('POST still 200 when the audit-event emit throws (best-effort)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    emitMock.mockRejectedValue(new Error('bus down'));
+    sqlMock.mockResolvedValueOnce([{ id: 'n', name: 'X', description: null, config: CONFIG, isDefault: false, scope: 'tenant', updatedAt: 't' }]);
+    expect((await POST(post({ name: 'X', config: CONFIG }), ctx)).status).toBe(200);
+  });
+
+  it('GET 500 with error+code when the query throws', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    sqlMock.mockRejectedValueOnce(new Error('db down'));
+    const res = await GET(new Request('http://t'), ctx);
+    expect(res.status).toBe(500);
+    expect((await res.json()).code).toBe('DB_ERROR');
+  });
+
   it('POST 422 when the config fails the framework-cap validation', async () => {
     authMock.mockResolvedValue(session('tenant_admin'));
     validateMock.mockReturnValue({ ok: false, errors: ['too many stages (max 3)'] });

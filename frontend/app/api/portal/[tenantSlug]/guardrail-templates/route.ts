@@ -80,8 +80,8 @@ export async function POST(request: Request, ctx: RouteContext) {
   if (!name) return NextResponse.json({ error: 'A template name is required', code: 'VALIDATION_ERROR' }, { status: 422 });
   if (name.length > 120) return NextResponse.json({ error: 'Template name too long (max 120)', code: 'VALIDATION_ERROR' }, { status: 422 });
   const config = body.config;
-  if (!config || typeof config !== 'object') {
-    return NextResponse.json({ error: 'A guardrail config is required', code: 'VALIDATION_ERROR' }, { status: 422 });
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return NextResponse.json({ error: 'A guardrail config object is required', code: 'VALIDATION_ERROR' }, { status: 422 });
   }
   // Validate against the framework caps so a saved template can never exceed them.
   const limits = await getGuardrailLimits();

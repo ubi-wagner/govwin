@@ -58,4 +58,67 @@ describe('GET automation-overview', () => {
     // portal config read back from guardrail_config
     expect(json.data.portals[0]).toMatchObject({ agentFirst: true, rfpOversight: false, stageCount: 2, managerCount: 1, nudgeDays: [5, 2] });
   });
+
+  it('empty tenant → 200 with zeroed coverage/tasks/portals (no crash)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    txMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const res = await GET(new Request('http://t'), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.tasks).toEqual([]);
+    expect(json.data.portals).toEqual([]);
+    // coverage still lists both scopes with catalog totals, 0 enabled/configured
+    expect(json.data.coverage.find((c: { scope: string }) => c.scope === 'discovery')).toMatchObject({ enabled: 0, configured: 0, total: 1 });
+    expect(json.data.coverage.find((c: { scope: string }) => c.scope === 'build')).toMatchObject({ enabled: 0, configured: 0, total: 5 });
+  });
+
+  it('malformed / legacy guardrail_config → safe defaults, never throws', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    txMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'p1', label: null, status: 'launched', currentStageIndex: 0, guardrailConfig: null },                 // null config
+        { id: 'p2', label: 'Legacy', status: 'launched', currentStageIndex: 0, guardrailConfig: '{}' },              // jsonb-as-string
+        { id: 'p3', label: 'Partial', status: 'launched', currentStageIndex: 0, guardrailConfig: { agentFirst: 'yes' } }, // wrong types / missing arrays
+      ]);
+    const res = await GET(new Request('http://t'), ctx);
+    expect(res.status).toBe(200);
+    const [p1, p2, p3] = (await res.json()).data.portals;
+    expect(p1).toMatchObject({ label: 'Untitled portal', agentFirst: false, rfpOversight: true, stageCount: 0, managerCount: 0, nudgeDays: [] });
+    expect(p2).toMatchObject({ stageCount: 0, managerCount: 0 });
+    expect(p3.agentFirst).toBe(false); // 'yes' is not === true
+  });
+
+  it('degenerate task rows (null dueAt, empty/overrun nudges) coerce safely', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    txMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 't1', title: 'A', taskType: 'x', status: 'open', assigneeRole: null, dueAt: null, nudgeSchedule: null, nudgesSent: 0, entityType: null, entityId: null, stepName: null },
+        { id: 't2', title: 'B', taskType: 'x', status: 'open', assigneeRole: null, dueAt: '2020-01-01T00:00:00Z', nudgeSchedule: [], nudgesSent: 9, entityType: null, entityId: null, stepName: null },
+      ])
+      .mockResolvedValueOnce([]);
+    const res = await GET(new Request('http://t'), ctx);
+    expect(res.status).toBe(200);
+    const tasks = (await res.json()).data.tasks;
+    expect(tasks[0].nudgeSchedule).toEqual([]); // null coerced to []
+    expect(tasks[1].nudgeSchedule).toEqual([]);
+  });
+
+  it('DB error → 500 with error+code (never leaks / never throws)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    withTenantMock.mockRejectedValueOnce(new Error('db down'));
+    const res = await GET(new Request('http://t'), ctx);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toBeTruthy();
+    expect(json.code).toBe('DB_ERROR');
+  });
+
+  it('wrong-tenant access denied (verifyTenantAccess=false → 403)', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    verifyTenantAccessMock.mockResolvedValue(false);
+    expect((await GET(new Request('http://t'), ctx)).status).toBe(403);
+  });
 });
