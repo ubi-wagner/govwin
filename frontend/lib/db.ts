@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { isTenantWideMember, hasRoleAtLeast, isRole } from './rbac';
+import { hasRoleAtLeast, isRole } from './rbac';
 
 // Next.js "Collecting page data" step at build time loads every
 // route module with NODE_ENV=production but without runtime secrets
@@ -105,7 +105,23 @@ export async function verifyProposalAccess(
   proposalId: string,
 ): Promise<boolean> {
   try {
-    if (isTenantWideMember(role, actorTenantId, tenantId)) return true;
+    // The proposal MUST belong to `tenantId` FIRST. Without this bind, a tenant-wide member of
+    // tenant A could pass tenant B's proposalId under their OWN slug (→ tenantId=A) and
+    // isTenantWideMember(A) would wave them straight through to B's proposal — a cross-tenant READ
+    // (RLS-audit leak #2). Binding here fixes every caller, not just the ones that add their own
+    // proposals-WHERE-tenant belt.
+    const [inTenant] = await sql`
+      SELECT 1 FROM proposals WHERE id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1
+    `;
+    if (!inTenant) return false;
+    // Tenant-wide access must be confirmed against the ACTIVE MEMBERSHIP LEDGER (verifyTenantAccess),
+    // NOT the session role/tenantId (isTenantWideMember). Team deactivation revokes only the
+    // membership row — users.is_active / role / tenant_id and the session are untouched — so a
+    // session-trusting check let a deactivated member keep proposal edit/export access (identity-
+    // audit HIGH: offboarding bypass). verifyTenantAccess denies a revoked membership; admins keep
+    // god-view. `actorTenantId` is now vestigial (kept for the call signature).
+    void actorTenantId;
+    if (await verifyTenantAccess(userId, role, tenantId)) return true;
     const [row] = await sql`
       SELECT 1 FROM proposal_collaborators
       WHERE proposal_id = ${proposalId}

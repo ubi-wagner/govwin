@@ -90,10 +90,11 @@ export async function resolveUserAccess(
     LIMIT 1
   `;
   const isPlatformAdmin = user?.role === 'master_admin' || user?.role === 'rfp_admin';
-  const isTenantAdmin =
-    isPlatformAdmin ||
-    membership?.role === 'tenant_admin' ||
-    (user?.role === 'tenant_admin' && user?.tenantId === tenantId);
+  // Tenant-admin access is granted ONLY via an ACTIVE membership (or platform god-view) — the
+  // legacy `users.role/tenant_id` fallback is retired (identity P4 / #115). It let a deactivated
+  // team member (membership revoked, users row untouched) keep edit/export permissions here, the
+  // second gate the section-save route reads (identity-audit HIGH: offboarding bypass).
+  const isTenantAdmin = isPlatformAdmin || membership?.role === 'tenant_admin';
   const isTenantWide = isTenantAdmin || membership?.role === 'tenant_user';
 
   if (isTenantWide) {

@@ -169,21 +169,30 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const { tenantId, finalSlug, newUserId } = result;
 
-    // Send welcome email with credentials
-    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
-    const emailContent = applicationAcceptedEmail({
-      contactName: app.contactName,
-      contactEmail: app.contactEmail,
-      companyName: app.companyName,
-      tempPassword: tempPw,
-      tenantSlug: finalSlug,
-      loginUrl,
-    });
-    const emailResult = await sendEmail({
-      to: app.contactEmail,
-      subject: emailContent.subject,
-      html: emailContent.html,
-    });
+    // Send welcome email with credentials. Post-commit + BEST-EFFORT: the tenant+user+membership
+    // are already committed above, so an email-layer throw must NEVER 500 and swallow the temp
+    // password — that would leave an approved customer with no way in (sweep F1). sendEmail is
+    // contractually no-throw today; this wrap keeps the guarantee even if that ever changes.
+    let emailResult: Awaited<ReturnType<typeof sendEmail>> = { provider: 'skipped', error: 'not-sent' };
+    try {
+      const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+      const emailContent = applicationAcceptedEmail({
+        contactName: app.contactName,
+        contactEmail: app.contactEmail,
+        companyName: app.companyName,
+        tempPassword: tempPw,
+        tenantSlug: finalSlug,
+        loginUrl,
+      });
+      emailResult = await sendEmail({
+        to: app.contactEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+    } catch (emailErr) {
+      console.error('[applications/accept] welcome email failed (non-fatal, account already created):', emailErr);
+      emailResult = { provider: 'skipped', error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
+    }
 
     // ── Carbon-copy mirror: clone the opportunity river onto the new tenant so a
     //    fresh customer lands with a populated /cards (not an empty pipeline).

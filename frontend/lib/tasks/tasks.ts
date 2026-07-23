@@ -285,6 +285,16 @@ export async function completeTask(opts: {
     return { ok: false, status: 409, error: `Task is already ${task.status}`, code: 'TASK_CLOSED' };
   }
 
+  // Cross-tenant guard (RLS-audit leak #1, cross-tenant WRITE): the task was loaded by bare id and
+  // the assignee-by-ROLE check below is a GLOBAL role-string match, so without this a tenant_admin
+  // of tenant A could close (and stamp a forged result / completed_by on) a same-role task in
+  // tenant B. A tenant actor may complete ONLY a task in their OWN tenant; admins (rfp_admin+) keep
+  // the cross-tenant / admin-task (tenant_id NULL) god-view the docstring describes.
+  const isAdmin = hasRoleAtLeast(actor.role, 'rfp_admin');
+  if (!isAdmin && task.tenantId !== actor.tenantId) {
+    return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
+  }
+
   // Must be an assignee of this task.
   const isAssignee =
     (task.assigneeRole && task.assigneeRole === actor.role) ||
@@ -304,6 +314,9 @@ export async function completeTask(opts: {
           completed_at = now(),
           updated_at = now()
       WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
+        -- Defense-in-depth tenant belt: non-admins can only close their own tenant's task, even if
+        -- the guard above is ever bypassed by a new caller (RLS-audit leak #1).
+        AND (${isAdmin} OR tenant_id IS NOT DISTINCT FROM ${actor.tenantId}::uuid)
       RETURNING id
     `;
   } catch (e) {
