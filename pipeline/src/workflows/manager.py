@@ -1115,6 +1115,10 @@ class WorkflowManager:
                         "channel": "email",
                         "template": "task_nudge",
                         "to_role": assignee_role,
+                        # A task nudge is automation/robot traffic → send as the automation
+                        # identity (sender_identity maps namespace 'system' → automation),
+                        # not the human engagement voice.
+                        "senderNamespace": "system",
                         "title": t["title"],
                         "due_at": t["due_at"].isoformat(),
                         "login_url": f"{base}/go?task={t['id']}",
@@ -1141,6 +1145,7 @@ class WorkflowManager:
             "channel": "email",
             "template": "task_nudge",
             "user_id": str(assignee_user_id),
+            "senderNamespace": "system",   # automation/robot voice (see admin branch above)
             "title": t["title"],
             "due_at": t["due_at"].isoformat(),
             "login_url": login_url,

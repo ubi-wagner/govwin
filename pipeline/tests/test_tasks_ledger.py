@@ -371,6 +371,7 @@ async def test_admin_role_bucket_nudge_emails_admin_cohort(monkeypatch, role):
     assert ctxs[0]["to_role"] == role          # resolved by role, not a single user
     assert ctxs[0]["template"] == "task_nudge"
     assert ctxs[0]["channel"] == "email"
+    assert ctxs[0]["senderNamespace"] == "system"  # automation/robot voice, not engagement
     assert "user_id" not in ctxs[0]            # NOT a per-user send
     assert "/go?task=" in ctxs[0]["login_url"]
 
