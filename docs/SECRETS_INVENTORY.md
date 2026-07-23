@@ -26,11 +26,23 @@ Legend for "have it?": ✅ you already have · ⚙️ auto-injected by Railway �
 
 ## B. Discovery — so opportunities actually flow (else `/cards` is empty)
 
-| Var | Service | Powers | Have it? |
-|-----|---------|--------|----------|
-| `SAM_GOV_API_KEY` | pipeline | federal opportunity ingestion from SAM.gov. Register at sam.gov → System Account → Public API Key. (Or load it through the admin **Sources** page — the encrypted DB copy then takes priority over the env var.) | 🔲 |
+The ingest layer is **multi-source** (`pipeline/src/ingest/dispatcher.py` registry: `dsip`, `sam_gov`,
+`sbir_gov`, `grants_gov`) and a source is turned **on by SCHEDULING it on the admin Sources page**
+(writes a `pipeline_schedules` cron row) — **not** by an env var. So which key you need depends on
+which source you enable:
 
-Without this, the scout/ingest pipeline has no federal source and the bridge → tenant cards stay empty.
+| Source | Needs a key? | Notes |
+|--------|--------------|-------|
+| **DSIP** (`DsipIngester`) — DoD SBIR/STTR Innovation Portal | **NO** — public API `dodsbirsttr.mil/topics-app/api/public/topics` (+ HTML fallback) | **This is the recommended source; needs zero secrets.** Enable + schedule it and topics ingest. |
+| `sbir.gov`, `grants.gov` | No (public) | Additional keyless sources if you want breadth. |
+| `SAM_GOV_API_KEY` (`sam_gov`) | Yes (register at sam.gov) | **Optional / skip** — only if you enable the SAM.gov source. Not being used. |
+
+Plus a **source-agnostic manual path**: an admin can upload a solicitation + topic files
+(`/api/admin/upload-topic-files`, `rfp-upload`) → opportunities, with no scraper at all — useful to
+seed discovery on day one.
+
+**Net: discovery needs no new secret** — enable DSIP (+ optionally sbir/grants) on the Sources page
+and set a daily schedule. `SAM_GOV_API_KEY` is dropped.
 
 ---
 
@@ -101,11 +113,13 @@ self-serve Stripe checkout is descoped (comp-code launch). Add when you turn on 
 
 1. **`GOOGLE_SERVICE_ACCOUNT_JSON` + Workspace domain-wide delegation** → unlocks send-as +
    inbox-sweep of `platform@` and `eric@`, and the whole nudge/template engine (already coded).
-2. **`SAM_GOV_API_KEY`** → so opportunities actually ingest (otherwise discovery is empty).
-3. **Generate + set `AUTH_SECRET` and `API_KEY_ENCRYPTION_SECRET`** (the latter identical on
+   **This is the only real acquisition.**
+2. **Generate + set `AUTH_SECRET` and `API_KEY_ENCRYPTION_SECRET`** (the latter identical on
    frontend + pipeline); confirm **`ANTHROPIC_API_KEY` on all three** services and the **R2 bucket
    linked** to frontend + pipeline.
-4. **DNS SPF/DKIM/DMARC** for rfppipeline.com (deliverability).
-5. **`MASTER_ADMIN_EMAIL` / `INITIAL_MASTER_ADMIN_PASSWORD`** once, to bootstrap the first admin.
+3. **DNS SPF/DKIM/DMARC** for rfppipeline.com (deliverability).
+4. **`MASTER_ADMIN_EMAIL` / `INITIAL_MASTER_ADMIN_PASSWORD`** once, to bootstrap the first admin.
+5. **Discovery = no secret** — enable + schedule the **DSIP** source on the admin Sources page
+   (public API, keyless). `SAM_GOV_API_KEY` is not needed.
 
 Everything else is either already in place, auto-injected by Railway, defaulted, or descoped.
