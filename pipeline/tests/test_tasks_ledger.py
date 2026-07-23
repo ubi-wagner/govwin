@@ -306,7 +306,11 @@ async def test_nudge_sweep_fires_due_and_is_idempotent():
 
     fired = await mgr._sweep_task_nudges(conn)
     assert fired == 2  # 3-day and 5-day thresholds crossed
-    assert mgr._emit_event.await_count == 2
+    # Count the IN-APP nudge events specifically — this row is a role-bucket admin task,
+    # so depending on PORTAL_BASE_URL the sweep may ALSO emit notification.requested emails
+    # (asserted separately below); the in-app count is the invariant here.
+    nudge_events = [c for c in mgr._emit_event.await_args_list if c.args[2] == "task.nudge"]
+    assert len(nudge_events) == 2
 
 
 async def test_nudge_sweep_skips_already_sent():
@@ -325,6 +329,90 @@ async def test_nudge_sweep_skips_already_sent():
     fired = await mgr._sweep_task_nudges(_NudgeConn(rows))
     assert fired == 0
     mgr._emit_event.assert_not_awaited()
+
+
+# ── (d2) role-bucket ADMIN nudge → EMAIL to the RFP-pipeline admin distro ─────
+# The 72h curation SLA ToDo is a role-bucket task (assignee_role='rfp_admin', no
+# single assignee_user_id). Its nudges must still reach the admins by EMAIL, not
+# just in-app: the sweep emits notification.requested with to_role, which the CMS
+# resolves to ADMIN_NOTIFICATION_EMAIL (docs/GMAIL_SETUP.md). These lock that the
+# admin-cohort email fires for admin roles, and ONLY for admin roles.
+
+def _role_bucket_task(now, role, *, hours_out=48):
+    return {
+        "id": uuid.uuid4(),
+        "tenant_id": uuid.uuid4(),
+        "assignee_role": role,
+        "assignee_user_id": None,          # role bucket — no single recipient
+        "title": "Curate the purchased portal",
+        "due_at": now + timedelta(hours=hours_out),
+        "nudge_schedule": [2, 1],
+        "nudges_sent": [],
+        "entity_type": None,
+        "entity_id": None,
+    }
+
+
+def _notif_ctxs(mgr):
+    return [c.args[4] for c in mgr._emit_event.await_args_list
+            if c.args[2] == "notification.requested"]
+
+
+@pytest.mark.parametrize("role", ["rfp_admin", "master_admin"])
+async def test_admin_role_bucket_nudge_emails_admin_cohort(monkeypatch, role):
+    monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:3000")
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    await mgr._emit_task_nudge_email(
+        object(), _role_bucket_task(datetime.now(timezone.utc), role), 1, False
+    )
+    ctxs = _notif_ctxs(mgr)
+    assert len(ctxs) == 1                      # exactly one admin-cohort email
+    assert ctxs[0]["to_role"] == role          # resolved by role, not a single user
+    assert ctxs[0]["template"] == "task_nudge"
+    assert ctxs[0]["channel"] == "email"
+    assert "user_id" not in ctxs[0]            # NOT a per-user send
+    assert "/go?task=" in ctxs[0]["login_url"]
+
+
+async def test_non_admin_role_bucket_nudge_stays_in_app(monkeypatch):
+    # A tenant role-bucket task (no single user, non-admin role) must NOT email the
+    # admin distro — its in-app nudge suffices (unchanged legacy behavior).
+    monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:3000")
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    await mgr._emit_task_nudge_email(
+        object(), _role_bucket_task(datetime.now(timezone.utc), "tenant_admin"), 1, False
+    )
+    mgr._emit_event.assert_not_awaited()
+
+
+async def test_admin_role_bucket_nudge_skips_email_without_base(monkeypatch):
+    # No PORTAL_BASE_URL/NEXTAUTH_URL → a relative CTA is a dead link, so skip the
+    # EMAIL (the in-app nudge already fired in the sweep). No crash, no emit.
+    monkeypatch.delenv("PORTAL_BASE_URL", raising=False)
+    monkeypatch.delenv("NEXTAUTH_URL", raising=False)
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    await mgr._emit_task_nudge_email(
+        object(), _role_bucket_task(datetime.now(timezone.utc), "rfp_admin"), 1, False
+    )
+    mgr._emit_event.assert_not_awaited()
+
+
+async def test_sweep_curation_task_fires_inapp_and_admin_email(monkeypatch):
+    # End-to-end through the real sweep: a 48h-out curation ToDo with schedule [2,1]
+    # crosses only the 2-day threshold → exactly ONE in-app nudge AND ONE admin email.
+    monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:3000")
+    mgr = WorkflowManager(source="pipeline")
+    mgr._emit_event = AsyncMock()
+    rows = [_role_bucket_task(datetime.now(timezone.utc), "rfp_admin", hours_out=48)]
+    fired = await mgr._sweep_task_nudges(_NudgeConn(rows))
+    assert fired == 1
+    types = [c.args[2] for c in mgr._emit_event.await_args_list]
+    assert types.count("task.nudge") == 1              # in-app push
+    assert types.count("notification.requested") == 1  # admin EMAIL push
+    assert _notif_ctxs(mgr)[0]["to_role"] == "rfp_admin"
 
 
 # ── (e) FINAL nudge escalates to the portal's DELEGATED managers ─────────────

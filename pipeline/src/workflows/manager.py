@@ -1091,9 +1091,39 @@ class WorkflowManager:
         On the FINAL nudge we ALSO emit a SEPARATE escalation email to the tenant's
         manager (tenant_admin) — cleaner than a CC and needs no listener change.
         """
-        assignee_user_id = t["assignee_user_id"]
+        assignee_user_id = t.get("assignee_user_id")
         if not assignee_user_id:
-            return  # role-bucket task → in-app nudge only
+            # Role-bucket ADMIN tasks (no single assignee) STILL nudge the RFP-pipeline
+            # admin distribution by EMAIL — the 72h curation SLA must reach the admins,
+            # not merely render in-app. The CMS resolves to_role∈{rfp_admin,master_admin}
+            # → ADMIN_NOTIFICATION_EMAIL (see docs/GMAIL_SETUP.md). This is an INTERNAL
+            # SLA, so it deliberately does NOT escalate to the tenant admin (the is_final
+            # tenant-manager path below is only for user-assigned tenant tasks).
+            assignee_role = t.get("assignee_role")
+            if assignee_role in ("rfp_admin", "master_admin"):
+                base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
+                if not base:
+                    logger.warning(
+                        "[_sweep_task_nudges] PORTAL_BASE_URL/NEXTAUTH_URL unset — skipping ADMIN "
+                        "nudge EMAIL for task %s (in-app nudge still delivered)", t["id"],
+                    )
+                    return
+                tenant_str = str(t["tenant_id"]) if t["tenant_id"] else None
+                await self._emit_event(
+                    conn, "system", "notification.requested", tenant_str,
+                    {
+                        "channel": "email",
+                        "template": "task_nudge",
+                        "to_role": assignee_role,
+                        "title": t["title"],
+                        "due_at": t["due_at"].isoformat(),
+                        "login_url": f"{base}/go?task={t['id']}",
+                        "nudge_index": nudge_index,
+                        "is_final": is_final,
+                        "task_id": str(t["id"]),
+                    },
+                )
+            return  # role-bucket task → (admin cohort emailed above) in-app nudge only
 
         base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
         if not base:
