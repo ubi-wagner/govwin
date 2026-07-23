@@ -2,3 +2,8 @@
 /playwright-report/
 /blob-report/
 /e2e/.auth/
+
+# Adversarial-sweep agents write throwaway vitest configs at the frontend root while a
+# background verification runs; the real scratch (tests/drives) lives under the session scratchpad.
+# These must never be tracked or committed.
+*.scratch.config.*
