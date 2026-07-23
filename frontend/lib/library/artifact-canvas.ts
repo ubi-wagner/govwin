@@ -70,6 +70,23 @@ export function tableToCanvasSheet(title: string, headers: string[], rows: strin
   return baseDoc(title, 'spreadsheet', [section]);
 }
 
+/** A blank starter CanvasDocument for a given form — the seed a Create-Canvas action
+ *  mints, then decomposes into a foundation artifact. */
+export function blankCanvasForForm(form: ArtifactForm, title: string): CanvasDocument {
+  if (form === 'sheet') {
+    return tableToCanvasSheet(title, ['Column A', 'Column B', 'Column C'], [['', '', '']]);
+  }
+  if (form === 'ppt') {
+    const section: CanvasSection = {
+      id: crypto.randomUUID(), title, layout: { mode: 'flow' },
+      groups: [{ id: crypto.randomUUID(), nodes: [node('heading', { level: 1, text: title })] }],
+    };
+    return baseDoc(title, 'slide_cso', [section]);
+  }
+  // doc / pdf → letter prose
+  return sectionsToCanvasDoc(title, [{ title: 'Section 1', body: 'Start writing…' }]);
+}
+
 /** Flatten a CanvasDocument's section nodes into the flat node list an atom stores. */
 export function flattenNodes(doc: CanvasDocument): CanvasNode[] {
   const out: CanvasNode[] = [...(doc.nodes ?? [])];
