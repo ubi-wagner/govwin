@@ -57,11 +57,12 @@ export default function PrivacyPage() {
           </div>
 
           <div>
-            <h2 className="text-base font-bold text-navy-900 mb-3">4. Data Sharing</h2>
-            <p>We do not sell your personal information. We may share data with:</p>
+            <h2 className="text-base font-bold text-navy-900 mb-3">4. Data Sharing & Expert Access</h2>
+            <p>We do not sell your personal information. We may share or grant access to data as follows:</p>
             <ul className="list-disc pl-6 space-y-1 mt-2">
               <li><strong>Service providers:</strong> Stripe (payments), Railway (infrastructure), AWS (storage), Anthropic (AI processing) — each bound by data processing agreements</li>
               <li><strong>Your collaborators:</strong> When you invite team members or partners, they can see the content you grant them access to</li>
+              <li><strong>RFP-Pipeline expert staff (shadow access):</strong> By default, our expert staff are granted oversight access to your proposal portals to curate, review, release, and support your build ("RFP-Pipeline Oversight"). This is enabled automatically for each portal and is how we provide expert curation. You can decline it per portal in that portal's guardrail settings; opting out means we no longer access or review that portal — see the Terms for the full effects.</li>
               <li><strong>Legal requirements:</strong> When required by law, court order, or governmental authority</li>
             </ul>
           </div>

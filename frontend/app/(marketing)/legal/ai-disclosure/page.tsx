@@ -112,7 +112,9 @@ export default function AiDisclosurePage() {
             </ul>
             <p className="mt-3">
               This is why human review is mandatory. The AI is a drafting assistant, not a
-              proposal writer. Your expertise and judgment are the final quality gate.
+              proposal writer. RFP-Pipeline expert curation and consultation are advisory as well —
+              our people can make mistakes too. Your expertise and judgment are the final quality
+              gate, and final review before submission is always your responsibility.
             </p>
           </div>
 

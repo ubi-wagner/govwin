@@ -77,10 +77,12 @@ export default function AcceptableUsePage() {
           <div>
             <h2 className="text-base font-bold text-navy-900 mb-3">6. Account Responsibility</h2>
             <p>
-              Tenant administrators are responsible for all users they invite to their workspace.
-              This includes ensuring team members and external collaborators understand and comply
-              with this AUP. Access permissions should be set to the minimum necessary for each
-              user&apos;s role.
+              User access is always the responsibility of the customer administrator. Tenant
+              administrators are responsible for all users they invite to their workspace and for
+              everything those users do with the access granted. This includes ensuring team members
+              and external collaborators understand and comply with this AUP, setting access
+              permissions to the minimum necessary for each user&apos;s role, and revoking access
+              promptly when it is no longer needed.
             </p>
           </div>
 
