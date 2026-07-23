@@ -11,12 +11,15 @@ import {
 } from '@/lib/types/canvas-document';
 import type { ExportFormat } from '@/lib/export/artifact-export';
 
-/** Native file format per artifact kind. */
-export const ARTIFACT_FORMAT: Record<string, ExportFormat> = {
+/** The FORM axis of the taxonomy (docs/LIBRARY_AND_VAULTS_DESIGN.md §3). */
+export type ArtifactForm = 'doc' | 'ppt' | 'pdf' | 'sheet';
+
+/** Native file FORMAT per form: form → exported file. */
+export const ARTIFACT_FORMAT: Record<ArtifactForm, ExportFormat> = {
   doc: 'docx',
-  sheet: 'xlsx',
-  deck: 'pptx',
+  ppt: 'pptx',
   pdf: 'pdf',
+  sheet: 'xlsx',
 };
 
 export interface Section { title: string; body: string; }

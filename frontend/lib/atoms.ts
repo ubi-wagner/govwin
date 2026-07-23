@@ -19,7 +19,11 @@ import type { CanvasNode } from '@/lib/types/canvas-document';
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
 export { atomSize, type AtomSize };
 
-export type Grain = 'primitive' | 'group' | 'reference';
+// Foundation-artifact containment (docs/LIBRARY_AND_VAULTS_DESIGN.md §1):
+// foundation ⊃ section ⊃ group ⊃ primitive. The three container grains aggregate
+// members (via atom_members); primitive is the leaf; reference is a pointer.
+export type Grain = 'foundation' | 'section' | 'group' | 'primitive' | 'reference';
+const CONTAINER_GRAINS: ReadonlySet<Grain> = new Set<Grain>(['foundation', 'section', 'group']);
 export type CreatorKind = 'admin' | 'ai' | 'collaborator' | 'system' | 'import';
 export type AtomSource = 'upload' | 'harvest' | 'download_derivative' | 'manual';
 export type Visibility = 'tenant' | 'owner_only' | 'shared_for_proposal' | 'admin_only';
@@ -128,8 +132,8 @@ export async function createAtom(
       `;
     }
 
-    // members (group aggregates ordered members)
-    const members = input.grain === 'group' ? (input.memberAtomIds ?? []) : [];
+    // members: a container grain (foundation/section/group) aggregates ordered members.
+    const members = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
     for (let i = 0; i < members.length; i++) {
       await tx`
         INSERT INTO atom_members (group_atom_id, member_atom_id, ordinal)

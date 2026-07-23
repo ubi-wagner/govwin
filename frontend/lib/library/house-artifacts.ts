@@ -4,42 +4,29 @@
  * the pure builders) and landed in the library as a canvas-backed atom; renderCanvas
  * then exports its real file (.docx / .xlsx / .pptx / .pdf).
  */
-import { createAtom } from '@/lib/atoms';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { ExportFormat } from '@/lib/export/artifact-export';
-import { HOUSE_COLLECTION } from '@/lib/library/house-docs';
 import {
   ARTIFACT_FORMAT, sectionsToCanvasDoc, tableToCanvasSheet, flattenNodes, type Section,
 } from '@/lib/library/artifact-canvas';
+import { decomposeAndIngest } from '@/lib/library/foundation';
 
 export { ARTIFACT_FORMAT, sectionsToCanvasDoc, tableToCanvasSheet, flattenNodes };
 export type { Section };
 
-/** Land a native-format CanvasDocument in a tenant's library as a canvas atom,
- *  tagged (collection=house_library, kind=<kind>, format=<docx|xlsx|pptx|pdf>). */
+/** Land a native-format CanvasDocument as a FOUNDATION ARTIFACT that decomposes into
+ *  section/group/atom real atoms (docs/LIBRARY_AND_VAULTS_DESIGN.md §1). Returns the
+ *  foundation atom id + the grain counts. */
 export async function ingestHouseArtifact(
   tenantId: string,
-  meta: { title: string; slug: string; kind: 'doc' | 'sheet' | 'deck' | 'pdf' },
+  meta: { title: string; slug: string; form: 'doc' | 'ppt' | 'pdf' | 'sheet'; kind?: 'template' | 'document'; context?: string },
   doc: CanvasDocument,
   actor: { id: string },
-): Promise<{ atomId: string; format: ExportFormat }> {
-  const format = ARTIFACT_FORMAT[meta.kind];
-  const { atomId } = await createAtom(tenantId, {
-    grain: 'group',
-    title: meta.title,
-    content: null,
-    canvasNodes: flattenNodes(doc),
-    summary: `House ${meta.kind} → ${format}`,
-    source: 'manual',
-    creatorKind: 'admin',
-    visibility: 'tenant',
-    status: 'approved',
-    tags: [
-      { dimension: 'collection', value: HOUSE_COLLECTION, source: 'admin', confirmed: true },
-      { dimension: 'doc', value: meta.slug, source: 'admin', confirmed: true },
-      { dimension: 'kind', value: meta.kind, source: 'admin', confirmed: true },
-      { dimension: 'format', value: format, source: 'admin', confirmed: true },
-    ],
-  }, { id: actor.id, kind: 'admin' });
-  return { atomId, format };
+): Promise<{ atomId: string; format: ExportFormat; sections: number; groups: number; atoms: number }> {
+  const format = ARTIFACT_FORMAT[meta.form];
+  const d = await decomposeAndIngest(tenantId, doc, meta, actor);
+  return {
+    atomId: d.foundationId, format,
+    sections: d.sectionIds.length, groups: d.groupIds.length, atoms: d.atomIds.length,
+  };
 }

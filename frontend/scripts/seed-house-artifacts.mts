@@ -64,23 +64,25 @@ async function main() {
   const docx = await renderCanvas('docx', t.doc, {});
   ok('terms.docx-bytes', isZip(docx), `${docx.length}b, ${t.sectionCount} sections`);
   writeFileSync(resolve(OUT, 'RFP-Pipeline-Terms.docx'), docx);
-  const ta = await ingestHouseArtifact(TENANT, { title: 'Terms & Conditions', slug: 'terms', kind: 'doc' }, t.doc, { id: ACTOR });
-  ok('terms.atom', !!ta.atomId && ta.format === 'docx');
+  const ta = await ingestHouseArtifact(TENANT, { title: 'Terms & Conditions', slug: 'terms', form: 'doc', kind: 'document', context: 'legal' }, t.doc, { id: ACTOR });
+  ok('terms.foundation', !!ta.atomId && ta.format === 'docx' && ta.sections > 0,
+    `foundation + ${ta.sections} sections / ${ta.groups} groups / ${ta.atoms} atoms`);
 
   // Calendar → sheet → .xlsx
   const c = await calendarSheet();
   const xlsx = await renderCanvas('xlsx', c.doc, {});
   ok('calendar.xlsx-bytes', isZip(xlsx), `${xlsx.length}b, ${c.rowCount} rows`);
   writeFileSync(resolve(OUT, 'RFP-Pipeline-Expert-Time-Schedule.xlsx'), xlsx);
-  const ca = await ingestHouseArtifact(TENANT, { title: 'Expert-Time Schedule', slug: 'calendar-schedule', kind: 'sheet' }, c.doc, { id: ACTOR });
-  ok('calendar.atom', !!ca.atomId && ca.format === 'xlsx');
+  const ca = await ingestHouseArtifact(TENANT, { title: 'Expert-Time Schedule', slug: 'calendar-schedule', form: 'sheet', kind: 'document', context: 'proposal' }, c.doc, { id: ACTOR });
+  ok('calendar.foundation', !!ca.atomId && ca.format === 'xlsx' && ca.sections > 0,
+    `foundation + ${ca.sections} sections / ${ca.groups} groups / ${ca.atoms} atoms`);
 
-  // Prove the atoms surface with the right format tag via the real read path.
+  // Prove the FOUNDATION atoms surface via the real read path, filtered by grain+format.
   const viewer = viewerFromRole(ACTOR, 'master_admin');
-  const docs = await listAtoms(TENANT, { dimension: 'format', value: 'docx', limit: 20 }, viewer);
-  const sheets = await listAtoms(TENANT, { dimension: 'format', value: 'xlsx', limit: 20 }, viewer);
-  ok('listAtoms.doc', docs.some((a) => a.id === ta.atomId), `${docs.length} docx atoms`);
-  ok('listAtoms.sheet', sheets.some((a) => a.id === ca.atomId), `${sheets.length} xlsx atoms`);
+  const docFnd = await listAtoms(TENANT, { grain: 'foundation', dimension: 'format', value: 'docx', limit: 20 }, viewer);
+  const sheetFnd = await listAtoms(TENANT, { grain: 'foundation', dimension: 'format', value: 'xlsx', limit: 20 }, viewer);
+  ok('listAtoms.doc-foundation', docFnd.some((a) => a.id === ta.atomId), `${docFnd.length} docx foundations`);
+  ok('listAtoms.sheet-foundation', sheetFnd.some((a) => a.id === ca.atomId), `${sheetFnd.length} xlsx foundations`);
 
   console.log(`\n${fail === 0 ? 'ALL PASS' : 'HAS FAILURES'} — ${pass} pass / ${fail} fail`);
   if (fail) process.exit(1);

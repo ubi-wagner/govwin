@@ -6,8 +6,8 @@ import {
 // Pure builders behind the native-format house artifacts (Terms→doc, Calendar→sheet).
 // The full canvas→.docx/.xlsx export + atom ingest is proven against the DB.
 describe('artifact-canvas builders', () => {
-  it('maps each artifact kind to its native file format', () => {
-    expect(ARTIFACT_FORMAT).toMatchObject({ doc: 'docx', sheet: 'xlsx', deck: 'pptx', pdf: 'pdf' });
+  it('maps each artifact FORM to its native file format', () => {
+    expect(ARTIFACT_FORMAT).toEqual({ doc: 'docx', ppt: 'pptx', pdf: 'pdf', sheet: 'xlsx' });
   });
 
   it('sectionsToCanvasDoc → a doc with a heading+body per section', () => {
