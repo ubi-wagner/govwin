@@ -45,7 +45,7 @@ export interface DecomposedArtifact {
 // numbered_list, image, table, url, caption, footnote. The structural set matches
 // the canvas's own library_eligible exclusions (page_break/spacer/toc), plus heading
 // (a bare heading is a label, not a standalone reusable atom).
-const STRUCTURAL_NODES: ReadonlySet<string> = new Set(['heading', 'toc', 'page_break', 'spacer']);
+const STRUCTURAL_NODES: ReadonlySet<string> = new Set(['heading', 'toc', 'page_break', 'spacer', 'divider']);
 
 function nodeLabel(n: CanvasNode): { title: string; content: string } {
   const c = (n.content ?? {}) as Record<string, unknown>;
