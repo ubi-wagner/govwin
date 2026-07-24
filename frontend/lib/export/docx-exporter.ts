@@ -278,6 +278,9 @@ function nodeToDocx(
         color: style.color,
         bold: style.weight === 'bold',
         italic: style.style === 'italic',
+        underline: style.underline,
+        strikethrough: style.strikethrough,
+        highlight: style.highlight,
       });
       return [new Paragraph({
         ...paraOpts,
@@ -499,14 +502,20 @@ function createFormattedRuns(
   content: TextBlockContent,
   font: string,
   size: number,
-  nodeStyle?: { color?: string; bold?: boolean; italic?: boolean },
+  nodeStyle?: { color?: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; highlight?: string },
 ): TextRun[] {
   const defaultColor = nodeStyle?.color?.replace('#', '') || undefined;
   const defaultBold = nodeStyle?.bold || undefined;
   const defaultItalic = nodeStyle?.italic || undefined;
+  const defaultUnderline = nodeStyle?.underline || undefined;
+  const defaultStrike = nodeStyle?.strikethrough || undefined;
+  const defaultShading = nodeStyle?.highlight ? { fill: nodeStyle.highlight.replace('#', '') } : undefined;
 
   if (!content.inline_formats || content.inline_formats.length === 0) {
-    return [new TextRun({ text: content.text, font, size, color: defaultColor, bold: defaultBold, italics: defaultItalic })];
+    return [new TextRun({
+      text: content.text, font, size, color: defaultColor, bold: defaultBold, italics: defaultItalic,
+      underline: defaultUnderline ? {} : undefined, strike: defaultStrike, shading: defaultShading,
+    })];
   }
 
   const text = content.text;
@@ -546,7 +555,9 @@ function createFormattedRuns(
       size,
       bold: isBold || defaultBold || undefined,
       italics: isItalic || defaultItalic || undefined,
-      underline: isUnderline ? {} : undefined,
+      underline: (isUnderline || defaultUnderline) ? {} : undefined,
+      strike: defaultStrike,
+      shading: defaultShading,
       superScript: isSuperscript || undefined,
       subScript: isSubscript || undefined,
       color: defaultColor,

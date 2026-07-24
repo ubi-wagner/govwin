@@ -16,6 +16,11 @@ export interface FontSpec {
   weight?: 'normal' | 'bold';
   style?: 'normal' | 'italic';
   color?: string;
+  // The rest of the run-formatting common to Word / PowerPoint / Excel / PDF, so
+  // every primitive can carry the full set (NodeStyle extends FontSpec).
+  underline?: boolean;
+  strikethrough?: boolean;
+  highlight?: string;   // hex background/highlight color, e.g. '#FFFF00'
 }
 
 // ─── Canvas rules (from volume_required_items) ──────────────────────
