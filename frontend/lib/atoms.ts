@@ -303,6 +303,72 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
   );
 }
 
+// ── faceted library list (P3.1): intersect taxonomy dimensions + facet counts ──
+export interface FacetFilter {
+  kind?: string; form?: string; context?: string; collection?: string; vehicle?: string;
+  grain?: Grain; q?: string; page?: number; pageSize?: number;
+}
+export interface FacetResult {
+  atoms: Array<Record<string, unknown>>;
+  total: number;
+  /** dimension → { value → count } over the visible library (for the filter chips). */
+  facets: Record<string, Record<string, number>>;
+}
+
+/**
+ * List the library with an ANDed taxonomy filter (kind × form × context × collection ×
+ * vehicle), grain filter, escaped search + pagination, plus facet counts for the chips.
+ * Visibility is the same viewer predicate as listAtoms. Every taxonomy filter is an
+ * EXISTS on atom_tags, so they intersect. Facet counts respect grain+q but NOT the
+ * taxonomy filters, so a chip always shows every available option with its total.
+ */
+export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer: Viewer): Promise<FacetResult> {
+  const pageSize = Math.min(100, Math.max(1, f.pageSize ?? 30));
+  const page = Math.max(1, f.page ?? 1);
+  const offset = (page - 1) * pageSize;
+  const esc = (s: string) => '%' + s.replace(/[%_\\]/g, '\\$&') + '%';
+  return withTenant(tenantId, async (tx) => {
+    const vis = tx`(${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)`;
+    const tagF = (dim: string, val?: string) =>
+      val ? tx`AND EXISTS (SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND t.dimension = ${dim} AND t.value = ${val})` : tx``;
+    const where = tx`
+      a.tenant_id = ${tenantId}::uuid
+      AND a.grain <> 'reference'
+      AND ${vis}
+      ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
+      ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
+      ${tagF('kind', f.kind)} ${tagF('form', f.form)} ${tagF('context', f.context)} ${tagF('collection', f.collection)} ${tagF('vehicle', f.vehicle)}`;
+
+    const atoms = await tx<Array<Record<string, unknown>>>`
+      SELECT a.id, a.grain, a.title, a.summary, a.word_count, a.status, a.usage_count, a.created_at,
+             (a.owner_user_id = ${viewer.userId}::uuid) AS is_mine,
+             (SELECT count(*)::int FROM atom_members m WHERE m.group_atom_id = a.id) AS member_count,
+             coalesce((SELECT array_agg(t.dimension || ':' || t.value ORDER BY t.dimension) FROM atom_tags t WHERE t.atom_id = a.id), '{}') AS tags
+      FROM library_atoms a
+      WHERE ${where}
+      ORDER BY a.created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}`;
+    const [{ total }] = await tx<Array<{ total: number }>>`SELECT count(*)::int AS total FROM library_atoms a WHERE ${where}`;
+
+    // Facet counts reflect the coarse SCOPE (grain + q + collection) but not the
+    // chip dimensions themselves, so each chip always shows every option available
+    // within the current library section.
+    const facetRows = await tx<Array<{ dimension: string; value: string; n: number }>>`
+      SELECT t.dimension, t.value, count(*)::int AS n
+      FROM library_atoms a JOIN atom_tags t ON t.atom_id = a.id
+      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND ${vis}
+        AND t.dimension IN ('kind','form','context','collection','vehicle')
+        ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
+        ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
+        ${f.collection ? tx`AND EXISTS (SELECT 1 FROM atom_tags c WHERE c.atom_id = a.id AND c.dimension = 'collection' AND c.value = ${f.collection})` : tx``}
+      GROUP BY t.dimension, t.value`;
+    const facets: Record<string, Record<string, number>> = {};
+    for (const r of facetRows) { (facets[r.dimension] ??= {})[r.value] = Number(r.n); }
+
+    return { atoms, total: Number(total), facets };
+  });
+}
+
 // ── full atom (tags + members + lineage) ──
 export async function getAtom(tenantId: string, atomId: string, viewer: Viewer): Promise<Record<string, unknown> | null> {
   return withTenant(tenantId, async (tx) => {
