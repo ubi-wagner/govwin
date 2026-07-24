@@ -14,6 +14,7 @@ import { CommentThread, type NodeComment } from './collaboration';
 import { computeSectionBudget, evaluateFit } from '@/lib/section-budget';
 import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
+import { NodeFormatControls } from './node-format-controls';
 
 interface Props {
   document: CanvasDocument;
@@ -37,6 +38,10 @@ interface Props {
   onReplaceFromLibrary?: (nodeId: string, atom: LibraryAtomCandidate) => void;
   /** Update per-node style overrides (alignment, font, spacing, etc.) */
   onUpdateNodeStyle?: (nodeId: string, style: Partial<NodeStyle>) => void;
+  /** Update a node's content payload (element-specific props: shape kind, callout variant, chart type, …) */
+  onUpdateNodeContent?: (nodeId: string, content: CanvasNode['content']) => void;
+  /** Update a node's free placement (position + wrap). */
+  onUpdateNodePosition?: (nodeId: string, patch: Partial<NonNullable<CanvasNode['position']>>) => void;
   /** Update canvas-level settings (margins, font, etc.) */
   onUpdateCanvas?: (canvas: CanvasRules) => void;
   /** Handler for AI revision — replaces a node's content with AI-revised text */
@@ -334,6 +339,8 @@ export function CanvasSidebar({
   onRevertNode,
   onReplaceFromLibrary,
   onUpdateNodeStyle,
+  onUpdateNodeContent,
+  onUpdateNodePosition,
   onUpdateCanvas,
   onReviseNode,
   proposalId,
@@ -720,6 +727,18 @@ export function CanvasSidebar({
                     className="w-full text-xs border rounded px-1.5 py-1"
                   />
                 </div>
+
+                {/* Context-aware ribbon groups: emphasis (U/S/highlight) · Shape
+                    Format (fill/border/opacity/rotation/shadow) · Arrange (free
+                    placement) · the element-specific control. Shown only for the
+                    node types that support each group. */}
+                <NodeFormatControls
+                  node={selectedNode}
+                  readOnly={readOnly}
+                  onStyle={(patch) => onUpdateNodeStyle(selectedNode.id, patch)}
+                  onContent={(content) => onUpdateNodeContent?.(selectedNode.id, content)}
+                  onPosition={(patch) => onUpdateNodePosition?.(selectedNode.id, patch)}
+                />
               </div>
             )}
 

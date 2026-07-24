@@ -79,8 +79,27 @@ function defaultContent(type: NodeType): CanvasNode['content'] {
     case 'footnote': return { marker: '1', text: 'Footnote text' };
     case 'toc': return { max_depth: 3 };
     case 'url': return { href: 'https://', display_text: 'Link text' };
+    // ── Extended elements ──
+    case 'shape': return { shape: 'rectangle', text: '' };
+    case 'text_box': return { text: 'Text box' };
+    case 'callout': return { variant: 'info', title: 'Note', text: 'Callout text' };
+    case 'code_block': return { code: '// code', language: 'text' };
+    case 'blockquote': return { text: 'Quote', cite: '' };
+    case 'chart': return { chart_type: 'bar', categories: ['A', 'B', 'C'], series: [{ name: 'Series 1', data: [3, 7, 5] }] };
+    case 'equation': return { latex: 'E = mc^2', display: true };
+    case 'divider': return { thickness: 1, line_style: 'solid' };
+    case 'video': return { url: '', caption: 'Video' };
+    case 'signature': return { label: 'Authorized Representative' };
     default: return null;
   }
+}
+
+/** A sensible starting look for a freshly-inserted extended element (so it's
+ *  visible on the canvas immediately and has something to format). */
+function defaultStyle(type: NodeType): NodeStyle | undefined {
+  if (type === 'shape') return { fill: { color: '#DCE6F1' }, border: { color: '#94A3B8', width: 1 } };
+  if (type === 'text_box') return { border: { color: '#CBD5E1', width: 1 } };
+  return undefined;
 }
 
 export function CanvasEditor(props: Props) {
@@ -227,6 +246,7 @@ function CanvasEditorInner({
       source: 'manual',
       actorId,
       actorName,
+      style: defaultStyle(type),
     });
 
     updateDoc((prev) => {
@@ -326,6 +346,14 @@ function CanvasEditorInner({
           style: { ...n.style, ...style },
         };
       }),
+    }));
+  }, [updateDoc]);
+
+  // Free-placement (content boxes / floating figures that don't snap to margins).
+  const handleUpdateNodePosition = useCallback((nodeId: string, patch: Partial<NonNullable<CanvasNode['position']>>) => {
+    updateDoc((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => (n.id === nodeId ? { ...n, position: { ...(n.position ?? {}), ...patch } } : n)),
     }));
   }, [updateDoc]);
 
@@ -864,6 +892,8 @@ function CanvasEditorInner({
         onRevertNode={handleRevertNode}
         onReplaceFromLibrary={handleReplaceFromLibrary}
         onUpdateNodeStyle={handleUpdateNodeStyle}
+        onUpdateNodeContent={handleUpdateNode}
+        onUpdateNodePosition={handleUpdateNodePosition}
         onUpdateCanvas={handleUpdateCanvas}
         onReviseNode={handleReviseNode}
         proposalId={proposalId}

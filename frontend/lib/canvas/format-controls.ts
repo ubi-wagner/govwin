@@ -1,0 +1,86 @@
+/**
+ * Which formatting controls apply to a given node type — the model behind the
+ * canvas editor's context-aware "ribbon" drawer (NodeFormatControls). Pure so it
+ * can be unit-tested and shared by the toolbar + the side drawer.
+ *
+ * Four control groups, mirroring Word/PowerPoint's ribbon tabs:
+ *   text    — run styling (font/size/B/I/U/S/highlight/color/align)
+ *   box     — the Shape-Format tab: fill(+opacity), border(color/width/style/radius), opacity, rotation, shadow
+ *   arrange — free placement: position x/y/w/h + text wrap (does NOT snap to margins)
+ *   element — the one type-specific control (shape kind, callout variant, chart type, …)
+ */
+import type { NodeType, ShapeKind } from '@/lib/types/canvas-document';
+
+export type ElementKind =
+  | 'shape' | 'callout' | 'chart' | 'divider' | 'code' | 'signature' | 'equation' | 'video' | 'heading' | 'list' | null;
+
+export interface FormatCaps {
+  /** run styling applies (the node bears text) */
+  text: boolean;
+  /** the box / shape look applies (fill · border · opacity · rotation · shadow) */
+  box: boolean;
+  /** free placement applies (position + wrap) */
+  arrange: boolean;
+  /** the single type-specific control, if any */
+  element: ElementKind;
+}
+
+// Text-bearing nodes carry run styling. (image/table/chart/divider/video/page_break/
+// spacer/toc do not — their content isn't a styled run.)
+const TEXT_RUN = new Set<NodeType>([
+  'heading', 'text_block', 'bulleted_list', 'numbered_list', 'caption', 'footnote',
+  'url', 'text_box', 'callout', 'blockquote', 'shape', 'code_block', 'equation', 'signature',
+]);
+// Box-look nodes carry fill/border/opacity/rotation/shadow (the Shape-Format tab).
+const BOX = new Set<NodeType>(['shape', 'text_box', 'callout', 'image', 'chart', 'video']);
+// Free-placement nodes (content boxes / shapes / floating figures that don't snap to margins).
+const ARRANGE = new Set<NodeType>(['shape', 'text_box', 'image', 'chart', 'video']);
+
+/** Resolve the control groups + the one element-specific control for a node type. */
+export function formatCapabilities(type: NodeType): FormatCaps {
+  const element: ElementKind =
+    type === 'shape' ? 'shape'
+      : type === 'callout' ? 'callout'
+        : type === 'chart' ? 'chart'
+          : type === 'divider' ? 'divider'
+            : type === 'code_block' ? 'code'
+              : type === 'signature' ? 'signature'
+                : type === 'equation' ? 'equation'
+                  : type === 'video' ? 'video'
+                    : type === 'heading' ? 'heading'
+                      : (type === 'bulleted_list' || type === 'numbered_list') ? 'list'
+                        : null;
+  return { text: TEXT_RUN.has(type), box: BOX.has(type), arrange: ARRANGE.has(type), element };
+}
+
+// ── Option lists for the drawer's dropdowns / pickers ──
+export const SHAPE_KINDS: ReadonlyArray<{ value: ShapeKind; label: string; glyph: string }> = [
+  { value: 'rectangle', label: 'Rectangle', glyph: '▭' },
+  { value: 'rounded_rectangle', label: 'Rounded', glyph: '▢' },
+  { value: 'ellipse', label: 'Ellipse', glyph: '◯' },
+  { value: 'triangle', label: 'Triangle', glyph: '△' },
+  { value: 'diamond', label: 'Diamond', glyph: '◇' },
+  { value: 'star', label: 'Star', glyph: '★' },
+  { value: 'arrow', label: 'Arrow', glyph: '➜' },
+  { value: 'line', label: 'Line', glyph: '─' },
+  { value: 'callout_bubble', label: 'Bubble', glyph: '💬' },
+];
+export const CALLOUT_VARIANTS = ['info', 'warning', 'tip', 'success', 'note'] as const;
+export const CHART_TYPES = ['bar', 'line', 'area', 'pie', 'doughnut', 'scatter'] as const;
+export const LINE_STYLES = ['solid', 'dashed', 'dotted'] as const;
+export const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'none'] as const;
+export const WRAP_MODES = ['inline', 'float', 'front', 'behind'] as const;
+export const FONT_FAMILIES = ['Times New Roman', 'Arial', 'Calibri', 'Georgia', 'Helvetica', 'Courier New'] as const;
+
+/** The extended element types insertable from the ribbon's Elements group. */
+export const INSERT_ELEMENTS: ReadonlyArray<{ type: NodeType; label: string; icon: string }> = [
+  { type: 'shape', label: 'Shape', icon: '▭' },
+  { type: 'text_box', label: 'Text box', icon: '⬚' },
+  { type: 'callout', label: 'Callout', icon: '❗' },
+  { type: 'chart', label: 'Chart', icon: '📊' },
+  { type: 'divider', label: 'Divider', icon: '―' },
+  { type: 'code_block', label: 'Code', icon: '</>' },
+  { type: 'blockquote', label: 'Quote', icon: '❝' },
+  { type: 'equation', label: 'Equation', icon: '∑' },
+  { type: 'signature', label: 'Signature', icon: '✍' },
+];

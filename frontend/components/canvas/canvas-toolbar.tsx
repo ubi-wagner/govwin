@@ -10,6 +10,7 @@
  * — it drives the editor's existing handlers, so undo/redo/save all still apply.
  */
 import type { CanvasNode, NodeType, NodeStyle } from '@/lib/types/canvas-document';
+import { INSERT_ELEMENTS } from '@/lib/canvas/format-controls';
 
 interface Props {
   format: string;
@@ -69,6 +70,23 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
 
       <span className="mx-1 h-5 w-px bg-gray-200 shrink-0" aria-hidden />
 
+      {/* Elements group — the extended blocks (shapes / boxes / callouts / chart / …) */}
+      <span className="text-[10px] uppercase tracking-wide text-gray-400 mr-1 shrink-0">Elements</span>
+      {INSERT_ELEMENTS.map((i) => (
+        <button
+          key={i.type}
+          type="button"
+          disabled={readOnly}
+          onClick={() => onAddNode(i.type, sel?.id)}
+          className={`${btn} ${idle} shrink-0`}
+          title={`Insert ${i.label.toLowerCase()}${sel ? ' after the selected block' : ''}`}
+        >
+          <span className="mr-1 text-gray-400" aria-hidden>{i.icon}</span>{i.label}
+        </button>
+      ))}
+
+      <span className="mx-1 h-5 w-px bg-gray-200 shrink-0" aria-hidden />
+
       {/* Format group — acts on the selected text block */}
       <span className="text-[10px] uppercase tracking-wide text-gray-400 mr-1 shrink-0">Format</span>
       <button
@@ -83,6 +101,30 @@ export function CanvasToolbar({ format, selectedNode, onAddNode, onUpdateNodeSty
         className={`${btn} italic shrink-0 ${canFormat && sel?.style.style === 'italic' ? active : idle}`}
         title="Italic"
       >I</button>
+      <button
+        type="button" disabled={!canFormat}
+        onClick={() => sel && onUpdateNodeStyle(sel.id, { underline: !sel.style.underline })}
+        className={`${btn} underline shrink-0 ${canFormat && sel?.style.underline ? active : idle}`}
+        title="Underline"
+      >U</button>
+      <button
+        type="button" disabled={!canFormat}
+        onClick={() => sel && onUpdateNodeStyle(sel.id, { strikethrough: !sel.style.strikethrough })}
+        className={`${btn} line-through shrink-0 ${canFormat && sel?.style.strikethrough ? active : idle}`}
+        title="Strikethrough"
+      >S</button>
+      <label className={`flex items-center shrink-0 ${canFormat ? '' : 'opacity-40 pointer-events-none'}`} title="Highlight">
+        <span className="text-[11px] mr-0.5" aria-hidden>🖍</span>
+        <input
+          type="color"
+          value={sel?.style.highlight || '#FFFF00'}
+          onChange={(e) => sel && onUpdateNodeStyle(sel.id, { highlight: e.target.value })}
+          className="h-6 w-6 rounded border border-gray-200 cursor-pointer p-0"
+        />
+        {sel?.style.highlight && (
+          <button type="button" onClick={() => sel && onUpdateNodeStyle(sel.id, { highlight: undefined })} className="text-[10px] text-gray-400 hover:text-rose-600 ml-0.5" title="Clear highlight">✕</button>
+        )}
+      </label>
 
       {ALIGNS.map((a) => (
         <button
