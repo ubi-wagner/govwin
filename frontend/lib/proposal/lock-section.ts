@@ -23,6 +23,7 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { harvestSectionToAtomLibrary } from '@/lib/proposal-atom-harvest';
 import { advanceProposalStage } from '@/lib/proposal-advance';
 import type { Role } from '@/lib/rbac';
+import { resolveAutomationPolicy } from '@/lib/automation/policy';
 
 export interface LockSectionCtx {
   tenantId: string;
@@ -189,11 +190,9 @@ export async function lockSectionCore(g: LockSectionCtx): Promise<LockSectionRes
       });
 
       try {
-        const [autoPref] = await sql<{ autoAdvanceWhenAllLocked: boolean }[]>`
-          SELECT auto_advance_when_all_locked FROM tenant_automation_preferences
-          WHERE tenant_id = ${tenantId}::uuid
-        `;
-        if (autoPref?.autoAdvanceWhenAllLocked) {
+        const autoPolicy = await resolveAutomationPolicy(tenantId, 'proposal:sections.all_locked#auto_advance').catch(() => null);
+        const autoAdvanceEnabled = autoPolicy !== null ? autoPolicy.enabled : false; // default off
+        if (autoAdvanceEnabled) {
           const result = await advanceProposalStage({
             tenantId, tenantSlug, proposalId, actorId: userId, actorEmail: email ?? null,
             actorRole: role, force: false, notes: 'Auto-advanced: all sections locked', trigger: 'auto',

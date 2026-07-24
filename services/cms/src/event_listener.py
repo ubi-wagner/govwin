@@ -246,12 +246,14 @@ def _rule_matches(
     return phase != 'start'
 
 
-# ── Tenant automation-preference gate (C3 Increment 3) ───────────────
+# ── Tenant automation-preference gate (C3 Increment 3 → #190 dual-read) ─────
 # A tenant-scoped rule opts into a customer toggle by naming a column in its
-# action_config.tenant_pref. The listener consults tenant_automation_preferences
-# (shared DB, reachable via the event pool) and skips the action when the tenant
-# has that toggle off. Default-on: a tenant with no preferences row uses the
-# column default. The pref name is allowlisted before it touches SQL.
+# action_config.tenant_pref. The listener checks (in precedence order):
+#   1. tenant_automation_policies (new — the resolver's source of truth, mig 126)
+#   2. tenant_automation_preferences (old — the dual-read fallback during transition)
+#   3. documented defaults (new tenant with no rows yet)
+# Never silently suppresses: lookup errors, ungated rules, non-tenant-scoped events
+# all return True.
 _GATED_PREFS: set[str] = {
     'notify_team_on_document_locked',
     'notify_collaborators_get_ready',
@@ -263,6 +265,14 @@ _PREF_DEFAULTS: dict[str, bool] = {
     'notify_collaborators_get_ready': True,
     'notify_on_stage_advanced': True,
     'notify_on_new_priority_opp': True,
+}
+# Maps the legacy tenant_pref column name → the new trigger_key in tenant_automation_policies.
+# This is the bridge that makes dual-read possible without changing the rule seed data.
+_PREF_TO_TRIGGER_KEY: dict[str, str] = {
+    'notify_team_on_document_locked': 'proposal:document.locked',
+    'notify_collaborators_get_ready':  'proposal:proposal.advance_ready',
+    'notify_on_stage_advanced':        'proposal:proposal.advanced',
+    'notify_on_new_priority_opp':      'capture:card.applied',
 }
 
 
@@ -281,8 +291,16 @@ def _extract_tenant_pref(config) -> str | None:
 
 async def _automation_pref_allows(config, payload: dict) -> bool:
     """Return False only when a tenant has explicitly turned off the customer
-    toggle this rule opts into. Ungated rules, non-tenant-scoped events, unknown
-    pref names, and lookup failures all return True (never silently suppress)."""
+    toggle this rule opts into.
+
+    Precedence (dual-read period — #190):
+      1. tenant_automation_policies row for this tenant + trigger_key
+         (the new policy table; NULL tenant_id = framework default)
+      2. tenant_automation_preferences row for this tenant (legacy fallback)
+      3. _PREF_DEFAULTS (no row in either table — unconfigured tenant)
+
+    Ungated rules, non-tenant-scoped events, unknown pref names, and lookup
+    failures all return True (never silently suppress notifications)."""
     pref = _extract_tenant_pref(config)
     if not pref:
         return True  # rule is not preference-gated
@@ -295,6 +313,30 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
     pool = get_event_pool()
     if not pool:
         return True
+
+    trigger_key = _PREF_TO_TRIGGER_KEY.get(pref)
+
+    # 1. Check tenant_automation_policies (new table — #190).
+    if trigger_key:
+        try:
+            policy_row = await pool.fetchrow(
+                '''SELECT enabled FROM tenant_automation_policies
+                   WHERE trigger_key = $1
+                     AND (tenant_id = $2::uuid OR tenant_id IS NULL)
+                   ORDER BY tenant_id NULLS LAST
+                   LIMIT 1''',
+                trigger_key,
+                str(tenant_id),
+            )
+            if policy_row is not None:
+                return bool(policy_row['enabled'])
+        except Exception as e:
+            logger.warning(
+                'policy lookup failed for trigger %s (tenant %s): %s — falling back',
+                trigger_key, tenant_id, e,
+            )
+
+    # 2. Fall back to tenant_automation_preferences (legacy dual-read).
     try:
         # pref is allowlisted against _GATED_PREFS above, so this interpolation is safe.
         row = await pool.fetchrow(
@@ -305,7 +347,7 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
         logger.warning('tenant preference lookup failed for %s (tenant %s): %s — allowing', pref, tenant_id, e)
         return True  # best-effort: a lookup error must not block notifications
     if row is None:
-        return _PREF_DEFAULTS.get(pref, True)  # lazy row — use the documented default
+        return _PREF_DEFAULTS.get(pref, True)  # unconfigured tenant — use documented default
     return bool(row['v'])
 
 

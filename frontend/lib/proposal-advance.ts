@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
 import { getNodeText, docNodes, type CanvasDocument } from '@/lib/types/canvas-document';
+import { resolveAutomationPolicy } from '@/lib/automation/policy';
 
 /**
  * Shared proposal stage-advance core.
@@ -422,11 +423,8 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   // box (proposal_comments, recommendation_type='ai_review'). Best-effort +
   // cost-guarded downstream — never blocks the advance.
   try {
-    const [pref] = await sql<{ aiReviewOnAdvance: boolean }[]>`
-      SELECT ai_review_on_advance FROM tenant_automation_preferences
-      WHERE tenant_id = ${tenantId}::uuid
-    `;
-    const aiReviewEnabled = pref ? pref.aiReviewOnAdvance : true; // default on
+    const aiPolicy = await resolveAutomationPolicy(tenantId, 'proposal:proposal.advanced#ai_review').catch(() => null);
+    const aiReviewEnabled = aiPolicy !== null ? aiPolicy.enabled : true; // default on
     if (aiReviewEnabled) {
       const reviewSections = await sql<{ id: string; title: string | null; content: string | null; sectionType: string | null }[]>`
         SELECT id, title, content, section_type

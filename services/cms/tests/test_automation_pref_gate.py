@@ -1,22 +1,41 @@
-"""C3 Increment 3 — tenant automation-preference gating in the event_listener.
+"""C3 Increment 3 → #190 dual-read — tenant automation-preference gating.
 
-Proposal-lifecycle notification rules opt into a customer toggle via
-action_config.tenant_pref. The listener consults tenant_automation_preferences
-(shared DB, via the event pool) and skips the action when the tenant turned the
-toggle off — with default-on safety (ungated rules, non-tenant events, unknown
-prefs, missing rows, and lookup errors all proceed). All DB calls are mocked.
+_automation_pref_allows() checks (in order):
+  1. tenant_automation_policies  (new table; fetchrow call 1)
+  2. tenant_automation_preferences (legacy fallback; fetchrow call 2)
+  3. _PREF_DEFAULTS if neither row exists
+
+Default-on safety: ungated rules, non-tenant events, unknown prefs, missing rows,
+and lookup errors all proceed. All DB calls are mocked.
 """
 from unittest.mock import AsyncMock, patch
 
 
-def _event_pool(pref_value):
-    """Fake shared/event pool whose fetchrow returns a one-column pref row.
-    pref_value=None simulates a tenant with no tenant_automation_preferences row."""
+def _policy_pool(policy_enabled=None, legacy_pref=None):
+    """Fake pool for the dual-read path (#190).
+
+    policy_enabled:
+        None      → no tenant_automation_policies row (first fetchrow → None)
+        True/False → policy row found; returns {'enabled': value}
+    legacy_pref:
+        None      → no tenant_automation_preferences row (second fetchrow → None)
+        True/False → legacy row found; returns {'v': value}
+
+    Call order: fetchrow call 1 = new-table (policy), call 2 = legacy-table (pref).
+    """
+    call_1 = None if policy_enabled is None else {'enabled': policy_enabled}
+    call_2 = None if legacy_pref is None else {'v': legacy_pref}
     pool = AsyncMock()
-    pool.fetchrow = AsyncMock(return_value=(None if pref_value is None else {'v': pref_value}))
+    pool.fetchrow = AsyncMock(side_effect=[call_1, call_2])
     pool.execute = AsyncMock()
     pool.fetch = AsyncMock(return_value=[])
     return pool
+
+
+def _event_pool(pref_value):
+    """Backward-compat helper: no policy row (falls through to legacy pref).
+    pref_value=None simulates a tenant with no tenant_automation_preferences row."""
+    return _policy_pool(policy_enabled=None, legacy_pref=pref_value)
 
 
 # ---------------------------------------------------------------------------
@@ -141,9 +160,13 @@ class TestExecuteRuleGate:
              patch('src.event_listener._do_action', new=AsyncMock()) as do_action:
             await _execute_rule(_RULE, _COLS, _doc_locked_event())
         do_action.assert_not_called()  # suppressed before dispatch
-        pool.fetchrow.assert_awaited_once()
-        # the gate resolved tenant scope from the event's tenant_id column
-        assert pool.fetchrow.call_args[0][1] == 'tenant-xyz'
+        # dual-read: up to 2 fetchrow calls (new table → None, legacy → False)
+        assert pool.fetchrow.await_count >= 1
+        # tenant scope resolved from the event's tenant_id column (both calls use it)
+        assert any(
+            call.args[1] == 'tenant-xyz'
+            for call in pool.fetchrow.await_args_list
+        )
 
     async def test_pref_on_dispatches_action(self):
         from src.event_listener import _execute_rule
@@ -153,3 +176,72 @@ class TestExecuteRuleGate:
              patch('src.event_listener._check_dedup', new=AsyncMock(return_value=False)):
             await _execute_rule(_RULE, _COLS, _doc_locked_event())
         do_action.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Dual-read (#190) — tenant_automation_policies takes precedence over legacy table
+# ---------------------------------------------------------------------------
+
+class TestDualReadPrecedence:
+    async def test_policy_row_enabled_true_allows(self):
+        """Policy row enabled=True wins; legacy table not consulted."""
+        from src.event_listener import _automation_pref_allows
+        pool = _policy_pool(policy_enabled=True, legacy_pref=None)
+        with patch('src.event_listener.get_event_pool', return_value=pool):
+            result = await _automation_pref_allows(
+                {'tenant_pref': 'notify_team_on_document_locked'}, {'tenantId': 't1'}
+            )
+        assert result is True
+        # Only one fetchrow call needed (policy row found)
+        assert pool.fetchrow.await_count == 1
+
+    async def test_policy_row_enabled_false_suppresses(self):
+        """Policy row enabled=False suppresses even if legacy pref is True."""
+        from src.event_listener import _automation_pref_allows
+        pool = _policy_pool(policy_enabled=False, legacy_pref=True)
+        with patch('src.event_listener.get_event_pool', return_value=pool):
+            result = await _automation_pref_allows(
+                {'tenant_pref': 'notify_on_stage_advanced'}, {'tenantId': 't1'}
+            )
+        assert result is False
+        assert pool.fetchrow.await_count == 1  # stopped at policy row
+
+    async def test_no_policy_row_falls_back_to_legacy(self):
+        """No policy row → falls through to legacy table."""
+        from src.event_listener import _automation_pref_allows
+        pool = _policy_pool(policy_enabled=None, legacy_pref=False)
+        with patch('src.event_listener.get_event_pool', return_value=pool):
+            result = await _automation_pref_allows(
+                {'tenant_pref': 'notify_collaborators_get_ready'}, {'tenantId': 't1'}
+            )
+        assert result is False
+        assert pool.fetchrow.await_count == 2  # both tables checked
+
+    async def test_no_rows_anywhere_uses_default_on(self):
+        """Neither table has a row → default_on applies."""
+        from src.event_listener import _automation_pref_allows
+        pool = _policy_pool(policy_enabled=None, legacy_pref=None)
+        with patch('src.event_listener.get_event_pool', return_value=pool):
+            result = await _automation_pref_allows(
+                {'tenant_pref': 'notify_on_new_priority_opp'}, {'tenantId': 't1'}
+            )
+        assert result is True  # default-on
+
+    async def test_policy_lookup_error_falls_back_to_legacy(self):
+        """Policy lookup error → falls through to legacy table (never silently suppresses)."""
+        from src.event_listener import _automation_pref_allows
+        pool = AsyncMock()
+        call_count = [0]
+        async def _fetchrow(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise Exception('policy table not found yet')
+            return {'v': True}
+        pool.fetchrow = _fetchrow
+        pool.execute = AsyncMock()
+        pool.fetch = AsyncMock(return_value=[])
+        with patch('src.event_listener.get_event_pool', return_value=pool):
+            result = await _automation_pref_allows(
+                {'tenant_pref': 'notify_team_on_document_locked'}, {'tenantId': 't1'}
+            )
+        assert result is True  # legacy table returned True

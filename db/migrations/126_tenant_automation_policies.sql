@@ -110,6 +110,11 @@ VALUES
     (NULL, 'build', 'proposal:proposal.advanced#ai_review',
      true, '{}', '{}', NULL, 'todo', now()),
 
+    -- Build: auto-advance when all sections are locked (flow control, not notify)
+    -- enabled=false by default (opt-in); channel='todo' because it's a flow action.
+    (NULL, 'build', 'proposal:sections.all_locked#auto_advance',
+     false, '{}', '{}', NULL, 'todo', now()),
+
     -- Discovery: notify on new high-priority opportunity
     (NULL, 'discovery', 'capture:card.applied',
      true, '{tenant_admin}', '{1,3}', NULL, 'email', now())
@@ -190,6 +195,22 @@ SELECT
     'build',
     'proposal:proposal.advanced#ai_review',
     p.ai_review_on_advance,
+    '{}',
+    '{}',
+    'todo',
+    p.configured_at
+FROM tenant_automation_preferences p
+WHERE p.configured_at IS NOT NULL
+ON CONFLICT (tenant_id, scope, trigger_key) DO NOTHING;
+
+-- Auto-advance when all sections locked (auto_advance_when_all_locked) — flow control
+INSERT INTO tenant_automation_policies
+    (tenant_id, scope, trigger_key, enabled, recipient_roles, nudge_days, channel, configured_at)
+SELECT
+    p.tenant_id,
+    'build',
+    'proposal:sections.all_locked#auto_advance',
+    p.auto_advance_when_all_locked,
     '{}',
     '{}',
     'todo',

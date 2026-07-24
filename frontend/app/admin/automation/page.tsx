@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { sql } from '@/lib/db';
 import Link from 'next/link';
 import { AutomationClient } from './automation-client';
+import { PolicyClient } from './policy-client';
 import { StatCard, type StatPreview } from '@/components/admin/stat-card';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,19 @@ type StatsRow = {
   recentExecutions: number;
 };
 
+type FrameworkPolicy = {
+  id: string;
+  scope: string;
+  triggerKey: string;
+  enabled: boolean;
+  recipientRoles: string[];
+  nudgeDays: number[];
+  dueInMinutes: number | null;
+  channel: string;
+  configuredAt: string | null;
+  updatedAt: string;
+};
+
 export default async function AutomationPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
@@ -39,6 +53,7 @@ export default async function AutomationPage() {
 
   let rules: AutomationRuleRow[] = [];
   let stats: StatsRow = { total: 0, active: 0, inactive: 0, recentExecutions: 0 };
+  let frameworkPolicies: FrameworkPolicy[] = [];
 
   try {
     rules = await sql<AutomationRuleRow[]>`
@@ -49,6 +64,19 @@ export default async function AutomationPage() {
     `;
   } catch (e) {
     console.error('[admin/automation] rules query failed:', e);
+  }
+
+  try {
+    frameworkPolicies = await sql<FrameworkPolicy[]>`
+      SELECT
+        id, scope, trigger_key, enabled, recipient_roles, nudge_days,
+        due_in_minutes, channel, configured_at, updated_at
+      FROM tenant_automation_policies
+      WHERE tenant_id IS NULL
+      ORDER BY scope, trigger_key
+    `;
+  } catch (e) {
+    console.error('[admin/automation] policies query failed:', e);
   }
 
   try {
@@ -94,6 +122,19 @@ export default async function AutomationPage() {
     updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt),
   }));
 
+  const serializedPolicies = frameworkPolicies.map((p) => ({
+    id: p.id,
+    scope: p.scope,
+    triggerKey: p.triggerKey,
+    enabled: p.enabled,
+    recipientRoles: Array.isArray(p.recipientRoles) ? p.recipientRoles : [],
+    nudgeDays: Array.isArray(p.nudgeDays) ? p.nudgeDays : [],
+    dueInMinutes: p.dueInMinutes ?? null,
+    channel: p.channel,
+    configuredAt: p.configuredAt ? String(p.configuredAt) : null,
+    updatedAt: String(p.updatedAt),
+  }));
+
   const ruleItem = (r: AutomationRuleRow) => ({
     left: r.name,
     sub: `${r.triggerNamespace}.${r.triggerType} → ${r.actionType}`,
@@ -129,6 +170,23 @@ export default async function AutomationPage() {
       </div>
 
       <AutomationClient initialRules={serializedRules} />
+
+      {/* Platform Automation Policies — framework defaults (tenant_id IS NULL) */}
+      <div className="mt-10">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Platform Automation Policies</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Per-trigger defaults. Every tenant rides these until they configure a tenant override.
+              Toggling here affects ALL tenants without a tenant-specific row.
+            </p>
+          </div>
+          <span className="text-xs text-gray-400">
+            {serializedPolicies.length} framework row{serializedPolicies.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <PolicyClient initialPolicies={serializedPolicies} />
+      </div>
     </div>
   );
 }
