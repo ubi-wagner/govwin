@@ -261,12 +261,16 @@ _GATED_PREFS: set[str] = {
     'notify_collaborators_get_ready',
     'notify_on_stage_advanced',
     'notify_on_new_priority_opp',
+    'ai_review_on_advance',
+    'auto_advance_when_all_locked',
 }
 _PREF_DEFAULTS: dict[str, bool] = {
     'notify_team_on_document_locked': True,
     'notify_collaborators_get_ready': True,
     'notify_on_stage_advanced': True,
     'notify_on_new_priority_opp': True,
+    'ai_review_on_advance': True,        # default on (same as framework row)
+    'auto_advance_when_all_locked': False, # opt-in (same as framework row)
 }
 # Maps the legacy tenant_pref column name → the new trigger_key in tenant_automation_policies.
 # This is the bridge that makes dual-read possible without changing the rule seed data.
@@ -275,6 +279,8 @@ _PREF_TO_TRIGGER_KEY: dict[str, str] = {
     'notify_collaborators_get_ready':  'proposal:proposal.advance_ready',
     'notify_on_stage_advanced':        'proposal:proposal.advanced',
     'notify_on_new_priority_opp':      'capture:card.applied',
+    'ai_review_on_advance':            'proposal:proposal.advanced#ai_review',
+    'auto_advance_when_all_locked':    'proposal:sections.all_locked#auto_advance',
 }
 
 
@@ -346,7 +352,9 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
             '''SELECT notify_team_on_document_locked,
                       notify_collaborators_get_ready,
                       notify_on_stage_advanced,
-                      notify_on_new_priority_opp
+                      notify_on_new_priority_opp,
+                      ai_review_on_advance,
+                      auto_advance_when_all_locked
                FROM tenant_automation_preferences
                WHERE tenant_id = $1::uuid''',
             str(tenant_id),

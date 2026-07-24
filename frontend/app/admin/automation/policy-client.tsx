@@ -15,11 +15,6 @@ type FrameworkPolicy = {
   updatedAt: string;
 };
 
-const SCOPE_COLORS: Record<string, string> = {
-  build: 'bg-blue-50 text-blue-700',
-  discovery: 'bg-emerald-50 text-emerald-700',
-};
-
 const CHANNEL_COLORS: Record<string, string> = {
   email: 'bg-green-50 text-green-700',
   todo: 'bg-pink-50 text-pink-700',

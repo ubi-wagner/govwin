@@ -19,12 +19,21 @@ def _policy_pool(policy_enabled=None, legacy_pref=None):
         True/False → policy row found; returns {'enabled': value}
     legacy_pref:
         None      → no tenant_automation_preferences row (second fetchrow → None)
-        True/False → legacy row found; returns {'v': value}
+        True/False → legacy row found; returns all 6 boolean columns set to value.
 
     Call order: fetchrow call 1 = new-table (policy), call 2 = legacy-table (pref).
+    The legacy mock must use actual column names because production code does
+    row[pref] where pref is e.g. 'notify_team_on_document_locked', not 'v'.
     """
     call_1 = None if policy_enabled is None else {'enabled': policy_enabled}
-    call_2 = None if legacy_pref is None else {'v': legacy_pref}
+    call_2 = None if legacy_pref is None else {
+        'notify_team_on_document_locked': legacy_pref,
+        'notify_collaborators_get_ready': legacy_pref,
+        'notify_on_stage_advanced': legacy_pref,
+        'notify_on_new_priority_opp': legacy_pref,
+        'ai_review_on_advance': legacy_pref,
+        'auto_advance_when_all_locked': legacy_pref,
+    }
     pool = AsyncMock()
     pool.fetchrow = AsyncMock(side_effect=[call_1, call_2])
     pool.execute = AsyncMock()
@@ -236,7 +245,15 @@ class TestDualReadPrecedence:
             call_count[0] += 1
             if call_count[0] == 1:
                 raise Exception('policy table not found yet')
-            return {'v': True}
+            # Return the actual column names — production code does row[pref], not row['v'].
+            return {
+                'notify_team_on_document_locked': True,
+                'notify_collaborators_get_ready': True,
+                'notify_on_stage_advanced': True,
+                'notify_on_new_priority_opp': True,
+                'ai_review_on_advance': True,
+                'auto_advance_when_all_locked': True,
+            }
         pool.fetchrow = _fetchrow
         pool.execute = AsyncMock()
         pool.fetch = AsyncMock(return_value=[])

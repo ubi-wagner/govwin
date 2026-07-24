@@ -121,48 +121,25 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       );
     }
 
+    // Build a single UPDATE so all field changes are atomic.
+    // Using the postgres.js fragment pattern from the preferences PATCH route.
+    const setClauses: ReturnType<typeof sql>[] = [];
+    if ('enabled' in body)        setClauses.push(sql`enabled = ${body.enabled as boolean}`);
+    if ('recipientRoles' in body) setClauses.push(sql`recipient_roles = ${body.recipientRoles as string[]}::text[]`);
+    if ('nudgeDays' in body)      setClauses.push(sql`nudge_days = ${body.nudgeDays as number[]}::int[]`);
+    if ('dueInMinutes' in body)   setClauses.push(sql`due_in_minutes = ${body.dueInMinutes as number | null}`);
+    if ('channel' in body)        setClauses.push(sql`channel = ${body.channel as string}`);
+    setClauses.push(sql`updated_at = now()`);
+    setClauses.push(sql`configured_at = COALESCE(configured_at, now())`);
+
+    const setFragment = setClauses.reduce((acc, frag, i) => (i === 0 ? frag : sql`${acc}, ${frag}`));
+
     try {
-      // Build update using individual SET calls per field to keep the SQL safe
-      if ('enabled' in body) {
-        await sql`
-          UPDATE tenant_automation_policies
-          SET enabled = ${body.enabled as boolean}, updated_at = now(),
-              configured_at = COALESCE(configured_at, now())
-          WHERE id = ${policyId}::uuid AND tenant_id IS NULL
-        `;
-      }
-      if ('recipientRoles' in body) {
-        await sql`
-          UPDATE tenant_automation_policies
-          SET recipient_roles = ${body.recipientRoles as string[]}::text[],
-              updated_at = now(), configured_at = COALESCE(configured_at, now())
-          WHERE id = ${policyId}::uuid AND tenant_id IS NULL
-        `;
-      }
-      if ('nudgeDays' in body) {
-        await sql`
-          UPDATE tenant_automation_policies
-          SET nudge_days = ${body.nudgeDays as number[]}::int[],
-              updated_at = now(), configured_at = COALESCE(configured_at, now())
-          WHERE id = ${policyId}::uuid AND tenant_id IS NULL
-        `;
-      }
-      if ('dueInMinutes' in body) {
-        await sql`
-          UPDATE tenant_automation_policies
-          SET due_in_minutes = ${body.dueInMinutes as number | null},
-              updated_at = now(), configured_at = COALESCE(configured_at, now())
-          WHERE id = ${policyId}::uuid AND tenant_id IS NULL
-        `;
-      }
-      if ('channel' in body) {
-        await sql`
-          UPDATE tenant_automation_policies
-          SET channel = ${body.channel as string},
-              updated_at = now(), configured_at = COALESCE(configured_at, now())
-          WHERE id = ${policyId}::uuid AND tenant_id IS NULL
-        `;
-      }
+      await sql`
+        UPDATE tenant_automation_policies
+        SET ${setFragment}
+        WHERE id = ${policyId}::uuid AND tenant_id IS NULL
+      `;
     } catch (err) {
       console.error('[admin/automation/policies PATCH] update failed:', err);
       return NextResponse.json({ error: 'Database update failed', code: 'DB_ERROR' }, { status: 500 });

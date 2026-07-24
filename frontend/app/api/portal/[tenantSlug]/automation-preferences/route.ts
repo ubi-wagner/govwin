@@ -175,7 +175,13 @@ export async function PATCH(request: Request, ctx: RouteContext) {
           ON CONFLICT (tenant_id, scope, trigger_key)
           DO UPDATE SET enabled = EXCLUDED.enabled, configured_at = now(), updated_at = now()
         `;
-      } catch { /* best-effort — resolver falls back to framework if this fails */ }
+      } catch (dualWriteErr) {
+        // Log but don't fail — resolver falls back to framework on missing row.
+        // WARNING: a silent failure here leaves the resolver reading the platform
+        // default (enabled=true) instead of the tenant's explicit choice until
+        // the next successful PATCH self-heals via the upsert.
+        console.error('[automation-preferences] dual-write to tenant_automation_policies failed for', mapping.trigger_key, dualWriteErr);
+      }
     }
 
     try {

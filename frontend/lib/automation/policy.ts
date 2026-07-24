@@ -152,11 +152,13 @@ function mergeRows(tenant: PolicyRow, framework: PolicyRow): PolicyRow {
     due_in_minutes:         tenant.due_in_minutes         ?? framework.due_in_minutes,
     relative_anchor:        tenant.relative_anchor         ?? framework.relative_anchor,
     relative_offset_minutes: tenant.relative_offset_minutes ?? framework.relative_offset_minutes,
-    // escalation + delivery: tenant wins
+    // escalation + delivery: tenant wins if set, else framework
     nudge_days:         tenant.nudge_days.length > 0 ? tenant.nudge_days : framework.nudge_days,
     channel:            tenant.channel ?? framework.channel,
-    cooldown_minutes:   tenant.cooldown_minutes,
-    max_fires_per_hour: tenant.max_fires_per_hour,
+    // Rate-limit fields: NOT NULL DEFAULT 0, so ?? won't trigger on 0.
+    // Use framework values when the tenant row was auto-created at default (0).
+    cooldown_minutes:   tenant.cooldown_minutes > 0 ? tenant.cooldown_minutes : framework.cooldown_minutes,
+    max_fires_per_hour: tenant.max_fires_per_hour > 0 ? tenant.max_fires_per_hour : framework.max_fires_per_hour,
   };
 }
 
