@@ -112,6 +112,37 @@ export async function decomposeAndIngest(
   return { foundationId, sectionIds, groupIds, atomIds };
 }
 
+// ── shared system scaffold: the starter foundations every tenant can see + copy ──
+
+/** Collection tag marking a foundation as part of the shared system starter set. */
+export const SYSTEM_COLLECTION = 'system_starter';
+
+export interface SystemFoundation { id: string; title: string | null; form: string | null; format: string | null; context: string | null }
+
+/** List the shared system-scaffold foundations (readable by any tenant — the "add to
+ *  my library" catalog). Cross-tenant read of the house scaffold, so no tenant filter. */
+export async function listSystemFoundations(): Promise<SystemFoundation[]> {
+  return sql<SystemFoundation[]>`
+    SELECT la.id, la.title,
+      (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'form')    AS form,
+      (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'format')  AS format,
+      (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'context') AS context
+    FROM library_atoms la
+    WHERE la.grain = 'foundation'
+      AND la.id IN (SELECT atom_id FROM atom_tags WHERE dimension = 'collection' AND value = ${SYSTEM_COLLECTION})
+    ORDER BY la.title`;
+}
+
+/** True iff the foundation is part of the shared system scaffold (guards copy-to-library). */
+export async function isSystemFoundation(foundationId: string): Promise<boolean> {
+  const [row] = await sql<Array<{ one: number }>>`
+    SELECT 1 AS one FROM library_atoms la
+    WHERE la.id = ${foundationId}::uuid AND la.grain = 'foundation'
+      AND la.id IN (SELECT atom_id FROM atom_tags WHERE dimension = 'collection' AND value = ${SYSTEM_COLLECTION})
+    LIMIT 1`;
+  return !!row;
+}
+
 // ── copy-on-use: materialize a per-tenant copy of a (shared/system) foundation ──
 
 interface SrcAtom { grain: string; title: string | null; content: string | null; canvasNodes: CanvasNode[] | null; tags: AtomTagInput[] }
