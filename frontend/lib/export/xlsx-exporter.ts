@@ -10,16 +10,72 @@
 
 import ExcelJS from 'exceljs';
 import { docNodes } from '@/lib/types/canvas-document';
+import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
 import type {
   CanvasDocument,
   CanvasNode,
+  NodeStyle,
   HeadingContent,
   TextBlockContent,
   ListContent,
   TableContent,
   TableCell as CanvasTableCell,
   CaptionContent,
+  ImageContent,
+  ShapeContent,
+  TextBoxContent,
+  CalloutContent,
+  CodeBlockContent,
+  BlockquoteContent,
+  ChartContent,
+  EquationContent,
+  DividerContent,
+  VideoContent,
+  SignatureContent,
 } from '@/lib/types/canvas-document';
+
+/** exceljs wants 8-digit ARGB; canvas colors are #RRGGBB. */
+function argb(hex?: string, alpha = 'FF'): string {
+  return alpha + (hex ?? '000000').replace(/^#/, '').trim().toUpperCase().padStart(6, '0').slice(0, 6);
+}
+/** An SVG string → utf8 data URI (encoded so payload commas don't break the rasterizer split). */
+function svgDataUri(svg: string): string {
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+const CALLOUT_ARGB: Record<string, { bg: string; fg: string }> = {
+  info: { bg: 'FFEFF6FF', fg: 'FF1D4ED8' }, warning: { bg: 'FFFEF3C7', fg: 'FFB45309' },
+  tip: { bg: 'FFECFDF5', fg: 'FF047857' }, success: { bg: 'FFECFDF5', fg: 'FF047857' }, note: { bg: 'FFF1F5F9', fg: 'FF475569' },
+};
+
+interface SheetCtx { workbook: ExcelJS.Workbook; raster: Map<CanvasNode, RasterPng | null> }
+
+/** Apply the run styling common to every primitive (family/size/bold/italic/underline/strike/color) to a cell. */
+function applyRunFont(cell: ExcelJS.Cell, style?: NodeStyle): void {
+  if (!style) return;
+  const f: Partial<ExcelJS.Font> = { ...(cell.font as ExcelJS.Font) };
+  if (style.family) f.name = style.family;
+  if (style.size) f.size = style.size;
+  if (style.weight === 'bold') f.bold = true;
+  if (style.style === 'italic') f.italic = true;
+  if (style.underline) f.underline = true;
+  if (style.strikethrough) f.strike = true;
+  if (style.color) f.color = { argb: argb(style.color) };
+  cell.font = f;
+}
+
+/** Place a pre-rastered PNG as a floating image over the sheet, reserving rows so
+ *  following content doesn't overlap it. */
+function placeImage(ws: ExcelJS.Worksheet, workbook: ExcelJS.Workbook, r: RasterPng, maxW = 460): void {
+  const aspect = r.width > 0 && r.height > 0 ? r.width / r.height : 1.6;
+  const w = Math.min(r.width || maxW, maxW);
+  const h = Math.round(w / aspect);
+  const id = workbook.addImage({ buffer: r.buffer as unknown as ExcelJS.Buffer, extension: 'png' });
+  const top = ws.rowCount;
+  ws.addImage(id, { tl: { col: 0.2, row: top + 0.2 }, ext: { width: w, height: h } });
+  const reserve = Math.ceil(h / 18) + 1;
+  for (let i = 0; i < reserve; i++) ws.addRow([]);
+}
 
 /** Get the text value from a TableCell or string. */
 function cellText(cell: string | CanvasTableCell): string {
@@ -219,8 +275,25 @@ export async function exportToXlsx(
       fgColor: { argb: 'FFE0E0E0' },
     };
 
+    // Pre-rasterize the picture-backed nodes (image / chart / shape) — exceljs has
+    // no vector-shape or reliable native-chart primitive, so each embeds as a PNG
+    // (the SAME chart/shape SVG the HTML/PDF/docx paths use). Best-effort: a null
+    // raster falls back to a text placeholder.
+    const raster = new Map<CanvasNode, RasterPng | null>();
+    await Promise.all(
+      nonTableNodes.filter((n) => n.type === 'image' || n.type === 'chart' || n.type === 'shape').map(async (n) => {
+        const uri = n.type === 'image'
+          ? (n.content as ImageContent)?.storage_key
+          : n.type === 'chart'
+            ? svgDataUri(renderChartSvg(n.content as ChartContent))
+            : svgDataUri(renderShapeSvg(n));
+        raster.set(n, await rasterizeDataUri(uri));
+      }),
+    );
+
+    const ctx: SheetCtx = { workbook, raster };
     for (const node of nonTableNodes) {
-      writeNodeToSheet(ws, node);
+      writeNodeToSheet(ws, node, ctx);
     }
   }
 
@@ -231,7 +304,7 @@ export async function exportToXlsx(
 // ─── Helpers ───────────────────────────────────────────────────────────
 
 /** Write a non-table node as row(s) in a worksheet. */
-function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode): void {
+function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode, ctx: SheetCtx): void {
   switch (node.type) {
     case 'heading': {
       const c = node.content as HeadingContent;
@@ -291,10 +364,95 @@ function writeNodeToSheet(ws: ExcelJS.Worksheet, node: CanvasNode): void {
       break;
     }
 
-    case 'image': {
-      const alt = (node.content as { alt_text?: string })?.alt_text ?? 'image';
-      const row = ws.addRow([`[Image: ${alt}]`]);
-      row.getCell(1).font = { italic: true, color: { argb: 'FF999999' } };
+    // image / chart / shape → embed the pre-rastered PNG (fallback: text stub)
+    case 'image':
+    case 'chart':
+    case 'shape': {
+      const r = ctx.raster.get(node);
+      if (r) { placeImage(ws, ctx.workbook, r, node.type === 'shape' ? 340 : 460); break; }
+      const label = node.type === 'chart' ? `[Chart: ${(node.content as ChartContent).chart_type}]`
+        : node.type === 'shape' ? `[${(node.content as ShapeContent).shape}]`
+          : `[Image: ${(node.content as ImageContent)?.alt_text ?? 'image'}]`;
+      ws.addRow([label]).getCell(1).font = { italic: true, color: { argb: 'FF999999' } };
+      break;
+    }
+
+    case 'text_box': {
+      const c = node.content as TextBoxContent;
+      const row = ws.addRow([c.text]);
+      const cell = row.getCell(1);
+      cell.alignment = { wrapText: true, vertical: 'top' };
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+      if (node.style?.fill?.color) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(node.style.fill.color) } };
+      applyRunFont(cell, node.style);
+      break;
+    }
+
+    case 'callout': {
+      const c = node.content as CalloutContent;
+      const pal = CALLOUT_ARGB[c.variant] ?? CALLOUT_ARGB.note;
+      if (c.title) {
+        const rt = ws.addRow([c.title]).getCell(1);
+        rt.font = { bold: true, color: { argb: pal.fg } };
+        rt.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pal.bg } };
+        rt.border = { left: { style: 'thick', color: { argb: pal.fg } } };
+      }
+      const rb = ws.addRow([c.text]).getCell(1);
+      rb.alignment = { wrapText: true, vertical: 'top' };
+      rb.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pal.bg } };
+      rb.border = { left: { style: 'thick', color: { argb: pal.fg } } };
+      break;
+    }
+
+    case 'code_block': {
+      const c = node.content as CodeBlockContent;
+      for (const ln of (c.code || ' ').split('\n')) {
+        const cell = ws.addRow([ln || ' ']).getCell(1);
+        cell.font = { name: 'Courier New', size: 10, color: { argb: 'FFE2E8F0' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      }
+      break;
+    }
+
+    case 'blockquote': {
+      const c = node.content as BlockquoteContent;
+      const cell = ws.addRow([c.text]).getCell(1);
+      cell.font = { italic: true, color: { argb: 'FF334155' } };
+      cell.alignment = { wrapText: true };
+      cell.border = { left: { style: 'thick', color: { argb: 'FF1F4E79' } } };
+      if (c.cite) ws.addRow([`— ${c.cite}`]).getCell(1).font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
+      break;
+    }
+
+    case 'equation': {
+      const c = node.content as EquationContent;
+      ws.addRow([c.latex ?? c.mathml ?? '(equation)']).getCell(1).font = { name: 'Cambria Math', italic: true };
+      break;
+    }
+
+    case 'divider': {
+      const c = node.content as DividerContent;
+      const cell = ws.addRow(['']).getCell(1);
+      cell.border = { bottom: { style: (c.thickness ?? 1) >= 2 ? 'medium' : 'thin', color: { argb: argb(c.color ?? '#CBD5E1') } } };
+      break;
+    }
+
+    case 'video': {
+      const c = node.content as VideoContent;
+      const label = '▶ ' + (c.caption ?? c.url ?? 'Video');
+      const cell = ws.addRow([label]).getCell(1);
+      if (c.url) {
+        cell.value = { text: label, hyperlink: c.url } as ExcelJS.CellHyperlinkValue;
+        cell.font = { color: { argb: 'FF0066CC' }, underline: true };
+      }
+      break;
+    }
+
+    case 'signature': {
+      const c = node.content as SignatureContent;
+      if (c.signed && c.signer_name) ws.addRow([c.signer_name]).getCell(1).font = { italic: true, size: 13, color: { argb: 'FF1E3A8A' } };
+      ws.addRow(['']).getCell(1).border = { bottom: { style: 'medium', color: { argb: 'FF1E293B' } } };
+      ws.addRow([(c.label ?? 'Signature') + (c.signed_at ? `   ·   ${c.signed_at}` : '')]).getCell(1).font = { size: 10, color: { argb: 'FF64748B' } };
       break;
     }
 
