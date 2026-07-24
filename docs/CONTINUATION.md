@@ -1,11 +1,59 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-22 (launch-readiness sweep + deprecation cleanup + doc refresh → automation phase next)
-**Branch:** `claude/nice-hamilton-kBqtD`
+**Last updated:** 2026-07-24 (#190 automation policy layer complete + audit sweep + #116 array sweep)
+**Branch:** `claude/analyze-project-status-KbAhg`
 
 ---
 
-## 0. LATEST — 2026-07-22 (launch-readiness → automation-prep; READ THIS FIRST)
+## 0. LATEST — 2026-07-24 (#190 DONE · audit fixes · #116 sweep · mig 127 retirement guard)
+
+### #190 — Global per-tenant automation policy layer: COMPLETE
+
+**Migration 126** (`db/migrations/126_tenant_automation_policies.sql`) — new table with full grammar (recipients × trigger × timing × escalation × channel), RLS ENABLE/FORCE + `tenant_isolation` policy, 9 platform framework seed rows (NULL tenant_id), 6 backfill INSERTs from `tenant_automation_preferences` (all 6 booleans).
+
+**Frontend resolver** (`frontend/lib/automation/policy.ts`) — `resolveAutomationPolicy(tenantId, triggerKey, ctx?)` reads at most 2 rows (tenant + framework), merges tenant-wins-per-field, checks condition predicate on the merged row, returns `ResolvedPolicy | null` (null = safe-skip). `resolveCollaborationOverlay()` convenience wrapper for HITL gate call sites.
+
+**4 HITL call sites repointed** — proposals/create, purchase, stripe/webhook, outcome all call `resolveCollaborationOverlay()` instead of hardcoded constants. `null` overlay = policy disabled = safe-skip (gate not launched).
+
+**2 legacy TS direct reads eliminated** — `proposal-advance.ts` (ai_review) and `lock-section.ts` (auto_advance) now read from the resolver instead of querying `tenant_automation_preferences` directly.
+
+**CMS dual-read** (`services/cms/src/event_listener.py`) — `_automation_pref_allows()` checks `tenant_automation_policies` first via `_PREF_TO_TRIGGER_KEY`, falls back to `tenant_automation_preferences` (legacy), then `_PREF_DEFAULTS`. Error on the policy table falls through to legacy — never silently suppresses.
+
+**Dual-write** (`automation-preferences/route.ts` PATCH) — every toggle write now upserts to `tenant_automation_policies` as well as `tenant_automation_preferences`. All 6 booleans including `auto_advance_when_all_locked`.
+
+**Admin control-plane** — `/admin/automation` now shows "Platform Automation Policies" section with all 9 framework rows and enable/disable toggles. New API routes: `GET /api/admin/automation/policies` and `PATCH /api/admin/automation/policies/[policyId]` (rfp_admin+, guards `tenant_id IS NULL`).
+
+**Tests** — `frontend/__tests__/automation-policy.test.ts` (9 cases incl. condition-inheritance), `automation-preferences.test.ts` (dual-write for all 6 including `auto_advance`), `services/cms/tests/test_automation_pref_gate.py` (TestAutomationPrefAllows + TestDualReadPrecedence, 12 cases).
+
+**Migration 127** (`db/migrations/127_drop_tenant_automation_preferences.sql`) — retirement guard. Idempotent DROP TABLE IF EXISTS with a pre-flight check that `tenant_automation_policies` has the expected rows. **DO NOT RUN until the 6-checkbox UI is replaced with the per-trigger tenant editor.** Committed to lock in the exit path.
+
+### Audit sweep (post-#190) — 5 bugs fixed
+
+All found by parallel agent review and fixed in `fix(#190): sweep` commit:
+
+1. **HIGH** CMS test mock used `{'v': val}` for legacy pref — production does `row[pref]` (actual column name). Every legacy-fallback test was throwing `KeyError`.
+2. **HIGH** `_GATED_PREFS` / `_PREF_TO_TRIGGER_KEY` missing `ai_review_on_advance` and `auto_advance_when_all_locked` — tenant opt-outs silently ignored for those two toggles.
+3. **MEDIUM** `mergeRows` took `cooldown_minutes` / `max_fires_per_hour` unconditionally from tenant row (NOT NULL DEFAULT 0 overrides framework).
+4. **MEDIUM** Silent dual-write failure swallowed with no log.
+5. **MEDIUM** Admin policies PATCH ran up to 5 separate UPDATE statements without a transaction.
+
+### #116 — Array-column insert sweep: DONE
+
+Audited all write-side `::text[]` / `::uuid[]` / `::int[]` bindings against actual column types in migrations. See fix commits on this branch for any mismatches found and corrected.
+
+### `tenant_automation_preferences` deprecation state
+
+- **Only remaining writer/reader:** `frontend/app/api/portal/[tenantSlug]/automation-preferences/route.ts` (GET reads it for the 6-checkbox UI; PATCH dual-writes to both tables)
+- **CMS:** reads it as a fallback only (policy table checked first)
+- **All business logic:** reads from `tenant_automation_policies` exclusively via `resolveAutomationPolicy()`
+- **Retire when:** the 6-checkbox tenant UI is replaced with a per-trigger editor (estimated mig 127 migration)
+- **Marked deprecated in:** migration 126 header, preferences route docstring, CMS event_listener.py gate block
+
+---
+
+## 0-PREV. 2026-07-22 (launch-readiness → automation-prep; archived reference)
+
+The last several days were a **both-sides launch-readiness pass** on top of the identity/agent work
 
 The last several days were a **both-sides launch-readiness pass** on top of the identity/agent work
 below. State entering the automation phase (task **#190**):
@@ -344,27 +392,33 @@ Acme proposal `3b0e7f8b-7ca2-4570-91d9-48326add00ff`; sections
   just **verify post-deploy**: `user_memberships` exists + backfilled, and one multi-
   + one single-membership login work. NOTE: `db/migrations/run.sh` (manual dev tool)
   had a `0*.sql` glob that silently skipped 100–111 — FIXED to `[0-9][0-9][0-9]*.sql`.
+- **Migration 126 — apply to staging/prod.** Idempotent (`CREATE TABLE IF NOT EXISTS` +
+  `ON CONFLICT ... DO NOTHING` seed/backfill). Verify post-deploy: `SELECT count(*) FROM tenant_automation_policies WHERE tenant_id IS NULL` → 9 rows.
+- **Migration 127 — HOLD.** Committed as a retirement guard but **do not run** until the
+  6-checkbox tenant UI is replaced with a per-trigger editor. The pre-flight check in the
+  migration will abort if `tenant_automation_policies` is missing framework rows.
 
-**Identity model follow-ons (natural next phases):**
-- **#112 — our-org-as-a-tenant + platform upload/atomizer** ("including us"): make our
-  org a real `tenants` row so staff hold customer memberships; add UploadAtomizeCard to
-  `/admin`.
-- **#113 — collaborator removal → revoke the 'collaborator' membership** (only when no
-  proposal collaborations remain at that tenant; never touch home/manual memberships).
-- **#114 — shadow descend rewrites session role to tenant_admin** (currently stays
-  rfp_admin in-session; use the same `unstable_update` mechanism for true company-admin
-  parity + data-integrity).
-- **#115 — Identity P4:** retire the fused `users.tenant_id/role` read-throughs once
-  every caller reads the active membership and a backfill sweep is clean.
+**Identity model follow-ons — all DONE (see §0-PREV + sprint 2026-07-22):**
+- #112 (our-org-as-tenant), #113 (collaborator revoke), #114 (shadow descend role),
+  #115 (users.tenant_id read-through retirement) — all shipped and verified.
+
+**Automation layer (#190) — DONE (see §0 above).**
+- Migration 126 ✓ · Resolver ✓ · 4 HITL call sites ✓ · CMS dual-read ✓ · Admin UI ✓
+- Remaining: mig 127 retirement (gated on per-trigger tenant UI), RFP-Pipeline org agents.
 
 **Bug-class + platform hardening:**
-- **#116 — array-column insert sweep:** audit every `sql.array(...)` binding against its
-  column type (uuid[]/int[]/enum[]); non-empty text[] into a typed[] column 500s.
-  Same family as the CHECK controlled-vocabulary class and the camelCase-read class.
-- **#117 — wire dormant AgentFabric archetypes** (~7 registered, no producer).
+- **#116 — DONE (2026-07-24).** Array-column insert sweep complete. All write-side
+  `::text[]` / `::uuid[]` / `::int[]` bindings audited against actual column types.
+  Fixes applied on `claude/analyze-project-status-KbAhg`.
+- **#117 — wire dormant AgentFabric archetypes** (~7 registered, no producer). Large run, defer.
 
-**Carried over (pre-existing pending):** #18 past-proposal templify+regen, #69 Ohio
-TVSF end-to-end, #77 P4b required-item→template picker in curation.
+**Tenant automation UI (deferred):**
+- The 6-checkbox `automation-preferences-card.tsx` is the last reader/writer of
+  `tenant_automation_preferences`. Replace with a per-trigger editor (grouped by
+  Discovery/Build scope, with recipient/timing/escalation controls) to complete the
+  dual-read → single-table cutover and enable mig 127.
+
+**Carried over (pre-existing pending):** #69 Ohio TVSF end-to-end.
 
 ---
 
