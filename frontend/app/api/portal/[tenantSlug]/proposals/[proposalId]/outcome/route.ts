@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveCollaborationOverlay } from '@/lib/automation/policy';
 import { coerceOriginCard } from '@/lib/cards/card';
 
 interface RouteContext {
@@ -304,21 +305,27 @@ export async function POST(request: Request, ctx: RouteContext) {
         }
 
         if (contractId) {
-          const launch = await launchProjectCollaboration({
-            actor: { id: sessionUser.id, email: sessionUser.email ?? null, role, tenantId },
-            tenantId,
-            scope: 'contract',
-            opportunityId: proposal.opportunityId,
-            taskType: 'contract_kickoff',
-            taskTitle: `Kick off contract: ${proposal.title}`,
-            assigneeRole: 'tenant_admin',
-            entityType: 'contract',
-            entityRef: contractId,
-            nudgeDays: [3, 1],
-            dueMinutes: 10080, // 7 days to kick off
-          });
-          if (!launch.ok) {
-            console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+          const overlay = await resolveCollaborationOverlay(
+            tenantId, 'proposal:contract.created',
+            { assigneeRole: 'tenant_admin', nudgeDays: [3, 1], dueMinutes: 10080 },
+          );
+          if (overlay) {
+            const launch = await launchProjectCollaboration({
+              actor: { id: sessionUser.id, email: sessionUser.email ?? null, role, tenantId },
+              tenantId,
+              scope: 'contract',
+              opportunityId: proposal.opportunityId,
+              taskType: 'contract_kickoff',
+              taskTitle: `Kick off contract: ${proposal.title}`,
+              assigneeRole: overlay.assigneeRole,
+              entityType: 'contract',
+              entityRef: contractId,
+              nudgeDays: overlay.nudgeDays,
+              dueMinutes: overlay.dueMinutes,
+            });
+            if (!launch.ok) {
+              console.error('[proposals/outcome] contract kickoff launch refused:', launch.code, launch.error);
+            }
           }
         }
       } catch (contractErr) {

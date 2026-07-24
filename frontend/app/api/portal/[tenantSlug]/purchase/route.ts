@@ -24,6 +24,7 @@ import { isValidUUID } from '@/lib/validation';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle } from '@/lib/events';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveCollaborationOverlay } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
 
 const CURATION_SLA_HOURS = 72;
@@ -143,20 +144,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       console.error('[portal/purchase] event emit failed (non-fatal)', evtErr);
     }
     try {
-      await launchProjectCollaboration({
-        actor: { id: g.userId, email: g.userEmail, tenantId: g.tenantId },
-        actorType: 'user',
-        tenantId: g.tenantId,
-        scope: 'opp',
-        opportunityId,
-        taskType: 'proposal_setup',
-        taskTitle: 'Curate + release the purchased proposal workspace',
-        assigneeRole: 'rfp_admin',
-        entityType: 'opportunity',
-        entityRef: opportunityId,
-        nudgeDays: [1, 3],
-        dueMinutes: CURATION_SLA_HOURS * 60,
-      });
+      const overlay = await resolveCollaborationOverlay(
+        g.tenantId, 'capture:purchase.completed',
+        { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueMinutes: CURATION_SLA_HOURS * 60 },
+      );
+      if (overlay) {
+        await launchProjectCollaboration({
+          actor: { id: g.userId, email: g.userEmail, tenantId: g.tenantId },
+          actorType: 'user',
+          tenantId: g.tenantId,
+          scope: 'opp',
+          opportunityId,
+          taskType: 'proposal_setup',
+          taskTitle: 'Curate + release the purchased proposal workspace',
+          assigneeRole: overlay.assigneeRole,
+          entityType: 'opportunity',
+          entityRef: opportunityId,
+          nudgeDays: overlay.nudgeDays,
+          dueMinutes: overlay.dueMinutes,
+        });
+      }
     } catch (setupErr) {
       console.error('[portal/purchase] curation-gate launch failed (non-fatal)', setupErr);
     }

@@ -142,6 +142,33 @@ export async function PATCH(request: Request, ctx: RouteContext) {
                 ai_review_on_advance, auto_advance_when_all_locked, configured_at
     `;
 
+    // Dual-write: sync the changed booleans into tenant_automation_policies so the
+    // resolver (resolveAutomationPolicy) sees the tenant's current choices without
+    // needing to fall back to the old table. The old table remains the source of
+    // truth for this route during the dual-read period; the new table is the
+    // resolver's source of truth going forward.
+    const PREF_TO_POLICY: Record<string, { scope: 'discovery' | 'build'; trigger_key: string }> = {
+      notify_team_on_document_locked:  { scope: 'build',     trigger_key: 'proposal:document.locked' },
+      notify_collaborators_get_ready:  { scope: 'build',     trigger_key: 'proposal:proposal.advance_ready' },
+      notify_on_stage_advanced:        { scope: 'build',     trigger_key: 'proposal:proposal.advanced' },
+      notify_on_new_priority_opp:      { scope: 'discovery', trigger_key: 'capture:card.applied' },
+      ai_review_on_advance:            { scope: 'build',     trigger_key: 'proposal:proposal.advanced#ai_review' },
+    };
+    for (const [col, val] of provided) {
+      const mapping = PREF_TO_POLICY[col];
+      if (!mapping) continue;
+      try {
+        await sql`
+          INSERT INTO tenant_automation_policies
+            (tenant_id, scope, trigger_key, enabled, configured_at)
+          VALUES
+            (${r.tenantId}::uuid, ${mapping.scope}, ${mapping.trigger_key}, ${val}, now())
+          ON CONFLICT (tenant_id, scope, trigger_key)
+          DO UPDATE SET enabled = EXCLUDED.enabled, configured_at = now(), updated_at = now()
+        `;
+      } catch { /* best-effort — resolver falls back to framework if this fails */ }
+    }
+
     try {
       await emitEventSingle({
         namespace: 'capture',

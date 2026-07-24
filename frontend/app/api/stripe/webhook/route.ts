@@ -6,6 +6,7 @@ import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveCollaborationOverlay } from '@/lib/automation/policy';
 
 /**
  * Stripe webhook handler. Verifies the webhook signature and processes
@@ -179,20 +180,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       // purchase.completed had no consumer at all. System-attributed launch.
       if (opportunityId) {
         try {
-          await launchProjectCollaboration({
-            actor: { id: 'stripe-webhook', email: null, tenantId },
-            actorType: 'system',
-            tenantId,
-            scope: 'opp',
-            opportunityId,
-            taskType: 'proposal_setup',
-            taskTitle: 'Set up the proposal workspace for this purchase',
-            assigneeRole: 'rfp_admin',
-            entityType: 'opportunity',
-            entityRef: opportunityId,
-            nudgeDays: [1, 3],
-            dueMinutes: 4320,
-          });
+          const overlay = await resolveCollaborationOverlay(
+            tenantId, 'capture:purchase.completed',
+            { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueMinutes: 4320 },
+          );
+          if (overlay) {
+            await launchProjectCollaboration({
+              actor: { id: 'stripe-webhook', email: null, tenantId },
+              actorType: 'system',
+              tenantId,
+              scope: 'opp',
+              opportunityId,
+              taskType: 'proposal_setup',
+              taskTitle: 'Set up the proposal workspace for this purchase',
+              assigneeRole: overlay.assigneeRole,
+              entityType: 'opportunity',
+              entityRef: opportunityId,
+              nudgeDays: overlay.nudgeDays,
+              dueMinutes: overlay.dueMinutes,
+            });
+          }
         } catch (setupErr) {
           console.error('[stripe/webhook] workspace-setup launch failed (non-fatal):', setupErr);
         }
