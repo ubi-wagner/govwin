@@ -45,10 +45,15 @@ on save decomposes into section/group/atom real atoms. `renderCanvas(format, doc
 exports the real `.docx / .pptx / .xlsx / .pdf` (already built + proven). Reuses the
 existing `new-document-chooser` presets + Template Studio editor.
 
-**~40% exists today:** the format-aware "New Document" chooser (flier/deck/workbook +
-from-template) lives on `/documents`; Template Studio authors templates; the exporters
-work. **Missing:** the in-*library* Create Canvas, the decompose-on-save grains, the
-taxonomy, and the seeding.
+**As-built (P2.1, shipped):** the in-library **Create Canvas** action now lives on
+`/atoms` — a `CreateCanvasButton` modal (name · form doc/ppt/sheet/pdf · kind · context)
+→ `POST …/library/canvas` mints the foundation and decomposes it into the section/group
+scaffold with the full `kind×form×format×context` taxonomy (proven 16/16 on the real DB:
+each form persists `grain=foundation` + correct tags + a members-wired section scaffold;
+blank canvases carry 0 primitive atoms until content is added). **Next (P2.2):** open the
+new foundation in the canvas editor (load/save the foundation's `canvas_nodes` with
+decompose-on-save). The format-aware exporters + Template Studio editor already exist and
+are reused.
 
 ---
 
