@@ -79,6 +79,8 @@ export function CanvasEditorPage({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [undoSteps, setUndoSteps] = useState(0);
   const [redoSteps, setRedoSteps] = useState(0);
+  const [undoTrail, setUndoTrail] = useState<string[]>([]);
+  const [redoTrail, setRedoTrail] = useState<string[]>([]);
   const [nodeCount, setNodeCount] = useState(canvasDocument.nodes?.length ?? 0);
   const [docStatus, setDocStatus] = useState(canvasDocument.metadata.status ?? 'empty');
   const [panelOpen, setPanelOpen] = useState(true);
@@ -121,6 +123,8 @@ export function CanvasEditorPage({
   const handleErrorChange  = useCallback((e: string | null) => setSaveError(e), []);
   const handleUndoCount    = useCallback((n: number)   => setUndoSteps(n), []);
   const handleRedoCount    = useCallback((n: number)   => setRedoSteps(n), []);
+  const handleUndoTrail    = useCallback((t: string[]) => setUndoTrail(t), []);
+  const handleRedoTrail    = useCallback((t: string[]) => setRedoTrail(t), []);
   const handleNodeCount    = useCallback((n: number)   => setNodeCount(n), []);
   const handleStatusChange = useCallback((s: string)   => setDocStatus(s), []);
   const handleFormatChange = useCallback((f: string)   => setCanvasFormat(f), []);
@@ -197,6 +201,8 @@ export function CanvasEditorPage({
           canRedo={redoSteps > 0}
           undoSteps={undoSteps}
           redoSteps={redoSteps}
+          undoTrail={undoTrail}
+          redoTrail={redoTrail}
           onSave={() => triggerSaveRef.current?.()}
           onUndo={() => triggerUndoRef.current?.()}
           onRedo={() => triggerRedoRef.current?.()}
@@ -243,6 +249,8 @@ export function CanvasEditorPage({
           onSaveErrorChange={handleErrorChange}
           onUndoCountChange={handleUndoCount}
           onRedoCountChange={handleRedoCount}
+          onUndoTrailChange={handleUndoTrail}
+          onRedoTrailChange={handleRedoTrail}
           onNodeCountChange={handleNodeCount}
           onStatusChange={handleStatusChange}
           onFormatChange={handleFormatChange}

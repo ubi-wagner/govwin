@@ -75,6 +75,8 @@ interface Props {
   onSaveErrorChange?:(err: string|null) => void;
   onUndoCountChange?:(n: number)        => void;
   onRedoCountChange?:(n: number)        => void;
+  onUndoTrailChange?:(trail: string[])  => void;
+  onRedoTrailChange?:(trail: string[])  => void;
   onNodeCountChange?:(n: number)        => void;
   onStatusChange?:   (s: string)        => void;
   onFormatChange?:   (f: string)        => void;
@@ -88,6 +90,34 @@ interface Props {
   triggerLockRef?:   React.MutableRefObject<(() => void) | null>;
   triggerPanelRef?:  React.MutableRefObject<(() => void) | null>;
   triggerExportRef?: React.MutableRefObject<((format: 'docx'|'pptx'|'xlsx'|'pdf') => void) | null>;
+}
+
+function nodeTypeLabel(type: NodeType): string {
+  switch (type) {
+    case 'heading':       return 'heading';
+    case 'text_block':    return 'text block';
+    case 'bulleted_list': return 'bullet list';
+    case 'numbered_list': return 'numbered list';
+    case 'image':         return 'image';
+    case 'table':         return 'table';
+    case 'caption':       return 'caption';
+    case 'footnote':      return 'footnote';
+    case 'toc':           return 'table of contents';
+    case 'url':           return 'link';
+    default:              return 'block';
+  }
+}
+
+function styleChangeLabel(style: Partial<NodeStyle>): string {
+  if ('reuse_marker'  in style) return 'Mark reuse';
+  if ('background'    in style) return 'Highlight';
+  if ('color'         in style) return 'Text color';
+  if ('underline'     in style || 'strikethrough' in style) return 'Text decoration';
+  if ('weight'        in style) return 'Bold';
+  if ('style'         in style) return 'Italic';
+  if ('alignment'     in style) return 'Alignment';
+  if ('size'          in style) return 'Font size';
+  return 'Format text';
 }
 
 function defaultContent(type: NodeType): CanvasNode['content'] {
@@ -147,6 +177,8 @@ function CanvasEditorInner({
   onSaveErrorChange,
   onUndoCountChange,
   onRedoCountChange,
+  onUndoTrailChange,
+  onRedoTrailChange,
   onNodeCountChange,
   onStatusChange,
   onFormatChange,
@@ -164,8 +196,8 @@ function CanvasEditorInner({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [undoStack, setUndoStack] = useState<CanvasDocument[]>([]);
-  const [redoStack, setRedoStack] = useState<CanvasDocument[]>([]);
+  const [undoStack, setUndoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
+  const [redoStack, setRedoStack] = useState<{ doc: CanvasDocument; label: string }[]>([]);
   const lastRevisionMetaRef = useRef<RevisionMeta | null>(null);
 
   // ── Fine tools gated by the resolved capabilities (role × stage), falling back
@@ -203,6 +235,8 @@ function CanvasEditorInner({
   useEffect(() => { onSaveErrorChange?.(saveError);      }, [saveError, onSaveErrorChange]);
   useEffect(() => { onUndoCountChange?.(undoStack.length);}, [undoStack.length, onUndoCountChange]);
   useEffect(() => { onRedoCountChange?.(redoStack.length);}, [redoStack.length, onRedoCountChange]);
+  useEffect(() => { onUndoTrailChange?.([...undoStack].reverse().map(e => e.label)); }, [undoStack, onUndoTrailChange]);
+  useEffect(() => { onRedoTrailChange?.([...redoStack].reverse().map(e => e.label)); }, [redoStack, onRedoTrailChange]);
   useEffect(() => { onNodeCountChange?.(doc.nodes.length);}, [doc.nodes.length, onNodeCountChange]);
   useEffect(() => { onStatusChange?.(doc.metadata.status); }, [doc.metadata.status, onStatusChange]);
   useEffect(() => { onFormatChange?.(doc.canvas.format);   }, [doc.canvas.format, onFormatChange]);
@@ -234,14 +268,12 @@ function CanvasEditorInner({
   const selectedNode = doc.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const isSlideFormat = doc.canvas.format === 'slide_16_9' || doc.canvas.format === 'slide_4_3';
 
-  const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument) => {
+  const updateDoc = useCallback((updater: (prev: CanvasDocument) => CanvasDocument, label = 'Edit') => {
     setDoc((prev) => {
-      // Push previous state onto undo stack (limit 50)
       setUndoStack(stack => {
-        const next = [...stack, prev];
+        const next = [...stack, { doc: prev, label }];
         return next.length > 50 ? next.slice(-50) : next;
       });
-      // Clear redo stack on new edit
       setRedoStack([]);
 
       const next = updater(prev);
@@ -274,7 +306,7 @@ function CanvasEditorInner({
           ],
         };
       }),
-    }));
+    }), 'Edit text');
   }, [updateDoc, actorId, actorName]);
 
   const handleAddNode = useCallback((type: NodeType, afterId?: string) => {
@@ -295,7 +327,7 @@ function CanvasEditorInner({
         nodes.push(newNode);
       }
       return { ...prev, nodes };
-    });
+    }, `Add ${nodeTypeLabel(type)}`);
 
     setSelectedNodeId(newNode.id);
   }, [updateDoc, actorId, actorName]);
@@ -306,7 +338,7 @@ function CanvasEditorInner({
     updateDoc((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== nodeId),
-    }));
+    }), 'Delete block');
     if (selectedNodeId === nodeId) setSelectedNodeId(null);
   }, [updateDoc, selectedNodeId]);
 
@@ -315,16 +347,11 @@ function CanvasEditorInner({
       const nodes = [...prev.nodes];
       const currentIndex = nodes.findIndex(n => n.id === nodeId);
       if (currentIndex === -1 || currentIndex === targetIndex) return prev;
-
-      // Remove from current position
       const [removed] = nodes.splice(currentIndex, 1);
-
-      // Insert at target position (adjust if removing shifted the index)
       const insertAt = targetIndex > currentIndex ? targetIndex - 1 : targetIndex;
       nodes.splice(insertAt, 0, removed);
-
       return { ...prev, nodes };
-    });
+    }, 'Reorder blocks');
   }, [updateDoc]);
 
   const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
@@ -338,7 +365,7 @@ function CanvasEditorInner({
       if (newIdx < 0 || newIdx >= nodes.length) return prev;
       [nodes[idx], nodes[newIdx]] = [nodes[newIdx], nodes[idx]];
       return { ...prev, nodes };
-    });
+    }, direction === 'up' ? 'Move block up' : 'Move block down');
   }, [updateDoc]);
 
   const handleAcceptNode = useCallback((nodeId: string) => {
@@ -354,7 +381,7 @@ function CanvasEditorInner({
           ],
         };
       }),
-    }));
+    }), 'Accept revision');
   }, [updateDoc, actorId, actorName]);
 
   const handleRevertNode = useCallback((nodeId: string) => {
@@ -370,7 +397,7 @@ function CanvasEditorInner({
           ],
         };
       }),
-    }));
+    }), 'Revert block');
   }, [updateDoc, actorId, actorName]);
 
   const handleUpdateNodeStyle = useCallback((nodeId: string, style: Partial<NodeStyle>) => {
@@ -383,11 +410,11 @@ function CanvasEditorInner({
           style: { ...n.style, ...style },
         };
       }),
-    }));
+    }), styleChangeLabel(style));
   }, [updateDoc]);
 
   const handleUpdateCanvas = useCallback((canvas: CanvasRules) => {
-    updateDoc((prev) => ({ ...prev, canvas }));
+    updateDoc((prev) => ({ ...prev, canvas }), 'Canvas settings');
   }, [updateDoc]);
 
   const handleReviseNode = useCallback((nodeId: string, newContent: CanvasNode['content'], meta?: { source: string; aiInstruction: string }) => {
@@ -412,7 +439,7 @@ function CanvasEditorInner({
           ],
         };
       }),
-    }));
+    }), 'AI revision');
   }, [updateDoc, actorId, actorName]);
 
   const handleReplaceFromLibrary = useCallback((nodeId: string, atom: LibraryAtomCandidate) => {
@@ -440,7 +467,7 @@ function CanvasEditorInner({
           ],
         };
       }),
-    }));
+    }), 'Replace from library');
   }, [updateDoc, actorId, actorName]);
 
   /** Insert hand-picked library atoms as new canvas nodes (heading + paragraphs). */
@@ -456,25 +483,25 @@ function CanvasEditorInner({
         }
       }
       return { ...prev, nodes };
-    });
+    }, 'Insert from library');
     setShowInsert(false);
   }, [updateDoc, actorId, actorName]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
-    setRedoStack(stack => [...stack, doc]);
-    const prev = undoStack[undoStack.length - 1];
+    const entry = undoStack[undoStack.length - 1];
+    setRedoStack(stack => [...stack, { doc, label: entry.label }]);
     setUndoStack(stack => stack.slice(0, -1));
-    setDoc(prev);
+    setDoc(entry.doc);
     setDirty(true);
   }, [undoStack, doc]);
 
   const handleRedo = useCallback(() => {
     if (redoStack.length === 0) return;
-    setUndoStack(stack => [...stack, doc]);
-    const next = redoStack[redoStack.length - 1];
+    const entry = redoStack[redoStack.length - 1];
+    setUndoStack(stack => [...stack, { doc, label: entry.label }]);
     setRedoStack(stack => stack.slice(0, -1));
-    setDoc(next);
+    setDoc(entry.doc);
     setDirty(true);
   }, [redoStack, doc]);
 
@@ -614,7 +641,7 @@ function CanvasEditorInner({
             ? { ...n, library_tags: [...(n.library_tags ?? []).filter((t) => !t.startsWith('type:')), `type:${key}`] }
             : n,
         ),
-      }));
+      }), 'Tag block');
     },
     [updateDoc],
   );
@@ -630,7 +657,7 @@ function CanvasEditorInner({
             ? { ...n, library_tags: (n.library_tags ?? []).includes(clean) ? n.library_tags : [...(n.library_tags ?? []), clean] }
             : n,
         ),
-      }));
+      }), 'Add tag');
     },
     [updateDoc],
   );
@@ -642,7 +669,7 @@ function CanvasEditorInner({
         nodes: prev.nodes.map((n) =>
           n.id === nodeId ? { ...n, library_tags: (n.library_tags ?? []).filter((t) => t !== tag) } : n,
         ),
-      }));
+      }), 'Remove tag');
     },
     [updateDoc],
   );

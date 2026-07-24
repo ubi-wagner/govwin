@@ -50,6 +50,8 @@ export interface SectionRibbonProps {
   canRedo: boolean;
   undoSteps: number;
   redoSteps: number;
+  undoTrail?: string[];
+  redoTrail?: string[];
 
   // Actions
   onSave: () => void;
@@ -96,6 +98,8 @@ export function SectionTopRibbon({
   canRedo,
   undoSteps,
   redoSteps,
+  undoTrail,
+  redoTrail,
   onSave,
   onUndo,
   onRedo,
@@ -107,7 +111,9 @@ export function SectionTopRibbon({
   hasTable,
   readOnly,
 }: SectionRibbonProps) {
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportOpen,    setExportOpen]    = useState(false);
+  const [undoTrailOpen, setUndoTrailOpen] = useState(false);
+  const [redoTrailOpen, setRedoTrailOpen] = useState(false);
   const exportRef  = useRef<HTMLDivElement>(null);
 
   // Close export dropdown on outside click
@@ -208,23 +214,67 @@ export function SectionTopRibbon({
 
         {!readOnly && (
           <>
-            {/* Undo / Redo */}
-            <button
-              onClick={onUndo}
-              disabled={!canUndo}
-              className={`${btn} ${idle}`}
-              title={`Undo (Ctrl+Z) — ${undoSteps} step${undoSteps !== 1 ? 's' : ''}`}
-            >
-              ↩ Undo
-            </button>
-            <button
-              onClick={onRedo}
-              disabled={!canRedo}
-              className={`${btn} ${idle}`}
-              title={`Redo (Ctrl+Shift+Z) — ${redoSteps} step${redoSteps !== 1 ? 's' : ''}`}
-            >
-              ↪ Redo
-            </button>
+            {/* Undo with history trail popover */}
+            <div className="relative">
+              <button
+                onClick={onUndo}
+                disabled={!canUndo}
+                onMouseEnter={() => undoTrail && undoTrail.length > 0 && setUndoTrailOpen(true)}
+                onMouseLeave={() => setUndoTrailOpen(false)}
+                className={`${btn} ${idle}`}
+                title={`Undo (Ctrl+Z) — ${undoSteps} step${undoSteps !== 1 ? 's' : ''}`}
+              >
+                ↩{undoSteps > 0 ? ` (${undoSteps})` : ' Undo'}
+              </button>
+              {undoTrailOpen && undoTrail && undoTrail.length > 0 && (
+                <div
+                  className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[170px]"
+                  onMouseEnter={() => setUndoTrailOpen(true)}
+                  onMouseLeave={() => setUndoTrailOpen(false)}
+                >
+                  <div className="px-3 py-1 text-[10px] text-gray-400 uppercase tracking-wide font-semibold border-b border-gray-100">
+                    Undo history
+                  </div>
+                  {undoTrail.slice(0, 6).map((label, i) => (
+                    <div key={i} className={`px-3 py-1.5 text-xs flex items-center gap-2 ${i === 0 ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+                      {i === 0 && <span className="text-[9px]">↩</span>}
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Redo with history trail popover */}
+            <div className="relative">
+              <button
+                onClick={onRedo}
+                disabled={!canRedo}
+                onMouseEnter={() => redoTrail && redoTrail.length > 0 && setRedoTrailOpen(true)}
+                onMouseLeave={() => setRedoTrailOpen(false)}
+                className={`${btn} ${idle}`}
+                title={`Redo (Ctrl+Shift+Z) — ${redoSteps} step${redoSteps !== 1 ? 's' : ''}`}
+              >
+                ↪{redoSteps > 0 ? ` (${redoSteps})` : ' Redo'}
+              </button>
+              {redoTrailOpen && redoTrail && redoTrail.length > 0 && (
+                <div
+                  className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[170px]"
+                  onMouseEnter={() => setRedoTrailOpen(true)}
+                  onMouseLeave={() => setRedoTrailOpen(false)}
+                >
+                  <div className="px-3 py-1 text-[10px] text-gray-400 uppercase tracking-wide font-semibold border-b border-gray-100">
+                    Redo available
+                  </div>
+                  {redoTrail.slice(0, 6).map((label, i) => (
+                    <div key={i} className={`px-3 py-1.5 text-xs flex items-center gap-2 ${i === 0 ? 'text-emerald-600 font-medium' : 'text-gray-500'}`}>
+                      {i === 0 && <span className="text-[9px]">↪</span>}
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <span className="mx-1 h-5 w-px bg-gray-200 shrink-0" aria-hidden />
 
