@@ -86,12 +86,30 @@ copy-on-use + shared scaffold, 4-format exporters of the full element set, the r
   (3) taxonomy tags (`kind=template`, right `form/format`, `context=general`) present.
 - DOC: design §4; a starter-set index in the doc.
 
-**P4.2 — Author the PROPOSAL starters**
-- DEV: technical-volume · cost-volume · commercialization-deck · past-performance · bio ·
-  capabilities-statement foundations (mold-aligned section scaffolds).
-- TEST×3: (1) technical-volume decomposes into the expected sections; (2) cost-volume sheet exports
-  a formula-bearing `.xlsx`; (3) `context=proposal` + mold-type tags present.
-- DOC: design §4.
+**P4.2 — Author the PROPOSAL starters** — the DoD/DoW vehicle set (user-specified)
+- Vehicles (each = a Technical-Volume foundation `doc` + a Cost-Volume foundation `sheet`;
+  a shared commercialization deck `ppt` reused across them). Tag each with a `vehicle`
+  dimension so the library filters by vehicle:
+  1. **DoW CSO** (Department of War — Commercial Solutions Opening): two-step — a Solution
+     Brief/white-paper `doc` {Problem/Need · Solution & Innovation · Technical Approach ·
+     Company & Team · Rough Pricing · Commercialization/Transition} → Full Proposal expands it;
+     Pricing `sheet`.
+  2. **SBIR Phase I**: TV {Significance of the Problem · Phase I Technical Objectives · Phase I
+     Work Plan · Related Work · Relationship to Future R&D (Phase II vision) · Commercialization
+     Strategy · Key Personnel · Facilities/Equipment · Subs/Consultants · Prior Support}; Cost `sheet`.
+  3. **SBIR Phase II**: TV {Significance · Phase I Results & Feasibility · Phase II Objectives ·
+     Phase II Work Plan/SOW · Commercialization Plan (expanded) · Key Personnel · Facilities ·
+     Related Work · Subs}; Cost `sheet` (base + options).
+  4. **STTR Phase I**: SBIR Phase I scaffold **+ {Research Institution & Partnership · Allocation
+     of Work (≥40% SBC / ≥30% RI) · IP & Data-Rights Allocation}**; Cost `sheet`.
+  5. **STTR Phase II**: SBIR Phase II scaffold + the same RI-partnership/allocation sections; Cost `sheet`.
+  6. **Direct-to-Phase-II (DP2)**: TV {Phase I Feasibility Documentation (equivalent-work evidence) ·
+     Phase II Objectives · Phase II Work Plan · Commercialization Plan · Key Personnel · Facilities};
+     Cost `sheet`.
+- TEST×3: (1) each vehicle's TV decomposes into its expected sections (assert per-vehicle scaffold);
+  (2) each Cost `sheet` exports a formula-bearing `.xlsx`; (3) `context=proposal` + `vehicle=<slug>` +
+  `kind=template` tags present on every grain.
+- DOC: design §4 (the vehicle set + scaffolds).
 
 **P4.3 — Seed script → house library (`system_starter`)**
 - DEV: `scripts/seed-starter-set.mts` upserts every starter into the house tenant under
