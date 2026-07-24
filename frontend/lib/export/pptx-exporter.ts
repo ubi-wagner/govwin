@@ -17,6 +17,7 @@ import type {
   CanvasDocument,
   CanvasNode,
   CanvasRules,
+  NodeStyle,
   HeadingContent,
   TextBlockContent,
   ListContent,
@@ -25,6 +26,17 @@ import type {
   CaptionContent,
   FootnoteContent,
   UrlContent,
+  ShapeContent,
+  ShapeKind,
+  TextBoxContent,
+  CalloutContent,
+  CodeBlockContent,
+  BlockquoteContent,
+  ChartContent,
+  EquationContent,
+  DividerContent,
+  VideoContent,
+  SignatureContent,
 } from '@/lib/types/canvas-document';
 import { rasterizeDataUri, fitBox, type RasterPng } from '@/lib/export/image-raster';
 import { docNodes, sectionsToNodes } from '@/lib/types/canvas-document';
@@ -53,6 +65,74 @@ function hex(c?: string | null): string | null {
   if (!c) return null;
   const h = c.replace(/^#/, '').trim();
   return /^[0-9a-fA-F]{6}$/.test(h) ? h.toUpperCase() : null;
+}
+
+// ─── Extended-element style plumbing (the ribbon's Shape-Format tab) ───
+// Our ShapeKind → the pptxgenjs shape name; our chart_type → its chart name.
+const SHAPE_MAP: Record<ShapeKind, PptxGenJS.SHAPE_NAME> = {
+  rectangle: 'rect', rounded_rectangle: 'roundRect', ellipse: 'ellipse', triangle: 'triangle',
+  line: 'line', arrow: 'rightArrow', star: 'star5', diamond: 'diamond', callout_bubble: 'wedgeRoundRectCallout',
+};
+// scatter has no shared data shape here (needs numeric X) → approximate with a line.
+const CHART_MAP: Record<ChartContent['chart_type'], PptxGenJS.CHART_NAME> = {
+  bar: 'bar', line: 'line', pie: 'pie', scatter: 'line', area: 'area', doughnut: 'doughnut',
+};
+const CHART_COLORS: string[] = ['1F4E79', '2E75B6', '9DC3E6', 'C55A11', 'ED7D31', 'FFC000', '70AD47', 'A5A5A5'];
+const CALLOUT_COLORS: Record<string, { bg: string; fg: string }> = {
+  info: { bg: 'EFF6FF', fg: '1D4ED8' }, warning: { bg: 'FEF3C7', fg: 'B45309' },
+  tip: { bg: 'ECFDF5', fg: '047857' }, success: { bg: 'ECFDF5', fg: '047857' }, note: { bg: 'F1F5F9', fg: '475569' },
+};
+const SHADOW: PptxGenJS.ShadowProps = { type: 'outer', blur: 3, offset: 2, angle: 45, color: '000000', opacity: 0.35 };
+
+/** Opacity 0..1 → pptx transparency percent (0=opaque). */
+function transparencyOf(opacity?: number): number | undefined {
+  if (opacity == null) return undefined;
+  return Math.round((1 - Math.max(0, Math.min(1, opacity))) * 100);
+}
+/** node.style.fill → a pptx shape fill (color + transparency), or undefined if none. */
+function fillFrom(style: NodeStyle): PptxGenJS.ShapeFillProps | undefined {
+  const color = hex(style.fill?.color);
+  if (!color) return undefined;
+  const t = transparencyOf(style.fill?.opacity);
+  return { color, ...(t != null ? { transparency: t } : {}) };
+}
+/** node.style.border → a pptx line spec (color/width/dash + transparency), or undefined. */
+function lineFrom(style: NodeStyle): PptxGenJS.ShapeLineProps | undefined {
+  const b = style.border;
+  if (!b) return undefined;
+  if (b.style === 'none') return { type: 'none' };
+  const t = transparencyOf(b.opacity);
+  const dashType = b.style === 'dashed' ? 'dash' : b.style === 'dotted' ? 'sysDot' : 'solid';
+  return { color: hex(b.color) ?? INK, width: b.width ?? 1, dashType, ...(t != null ? { transparency: t } : {}) };
+}
+function clampRotate(deg?: number): number { return Math.max(-360, Math.min(360, deg ?? 0)); }
+
+/**
+ * Resolve a node's box. A node with an explicit `position.x/y` is FREE-PLACED
+ * (absolute slide coords, does not advance the body flow — Word's "in front of /
+ * behind text"); otherwise it flows at (x,y) with a measured default height.
+ */
+function placeBox(
+  node: CanvasNode, x: number, y: number, w: number, defaultH: number, maxH: number,
+): { x: number; y: number; w: number; h: number; consumed: number } {
+  const p = node.position;
+  if (p && (p.x != null || p.y != null)) {
+    return { x: p.x ?? x, y: p.y ?? y, w: p.w ?? w, h: p.h ?? defaultH, consumed: 0 };
+  }
+  const h = Math.min(p?.h ?? defaultH, maxH);
+  return { x, y, w: p?.w ?? w, h, consumed: h + 0.12 };
+}
+
+/** The run styling common to every primitive (bold/italic/underline/strike/highlight/align/color). */
+function runStyle(style: NodeStyle, font: string, fontSize: number, fallbackColor: string): PptxGenJS.TextPropsOptions {
+  const o: PptxGenJS.TextPropsOptions = { fontFace: style.family ?? font, fontSize: style.size ?? fontSize, color: hex(style.color) ?? fallbackColor };
+  if (style.weight === 'bold') o.bold = true;
+  if (style.style === 'italic') o.italic = true;
+  if (style.underline) o.underline = { style: 'sng' } as PptxGenJS.TextPropsOptions['underline'];
+  if (style.strikethrough) o.strike = 'sngStrike';
+  const hl = hex(style.highlight); if (hl) o.highlight = hl;
+  if (style.alignment) o.align = style.alignment;
+  return o;
 }
 
 export async function exportToPptx(
@@ -247,7 +327,7 @@ function addNodeToSlide(
       const h = Math.min(Math.max(0.35, lineCount * 0.28), maxH);
       const formats = c.inline_formats ?? [];
       if (formats.length === 0) {
-        slide.addText(sub(c.text), { x, y, w, h, fontSize, fontFace: font, color: nodeColor ?? INK, valign: 'top', wrap: true });
+        slide.addText(sub(c.text), { x, y, w, h, ...runStyle(node.style, font, fontSize, INK), valign: 'top', wrap: true });
       } else {
         const boundaries = new Set<number>([0, c.text.length]);
         for (const f of formats) { boundaries.add(f.start); boundaries.add(f.start + f.length); }
@@ -341,6 +421,133 @@ function addNodeToSlide(
       const c = node.content as UrlContent;
       slide.addText([{ text: sub(c.display_text), options: { fontSize, fontFace: font, color: '0066CC', hyperlink: { url: c.href } } }], { x, y, w, h: 0.35 });
       return 0.4;
+    }
+    case 'shape': {
+      const c = node.content as ShapeContent;
+      const b = placeBox(node, x, y, w, 1.2, maxH);
+      const shapeName = SHAPE_MAP[c.shape] ?? 'rect';
+      const geom: PptxGenJS.ShapeProps = {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        fill: fillFrom(node.style) ?? { color: hex(node.style.color) ?? 'DCE6F1' },
+        line: lineFrom(node.style) ?? { type: 'none' },
+        ...(node.style.rotation ? { rotate: clampRotate(node.style.rotation) } : {}),
+        ...(c.shape === 'rounded_rectangle' ? { rectRadius: 0.1 } : {}),
+        ...(node.style.shadow ? { shadow: SHADOW } : {}),
+      };
+      if (c.text) {
+        slide.addText(sub(c.text), { ...geom, shape: shapeName, align: 'center', valign: 'middle', fontFace: font, fontSize, color: nodeColor ?? INK, wrap: true });
+      } else {
+        slide.addShape(shapeName, geom);
+      }
+      return b.consumed;
+    }
+    case 'text_box': {
+      const c = node.content as TextBoxContent;
+      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60));
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * 0.3 + 0.15), maxH), maxH);
+      slide.addText(sub(c.text), {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        ...runStyle(node.style, font, fontSize, INK),
+        fill: fillFrom(node.style), line: lineFrom(node.style),
+        ...(node.style.rotation ? { rotate: clampRotate(node.style.rotation) } : {}),
+        ...(node.style.shadow ? { shadow: SHADOW } : {}),
+        valign: 'top', wrap: true, isTextBox: true, margin: 6,
+      });
+      return b.consumed;
+    }
+    case 'callout': {
+      const c = node.content as CalloutContent;
+      const pal = CALLOUT_COLORS[c.variant] ?? CALLOUT_COLORS.note;
+      const lines = Math.max(1, Math.ceil(sub(c.text).length / 60)) + (c.title ? 1 : 0);
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.6, lines * 0.3 + 0.2), maxH), maxH);
+      slide.addText([
+        ...(c.title ? [{ text: sub(c.title), options: { bold: true, color: pal.fg, fontFace: font, fontSize, breakLine: true } }] : []),
+        { text: sub(c.text), options: { color: INK, fontFace: font, fontSize } },
+      ], {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        shape: 'roundRect', rectRadius: 0.05, fill: { color: pal.bg }, line: { color: pal.fg, width: 1 },
+        align: 'left', valign: 'top', wrap: true, margin: 8,
+      });
+      return b.consumed;
+    }
+    case 'code_block': {
+      const c = node.content as CodeBlockContent;
+      const lines = c.code.split('\n').length;
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.4, lines * 0.24 + 0.2), maxH), maxH);
+      slide.addText(c.code || ' ', {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        fontFace: 'Courier New', fontSize: Math.max(9, fontSize - 2), color: 'E2E8F0',
+        fill: { color: '1E293B' }, align: 'left', valign: 'top', wrap: true, margin: 8, isTextBox: true,
+      });
+      return b.consumed;
+    }
+    case 'blockquote': {
+      const c = node.content as BlockquoteContent;
+      const lines = Math.max(1, Math.ceil(sub(c.text).length / 65));
+      const b = placeBox(node, x, y, w, Math.min(Math.max(0.5, lines * 0.32 + 0.2), maxH), maxH);
+      slide.addShape('rect', { x: b.x, y: b.y, w: 0.06, h: b.h, fill: { color: accent }, line: { type: 'none' } });
+      slide.addText([
+        { text: sub(c.text), options: { italic: true, color: INK, fontFace: font, fontSize, breakLine: true } },
+        ...(c.cite ? [{ text: `— ${sub(c.cite)}`, options: { color: MUTED, fontFace: font, fontSize: Math.max(9, fontSize - 2) } }] : []),
+      ], { x: b.x + 0.2, y: b.y, w: b.w - 0.2, h: b.h, align: 'left', valign: 'top', wrap: true });
+      return b.consumed;
+    }
+    case 'chart': {
+      const c = node.content as ChartContent;
+      const type = CHART_MAP[c.chart_type] ?? 'bar';
+      const isPie = type === 'pie' || type === 'doughnut';
+      const b = placeBox(node, x, y, w, Math.min(Math.max(2.4, maxH * 0.7), maxH), maxH);
+      const data = isPie
+        ? [{ name: c.series[0]?.name ?? 'Series', labels: c.categories, values: c.series[0]?.data ?? [] }]
+        : c.series.map((s) => ({ name: s.name, labels: c.categories, values: s.data }));
+      const colors = c.series.map((s) => hex(s.color)).filter((v): v is string => !!v);
+      slide.addChart(type, data, {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        showTitle: !!c.title, ...(c.title ? { title: sub(c.title) } : {}),
+        showLegend: c.series.length > 1 || isPie, legendPos: 'b',
+        showValue: false, chartColors: colors.length ? colors : CHART_COLORS,
+        catAxisLabelFontFace: font, valAxisLabelFontFace: font, dataLabelFontFace: font,
+        ...(isPie ? { showPercent: true } : {}),
+        ...(type === 'doughnut' ? { holeSize: 55 } : {}),
+      });
+      return b.consumed;
+    }
+    case 'equation': {
+      const c = node.content as EquationContent;
+      const tex = c.latex ?? c.mathml ?? '';
+      const b = placeBox(node, x, y, w, 0.5, maxH);
+      slide.addText(tex || '(equation)', {
+        x: b.x, y: b.y, w: b.w, h: b.h, fontFace: 'Cambria Math', fontSize: fontSize + 1,
+        italic: true, color: INK, align: c.display === false ? 'left' : 'center', valign: 'middle',
+      });
+      return b.consumed;
+    }
+    case 'divider': {
+      const c = node.content as DividerContent;
+      const dash = c.line_style === 'dashed' ? 'dash' : c.line_style === 'dotted' ? 'sysDot' : 'solid';
+      slide.addShape('line', { x, y: y + 0.15, w, h: 0, line: { color: hex(c.color) ?? 'CBD5E1', width: c.thickness ?? 1, dashType: dash } });
+      return 0.35;
+    }
+    case 'video': {
+      const c = node.content as VideoContent;
+      const b = placeBox(node, x, y, w, Math.min(2.4, maxH), maxH);
+      const label = c.caption ?? c.url ?? 'Video';
+      slide.addShape('rect', { x: b.x, y: b.y, w: b.w, h: b.h, fill: { color: '0F172A' }, line: { type: 'none' } });
+      slide.addText('▶', { x: b.x, y: b.y, w: b.w, h: b.h - 0.3, align: 'center', valign: 'middle', fontSize: 40, color: 'FFFFFF' });
+      slide.addText(sub(label), { x: b.x, y: b.y + b.h - 0.35, w: b.w, h: 0.3, align: 'center', valign: 'middle', fontSize: Math.max(9, fontSize - 3), color: 'E2E8F0', ...(c.url ? { hyperlink: { url: c.url } } : {}) });
+      return b.consumed;
+    }
+    case 'signature': {
+      const c = node.content as SignatureContent;
+      const b = placeBox(node, x, y, w, 0.9, maxH);
+      const lineY = b.y + 0.5;
+      const sigW = Math.min(3.2, b.w);
+      if (c.signed && c.signer_name) {
+        slide.addText(sub(c.signer_name), { x: b.x, y: lineY - 0.34, w: sigW, h: 0.32, fontFace: 'Segoe Script', fontSize: fontSize + 2, italic: true, color: '1E3A8A', valign: 'bottom' });
+      }
+      slide.addShape('line', { x: b.x, y: lineY, w: sigW, h: 0, line: { color: INK, width: 1 } });
+      slide.addText(sub(c.label ?? 'Signature') + (c.signed_at ? `   ·   ${c.signed_at}` : ''), { x: b.x, y: lineY + 0.03, w: b.w, h: 0.28, fontFace: font, fontSize: Math.max(9, fontSize - 2), color: MUTED });
+      return b.consumed;
     }
     case 'spacer':
       return 0.3;
