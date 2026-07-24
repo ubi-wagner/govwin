@@ -1,23 +1,32 @@
 'use client';
 
 /**
- * Canvas Editor Page — wraps CanvasEditor with save/export wiring.
+ * Canvas Editor Page — wraps CanvasEditor with save/export wiring and
+ * the persistent SectionTopRibbon for proposal-mode sections.
  *
- * One shell, two targets (the canvas itself is identical — only the persistence
- * routes and back-link differ, docs/CANVAS_GEOMETRY_REDESIGN.md §8a):
+ * Two targets (canvas itself is identical — routes and ribbon differ):
  *   • SECTION mode  — a proposal volume section (proposalId + sectionId given).
- *   • DOCUMENT mode — a standalone tenant document (documentId given, Tier 2 #3).
- * The proposal-scoped section tools (atomize-node, comments, complete-&-lock)
- * light up only in section mode because proposalId/sectionId aren't threaded to
- * the editor for a standalone document.
+ *     Full ribbon: breadcrumb, metadata chips, compliance, save/undo/lock/export.
+ *   • DOCUMENT mode — a standalone tenant document (documentId given).
+ *     Minimal top bar: back link + title only (compliance/lock don't apply).
+ *
+ * The ribbon owns the UX chrome (save, undo, export, lock); the inner
+ * CanvasEditor's header toolbar keeps the content controls (insert/format/
+ * sidebar toggle). State for ribbon-exposed actions flows up via callbacks
+ * the editor exposes through an imperative handle.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
+import type { ComplianceItem } from '@/components/portal/section-compliance-chip';
 import { CanvasEditor } from './canvas-editor';
+import { SectionTopRibbon } from './section-top-ribbon';
+
+// ─── Public ref handle (raised from CanvasEditor via innerRef prop) ────
+// We mirror save/undo/redo/lock state up so the ribbon can display it.
 
 interface Props {
   canvasDocument: CanvasDocument;
@@ -35,6 +44,12 @@ interface Props {
   stage?: string;
   tenantSlug?: string;
   initialVersion?: number;
+  // Section-mode extra metadata (populated by the portal section page)
+  sectionNumber?: string;
+  volumeName?: string;
+  pageAllocation?: number | null;
+  isLocked?: boolean;
+  complianceItems?: ComplianceItem[];
 }
 
 export function CanvasEditorPage({
@@ -49,12 +64,34 @@ export function CanvasEditorPage({
   stage,
   tenantSlug,
   initialVersion,
+  sectionNumber,
+  volumeName,
+  pageAllocation,
+  isLocked = false,
+  complianceItems,
 }: Props) {
   const router = useRouter();
-  // The DB row version this editor loaded — sent as baseVersion so the save is a
-  // real optimistic lock (reject if someone else saved since load), and synced
-  // forward from each successful save so subsequent saves stay in step.
   const versionRef = useRef<number | undefined>(initialVersion);
+
+  // Ribbon state — mirrored from the inner editor via callbacks
+  const [dirty,     setDirty]     = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [undoSteps, setUndoSteps] = useState(0);
+  const [redoSteps, setRedoSteps] = useState(0);
+  const [nodeCount, setNodeCount] = useState(canvasDocument.nodes?.length ?? 0);
+  const [docStatus, setDocStatus] = useState(canvasDocument.metadata.status ?? 'empty');
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [canvasFormat, setCanvasFormat] = useState(canvasDocument.canvas?.format ?? 'letter');
+  const [hasTable,   setHasTable]   = useState(() => (canvasDocument.nodes ?? []).some((n) => n.type === 'table'));
+
+  // Imperative trigger refs — the ribbon calls these to invoke editor actions
+  const triggerSaveRef  = useRef<(() => void) | null>(null);
+  const triggerUndoRef  = useRef<(() => void) | null>(null);
+  const triggerRedoRef  = useRef<(() => void) | null>(null);
+  const triggerLockRef  = useRef<(() => void) | null>(null);
+  const triggerPanelRef = useRef<(() => void) | null>(null);
+  const triggerExportRef= useRef<((format: 'docx'|'pptx'|'xlsx'|'pdf') => void) | null>(null);
 
   const isDocument = Boolean(documentId);
 
@@ -78,15 +115,23 @@ export function CanvasEditorPage({
 
   const backLabel = isDocument ? 'Back to Documents' : 'Back to Proposal';
 
+  // ── Callbacks CanvasEditor calls to push state up into the ribbon ───
+  const handleDirtyChange  = useCallback((d: boolean)  => setDirty(d),    []);
+  const handleSavingChange = useCallback((s: boolean)  => setSaving(s),   []);
+  const handleErrorChange  = useCallback((e: string | null) => setSaveError(e), []);
+  const handleUndoCount    = useCallback((n: number)   => setUndoSteps(n), []);
+  const handleRedoCount    = useCallback((n: number)   => setRedoSteps(n), []);
+  const handleNodeCount    = useCallback((n: number)   => setNodeCount(n), []);
+  const handleStatusChange = useCallback((s: string)   => setDocStatus(s), []);
+  const handleFormatChange = useCallback((f: string)   => setCanvasFormat(f), []);
+  const handleHasTable     = useCallback((h: boolean)  => setHasTable(h),  []);
+
+  // ── Persistence handlers (same logic as before) ─────────────────────
   const handleSave = useCallback(async (doc: CanvasDocument & { __revisionMeta?: { source: string; aiInstruction: string } }) => {
-    // Extract revision metadata if present (set by AI revision panel)
     const meta = doc.__revisionMeta;
     const payload: Record<string, unknown> = { content: doc };
     if (versionRef.current != null) payload.baseVersion = versionRef.current;
-    if (meta) {
-      payload.source = meta.source;
-      payload.aiInstruction = meta.aiInstruction;
-    }
+    if (meta) { payload.source = meta.source; payload.aiInstruction = meta.aiInstruction; }
     const resp = await fetch(saveUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -94,8 +139,6 @@ export function CanvasEditorPage({
     });
     if (!resp.ok) {
       const json = await resp.json().catch(() => ({}));
-      // On a 409 the row changed under us — reflect the new base version and
-      // surface a clear conflict so the user reloads rather than silently losing work.
       if (resp.status === 409 && typeof json.currentVersion === 'number') versionRef.current = json.currentVersion;
       throw new Error(
         resp.status === 409
@@ -118,26 +161,63 @@ export function CanvasEditorPage({
       throw new Error(json.error ?? `Export failed (HTTP ${resp.status})`);
     }
     const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement('a'), {
-      href: url,
+    const url  = URL.createObjectURL(blob);
+    Object.assign(document.createElement('a'), {
+      href:     url,
       download: `${doc.metadata.title || 'document'}.${format}`,
-    });
-    a.click();
+    }).click();
     URL.revokeObjectURL(url);
   }, [exportUrl]);
 
+  // ── Section mode: full SectionTopRibbon ─────────────────────────────
+  const sectionMode = !isDocument && Boolean(proposalId && sectionId);
+
   return (
     <div className="h-screen flex flex-col">
-      <div className="bg-white border-b px-4 py-2 flex items-center gap-4">
-        <Link
-          href={backUrl}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          &larr; {backLabel}
-        </Link>
-        <span className="text-sm text-gray-400">{canvasDocument.metadata.title}</span>
-      </div>
+
+      {sectionMode ? (
+        <SectionTopRibbon
+          backUrl={backUrl}
+          backLabel={backLabel}
+          sectionTitle={canvasDocument.metadata.title || 'Untitled Section'}
+          sectionNumber={sectionNumber}
+          volumeName={volumeName}
+          version={versionRef.current}
+          status={docStatus}
+          pageAllocation={pageAllocation ?? null}
+          nodeCount={nodeCount}
+          isLocked={isLocked}
+          canLock={!!(capabilities?.canLock) && !isLocked}
+          dirty={dirty}
+          saving={saving}
+          saveError={saveError}
+          complianceItems={complianceItems}
+          canExport={!!(capabilities?.canExport ?? true)}
+          canUndo={undoSteps > 0}
+          canRedo={redoSteps > 0}
+          undoSteps={undoSteps}
+          redoSteps={redoSteps}
+          onSave={() => triggerSaveRef.current?.()}
+          onUndo={() => triggerUndoRef.current?.()}
+          onRedo={() => triggerRedoRef.current?.()}
+          onLock={() => triggerLockRef.current?.()}
+          onExport={(fmt) => triggerExportRef.current?.(fmt)}
+          onTogglePanel={() => { setPanelOpen((prev) => !prev); triggerPanelRef.current?.(); }}
+          panelOpen={panelOpen}
+          canvasFormat={canvasFormat}
+          hasTable={hasTable}
+          readOnly={readOnly}
+        />
+      ) : (
+        // Document mode — minimal back/title bar
+        <div className="bg-white border-b px-4 py-2 flex items-center gap-4 shrink-0">
+          <Link href={backUrl} className="text-sm text-blue-600 hover:text-blue-800">
+            &larr; {backLabel}
+          </Link>
+          <span className="text-sm text-gray-400">{canvasDocument.metadata.title}</span>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden">
         <CanvasEditor
           initialDocument={canvasDocument}
@@ -156,6 +236,25 @@ export function CanvasEditorPage({
             company_name: 'Your Company',
             topic_number: 'TBD',
           }}
+          // Ribbon state callbacks — the editor pushes state up so the ribbon
+          // can reflect dirty/saving/undo counts without owning the doc state.
+          onDirtyChange={handleDirtyChange}
+          onSavingChange={handleSavingChange}
+          onSaveErrorChange={handleErrorChange}
+          onUndoCountChange={handleUndoCount}
+          onRedoCountChange={handleRedoCount}
+          onNodeCountChange={handleNodeCount}
+          onStatusChange={handleStatusChange}
+          onFormatChange={handleFormatChange}
+          onHasTableChange={handleHasTable}
+          // Imperative trigger refs — ribbon buttons call these
+          triggerSaveRef={triggerSaveRef}
+          triggerUndoRef={triggerUndoRef}
+          triggerRedoRef={triggerRedoRef}
+          triggerLockRef={triggerLockRef}
+          triggerPanelRef={triggerPanelRef}
+          triggerExportRef={triggerExportRef}
+          externalPanelOpen={sectionMode ? panelOpen : undefined}
         />
       </div>
     </div>

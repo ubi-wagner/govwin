@@ -350,16 +350,22 @@ function NodeRenderer({
     ? 'bg-gray-100 text-gray-500'
     : null;
 
+  const isReuse = node.style.reuse_marker === true;
   const nodeStyle: React.CSSProperties = {
     fontFamily: node.style.family ?? fontDefault.family,
     fontSize: node.style.size ? `${node.style.size * scale}pt` : undefined,
     fontWeight: node.style.weight,
-    fontStyle: node.style.style,
+    fontStyle: isReuse ? 'italic' : node.style.style,
     textAlign: node.style.alignment,
     marginLeft: node.style.indent ? node.style.indent * scale : undefined,
     paddingTop: (node.style.space_before ?? 4) * scale,
     paddingBottom: (node.style.space_after ?? 4) * scale,
-    color: node.style.color ?? undefined,
+    color: isReuse ? '#dc2626' : (node.style.color ?? undefined),
+    textDecoration: [
+      node.style.underline ? 'underline' : null,
+      node.style.strikethrough ? 'line-through' : null,
+    ].filter(Boolean).join(' ') || undefined,
+    backgroundColor: node.style.background ?? undefined,
   };
 
   return (

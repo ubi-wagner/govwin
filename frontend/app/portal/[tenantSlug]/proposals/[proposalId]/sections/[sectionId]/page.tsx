@@ -60,7 +60,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
 
   if (!proposal) notFound();
 
-  // ── Load the section's canvas content ──────────────────────────────
+  // ── Load the section's canvas content + ribbon metadata ──────────────
   let sectionRows: {
     id: string;
     title: string | null;
@@ -69,10 +69,14 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     isLocked: boolean;
     proposalId: string;
     version: number;
+    sectionNumber: string | null;
+    volumeName: string | null;
+    pageAllocation: number | null;
   }[] = [];
   try {
     sectionRows = await sql<typeof sectionRows>`
-      SELECT id, title, content, status, is_locked, proposal_id, version
+      SELECT id, title, content, status, is_locked, proposal_id, version,
+             section_number, volume_name, page_allocation
       FROM proposal_sections
       WHERE id = ${sectionId}::uuid
         AND proposal_id = ${proposalId}::uuid
@@ -83,6 +87,25 @@ export default async function PortalSectionEditorPage({ params }: Props) {
 
   if (sectionRows.length === 0) notFound();
   const section = sectionRows[0];
+
+  // ── Load compliance items for this section (for the ribbon chip) ──────
+  let sectionCompliance: {
+    id: string;
+    requirement: string;
+    status: string;
+    notes: string | null;
+    sectionId: string | null;
+  }[] = [];
+  try {
+    sectionCompliance = await sql<typeof sectionCompliance>`
+      SELECT id, requirement_text AS requirement, status, notes, section_id
+      FROM proposal_compliance_matrix
+      WHERE proposal_id = ${proposalId}::uuid
+        AND section_id  = ${sectionId}::uuid
+    `;
+  } catch (e) {
+    console.error('[portal/sections] compliance query error:', e);
+  }
 
   // ── Collaborator scoping ───────────────────────────────────────────
   // Home tenant staff (tenant_user+) have tenant-wide proposal access by design.
@@ -149,6 +172,17 @@ export default async function PortalSectionEditorPage({ params }: Props) {
       capabilities={capabilities}
       stage={stage}
       tenantSlug={tenantSlug}
+      sectionNumber={section.sectionNumber ?? undefined}
+      volumeName={section.volumeName ?? undefined}
+      pageAllocation={section.pageAllocation ?? null}
+      isLocked={proposal.isLocked || section.isLocked}
+      complianceItems={sectionCompliance.map((c) => ({
+        id: c.id,
+        requirement: c.requirement,
+        status: c.status,
+        details: c.notes,
+        sectionId: c.sectionId,
+      }))}
     />
   );
 }

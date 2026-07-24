@@ -6,6 +6,7 @@ import { TeamManager } from './team-manager';
 import { ProposalDropbox } from './proposal-dropbox';
 import { VolumeLayoutGauge } from './volume-layout-gauge';
 import { SaveAsTemplate } from './save-as-template';
+import { SectionComplianceChip } from './section-compliance-chip';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ interface ComplianceItem {
   label?: string;
   met?: boolean;
   value?: string;
+  sectionId?: string | null;
 }
 
 interface DropboxFileEntry {
@@ -582,104 +584,188 @@ export function ProposalAdminPanel({
                   })()}
                 </div>
               </div>
-              <div className="border border-gray-200 border-t-0 rounded-b-lg">
+              <div className="border border-gray-200 border-t-0 rounded-b-lg divide-y divide-gray-100">
                 {volume.sections.map((section) => {
-                  const icon = getSectionIcon(section.title);
-                  const statusInfo = STATUS_CONFIG[section.status] || STATUS_CONFIG.empty;
-                  const assignee = collaborators.find((c) => c.userId === section.assignedTo);
+                  const icon        = getSectionIcon(section.title);
+                  const statusInfo  = STATUS_CONFIG[section.status] || STATUS_CONFIG.empty;
+                  const assignee    = collaborators.find((c) => c.userId === section.assignedTo);
                   const assigneeIdx = assignee ? collaborators.indexOf(assignee) : -1;
+                  const pageEst     = section.nodeCount > 0 ? Math.ceil(section.nodeCount / 3) : 0;
                   const pagePercent = section.pageAllocation
                     ? Math.round((section.nodeCount / (section.pageAllocation * 3)) * 100)
                     : 0;
-                  const pageColor = pagePercent > 100 ? 'bg-red-500' : pagePercent > 90 ? 'bg-amber-500' : 'bg-emerald-500';
-                  const locked = isSectionLocked(section);
-                  const lockBusy = lockPending === section.id;
-                  const lockable = section.status !== 'empty' && section.nodeCount > 0;
+                  const pageBarColor = pagePercent > 100 ? 'bg-red-500' : pagePercent > 90 ? 'bg-amber-500' : 'bg-emerald-500';
+                  const pageTextColor= pagePercent > 100 ? 'text-red-600' : pagePercent > 90 ? 'text-amber-600' : 'text-gray-500';
+                  const locked      = isSectionLocked(section);
+                  const lockBusy    = lockPending === section.id;
+                  const lockable    = section.status !== 'empty' && section.nodeCount > 0;
+
+                  // Status dot color (left border accent)
+                  const statusDot =
+                    locked                            ? 'bg-amber-400'   :
+                    section.status === 'complete'     ? 'bg-emerald-500' :
+                    section.status === 'approved'     ? 'bg-emerald-600' :
+                    section.status === 'in_progress'  ? 'bg-blue-400'    :
+                    section.status === 'ai_drafted'   ? 'bg-indigo-400'  :
+                    'bg-gray-300';
+
+                  // Compliance items for this section
+                  const sectionCompliance = (compliance?.items ?? []).filter(
+                    (i) => i.sectionId === section.id,
+                  );
 
                   return (
-                    <div
-                      key={section.id}
-                      className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className={`w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${icon.color}`}>
-                        {icon.label}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900">{section.title}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          {section.pageAllocation ? `${section.pageAllocation} page limit` : 'No page limit'}
-                          {section.nodeCount > 0 && ` • v${section.version}`}
+                    <div key={section.id} className="group hover:bg-gray-50/60 transition-colors">
+
+                      {/* ── Row 1: identity + metadata ─────────────────────── */}
+                      <div className="flex items-start gap-3 px-4 pt-3 pb-1">
+                        {/* Status accent dot */}
+                        <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${statusDot}`} />
+
+                        {/* File-type icon */}
+                        <div className={`w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${icon.color}`}>
+                          {icon.label}
                         </div>
-                      </div>
 
-                      {/* Assignee */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {assignee ? (
-                          <>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold text-white ${AVATAR_COLORS[assigneeIdx % AVATAR_COLORS.length]}`}>
-                              {getInitials(assignee.name, assignee.email)}
-                            </div>
-                            <span className="text-xs text-gray-500">{assignee.name?.split(' ')[0] || assignee.email.split('@')[0]}</span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-gray-300">Unassigned</span>
-                        )}
-                      </div>
-
-                      {/* Page progress */}
-                      {section.pageAllocation ? (
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${pageColor}`} style={{ width: `${pagePercent}%` }} />
+                        {/* Title + sub-row */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900 leading-tight">
+                              {section.sectionNumber ? `${section.sectionNumber}. ` : ''}{section.title}
+                            </span>
+                            {locked && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 uppercase tracking-wide">
+                                🔒 Locked
+                              </span>
+                            )}
+                            {section.completedStage && (
+                              <span
+                                className="text-[10px] text-gray-400"
+                                title={`Accepted in ${section.completedStage}${section.acceptedByName ? ` by ${section.acceptedByName}` : ''}${section.completedAt ? ` on ${new Date(section.completedAt).toLocaleDateString()}` : ''}`}
+                              >
+                                ✓ {section.completedStage}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-xs text-gray-500 w-8">{section.nodeCount > 0 ? `${Math.ceil(section.nodeCount / 3)}/${section.pageAllocation}` : ''}</span>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            {/* Assignee */}
+                            {assignee ? (
+                              <span className="flex items-center gap-1 text-xs text-gray-500">
+                                <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[8px] font-bold text-white ${AVATAR_COLORS[assigneeIdx % AVATAR_COLORS.length]}`}>
+                                  {getInitials(assignee.name, assignee.email)}
+                                </span>
+                                {assignee.name?.split(' ')[0] || assignee.email.split('@')[0]}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300 italic">Unassigned</span>
+                            )}
+
+                            {/* Page budget */}
+                            {section.pageAllocation ? (
+                              <span className="flex items-center gap-1.5 text-xs">
+                                <span className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden inline-block align-middle">
+                                  <span
+                                    className={`block h-full rounded-full ${pageBarColor}`}
+                                    style={{ width: `${Math.min(pagePercent, 100)}%` }}
+                                  />
+                                </span>
+                                <span className={`tabular-nums ${pageTextColor}`}>
+                                  {pageEst}/{section.pageAllocation}p
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300">No page limit</span>
+                            )}
+
+                            {/* Version */}
+                            {section.nodeCount > 0 && (
+                              <span className="text-[10px] text-gray-400 font-mono bg-gray-100 px-1 rounded">v{section.version}</span>
+                            )}
+
+                            {/* Node count */}
+                            {section.nodeCount > 0 && (
+                              <span className="text-xs text-gray-400">{section.nodeCount} block{section.nodeCount !== 1 ? 's' : ''}</span>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <div className="w-[100px]" />
-                      )}
 
-                      {/* Status */}
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 ${statusInfo.badge}`}>
-                        {statusInfo.label}
-                      </span>
+                        {/* Right-side chips */}
+                        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide ${statusInfo.badge}`}>
+                            {statusInfo.label}
+                          </span>
+                          {sectionCompliance.length > 0 && (
+                            <SectionComplianceChip items={sectionCompliance} compact />
+                          )}
+                        </div>
+                      </div>
 
-                      {/* Completion marker */}
-                      {section.completedStage && (
-                        <span className="text-[10px] text-gray-400 flex items-center gap-0.5 flex-shrink-0" title={`Completed in ${section.completedStage}${section.acceptedByName ? ` by ${section.acceptedByName}` : ''}${section.completedAt ? ` on ${new Date(section.completedAt).toLocaleDateString()}` : ''}`}>
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                        </span>
-                      )}
+                      {/* ── Row 2: action tray ─────────────────────────────── */}
+                      <div className="flex items-center gap-2 px-4 pb-3 pt-1.5 pl-[52px]">
 
-                      {/* Accept & Lock / Unlock — the unit of "approved content" */}
-                      {locked ? (
+                        {/* Accept & Lock / Unlock */}
+                        {locked ? (
+                          <button
+                            onClick={() => handleToggleLock(section.id, true)}
+                            disabled={lockBusy}
+                            title="Accepted & locked. Click to unlock for editing."
+                            className="px-2.5 py-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                          >
+                            {lockBusy ? '…' : '🔓 Unlock'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleLock(section.id, false)}
+                            disabled={lockBusy || !lockable}
+                            title={lockable ? 'Accept and lock this section for the current stage' : 'Add content before accepting'}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {lockBusy ? '…' : '✓ Accept & Lock'}
+                          </button>
+                        )}
+
+                        {/* AI Re-draft */}
+                        {!locked && (
+                          <button
+                            onClick={() => handleSectionClick(section.id)}
+                            title="Open canvas to re-draft with AI"
+                            className="px-2.5 py-1 text-[11px] font-medium text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50 transition-colors"
+                          >
+                            ↺ Re-draft
+                          </button>
+                        )}
+
+                        {/* Atomize */}
+                        {section.nodeCount > 0 && (
+                          <button
+                            onClick={() => handleSectionClick(section.id)}
+                            title="Open canvas to atomize content into the library"
+                            className="px-2.5 py-1 text-[11px] font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+                          >
+                            ⬡ Atomize
+                          </button>
+                        )}
+
+                        {/* Expert notes indicator */}
+                        {(section as { expertNotes?: string | null }).expertNotes && (
+                          <span
+                            className="text-[10px] text-purple-600 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-md"
+                            title={`Expert notes: ${(section as { expertNotes?: string | null }).expertNotes}`}
+                          >
+                            ★ Notes
+                          </span>
+                        )}
+
+                        <span className="flex-1" />
+
+                        {/* Open */}
                         <button
-                          onClick={() => handleToggleLock(section.id, true)}
-                          disabled={lockBusy}
-                          title="Accepted & locked for this stage. Unlock to edit or regenerate."
-                          className="px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 disabled:opacity-50 flex-shrink-0 transition-colors"
+                          onClick={() => handleSectionClick(section.id)}
+                          className="px-3 py-1 text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
                         >
-                          {lockBusy ? '…' : '🔒 Unlock'}
+                          Open →
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleLock(section.id, false)}
-                          disabled={lockBusy || !lockable}
-                          title={lockable ? 'Accept this section and lock it for this stage' : 'Draft content before accepting'}
-                          className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 transition-colors"
-                        >
-                          {lockBusy ? '…' : 'Accept & Lock'}
-                        </button>
-                      )}
-
-                      {/* Action */}
-                      <button
-                        onClick={() => handleSectionClick(section.id)}
-                        className="px-2.5 py-1 text-xs font-medium text-gray-500 border border-gray-200 rounded-md hover:bg-gray-100 flex-shrink-0 transition-colors"
-                      >
-                        Open
-                      </button>
+                      </div>
                     </div>
                   );
                 })}

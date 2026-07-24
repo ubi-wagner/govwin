@@ -261,6 +261,10 @@ export interface NodeStyle extends Partial<FontSpec> {
   indent?: number;
   space_before?: number;
   space_after?: number;
+  underline?: boolean;
+  strikethrough?: boolean;
+  background?: string;   // hex highlight color
+  reuse_marker?: boolean; // imported from a prior proposal — rendered red italic
 }
 
 // ─── Canvas Node (the atom) ─────────────────────────────────────────

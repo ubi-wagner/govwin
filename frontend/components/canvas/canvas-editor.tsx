@@ -65,6 +65,29 @@ interface Props {
   sectionId?: string;
   /** Tenant slug — enables comments API when present */
   tenantSlug?: string;
+
+  // ── Ribbon state callbacks (SectionTopRibbon integration) ──────────────
+  // When a SectionTopRibbon is mounted above this editor, it needs to reflect
+  // the editor's live state without owning the doc state. These optional
+  // callbacks push state up; the ribbon's trigger refs pull actions down.
+  onDirtyChange?:    (dirty: boolean)   => void;
+  onSavingChange?:   (saving: boolean)  => void;
+  onSaveErrorChange?:(err: string|null) => void;
+  onUndoCountChange?:(n: number)        => void;
+  onRedoCountChange?:(n: number)        => void;
+  onNodeCountChange?:(n: number)        => void;
+  onStatusChange?:   (s: string)        => void;
+  onFormatChange?:   (f: string)        => void;
+  onHasTableChange?: (h: boolean)       => void;
+  /** When set, the ribbon owns the panel-open state (overrides local). */
+  externalPanelOpen?: boolean;
+  /** Imperative trigger refs — ribbon buttons call these to invoke editor actions. */
+  triggerSaveRef?:   React.MutableRefObject<(() => void) | null>;
+  triggerUndoRef?:   React.MutableRefObject<(() => void) | null>;
+  triggerRedoRef?:   React.MutableRefObject<(() => void) | null>;
+  triggerLockRef?:   React.MutableRefObject<(() => void) | null>;
+  triggerPanelRef?:  React.MutableRefObject<(() => void) | null>;
+  triggerExportRef?: React.MutableRefObject<((format: 'docx'|'pptx'|'xlsx'|'pdf') => void) | null>;
 }
 
 function defaultContent(type: NodeType): CanvasNode['content'] {
@@ -119,6 +142,22 @@ function CanvasEditorInner({
   proposalId,
   sectionId,
   tenantSlug,
+  onDirtyChange,
+  onSavingChange,
+  onSaveErrorChange,
+  onUndoCountChange,
+  onRedoCountChange,
+  onNodeCountChange,
+  onStatusChange,
+  onFormatChange,
+  onHasTableChange,
+  externalPanelOpen,
+  triggerSaveRef,
+  triggerUndoRef,
+  triggerRedoRef,
+  triggerLockRef,
+  triggerPanelRef,
+  triggerExportRef,
 }: Props) {
   const [doc, setDoc] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -152,6 +191,24 @@ function CanvasEditorInner({
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, []);
+
+  // ── Sync panel open/closed when the ribbon controls it externally ────
+  useEffect(() => {
+    if (externalPanelOpen !== undefined) setSidebarOpen(externalPanelOpen);
+  }, [externalPanelOpen]);
+
+  // ── Push live state up to ribbon (all best-effort) ────────────────────
+  useEffect(() => { onDirtyChange?.(dirty);              }, [dirty, onDirtyChange]);
+  useEffect(() => { onSavingChange?.(saving);            }, [saving, onSavingChange]);
+  useEffect(() => { onSaveErrorChange?.(saveError);      }, [saveError, onSaveErrorChange]);
+  useEffect(() => { onUndoCountChange?.(undoStack.length);}, [undoStack.length, onUndoCountChange]);
+  useEffect(() => { onRedoCountChange?.(redoStack.length);}, [redoStack.length, onRedoCountChange]);
+  useEffect(() => { onNodeCountChange?.(doc.nodes.length);}, [doc.nodes.length, onNodeCountChange]);
+  useEffect(() => { onStatusChange?.(doc.metadata.status); }, [doc.metadata.status, onStatusChange]);
+  useEffect(() => { onFormatChange?.(doc.canvas.format);   }, [doc.canvas.format, onFormatChange]);
+  useEffect(() => {
+    onHasTableChange?.(doc.nodes.some((n) => n.type === 'table'));
+  }, [doc.nodes, onHasTableChange]);
 
   // Sync the editor's dirty flag to the admin nav guard (no-op outside /admin).
   useUnsavedChanges(dirty);
@@ -505,6 +562,18 @@ function CanvasEditorInner({
       setSaveError(err instanceof Error ? err.message : 'Save template failed');
     }
   }, [doc, tenantSlug]);
+
+  // ── Wire ribbon trigger refs (stable after mount) ─────────────────────
+  // These refs let the SectionTopRibbon call editor actions imperatively
+  // without threading callbacks through every intermediate component.
+  if (triggerSaveRef)   triggerSaveRef.current   = handleSave;
+  if (triggerUndoRef)   triggerUndoRef.current   = handleUndo;
+  if (triggerRedoRef)   triggerRedoRef.current   = handleRedo;
+  if (triggerLockRef)   triggerLockRef.current   = handleCompleteLock;
+  if (triggerPanelRef)  triggerPanelRef.current  = () => setSidebarOpen((v) => !v);
+  if (triggerExportRef) triggerExportRef.current = (fmt) => {
+    if (onExport) onExport(doc, fmt).catch((err) => setSaveError(err instanceof Error ? err.message : 'Export failed'));
+  };
 
   // ── One dispatch the sidebar toolbox cards call for editor-hosted tools. ──
   const handleToolAction = useCallback((id: string) => {
