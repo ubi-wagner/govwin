@@ -222,7 +222,7 @@ const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#
 
 /** A self-contained inline SVG chart (bar / line / area / pie / doughnut). Embeddable
  *  anywhere HTML goes; docx/pptx pick it up as an image, pdf renders it directly. */
-function renderChartSvg(ch: ChartContent): string {
+export function renderChartSvg(ch: ChartContent): string {
   const W = 460, H = 240, pad = 32;
   const cats = ch.categories ?? [];
   const series = ch.series ?? [];
@@ -262,6 +262,56 @@ function renderChartSvg(ch: ChartContent): string {
   const axes = ch.chart_type === 'pie' || ch.chart_type === 'doughnut' ? ''
     : `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#94a3b8"/><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="#94a3b8"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="${esc(ch.chart_type)}">${title}${axes}${body}</svg>`;
+}
+
+/** A regular N-pointed star polygon centered at (cx,cy). */
+function starPoints(cx: number, cy: number, rOuter: number, points = 5): string {
+  const rInner = rOuter * 0.4;
+  const pts: string[] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? rOuter : rInner;
+    const a = -Math.PI / 2 + (i * Math.PI) / points;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+/**
+ * A self-contained SVG for a shape primitive — fill (+opacity), border (color/
+ * width/style), whole-shape opacity, rotation, and optional centered text. The
+ * raster exporters (docx/xlsx, which have no vector-shape primitive) rasterize
+ * this to a PNG; the HTML/PDF path draws shapes as styled divs, so this is
+ * export-only. Covers every ShapeKind.
+ */
+export function renderShapeSvg(node: CanvasNode): string {
+  const sc = (node.content ?? {}) as ShapeContent;
+  const sh = sc.shape ?? 'rectangle';
+  const s = node.style ?? {};
+  const W = 320, H = 200, m = 8;
+  const x = m, y = m, w = W - 2 * m, h = H - 2 * m;
+  const fill = cssColor(s.fill?.color, s.fill?.opacity) ?? '#DCE6F1';
+  const strokeCol = cssColor(s.border?.color) ?? (s.border && s.border.style !== 'none' ? '#334155' : null);
+  const sw = s.border?.width ?? (strokeCol ? 1 : 0);
+  const dash = s.border?.style === 'dashed' ? ' stroke-dasharray="7,4"' : s.border?.style === 'dotted' ? ' stroke-dasharray="2,3"' : '';
+  const stroke = sw > 0 && strokeCol ? ` stroke="${strokeCol}" stroke-width="${sw}"${dash}` : '';
+  let el: string;
+  switch (sh) {
+    case 'ellipse': el = `<ellipse cx="${W / 2}" cy="${H / 2}" rx="${w / 2}" ry="${h / 2}" fill="${fill}"${stroke}/>`; break;
+    case 'rounded_rectangle': el = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" ry="18" fill="${fill}"${stroke}/>`; break;
+    case 'triangle': el = `<polygon points="${W / 2},${y} ${W - m},${H - m} ${m},${H - m}" fill="${fill}"${stroke}/>`; break;
+    case 'diamond': el = `<polygon points="${W / 2},${y} ${W - m},${H / 2} ${W / 2},${H - m} ${m},${H / 2}" fill="${fill}"${stroke}/>`; break;
+    case 'star': el = `<polygon points="${starPoints(W / 2, H / 2, Math.min(w, h) / 2)}" fill="${fill}"${stroke}/>`; break;
+    case 'line': el = `<line x1="${m}" y1="${H / 2}" x2="${W - m}" y2="${H / 2}" stroke="${strokeCol ?? '#334155'}" stroke-width="${sw || 2}"${dash}/>`; break;
+    case 'arrow': el = `<path d="M${m},${H * 0.38} L${W * 0.66},${H * 0.38} L${W * 0.66},${H * 0.2} L${W - m},${H / 2} L${W * 0.66},${H * 0.8} L${W * 0.66},${H * 0.62} L${m},${H * 0.62} Z" fill="${fill}"${stroke}/>`; break;
+    case 'callout_bubble': el = `<path d="M${x + 18},${y} h${w - 36} q18,0 18,18 v${h - 60} q0,18 -18,18 h-${(w - 36) * 0.55} l-22,26 v-26 h-${(w - 36) * 0.45} q-18,0 -18,-18 v-${h - 60} q0,-18 18,-18 Z" fill="${fill}"${stroke}/>`; break;
+    default: el = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"${stroke}/>`; // rectangle
+  }
+  const txt = sc.text;
+  const textEl = txt
+    ? `<text x="${W / 2}" y="${H / 2}" dominant-baseline="central" text-anchor="middle" font-size="16" font-family="${esc(s.family ?? 'Arial')}" fill="${s.color ?? '#1E293B'}">${esc(txt)}</text>`
+    : '';
+  const g = `<g opacity="${s.opacity ?? 1}"${s.rotation ? ` transform="rotate(${s.rotation} ${W / 2} ${H / 2})"` : ''}>${el}${textEl}</g>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" data-shape="${esc(sh)}">${g}</svg>`;
 }
 
 function renderNode(node: CanvasNode, vars: Record<string, string>): string {
