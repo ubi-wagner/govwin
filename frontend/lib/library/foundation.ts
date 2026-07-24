@@ -38,6 +38,11 @@ export interface DecomposedArtifact {
   atomIds: string[];
 }
 
+// Structural nodes render inside their group/section but are NOT reusable content,
+// so they don't get their own primitive atom (their text is captured in titles).
+// Keeps the library to MEANINGFUL atoms (text/table/figure/image), not bare headings.
+const STRUCTURAL_NODES: ReadonlySet<string> = new Set(['heading', 'spacer', 'page_break', 'divider']);
+
 function nodeLabel(n: CanvasNode): { title: string; content: string } {
   const c = (n.content ?? {}) as Record<string, unknown>;
   if (n.type === 'heading') { const t = String(c.text ?? ''); return { title: t.slice(0, 120) || 'Heading', content: t }; }
@@ -75,6 +80,7 @@ export async function decomposeAndIngest(
     for (const group of section.groups ?? []) {
       const groupAtomIds: string[] = [];
       for (const n of group.nodes ?? []) {
+        if (STRUCTURAL_NODES.has(n.type)) continue;   // renders in the group, but not its own atom
         const { title, content } = nodeLabel(n);
         const { atomId } = await createAtom(tenantId, {
           grain: 'primitive', title, content, canvasNodes: [n], tags: tags(), ...common,
