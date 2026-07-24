@@ -9,8 +9,14 @@
 --
 -- Ships INERT: every un-configured tenant rides the platform framework row,
 -- so behaviour is identical to today until a tenant (or RFP admin) edits a rule.
--- The 6-boolean table remains readable (dual-read period); it is retired once
--- frontend routes are fully repointed (mig 1XX).
+--
+-- DEPRECATED TABLE: tenant_automation_preferences
+-- The 6-boolean table is in a dual-read period. It remains writable only by
+-- the /api/portal/[tenantSlug]/automation-preferences PATCH route (which
+-- dual-writes every toggle to this table). All resolver reads now use
+-- tenant_automation_policies exclusively. The old table will be DROPPED in a
+-- later migration (mig 1XX) once the per-trigger tenant editor replaces the
+-- 6-checkbox UI. Until then: write to both, read from the new one.
 
 CREATE TABLE IF NOT EXISTS tenant_automation_policies (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),

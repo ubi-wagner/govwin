@@ -119,6 +119,21 @@ describe('resolveAutomationPolicy', () => {
     expect(result!.enabled).toBe(true);
   });
 
+  it('inherits framework condition when tenant row has empty condition', async () => {
+    const tenantRow = { ...FRAMEWORK_ROW, condition: {}, recipient_roles: ['tenant_admin'] };
+    const frameworkRow = { ...FRAMEWORK_ROW, condition: { stage: 'review' } };
+    // rows[0]=tenant (empty condition), rows[1]=framework (has condition)
+    sqlMock.mockResolvedValue([tenantRow, frameworkRow]);
+    const mismatch = await resolveAutomationPolicy(
+      TENANT, 'proposal:proposal.advanced', { payload: { stage: 'draft' } },
+    );
+    expect(mismatch!.enabled).toBe(false); // framework condition was inherited and failed
+    const match = await resolveAutomationPolicy(
+      TENANT, 'proposal:proposal.advanced', { payload: { stage: 'review' } },
+    );
+    expect(match!.enabled).toBe(true);
+  });
+
   it('null tenantId resolves only the framework row', async () => {
     sqlMock.mockResolvedValue([FRAMEWORK_ROW]);
     const result = await resolveAutomationPolicy(null, 'proposal:proposal.created');

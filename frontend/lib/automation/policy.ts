@@ -119,23 +119,22 @@ export async function resolveAutomationPolicy(
   const tenantRow = rows.length === 2 ? rows[0] : null;
   const frameworkRow = rows.length === 2 ? rows[1] : rows[0];
 
-  // Condition predicate check: if the matching row has a non-empty condition,
-  // it must match the event payload, otherwise skip (treat as disabled).
-  const activeRow = tenantRow ?? frameworkRow;
+  // Merge first so condition check uses the effective (merged) predicate.
+  // mergeRows falls back to the framework condition when the tenant row has
+  // an empty condition — matching is always against the governing rule.
+  const merged = tenantRow ? mergeRows(tenantRow, frameworkRow) : frameworkRow;
+
+  // Condition predicate: if the effective row has a non-empty condition it must
+  // match the event payload, otherwise treat the policy as disabled (safe-skip).
   if (
     ctx.payload &&
-    activeRow.condition &&
-    Object.keys(activeRow.condition).length > 0
+    merged.condition &&
+    Object.keys(merged.condition).length > 0
   ) {
-    if (!conditionsMatch(activeRow.condition, ctx.payload)) {
-      return { ...toResolved(activeRow), enabled: false };
+    if (!conditionsMatch(merged.condition, ctx.payload)) {
+      return { ...toResolved(merged), enabled: false };
     }
   }
-
-  // Tenant row wins per field; missing fields fall back to framework.
-  const merged = tenantRow
-    ? mergeRows(tenantRow, frameworkRow)
-    : frameworkRow;
 
   return toResolved(merged);
 }

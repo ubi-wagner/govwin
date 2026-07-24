@@ -250,7 +250,9 @@ def _rule_matches(
 # A tenant-scoped rule opts into a customer toggle by naming a column in its
 # action_config.tenant_pref. The listener checks (in precedence order):
 #   1. tenant_automation_policies (new — the resolver's source of truth, mig 126)
-#   2. tenant_automation_preferences (old — the dual-read fallback during transition)
+#   2. tenant_automation_preferences (DEPRECATED — dual-read fallback only; read by
+#      this function and the tenant 6-checkbox PATCH route until a per-trigger
+#      tenant editor replaces the checkbox UI and the table is dropped)
 #   3. documented defaults (new tenant with no rows yet)
 # Never silently suppresses: lookup errors, ungated rules, non-tenant-scoped events
 # all return True.
@@ -336,11 +338,17 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
                 trigger_key, tenant_id, e,
             )
 
-    # 2. Fall back to tenant_automation_preferences (legacy dual-read).
+    # 2. Fall back to tenant_automation_preferences (DEPRECATED — dual-read period only).
+    # Select all four boolean columns statically; look up pref in the result dict so no
+    # column name is ever interpolated into SQL (pref is Python dict-key access only).
     try:
-        # pref is allowlisted against _GATED_PREFS above, so this interpolation is safe.
         row = await pool.fetchrow(
-            f'SELECT {pref} AS v FROM tenant_automation_preferences WHERE tenant_id = $1::uuid',
+            '''SELECT notify_team_on_document_locked,
+                      notify_collaborators_get_ready,
+                      notify_on_stage_advanced,
+                      notify_on_new_priority_opp
+               FROM tenant_automation_preferences
+               WHERE tenant_id = $1::uuid''',
             str(tenant_id),
         )
     except Exception as e:
@@ -348,7 +356,7 @@ async def _automation_pref_allows(config, payload: dict) -> bool:
         return True  # best-effort: a lookup error must not block notifications
     if row is None:
         return _PREF_DEFAULTS.get(pref, True)  # unconfigured tenant — use documented default
-    return bool(row['v'])
+    return bool(row[pref])
 
 
 async def _execute_rule(rule, col_names: set, event):

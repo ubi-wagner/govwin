@@ -106,4 +106,32 @@ describe('PATCH automation-preferences', () => {
       expect.objectContaining({ namespace: 'capture', type: 'automation_preferences.updated' }),
     );
   });
+
+  it('dual-writes autoAdvanceWhenAllLocked to tenant_automation_policies', async () => {
+    authMock.mockResolvedValue(session('tenant_admin'));
+    const policyUpserts: string[] = [];
+    sqlMock.mockImplementation((strings: TemplateStringsArray) => {
+      const q = Array.isArray(strings) ? strings.join('?') : String(strings);
+      if (q.includes('INSERT INTO tenant_automation_policies')) {
+        policyUpserts.push(q);
+        return Promise.resolve([]);
+      }
+      if (q.includes('UPDATE tenant_automation_preferences')) {
+        return Promise.resolve([{
+          notifyTeamOnDocumentLocked: true,
+          notifyCollaboratorsGetReady: true,
+          notifyOnStageAdvanced: true,
+          notifyOnNewPriorityOpp: true,
+          aiReviewOnAdvance: true,
+          autoAdvanceWhenAllLocked: true,
+          configuredAt: '2026-06-25T00:00:00Z',
+        }]);
+      }
+      return Promise.resolve([]);
+    });
+    const res = await PATCH(patchReq({ autoAdvanceWhenAllLocked: true }), ctx);
+    expect(res.status).toBe(200);
+    // auto_advance_when_all_locked must be dual-written to the new policies table
+    expect(policyUpserts.length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -5,6 +5,14 @@
  * The customer admin's automation setup (configured at portal purchase, editable
  * later). Gates the milestone automations driven by the emitted proposal events.
  * Auth: tenant_admin or above with tenant access.
+ *
+ * @deprecated-table tenant_automation_preferences
+ * This route is the ONLY remaining writer/reader of `tenant_automation_preferences`.
+ * The PATCH dual-writes every toggle to `tenant_automation_policies` so the resolver
+ * (resolveAutomationPolicy) sees the tenant's choices immediately. All other business
+ * logic already reads from `tenant_automation_policies`. This route (and the 6-checkbox
+ * UI it backs) is the last piece before `tenant_automation_preferences` can be dropped
+ * in a later migration once a per-trigger tenant editor replaces the checkbox UI.
  */
 
 import { NextResponse } from 'next/server';
@@ -153,6 +161,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
       notify_on_stage_advanced:        { scope: 'build',     trigger_key: 'proposal:proposal.advanced' },
       notify_on_new_priority_opp:      { scope: 'discovery', trigger_key: 'capture:card.applied' },
       ai_review_on_advance:            { scope: 'build',     trigger_key: 'proposal:proposal.advanced#ai_review' },
+      auto_advance_when_all_locked:    { scope: 'build',     trigger_key: 'proposal:sections.all_locked#auto_advance' },
     };
     for (const [col, val] of provided) {
       const mapping = PREF_TO_POLICY[col];
