@@ -55,30 +55,31 @@ function nodeLabel(n: CanvasNode): { title: string; content: string } {
   return { title: n.type, content: typeof c === 'object' ? JSON.stringify(c).slice(0, 4000) : String(c) };
 }
 
-/** Decompose a CanvasDocument into foundation/section/group/atom real atoms and
- *  persist them (bottom-up so member ids exist before their container). */
-export async function decomposeAndIngest(
-  tenantId: string,
-  doc: CanvasDocument,
-  meta: FoundationMeta,
-  actor: { id: string },
-): Promise<DecomposedArtifact> {
-  const format = ARTIFACT_FORMAT[meta.form];
-  const tags = (): AtomTagInput[] => [
+/** The taxonomy tag set for a foundation + all its grains (collection · doc=slug · kind · form · format · context). */
+function foundationTags(meta: FoundationMeta): AtomTagInput[] {
+  return [
     { dimension: 'collection', value: meta.collection ?? HOUSE_COLLECTION, source: 'admin', confirmed: true },
     { dimension: 'doc', value: meta.slug, source: 'admin', confirmed: true },
     { dimension: 'kind', value: meta.kind ?? 'document', source: 'admin', confirmed: true },
     { dimension: 'form', value: meta.form, source: 'admin', confirmed: true },
-    { dimension: 'format', value: format, source: 'admin', confirmed: true },
+    { dimension: 'format', value: ARTIFACT_FORMAT[meta.form], source: 'admin', confirmed: true },
     { dimension: 'context', value: meta.context ?? 'general', source: 'admin', confirmed: true },
   ];
-  const common = { source: 'manual' as const, creatorKind: 'admin' as const, visibility: 'tenant' as const, status: 'approved' as const };
-  const A = { id: actor.id, kind: 'admin' as const };
+}
 
+const DECOMPOSE_COMMON = { source: 'manual' as const, creatorKind: 'admin' as const, visibility: 'tenant' as const, status: 'approved' as const };
+
+/** Build the section/group/primitive child grains (bottom-up) from a doc's sections,
+ *  tagging every grain with the same taxonomy. Shared by create + re-decompose. */
+async function buildChildGrains(
+  tenantId: string,
+  doc: CanvasDocument,
+  tags: () => AtomTagInput[],
+  actor: { id: string; kind: 'admin' },
+): Promise<{ sectionIds: string[]; groupIds: string[]; atomIds: string[] }> {
   const atomIds: string[] = [];
   const groupIds: string[] = [];
   const sectionIds: string[] = [];
-
   for (const section of doc.sections ?? []) {
     const sectionGroupIds: string[] = [];
     for (const group of section.groups ?? []) {
@@ -87,32 +88,103 @@ export async function decomposeAndIngest(
         // Skip structural nodes and anything the canvas itself marks non-eligible.
         if (STRUCTURAL_NODES.has(n.type) || n.library_eligible === false) continue;
         const { title, content } = nodeLabel(n);
-        const { atomId } = await createAtom(tenantId, {
-          grain: 'primitive', title, content, canvasNodes: [n], tags: tags(), ...common,
-        }, A);
+        const { atomId } = await createAtom(tenantId, { grain: 'primitive', title, content, canvasNodes: [n], tags: tags(), ...DECOMPOSE_COMMON }, actor);
         groupAtomIds.push(atomId);
       }
       atomIds.push(...groupAtomIds);
       const { atomId: gid } = await createAtom(tenantId, {
         grain: 'group', title: section.title || 'Group', canvasNodes: group.nodes ?? [],
-        memberAtomIds: groupAtomIds, tags: tags(), ...common,
-      }, A);
+        memberAtomIds: groupAtomIds, tags: tags(), ...DECOMPOSE_COMMON,
+      }, actor);
       sectionGroupIds.push(gid);
     }
     groupIds.push(...sectionGroupIds);
     const sectionNodes: CanvasNode[] = (section.groups ?? []).flatMap((g) => g.nodes ?? []);
     const { atomId: sid } = await createAtom(tenantId, {
       grain: 'section', title: section.title || 'Section', canvasNodes: sectionNodes,
-      memberAtomIds: sectionGroupIds, tags: tags(), ...common,
-    }, A);
+      memberAtomIds: sectionGroupIds, tags: tags(), ...DECOMPOSE_COMMON,
+    }, actor);
     sectionIds.push(sid);
   }
+  return { sectionIds, groupIds, atomIds };
+}
 
+/** Decompose a CanvasDocument into foundation/section/group/atom real atoms and
+ *  persist them (bottom-up so member ids exist before their container). */
+export async function decomposeAndIngest(
+  tenantId: string,
+  doc: CanvasDocument,
+  meta: FoundationMeta,
+  actor: { id: string },
+): Promise<DecomposedArtifact> {
+  const tags = () => foundationTags(meta);
+  const A = { id: actor.id, kind: 'admin' as const };
+  const { sectionIds, groupIds, atomIds } = await buildChildGrains(tenantId, doc, tags, A);
   const { atomId: foundationId } = await createAtom(tenantId, {
     grain: 'foundation', title: meta.title, canvasNodes: flattenNodes(doc), memberAtomIds: sectionIds,
-    summary: `Foundation ${meta.form} → ${format} · ${sectionIds.length} sections`, tags: tags(), ...common,
+    summary: `Foundation ${meta.form} → ${ARTIFACT_FORMAT[meta.form]} · ${sectionIds.length} sections`, tags: tags(), ...DECOMPOSE_COMMON,
   }, A);
+  return { foundationId, sectionIds, groupIds, atomIds };
+}
 
+/**
+ * Decompose-on-save (design §2): refresh a foundation's grains to match its edited
+ * canvas. Keeps the foundation id stable (external refs survive) but replaces its
+ * child subtree — delete the old sections/groups/primitives (atom_members / _tags /
+ * _lineage cascade), rebuild from `doc`, and re-wire the foundation's members. The
+ * taxonomy is preserved (read back from the foundation's own tags). Non-transactional
+ * across grains, matching decomposeAndIngest.
+ */
+export async function redecomposeFoundation(
+  tenantId: string,
+  foundationId: string,
+  doc: CanvasDocument,
+  actor: { id: string },
+): Promise<DecomposedArtifact> {
+  const [f] = await sql<Array<{ title: string | null }>>`
+    SELECT title FROM library_atoms
+    WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation' LIMIT 1`;
+  if (!f) throw new Error('foundation not found');
+
+  // Reconstruct the taxonomy meta from the foundation's own tags (fixed at creation).
+  const tagRows = await sql<Array<{ dimension: string; value: string }>>`
+    SELECT dimension, value FROM atom_tags WHERE atom_id = ${foundationId}::uuid`;
+  const dim = (d: string) => tagRows.find((t) => t.dimension === d)?.value;
+  const form = (dim('form') ?? 'doc') as ArtifactForm;
+  const meta: FoundationMeta = {
+    title: doc.metadata?.title || f.title || 'Canvas',
+    slug: dim('doc') ?? 'canvas', form,
+    kind: (dim('kind') as 'template' | 'document') ?? 'document',
+    context: dim('context') ?? 'general',
+    collection: dim('collection') ?? HOUSE_COLLECTION,
+  };
+  const tags = () => foundationTags(meta);
+  const A = { id: actor.id, kind: 'admin' as const };
+
+  // Gather + delete the old child subtree (sections → groups → primitives).
+  const memberIds = async (parents: string[]): Promise<string[]> =>
+    parents.length
+      ? (await sql<Array<{ id: string }>>`SELECT member_atom_id AS id FROM atom_members WHERE group_atom_id = ANY(${parents}::uuid[])`).map((r) => r.id)
+      : [];
+  const secIds = await memberIds([foundationId]);
+  const grpIds = await memberIds(secIds);
+  const primIds = await memberIds(grpIds);
+  const subtree = [...secIds, ...grpIds, ...primIds];
+  if (subtree.length) await sql`DELETE FROM library_atoms WHERE id = ANY(${subtree}::uuid[]) AND tenant_id = ${tenantId}::uuid`;
+
+  // Rebuild the children + refresh the foundation (canvas_nodes/title/summary) + re-wire members.
+  const { sectionIds, groupIds, atomIds } = await buildChildGrains(tenantId, doc, tags, A);
+  await sql`
+    UPDATE library_atoms SET
+      title = ${meta.title},
+      canvas_nodes = ${sql.json(flattenNodes(doc) as unknown as Parameters<typeof sql.json>[0])},
+      summary = ${`Foundation ${meta.form} → ${ARTIFACT_FORMAT[meta.form]} · ${sectionIds.length} sections`}
+    WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid`;
+  await sql`DELETE FROM atom_members WHERE group_atom_id = ${foundationId}::uuid`;
+  for (let i = 0; i < sectionIds.length; i++) {
+    await sql`INSERT INTO atom_members (group_atom_id, member_atom_id, ordinal)
+      VALUES (${foundationId}::uuid, ${sectionIds[i]}::uuid, ${i}) ON CONFLICT (group_atom_id, member_atom_id) DO NOTHING`;
+  }
   return { foundationId, sectionIds, groupIds, atomIds };
 }
 

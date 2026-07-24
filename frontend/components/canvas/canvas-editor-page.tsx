@@ -26,6 +26,8 @@ interface Props {
   proposalId?: string;
   /** Document mode: the standalone tenant_documents row this canvas belongs to. */
   documentId?: string;
+  /** Foundation mode: a library foundation artifact (decompose-on-save). */
+  foundationId?: string;
   actorId: string;
   actorName: string;
   readOnly?: boolean;
@@ -42,6 +44,7 @@ export function CanvasEditorPage({
   sectionId,
   proposalId,
   documentId,
+  foundationId,
   actorId,
   actorName,
   readOnly = false,
@@ -56,27 +59,34 @@ export function CanvasEditorPage({
   // forward from each successful save so subsequent saves stay in step.
   const versionRef = useRef<number | undefined>(initialVersion);
 
+  const isFoundation = Boolean(foundationId);
   const isDocument = Boolean(documentId);
 
-  const saveUrl = isDocument
-    ? `/api/portal/${tenantSlug}/documents/${documentId}/save`
-    : tenantSlug
-      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
-      : `/api/admin/proposals/${proposalId}/sections/${sectionId}`;
+  const saveUrl = isFoundation
+    ? `/api/portal/${tenantSlug}/library/foundation/${foundationId}/save`
+    : isDocument
+      ? `/api/portal/${tenantSlug}/documents/${documentId}/save`
+      : tenantSlug
+        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/save`
+        : `/api/admin/proposals/${proposalId}/sections/${sectionId}`;
 
-  const exportUrl = isDocument
-    ? `/api/portal/${tenantSlug}/documents/${documentId}/export`
-    : tenantSlug
-      ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
-      : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
+  const exportUrl = isFoundation
+    ? `/api/portal/${tenantSlug}/library/foundation/${foundationId}/export`
+    : isDocument
+      ? `/api/portal/${tenantSlug}/documents/${documentId}/export`
+      : tenantSlug
+        ? `/api/portal/${tenantSlug}/proposals/${proposalId}/sections/${sectionId}/export`
+        : `/api/admin/proposals/${proposalId}/sections/${sectionId}/export`;
 
-  const backUrl = isDocument
-    ? `/portal/${tenantSlug}/documents`
-    : tenantSlug
-      ? `/portal/${tenantSlug}/proposals/${proposalId}`
-      : `/admin/proposals/${proposalId}`;
+  const backUrl = isFoundation
+    ? `/portal/${tenantSlug}/atoms`
+    : isDocument
+      ? `/portal/${tenantSlug}/documents`
+      : tenantSlug
+        ? `/portal/${tenantSlug}/proposals/${proposalId}`
+        : `/admin/proposals/${proposalId}`;
 
-  const backLabel = isDocument ? 'Back to Documents' : 'Back to Proposal';
+  const backLabel = isFoundation ? 'Back to Library' : isDocument ? 'Back to Documents' : 'Back to Proposal';
 
   const handleSave = useCallback(async (doc: CanvasDocument & { __revisionMeta?: { source: string; aiInstruction: string } }) => {
     // Extract revision metadata if present (set by AI revision panel)

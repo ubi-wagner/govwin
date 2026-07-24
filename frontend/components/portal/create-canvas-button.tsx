@@ -36,9 +36,8 @@ export function CreateCanvasButton({ tenantSlug }: Props) {
   const [context, setContext] = useState('general');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ sections: number; groups: number; atoms: number } | null>(null);
 
-  const reset = () => { setTitle(''); setForm('doc'); setKind('document'); setContext('general'); setError(null); setDone(null); };
+  const reset = () => { setTitle(''); setForm('doc'); setKind('document'); setContext('general'); setError(null); };
   const close = () => { setOpen(false); reset(); };
 
   const create = async () => {
@@ -51,8 +50,10 @@ export function CreateCanvasButton({ tenantSlug }: Props) {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { setError(body.error || 'Could not create the canvas.'); return; }
-      setDone({ sections: body.data.sections, groups: body.data.groups, atoms: body.data.atoms });
-      router.refresh();
+      // Open the new foundation straight in the canvas editor (design §2). Keep
+      // busy=true through the navigation so the button reads "Opening…".
+      router.push(`/portal/${tenantSlug}/library/foundation/${body.data.foundationId}`);
+      return;
     } catch {
       setError('Network error — try again.');
     } finally {
@@ -78,21 +79,7 @@ export function CreateCanvasButton({ tenantSlug }: Props) {
               <button onClick={close} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
             </div>
 
-            {done ? (
-              <div className="p-5 text-sm">
-                <p className="mb-2 font-medium text-emerald-700">Canvas created 🎉</p>
-                <p className="text-gray-600">
-                  Decomposed into <strong>{done.sections}</strong> section{done.sections !== 1 ? 's' : ''},{' '}
-                  <strong>{done.groups}</strong> group{done.groups !== 1 ? 's' : ''}, and{' '}
-                  <strong>{done.atoms}</strong> atom{done.atoms !== 1 ? 's' : ''}. Find it in your library below.
-                </p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <button onClick={reset} className="rounded border px-3 py-1.5 text-sm hover:bg-gray-50">Create another</button>
-                  <button onClick={close} className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700">Done</button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 p-5">
+            <div className="space-y-4 p-5">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-500">Name</label>
                   <input
@@ -147,8 +134,7 @@ export function CreateCanvasButton({ tenantSlug }: Props) {
                     {busy ? 'Creating…' : 'Create'}
                   </button>
                 </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
