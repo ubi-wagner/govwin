@@ -60,18 +60,39 @@ Read cross-tenant by design; app-layer already filters portal reads:
 
 ---
 
-## P4 — GUC coverage + bypass routing (code)
-1. Every `govtech_app` read of an isolated table must run inside `withTenant`. Known bare-`sql`
-   reader to wrap: `lib/tools/library-search-atoms.ts` (sweep finding). Sweep remaining readers.
-2. Admin cross-tenant reads → a `sqlBypass` (owner) connection: `/api/admin/agents/workforce`
-   (agent_task_queue rollup), plus any admin route aggregating purchases/tasks/process_instances
-   across tenants. Auth (users) already hits RLS-off tables, so no change needed there.
-3. The Python pipeline keeps its own (owner) `DATABASE_URL` — it is the cross-tenant engine.
+## P4 — the transparent context layer (BUILT + PROVEN — the zero-per-route mechanism)
 
-## P5 — sandbox proof (before any prod flip)
-- `ALTER ROLE govtech_app LOGIN PASSWORD '…'` (sandbox only), connect a drive as `govtech_app`
-  with `app.tenant_id` set, and assert: (a) a **forged cross-tenant query** with no `WHERE
-  tenant_id` returns **only** the current tenant's rows (RLS caught it); (b) the full drive suite
-  is green (nothing DENY-ALLs); (c) the owner/bypass connection still reads all tenants.
-- **Prod flip = one op:** repoint the frontend `DATABASE_URL` to `govtech_app` (keep an owner
-  connection string for the bypass pool). No code change at flip time.
+Rather than hand-wrap ~73 call sites, tenant context is set at choke points and read by a
+context-aware `sql` client:
+- `lib/tenant-context.ts` — a **globalThis-singleton** AsyncLocalStorage (survives module
+  duplication / Next dev reload). `enterTenant(id)` / `enterBypass()` / `runInTenant(id, fn)`.
+- `lib/db.ts` — `sql` is now a **Proxy** over the raw client: with an active tenant context it
+  runs each `sql\`\`` inside a `SET LOCAL app.tenant_id` transaction (RLS scopes it); with no
+  context or a bypass context it is an **exact passthrough**. `sqlBypass` is the owner pool for
+  cross-tenant reads.
+
+**PROVEN in sandbox** (`scripts/drive-rls-context.mts`, app connected as `govtech_app`): 5/5 —
+no-context → DENY-ALL, correct tenant → sees its row, other/forged-by-id cross-tenant → 0 (RLS
+backstop), owner bypass → all. And **passthrough is transparent**: with no context wired,
+`vitest` 829 + `drive-vault-{collab-surface 5/5, isolation 7/7, leak}` are green (the Proxy is
+inert in the hot path). tsc 0.
+
+### Activation (the remaining wiring — a gated step, NOT yet enabled)
+1. **Portal (50 routes) — one choke point:** call `enterTenant(tenantId)` right after a
+   successful `verifyTenantAccess` (or in the shared portal gate). Every portal `sql` then
+   self-scopes; no per-route edits.
+2. **Admin (20 routes) — cross-tenant reads:** swap `sql` → `sqlBypass` for reads that aggregate
+   across tenants (`/api/admin/agents/workforce` agent_task_queue rollup, etc.). Auth
+   (users/user_memberships) already hits RLS-off tables, so no change.
+3. **Pipeline** keeps its own owner `DATABASE_URL` (the cross-tenant engine).
+
+Activation flips every portal request onto per-query transactions (results identical under the
+owner today; isolation under `govtech_app`), so it must land with the P5 full-app proof, not
+before.
+
+## P5 — the pre-flip gate (the mechanism is proven; the app-wide proof remains)
+Run the whole Next app connected as `govtech_app` (sandbox) and drive the real routes (Playwright
++ the drive suite) to confirm **nothing DENY-ALLs** — this surfaces any portal route that skips
+the `enterTenant` choke point or any admin read that still needs `sqlBypass`. Fix those, re-run
+green. **Prod flip is then one op:** point the frontend `DATABASE_URL` at `govtech_app`, set
+`DATABASE_URL_OWNER` to the owner string (for `sqlBypass`). No code change at flip time.

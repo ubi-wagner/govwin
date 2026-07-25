@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { hasRoleAtLeast, isRole } from './rbac';
+import { currentTenantContext } from '@/lib/tenant-context';
 
 // Next.js "Collecting page data" step at build time loads every
 // route module with NODE_ENV=production but without runtime secrets
@@ -13,7 +14,7 @@ if (!DATABASE_URL && !_isBuildPhase) {
   throw new Error('DATABASE_URL environment variable is required');
 }
 
-export const sql = postgres(DATABASE_URL!, {
+const rawSql = postgres(DATABASE_URL!, {
   max: 10,
   idle_timeout: 30,
   connect_timeout: 10,
@@ -34,6 +35,53 @@ export const sql = postgres(DATABASE_URL!, {
   // which is why NextAuth surfaced "Invalid email or password" even
   // when the correct credentials were entered against the correct
   // row — the auth chain never reached the bcrypt.compare step.
+  transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } },
+  onnotice: () => {},
+});
+
+/**
+ * Context-aware `sql` (docs/RLS_CUTOVER.md). Transparent Proxy over the raw client:
+ *   • no context (every path today) OR a bypass context → EXACT passthrough to rawSql.
+ *   • an active tenant context (enterTenant) → each `sql\`\`` query runs inside a
+ *     `SET LOCAL app.tenant_id` transaction, so RLS scopes it under the govtech_app role.
+ * Inert until a request enters a tenant context AND the app connects as govtech_app; under
+ * the owner connection the GUC is harmless (owner bypasses RLS). Only the tagged-template
+ * CALL is wrapped — helpers (sql.json/array/begin/…) forward unchanged.
+ */
+export const sql: typeof rawSql = new Proxy(rawSql, {
+  apply(target, thisArg, args) {
+    const first = args[0] as unknown;
+    const isTemplate = Array.isArray(first) && Object.prototype.hasOwnProperty.call(first, 'raw');
+    const ctx = currentTenantContext();
+    if (isTemplate && ctx && ctx.tenantId && !ctx.bypass) {
+      const tid = ctx.tenantId;
+      return (target as unknown as { begin: (fn: (tx: unknown) => unknown) => Promise<unknown> }).begin(async (tx) => {
+        const t = tx as (s: TemplateStringsArray, ...v: unknown[]) => Promise<unknown>;
+        await t`SELECT set_config('app.tenant_id', ${tid}, true)` as unknown;
+        return (t as unknown as (...a: unknown[]) => unknown)(...args);
+      });
+    }
+    return Reflect.apply(target as unknown as (...a: unknown[]) => unknown, thisArg, args);
+  },
+  get(target, prop) {
+    const v = Reflect.get(target, prop, target);
+    return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
+  },
+});
+
+/**
+ * Bypass pool — the OWNER (BYPASSRLS) connection, for reads that must legitimately cross
+ * tenants: auth (users lookup before any tenant context), admin cross-tenant aggregates
+ * (e.g. the agent-workforce rollup), and owner-only maintenance. Post-NOBYPASSRLS-cutover
+ * (docs/RLS_CUTOVER.md) `DATABASE_URL` points at the non-owner `govtech_app` role and
+ * `DATABASE_URL_OWNER` carries the owner string for THIS pool. Pre-cutover both env vars
+ * resolve to the same connection, so `sqlBypass` is identical to `sql` today — inert until
+ * the flip. Use it explicitly in admin cross-tenant read paths as they migrate.
+ */
+export const sqlBypass = postgres((process.env.DATABASE_URL_OWNER || DATABASE_URL)!, {
+  max: 5,
+  idle_timeout: 30,
+  connect_timeout: 10,
   transform: { column: { from: postgres.toCamel, to: postgres.fromCamel } },
   onnotice: () => {},
 });
