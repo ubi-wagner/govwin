@@ -2,9 +2,11 @@
 librarian — Library cataloging, scoring, dedup, and freshness for the atom library.
 
 GREENFIELDED (#117) onto the current spine: the library is `library_atoms` (grain =
-primitive | group | reference) tagged in `atom_tags` (dimension:value — kind, vol, agency,
-program, phase, …), NOT the retired `library_units`. Memory is plain DB text
-(`episodic_memories`, ILIKE) — no vector search needed for cataloging/patterning.
+foundation | section | group | primitive | reference) tagged in `atom_tags`
+(dimension:value — kind, vol, agency, program, phase, …), NOT the retired `library_units`.
+Memory is plain DB text (`episodic_memories`, ILIKE) — no vector search needed for
+cataloging/patterning. The starter set gives a `grain='section'` skeleton to classify
+uploads against (P6.3: match_section_skeleton).
 
 TRIGGERS (via agent_task_queue, enqueued by the frontend at the lifecycle point):
     library.package.atomized  — a new upload was atomized into the library
@@ -64,12 +66,12 @@ For each atom in the package you are cataloging:
 4. DUPLICATES: compare CONTENT (not just titles) against existing atoms; flag candidates by atom id (exact | substantial | partial).
 5. FRESHNESS: current | aging | stale (personnel moves, old dates, deprecated tech).
 
-Use search_atoms to find existing similar atoms for dedup. Use get_tenant_profile for the company's focus areas. Use search_memory for past cataloging decisions (consistency).
+Use search_atoms to find existing similar atoms for dedup. Use get_tenant_profile for the company's focus areas. Use search_memory for past cataloging decisions (consistency). Use match_section_skeleton to classify each atom against the reusable section skeleton (the starter templates' sections, e.g. "this looks like a Technical Approach section").
 NEVER recommend auto-approving or deleting — your output is advisory for a tenant admin."""
 
     @property
     def tools(self) -> list[str]:
-        return ["search_atoms", "search_memory", "get_tenant_profile"]
+        return ["search_atoms", "match_section_skeleton", "search_memory", "get_tenant_profile"]
 
     def handles_event(self, event_type: str) -> bool:
         # Handled both bare and namespaced, since dispatch paths differ.
@@ -91,6 +93,16 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                         "limit": {"type": "integer", "description": "Max results", "default": 10},
                     },
                     "required": ["query"],
+                },
+            },
+            {
+                "name": "match_section_skeleton",
+                "description": "List the tenant's reusable SECTION skeleton — the grain='section' starter atoms (each with a guidance preview) — so you can classify each uploaded atom against the intended sections (e.g. decide 'this atom belongs in a Technical Approach section'). Returns an empty list if the tenant has no section grains yet.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "limit": {"type": "integer", "description": "Max sections to return", "default": 40},
+                    },
                 },
             },
             {
@@ -145,17 +157,20 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                 user_content += f"- id={a.get('id')} title={str(a.get('title',''))[:120]!r}: {str(a.get('content',''))[:400]}\n"
             user_content += "--- END UNTRUSTED ATOMS ---\n\n"
         user_content += (
-            "Steps: (1) get_tenant_profile for focus areas; (2) for each atom, search_atoms to find "
-            "existing similar atoms (dedup); (3) search_memory for prior decisions.\n\n"
+            "Steps: (1) get_tenant_profile for focus areas; (2) match_section_skeleton to load the "
+            "reusable section skeleton; (3) for each atom, search_atoms to find existing similar atoms "
+            "(dedup) and classify it against the section skeleton; (4) search_memory for prior decisions.\n\n"
             "Then output JSON:\n"
             "{\n"
             '  "assessments": [\n'
             '    {"atom_id": "...", "vol": "...", "kind": "...", "quality_score": 0.0, "relevance_score": 0.0,\n'
             '     "suggested_tags": ["dimension:value"], "duplicate_candidates": [{"atom_id": "...", "similarity": "exact|substantial|partial"}],\n'
+            '     "section_match": {"section_atom_id": "...", "section_title": "...", "confidence": 0.0},\n'
             '     "freshness": "current|aging|stale", "summary": "1 sentence"}\n'
             "  ],\n"
             '  "package_notes": "overall observations for the tenant admin"\n'
-            "}"
+            "}\n"
+            "section_match is the skeleton section this atom best fits (null if none fits)."
         )
         messages.append({"role": "user", "content": user_content})
         return messages
@@ -164,11 +179,50 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
         tenant_id = context.get("tenant_id")
         if tool_name == "search_atoms":
             return await self._search_atoms(conn, tool_input, tenant_id)
+        if tool_name == "match_section_skeleton":
+            return await self._match_section_skeleton(conn, tool_input, tenant_id)
         if tool_name == "get_tenant_profile":
             return await self._get_tenant_profile(conn, tenant_id)
         if tool_name == "search_memory":
             return await self._search_memory(conn, tool_input, tenant_id)
         return {"error": f"Unknown tool: {tool_name}"}
+
+    async def _match_section_skeleton(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
+        """Return the tenant's reusable section skeleton (grain='section' atoms + a
+        guidance preview aggregated from each section's primitives) so the model can
+        classify an uploaded atom against the intended sections (P6.3). Tenant-scoped
+        (tenant_id from the trusted task context, never model input)."""
+        if not tenant_id:
+            return {"sections": [], "note": "No tenant context"}
+        limit = int(tool_input.get("limit", 40))
+        try:
+            rows = await conn.fetch(
+                """
+                SELECT s.id AS section_id, s.title AS section_title,
+                       string_agg(DISTINCT left(p.content, 200), ' | ') AS guidance
+                FROM library_atoms s
+                JOIN atom_members sg ON sg.group_atom_id = s.id
+                JOIN atom_members gp ON gp.group_atom_id = sg.member_atom_id
+                JOIN library_atoms p ON p.id = gp.member_atom_id AND p.tenant_id = s.tenant_id
+                WHERE s.tenant_id = $1 AND s.grain = 'section' AND s.status <> 'archived'
+                  AND p.status <> 'archived'
+                GROUP BY s.id, s.title
+                ORDER BY s.title
+                LIMIT $2
+                """,
+                uuid.UUID(tenant_id),
+                limit,
+            )
+            return {
+                "sections": [
+                    {"section_atom_id": str(r["section_id"]), "title": r["section_title"],
+                     "guidance": (r["guidance"] or "")[:600]}
+                    for r in rows
+                ]
+            }
+        except Exception as e:
+            logger.warning("match_section_skeleton failed: %s", e)
+            return {"sections": [], "error": str(e)}
 
     async def _search_atoms(self, conn, tool_input: dict, tenant_id: str | None) -> dict:
         if not tenant_id:

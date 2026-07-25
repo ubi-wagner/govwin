@@ -139,6 +139,16 @@ scaffold-in-prompt · rfp fence intact) + a real-DB `_match_section_grain` drive
 match returns the skeleton · unknown title empty · other-tenant no-leak). LLM reasoning runs
 live on deploy; the sandbox verifies the tool SQL + wiring.
 
+**As-built (P6.3, shipped) — librarian matches uploads to the skeleton:** the `librarian`
+archetype gained a `match_section_skeleton` tool (no `tenant_id` in schema) that returns the
+tenant's `grain='section'` skeleton — each section title + a guidance preview aggregated from
+its primitives — so the model classifies each cataloged upload against the intended sections
+and emits a `section_match {section_atom_id, section_title, confidence}` field per assessment.
+Untrusted upload text stays fenced; the stale grain docstring was refreshed. Proven: the
+librarian wiring test (updated tool set · still no tenant_id · fence) + a real-DB
+`_match_section_skeleton` drive 3/3 (skeleton non-empty · guidance preview present ·
+other-tenant empty).
+
 ---
 
 ## 5. Collaboration vaults ("nooks") — the segregated external bridge
