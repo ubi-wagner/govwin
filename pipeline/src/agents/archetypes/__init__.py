@@ -11,6 +11,8 @@ from .cost_estimator import CostEstimatorArchetype
 from .curation_qa import CurationQaArchetype
 from .ingest_analyst import IngestAnalystArchetype
 from .librarian import LibrarianArchetype
+from .library_seed_mapper import LibrarySeedMapperArchetype
+from .library_seed_suggester import LibrarySeedSuggesterArchetype
 from .matrix_stager import MatrixStagerArchetype
 from .onboarding_agent import OnboardingAgentArchetype
 from .opportunity_analyst import OpportunityAnalystArchetype
@@ -39,6 +41,8 @@ __all__ = [
     "CurationQaArchetype",
     "IngestAnalystArchetype",
     "LibrarianArchetype",
+    "LibrarySeedMapperArchetype",
+    "LibrarySeedSuggesterArchetype",
     "MatrixStagerArchetype",
     "OnboardingAgentArchetype",
     "OpportunityAnalystArchetype",

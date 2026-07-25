@@ -157,6 +157,20 @@ class OnProposalCreated(Workflow):
             },
             timeout_minutes=10,
         ),
+        # Library seed suggester: runs in parallel with the structural advisory agents
+        # BEFORE the drafter fires, so a seeded proposal can skip/augment drafted sections.
+        # Non-blocking: a failure/skip never delays draft_sections.
+        # The suggester reads library_seed_jobs by proposal_id (created by provision-proposal.ts).
+        Step(
+            name="library_seed_suggest",
+            step_type=StepType.AI_INVOKE,
+            action="tool.proposal.seed_suggest",
+            input_map={
+                "proposal_id": "payload.proposalId",
+                "tenant_id": "payload.tenantId",
+            },
+            timeout_minutes=5,
+        ),
         Step(
             name="draft_sections",
             step_type=StepType.ACTION,

@@ -237,6 +237,9 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.proposal.review_color_team": "color_team_reviewer",
     "tool.proposal.package": "packaging_specialist",
     "tool.library.curate": "librarian",
+    # library_seed flow — fires on provision, then on admin selection
+    "tool.proposal.seed_suggest": "library_seed_suggester",
+    "tool.proposal.seed_map": "library_seed_mapper",
     "tool.partner.coordinate": "partner_coordinator",
     "tool.proposal.architect": "proposal_architect",
     # on_application_accepted.py — new-tenant cold-start (Batch B)

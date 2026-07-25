@@ -7,6 +7,7 @@ import { ProposalDropbox } from './proposal-dropbox';
 import { VolumeLayoutGauge } from './volume-layout-gauge';
 import { SaveAsTemplate } from './save-as-template';
 import { SectionComplianceChip } from './section-compliance-chip';
+import { LibrarySeedPanel } from './library-seed-panel';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ export function ProposalAdminPanel({
   proposalStage,
 }: ProposalAdminPanelProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'artifacts' | 'team' | 'compliance' | 'ai'>('artifacts');
+  const [activeTab, setActiveTab] = useState<'artifacts' | 'team' | 'compliance' | 'ai' | 'seed'>('artifacts');
   const [advancing, setAdvancing] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -474,6 +475,7 @@ export function ProposalAdminPanel({
     { key: 'team' as const, label: 'Team & Access' },
     { key: 'compliance' as const, label: 'Compliance' },
     { key: 'ai' as const, label: 'AI & Library' },
+    { key: 'seed' as const, label: 'Library Seed' },
   ];
 
   return (
@@ -1047,6 +1049,13 @@ export function ProposalAdminPanel({
           stage={proposalStage}
           userRole="admin"
           isLocked={isLocked}
+        />
+      )}
+
+      {activeTab === 'seed' && (
+        <LibrarySeedPanel
+          tenantSlug={tenantSlug}
+          proposalId={proposalId}
         />
       )}
     </div>

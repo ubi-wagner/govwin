@@ -19,6 +19,7 @@ import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
+import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export interface ProvisionResult { proposalId: string; sectionCount: number }
@@ -177,6 +178,30 @@ export async function provisionProposalForPortal(opts: {
     });
 
     await emitEventEnd(eventId, { result: { tenantId, tenantSlug, proposalId: out.proposalId, sectionCount: out.sectionCount, title: proposalTitle } });
+
+    // Create library seed job + enqueue suggester (best-effort, non-blocking).
+    // The suggester scans existing library atoms for prior-proposal content that
+    // matches the new compliance matrix, surfaces ranked candidates to the admin.
+    try {
+      const [seedJob] = await sql<{ id: string }[]>`
+        INSERT INTO library_seed_jobs (tenant_id, proposal_id, status)
+        VALUES (${tenantId}, ${out.proposalId}, 'analyzing')
+        RETURNING id
+      `;
+      if (seedJob?.id) {
+        await requestAgentTask({
+          tenantId,
+          agentRole: 'library_seed_suggester',
+          taskType: 'seed_suggest',
+          input: { proposal_id: out.proposalId, tenant_id: tenantId, seed_job_id: seedJob.id },
+          proposalId: out.proposalId,
+        });
+      }
+    } catch (e) {
+      // Non-blocking — provision succeeds even if seed job creation fails
+      console.error('[provision-proposal] seed job init failed (non-blocking)', e);
+    }
+
     return out;
   } catch (e) {
     console.error('[provision-proposal] transaction failed', e);
