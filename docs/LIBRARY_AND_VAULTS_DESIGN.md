@@ -149,6 +149,17 @@ librarian wiring test (updated tool set · still no tenant_id · fence) + a real
 `_match_section_skeleton` drive 3/3 (skeleton non-empty · guidance preview present ·
 other-tenant empty).
 
+**As-built (P6.1, shipped) — mold → starter-template link:** molds live in
+`document_templates`, the starter set in `library_atoms`; the link between them is a
+resolver, not a duplicated row. `matchStarterFoundation(tenantId, {title, vehicle?})`
+(`lib/library/starter-match.ts`) resolves a required-item / section title to the matching
+starter FOUNDATION + the specific SECTION grain inside it (walking section→foundation via
+`atom_members`), narrowing by `vehicle` when given (a SBIR-Phase-I item links to the
+SBIR-Phase-I starter, not STTR). Exposed at `GET …/library/starter-match?title=&vehicle=`
+for curation to surface the link; it's the TS counterpart to the section_drafter grounding
+match (P6.2). Proven: real-DB drive 3/3 (title→foundation+section · vehicle narrows /
+bogus-vehicle null · unknown null + other-tenant null).
+
 ---
 
 ## 5. Collaboration vaults ("nooks") — the segregated external bridge
