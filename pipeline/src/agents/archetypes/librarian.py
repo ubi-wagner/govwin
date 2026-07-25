@@ -154,7 +154,9 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                 "--- BEGIN UNTRUSTED ATOMS ---\n"
             )
             for a in atoms[:40]:
-                user_content += f"- id={a.get('id')} title={str(a.get('title',''))[:120]!r}: {str(a.get('content',''))[:400]}\n"
+                # Neutralize a forged closing marker so atom content can't break the fence.
+                content = str(a.get('content', ''))[:400].replace("--- END UNTRUSTED ATOMS ---", "--- END UNTRUSTED ATOMS [escaped] ---")
+                user_content += f"- id={a.get('id')} title={str(a.get('title',''))[:120]!r}: {content}\n"
             user_content += "--- END UNTRUSTED ATOMS ---\n\n"
         user_content += (
             "Steps: (1) get_tenant_profile for focus areas; (2) match_section_skeleton to load the "
@@ -205,7 +207,7 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                 JOIN atom_members gp ON gp.group_atom_id = sg.member_atom_id
                 JOIN library_atoms p ON p.id = gp.member_atom_id AND p.tenant_id = s.tenant_id
                 WHERE s.tenant_id = $1 AND s.grain = 'section' AND s.status <> 'archived'
-                  AND s.vault_id IS NULL AND p.status <> 'archived'
+                  AND s.vault_id IS NULL AND p.vault_id IS NULL AND p.status <> 'archived'
                 GROUP BY s.id, s.title
                 ORDER BY s.title
                 LIMIT $2
@@ -271,7 +273,7 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                 SELECT t.value AS vol, COUNT(DISTINCT a.id) AS count
                 FROM library_atoms a
                 JOIN atom_tags t ON t.atom_id = a.id AND t.dimension = 'vol'
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                 GROUP BY t.value ORDER BY count DESC
                 """, tid)
             focus = await conn.fetch(

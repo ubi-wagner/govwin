@@ -41,9 +41,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     const format = new URL(request.url).searchParams.get('format') ?? '';
     if (!FORMATS.has(format)) return NextResponse.json({ error: 'format must be docx|pptx|xlsx|pdf', code: 'VALIDATION_ERROR' }, { status: 400 });
 
-    // camelCased column (transform.toCamel): canvas_nodes → canvasNodes.
+    // camelCased column (transform.toCamel): canvas_nodes → canvasNodes. Fence to the
+    // main library (vault atoms live only on the vault surface) + the viewer's visibility,
+    // mirroring getAtom so a non-owner/non-admin can't pull a 'vault'/'owner_only' atom by id.
+    const isAdmin = hasRoleAtLeast(role, 'tenant_admin');
     const [row] = await sql<Array<{ title: string | null; canvasNodes: unknown }>>`
-      SELECT title, canvas_nodes FROM library_atoms WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid LIMIT 1`;
+      SELECT title, canvas_nodes FROM library_atoms
+      WHERE id = ${atomId}::uuid AND tenant_id = ${tenantId}::uuid
+        AND vault_id IS NULL
+        AND (${isAdmin} OR visibility = 'tenant' OR owner_user_id = ${u.id}::uuid)
+      LIMIT 1`;
     if (!row) return NextResponse.json({ error: 'Atom not found', code: 'NOT_FOUND' }, { status: 404 });
     const [t] = await sql<Array<{ value: string }>>`SELECT value FROM atom_tags WHERE atom_id = ${atomId}::uuid AND dimension = 'form' LIMIT 1`;
     const preset = CANVAS_PRESETS[PRESET_FOR[t?.value ?? 'doc'] ?? 'letter_standard'] ?? CANVAS_PRESETS.letter_standard;

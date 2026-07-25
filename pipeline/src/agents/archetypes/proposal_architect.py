@@ -568,7 +568,7 @@ Then provide the outline as JSON:
                                 FILTER (WHERE t.dimension IS NOT NULL), '{}') AS tags
                 FROM library_atoms a
                 LEFT JOIN atom_tags t ON t.atom_id = a.id
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                   AND (a.content ILIKE $2 OR a.title ILIKE $2)
             """
             if vol:

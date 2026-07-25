@@ -85,6 +85,7 @@ export async function GET(request: Request, ctx: RouteContext) {
           created_at
         FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
+          AND vault_id IS NULL
           AND source = 'upload'
         ORDER BY created_at DESC
         LIMIT 200

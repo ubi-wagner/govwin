@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     let body: { email?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
     const email = typeof body.email === 'string' ? body.email.trim() : '';
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (!email || email.length > 320 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return NextResponse.json({ error: 'a valid email is required', code: 'BAD_REQUEST' }, { status: 400 });
     }
     const member = await inviteVaultMember(vaultId, g.tenantId, { id: g.userId, email: g.email }, email);

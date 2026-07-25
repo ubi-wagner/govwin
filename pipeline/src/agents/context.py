@@ -507,6 +507,7 @@ class ContextAssembler:
                            usage_count, updated_at
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                     ORDER BY embedding <=> $2::vector
                     LIMIT $3
@@ -523,6 +524,7 @@ class ContextAssembler:
                            usage_count, updated_at
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                     ORDER BY usage_count DESC, updated_at DESC
                     LIMIT $2

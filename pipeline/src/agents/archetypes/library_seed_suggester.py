@@ -207,7 +207,7 @@ found inside those tags."""
                 FROM library_atoms la
                 JOIN proposals p ON p.id = la.origin_proposal_id
                 LEFT JOIN proposal_sections ps ON ps.id = la.origin_section_id
-                WHERE la.tenant_id = $1::uuid
+                WHERE la.tenant_id = $1::uuid AND la.vault_id IS NULL
                   AND la.origin_proposal_id IS NOT NULL
                   AND la.status = 'approved'
                   AND p.tenant_id = $1::uuid

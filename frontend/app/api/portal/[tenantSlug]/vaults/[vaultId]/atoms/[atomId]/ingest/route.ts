@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { isValidUUID } from '@/lib/validation';
 import { resolveVaultAccess, ingestVaultFoundation } from '@/lib/vaults/vaults';
 
 export async function POST(_request: Request, { params }: { params: Promise<{ tenantSlug: string; vaultId: string; atomId: string }> }) {
@@ -18,6 +19,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ te
     const u = session.user as { id?: string; role?: unknown; email?: string };
     const role: Role | null = isRole(u.role) ? u.role : null;
     if (!role || !u.id) return NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 });
+    if (!isValidUUID(atomId)) return NextResponse.json({ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }, { status: 400 });
     const tenant = await getTenantBySlug(tenantSlug);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
     const tenantId = tenant.id as string;

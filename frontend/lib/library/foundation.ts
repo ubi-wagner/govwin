@@ -79,6 +79,7 @@ async function buildChildGrains(
   doc: CanvasDocument,
   tags: () => AtomTagInput[],
   actor: { id: string; kind: 'admin' },
+  common: { source: 'manual'; creatorKind: 'admin'; status: 'approved'; visibility: 'tenant' | 'vault'; vaultId?: string } = DECOMPOSE_COMMON,
 ): Promise<{ sectionIds: string[]; groupIds: string[]; atomIds: string[] }> {
   const atomIds: string[] = [];
   const groupIds: string[] = [];
@@ -91,13 +92,13 @@ async function buildChildGrains(
         // Skip structural nodes and anything the canvas itself marks non-eligible.
         if (STRUCTURAL_NODES.has(n.type) || n.library_eligible === false) continue;
         const { title, content } = nodeLabel(n);
-        const { atomId } = await createAtom(tenantId, { grain: 'primitive', title, content, canvasNodes: [n], tags: tags(), ...DECOMPOSE_COMMON }, actor);
+        const { atomId } = await createAtom(tenantId, { grain: 'primitive', title, content, canvasNodes: [n], tags: tags(), ...common }, actor);
         groupAtomIds.push(atomId);
       }
       atomIds.push(...groupAtomIds);
       const { atomId: gid } = await createAtom(tenantId, {
         grain: 'group', title: section.title || 'Group', canvasNodes: group.nodes ?? [],
-        memberAtomIds: groupAtomIds, tags: tags(), ...DECOMPOSE_COMMON,
+        memberAtomIds: groupAtomIds, tags: tags(), ...common,
       }, actor);
       sectionGroupIds.push(gid);
     }
@@ -105,7 +106,7 @@ async function buildChildGrains(
     const sectionNodes: CanvasNode[] = (section.groups ?? []).flatMap((g) => g.nodes ?? []);
     const { atomId: sid } = await createAtom(tenantId, {
       grain: 'section', title: section.title || 'Section', canvasNodes: sectionNodes,
-      memberAtomIds: sectionGroupIds, tags: tags(), ...DECOMPOSE_COMMON,
+      memberAtomIds: sectionGroupIds, tags: tags(), ...common,
     }, actor);
     sectionIds.push(sid);
   }
@@ -119,13 +120,18 @@ export async function decomposeAndIngest(
   doc: CanvasDocument,
   meta: FoundationMeta,
   actor: { id: string },
+  opts?: { vaultId?: string },
 ): Promise<DecomposedArtifact> {
   const tags = () => foundationTags(meta);
   const A = { id: actor.id, kind: 'admin' as const };
-  const { sectionIds, groupIds, atomIds } = await buildChildGrains(tenantId, doc, tags, A);
+  // When minting into a vault, every grain is born vault-scoped (visibility='vault' +
+  // vault_id) so partner content is never briefly visible in the main library and a
+  // mid-decompose failure can't strand it there — atomic by construction.
+  const common = opts?.vaultId ? { ...DECOMPOSE_COMMON, visibility: 'vault' as const, vaultId: opts.vaultId } : DECOMPOSE_COMMON;
+  const { sectionIds, groupIds, atomIds } = await buildChildGrains(tenantId, doc, tags, A, common);
   const { atomId: foundationId } = await createAtom(tenantId, {
     grain: 'foundation', title: meta.title, canvasNodes: flattenNodes(doc), memberAtomIds: sectionIds,
-    summary: `Foundation ${meta.form} → ${ARTIFACT_FORMAT[meta.form]} · ${sectionIds.length} sections`, tags: tags(), ...DECOMPOSE_COMMON,
+    summary: `Foundation ${meta.form} → ${ARTIFACT_FORMAT[meta.form]} · ${sectionIds.length} sections`, tags: tags(), ...common,
   }, A);
   return { foundationId, sectionIds, groupIds, atomIds };
 }
@@ -146,7 +152,8 @@ export async function redecomposeFoundation(
 ): Promise<DecomposedArtifact> {
   const [f] = await sql<Array<{ title: string | null }>>`
     SELECT title FROM library_atoms
-    WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation' LIMIT 1`;
+    WHERE id = ${foundationId}::uuid AND tenant_id = ${tenantId}::uuid AND grain = 'foundation'
+      AND vault_id IS NULL LIMIT 1`;
   if (!f) throw new Error('foundation not found');
 
   // Reconstruct the taxonomy meta from the foundation's own tags (fixed at creation).
@@ -317,7 +324,7 @@ export async function copyStarterSetToTenant(
       ? (await sql<Array<{ slug: string }>>`
           SELECT DISTINCT t.value AS slug
           FROM atom_tags t
-          JOIN library_atoms la ON la.id = t.atom_id AND la.grain = 'foundation' AND la.tenant_id = ${targetTenantId}::uuid
+          JOIN library_atoms la ON la.id = t.atom_id AND la.grain = 'foundation' AND la.tenant_id = ${targetTenantId}::uuid AND la.vault_id IS NULL
           WHERE t.dimension = 'doc' AND t.value = ANY(${slugs})`).map((r) => r.slug)
       : [],
   );

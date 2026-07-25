@@ -14,7 +14,7 @@ import { buildLibraryQuery, type LibraryFilters } from '@/lib/library/library-qu
 
 interface Atom {
   id: string; grain: string; title: string | null; summary: string | null;
-  member_count: number; usage_count: number; tags: string[];
+  memberCount: number; usageCount: number; tags: string[];
 }
 interface ApiResult { atoms: Atom[]; total: number; facets: Record<string, Record<string, number>> }
 
@@ -124,7 +124,7 @@ export function LibraryBrowser({ tenantSlug }: { tenantSlug: string }) {
                         {a.tags.filter((t) => /^(kind|form|context|vehicle):/.test(t)).map((t) => (
                           <span key={t} className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{t.split(':')[1]}</span>
                         ))}
-                        {a.member_count > 0 && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-400">{a.member_count} members</span>}
+                        {a.memberCount > 0 && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-400">{a.memberCount} members</span>}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">

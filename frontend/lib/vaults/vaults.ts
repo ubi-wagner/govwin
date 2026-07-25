@@ -63,11 +63,14 @@ export async function resolveVaultAccess(
   }
   if (tenantSide) return { vaultId: v.id, ownerTenantId: v.tenantId, side: 'tenant', rights: TENANT_RIGHTS };
 
-  // Collaborator side — active grant by user id OR by invited email.
+  // Collaborator side — active grant by user id OR by invited email. Guard a null/empty
+  // session email so it can never match a member row (emails are stored NOT NULL, but be
+  // defensive — an empty match must never grant access).
+  const emailMatch = actor.email && actor.email.trim() ? actor.email.trim() : null;
   const [cm] = await sql<Array<{ ok: number }>>`
     SELECT 1 AS ok FROM vault_members
     WHERE vault_id = ${vaultId}::uuid AND status <> 'revoked'
-      AND (user_id = ${actor.userId}::uuid OR lower(email) = lower(${actor.email ?? ''}))
+      AND (user_id = ${actor.userId}::uuid OR (${emailMatch}::text IS NOT NULL AND lower(email) = lower(${emailMatch})))
     LIMIT 1`;
   if (cm) return { vaultId: v.id, ownerTenantId: v.tenantId, side: 'collaborator', rights: COLLAB_RIGHTS };
 
@@ -162,11 +165,10 @@ export async function createVaultArtifact(
   meta: FoundationMeta,
   actor: { id: string },
 ): Promise<{ foundationId: string }> {
-  const d = await decomposeAndIngest(ownerTenantId, doc, { ...meta, collection: 'vault' }, actor);
-  const all = [d.foundationId, ...d.sectionIds, ...d.groupIds, ...d.atomIds];
-  await sql`
-    UPDATE library_atoms SET vault_id = ${vaultId}::uuid, visibility = 'vault'
-    WHERE id = ANY(${all}::uuid[]) AND tenant_id = ${ownerTenantId}::uuid`;
+  // Born vault-scoped: decomposeAndIngest tags every grain visibility='vault' + vault_id
+  // at insert time, so there is no window where partner content is visible in the main
+  // library and a mid-op failure cannot strand it there (atomic per grain).
+  const d = await decomposeAndIngest(ownerTenantId, doc, { ...meta, collection: 'vault' }, actor, { vaultId });
   return { foundationId: d.foundationId };
 }
 

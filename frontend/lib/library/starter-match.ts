@@ -45,6 +45,7 @@ export async function matchStarterFoundation(
     JOIN atom_members fs ON fs.member_atom_id = s.id
     JOIN library_atoms f ON f.id = fs.group_atom_id AND f.grain = 'foundation' AND f.tenant_id = s.tenant_id
     WHERE s.tenant_id = ${tenantId}::uuid
+      AND s.vault_id IS NULL
       AND s.grain = 'section'
       AND s.status <> 'archived'
       AND s.title ILIKE ${pattern}

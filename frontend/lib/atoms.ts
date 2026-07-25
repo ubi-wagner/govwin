@@ -26,7 +26,7 @@ export type Grain = 'foundation' | 'section' | 'group' | 'primitive' | 'referenc
 const CONTAINER_GRAINS: ReadonlySet<Grain> = new Set<Grain>(['foundation', 'section', 'group']);
 export type CreatorKind = 'admin' | 'ai' | 'collaborator' | 'system' | 'import';
 export type AtomSource = 'upload' | 'harvest' | 'download_derivative' | 'manual';
-export type Visibility = 'tenant' | 'owner_only' | 'shared_for_proposal' | 'admin_only';
+export type Visibility = 'tenant' | 'owner_only' | 'shared_for_proposal' | 'admin_only' | 'vault';
 export type AtomStatus = 'draft' | 'approved' | 'archived';
 
 export interface AtomTagInput {
@@ -50,6 +50,7 @@ export interface CreateAtomInput {
   originProposalId?: string | null;
   originSectionId?: string | null;
   visibility?: Visibility;
+  vaultId?: string | null;             // segregates the atom into a collaboration vault (nook)
   status?: AtomStatus;
   memberAtomIds?: string[];            // grain='group'
   parentAtomIds?: string[];            // lineage: derived_from
@@ -106,13 +107,13 @@ export async function createAtom(
       const [atom] = await tx<Array<{ id: string }>>`
         INSERT INTO library_atoms
           (tenant_id, grain, title, content, canvas_nodes, summary, word_count, char_count,
-           status, source, creator_kind, created_by, owner_user_id, visibility,
+           status, source, creator_kind, created_by, owner_user_id, visibility, vault_id,
            cocoon_id, source_anchor, origin_proposal_id, origin_section_id)
         VALUES
           (${tenantId}::uuid, ${input.grain}, ${input.title ?? null}, ${input.content ?? null},
            ${input.canvasNodes ? tx.json(input.canvasNodes) : null}, ${input.summary ?? null},
            ${size.words}, ${size.chars}, ${input.status ?? 'draft'}, ${input.source ?? 'manual'},
-           ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'},
+           ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'}, ${input.vaultId ?? null}::uuid,
            ${input.cocoonId ?? null}, ${input.sourceAnchor ? tx.json(input.sourceAnchor) : null},
            ${input.originProposalId ?? null}, ${input.originSectionId ?? null})
         RETURNING id
@@ -251,6 +252,7 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
                     AND t.value = ANY(${context}::text[])) AS "ctxMatches"
         FROM library_atoms a
         WHERE a.tenant_id = ${tenantId}::uuid
+          AND a.vault_id IS NULL
           AND a.status = 'approved'
           AND a.grain <> 'reference'
           AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
@@ -291,6 +293,7 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
       FROM library_atoms a
       LEFT JOIN users u ON u.id = a.owner_user_id
       WHERE a.tenant_id = ${tenantId}::uuid
+        AND a.vault_id IS NULL
         AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
         ${f.mine ? tx`AND a.owner_user_id = ${viewer.userId}::uuid` : tx``}
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}

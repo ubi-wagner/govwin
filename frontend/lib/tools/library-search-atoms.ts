@@ -132,6 +132,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
         updated_at
       FROM library_atoms
       WHERE tenant_id = ${tenantId}::uuid
+        AND vault_id IS NULL
         AND status = 'approved'
         ${categoryFilter}
         ${tagsFilter}
@@ -145,6 +146,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
         SELECT COUNT(*)::text AS count
         FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
+          AND vault_id IS NULL
           AND status = 'approved'
           ${categoryFilter}
           ${tagsFilter}

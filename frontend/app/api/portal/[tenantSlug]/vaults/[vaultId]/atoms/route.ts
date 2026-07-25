@@ -60,6 +60,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const kind = body.kind === 'template' ? 'template' : 'document';
     const context = typeof body.context === 'string' ? body.context.trim().slice(0, 60) : 'general';
     if (!title) return NextResponse.json({ error: 'title is required', code: 'BAD_REQUEST' }, { status: 400 });
+    // Cap the client-supplied doc (a collaborator is the least-trusted principal) so one
+    // request can't decompose into thousands of serial per-node writes — matches the save route.
+    if (body.doc && JSON.stringify(body.doc).length > 2_000_000) {
+      return NextResponse.json({ error: 'artifact too large', code: 'PAYLOAD_TOO_LARGE' }, { status: 413 });
+    }
     // A supplied CanvasDocument is atomized; otherwise mint a blank artifact of the form.
     const doc = (body.doc && typeof body.doc === 'object' ? body.doc : blankCanvasForForm(form, title)) as CanvasDocument;
 

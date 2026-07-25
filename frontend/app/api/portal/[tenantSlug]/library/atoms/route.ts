@@ -39,8 +39,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
       vehicle: p.get('vehicle') ?? undefined,
       grain,
       q: p.get('q') ?? undefined,
-      page: p.get('page') ? Number(p.get('page')) : undefined,
-      pageSize: p.get('pageSize') ? Number(p.get('pageSize')) : undefined,
+      page: Number.isFinite(Number(p.get('page'))) && p.get('page') ? Number(p.get('page')) : undefined,
+      pageSize: Number.isFinite(Number(p.get('pageSize'))) && p.get('pageSize') ? Number(p.get('pageSize')) : undefined,
     }, viewerFromRole(u.id, role));
     return NextResponse.json({ data: res });
   } catch (e) {
