@@ -96,6 +96,14 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   'gate_requirement.toggled': 'Gate requirement updated',
   'supporting_doc.deleted': 'Supporting document removed',
 
+  // ── Library seed ─────────────────────────────────────────────────────
+  'seed_job.analyzing': 'Library seed: analyzing prior proposals',
+  'seed_job.awaiting_selection': 'Library seed: candidates ready for selection',
+  'seed_job.mapping': 'Library seed: mapping sections to source proposal',
+  'seed_job.awaiting_review': 'Library seed: mapping ready for admin review',
+  'seed_job.applied': 'Library seed: approved and seeded into proposal',
+  'seed_job.skipped': 'Library seed: skipped — no suitable prior proposals',
+
   // ── Identity ────────────────────────────────────────────────────────
   'user.logged_in': 'Signed in',
   'password.reset_requested': 'Password reset requested',

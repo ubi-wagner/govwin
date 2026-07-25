@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { sql, getTenantBySlug } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
+import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,7 @@ export async function POST(req: Request, { params }: Params) {
           history: [{ actor_id: 'system', actor_name: 'Library Seed', action: 'edited', timestamp: new Date().toISOString() }],
           provenance: { source: 'library' as const, drafted_at: new Date().toISOString() },
           library_tags: [],
+          library_eligible: false,
         });
         for (const atom of reuseAtoms) {
           const paras = (atom.content ?? '')
@@ -142,6 +144,7 @@ export async function POST(req: Request, { params }: Params) {
                 drafted_at: new Date().toISOString(),
               },
               library_tags: [],
+              library_eligible: false,
             });
           }
           atomsReused++;
@@ -157,6 +160,7 @@ export async function POST(req: Request, { params }: Params) {
           history: [{ actor_id: 'system', actor_name: 'Library Seed', action: 'edited', timestamp: new Date().toISOString() }],
           provenance: { source: 'library' as const, drafted_at: new Date().toISOString() },
           library_tags: ['seed:regen', ...regenAtoms.map((a) => `atom:${a.atom_id}`)],
+          library_eligible: false,
         });
         atomsRegenMarked += regenAtoms.length;
       }
@@ -171,9 +175,9 @@ export async function POST(req: Request, { params }: Params) {
           : null);
 
       const doc: CanvasDocument = existingDoc ?? {
-        version: '2.0',
+        version: 2,
         document_id: targetSectionId,
-        canvas: { format: 'letter', margins: { top: 72, bottom: 72, left: 72, right: 72 }, columns: 1 },
+        canvas: CANVAS_PRESETS['proposal_standard'] ?? CANVAS_PRESETS['default'],
         metadata: {
           title: section.title ?? 'Section',
           volume_id: '',

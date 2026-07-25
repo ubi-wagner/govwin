@@ -493,6 +493,12 @@ export default async function ProposalWorkspacePage({ params }: Props) {
                   {closeDateStr}
                 </span>
               )}
+              <a
+                href={`/portal/${tenantSlug}/proposals/${proposalId}/activity`}
+                className="ml-1 text-xs text-blue-600 hover:underline"
+              >
+                Activity log →
+              </a>
             </div>
           </div>
         </div>

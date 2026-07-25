@@ -126,8 +126,8 @@ export function CanvasEditorPage({
   const handleUndoTrail    = useCallback((t: string[]) => setUndoTrail(t), []);
   const handleRedoTrail    = useCallback((t: string[]) => setRedoTrail(t), []);
   const handleNodeCount    = useCallback((n: number)   => setNodeCount(n), []);
-  const handleStatusChange = useCallback((s: string)   => setDocStatus(s), []);
-  const handleFormatChange = useCallback((f: string)   => setCanvasFormat(f), []);
+  const handleStatusChange = useCallback((s: string)   => setDocStatus(s as typeof docStatus), []);
+  const handleFormatChange = useCallback((f: string)   => setCanvasFormat(f as typeof canvasFormat), []);
   const handleHasTable     = useCallback((h: boolean)  => setHasTable(h),  []);
 
   // ── Persistence handlers (same logic as before) ─────────────────────
