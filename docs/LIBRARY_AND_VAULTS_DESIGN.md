@@ -220,6 +220,24 @@ bios/facilities — never actually built. The nook **is** where that lands: the 
 partner, content in the nook, the customer reviewing + harvesting into the proposal. Same
 exact shape as the future review/execution workflows.
 
+### 5.6 As-built (P8.1–P8.2, shipped)
+**Schema (mig 134):** `collaboration_vaults` (the nook: owner tenant × partner) +
+`vault_members` (partner emails granted to a vault; email is the invite-before-signup key) +
+`library_atoms.vault_id` (vault content is `visibility='vault'` + `vault_id` set). Both new
+tables are RLS FORCE'd with owner-tenant isolation (the NOBYPASSRLS backstop).
+
+**Isolation contract (`lib/vaults/vaults.ts`, live enforcement):** `resolveVaultAccess`
+returns a caller's *side* + *rights* or null — **tenant side** (platform admin, or an active
+tenant_admin membership at the owner tenant): copy-in upload · atomize · download ANY grain ·
+ingest · manage; **collaborator side** (an active `vault_members` grant by user id or email):
+upload · atomize · download WHOLE only. Everyone else: no access. Vault atoms are excluded
+from every non-vault read — the main library (`listAtomsFaceted`/`getAtom` gain `vault_id IS
+NULL`, so even an admin browsing `/atoms` never sees vault content) and the tenant agents
+(`section_drafter`/`librarian` search tools gain `vault_id IS NULL`, so agents never cross the
+boundary). Proven: the adversarial isolation drive **7/7** — owner tenant_admin→full rights ·
+collaborator→whole-only · cross-vault→null · non-member→null · other-company admin→null ·
+platform-admin(shadow)→tenant · each collaborator sees only their own vault.
+
 ---
 
 ## 6. Per-role ToDos (consolidated)

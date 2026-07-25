@@ -229,6 +229,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                 SELECT id, title
                 FROM library_atoms
                 WHERE tenant_id = $1 AND grain = 'section' AND status != 'archived'
+                  AND vault_id IS NULL
                   AND title ILIKE $2
                 ORDER BY updated_at DESC
                 LIMIT 1
@@ -288,6 +289,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                     FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
+                      AND vault_id IS NULL
                       AND EXISTS (SELECT 1 FROM atom_tags t
                                   WHERE t.atom_id = library_atoms.id AND t.value = $2)
                       AND content ILIKE $3
@@ -307,6 +309,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
                     FROM library_atoms
                     WHERE tenant_id = $1
                       AND status != 'archived'
+                      AND vault_id IS NULL
                       AND (content ILIKE $2 OR title ILIKE $2)
                     ORDER BY updated_at DESC
                     LIMIT $3

@@ -334,6 +334,7 @@ export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer:
     const where = tx`
       a.tenant_id = ${tenantId}::uuid
       AND a.grain <> 'reference'
+      AND a.vault_id IS NULL
       AND ${vis}
       ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
       ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
@@ -356,7 +357,7 @@ export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer:
     const facetRows = await tx<Array<{ dimension: string; value: string; n: number }>>`
       SELECT t.dimension, t.value, count(*)::int AS n
       FROM library_atoms a JOIN atom_tags t ON t.atom_id = a.id
-      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND ${vis}
+      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND a.vault_id IS NULL AND ${vis}
         AND t.dimension IN ('kind','form','context','collection','vehicle')
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
         ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
@@ -375,6 +376,7 @@ export async function getAtom(tenantId: string, atomId: string, viewer: Viewer):
     const [atom] = await tx<Array<Record<string, unknown>>>`
       SELECT * FROM library_atoms
       WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid
+        AND vault_id IS NULL
         AND (${viewer.isAdmin} OR visibility = 'tenant' OR owner_user_id = ${viewer.userId}::uuid)
       LIMIT 1
     `;

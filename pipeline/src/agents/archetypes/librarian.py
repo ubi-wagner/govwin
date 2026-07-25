@@ -205,7 +205,7 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                 JOIN atom_members gp ON gp.group_atom_id = sg.member_atom_id
                 JOIN library_atoms p ON p.id = gp.member_atom_id AND p.tenant_id = s.tenant_id
                 WHERE s.tenant_id = $1 AND s.grain = 'section' AND s.status <> 'archived'
-                  AND p.status <> 'archived'
+                  AND s.vault_id IS NULL AND p.status <> 'archived'
                 GROUP BY s.id, s.title
                 ORDER BY s.title
                 LIMIT $2
@@ -239,7 +239,7 @@ NEVER recommend auto-approving or deleting — your output is advisory for a ten
                                 FILTER (WHERE t.dimension IS NOT NULL), '{}') AS tags
                 FROM library_atoms a
                 LEFT JOIN atom_tags t ON t.atom_id = a.id
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                   AND (a.content ILIKE $2 OR a.title ILIKE $2)
             """
             if vol:
