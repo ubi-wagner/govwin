@@ -22,7 +22,7 @@ import { z } from 'zod';
 
 // Mock the DB-touching modules BEFORE importing anything that uses them.
 // This keeps the test hermetic — no PG, no network, no slow tests.
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: vi.fn(),
 }));
 

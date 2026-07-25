@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -66,6 +66,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point
 
     // ── Business logic ───────────────────────────────────────────
     try {

@@ -32,7 +32,7 @@ const { bcryptCompareMock } = vi.hoisted(() => {
 
 // ─── Mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
 }));
 

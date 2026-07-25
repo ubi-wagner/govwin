@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { pinCard, unpinCard, resyncPinnedCard } from '@/lib/opportunity-pin';
@@ -37,6 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, opportunityId } = await params;
     const r = await resolve(tenantSlug, opportunityId);
     if ('error' in r) return r.error;
+    enterTenant(r.tenantId); // RLS choke point
     const action = new URL(request.url).searchParams.get('action');
     if (action === 'resync') {
       const { docs } = await resyncPinnedCard(r.tenantId, r.tenantSlug, opportunityId);
@@ -85,6 +86,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { tenantSlug, opportunityId } = await params;
     const r = await resolve(tenantSlug, opportunityId);
     if ('error' in r) return r.error;
+    enterTenant(r.tenantId); // RLS choke point
     await unpinCard(r.tenantId, opportunityId);
     await emitEventSingle({
       namespace: 'capture',

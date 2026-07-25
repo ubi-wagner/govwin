@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 
@@ -47,6 +47,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // ── Load proposal with opportunity context ──────────────────────
     let proposal: {

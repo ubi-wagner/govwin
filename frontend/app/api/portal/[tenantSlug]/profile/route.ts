@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { hasRoleAtLeast, isRole } from '@/lib/rbac';
 
@@ -32,6 +32,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
 
     const tenantId = tenant.id as string;
+    enterTenant(tenantId); // RLS choke point
 
     let tenantInfo, profile;
     try {
@@ -81,6 +82,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     if (!hasAccess) return NextResponse.json({ error: 'Access denied', code: 'FORBIDDEN' }, { status: 403 });
 
     const tenantId = tenant.id as string;
+    enterTenant(tenantId); // RLS choke point
 
     let body: Record<string, unknown>;
     try {

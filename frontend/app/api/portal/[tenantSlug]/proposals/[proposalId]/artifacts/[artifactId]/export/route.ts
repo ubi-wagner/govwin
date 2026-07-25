@@ -13,7 +13,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -48,6 +48,8 @@ export async function GET(request: Request, ctx: RouteContext) {
     if (!(await verifyProposalAccess(su.id, role, su.tenantId, tenantId, proposalId))) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // ── Proposal + download gate ───────────────────────────────────────
     let proposal: { id: string; lockCount: number; stage: string } | undefined;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
@@ -48,6 +48,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasRoleAtLeast(role, 'tenant_user')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point
 
     let members: {
       id: string;
@@ -124,6 +125,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point
 
     let body: { email?: unknown; name?: unknown; role?: unknown };
     try {

@@ -11,7 +11,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createAtom } from '@/lib/atoms';
@@ -69,6 +69,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point
 
     // ── Business logic ───────────────────────────────────────────
     try {
@@ -158,6 +159,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point
 
     // ── Parse multipart form data ────────────────────────────────
     let formData: FormData;

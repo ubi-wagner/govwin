@@ -14,7 +14,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, emitEven
 });
 
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ sql: sqlMock, getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
 vi.mock('@/lib/rls', () => ({ withTenant: withTenantMock }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,

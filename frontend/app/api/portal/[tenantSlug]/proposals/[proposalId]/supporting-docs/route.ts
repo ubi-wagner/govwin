@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { putObject, getSignedGetUrl } from '@/lib/storage/s3-client';
@@ -73,6 +73,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
       );
     }
 
+    enterTenant(tenantId);
+
     // ── Verify proposal belongs to tenant ────────────────────
     let proposal: { id: string } | undefined;
     try {
@@ -110,7 +112,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
       reviewedBy: string | null;
       reviewedAt: Date | null;
       notes: string | null;
-      libraryUnitId: string | null;
       createdAt: Date;
       updatedAt: Date;
     }[];
@@ -119,7 +120,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         SELECT id, requirement_label, requirement_source, category, is_required,
                storage_key, original_filename, file_size, content_type,
                status, uploaded_by, uploaded_at, reviewed_by, reviewed_at,
-               notes, library_unit_id, created_at, updated_at
+               notes, created_at, updated_at
         FROM proposal_supporting_docs
         WHERE proposal_id = ${proposalId}::uuid AND tenant_id = ${tenantId}::uuid
         ORDER BY
@@ -147,7 +148,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
       reviewedBy: doc.reviewedBy,
       reviewedAt: doc.reviewedAt,
       notes: doc.notes,
-      libraryUnitId: doc.libraryUnitId,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
       downloadUrl: doc.storageKey ? await getSignedGetUrl(doc.storageKey).catch(() => null) : null,
@@ -243,6 +243,8 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+
+    enterTenant(tenantId);
 
     // ── Parse body ───────────────────────────────────────────
     let body: {

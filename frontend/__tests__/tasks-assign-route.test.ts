@@ -12,7 +12,7 @@ const { authMock, getTenantMock, verifyAccessMock, createTaskMock } = vi.hoisted
   createTaskMock: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ getTenantBySlug: getTenantMock, verifyTenantAccess: verifyAccessMock, sql: vi.fn() }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, getTenantBySlug: getTenantMock, verifyTenantAccess: verifyAccessMock, sql: vi.fn() }));
 vi.mock('@/lib/tasks/tasks', () => ({ createTask: createTaskMock }));
 
 import { POST } from '@/app/api/portal/[tenantSlug]/tasks/assign/route';

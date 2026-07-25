@@ -13,7 +13,7 @@
  */
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
@@ -49,7 +49,14 @@ export async function resolveVaultAccess(
   vaultId: string,
   actor: { userId: string; email?: string | null; role: Role },
 ): Promise<VaultAccess | null> {
-  const [v] = await sql<Array<{ id: string; tenantId: string }>>`
+  // AUTHORIZATION lookup — runs BEFORE any tenant context is pinnable: it resolves the vault BY
+  // ID to *discover* its owner tenant (chicken-and-egg — we can't SET app.tenant_id to a tenant
+  // we don't yet know). So it reads the forced `collaboration_vaults`/`vault_members` tables via
+  // the owner `sqlBypass` pool, exactly like auth reads `users` by email pre-context. Isolation is
+  // NOT weakened: access is still gated by the tenant-membership / collaborator-membership checks
+  // below (no membership → null → 403). The CALLER then enterTenant(ownerTenantId) for the
+  // handler's own content reads. (docs/RLS_CUTOVER.md — entity-first gates use bypass.)
+  const [v] = await sqlBypass<Array<{ id: string; tenantId: string }>>`
     SELECT id, tenant_id AS "tenantId" FROM collaboration_vaults
     WHERE id = ${vaultId}::uuid AND status = 'active' LIMIT 1`;
   if (!v) return null;
@@ -58,7 +65,7 @@ export async function resolveVaultAccess(
   const platformAdmin = actor.role === 'master_admin' || actor.role === 'rfp_admin';
   let tenantSide = platformAdmin;
   if (!tenantSide && hasRoleAtLeast(actor.role, 'tenant_admin')) {
-    const [m] = await sql<Array<{ ok: number }>>`
+    const [m] = await sqlBypass<Array<{ ok: number }>>`
       SELECT 1 AS ok FROM user_memberships
       WHERE user_id = ${actor.userId}::uuid AND tenant_id = ${v.tenantId}::uuid
         AND role = 'tenant_admin' AND status = 'active' LIMIT 1`;
@@ -70,7 +77,7 @@ export async function resolveVaultAccess(
   // session email so it can never match a member row (emails are stored NOT NULL, but be
   // defensive — an empty match must never grant access).
   const emailMatch = actor.email && actor.email.trim() ? actor.email.trim() : null;
-  const [cm] = await sql<Array<{ ok: number }>>`
+  const [cm] = await sqlBypass<Array<{ ok: number }>>`
     SELECT 1 AS ok FROM vault_members
     WHERE vault_id = ${vaultId}::uuid AND status <> 'revoked'
       AND (user_id = ${actor.userId}::uuid OR (${emailMatch}::text IS NOT NULL AND lower(email) = lower(${emailMatch})))

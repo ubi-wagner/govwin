@@ -14,7 +14,7 @@ const H = vi.hoisted(() => ({
   emitSingleMock: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: H.authMock }));
-vi.mock('@/lib/db', () => ({ getTenantBySlug: H.getTenantBySlugMock, verifyTenantAccess: H.verifyTenantAccessMock, sql: vi.fn() }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, getTenantBySlug: H.getTenantBySlugMock, verifyTenantAccess: H.verifyTenantAccessMock, sql: vi.fn() }));
 vi.mock('@/lib/rls', () => ({ withTenant: H.withTenantMock }));
 vi.mock('@/lib/portal-launch', () => ({
   acceptGuardrails: H.acceptGuardrailsMock, releaseFromCuration: H.releaseFromCurationMock,

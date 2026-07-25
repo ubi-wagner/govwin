@@ -6,7 +6,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { createVault, listVaults } from '@/lib/vaults/vaults';
 
@@ -29,6 +29,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const g = await gate(tenantSlug, 'tenant_admin');
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point — in the route frame, so listVaults' sql inherits it
     return NextResponse.json({ data: await listVaults(g.tenantId) });
   } catch (e) {
     console.error('[vaults GET]', e);
@@ -41,6 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const g = await gate(tenantSlug, 'tenant_admin');
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point — createVault's sql inherits this tenant context
     let body: { partnerName?: unknown; partnerOrg?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
     const partnerName = typeof body.partnerName === 'string' ? body.partnerName.trim() : '';

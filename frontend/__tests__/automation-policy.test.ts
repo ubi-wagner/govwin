@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
 // withTenant passthrough → the tenant-policy read goes through sqlMock (call #2) as before.
 vi.mock('@/lib/rls', () => ({ withTenant: (_t: string, fn: (tx: unknown) => unknown) => fn(sqlMock) }));
 vi.mock('@/lib/logger', () => ({

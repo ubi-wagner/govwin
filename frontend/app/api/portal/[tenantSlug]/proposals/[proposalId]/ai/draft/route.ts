@@ -14,7 +14,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 
@@ -73,6 +73,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId);
 
     // ── Input validation ─────────────────────────────────────────
     let body: { sectionId?: string; instructions?: string };

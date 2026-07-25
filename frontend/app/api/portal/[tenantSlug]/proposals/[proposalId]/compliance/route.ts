@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { getObjectBuffer } from '@/lib/storage/s3-client';
@@ -45,6 +45,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     if (!isValidUUID(proposalId)) {
       return NextResponse.json({ error: 'Invalid proposal id', code: 'VALIDATION_ERROR' }, { status: 400 });

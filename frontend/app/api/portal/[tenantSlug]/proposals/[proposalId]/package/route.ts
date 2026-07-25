@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { isValidUUID } from '@/lib/validation';
@@ -234,6 +234,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       { status: 403 },
     );
   }
+
+  enterTenant(tenantId);
 
   // ── ZIP export path (whole proposal, each volume in its NATIVE format) ──
   // A proposal mixes docx/pptx/xlsx volumes, so a single-format download is lossy;

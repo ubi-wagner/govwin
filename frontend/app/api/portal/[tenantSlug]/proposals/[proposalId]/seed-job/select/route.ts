@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug } from '@/lib/db';
+import { sql, getTenantBySlug, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { requestAgentTask } from '@/lib/agent-client';
 
@@ -37,6 +37,8 @@ export async function POST(req: Request, { params }: Params) {
   const tenant = await getTenantBySlug(tenantSlug).catch(() => null);
   if (!tenant) return NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 });
   const tenantId = tenant.id as string;
+
+  enterTenant(tenantId);
 
   try {
     // Verify the seed job belongs to this tenant+proposal

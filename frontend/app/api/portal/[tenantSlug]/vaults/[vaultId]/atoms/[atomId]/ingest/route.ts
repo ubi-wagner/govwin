@@ -6,7 +6,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug } from '@/lib/db';
+import { getTenantBySlug, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { resolveVaultAccess, ingestVaultFoundation } from '@/lib/vaults/vaults';
@@ -27,6 +27,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ te
     const access = await resolveVaultAccess(vaultId, { userId: u.id, email: u.email ?? null, role });
     if (!access || access.ownerTenantId !== tenantId) return NextResponse.json({ error: 'Vault not found', code: 'NOT_FOUND' }, { status: 404 });
     if (!access.rights.ingest) return NextResponse.json({ error: 'Only the tenant can ingest vault content', code: 'FORBIDDEN' }, { status: 403 });
+    enterTenant(tenantId); // RLS choke point
 
     const r = await ingestVaultFoundation(vaultId, atomId, tenantId, { id: u.id });
     return NextResponse.json({ data: { foundationId: r.foundationId } }, { status: 201 });

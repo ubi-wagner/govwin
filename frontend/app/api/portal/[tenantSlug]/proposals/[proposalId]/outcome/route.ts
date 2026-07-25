@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
@@ -94,6 +95,8 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
+    enterTenant(tenantId);
+
     // ── Parse + validate body ───────────────────────────────────────
     let body: Record<string, unknown>;
     try {
@@ -177,7 +180,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // Wrap proposal archive + library_atoms outcome update in transaction
     let atomsUpdated: number;
     try {
-    atomsUpdated = await sql.begin(async (tx: any) => {
+    atomsUpdated = await withTenant(tenantId, async (tx: any) => {
       // Scope this transaction to the tenant so the FORCE-RLS library_atoms writes
       // below pass the per-tenant policy (mirrors withTenant). Harmless for the
       // proposals/stage-history writes under the current owner connection.

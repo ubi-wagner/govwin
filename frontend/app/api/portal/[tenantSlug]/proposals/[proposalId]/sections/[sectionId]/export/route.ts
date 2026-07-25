@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { exportToDocx } from '@/lib/export/docx-exporter';
@@ -71,6 +71,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // ── Input validation ─────────────────────────────────────────────
     let body: { document?: unknown; format?: unknown };

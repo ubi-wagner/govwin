@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/lib/db', () => ({ sql: vi.fn() }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: vi.fn() }));
 vi.mock('@/lib/rls', () => ({ withTenant: vi.fn() }));
 vi.mock('@/lib/tasks/tasks', () => ({ createTask: vi.fn() }));
 

@@ -9,7 +9,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { requestAgentTask, getAgentTaskResult } from '@/lib/agent-client';
@@ -36,6 +36,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     const a = await authTenant(tenantSlug);
     if (a.err) return a.err;
     const { u, tenantId } = a;
+    enterTenant(tenantId as string);
 
     let body: { question?: string; sectionId?: string };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }

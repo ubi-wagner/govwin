@@ -14,6 +14,7 @@
  */
 
 import { sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
 import { preStageProposalReviewTodos } from '@/lib/automation/prestage-todos';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
@@ -97,7 +98,10 @@ export async function provisionProposalForPortal(opts: {
   });
 
   try {
-    const out = await sql.begin(async (tx: any) => {
+    // RLS cutover: withTenant (not sql.begin) so the provision transaction runs with SET LOCAL
+    // app.tenant_id under govtech_app (the Proxy does not route `.begin` through context). Works
+    // from both the portal self-provision and the admin release-for-tenant callers. (RLS_CUTOVER)
+    const out = await withTenant(tenantId, async (tx: any) => {
       const [p] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (${tenantId}, ${opportunityId}, ${t.solicitationId}, ${proposalTitle}, 'draft', ${sql.json(gateConfig)}, false, ${sql.json(originCard)}, ${null})

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -62,6 +62,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // ── Input validation ─────────────────────────────────────────────
     let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown; baseVersion?: unknown };

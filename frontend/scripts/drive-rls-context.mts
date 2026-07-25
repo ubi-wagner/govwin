@@ -6,7 +6,7 @@
  */
 import postgres from 'postgres';
 import { sql } from '@/lib/db';
-import { runInTenant } from '@/lib/tenant-context';
+import { runInTenant, runInBypass } from '@/lib/tenant-context';
 
 const owner = postgres(process.env.OWNER_URL!, { max: 2 });
 const n = (r: Array<{ n: number }>) => r[0]?.n ?? -1;
@@ -21,19 +21,21 @@ async function main() {
   const right  = n(await runInTenant(ptid,  () => sql<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases`));         // correct tenant → sees it
   const wrong  = n(await runInTenant(other, () => sql<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases`));         // other tenant → 0
   const forged = n(await runInTenant(other, () => sql<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases WHERE tenant_id = ${ptid}::uuid`)); // forged by-id → 0
-  const ownerN = n(await owner<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases`);                                 // owner bypass → all
+  const bypass = n(await runInBypass(() => sql<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases`));                // bypass ctx → owner pool → all
+  const ownerN = n(await owner<Array<{ n: number }>>`SELECT count(*)::int AS n FROM purchases`);                                 // direct owner → all
 
   const results: Array<[string, boolean]> = [
     ['app · no tenant context → DENY-ALL (0)', noCtx === 0],
     ['app · correct tenant context → sees row (>=1)', right >= 1],
     ['app · other-tenant context → 0 (RLS isolates)', wrong === 0],
     ['app · forged by-id cross-tenant → 0 (RLS backstop)', forged === 0],
+    ['app · BYPASS context → owner pool → sees all (== owner)', bypass === ownerN && bypass >= 1],
     ['owner bypass → sees all (>=1)', ownerN >= 1],
   ];
   for (const [m, ok] of results) console.log(`${ok ? '✅' : '❌'} ${m}`);
-  console.log(`   (noCtx=${noCtx} right=${right} wrong=${wrong} forged=${forged} owner=${ownerN})`);
+  console.log(`   (noCtx=${noCtx} right=${right} wrong=${wrong} forged=${forged} bypass=${bypass} owner=${ownerN})`);
   const pass = results.every(([, ok]) => ok);
-  console.log(pass ? '\n✅ RLS CONTEXT-PROXY PROOF PASS (5/5)' : '\n❌ FAIL');
+  console.log(pass ? '\n✅ RLS CONTEXT-PROXY PROOF PASS (6/6)' : '\n❌ FAIL');
   if (!pass) process.exit(1);
 }
 main().then(async () => { await sql.end(); await owner.end(); }).catch(async (e) => { console.error(String(e).slice(0, 300)); await owner.end().catch(() => {}); process.exit(1); });

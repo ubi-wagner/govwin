@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
@@ -95,6 +96,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // Stripe gate — founding cohort. FAIL-SAFE: the paywall is ENFORCED by default; a
     // founding-cohort deploy must EXPLICITLY set FOUNDING_COHORT_BYPASS=true to allow free
@@ -332,7 +335,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       frozenAt: new Date().toISOString(),
     };
 
-    const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
+    const { proposal, sectionCount, artifacts } = await withTenant(tenantId, async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (

@@ -12,7 +12,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
@@ -70,6 +70,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId);
 
     if (!isValidUUID(proposalId)) {
       return NextResponse.json(
@@ -176,6 +177,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId);
 
     if (!isValidUUID(proposalId)) {
       return NextResponse.json(

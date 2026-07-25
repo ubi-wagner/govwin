@@ -10,7 +10,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, emitMock
   withTenantMock: vi.fn(), txMock: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ sql: Object.assign(sqlMock, { json: (x: unknown) => x }), getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: Object.assign(sqlMock, { json: (x: unknown) => x }), getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
 // The route wraps its GET SELECT and POST INSERT in withTenant() (RLS-cutover-correct), so the
 // TEMPLATE queries run on the transaction handle (txMock), not the top-level sql mock. Mocking
 // this pass-through is load-bearing: without it the REAL withTenant runs against a mocked sql with

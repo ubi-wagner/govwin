@@ -7,7 +7,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveVaultAccess, inviteVaultMember, listVaultMembers, revokeVaultMember } from '@/lib/vaults/vaults';
 import { sendEmail } from '@/lib/email';
@@ -37,6 +37,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, vaultId } = await params;
     const g = await gate(tenantSlug, vaultId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point
     return NextResponse.json({ data: await listVaultMembers(vaultId, g.tenantId) });
   } catch (e) {
     console.error('[vault members GET]', e);
@@ -49,6 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, vaultId } = await params;
     const g = await gate(tenantSlug, vaultId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point
     let body: { email?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
     const email = typeof body.email === 'string' ? body.email.trim() : '';
@@ -90,6 +92,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ t
     const { tenantSlug, vaultId } = await params;
     const g = await gate(tenantSlug, vaultId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point
     let body: { memberId?: unknown };
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';

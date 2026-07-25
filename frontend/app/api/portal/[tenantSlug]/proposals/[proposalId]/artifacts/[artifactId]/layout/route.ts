@@ -14,7 +14,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { assembleArtifactCanvas } from '@/lib/export/artifact-export';
@@ -49,6 +49,8 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!(await verifyProposalAccess(su.id, role, su.tenantId, tenantId, proposalId))) {
       return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // ── Artifact + its sections ────────────────────────────────────────
     let artifact: { id: string; artifactType: string | null; volumeName: string | null } | undefined;

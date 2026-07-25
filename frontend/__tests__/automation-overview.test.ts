@@ -9,7 +9,7 @@ const { authMock, getTenantBySlugMock, verifyTenantAccessMock, withTenantMock, t
   withTenantMock: vi.fn(), txMock: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, getTenantBySlug: getTenantBySlugMock, verifyTenantAccess: verifyTenantAccessMock }));
 vi.mock('@/lib/rls', () => ({ withTenant: withTenantMock }));
 
 import { GET } from '@/app/api/portal/[tenantSlug]/automation-overview/route';

@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { auth } from '@/auth';
-import { getTenantBySlug } from '@/lib/db';
+import { getTenantBySlug, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { resolveVaultAccess, createVaultArtifact, listVaultArtifacts, getVault, notifyCollaboratorUpload } from '@/lib/vaults/vaults';
 import { blankCanvasForForm, type ArtifactForm } from '@/lib/library/artifact-canvas';
@@ -39,6 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, vaultId } = await params;
     const g = await gate(tenantSlug, vaultId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point
     return NextResponse.json({ data: await listVaultArtifacts(vaultId) });
   } catch (e) {
     console.error('[vault atoms GET]', e);
@@ -51,6 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug, vaultId } = await params;
     const g = await gate(tenantSlug, vaultId);
     if ('error' in g) return g.error;
+    enterTenant(g.tenantId); // RLS choke point
     if (!g.access.rights.upload) return NextResponse.json({ error: 'No upload right', code: 'FORBIDDEN' }, { status: 403 });
 
     let body: { title?: unknown; form?: unknown; kind?: unknown; context?: unknown; doc?: unknown };

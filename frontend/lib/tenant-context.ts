@@ -46,3 +46,8 @@ export function currentTenantContext(): TenantContext | undefined {
 export function runInTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
   return store.run({ tenantId, bypass: false }, fn);
 }
+
+/** Scoped bypass variant — routes the context-aware `sql` to the owner pool for the fn. */
+export function runInBypass<T>(fn: () => Promise<T>): Promise<T> {
+  return store.run({ tenantId: null, bypass: true }, fn);
+}

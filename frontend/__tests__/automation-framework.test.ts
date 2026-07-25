@@ -8,7 +8,7 @@ const { authMock, sqlMock, emitEventSingleMock } = vi.hoisted(() => ({
   authMock: vi.fn(), sqlMock: vi.fn(), emitEventSingleMock: vi.fn(),
 }));
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
 vi.mock('@/lib/events', () => ({ emitEventSingle: emitEventSingleMock }));
 
 import { GET, PATCH } from '@/app/api/admin/automation-framework/route';

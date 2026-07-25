@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole, isTenantWideMember } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { randomUUID } from 'crypto';
@@ -51,6 +51,7 @@ export async function GET(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId);
 
     // ── Verify proposal belongs to tenant ────────────────────────────
     let proposal: { id: string } | undefined;
@@ -247,6 +248,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId);
 
     // ── Input validation ─────────────────────────────────────────────
     let body: { nodeId?: unknown; text?: unknown };
