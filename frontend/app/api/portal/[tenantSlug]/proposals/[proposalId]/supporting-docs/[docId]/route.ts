@@ -89,7 +89,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
       reviewedBy: string | null;
       reviewedAt: Date | null;
       notes: string | null;
-      libraryUnitId: string | null;
       createdAt: Date;
       updatedAt: Date;
     } | undefined;
@@ -98,7 +97,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
         SELECT id, proposal_id, requirement_label, requirement_source,
                category, is_required, storage_key, original_filename,
                file_size, content_type, status, uploaded_by, uploaded_at,
-               reviewed_by, reviewed_at, notes, library_unit_id,
+               reviewed_by, reviewed_at, notes,
                created_at, updated_at
         FROM proposal_supporting_docs
         WHERE id = ${docId}::uuid
@@ -144,7 +143,6 @@ export async function GET(_request: Request, ctx: RouteContext) {
         reviewedBy: doc.reviewedBy,
         reviewedAt: doc.reviewedAt,
         notes: doc.notes,
-        libraryUnitId: doc.libraryUnitId,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
         downloadUrl,
