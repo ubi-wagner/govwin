@@ -115,19 +115,19 @@ pages got `sqlBypass`, `/api/invite` + `/api/stripe/webhook` + `listVaultsForCol
 `sqlBypass`. Audit confirmed NO frontend cron, NO `unstable_after`; analytics tables aren't RLS'd;
 other forced writers are request-reached or the Python pipeline (owner).
 
-**OPEN — verify before the flip (⚠ likely needs a fix):** a server-component page-drive
-(`scripts/drive-rls-pages.mjs`) suggested that portal *server components* which query forced tables
-**directly** may render EMPTY under govtech_app — because **`enterTenant` uses AsyncLocalStorage
-`enterWith`, which is not reliable inside a React Server Component render** (React can isolate the
-async context per component; this is a known Next gotcha). The API/client-component surface is fine
-(proven 38/38 + 13/13). If confirmed, the fix is: **portal server components use `withTenant(tenantId,
-tx => …)` instead of `enterTenant`** (withTenant is ALS-independent — an explicit `SET LOCAL`
-transaction — so it works in any render context). Admin server components already use `sqlBypass`
-(ALS-independent; API-proven 13/13). This must be re-driven in a STABLE build/serve environment
-(the sandbox tooling degraded during the wiring session, giving inconsistent results — e.g. the same
-API drive returned 38/38 on `next dev` but 36/38 on the standalone, so the page-drive's empties there
-are not trustworthy). **Everything is inert pre-flip (owner bypasses RLS → pages render fine today),
-so this is a pre-flip verification item, not a live regression.**
+**VERIFIED (`scripts/drive-rls-pages.mts` — 9/9, app connected as govtech_app on `next dev`):** the
+server-component surface renders correct tenant-scoped forced data. `enterTenant` **does** work inside
+a React Server Component render (proposals list, dashboard, proposals/[id] all render the tenant's
+proposal), and `sqlBypass` works in admin server components (admin/proposals renders cross-tenant
+proposals; admin/tenants/[id] renders the tenant's `PROPOSALS → 1 · LIBRARY ATOMS → 367`); the manage
+console renders `6 Buckets · 8 OPPs · 1 Active` and the library browser its facets — all forced-table
+reads under govtech_app. **No `withTenant` conversion was needed** — the `enterTenant`/`sqlBypass`
+wiring is correct.
+
+(Historical note: an earlier run against a `next start` **standalone** build showed several pages
+empty, but that was environment pollution — the *same* API drive returned 38/38 on `next dev` vs
+36/38 on that standalone. The reliable `next dev` run (API 38/38 → pages 9/9) is the trustworthy
+result. Re-verify with `drive-rls-pages` on a clean `next dev` if ever in doubt.)
 
 ### Known deferred (documented, not blocking the flip)
 Background/workflow paths that write forced tables in their OWN `sql.begin` outside a request

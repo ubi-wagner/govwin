@@ -33,12 +33,14 @@ const PORTAL = [
   ['dashboard', `/portal/${S}/dashboard`, 'DON26BX03'],
   ['buckets', `/portal/${S}/buckets`, 'Autonomy'],
   ['cards', `/portal/${S}/cards`, 'Autonomy'],
-  ['atoms (library)', `/portal/${S}/atoms`, 'GHOST'],
-  ['manage', `/portal/${S}/manage`, 'DON26BX03'],
+  // atoms + manage are counts/facets rendered from forced tables (client-lib / server console),
+  // so assert a NON-ZERO forced-data string (a DENY-ALL would show 0 / no facets), not a title.
+  ['atoms (library facets)', `/portal/${S}/atoms`, 'commercialization'],
+  ['manage (spotlight summary)', `/portal/${S}/manage`, '8 OPPs'],
 ];
 const ADMIN = [
   ['admin/proposals (cross-tenant)', `/admin/proposals`, 'DON26BX03'],
-  ['admin/tenants/[id] (any-tenant)', `/admin/tenants/${IMMO}`, 'DON26BX03'],
+  ['admin/tenants/[id] (any-tenant, atom count)', `/admin/tenants/${IMMO}`, '367'],
 ];
 
 async function checkPage(page, path, token) {
