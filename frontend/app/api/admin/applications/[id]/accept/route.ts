@@ -7,6 +7,8 @@ import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
+import { offerStarterSet } from '@/lib/library/starter-offer';
+import { isRole, type Role } from '@/lib/rbac';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -219,6 +221,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (backfillErr) {
       console.error('[api/admin/applications/accept] card backfill failed (non-fatal):', backfillErr);
+    }
+
+    // Offer the dogfooded starter template set to the new tenant_admin (P5.3) — a
+    // one-time dismissible ToDo routing them to the Library's one-click bulk add.
+    // Best-effort: a failure must NEVER fail the accept.
+    try {
+      await offerStarterSet({
+        tenantId, tenantSlug: finalSlug, adminUserId: newUserId,
+        actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: (isRole(role) ? role : 'rfp_admin') as Role, tenantId: null },
+      });
+    } catch (offerErr) {
+      console.error('[api/admin/applications/accept] starter-set offer failed (non-fatal):', offerErr);
     }
 
     await emitEventEnd(eventId, {

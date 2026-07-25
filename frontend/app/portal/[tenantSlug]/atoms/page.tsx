@@ -5,6 +5,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AtomsWorkbench } from '@/components/portal/atoms-workbench';
 import { TemplifyPastProposals } from '@/components/portal/templify-past-proposals';
 import { CreateCanvasButton } from '@/components/portal/create-canvas-button';
+import { StarterCatalog } from '@/components/portal/starter-catalog';
 import { LibraryBrowser } from '@/components/portal/library-browser';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,7 @@ export default async function AtomsPage({ params }: { params: Promise<{ tenantSl
           <CreateCanvasButton tenantSlug={tenantSlug} />
         </div>
       </div>
+      <StarterCatalog tenantSlug={tenantSlug} />
       <div className="mb-6">
         <LibraryBrowser tenantSlug={tenantSlug} />
       </div>

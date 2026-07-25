@@ -80,11 +80,11 @@ I (dogfooding) author a starter set via the tool — **generic** foundation arti
 (capability statement/doc, one-pager/doc, pitch deck/ppt, budget/sheet, email
 templates/doc, marketing/pdf) + **common proposal** foundation artifacts (SBIR/STTR
 technical volume/doc, cost volume/sheet, commercialization deck/ppt, SOW/doc). They
-land in the **system/house library** and **seed every new customer library on
-onboarding** (idempotent; addable anytime). Because each carries its
-section/group/atom decomposition, the **agents** (Librarian, Onboarding Concierge)
-have a reference skeleton to match uploads against — "this is a Technical Approach
-section; these are past-performance atoms" — on onboarding, bucket setup, and adds.
+land in the **system/house library** and are **offered to every new customer on
+onboarding** (copy-on-use, not deep-seeded; idempotent; addable anytime). Because each
+carries its section/group/atom decomposition, the **agents** (Librarian, Onboarding
+Concierge) have a reference skeleton to match uploads against — "this is a Technical
+Approach section; these are past-performance atoms" — on onboarding, bucket setup, and adds.
 
 **As-built (P4, shipped):** the starter set is authored as pure data in
 `lib/library/starter-set.ts` (`STARTER_SET`, each a taxonomy + a `build() →
@@ -112,6 +112,21 @@ idempotency (cleared 208 → seeded 18), grain distribution 18/95/95/95, vehicle
 propagation to primitives (7–14 per vehicle), table-atom payload (headers+rows
 preserved), and a copy-on-use proof (1/10/10/10 tree · 31/31 lineage · 10/10 canvas
 nodes · min 7 tags/primitive).
+
+**As-built (P5, shipped) — offer + one-click add:** a tenant materializes the catalog
+into their own library on demand (copy-on-use), never a deep-seed. `copyStarterSetToTenant`
+(`lib/library/foundation.ts`) bulk-copies the whole catalog with `derived_from` lineage,
+idempotently (skips any starter whose `doc` slug the tenant already holds). The
+`system-templates` route gained a bulk `POST { all: true }` alongside the single
+`{ foundationId }` copy (both emit `library:template.added` / `starter_set.added`). The
+`/atoms` **StarterCatalog** (P5.1) surfaces the offer front-and-center when the library is
+empty ("Add all N") and as a compact add-anytime affordance otherwise. Onboarding wires a
+one-time **offer** (P5.3, `offerStarterSet`): both tenant-provisioning paths (application
+accept + admin-manual create) emit `library:starter_set.offered` and drop a dismissible
+`tenant_admin` acknowledge ToDo linking to `/atoms` (best-effort — never fails onboarding;
+idempotent per open offer). Proven on the real DB: bulk copy 3/3 (fresh 18 · idempotent
+0-added/18-skipped · partial 3-refill), offer 3/3 (creates the acknowledge ToDo + emits
+once · idempotent · surfaces in the tenant_admin queue).
 
 ---
 

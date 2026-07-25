@@ -14,6 +14,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
+import { offerStarterSet } from '@/lib/library/starter-offer';
 import bcrypt from 'bcryptjs';
 
 function slugify(name: string): string {
@@ -252,6 +253,14 @@ export async function POST(request: Request) {
     try { await seedDefaultBuckets(created.tenantId, created.adminUserId); } catch (e) { console.error('[admin/tenants/create] seed buckets failed', e); }
     let cardsBackfilled = 0;
     try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[admin/tenants/create] backfill failed', e); }
+
+    // Offer the starter template set to the new tenant_admin (P5.3, best-effort).
+    try {
+      await offerStarterSet({
+        tenantId: created.tenantId, tenantSlug: created.slug, adminUserId: created.adminUserId,
+        actor: { id: sessionUser.id ?? '', email: (session.user as { email?: string }).email ?? null, role: role ?? 'rfp_admin', tenantId: null },
+      });
+    } catch (e) { console.error('[admin/tenants/create] starter-set offer failed', e); }
 
     await emitEventSingle({
       namespace: 'finder',

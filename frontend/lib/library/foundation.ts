@@ -285,3 +285,49 @@ export async function copyFoundationToTenant(
   const foundationId = await copyAtom(sourceFoundationId, newSectionIds);
   return { foundationId, sectionIds, groupIds, atomIds };
 }
+
+export interface StarterSetResult { added: number; skipped: number; foundationIds: string[] }
+
+/**
+ * Bulk copy-on-use (P5.2): materialize the WHOLE system-starter catalog into a
+ * tenant's library — each foundation copied with `derived_from` lineage and retagged
+ * `collection=my_library`. This is the one-click "add the starter set" behind the
+ * empty-library offer (P5.1) and the onboarding hook (P5.3).
+ *
+ * Idempotent: skips any starter whose `doc` slug already has a foundation in the
+ * tenant, so re-running (or a double-click) never duplicates. Returns added/skipped.
+ */
+export async function copyStarterSetToTenant(
+  targetTenantId: string,
+  actor: { id: string },
+  opts?: { collection?: string },
+): Promise<StarterSetResult> {
+  const collection = opts?.collection ?? 'my_library';
+  const catalog = await sql<Array<{ id: string; slug: string | null }>>`
+    SELECT la.id, (SELECT value FROM atom_tags WHERE atom_id = la.id AND dimension = 'doc') AS slug
+    FROM library_atoms la
+    WHERE la.grain = 'foundation'
+      AND la.id IN (SELECT atom_id FROM atom_tags WHERE dimension = 'collection' AND value = ${SYSTEM_COLLECTION})
+    ORDER BY la.title`;
+
+  // Which starter slugs does the tenant already hold a foundation for? (dedup key)
+  const slugs = catalog.map((c) => c.slug).filter((s): s is string => !!s);
+  const present = new Set<string>(
+    slugs.length
+      ? (await sql<Array<{ slug: string }>>`
+          SELECT DISTINCT t.value AS slug
+          FROM atom_tags t
+          JOIN library_atoms la ON la.id = t.atom_id AND la.grain = 'foundation' AND la.tenant_id = ${targetTenantId}::uuid
+          WHERE t.dimension = 'doc' AND t.value = ANY(${slugs})`).map((r) => r.slug)
+      : [],
+  );
+
+  const foundationIds: string[] = [];
+  let skipped = 0;
+  for (const c of catalog) {
+    if (c.slug && present.has(c.slug)) { skipped++; continue; }
+    const d = await copyFoundationToTenant(c.id, targetTenantId, actor, { collection });
+    foundationIds.push(d.foundationId);
+  }
+  return { added: foundationIds.length, skipped, foundationIds };
+}
