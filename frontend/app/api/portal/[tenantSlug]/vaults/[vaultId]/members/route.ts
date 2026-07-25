@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { resolveVaultAccess, inviteVaultMember, listVaultMembers } from '@/lib/vaults/vaults';
+import { resolveVaultAccess, inviteVaultMember, listVaultMembers, revokeVaultMember } from '@/lib/vaults/vaults';
 
 async function gate(tenantSlug: string, vaultId: string) {
   const session = await auth();
@@ -58,5 +58,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   } catch (e) {
     console.error('[vault members POST]', e);
     return NextResponse.json({ error: 'Failed to invite member', code: 'DB_ERROR' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ tenantSlug: string; vaultId: string }> }) {
+  try {
+    const { tenantSlug, vaultId } = await params;
+    const g = await gate(tenantSlug, vaultId);
+    if ('error' in g) return g.error;
+    let body: { memberId?: unknown };
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
+    const memberId = typeof body.memberId === 'string' ? body.memberId : '';
+    if (!memberId) return NextResponse.json({ error: 'memberId is required', code: 'BAD_REQUEST' }, { status: 400 });
+    const ok = await revokeVaultMember(vaultId, g.tenantId, memberId);
+    if (!ok) return NextResponse.json({ error: 'Member not found', code: 'NOT_FOUND' }, { status: 404 });
+    return NextResponse.json({ data: { revoked: true } });
+  } catch (e) {
+    console.error('[vault members DELETE]', e);
+    return NextResponse.json({ error: 'Failed to revoke member', code: 'DB_ERROR' }, { status: 500 });
   }
 }

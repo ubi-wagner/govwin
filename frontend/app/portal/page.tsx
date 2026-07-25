@@ -4,6 +4,7 @@ import { sql } from '@/lib/db';
 import { SignOutButton } from '@/components/auth/sign-out-button';
 import { getLandingPath, isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { getActiveMemberships } from '@/lib/memberships';
+import { listVaultsForCollaborator } from '@/lib/vaults/vaults';
 
 /**
  * /portal — post-login traffic cop.
@@ -89,6 +90,22 @@ export default async function PortalDispatcher() {
   if (target) {
     redirect(target);
   }
+
+  // No tenant landing. A vault-only collaborator (a partner invited into a nook but NOT a
+  // member of any tenant, and with no proposal collaboration) still has a home — their
+  // collaboration vault(s). Route them there instead of the dead-end message. The redirect
+  // is kept OUTSIDE the try so its NEXT_REDIRECT is never swallowed by the catch.
+  let hasNook = false;
+  const dispatchEmail = (sessionUser as { email?: string }).email ?? null;
+  if (dispatchUserId) {
+    try {
+      const nooks = await listVaultsForCollaborator(dispatchUserId, dispatchEmail);
+      hasNook = nooks.length > 0;
+    } catch (e) {
+      console.error('[portal dispatcher] vault check failed:', e);
+    }
+  }
+  if (hasNook) redirect('/vaults');
 
   // No valid landing path. Distinguish a company in license SLUMBER (archived) from a
   // genuinely unlinked account, so the message is accurate. Render (never redirect from

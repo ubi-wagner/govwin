@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto';
 import { auth } from '@/auth';
 import { getTenantBySlug } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
-import { resolveVaultAccess, createVaultArtifact, listVaultArtifacts } from '@/lib/vaults/vaults';
+import { resolveVaultAccess, createVaultArtifact, listVaultArtifacts, getVault, notifyCollaboratorUpload } from '@/lib/vaults/vaults';
 import { blankCanvasForForm, type ArtifactForm } from '@/lib/library/artifact-canvas';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -31,7 +31,7 @@ async function gate(tenantSlug: string, vaultId: string) {
   const tenantId = tenant.id as string;
   const access = await resolveVaultAccess(vaultId, { userId: u.id, email: u.email ?? null, role });
   if (!access || access.ownerTenantId !== tenantId) return { error: NextResponse.json({ error: 'Vault not found', code: 'NOT_FOUND' }, { status: 404 }) };
-  return { access, tenantId, userId: u.id };
+  return { access, tenantId, userId: u.id, role, email: u.email ?? null };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string; vaultId: string }> }) {
@@ -69,6 +69,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     const doc = (body.doc && typeof body.doc === 'object' ? body.doc : blankCanvasForForm(form, title)) as CanvasDocument;
 
     const r = await createVaultArtifact(vaultId, g.tenantId, doc, { title, slug: slugify(title), form, kind, context }, { id: g.userId });
+
+    // P8.7 HITL — a COLLABORATOR's upload notifies the owner tenant (advisory → the customer
+    // decides whether to harvest). A tenant-admin copy-in is self-initiated, so no ToDo.
+    if (g.access.side === 'collaborator') {
+      const vault = await getVault(vaultId, g.tenantId);
+      await notifyCollaboratorUpload(vaultId, g.tenantId, { id: g.userId, email: g.email, role: g.role }, r.foundationId, vault?.partnerName ?? 'partner');
+    }
     return NextResponse.json({ data: { foundationId: r.foundationId } }, { status: 201 });
   } catch (e) {
     console.error('[vault atoms POST]', e);

@@ -14,6 +14,7 @@
 import { sql } from '@/lib/db';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { createTask } from '@/lib/tasks/tasks';
 import { decomposeAndIngest, copyFoundationToTenant, type FoundationMeta } from '@/lib/library/foundation';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
@@ -94,6 +95,14 @@ export async function createVault(
   return v;
 }
 
+/** Fetch one active nook (for a detail page); tenant-scoped by the owner. */
+export async function getVault(vaultId: string, ownerTenantId: string): Promise<Vault | null> {
+  const [v] = await sql<Array<Vault>>`
+    SELECT id, tenant_id AS "tenantId", partner_name AS "partnerName", partner_org AS "partnerOrg", status, created_at AS "createdAt"
+    FROM collaboration_vaults WHERE id = ${vaultId}::uuid AND tenant_id = ${ownerTenantId}::uuid AND status = 'active' LIMIT 1`;
+  return v ?? null;
+}
+
 /** List a tenant's own nooks (tenant side). */
 export async function listVaults(tenantId: string): Promise<Vault[]> {
   return sql<Array<Vault>>`
@@ -102,14 +111,37 @@ export async function listVaults(tenantId: string): Promise<Vault[]> {
     ORDER BY created_at DESC`;
 }
 
+/**
+ * The collaborator's view of a nook. A collaborator sees the OWNER org they are
+ * partnering with (never their own "partner_name", which is how the tenant labels them),
+ * plus the owner slug so the client can address the shared /api/portal/<slug>/vaults API.
+ */
+export interface CollaboratorVaultView { id: string; ownerName: string; ownerSlug: string; createdAt: string }
+
 /** List the nooks a collaborator can reach (their own vault(s) only — the segregation). */
-export async function listVaultsForCollaborator(userId: string, email: string | null): Promise<Vault[]> {
-  return sql<Array<Vault>>`
-    SELECT v.id, v.tenant_id AS "tenantId", v.partner_name AS "partnerName", v.partner_org AS "partnerOrg", v.status, v.created_at AS "createdAt"
+export async function listVaultsForCollaborator(userId: string, email: string | null): Promise<CollaboratorVaultView[]> {
+  const emailMatch = email && email.trim() ? email.trim() : null;
+  return sql<Array<CollaboratorVaultView>>`
+    SELECT v.id, t.name AS "ownerName", t.slug AS "ownerSlug", v.created_at AS "createdAt"
     FROM collaboration_vaults v
     JOIN vault_members m ON m.vault_id = v.id AND m.status <> 'revoked'
-    WHERE v.status = 'active' AND (m.user_id = ${userId}::uuid OR lower(m.email) = lower(${email ?? ''}))
+    JOIN tenants t ON t.id = v.tenant_id
+    WHERE v.status = 'active' AND t.archived_at IS NULL
+      AND (m.user_id = ${userId}::uuid OR (${emailMatch}::text IS NOT NULL AND lower(m.email) = lower(${emailMatch})))
     ORDER BY v.created_at DESC`;
+}
+
+/**
+ * Resolve the owner org's slug + name for a vault (for the collaborator detail page, which
+ * addresses the tenant-namespaced vault API and labels the nook with the owner org). The
+ * caller has already been authorized via resolveVaultAccess; this only reads display context.
+ */
+export async function getVaultOwnerContext(vaultId: string): Promise<{ ownerSlug: string; ownerName: string } | null> {
+  const [r] = await sql<Array<{ ownerSlug: string; ownerName: string }>>`
+    SELECT t.slug AS "ownerSlug", t.name AS "ownerName"
+    FROM collaboration_vaults v JOIN tenants t ON t.id = v.tenant_id
+    WHERE v.id = ${vaultId}::uuid AND v.status = 'active' AND t.archived_at IS NULL LIMIT 1`;
+  return r ?? null;
 }
 
 /** Invite a partner email into a vault (upsert on the email; mirrors adding a proposal collaborator). */
@@ -170,6 +202,54 @@ export async function createVaultArtifact(
   // library and a mid-op failure cannot strand it there (atomic per grain).
   const d = await decomposeAndIngest(ownerTenantId, doc, { ...meta, collection: 'vault' }, actor, { vaultId });
   return { foundationId: d.foundationId };
+}
+
+/**
+ * P8.7 — the collaborator-content HITL. When a COLLABORATOR uploads an artifact into a nook,
+ * notify the owner tenant so a human decides whether to harvest it (advisory → land, never an
+ * auto-write into the main library). Emits a library audit event for every upload, and raises
+ * ONE standing review ToDo per nook for the owner's tenant admins (idempotent — repeated
+ * uploads log events but don't pile up ToDos). Best-effort: a notification failure never fails
+ * the upload itself (the content is already safely in the vault).
+ */
+export async function notifyCollaboratorUpload(
+  vaultId: string,
+  ownerTenantId: string,
+  uploader: { id: string; email?: string | null; role: Role },
+  foundationId: string,
+  partnerLabel: string,
+): Promise<void> {
+  try {
+    await emitEventSingle({
+      namespace: 'library', type: 'vault.artifact_uploaded',
+      actor: userActor(uploader.id, uploader.email ?? undefined), tenantId: ownerTenantId,
+      payload: { vaultId, foundationId, uploadedBy: uploader.id },
+    });
+  } catch (e) {
+    console.error('[vault] notifyCollaboratorUpload event failed:', e);
+  }
+  try {
+    // One standing review ToDo per nook — if an open one already exists for this vault,
+    // don't pile on (each upload still emits the audit event above). The benign race of two
+    // concurrent uploads both creating a ToDo is acceptable for a notification.
+    const [existing] = await sql<Array<{ id: string }>>`
+      SELECT id FROM tasks
+      WHERE tenant_id = ${ownerTenantId}::uuid AND task_type = 'vault_artifact_review'
+        AND entity_id = ${vaultId}::uuid AND status IN ('open', 'in_progress') LIMIT 1`;
+    if (existing) return;
+    await createTask({
+      actor: { id: uploader.id, email: uploader.email ?? null, role: uploader.role, tenantId: null },
+      tenantId: ownerTenantId,
+      assigneeRole: 'tenant_admin',
+      taskType: 'vault_artifact_review',
+      title: `New partner content in the ${partnerLabel} nook`,
+      description: 'A collaborator uploaded content to a collaboration vault. Review it and harvest what you need into your proposal library.',
+      entityType: 'collaboration_vault',
+      entityId: vaultId,
+    });
+  } catch (e) {
+    console.error('[vault] notifyCollaboratorUpload task failed:', e);
+  }
 }
 
 /** List a vault's whole artifacts (foundations) — both sides see these. */
