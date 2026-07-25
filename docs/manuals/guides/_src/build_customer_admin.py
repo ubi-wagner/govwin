@@ -121,8 +121,30 @@ sec(id="library", toc="5 · Library & atoms", heading="Library — build your co
     lead="<p>Your library is the raw material every draft is built from. You deconstruct your documents into tagged, sized "
          "<b>atoms</b>, then compose and reuse them. The page has three tabs — <b>Library</b>, <b>Upload package</b>, "
          "<b>Atomize</b> — plus a reuse-a-past-proposal panel.</p>",
-    img=TS+"atoms.png", caption="The library — tagged atoms with grain, usage, lineage, and visibility.",
+    img=TS+"library-atoms.png", caption="The library — tagged atoms with grain, usage, lineage, and visibility.",
     subs=[
+      {"id":"lib-foundations","heading":"Create a canvas · start from a template · downloads","toc":"5.0 · Create canvas & starter templates",
+       "lead":"<p>Beyond hand-shredding, you can <b>create a canvas</b> — a <b>foundation artifact</b> (a whole doc / deck / sheet / "
+         "PDF) that decomposes on save into reusable section / group / atom grains — and copy in ready-made <b>starter "
+         "templates</b>.</p>",
+       "steps":[
+         S("Click <b>Create canvas</b>. The <b>Blank</b> tab mints a foundation from a form (Document · Deck · Sheet · PDF) "
+           "with a kind × context taxonomy, and opens straight in the canvas editor.",
+           TC+"create-canvas-blank.png","Create canvas — a blank foundation by form + taxonomy.","half"),
+         S("The <b>Start from a template</b> tab lists the shared starter catalog — capability statement, one-pager, "
+           "SBIR/STTR technical &amp; cost volumes, DoW CSO brief, commercialization deck. <b>Use</b> copies one into your "
+           "library as your own editable canvas (with lineage back to the original).",
+           TC+"create-canvas-templates.png","Start from a template — the starter catalog, copy-on-use.","half"),
+         S("When your library is empty, the <b>starter offer</b> appears at the top — <b>Add all N</b> bulk-copies the whole "
+           "starter set in one click (idempotent; addable anytime).",
+           TC+"library-starter-affordance.png","The starter-set offer on an empty library.","half"),
+         S("<b>Browse library</b> filters foundations / sections / groups / atoms by kind × form × context × vehicle (facet "
+           "counts update live), and every row offers a native-format <b>download</b> (.docx · .pptx · .xlsx · .pdf).",
+           TC+"library-browse.png","The faceted library browser with per-row downloads.","full"),
+       ],
+       "callouts":[{"kind":"note","html":"<b>Collaboration vaults (nooks)</b> — a customer-owned, RLS-segregated branch library "
+         "per external partner — are provisioned server-side (create · invite · upload/atomize · download-whole · ingest, with "
+         "the isolation contract adversarially proven). The two-sided nook UI ships next.","w":"full"}]},
       {"id":"lib-browse","heading":"Browse, filter & compose","toc":"5.1 · Browse & compose",
        "steps":[
          S("Filter with the search box, the <b>grain</b> select (primitive / group / foundational), the status select, and "
