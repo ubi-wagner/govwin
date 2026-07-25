@@ -10,6 +10,8 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveVaultAccess, inviteVaultMember, listVaultMembers, revokeVaultMember } from '@/lib/vaults/vaults';
+import { sendEmail } from '@/lib/email';
+import { collaboratorInviteEmail } from '@/lib/email-templates';
 
 async function gate(tenantSlug: string, vaultId: string) {
   const session = await auth();
@@ -54,7 +56,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       return NextResponse.json({ error: 'a valid email is required', code: 'BAD_REQUEST' }, { status: 400 });
     }
     const member = await inviteVaultMember(vaultId, g.tenantId, { id: g.userId, email: g.email }, email);
-    return NextResponse.json({ data: member }, { status: 201 });
+    // Send the acceptance email (best-effort). A brand-new partner gets a temp password +
+    // login link; the forced-change gate covers first sign-in and the dispatcher routes them
+    // to /vaults. tempPassword is returned only when the email couldn't be sent, so the
+    // inviting admin can relay it by hand (mirrors the application-accept backstop).
+    let emailSent = false;
+    try {
+      const tenant = await getTenantBySlug(tenantSlug);
+      const ownerName = (tenant?.name as string) ?? 'a customer';
+      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      const content = collaboratorInviteEmail({
+        recipientName: email.split('@')[0], recipientEmail: email,
+        proposalTitle: `${ownerName} — shared collaboration space`,
+        inviterName: g.email ?? ownerName, role: 'external', permission: 'edit',
+        isNewUser: member.isNewUser, loginUrl: `${base}/login`, proposalUrl: `${base}/vaults`,
+        tempPassword: member.tempPassword ?? undefined,
+      });
+      const r = await sendEmail({ to: email, subject: content.subject, html: content.html });
+      emailSent = r.provider !== 'skipped' && !r.error;
+    } catch (e) { console.error('[vault members POST] invite email failed', e); }
+    return NextResponse.json({
+      data: { id: member.id, email: member.email, userId: member.userId, status: member.status, createdAt: member.createdAt },
+      emailSent, tempPassword: emailSent ? undefined : member.tempPassword,
+    }, { status: 201 });
   } catch (e) {
     console.error('[vault members POST]', e);
     return NextResponse.json({ error: 'Failed to invite member', code: 'DB_ERROR' }, { status: 500 });
@@ -70,7 +94,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ t
     try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 }); }
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';
     if (!memberId) return NextResponse.json({ error: 'memberId is required', code: 'BAD_REQUEST' }, { status: 400 });
-    const ok = await revokeVaultMember(vaultId, g.tenantId, memberId);
+    const ok = await revokeVaultMember(vaultId, g.tenantId, memberId, { id: g.userId, email: g.email });
     if (!ok) return NextResponse.json({ error: 'Member not found', code: 'NOT_FOUND' }, { status: 404 });
     return NextResponse.json({ data: { revoked: true } });
   } catch (e) {

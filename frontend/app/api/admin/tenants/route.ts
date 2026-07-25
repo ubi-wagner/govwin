@@ -15,6 +15,8 @@ import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
 import { offerStarterSet } from '@/lib/library/starter-offer';
+import { sendEmail } from '@/lib/email';
+import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
 
 function slugify(name: string): string {
@@ -271,12 +273,30 @@ export async function POST(request: Request) {
       payload: { tenantId: created.tenantId, slug: created.slug, name, adminEmail, source: 'admin_manual', cardsBackfilled },
     });
 
+    // Onboard the POC the same way self-serve accept does (sweep gap: this path never
+    // emailed). New user → temp-pw acceptance mail; existing user → an "added as admin"
+    // notice. Best-effort; the tempPassword also returns below as an admin-relay backstop.
+    let emailSent = false;
+    try {
+      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      if (created.isNewUser) {
+        const c = applicationAcceptedEmail({ contactName: adminName ?? adminEmail, contactEmail: adminEmail, companyName: name, tempPassword: tempPw, tenantSlug: created.slug, loginUrl: `${base}/login` });
+        const r = await sendEmail({ to: adminEmail, subject: c.subject, html: c.html });
+        emailSent = r.provider !== 'skipped' && !r.error;
+      } else {
+        const safe = (s: string | null) => String(s ?? '').replace(/[<>&"]/g, '');
+        const r = await sendEmail({ to: adminEmail, subject: `You've been added as an administrator of ${safe(name)}`,
+          html: `<p>Hi ${safe(adminName) || 'there'},</p><p>You now have <strong>administrator</strong> access to <strong>${safe(name)}</strong> on RFP Pipeline. Sign in with your existing account to manage the workspace.</p><p><a href="${base}/login">Sign in</a></p>` });
+        emailSent = r.provider !== 'skipped' && !r.error;
+      }
+    } catch (e) { console.error('[admin/tenants/create] acceptance email failed', e); }
+
     return NextResponse.json({
       data: {
         tenantId: created.tenantId,
         slug: created.slug,
         name,
-        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null },
+        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null, emailSent },
         cardsBackfilled,
       },
     }, { status: 201 });

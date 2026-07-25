@@ -55,6 +55,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     // "Add starter set" offer). Idempotent — re-adding skips starters already held.
     if (body.all === true) {
       const r = await copyStarterSetToTenant(g.tenantId, { id: g.userId }, { collection: 'my_library' });
+      // No silent no-op: added=0 AND skipped=0 means the shared starter catalog itself is
+      // empty (not yet seeded), which would otherwise report success while the tenant's
+      // baseline library stays empty. Surface it so the failure is visible (sweep finding).
+      if (r.added === 0 && r.skipped === 0) {
+        return NextResponse.json(
+          { error: 'The starter template catalog is not available yet — contact your RFP Pipeline admin to seed it.', code: 'CATALOG_EMPTY' },
+          { status: 409 },
+        );
+      }
       await emitEventSingle({
         namespace: 'library', type: 'starter_set.added', actor: userActor(g.userId), tenantId: g.tenantId,
         payload: { added: r.added, skipped: r.skipped },

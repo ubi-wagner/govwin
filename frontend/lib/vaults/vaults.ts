@@ -11,6 +11,8 @@
  * Anyone else: no access. A collaborator sees ONLY their vault, never the main library
  * or another nook.
  */
+import { randomUUID } from 'crypto';
+import bcrypt from 'bcryptjs';
 import { sql } from '@/lib/db';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -144,24 +146,46 @@ export async function getVaultOwnerContext(vaultId: string): Promise<{ ownerSlug
   return r ?? null;
 }
 
-/** Invite a partner email into a vault (upsert on the email; mirrors adding a proposal collaborator). */
+/**
+ * Invite a partner email into a vault (upsert on the email; mirrors adding a proposal
+ * collaborator). A nook collaborator resolves access by user_id OR email, but with no
+ * `users` row they have NO credential — the invite would be a dead end (sweep finding). So
+ * we ensure a login-capable account exists: an unknown email gets a `partner_user` with a
+ * temp password (the forced-change middleware gate covers first login) and no home tenant
+ * (so the dispatcher routes them straight to /vaults). Returns isNewUser + the tempPassword
+ * so the route can send the acceptance email (and the admin can relay it if email fails).
+ */
 export async function inviteVaultMember(
   vaultId: string,
   tenantId: string,
   actor: { id: string; email?: string | null },
   email: string,
-): Promise<VaultMember> {
+): Promise<VaultMember & { isNewUser: boolean; tempPassword: string | null }> {
   const clean = email.trim().toLowerCase();
+  // Ensure a login-capable account for the invited partner.
+  let isNewUser = false;
+  let tempPassword: string | null = null;
+  let [u] = await sql<Array<{ id: string }>>`SELECT id FROM users WHERE email = ${clean} LIMIT 1`;
+  if (!u) {
+    isNewUser = true;
+    tempPassword = randomUUID().slice(0, 12);
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    [u] = await sql<Array<{ id: string }>>`
+      INSERT INTO users (email, role, temp_password, password_hash)
+      VALUES (${clean}, 'partner_user', true, ${passwordHash})
+      ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+      RETURNING id`;
+  }
   const [m] = await sql<Array<VaultMember>>`
-    INSERT INTO vault_members (vault_id, tenant_id, email, invited_by)
-    VALUES (${vaultId}::uuid, ${tenantId}::uuid, ${clean}, ${actor.id}::uuid)
-    ON CONFLICT (vault_id, lower(email)) DO UPDATE SET status = 'invited', revoked_at = NULL
+    INSERT INTO vault_members (vault_id, tenant_id, email, user_id, invited_by)
+    VALUES (${vaultId}::uuid, ${tenantId}::uuid, ${clean}, ${u.id}::uuid, ${actor.id}::uuid)
+    ON CONFLICT (vault_id, lower(email)) DO UPDATE SET status = 'invited', revoked_at = NULL, user_id = EXCLUDED.user_id
     RETURNING id, email, user_id AS "userId", status, created_at AS "createdAt"`;
   await emitEventSingle({
     namespace: 'library', type: 'vault.member_invited', actor: userActor(actor.id, actor.email ?? undefined), tenantId,
-    payload: { vaultId, email: clean },
+    payload: { vaultId, email: clean, isNewUser },
   });
-  return m;
+  return { ...m, isNewUser, tempPassword };
 }
 
 /** List a vault's members (tenant side). */
@@ -172,13 +196,24 @@ export async function listVaultMembers(vaultId: string, tenantId: string): Promi
     ORDER BY created_at`;
 }
 
-/** Revoke a partner's access to a vault (tenant side). */
-export async function revokeVaultMember(vaultId: string, tenantId: string, memberId: string): Promise<boolean> {
-  const rows = await sql<Array<{ id: string }>>`
+/** Revoke a partner's access to a vault (tenant side). Audited (mirrors the invite emit). */
+export async function revokeVaultMember(
+  vaultId: string,
+  tenantId: string,
+  memberId: string,
+  actor?: { id: string; email?: string | null },
+): Promise<boolean> {
+  const rows = await sql<Array<{ id: string; email: string }>>`
     UPDATE vault_members SET status = 'revoked', revoked_at = now()
     WHERE id = ${memberId}::uuid AND vault_id = ${vaultId}::uuid AND tenant_id = ${tenantId}::uuid
-    RETURNING id`;
-  return rows.length > 0;
+    RETURNING id, email`;
+  if (rows.length === 0) return false;
+  await emitEventSingle({
+    namespace: 'library', type: 'vault.member_revoked',
+    actor: userActor(actor?.id ?? 'system', actor?.email ?? undefined), tenantId,
+    payload: { vaultId, memberId, email: rows[0].email },
+  });
+  return true;
 }
 
 // ── content ops (P8.5 collaborator / P8.6 tenant-admin) ──

@@ -12,6 +12,7 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
 import { redecomposeFoundation } from '@/lib/library/foundation';
+import { emitEventSingle, userActor } from '@/lib/events';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export async function PUT(request: Request, ctx: { params: Promise<{ tenantSlug: string; foundationId: string }> }) {
@@ -43,6 +44,14 @@ export async function PUT(request: Request, ctx: { params: Promise<{ tenantSlug:
 
     try {
       const d = await redecomposeFoundation(tenantId, foundationId, content as unknown as CanvasDocument, { id: su.id });
+      // Audit the redecompose (deletes+rebuilds the whole atom subtree) so library content
+      // history is visible to events/automation consumers — best-effort, never fails the save.
+      try {
+        await emitEventSingle({
+          namespace: 'library', type: 'foundation.saved', actor: userActor(su.id), tenantId,
+          payload: { foundationId: d.foundationId, sections: d.sectionIds.length, groups: d.groupIds.length, atoms: d.atomIds.length },
+        });
+      } catch (ev) { console.error('[library/foundation save] audit emit failed', ev); }
       return NextResponse.json({ data: { foundationId: d.foundationId, sections: d.sectionIds.length, groups: d.groupIds.length, atoms: d.atomIds.length } });
     } catch (e) {
       if (e instanceof Error && e.message === 'foundation not found') {

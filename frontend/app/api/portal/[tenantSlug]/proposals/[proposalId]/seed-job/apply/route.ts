@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { CANVAS_PRESETS } from '@/lib/types/canvas-document';
 import type { CanvasDocument, CanvasNode } from '@/lib/types/canvas-document';
 
@@ -222,6 +223,15 @@ export async function POST(req: Request, { params }: Params) {
           updated_at = now()
       WHERE id = ${seedJobId}::uuid
     `;
+
+    // Audit which prior proposal was cloned into this build — the reuse chain's sole
+    // state-transition was previously off-ledger. Best-effort; never fails the apply.
+    try {
+      await emitEventSingle({
+        namespace: 'proposal', type: 'section.seeded_from_prior', actor: userActor(sessionUser.id ?? 'system'), tenantId,
+        payload: { proposalId, seedJobId, sectionsSeeded, atomsReused, atomsRegenMarked },
+      });
+    } catch (ev) { console.error('[seed-job/apply] audit emit failed', ev); }
 
     return NextResponse.json({
       data: { applied: true, sectionsSeeded, atomsReused, atomsRegenMarked },
