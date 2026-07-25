@@ -450,20 +450,53 @@ sec(id="team", toc="12 · Team", heading="Team — members & collaborators",
         "<b>Proposal Collaborators</b> lists per-proposal partners and their accepted/pending status."),
     ])
 
-sec(id="settings", toc="13 · Automation, Settings & Billing", heading="Automation, Settings & Billing",
+sec(id="vaults", toc="13 · Collaboration vaults", heading="Collaboration vaults (“nooks”) — segregated partner libraries",
+    where="/portal/<company>/vaults",
+    lead="<p>A <b>nook</b> is a private, per-partner branch library — a segregated clearing house you and one external partner "
+         "(a subcontractor, a university, a teaming partner) both reach. The partner sees <b>only</b> their nook, never your "
+         "main library or another partner’s nook; your main library and your AI agents never see nook content until you "
+         "deliberately harvest it. It’s the safe way to exchange content across company lines.</p>",
+    img=TS+"vaults-tenant-detail.png",
+    caption="A nook, owner side — invite the partner, copy content in, download at any grain, and Harvest an artifact into "
+            "your proposal library.",
+    steps=[
+      S("Open <b>Vaults</b> in the sidebar (admins) and <b>＋ New nook</b> — name the partner and (optionally) their "
+        "organization. One nook per partner relationship.",
+        TS+"vaults-tenant-index.png","The nooks index — one card per partner, with New nook.","half"),
+      S("<b>Invite</b> the partner by email under <b>Partner access</b>. They receive access to <i>only</i> this nook and land "
+        "on their own <code>/vaults</code> surface — never inside your portal."),
+      S("<b>Copy content in</b> (Add artifact) for the partner to use, and <b>download</b> anything in the nook at any grain. "
+        "What you add is a COPY — nothing is linked from your main library."),
+      S("When the partner uploads, you get a notification and a <b>review ToDo</b>. <b>Harvest → library</b> pulls a whole "
+        "artifact into your proposal library (with lineage) so you can use it in a build; until you do, it stays walled off "
+        "in the nook."),
+    ],
+    table={"title":"Nook rights — the two sides","headers":["Capability","You (owner)","Partner"],"rows":[
+      ["Invite / remove members · close the nook","✅","—"],
+      ["Copy-in upload &amp; atomize","✅","✅"],
+      ["Download a whole artifact","✅","✅"],
+      ["Download an individual section / atom","✅","—"],
+      ["Harvest a nook artifact into the proposal library","✅","—"]]},
+    callouts=[{"kind":"note","html":"Isolation is enforced end-to-end: nook content carries a <code>vault_id</code> that fences "
+      "it out of every main-library reader <i>and</i> every agent, so a partner’s draft can never leak into your library or an "
+      "AI draft until you harvest it."},
+      {"kind":"tip","html":"Sharing is instruction-based for launch: add only what you’re comfortable with the partner using, "
+      "and harvest only what you want in your build. Partial-share and signed exchanges are a later addition."}])
+
+sec(id="settings", toc="14 · Automation, Settings & Billing", heading="Automation, Settings & Billing",
     where="/automation · /profile · /billing · /portals · /agents",
     lead="<p>Your account and preferences.</p>",
     subs=[
-      {"id":"automation","heading":"Automation preferences","toc":"13.1 · Automation",
+      {"id":"automation","heading":"Automation preferences","toc":"14.1 · Automation",
        "figures":[F(TS+"automation.png","Automation preferences — toggle what runs automatically.","half")],
        "body":"<p><b>Automation</b> (admins) toggles notifications (document ready · collaborator get-ready · stage advanced · "
          "new priority opportunity), AI (review on advance), and flow (auto-advance when all locked). <b>Save</b> to apply.</p>"},
-      {"id":"profile","heading":"Company profile","toc":"13.2 · Settings",
+      {"id":"profile","heading":"Company profile","toc":"14.2 · Settings",
        "figures":[F(TS+"profile.png","Settings — your company profile feeds AI drafting.","half")],
        "body":"<p><b>Settings</b> shows your account + subscription and the editable <b>Company Profile</b> (legal name, "
          "website, summary, technology focus, NAICS, set-asides, target agencies, keywords). These fields feed proposal "
          "templates and AI drafting, so keep them current.</p>"},
-      {"id":"billing","heading":"Billing & Builds & AI Usage","toc":"13.3 · Billing · Builds · AI",
+      {"id":"billing","heading":"Billing & Builds & AI Usage","toc":"14.3 · Billing · Builds · AI",
        "figures":[F(TS+"billing.png","Billing — subscription, consulting, purchase history.","half"),
                   F(TS+"portals.png","Builds — your purchased proposal portals.","half")],
        "body":"<p><b>Billing</b> manages your Spotlight subscription, expert-consulting hours, and purchase history. "
@@ -472,8 +505,8 @@ sec(id="settings", toc="13 · Automation, Settings & Billing", heading="Automati
          "(<code>/agents</code>) shows your agent calls, allocation used, per-agent breakdown, and recent activity.</p>"},
     ])
 
-# ── 14. Export ────────────────────────────────────────────────────────────────
-sec(id="export", toc="14 · Export & deliver", heading="Export — your submission-ready files",
+# ── 15. Export ────────────────────────────────────────────────────────────────
+sec(id="export", toc="15 · Export & deliver", heading="Export — your submission-ready files",
     where="Download Proposal (.docx) · Cost Volume (.xlsx)",
     lead="<p>With a volume locked, download your deliverables. The Technical Volume exports to a submission-ready "
          "<b>.docx</b> (US-Letter, 1″ margins, the agency’s fonts, figures inline &amp; captioned); the Cost Volume to an "

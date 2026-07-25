@@ -123,8 +123,39 @@ sec(id="files", toc="7 · Files & content", heading="Files — dropbox & add con
     callouts=[{"kind":"note","html":"Uploads are blocked once the proposal is locked (you’ll get a clear message). Before the "
       "first lock, section export is also unavailable (<i>“Downloads available after final review and lock”</i>)."}])
 
-# ── 8. Scope boundaries ───────────────────────────────────────────────────────
-sec(id="scope", toc="8 · What you can’t see", heading="Scope boundaries — what’s out of reach",
+# ── 8. Collaboration vaults (nooks) ───────────────────────────────────────────
+sec(id="vaults", toc="8 · Collaboration vaults", heading="Collaboration vaults (“nooks”) — your shared workspace",
+    where="/vaults",
+    lead="<p>A <b>nook</b> is a private, segregated workspace between you and a customer — a place to hand content back and "
+         "forth without either side seeing the other’s wider library. It is separate from proposal collaboration: if a customer "
+         "invites you into a nook, you reach it at <b>/vaults</b> (the platform routes you there automatically at sign-in when "
+         "you have no proposal assignment). You see <b>only</b> the nook(s) you were invited to — never the customer’s main "
+         "library, and never another partner’s nook.</p>",
+    img="docs/manuals/img/shots/tenant/vaults-collab-detail.png",
+    caption="Your nook — a dedicated Collaboration surface (no customer nav, no other partners). Download whole artifacts, "
+            "add your own; the whole-only note sits at the foot of the list.",
+    steps=[
+      S("Sign in. If your only access is a nook, you land on <b>/vaults</b> — a simple list of the customer(s) you collaborate "
+        "with. Click <b>Open nook →</b> to enter.",
+        "docs/manuals/img/shots/tenant/vaults-collab-index.png","Your /vaults list — only the customer(s) you collaborate with.","half"),
+      S("<b>Add an artifact</b> — name it, pick its form (Document · Deck · Sheet · PDF), and add it. Your upload is atomized "
+        "into the nook (it is <i>invisible</i> to the customer’s main library until they choose to harvest it)."),
+      S("<b>Download</b> a whole artifact in any format (.docx · .pptx · .xlsx · .pdf). You can download <b>whole</b> artifacts "
+        "only — pulling out individual sections is a customer-side action."),
+    ],
+    table={"title":"What you can do in a nook","headers":["Action","Collaborator (you)","Customer (owner)"],"rows":[
+      ["Upload &amp; atomize an artifact","✅","✅"],
+      ["Download a <b>whole</b> artifact","✅","✅"],
+      ["Download an individual <b>section / atom</b>","—","✅"],
+      ["Harvest content into the proposal library","—","✅"],
+      ["Invite / remove members, close the nook","—","✅"]]},
+    callouts=[{"kind":"note","html":"When you add content, the customer is notified and a review task is raised on their side — "
+      "they decide what (if anything) to pull into their proposal. Only add content you’re comfortable with the customer using."},
+      {"kind":"tip","html":"A nook is deliberately quiet: no main-library clutter, no other partners. Everything you add stays "
+      "scoped to that one customer relationship."}])
+
+# ── 9. Scope boundaries ───────────────────────────────────────────────────────
+sec(id="scope", toc="9 · What you can’t see", heading="Scope boundaries — what’s out of reach",
     where="redirects / access checks",
     lead="<p>By design, a collaborator can’t see the company’s book of business. This keeps their pipeline, library, and "
          "billing private while still letting you do the work you were brought in for.</p>",
@@ -137,8 +168,8 @@ sec(id="scope", toc="8 · What you can’t see", heading="Scope boundaries — w
       "<b>revoke</b> it. If your access ends, your collaborator membership at that company is cleanly removed — without "
       "touching any other company you collaborate with. Re-inviting a revoked email restores the same record with fresh grants."}])
 
-# ── 9. Lifecycle ──────────────────────────────────────────────────────────────
-sec(id="lifecycle", toc="9 · Your lifecycle & states", heading="Your lifecycle & states",
+# ── 10. Lifecycle ─────────────────────────────────────────────────────────────
+sec(id="lifecycle", toc="10 · Your lifecycle & states", heading="Your lifecycle & states",
     where="invite → accept → contribute → (revoke)",
     lead="<p>A quick reference for where you stand at any moment.</p>",
     table={"title":"Collaborator states","headers":["State","What you see"],"rows":[

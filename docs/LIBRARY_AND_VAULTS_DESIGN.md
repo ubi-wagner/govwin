@@ -312,3 +312,49 @@ Library-first, vault-second — the foundation model makes the future partial-sh
 4. **Nooks**: segregated branch + rights matrix (#239) + access grant (#240) +
    collaborator-content HITL (#241); instruction-based sharing for launch (#242).
 5. Per-role ToDos wired into the automation/ToDo system (#237).
+
+---
+
+## 9. As-built — the two-sided nook UI (P8.9 · P8.7 · P8.8)
+
+The isolation contract, rights matrix, and content ops (§5–7) are now fronted by a
+**two-sided surface**, both gated exclusively by `resolveVaultAccess` (never
+`verifyTenantAccess`), so the API can never offer an action the server would refuse.
+
+**Tenant side** (in the portal, `tenant_admin`):
+- `/portal/[slug]/vaults` — the nooks index (`NooksIndex`): list + create-a-nook modal.
+- `/portal/[slug]/vaults/[vaultId]` — the nook detail (`NookDetail`, `side='tenant'`,
+  `TENANT_RIGHTS`): invite/revoke members, add artifact, any-grain download, **Harvest →
+  library**.
+- A **Vaults** nav link sits beside Library (tenant_admin-gated).
+
+**Collaborator side** (dedicated top-level surface — a vault-only partner holds NO tenant
+membership, so the portal layout would bounce them):
+- `app/vaults/layout.tsx` — a thin auth-only shell (brand + sign out), no tenant nav.
+- `/vaults` — `listVaultsForCollaborator` (their own nook(s) only, joined to the owner org
+  name/slug). No create action — a collaborator only ever joins.
+- `/vaults/[vaultId]` — the **same** `NookDetail` with `COLLAB_RIGHTS` (upload · atomize ·
+  download-WHOLE-only), addressing the shared tenant-namespaced vault API via the owner slug
+  (`getVaultOwnerContext`). The members panel and Harvest control are absent (no rights);
+  the whole-only note rides at the foot of the list.
+- The **portal dispatcher** routes a vault-only collaborator to `/vaults` at sign-in
+  instead of the dead-end "no workspace" message (the redirect stays outside the try so its
+  `NEXT_REDIRECT` is never swallowed).
+
+**P8.7 collaborator-content HITL** (`notifyCollaboratorUpload`) — a COLLABORATOR upload emits
+`library:vault.artifact_uploaded` for every upload and raises **one** standing `tenant_admin`
+`vault_artifact_review` ToDo per nook (idempotent — a pre-check skips a second open ToDo; a
+tenant-admin copy-in is self-initiated, so no ToDo). Best-effort: a notification failure
+never fails the upload (the content is already safely vault-scoped).
+
+**P8.8 instruction-based sharing** — the share-by-instruction copy rides on each upload
+control per side (tenant: "copying a COPY … only add content you're comfortable with the
+partner using"; collaborator: "only upload content you're comfortable with the customer
+using"). Partial-share + signed exchanges remain deferred (§7).
+
+**Verified:** `tsc` 0 · `vitest` 829 · `next build` (all four routes) ·
+`drive-vault-collab-surface` 5/5 (email-match list + owner ctx · null-email isolation guard ·
+collaborator side+rights · HITL 1-ToDo+2-events idempotent) · no regression in
+`drive-vault-{isolation 7/7, content 5/5, leak 0-leak}` · both sides captured in-browser
+(`scripts/capture-vaults.mjs`; seed `scripts/seed-vault-demo.mts`) into the Customer-Admin
+(§13) and Collaborator (§8) manuals.
