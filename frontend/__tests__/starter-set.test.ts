@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GENERIC_STARTERS, STARTER_SET } from '@/lib/library/starter-set';
+import { GENERIC_STARTERS, PROPOSAL_STARTERS, STARTER_SET } from '@/lib/library/starter-set';
 import { ARTIFACT_FORMAT } from '@/lib/library/artifact-canvas';
 import { renderCanvas } from '@/lib/export/artifact-export';
 
@@ -37,5 +37,37 @@ describe('starter set (P4.1 generics)', () => {
     }
     // the generics cover the three exportable office forms
     expect(new Set(GENERIC_STARTERS.map((s) => s.form))).toEqual(new Set(['doc', 'ppt', 'sheet']));
+  });
+});
+
+describe('starter set (P4.2 proposal vehicles)', () => {
+  const VEHICLES = ['dow-cso', 'sbir-phase-1', 'sbir-phase-2', 'sttr-phase-1', 'sttr-phase-2', 'direct-to-phase-2'];
+  const titles = (d: ReturnType<typeof PROPOSAL_STARTERS[number]['build']>) => (d.sections ?? []).map((s) => s.title);
+
+  it('every DoD/DoW vehicle has a Technical-Volume doc + a Cost-Volume sheet, plus a shared comm deck', () => {
+    for (const v of VEHICLES) {
+      const forVeh = PROPOSAL_STARTERS.filter((s) => s.vehicle === v);
+      expect(forVeh.some((s) => s.form === 'doc'), `${v} TV doc`).toBe(true);
+      expect(forVeh.some((s) => s.form === 'sheet'), `${v} cost sheet`).toBe(true);
+    }
+    expect(PROPOSAL_STARTERS.some((s) => s.form === 'ppt' && s.context === 'commercialization')).toBe(true);
+  });
+
+  it('STTR TVs include the research-institution partnership scaffold (a superset of SBIR)', () => {
+    const sbirP1 = PROPOSAL_STARTERS.find((s) => s.slug === 'sbir-p1-technical-volume')!.build();
+    const sttrP1 = PROPOSAL_STARTERS.find((s) => s.slug === 'sttr-p1-technical-volume')!.build();
+    expect(sttrP1.sections!.length).toBeGreaterThan(sbirP1.sections!.length);
+    expect(titles(sttrP1)).toContain('Research Institution & Partnership');
+    expect(titles(sttrP1)).toContain('Allocation of Work');
+    // DP2's distinctive feasibility-first section
+    const dp2 = PROPOSAL_STARTERS.find((s) => s.slug === 'dp2-technical-volume')!.build();
+    expect(titles(dp2)[0]).toBe('Phase I Feasibility Documentation');
+  });
+
+  it('each proposal starter renders to its native format (valid zip)', async () => {
+    for (const s of PROPOSAL_STARTERS) {
+      const buf = await renderCanvas(ARTIFACT_FORMAT[s.form], s.build(), {});
+      expect(buf.slice(0, 2).toString('latin1'), s.slug).toBe('PK');
+    }
   });
 });

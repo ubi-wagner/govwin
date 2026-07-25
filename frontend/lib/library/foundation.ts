@@ -30,6 +30,8 @@ export interface FoundationMeta {
   kind?: 'template' | 'document';
   context?: string;
   collection?: string;
+  /** DoD/DoW solicitation vehicle (SBIR/STTR/CSO/DP2) — a filterable taxonomy dimension. */
+  vehicle?: string;
 }
 
 export interface DecomposedArtifact {
@@ -64,6 +66,7 @@ function foundationTags(meta: FoundationMeta): AtomTagInput[] {
     { dimension: 'form', value: meta.form, source: 'admin', confirmed: true },
     { dimension: 'format', value: ARTIFACT_FORMAT[meta.form], source: 'admin', confirmed: true },
     { dimension: 'context', value: meta.context ?? 'general', source: 'admin', confirmed: true },
+    ...(meta.vehicle ? [{ dimension: 'vehicle', value: meta.vehicle, source: 'admin' as const, confirmed: true }] : []),
   ];
 }
 
@@ -157,6 +160,7 @@ export async function redecomposeFoundation(
     kind: (dim('kind') as 'template' | 'document') ?? 'document',
     context: dim('context') ?? 'general',
     collection: dim('collection') ?? HOUSE_COLLECTION,
+    vehicle: dim('vehicle'),
   };
   const tags = () => foundationTags(meta);
   const A = { id: actor.id, kind: 'admin' as const };

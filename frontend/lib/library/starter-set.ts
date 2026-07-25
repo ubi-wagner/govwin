@@ -107,5 +107,102 @@ export const GENERIC_STARTERS: StarterDef[] = [
   },
 ];
 
-// STARTER_SET grows with the proposal-vehicle set (P4.2).
-export const STARTER_SET: StarterDef[] = [...GENERIC_STARTERS];
+// ── PROPOSAL vehicle set (P4.2) — DoD/DoW: DoW CSO · SBIR I/II · STTR I/II · DP2 ──
+// Each vehicle = a Technical-Volume doc + a Cost-Volume sheet; a shared
+// commercialization deck is reused across them. TVs carry a `vehicle` tag.
+
+const S = (title: string, body: string): Section => ({ title, body });
+
+const SBIR_P1_TV: Section[] = [
+  S('Identification & Significance of the Problem', 'The mission gap / opportunity and why it matters to the customer. Quantify the impact.'),
+  S('Phase I Technical Objectives', 'The specific, measurable objectives that establish feasibility in Phase I.'),
+  S('Phase I Work Plan', 'Tasks, methods, milestones, and schedule to meet the objectives.'),
+  S('Related Work', 'Your prior/ongoing work and the state of the art that grounds the approach.'),
+  S('Relationship with Future R&D', 'How Phase I sets up Phase II — the anticipated Phase II vision and end state.'),
+  S('Commercialization Strategy', 'Target customers, transition path, and the dual-use / commercial potential.'),
+  S('Key Personnel', 'PI and key staff, roles, level of effort, and relevant qualifications.'),
+  S('Facilities & Equipment', 'The facilities, equipment, and resources available to perform the work.'),
+  S('Subcontractors & Consultants', 'Any subs/consultants, their roles, and allocation of effort.'),
+  S('Prior, Current, or Pending Support', 'Related funding to avoid duplication and show non-overlap.'),
+];
+
+const SBIR_P2_TV: Section[] = [
+  S('Identification & Significance of the Problem', 'The mission gap / opportunity, refined with Phase I insight.'),
+  S('Phase I Results & Feasibility', 'What Phase I proved — the data and results that establish feasibility.'),
+  S('Phase II Technical Objectives', 'The full-scale R&D objectives that build on Phase I.'),
+  S('Phase II Work Plan / Statement of Work', 'Detailed tasks, methods, milestones, deliverables, and schedule.'),
+  S('Commercialization Plan', 'Expanded market analysis, transition/customer commitments, and the business model.'),
+  S('Key Personnel', 'PI and key staff, roles, level of effort, and qualifications.'),
+  S('Facilities & Equipment', 'Facilities, equipment, and resources for the full effort.'),
+  S('Related Work', 'Prior/ongoing work and the state of the art.'),
+  S('Subcontractors & Consultants', 'Subs/consultants, roles, and allocation of effort.'),
+];
+
+const STTR_RI: Section[] = [
+  S('Research Institution & Partnership', 'The partnering research institution, its role, and the collaboration structure.'),
+  S('Allocation of Work', 'Work split meeting STTR minimums (≥40% small business, ≥30% research institution).'),
+  S('Intellectual Property & Data Rights', 'IP ownership + data-rights allocation between the small business and the RI.'),
+];
+
+const DP2_TV: Section[] = [
+  S('Phase I Feasibility Documentation', 'Evidence you have ALREADY achieved Phase I-equivalent feasibility (the DP2 gate) — prior data/results.'),
+  S('Phase II Technical Objectives', 'The full-scale R&D objectives.'),
+  S('Phase II Work Plan / Statement of Work', 'Detailed tasks, methods, milestones, deliverables, and schedule.'),
+  S('Commercialization Plan', 'Market analysis, transition/customer commitments, and business model.'),
+  S('Key Personnel', 'PI and key staff, roles, level of effort, and qualifications.'),
+  S('Facilities & Equipment', 'Facilities, equipment, and resources for the effort.'),
+];
+
+const CSO_BRIEF: Section[] = [
+  S('Problem / Mission Need', 'The government problem or need, in the customer’s language.'),
+  S('Solution & Innovation', 'Your commercial solution and what makes it innovative.'),
+  S('Technical Approach', 'How the solution works and how you would deliver / demonstrate it.'),
+  S('Company & Team', 'Who you are, relevant experience, and why you can execute.'),
+  S('Rough Order of Magnitude Pricing', 'Indicative pricing / cost basis for the effort.'),
+  S('Commercialization & Transition', 'Dual-use potential and the path to fielding / transition.'),
+];
+
+const COST_ELEMENTS = ['Direct Labor', 'Fringe Benefits', 'Materials & Supplies', 'Travel', 'Equipment', 'Subcontracts', 'Consultants', 'Other Direct Costs', 'Indirect (Overhead)', 'Indirect (G&A)', 'Fee / Profit', 'Total'];
+const costSheet = (title: string, withOption: boolean): CanvasDocument => {
+  const headers = withOption ? ['Cost Element', 'Base Period', 'Option Period', 'Total'] : ['Cost Element', 'Base Period', 'Total'];
+  const rows = COST_ELEMENTS.map((c) => (withOption ? [c, '', '', ''] : [c, '', '']));
+  return sheet(title, headers, rows);
+};
+
+const tvDoc = (title: string, sections: Section[]) => () => doc(title, sections);
+
+export const PROPOSAL_STARTERS: StarterDef[] = [
+  // DoW CSO — Commercial Solutions Opening (solution brief → full proposal + pricing)
+  { slug: 'dow-cso-solution-brief', title: 'DoW CSO — Solution Brief', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'dow-cso', build: tvDoc('DoW CSO — Solution Brief', CSO_BRIEF) },
+  { slug: 'dow-cso-pricing', title: 'DoW CSO — Pricing', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'dow-cso', build: () => costSheet('DoW CSO — Pricing', false) },
+  // SBIR Phase I / II
+  { slug: 'sbir-p1-technical-volume', title: 'SBIR Phase I — Technical Volume', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'sbir-phase-1', build: tvDoc('SBIR Phase I — Technical Volume', SBIR_P1_TV) },
+  { slug: 'sbir-p1-cost-volume', title: 'SBIR Phase I — Cost Volume', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'sbir-phase-1', build: () => costSheet('SBIR Phase I — Cost Volume', false) },
+  { slug: 'sbir-p2-technical-volume', title: 'SBIR Phase II — Technical Volume', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'sbir-phase-2', build: tvDoc('SBIR Phase II — Technical Volume', SBIR_P2_TV) },
+  { slug: 'sbir-p2-cost-volume', title: 'SBIR Phase II — Cost Volume', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'sbir-phase-2', build: () => costSheet('SBIR Phase II — Cost Volume', true) },
+  // STTR Phase I / II (SBIR scaffold + research-institution partnership)
+  { slug: 'sttr-p1-technical-volume', title: 'STTR Phase I — Technical Volume', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'sttr-phase-1', build: tvDoc('STTR Phase I — Technical Volume', [...SBIR_P1_TV, ...STTR_RI]) },
+  { slug: 'sttr-p1-cost-volume', title: 'STTR Phase I — Cost Volume', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'sttr-phase-1', build: () => costSheet('STTR Phase I — Cost Volume', false) },
+  { slug: 'sttr-p2-technical-volume', title: 'STTR Phase II — Technical Volume', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'sttr-phase-2', build: tvDoc('STTR Phase II — Technical Volume', [...SBIR_P2_TV, ...STTR_RI]) },
+  { slug: 'sttr-p2-cost-volume', title: 'STTR Phase II — Cost Volume', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'sttr-phase-2', build: () => costSheet('STTR Phase II — Cost Volume', true) },
+  // Direct to Phase II
+  { slug: 'dp2-technical-volume', title: 'Direct-to-Phase-II — Technical Volume', form: 'doc', kind: 'template', context: 'proposal', vehicle: 'direct-to-phase-2', build: tvDoc('Direct-to-Phase-II — Technical Volume', DP2_TV) },
+  { slug: 'dp2-cost-volume', title: 'Direct-to-Phase-II — Cost Volume', form: 'sheet', kind: 'template', context: 'proposal', vehicle: 'direct-to-phase-2', build: () => costSheet('Direct-to-Phase-II — Cost Volume', true) },
+  // Shared commercialization deck (reused across vehicles)
+  {
+    slug: 'commercialization-deck', title: 'Commercialization Deck', form: 'ppt', kind: 'template', context: 'commercialization',
+    build: () => deckToCanvasDoc('Commercialization Deck', [
+      { title: 'Commercialization Strategy', bullets: ['The transition thesis in one line'] },
+      { title: 'Market Opportunity', bullets: ['TAM / SAM / SOM', 'Defense + commercial demand'] },
+      { title: 'Customer & Transition Path', bullets: ['Program of record', 'Transition partners', 'Acquisition pathway'] },
+      { title: 'Business Model', bullets: ['How you make money', 'Pricing', 'Scaling'] },
+      { title: 'Competitive Landscape', bullets: ['Alternatives', 'Your moat'] },
+      { title: 'IP & Data Rights', bullets: ['Owned IP', 'Government data rights posture'] },
+      { title: 'Funding & Milestones', bullets: ['Non-dilutive + dilutive', 'Key milestones'] },
+      { title: 'Team & Partners', bullets: ['Key personnel', 'Research + industry partners'] },
+    ]),
+  },
+];
+
+/** The full dogfooded starter set: generics + the DoD/DoW proposal-vehicle set. */
+export const STARTER_SET: StarterDef[] = [...GENERIC_STARTERS, ...PROPOSAL_STARTERS];
