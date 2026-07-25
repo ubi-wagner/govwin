@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { TeamInviteForm } from '@/components/portal/team-invite-form';
@@ -40,6 +40,7 @@ export default async function TeamPage({ params }: Props) {
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId); // RLS choke point
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     redirect(`/portal/${tenantSlug}/proposals`);

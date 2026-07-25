@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { getAmountCents, type ProductType } from '@/lib/stripe';
-import { sql } from '@/lib/db';
+// Signature-verified Stripe webhook (no user session) — a privileged system write on behalf of
+// the paying tenant (purchases + tenants). Runs pre-context, so it uses the owner (BYPASSRLS)
+// pool; the Stripe signature check is the authorization. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';

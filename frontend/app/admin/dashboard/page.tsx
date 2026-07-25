@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+// Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import Link from 'next/link';
 import { TaskQueue } from '@/components/tasks/task-queue';
 import { StatCard, type StatPreview } from '@/components/admin/stat-card';

@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { resolveCanvasCapabilities, type CanvasPermission, type CanvasArtifactType } from '@/lib/canvas/capabilities';
@@ -38,6 +38,7 @@ export default async function PortalSectionEditorPage({ params }: Props) {
   // Proposal-scoped gate: tenant member OR accepted collaborator on THIS proposal.
   const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   const userId = sessionUser.id;
   const userName = sessionUser.name ?? sessionUser.email ?? 'Unknown';

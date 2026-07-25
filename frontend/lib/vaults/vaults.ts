@@ -130,7 +130,11 @@ export interface CollaboratorVaultView { id: string; ownerName: string; ownerSlu
 /** List the nooks a collaborator can reach (their own vault(s) only — the segregation). */
 export async function listVaultsForCollaborator(userId: string, email: string | null): Promise<CollaboratorVaultView[]> {
   const emailMatch = email && email.trim() ? email.trim() : null;
-  return sql<Array<CollaboratorVaultView>>`
+  // CROSS-TENANT by design: a collaborator's vaults span the different owner tenants they partner
+  // with, and this runs from the no-slug /portal dispatcher with NO single tenant to pin. Gated by
+  // the user_id/email membership match (like resolveVaultAccess) → reads via the owner sqlBypass
+  // pool so it doesn't DENY-ALL under govtech_app. (docs/RLS_CUTOVER.md — cross-tenant collab view.)
+  return sqlBypass<Array<CollaboratorVaultView>>`
     SELECT v.id, t.name AS "ownerName", t.slug AS "ownerSlug", v.created_at AS "createdAt"
     FROM collaboration_vaults v
     JOIN vault_members m ON m.vault_id = v.id AND m.status <> 'revoked'

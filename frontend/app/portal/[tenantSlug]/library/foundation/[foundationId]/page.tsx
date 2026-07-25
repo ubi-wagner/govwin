@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import { resolveDocumentCapabilities, type CanvasArtifactType } from '@/lib/canvas/capabilities';
@@ -32,6 +32,7 @@ export default async function FoundationEditorPage({ params }: { params: Promise
   const tenantId = tenant.id as string;
   if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
   if (!(await verifyTenantAccess(su.id, role, tenantId))) redirect('/portal');
+  enterTenant(tenantId); // RLS choke point
 
   // NB: the db client camelCases result columns (transform.toCamel), so
   // `canvas_nodes` arrives as `canvasNodes`.

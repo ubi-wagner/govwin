@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { ProfileEditor } from '@/components/portal/profile-editor';
 
@@ -32,6 +32,7 @@ export default async function ProfilePage({ params }: Props) {
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   // Company settings (profile, billing email) are tenant-staff only. A
   // partner_user is an external collaborator and must not see tenant

@@ -8,7 +8,8 @@
  */
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AdminProcessesClient, type AdminProcessRow } from './admin-processes-client';
 

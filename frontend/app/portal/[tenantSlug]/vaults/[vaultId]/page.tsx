@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { auth } from '@/auth';
-import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveVaultAccess, getVault } from '@/lib/vaults/vaults';
 import { NookDetail } from '@/components/portal/vaults/nook-detail';
@@ -20,6 +20,7 @@ export default async function NookPage({ params }: { params: Promise<{ tenantSlu
   if (!tenant) redirect('/portal');
   const tenantId = tenant.id as string;
   if (!(await verifyTenantAccess(su.id, role, tenantId))) redirect('/portal');
+  enterTenant(tenantId); // RLS choke point
   if (!hasRoleAtLeast(role, 'tenant_admin')) redirect(`/portal/${tenantSlug}/proposals`);
 
   const access = await resolveVaultAccess(vaultId, { userId: su.id, email: su.email ?? null, role });

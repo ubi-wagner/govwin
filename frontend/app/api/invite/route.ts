@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+// Public, token-gated collaborator-invite flow (the token IS the credential, no session yet) —
+// an entity-first lookup that reads `proposals`/`tenants` before any tenant context is pinnable,
+// so it uses the owner (BYPASSRLS) pool like auth. The token gates access. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, systemActor } from '@/lib/events';

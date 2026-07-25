@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { describeEvent } from '@/lib/event-labels';
 import { Cockpit } from '@/components/portal/cockpit';
@@ -43,6 +43,7 @@ export default async function DashboardPage({
   if (!hasAccess) {
     redirect('/portal');
   }
+  enterTenant(tenantId);
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     redirect(`/portal/${tenantSlug}/proposals`);
   }
