@@ -251,6 +251,27 @@ to the main library even for an admin viewer · listed to both sides · whole-on
 ingest→main library). **Remaining (not built):** the two-sided nook UI (P8.9), the
 collaborator-content HITL ToDo (P8.7), and the instruction-based-sharing copy (P8.8).
 
+### 5.7 As-built (pre-alpha adversarial sweep, shipped) — the isolation contract, hardened
+A five-lens adversarial sweep (vault-security · API/auth · DB/SQL · agents/automation · UI)
+proved the **collaborator-confinement half solid** (cross-vault, grain-extraction,
+ingest/manage, cross-tenant admin, foreign-id ingest all blocked) and found the real gap in
+the **tenant→vault direction**: the `vault_id IS NULL` fence had reached only 2 of ~20
+`library_atoms` readers, so partner content leaked into the main library, live AI drafting,
+and — highest impact — **every agent's prompt** via the pipeline `ContextAssembler`. The fix
+fenced **every** main-library reader (frontend `selectForSection`/`listAtoms`/`library.search_atoms`/
+download/redecompose/starter-match/copy-present-check/uploads/bulk/dashboard; pipeline
+`_load_library_atoms`, `_library_search`/`_library_get_unit`, the two multi-hop tool leaf-joins,
+and every archetype content/count reader) so **vault content is invisible to the main library
+AND the agents**. `createVaultArtifact` now decomposes **born vault-scoped** (`createAtom`
+gained `vault_id`; `decomposeAndIngest` threads it) — atomic, no window, nothing stranded on
+a mid-op failure. The message-side injection fences now neutralize forged END markers (mirrors
+`ContextAssembler._wrap`). Proven by a new adversarial **vault-leak drive**: seed a vault atom →
+**0 leaks** across every reader under the admin + owner viewer branches that originally defeated
+the visibility predicate, grains born vault-scoped 19/19. Robustness: vault-upload 2 MB cap,
+UUID/NaN/email-length guards, and a partial unique index (mig 135) backstopping the starter-offer
+TOCTOU. Full backbone green: tsc 0 · vitest 729→**829** · pipeline **209** · `next build` · all vault
++ starter + P6 drives.
+
 ---
 
 ## 6. Per-role ToDos (consolidated)
