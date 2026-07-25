@@ -389,6 +389,8 @@ export interface NodeStyle extends Partial<FontSpec> {
   opacity?: number;    // whole-node transparency 0..1 (shapes + images)
   shadow?: boolean;
   rotation?: number;   // degrees
+  reuse_marker?: boolean; // imported from a prior proposal — rendered red italic
+  background?: string;    // hex highlight (section-ribbon alias for `highlight`)
 }
 
 // ─── Canvas Node (the atom) ─────────────────────────────────────────

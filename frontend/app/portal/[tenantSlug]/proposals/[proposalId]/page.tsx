@@ -314,6 +314,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       label?: string;
       met?: boolean;
       value?: string;
+      sectionId?: string | null;
     }>;
     source?: string;
   } | null = null;
@@ -338,6 +339,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
           label: row.requirementText,
           status: row.status,
           details: row.notes,
+          sectionId: row.sectionId,
         })),
         source: 'database',
       };
