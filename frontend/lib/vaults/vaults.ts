@@ -14,6 +14,8 @@
 import { sql } from '@/lib/db';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
+import { decomposeAndIngest, copyFoundationToTenant, type FoundationMeta } from '@/lib/library/foundation';
+import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export type VaultSide = 'tenant' | 'collaborator';
 
@@ -142,4 +144,67 @@ export async function revokeVaultMember(vaultId: string, tenantId: string, membe
     WHERE id = ${memberId}::uuid AND vault_id = ${vaultId}::uuid AND tenant_id = ${tenantId}::uuid
     RETURNING id`;
   return rows.length > 0;
+}
+
+// ── content ops (P8.5 collaborator / P8.6 tenant-admin) ──
+
+export interface VaultArtifact { id: string; title: string | null; grain: string; createdAt: string }
+
+/**
+ * Add an artifact to a vault (upload + atomize): decompose it into vault-scoped grains
+ * (visibility='vault' + vault_id), reusing the proven decomposition. Both sides may upload;
+ * an atom created here is invisible to the main library + the agents (vault_id filter).
+ */
+export async function createVaultArtifact(
+  vaultId: string,
+  ownerTenantId: string,
+  doc: CanvasDocument,
+  meta: FoundationMeta,
+  actor: { id: string },
+): Promise<{ foundationId: string }> {
+  const d = await decomposeAndIngest(ownerTenantId, doc, { ...meta, collection: 'vault' }, actor);
+  const all = [d.foundationId, ...d.sectionIds, ...d.groupIds, ...d.atomIds];
+  await sql`
+    UPDATE library_atoms SET vault_id = ${vaultId}::uuid, visibility = 'vault'
+    WHERE id = ANY(${all}::uuid[]) AND tenant_id = ${ownerTenantId}::uuid`;
+  return { foundationId: d.foundationId };
+}
+
+/** List a vault's whole artifacts (foundations) — both sides see these. */
+export async function listVaultArtifacts(vaultId: string): Promise<VaultArtifact[]> {
+  return sql<Array<VaultArtifact>>`
+    SELECT id, title, grain, created_at AS "createdAt"
+    FROM library_atoms WHERE vault_id = ${vaultId}::uuid AND grain = 'foundation'
+    ORDER BY created_at DESC`;
+}
+
+/** Read a vault atom for download (returns its grain so the route can gate whole-vs-grain). */
+export async function getVaultAtom(vaultId: string, atomId: string): Promise<{ grain: string; title: string | null } | null> {
+  const [a] = await sql<Array<{ grain: string; title: string | null }>>`
+    SELECT grain, title FROM library_atoms WHERE id = ${atomId}::uuid AND vault_id = ${vaultId}::uuid LIMIT 1`;
+  return a ?? null;
+}
+
+/** The whole-only download gate: a collaborator may download only a whole foundation. */
+export function canDownloadGrain(access: VaultAccess, grain: string): boolean {
+  return access.rights.downloadGrain || grain === 'foundation';
+}
+
+/**
+ * Ingest a vault foundation into the tenant's MAIN library (tenant-side ingest right).
+ * The whole grain tree is copied with derived_from lineage; copies land vault_id NULL +
+ * visibility='tenant', so they join the main library and the customer harvests from there.
+ */
+export async function ingestVaultFoundation(
+  vaultId: string,
+  sourceFoundationId: string,
+  targetTenantId: string,
+  actor: { id: string },
+): Promise<{ foundationId: string }> {
+  const [f] = await sql<Array<{ ok: number }>>`
+    SELECT 1 AS ok FROM library_atoms
+    WHERE id = ${sourceFoundationId}::uuid AND vault_id = ${vaultId}::uuid AND grain = 'foundation' LIMIT 1`;
+  if (!f) throw new Error('not a vault foundation');
+  const d = await copyFoundationToTenant(sourceFoundationId, targetTenantId, actor, { collection: 'my_library', visibility: 'tenant' });
+  return { foundationId: d.foundationId };
 }
