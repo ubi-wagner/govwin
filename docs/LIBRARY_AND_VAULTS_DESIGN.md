@@ -86,6 +86,21 @@ section/group/atom decomposition, the **agents** (Librarian, Onboarding Concierg
 have a reference skeleton to match uploads against — "this is a Technical Approach
 section; these are past-performance atoms" — on onboarding, bucket setup, and adds.
 
+**As-built (P4, shipped):** the starter set is authored as pure data in
+`lib/library/starter-set.ts` (`STARTER_SET`, each a taxonomy + a `build() →
+CanvasDocument`): 5 **generics** (capability-statement · one-pager · memo /doc,
+pitch-deck /ppt, budget-workbook /sheet) + 13 **DoD/DoW proposal** foundations —
+**DoW CSO** (solution brief + pricing), **SBIR Phase I/II**, **STTR Phase I/II**
+(SBIR scaffold + the RI-partnership / allocation-of-work / IP sections), and
+**Direct-to-Phase-II** (feasibility-first) — each a Technical-Volume /doc + a
+Cost-Volume /sheet, plus one shared Commercialization Deck /ppt. Every proposal
+foundation carries a `vehicle` tag (propagated to all grains, so the faceted
+library filters by vehicle). `scripts/seed-starter-set.mts` (→ `seedStarterSet`)
+idempotently seeds them into the house library under `system_starter`; re-running
+refreshes without duplicating. Proven: vitest 6/6 (build + native render + STTR⊃SBIR)
++ real-DB drives (generics 5/5, vehicles 13/13 with vehicle-tag propagation, seed
+idempotency 5/5).
+
 ---
 
 ## 5. Collaboration vaults ("nooks") — the segregated external bridge
