@@ -102,6 +102,14 @@ gate when they call an RLS'd-table helper. **Pipeline** keeps its own owner `DAT
 - `scripts/drive-rls-admin.mts` — admin routes return **cross-tenant** data via `sqlBypass`
   (the tenants list sees ≥2 tenants; a DENY-ALL would see 0/1).
 - `tsc` 0 · `vitest` 829 (test `@/lib/db` mocks gained `enterTenant`/`enterBypass` no-ops).
+- **Migration integrity (nuke + migrate from scratch):** `ALLOW_SCHEMA_RESET=true migrate.mjs` on an
+  empty database applies the WHOLE chain clean — **137 applied, 0 skipped, EXIT 0** (000_drop_all →
+  001…136, incl. the RLS cutover). The freshly-migrated DB comes up fully armed: **19 force-RLS
+  tables · 35 enabled + 35 `tenant_isolation` policies · 444 `govtech_app` grants · the `govtech_app`
+  role** — all migration-defined, no manual schema step at deploy (the only sandbox-only manual bit is
+  `ALTER ROLE govtech_app LOGIN PASSWORD …`, which prod sets via env, not schema). And **zero schema
+  drift**: the seeded working DB's table set is identical to a from-scratch migrate. So Railway's
+  deploy-time `migrate.mjs` produces exactly this RLS-armed schema.
 
 Inert until the flip (owner bypasses RLS today). **Prod flip is one op the operator runs:** point
 the frontend `DATABASE_URL` at `govtech_app` and set `DATABASE_URL_OWNER` to the owner string (for
