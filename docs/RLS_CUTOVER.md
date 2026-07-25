@@ -107,6 +107,28 @@ Inert until the flip (owner bypasses RLS today). **Prod flip is one op the opera
 the frontend `DATABASE_URL` at `govtech_app` and set `DATABASE_URL_OWNER` to the owner string (for
 `sqlBypass`). No code change at flip time.
 
+### Server components (page.tsx) + non-request entry points — WIRED, one open verification
+The API-route wiring doesn't cover code that also runs as govtech_app: Next **server components**
+(page.tsx query forced tables during the server render) and non-request routes. These were audited
+and wired (commit "close the server-component surface"): ~18 portal pages got `enterTenant`, 27 admin
+pages got `sqlBypass`, `/api/invite` + `/api/stripe/webhook` + `listVaultsForCollaborator` got
+`sqlBypass`. Audit confirmed NO frontend cron, NO `unstable_after`; analytics tables aren't RLS'd;
+other forced writers are request-reached or the Python pipeline (owner).
+
+**OPEN — verify before the flip (⚠ likely needs a fix):** a server-component page-drive
+(`scripts/drive-rls-pages.mjs`) suggested that portal *server components* which query forced tables
+**directly** may render EMPTY under govtech_app — because **`enterTenant` uses AsyncLocalStorage
+`enterWith`, which is not reliable inside a React Server Component render** (React can isolate the
+async context per component; this is a known Next gotcha). The API/client-component surface is fine
+(proven 38/38 + 13/13). If confirmed, the fix is: **portal server components use `withTenant(tenantId,
+tx => …)` instead of `enterTenant`** (withTenant is ALS-independent — an explicit `SET LOCAL`
+transaction — so it works in any render context). Admin server components already use `sqlBypass`
+(ALS-independent; API-proven 13/13). This must be re-driven in a STABLE build/serve environment
+(the sandbox tooling degraded during the wiring session, giving inconsistent results — e.g. the same
+API drive returned 38/38 on `next dev` but 36/38 on the standalone, so the page-drive's empties there
+are not trustworthy). **Everything is inert pre-flip (owner bypasses RLS → pages render fine today),
+so this is a pre-flip verification item, not a live regression.**
+
 ### Known deferred (documented, not blocking the flip)
 Background/workflow paths that write forced tables in their OWN `sql.begin` outside a request
 context are covered where reached from routes (advance/provision → withTenant). Any NEW forced-table
