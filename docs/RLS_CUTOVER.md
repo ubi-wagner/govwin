@@ -60,39 +60,55 @@ Read cross-tenant by design; app-layer already filters portal reads:
 
 ---
 
-## P4 — the transparent context layer (BUILT + PROVEN — the zero-per-route mechanism)
+## P4 — the context layer (BUILT + PROVEN — as-built, corrected)
 
-Rather than hand-wrap ~73 call sites, tenant context is set at choke points and read by a
-context-aware `sql` client:
-- `lib/tenant-context.ts` — a **globalThis-singleton** AsyncLocalStorage (survives module
-  duplication / Next dev reload). `enterTenant(id)` / `enterBypass()` / `runInTenant(id, fn)`.
-- `lib/db.ts` — `sql` is now a **Proxy** over the raw client: with an active tenant context it
-  runs each `sql\`\`` inside a `SET LOCAL app.tenant_id` transaction (RLS scopes it); with no
-  context or a bypass context it is an **exact passthrough**. `sqlBypass` is the owner pool for
-  cross-tenant reads.
+The original plan (set `enterTenant` inside `verifyTenantAccess`, zero per-route edits) **cannot
+work**, and the proofing proved it: AsyncLocalStorage context flows parent→child only, and Next
+wraps each route handler in its own `run()`, so a context set inside the awaited helper is reverted
+when control returns to the route. And the context-aware `sql` Proxy cannot transparently handle
+composed `sql\`\`` **fragments** (`filters.push(sql\`…\`)`, `sql\`${a} AND ${b}\``) — it would
+eagerly execute the fragment. So the as-built model is per-frame and explicit:
 
-**PROVEN in sandbox** (`scripts/drive-rls-context.mts`, app connected as `govtech_app`): 5/5 —
-no-context → DENY-ALL, correct tenant → sees its row, other/forged-by-id cross-tenant → 0 (RLS
-backstop), owner bypass → all. And **passthrough is transparent**: with no context wired,
-`vitest` 829 + `drive-vault-{collab-surface 5/5, isolation 7/7, leak}` are green (the Proxy is
-inert in the hot path). tsc 0.
+- `lib/tenant-context.ts` — **globalThis-singleton** AsyncLocalStorage. `enterTenant(id)` /
+  `enterBypass()` / `runInTenant(id, fn)` / `runInBypass(fn)`.
+- `lib/db.ts` — `sql` is a **Proxy** routed by the per-request context: **no context** → exact
+  passthrough (rawSql); **tenant context** → each `sql\`\`` runs in a `SET LOCAL app.tenant_id`
+  transaction (RLS scopes it under govtech_app); **bypass context** → each `sql\`\`` is routed to
+  the owner `sqlBypass` pool (privileged cross-tenant). `verifyTenantAccess` does NOT self-enter
+  (that call was dead — child frame). `sqlBypass` is the owner pool.
 
-### Activation (the remaining wiring — a gated step, NOT yet enabled)
-1. **Portal (50 routes) — one choke point:** call `enterTenant(tenantId)` right after a
-   successful `verifyTenantAccess` (or in the shared portal gate). Every portal `sql` then
-   self-scopes; no per-route edits.
-2. **Admin (20 routes) — cross-tenant reads:** swap `sql` → `sqlBypass` for reads that aggregate
-   across tenants (`/api/admin/agents/workforce` agent_task_queue rollup, etc.). Auth
-   (users/user_memberships) already hits RLS-off tables, so no change.
-3. **Pipeline** keeps its own owner `DATABASE_URL` (the cross-tenant engine).
+**The choke point is the ROUTE BODY.** Three patterns:
+1. **`enterTenant(tenantId)` in the handler's own frame**, after the access gate — for routes with
+   direct `sql\`\`` queries and/or lib-helper calls (helpers inherit the context, parent→child).
+   ~49 portal routes.
+2. **`withTenant(tenantId, async tx => …)`** (raw `tx`, bypasses the Proxy) — for routes that
+   compose `sql\`\`` fragments or use `sql.begin`: proposals list, proposals/create, outcome,
+   collaborators; and the lib transactions `advanceProposalStage` + `provisionProposalForPortal`.
+3. **`sqlBypass`** for **entity-first authorization gates** that look up a row BY ID to discover its
+   owner tenant before any context is pinnable (like auth reading `users` by email):
+   `resolveVaultAccess`. A local `guard()` that reads forced tables self-enters before its own reads
+   (`lock` route, mirrors verifyProposalAccess).
 
-Activation flips every portal request onto per-query transactions (results identical under the
-owner today; isolation under `govtech_app`), so it must land with the P5 full-app proof, not
-before.
+**Admin routes** (cross-tenant, gated to master_admin/rfp_admin): import `{ sqlBypass as sql }` so
+their own direct/fragment/begin queries hit the owner pool, plus `enterBypass()` after the admin
+gate when they call an RLS'd-table helper. **Pipeline** keeps its own owner `DATABASE_URL`.
 
-## P5 — the pre-flip gate (the mechanism is proven; the app-wide proof remains)
-Run the whole Next app connected as `govtech_app` (sandbox) and drive the real routes (Playwright
-+ the drive suite) to confirm **nothing DENY-ALLs** — this surfaces any portal route that skips
-the `enterTenant` choke point or any admin read that still needs `sqlBypass`. Fix those, re-run
-green. **Prod flip is then one op:** point the frontend `DATABASE_URL` at `govtech_app`, set
-`DATABASE_URL_OWNER` to the owner string (for `sqlBypass`). No code change at flip time.
+## P5 — PROVEN in sandbox (app connected as `govtech_app`, NOBYPASSRLS)
+- `scripts/drive-rls-context.mts` **6/6** — no-ctx → DENY-ALL, correct tenant → sees own,
+  other/forged-by-id cross-tenant → 0 (RLS backstop), **bypass ctx → owner pool**, direct owner → all.
+- `scripts/drive-rls-portal.mts` **38/38** — every data-bearing portal route returns its tenant's
+  data (was 11 DENY-ALL 404s pre-fix); admin-only route 403s, retired route 410s. Surfaced + fixed a
+  pre-existing prod bug (supporting-docs queried the dropped `library_unit_id` column → 500).
+- `scripts/drive-rls-admin.mts` — admin routes return **cross-tenant** data via `sqlBypass`
+  (the tenants list sees ≥2 tenants; a DENY-ALL would see 0/1).
+- `tsc` 0 · `vitest` 829 (test `@/lib/db` mocks gained `enterTenant`/`enterBypass` no-ops).
+
+Inert until the flip (owner bypasses RLS today). **Prod flip is one op the operator runs:** point
+the frontend `DATABASE_URL` at `govtech_app` and set `DATABASE_URL_OWNER` to the owner string (for
+`sqlBypass`). No code change at flip time.
+
+### Known deferred (documented, not blocking the flip)
+Background/workflow paths that write forced tables in their OWN `sql.begin` outside a request
+context are covered where reached from routes (advance/provision → withTenant). Any NEW forced-table
+writer added later must pick a pattern: `enterTenant`+simple-sql, `withTenant` for its transaction,
+or run under the pipeline owner connection.
