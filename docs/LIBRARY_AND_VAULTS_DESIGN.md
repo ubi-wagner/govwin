@@ -97,9 +97,21 @@ Cost-Volume /sheet, plus one shared Commercialization Deck /ppt. Every proposal
 foundation carries a `vehicle` tag (propagated to all grains, so the faceted
 library filters by vehicle). `scripts/seed-starter-set.mts` (→ `seedStarterSet`)
 idempotently seeds them into the house library under `system_starter`; re-running
-refreshes without duplicating. Proven: vitest 6/6 (build + native render + STTR⊃SBIR)
-+ real-DB drives (generics 5/5, vehicles 13/13 with vehicle-tag propagation, seed
-idempotency 5/5).
+refreshes without duplicating.
+
+Every starter decomposes to the **full `foundation ⊃ section ⊃ group ⊃ atom`
+hierarchy** — the section bodies (text_block / bulleted_list / table) are
+`library_eligible`, so each lands as a **canvas-ready primitive ATOM** carrying its
+own `canvas_node` + the full 6-/7-tag taxonomy (headings stay structural per
+`STRUCTURAL_NODES`, never their own atom). A seed of the 18 starters yields **18
+foundations · 95 sections · 95 groups · 95 primitives**, and copy-on-use
+(`copyFoundationToTenant`) reproduces the whole tree per tenant with `derived_from`
+lineage on every grain. Proven: vitest 7/7 (build + native render + STTR⊃SBIR +
+eligible-primitive/structural-heading assertion) + real-DB drives — seed
+idempotency (cleared 208 → seeded 18), grain distribution 18/95/95/95, vehicle-tag
+propagation to primitives (7–14 per vehicle), table-atom payload (headers+rows
+preserved), and a copy-on-use proof (1/10/10/10 tree · 31/31 lineage · 10/10 canvas
+nodes · min 7 tags/primitive).
 
 ---
 

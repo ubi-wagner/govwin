@@ -5,12 +5,14 @@
  * agents have a reference scaffold to match uploads against.
  *
  * Each StarterDef is pure data: a taxonomy (kind × form × context [× vehicle]) plus
- * a build() that returns a CanvasDocument. The section titles ARE the reusable
- * scaffold — decomposeAndIngest turns them into section grains (bodies are
- * placeholder guidance, marked non-eligible, so a template is pure structure).
+ * a build() that returns a CanvasDocument. decomposeAndIngest turns each into the
+ * full foundation ⊃ section ⊃ group ⊃ atom hierarchy: section titles become section
+ * grains, and every body (text_block / bulleted_list / table) is library_eligible so
+ * it lands as a canvas-ready primitive ATOM carrying its canvas_node + the full
+ * taxonomy — the reusable, agent-identifiable skeleton uploads are matched against.
  */
-import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode, type CanvasSection } from '@/lib/types/canvas-document';
-import { sectionsToCanvasDoc, tableToCanvasSheet, type ArtifactForm, type Section } from '@/lib/library/artifact-canvas';
+import { CANVAS_PRESETS, type CanvasDocument, type CanvasNode, type CanvasSection, type TableContent } from '@/lib/types/canvas-document';
+import type { ArtifactForm, Section } from '@/lib/library/artifact-canvas';
 
 export interface StarterDef {
   slug: string;
@@ -22,28 +24,56 @@ export interface StarterDef {
   build: () => CanvasDocument;
 }
 
-const scaffoldNode = (type: CanvasNode['type'], content: unknown): CanvasNode => ({
+// Node builders. A CONTENT node (text_block / bulleted_list / table) is
+// library_eligible → decomposeAndIngest mints it as its own primitive ATOM, so every
+// grain is canvas-ready (carries a canvas_node + the full taxonomy). A HEADING is
+// structural (STRUCTURAL_NODES) — it labels its section/group, never its own atom.
+const contentNode = (type: CanvasNode['type'], content: unknown): CanvasNode => ({
   id: crypto.randomUUID(), type, content: content as CanvasNode['content'],
+  style: {} as CanvasNode['style'], provenance: { source: 'template' }, history: [], library_eligible: true,
+});
+const headingNode = (level: number, text: string): CanvasNode => ({
+  id: crypto.randomUUID(), type: 'heading', content: { level, text } as CanvasNode['content'],
   style: {} as CanvasNode['style'], provenance: { source: 'template' }, history: [], library_eligible: false,
 });
 
-/** A deck (ppt) foundation — one section per slide (heading + optional bullets). */
-export function deckToCanvasDoc(title: string, slides: Array<{ title: string; bullets?: string[] }>): CanvasDocument {
-  const sections: CanvasSection[] = slides.map((s, i) => {
-    const nodes: CanvasNode[] = [scaffoldNode('heading', { level: i === 0 ? 1 : 2, text: s.title })];
-    if (s.bullets?.length) nodes.push(scaffoldNode('bulleted_list', { items: s.bullets.map((t) => ({ text: t })) }));
-    return { id: crypto.randomUUID(), title: s.title, layout: { mode: 'flow' }, groups: [{ id: crypto.randomUUID(), nodes }] };
-  });
+function baseDoc(title: string, preset: string, sections: CanvasSection[]): CanvasDocument {
   return {
-    version: 2, document_id: crypto.randomUUID(), canvas: CANVAS_PRESETS.slide_cso, nodes: [], sections,
+    version: 2, document_id: crypto.randomUUID(),
+    canvas: CANVAS_PRESETS[preset] ?? CANVAS_PRESETS.custom, nodes: [], sections,
     metadata: { title, volume_id: '', required_item_id: '', proposal_id: '', solicitation_id: '', created_at: '', last_modified_at: '', last_modified_by: '', version_number: 1, status: 'accepted' },
   } as CanvasDocument;
 }
 
-/** doc scaffold from titled sections (placeholder bodies guide the author). */
-const doc = (title: string, sections: Section[]): CanvasDocument => sectionsToCanvasDoc(title, sections);
-/** a cost sheet with a header row + a few placeholder line rows. */
-const sheet = (title: string, headers: string[], rows: string[][]): CanvasDocument => tableToCanvasSheet(title, headers, rows, title.slice(0, 28));
+/** A deck (ppt) foundation — one section per slide (heading label + a bullets ATOM). */
+export function deckToCanvasDoc(title: string, slides: Array<{ title: string; bullets?: string[] }>): CanvasDocument {
+  const sections: CanvasSection[] = slides.map((s, i) => {
+    const nodes: CanvasNode[] = [headingNode(i === 0 ? 1 : 2, s.title)];
+    if (s.bullets?.length) nodes.push(contentNode('bulleted_list', { items: s.bullets.map((t) => ({ text: t })) }));
+    return { id: crypto.randomUUID(), title: s.title, layout: { mode: 'flow' }, groups: [{ id: crypto.randomUUID(), nodes }] };
+  });
+  return baseDoc(title, 'slide_cso', sections);
+}
+
+/** doc scaffold from titled sections — each section = a heading label + a body
+ *  text_block ATOM, so every section decomposes to a real canvas-ready primitive. */
+const doc = (title: string, sections: Section[]): CanvasDocument => {
+  const canvasSections: CanvasSection[] = sections.map((s) => {
+    const nodes: CanvasNode[] = [headingNode(2, s.title)];
+    if (s.body) nodes.push(contentNode('text_block', { text: s.body }));
+    return { id: crypto.randomUUID(), title: s.title, layout: { mode: 'flow' }, groups: [{ id: crypto.randomUUID(), nodes }] };
+  });
+  return baseDoc(title, 'custom', canvasSections);
+};
+/** a cost/data sheet → one section with a heading label + a table ATOM (→ a worksheet). */
+const sheet = (title: string, headers: string[], rows: string[][]): CanvasDocument => {
+  const table: TableContent = { headers, rows, sheet_name: title.slice(0, 28) };
+  const section: CanvasSection = {
+    id: crypto.randomUUID(), title, layout: { mode: 'flow' },
+    groups: [{ id: crypto.randomUUID(), nodes: [headingNode(2, title), contentNode('table', table)] }],
+  };
+  return baseDoc(title, 'spreadsheet', [section]);
+};
 
 // ── GENERIC starters (P4.1) — reusable business artifacts, context=general/marketing ──
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GENERIC_STARTERS, PROPOSAL_STARTERS, STARTER_SET } from '@/lib/library/starter-set';
-import { ARTIFACT_FORMAT } from '@/lib/library/artifact-canvas';
+import { ARTIFACT_FORMAT, flattenNodes } from '@/lib/library/artifact-canvas';
 import { renderCanvas } from '@/lib/export/artifact-export';
 
 // The dogfooded starter set (P4). Pure proof: each builds a valid v2 canvas,
@@ -24,6 +24,23 @@ describe('starter set (P4.1 generics)', () => {
       expect(Buffer.isBuffer(buf), s.slug).toBe(true);
       expect(buf.length, s.slug).toBeGreaterThan(500);
       expect(buf.slice(0, 2).toString('latin1'), s.slug).toBe('PK'); // docx/pptx/xlsx are OpenXML zips
+    }
+  });
+
+  it('every starter decomposes to canvas-ready primitive atoms (eligible content, structural headings)', () => {
+    const CONTENT = ['text_block', 'bulleted_list', 'numbered_list', 'table', 'image', 'caption'];
+    for (const s of STARTER_SET) {
+      const nodes = flattenNodes(s.build());
+      // ≥1 library_eligible node → decomposeAndIngest mints ≥1 primitive ATOM per foundation
+      const eligible = nodes.filter((n) => n.library_eligible === true);
+      expect(eligible.length, s.slug).toBeGreaterThanOrEqual(1);
+      // every eligible node is substantive content carrying a canvas node (the atom's payload)
+      for (const n of eligible) {
+        expect(CONTENT, `${s.slug}:${n.type}`).toContain(n.type);
+        expect(n.content, `${s.slug}:${n.type}`).toBeTruthy();
+      }
+      // headings stay structural — a bare heading is a label, never its own atom
+      for (const h of nodes.filter((n) => n.type === 'heading')) expect(h.library_eligible, s.slug).toBe(false);
     }
   });
 
