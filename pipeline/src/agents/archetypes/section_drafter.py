@@ -45,8 +45,12 @@ When drafting, you MUST:
 3. Use quantifiable metrics where possible
 4. Structure content to match the required format (page limits, sections)
 5. Include clear benefit statements tied to the government's objectives
+6. Follow the reusable section skeleton from the starter template when one exists
 
-Use the search_library tool to find relevant past performance and capability atoms.
+Use the search_starter_scaffold tool FIRST to pull the reusable skeleton for this section
+(the dogfooded starter template's structure + guidance), so your draft follows the expected
+shape and covers every intended subsection. Then use the search_library tool to fill that
+skeleton with the contractor's actual past performance and capability atoms.
 Use the get_compliance tool to check formatting and structural requirements.
 
 Output your draft as structured text with markdown-style headings (## for subsections).
@@ -54,7 +58,7 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
 
     @property
     def tools(self) -> list[str]:
-        return ["search_library", "get_compliance"]
+        return ["search_starter_scaffold", "search_library", "get_compliance"]
 
     def handles_event(self, event_type: str) -> bool:
         """Check if this archetype handles the given event type."""
@@ -63,6 +67,20 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
     def get_tools(self) -> list[dict]:
         """Return tool definitions in Anthropic tool-use format."""
         return [
+            {
+                "name": "search_starter_scaffold",
+                "description": "Fetch the reusable SECTION skeleton for this section from the tenant's starter templates — the section grain that matches this section's title, plus its constituent guidance atoms (the intended subsections/content). Call this first so your draft follows the expected structure. Returns an empty skeleton if no starter section matches.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "section_title": {
+                            "type": "string",
+                            "description": "The section title to match against starter section grains (e.g. 'Technical Approach', 'Phase I Technical Objectives').",
+                        },
+                    },
+                    "required": ["section_title"],
+                },
+            },
             {
                 "name": "search_library",
                 "description": "Search the customer's content library for relevant past performance, capabilities, and reusable content atoms. Use this to ground your draft in actual company capabilities.",
@@ -183,12 +201,71 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
         """Execute a tool call and return results."""
         tenant_id = context.get("tenant_id")
 
-        if tool_name == "search_library":
+        if tool_name == "search_starter_scaffold":
+            title = tool_input.get("section_title") or context.get("payload", context).get("section_title", "")
+            return await self._match_section_grain(conn, tenant_id, title)
+        elif tool_name == "search_library":
             return await self._search_library(conn, tenant_id, tool_input)
         elif tool_name == "get_compliance":
             return await self._get_compliance(conn, tool_input, tenant_id=tenant_id)
         else:
             return {"error": f"Unknown tool: {tool_name}"}
+
+    async def _match_section_grain(self, conn, tenant_id: str | None, section_title: str) -> dict:
+        """Find the reusable starter SECTION grain matching this section's title and
+        return its guidance skeleton (the section's constituent primitive atoms).
+
+        Grounds the draft on the dogfooded starter scaffold (P6.2): the starter set
+        decomposes into foundation ⊃ section ⊃ group ⊃ primitive grains in the tenant's
+        own library_atoms, so a title match on grain='section' yields the reusable
+        skeleton. Tenant-scoped (tenant_id from the trusted task context, never the model).
+        """
+        if not tenant_id or not section_title:
+            return {"matched": False, "skeleton": []}
+        try:
+            escaped = section_title[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            section = await conn.fetchrow(
+                """
+                SELECT id, title
+                FROM library_atoms
+                WHERE tenant_id = $1 AND grain = 'section' AND status != 'archived'
+                  AND title ILIKE $2
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                uuid.UUID(tenant_id),
+                f"%{escaped}%",
+            )
+            if not section:
+                return {"matched": False, "skeleton": [], "note": f'No starter section matches "{section_title}"'}
+
+            # A section's members are groups; the groups' members are the primitive
+            # guidance atoms — walk both hops to recover the ordered skeleton content.
+            prim_rows = await conn.fetch(
+                """
+                SELECT a.title, a.content
+                FROM atom_members sg
+                JOIN atom_members gp ON gp.group_atom_id = sg.member_atom_id
+                JOIN library_atoms a ON a.id = gp.member_atom_id
+                WHERE sg.group_atom_id = $1
+                  AND a.tenant_id = $2 AND a.status != 'archived'
+                ORDER BY sg.ordinal, gp.ordinal
+                """,
+                section["id"],
+                uuid.UUID(tenant_id),
+            )
+            return {
+                "matched": True,
+                "section_atom_id": str(section["id"]),
+                "section_title": section["title"],
+                "skeleton": [
+                    {"title": r["title"], "guidance": (r["content"][:1500] if r["content"] else "")}
+                    for r in prim_rows
+                ],
+            }
+        except Exception as e:
+            logger.warning("search_starter_scaffold failed: %s", e)
+            return {"matched": False, "skeleton": [], "error": str(e)}
 
     async def _search_library(self, conn, tenant_id: str | None, tool_input: dict) -> dict:
         """Search the content library for relevant units."""

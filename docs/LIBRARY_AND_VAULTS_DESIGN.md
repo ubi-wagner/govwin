@@ -128,6 +128,17 @@ idempotent per open offer). Proven on the real DB: bulk copy 3/3 (fresh 18 · id
 0-added/18-skipped · partial 3-refill), offer 3/3 (creates the acknowledge ToDo + emits
 once · idempotent · surfaces in the tenant_admin queue).
 
+**As-built (P6.2, shipped) — section_drafter grounds on the scaffold:** the
+`section_drafter` archetype gained a `search_starter_scaffold` tool (declared first, no
+`tenant_id` in its schema — tenant-discretion) that title-matches the section against the
+tenant's `grain='section'` starter atoms and returns the reusable skeleton (the section's
+constituent primitive guidance atoms, walked section→group→primitive). The system prompt
+directs the model to pull the scaffold first, then fill it from the library; the raw RFP
+excerpt stays injection-fenced. Proven: pipeline wiring tests (tool declared · no tenant_id ·
+scaffold-in-prompt · rfp fence intact) + a real-DB `_match_section_grain` drive 3/3 (title
+match returns the skeleton · unknown title empty · other-tenant no-leak). LLM reasoning runs
+live on deploy; the sandbox verifies the tool SQL + wiring.
+
 ---
 
 ## 5. Collaboration vaults ("nooks") — the segregated external bridge

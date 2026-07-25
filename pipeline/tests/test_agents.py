@@ -67,6 +67,9 @@ EXPECTED_ARCHETYPES = {
     "content_generator",
     "content_curator",
     "social_scheduler",
+    # Library-seed pair (provision-time starter suggestion/mapping)
+    "library_seed_suggester",
+    "library_seed_mapper",
 }
 
 
