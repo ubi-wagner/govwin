@@ -238,6 +238,19 @@ boundary). Proven: the adversarial isolation drive **7/7** — owner tenant_admi
 collaborator→whole-only · cross-vault→null · non-member→null · other-company admin→null ·
 platform-admin(shadow)→tenant · each collaborator sees only their own vault.
 
+**As-built (P8.3–P8.6, shipped) — operable backend:** CRUD + membership routes
+(`vaults` create/list, `vaults/[id]/members` invite/list — tenant_admin gated) and the
+content ops over the rights matrix, all **gated by `resolveVaultAccess` (not
+`verifyTenantAccess`)** so an invited collaborator who is not a member of the owner tenant
+reaches ONLY their nook: `vaults/[id]/atoms` list/add (upload right, both sides →
+`createVaultArtifact` decomposes + tags every grain vault), `…/atoms/[atomId]/download`
+(native-format, whole-only gate — collaborator=foundation only, tenant=any grain), and
+`…/atoms/[atomId]/ingest` (tenant-side → `ingestVaultFoundation` copies the tree into the
+MAIN library, vault_id NULL). Proven: content drive **5/5** (grains tagged vault · invisible
+to the main library even for an admin viewer · listed to both sides · whole-only vs any-grain ·
+ingest→main library). **Remaining (not built):** the two-sided nook UI (P8.9), the
+collaborator-content HITL ToDo (P8.7), and the instruction-based-sharing copy (P8.8).
+
 ---
 
 ## 6. Per-role ToDos (consolidated)
