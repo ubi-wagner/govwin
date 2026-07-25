@@ -13,7 +13,9 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads cross-cycle curator memories, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 // Well-known variable defaults for common compliance fields.
 // These show up as suggestions even when no memory exists (cold start).
@@ -33,6 +35,14 @@ export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }, { status: 401 });
+  }
+  // ADMIN-ONLY: this surfaces cross-cycle curator decision memories (episodic_memories) — an
+  // rfp_admin/master_admin curation aid under /api/admin/. It previously gated on authentication
+  // ONLY, so any authenticated user (incl. tenant_user/partner_user) could read it. Restrict to
+  // platform admins. (RLS launch sweep — closed an unaudited admin read.)
+  const role: Role | null = isRole((session.user as { role?: unknown }).role) ? (session.user as { role: Role }).role : null;
+  if (!role || !hasRoleAtLeast(role, 'rfp_admin')) {
+    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
 
   const url = new URL(request.url);

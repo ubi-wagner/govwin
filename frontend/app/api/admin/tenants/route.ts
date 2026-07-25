@@ -9,7 +9,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql, enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
@@ -188,6 +189,8 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
+    // Cross-tenant helper (offerStarterSet) uses global sql — route it to the owner pool. (docs/RLS_CUTOVER.md)
+    enterBypass();
 
     // Body: create a company + its admin POC directly (the "we/expert add them" path,
     // vs. the customer self-serve /apply → accept flow). See MULTI_MEMBERSHIP_IDENTITY_DESIGN.

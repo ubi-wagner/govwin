@@ -34,7 +34,8 @@ import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
