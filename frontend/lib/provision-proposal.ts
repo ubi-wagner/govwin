@@ -195,9 +195,15 @@ export async function provisionProposalForPortal(opts: {
     // The suggester scans existing library atoms for prior-proposal content that
     // matches the new compliance matrix, surfaces ranked candidates to the admin.
     try {
+      // ON CONFLICT restates the partial-unique predicate of idx_library_seed_jobs_active
+      // (one active job per proposal): a re-provision no-ops instead of throwing a
+      // duplicate-key error. On conflict RETURNING yields no row, so the suggester
+      // isn't re-enqueued — the existing active job already owns that work.
       const [seedJob] = await sql<{ id: string }[]>`
         INSERT INTO library_seed_jobs (tenant_id, proposal_id, status)
         VALUES (${tenantId}, ${out.proposalId}, 'analyzing')
+        ON CONFLICT (proposal_id) WHERE status <> ALL (ARRAY['applied', 'skipped'])
+        DO NOTHING
         RETURNING id
       `;
       if (seedJob?.id) {

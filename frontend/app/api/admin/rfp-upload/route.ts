@@ -49,6 +49,14 @@ import { isValidUUID } from '@/lib/validation';
 const MAX_TOTAL_BYTES = 30 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md'];
 
+// solicitation_documents.document_type CHECK set — validate client input against
+// it so a bad value fails fast as a 400 instead of a 500 CHECK violation on the
+// attach-to-existing insert path (effectiveType = docType).
+const VALID_DOCUMENT_TYPES = [
+  'source', 'rfp', 'nofo', 'instructions', 'amendment', 'qa',
+  'template', 'supporting', 'attachment', 'topic', 'other',
+] as const;
+
 const MetaSchema = z.object({
   title: z.string().min(1).max(500),
   agency: z.string().min(1).max(500),
@@ -123,6 +131,15 @@ export async function POST(request: Request) {
     );
   }
   const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
+  if (
+    requestedDocType !== null &&
+    !VALID_DOCUMENT_TYPES.includes(requestedDocType as (typeof VALID_DOCUMENT_TYPES)[number])
+  ) {
+    return NextResponse.json(
+      { error: `Invalid documentType (allowed: ${VALID_DOCUMENT_TYPES.join(', ')})`, code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
   const requestedIsPrimary = formData.get('isPrimary') === 'true';
 
   // Metadata is only required when creating a new solicitation
