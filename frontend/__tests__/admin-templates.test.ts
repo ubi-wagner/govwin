@@ -11,7 +11,7 @@ const { authMock, sqlMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, sqlBypass: sqlMock }));
 vi.mock('@/lib/validation', () => ({
   isValidUUID: (v: string) => /^[0-9a-f-]{36}$/i.test(v),
 }));
