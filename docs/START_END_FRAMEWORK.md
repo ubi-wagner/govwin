@@ -570,9 +570,9 @@ unimplemented (`rescore.py:189-190`); cron-digest *delivery* (decision ⑥) is d
   `proposal_portals` phase-machine (§2).
 - **D-Bridge-1 (MAJOR):** `MASTER_MIRROR_OPP_DESIGN.md` says the fan-out scores in-tx via `autoScoreCard`;
   scoring is tenant-side/event-driven (§4a) and `autoScoreCard` is dead (F-A).
-- **D-Agent-1..5:** `AGENT_WORKFORCE.md`/`AGENT_FABRIC_DESIGN.md` call 15 archetypes “dormant” (all 25 have
+- **D-Agent-1..5:** `AGENT_WORKFORCE.md`/`AGENT_FABRIC_DESIGN.md` call 15 archetypes “dormant” (all 27 have
   invocation sites), omit the `research_scout` producer, and overstate the injection-fence/test coverage (F-C).
-- **CLAUDE.md** says “migrations at 125”; the tree is at **129**.
+- **CLAUDE.md** and the migration tree are now in sync at migration **137** (the earlier 125-vs-129 drift is resolved).
 
 ---
 

@@ -235,7 +235,7 @@ The spine is built; these are the wiring jobs on top of clean rivers:
 2. **Cron dispatch** for the scheduled sweeper (nudge sweep + `OnSolicitationUpdateScan` +
    `OnOpsDigestRequested`) — confirm the cron cadence + the fail-safe (a missed tick just
    re-derives next tick; no state lost).
-3. **Wake the dormant agent archetypes** one at a time per `AGENT_WORKFORCE.md` (all 25 are
+3. **Wake the dormant agent archetypes** one at a time per `AGENT_WORKFORCE.md` (all 27 are
    registry-wired; dormant ≠ dead) — each is either an `AI_INVOKE` step or a per-tenant producer,
    gated advisory→guardrail→land-or-review, injection-fenced, RLS-backstopped.
 4. **Uniform start→end coverage audit** — confirm every step (esp. the newly-woken agent steps)

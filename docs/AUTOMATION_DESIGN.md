@@ -5,8 +5,8 @@
 > workflows, the customer automation grammar, and the gap list to zero-day). **This file is its
 > mechanism-level companion** — the same substrate grounded in `file:line` (emit API, the poll loops, the
 > `automation_rules` vs `process_instances` split, HITL resume, the nudge sweep). Where the two overlap, the
-> SPINE_MAP's framing wins; the counts here have been reconciled to it (25 archetypes, ~20 workflows,
-> migrations to 125).
+> SPINE_MAP's framing wins; the counts here have been reconciled to it (27 archetypes, ~20 workflows,
+> migrations to 137).
 
 > **AS-BUILT UPDATE (#117, 2026-07-19) — agents as automation actors.** Agents run inside the automation
 > layer two ways: (1) a **declarative `AI_INVOKE` `Step`** in a workflow (single-entity agents — a step
@@ -49,7 +49,7 @@ consumers do in response.
                   │  PIPELINE worker              │  │  CMS event_listener           │
                   │  processor.run_workflow_...   │  │  _poll_loop → automation_rules│
                   │  → WorkflowManager (mig 043)  │  │  → send_email/notify/create_  │
-                  │  → AgentFabric (25 archetypes)│  │     todo/publish… (§3)        │
+                  │  → AgentFabric (27 archetypes)│  │     todo/publish… (§3)        │
                   │  → task nudge sweep (60s)     │  └──────────────────────────────┘
                   └──────────────┬───────────────┘
         parks TODO/HITL steps ▼  ▲ completeTask → forceAdvanceProcess (resume)
@@ -211,7 +211,7 @@ only their own copy spine (§1 two-spine model).
 
 ## 5. The agent fabric — the AI execution layer
 
-- `AgentFabric` (`fabric.py`) registers **25 archetypes** (`_ARCHETYPE_CLASSES`,
+- `AgentFabric` (`fabric.py`) registers **27 archetypes** (`_ARCHETYPE_CLASSES`,
   `archetypes/__init__.py`) at pipeline boot — **dormant ≠ dead** (all registry-wired; see the roster in
   `AGENT_WORKFORCE.md §1`). **Three live entry points:** `invoke_agent(...)` (`:261`,
   direct — workflow AI_INVOKE steps + `draft_v0`), `process_task_queue` (`:697`, the `agent_task_queue`

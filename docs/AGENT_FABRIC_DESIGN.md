@@ -1,6 +1,6 @@
 # Agent Fabric Design — RFP Pipeline
 
-**Status:** As-built. The `AgentFabric` auto-registers **25 archetypes** at pipeline boot; **dormant ≠
+**Status:** As-built. The `AgentFabric` auto-registers **27 archetypes** at pipeline boot; **dormant ≠
 dead** — every archetype is registry-wired and invocable, and "dormant" means only that no producer/step
 fires it yet. **The as-built wiring, safety contract, tenant-discretion, RLS/guardrail flags, and per-agent
 plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine those agents plug into is
@@ -8,7 +8,7 @@ plan are the source of truth in `docs/AGENT_WORKFORCE.md`; the automation spine 
 `docs/archive/AGENT_ROADMAP.md`. This file is the fabric definition + the how-to for ADDING/UPDATING an archetype
 (§0), plus the original design rationale (§1–8, archived).**
 
-> **AS-BUILT (2026-07-22):** the fabric registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
+> **AS-BUILT (2026-07-22):** the fabric registers **27 archetypes** (`_ARCHETYPE_CLASSES` in
 > `pipeline/src/agents/fabric.py` — `BaseArchetype` excluded). The original #117 batch of 10 is fully wired
 > as workflow actors: section_drafter (`draft_v0` + interactive), compliance_reviewer (inline `ai/compliance`
 > + `AI_INVOKE`), color_team_reviewer (advance queue + `handle_event`), librarian (producer in
@@ -56,9 +56,9 @@ and the specific agent archetypes at each layer.
 > The canonical roster + safety detail is `docs/AGENT_WORKFORCE.md`; the forward plan is
 > `docs/archive/AGENT_ROADMAP.md`. This section is the fabric-doc mirror so the design file is self-contained.
 
-### 0.1 The 25 archetypes (registry-wired · dormant ≠ dead)
+### 0.1 The 27 archetypes (registry-wired · dormant ≠ dead)
 
-All 25 auto-register from `_ARCHETYPE_CLASSES` at fabric boot (`fabric.py::_register_all_archetypes`),
+All 27 auto-register from `_ARCHETYPE_CLASSES` at fabric boot (`fabric.py::_register_all_archetypes`),
 keyed by their `role_name`. The **canonical per-agent roster (scope · trigger · live/dormant status)
 lives in `AGENT_WORKFORCE.md §1`** — this is the fabric-doc mirror. The core #117 tenant-side ten (fully
 producer/step-wired) are the illustrative set below; the other 15 are grouped after it.
@@ -137,7 +137,7 @@ never held state — the fabric holds no per-invocation memory.
 
 ### 0.4 Safety contract (enforced) — the invariants + the one pending deploy step
 
-Enforced (per-agent tests): **injection fence** on all 25 (untrusted tenant text fenced `--- BEGIN/END USER
+Enforced (per-agent tests): **injection fence** on all 27 (untrusted tenant text fenced `--- BEGIN/END USER
 CONTENT ---` with a treat-as-data guard in `build_messages`) · **runaway caps** (`MAX_TOOL_ROUNDS=20`,
 `$0.50`/call mid-loop, `50`/hr/tenant, `$50`/mo, + a platform master switch & monthly cap) · **never
 dead-ends** (unmapped/failed `AI_INVOKE` = safe skip; advisory-only, never writes business tables; fabric
@@ -600,7 +600,7 @@ A future workflow orchestrator reads these events to:
 3. Build audit trails (all events with same parent_event_id = one workflow)
 4. Compute SLA metrics (duration_ms between start and end)
 
-### Workflow templates (future — stored in `system_config`)
+### Workflow templates (stored in `process_templates`)
 
 ```json
 {

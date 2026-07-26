@@ -30,7 +30,7 @@ full **two-sided UI** now live (design: docs/LIBRARY_AND_VAULTS_DESIGN.md §9).
 **Migrations:** 134 (collaboration_vaults + vault_members + library_atoms.vault_id + visibility
 CHECK += 'vault' + FORCE RLS), 135 (starter-offer partial-unique idempotency).
 
-**Verification (all green):** `tsc` 0 · `vitest` **829** · `next build` (all four vault routes) ·
+**Verification (all green):** `tsc` 0 · `vitest` **828** · `next build` (all four vault routes) ·
 drives: `drive-vault-collab-surface` 5/5, `drive-vault-{isolation 7/7, content 5/5, leak 0-leak}` ·
 both sides captured in-browser → Customer-Admin (§13) + Collaborator (§8) manuals re-rendered.
 
@@ -115,7 +115,7 @@ AUTOMATION_SPINE_MAP, LAUNCH_READINESS_2026-07-22.
 
 ---
 
-**AGENT WORKFORCE — COMPLETE + EXPANDED (19 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
+**AGENT WORKFORCE — COMPLETE + EXPANDED (27 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
 forward plan: `docs/archive/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
 
 - **#117 DONE — all 10 original archetypes awake as workflow actors.** section_drafter / compliance_reviewer /
@@ -130,7 +130,7 @@ forward plan: `docs/archive/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_F
   via `AGENT_DATABASE_URL`). `agents/guardrails.py::enforce_guardrails` gates every result (advisory →
   guardrail → land-or-review): disallowed content → review, scoring adjustment clamped to ±15, fail-safe.
   **Deploy step (gated):** provision a login member of `rfp_agent` + set `AGENT_DATABASE_URL`.
-- **Batches A/B/C DONE — fabric now 19.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
+- **Batches A/B/C DONE — fabric then 19; POD4/CMS + the library-seed pair have since taken it to 27.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
   platform-scope opportunity_scout/ingest_analyst/matrix_stager/skeleton_architect (OnOpportunitiesDetected +
   OnRfpUploaded). Batch C outcome_analyst/amendment_monitor/cost_estimator/pp_matcher (OnProposalOutcomeRecorded
   / OnSourceChangeDetected / OnProposalCreated). Platform agents skip tenant-discretion (no tenant) but KEEP

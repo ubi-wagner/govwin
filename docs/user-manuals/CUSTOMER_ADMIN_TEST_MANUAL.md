@@ -11,7 +11,7 @@
 ### Prerequisites
 - A `tenant_admin` account (provisioned by RFP Pipeline when your application was accepted — your **first login forces a password change**).
 - At least one opportunity **pushed** by the RFP admin so it appears in your **Opportunities** feed (`/cards`). A brand-new account is auto-mirrored the whole live opportunity river at signup.
-- **Test-instance notes** (for whoever stands up the environment): migrations run via `node db/migrations/migrate.mjs` (high-water **108**; migs **105–108** shipped the comp-code purchase → curation → release model + `spotlight_summary`). Seed with `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true` (marketing pages).
+- **Test-instance notes** (for whoever stands up the environment): migrations run via `node db/migrations/migrate.mjs` (high-water **137**; migs **105–108** shipped the comp-code purchase → curation → release model + `spotlight_summary`). Seed with `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true` (marketing pages).
 
 ---
 

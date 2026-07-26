@@ -17,7 +17,7 @@ The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and n
 `tenant_opportunity_cards` (including the rebuilt `v_opportunity_rollup` view + the CMS
 `matched_opportunities` variable). The compliance matrix (`proposal_compliance_matrix`) populates
 at provision and advances on section lock. Verified end-to-end (Playwright + the live Python workflow
-engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 729 · `next build`).
+engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 828 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -26,12 +26,12 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 129). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 137). A build can also be **RFP-Admin-approved as a free (comped) portal** — that records a $0
 `purchases` row (`metadata.grant='admin'`) + emits `capture:purchase.completed`, so a comp audits
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, **25 archetypes, all auto-registered — dormant ≠ dead**)
+The pipeline agent workforce (`AgentFabric`, **27 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
@@ -44,9 +44,12 @@ spine, then either a **per-tenant producer** (fan-out agents) or a declarative *
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
 authority; tool schemas expose NO `tenant_id`); output is **advisory → guardrail → land-or-review** (never
 auto-writes business tables); untrusted tenant content is **injection-fenced**; runtime bounds **runaway**
-(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop pending a
-`NOBYPASSRLS` agent role (mig 116 forced RLS on `episodic_memories`; `SET app.tenant_id` wiring specified in
-the doc). Oversight: `/admin/agents` → Agent Workforce (roster + per-tenant usage, forward-only bridge).
+(round/cost/rate/budget caps) and never **dead-ends** a workflow (safe-skip). RLS backstop is **built + applied
+in schema** — mig 116 forced RLS on `episodic_memories`, and mig 136_rls_cutover added the `NOBYPASSRLS` roles
+(`govtech_app` app / `rfp_agent` agents), `tenant_isolation` policies, and the per-request `SET app.tenant_id`
+context layer (mig 137 validates the namespace CHECK); it stays **inert until the one-op prod `DATABASE_URL`
+flip** off the owner role (see docs/RLS_CUTOVER.md). Oversight: `/admin/agents` → Agent Workforce (roster +
+per-tenant usage, forward-only bridge).
 `opportunity_id` keys the spine (mig 088). **The workflow engine the agents plug into — the declarative
 trigger+step templates, the start→end event gate, and the two stateless reconcilers — is mapped in
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
@@ -90,7 +93,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (729 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (828 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 
@@ -138,10 +141,12 @@ See CLAUDE_CLIFFNOTES.md for:
 - User content clearly delimited in agent prompts (prompt injection defense)
 - No committed production credentials — mig 124 rotated master_admin off the committed seed
   (`temp_password` forces a reset); the `.test` seed accounts are deactivated + hash-invalidated
-- RLS is ENABLE/FORCE'd but **single-layer today** (the app runs as the RLS-bypassing owner role); the
-  `NOBYPASSRLS` `govtech_app` cutover is the backstop (pending). Cross-tenant admin/CMS reads on
-  RLS-forced tables must run on a BYPASS connection / owner-view — RLS-cutover checklist in
-  docs/DEPRECATION_CLEANUP_2026-07-22.md. Full posture: **docs/SECURITY_AND_SAFETY.md**.
+- RLS is ENABLE/FORCE'd and **single-layer in effect today** (the app still connects as the RLS-bypassing
+  owner role). The `NOBYPASSRLS` `govtech_app` cutover is **built + applied in schema** (mig 136_rls_cutover:
+  19 force-RLS tables, 35 policies, the `govtech_app`/`rfp_agent` roles + the per-request context layer;
+  mig 137 validates the namespace CHECK) — it stays **inert until the one-op prod `DATABASE_URL` flip** to
+  `govtech_app`. Cross-tenant admin/CMS reads on RLS-forced tables must run on a BYPASS connection /
+  owner-view — RLS-cutover checklist in docs/RLS_CUTOVER.md. Full posture: **docs/SECURITY_AND_SAFETY.md**.
 
 ## Project Structure
 See ARCHITECTURE_V10.md (the as-built successor to V9) for the full system design and file tree, and

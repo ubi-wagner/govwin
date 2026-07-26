@@ -110,7 +110,7 @@ This order prevents information leaks (no `ValidationError` before auth check --
 - New tenant-scoped tables must include `tenant_id UUID NOT NULL REFERENCES tenants(id)` and an index on `tenant_id`.
 - Portal routes MUST verify tenant access -- never query by ID alone.
 
-**Tenant-scoped tables include:** `users`, `proposals`, `proposal_sections`, `proposal_comments`, `purchases`, `library_atoms`, `tenant_opportunity_cards`, `tenant_profiles`, `agent_task_queue`, `agent_memories`, `episodic_memories`, `tool_invocation_metrics`. (The retired `proposal_reviews`, `library_units`, and `tenant_pipeline_items` were dropped in migrations 121/125 — see the drop rule in §5.)
+**Tenant-scoped tables include:** `users`, `proposals`, `proposal_sections`, `proposal_comments`, `purchases`, `library_atoms`, `tenant_opportunity_cards`, `tenant_profiles`, `agent_task_queue`, `episodic_memories`, `semantic_memories`, `procedural_memories`, `tool_invocation_metrics`. (The retired `proposal_reviews`, `library_units`, and `tenant_pipeline_items` were dropped in migrations 121/125 — see the drop rule in §5.)
 
 ### Input Validation
 
@@ -158,8 +158,8 @@ Every change is verified through this exact sequence, in order. Each gate must p
 next is meaningful — do not skip ahead:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. Non-negotiable first gate.
-2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**729/729** at
-   migration head 125). Run on every change, not just schema changes.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**828/828** at
+   migration head 137). Run on every change, not just schema changes.
 3. **Migration (schema changes only)** — apply the new migration via the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner is
    idempotent (tracks applied files in `_migration_history`); re-running must be a clean no-op.

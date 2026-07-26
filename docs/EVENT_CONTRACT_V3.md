@@ -436,8 +436,8 @@ before 10.2 kills it.
 
 ### 10.8 🟡 Agents — written but dormant (V2, not today)
 > ⚠️ **SUPERSEDED (2026-07-22) — this section describes the pre-#117 snapshot and is now FALSE.**
-> As-built: **25 archetypes** auto-register and **are wired as workflow actors** (#117 + batches A/B/C +
-> POD4/CMS); `AgentFabric` is passed into `run_workflow_processor()` (not discarded), AI_INVOKE routes via
+> As-built: **27 archetypes** auto-register and **are wired as workflow actors** (#117 + batches A/B/C +
+> POD4/CMS + the library-seed pair); `AgentFabric` is passed into `run_workflow_processor()` (not discarded), AI_INVOKE routes via
 > `fabric.invoke_agent()`, and guardrails ARE reached (advisory → guardrail → land-or-review). **RLS now
 > has policies** — mig 117 FORCEs RLS + defines `tenant_isolation` on the tenant tables and adds the
 > `rfp_agent` NOBYPASSRLS role (inert only because the app connects as the RLS-bypassing owner today; the

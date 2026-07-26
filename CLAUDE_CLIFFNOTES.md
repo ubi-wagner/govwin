@@ -28,7 +28,7 @@ The schema is defined across **69 migrations (000–067, plus the interleaved
 produces **72 live tables across 14 domains**. Full per-table detail:
 `docs/archive/baseline/inventory/DB_SCHEMA_CURRENT.md`.
 (Prior docs said "53 / 051" or "40 / 039" — both stale/wrong.)
-> **⚠ high-water is now `108`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
+> **⚠ high-water is now `137`** (this §1 snapshot froze at `067`). Newer tables/columns are in the
 > dated deltas below: §1b (migs 088–092), §1c (migs 094–103), and **As-built delta — 2026-07-15**
 > (migs 105–108). The opportunity→purchase→proposal spine is specified in
 > `docs/MASTER_MIRROR_OPP_DESIGN.md` (master + one-way bridge + per-tenant mirror).
@@ -1107,7 +1107,7 @@ Both read/write the same `cms_content` rows (content_type='page_block'). `/admin
 - Active ingesters: SAM.gov (daily), SBIR.gov (weekly), DSIP (daily)
 
 ### Agent Fabric (pipeline/src/agents/) — WIRED + context-bound + injection-hardened + tenant-isolated (PIPE-12–16); advisory output; real Claude + embeddings activate on-deploy
-- **25 archetypes** auto-register (this delta shipped with 10; #117 + batches A/B/C + POD4/CMS took it to 25); fabric is passed to `run_workflow_processor()`; AI_INVOKE routes via `fabric.invoke_agent()`; `process_task_queue()` is scheduled as a 5th asyncio task. Two learning workflows wired: `OnProposalSectionEdited` → DiffAnalyzer; `OnProposalOutcomeRecorded` → OutcomeAttributor.
+- **27 archetypes** auto-register (this delta shipped with 10; #117 + batches A/B/C + POD4/CMS + the library-seed pair took it to 27); fabric is passed to `run_workflow_processor()`; AI_INVOKE routes via `fabric.invoke_agent()`; `process_task_queue()` is scheduled as a 5th asyncio task. Two learning workflows wired: `OnProposalSectionEdited` → DiffAnalyzer; `OnProposalOutcomeRecorded` → OutcomeAttributor.
 - Context-binding: ContextAssembler pre-loads proposal sections + RFP compliance + tenant library atoms before each agent call. User content is delimited by `<untrusted_data>` tags (prompt injection defense). All agent tools enforce `tenant_id`.
 - Output is advisory only — agent output is surfaced via NOTIFY/agent_task_log; never auto-applied to proposals.
 - Guardrails (120s timeout, 20-round cap, $0.50/call, 50/hr, $50/mo) are coded in `fabric.invoke_agent`. Budget column is `monthly_budget` (dollars), NOT `max_cost_per_month_cents`. `human_gate` enforced.
@@ -1457,8 +1457,8 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
 
 ## As-built delta — 2026-07-05 (Alpha hardening + Immobileyes rehearsal)
 
-**Latest migration (this 2026-07-05 delta): 104** — *superseded; high-water is now `108`, see the
-2026-07-15 delta at the end of this file.* (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
+**Latest migration (this 2026-07-05 delta): 104** — *superseded; high-water is now `137`, see the
+later deltas at the end of this file.* (`104_jsonb_string_scalar_backfill.sql` — jsonb backfill + `sbir_awards` unique
 index). The greenfield spine (ingest → skeleton → push → signup-mirror → provision-with-template → release →
 build → lock → download) is **driven-green end-to-end** — verified as RFP-admin→shadow→**Immobileyes**
 (`docs/HITL_IMMOBILEYES_CLICKPLAN.md`). Design/architecture/ToDo: `docs/archive/ALPHA_ARCHITECTURE_ASBUILT.md`,
