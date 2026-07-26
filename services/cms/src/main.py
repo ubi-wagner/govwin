@@ -3,11 +3,10 @@ CMS-CRM Service — email automation, content management, event-driven actions.
 
 Separate from the frontend/pipeline services. Owns:
 - Gmail API integration (send as platform@rfppipeline.com)
-- Calendar API for deadline reminders
-- Email templates and campaigns
-- CMS content (blog, resources, guides)
+- Email templates, campaigns, and drip sequences
+- CMS content (blog, resources, guides) and the page-block editor
+- Social posting automation
 - Event listener that bridges system_events → automated actions
-- SBIR award lookup for application enrichment
 """
 import asyncio
 import logging

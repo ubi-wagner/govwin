@@ -4,7 +4,7 @@
 export type AdminNavItem = { href: string; label: string };
 export type AdminNavSection = { title: string; items: AdminNavItem[] };
 
-export const ADMIN_NAV: AdminNavSection[] = [
+const ADMIN_NAV: AdminNavSection[] = [
   { title: 'Overview', items: [{ href: '/admin/dashboard', label: 'Dashboard' }] },
   {
     title: 'Opportunities',

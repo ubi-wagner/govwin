@@ -122,16 +122,9 @@ class OnApplicationAccepted(Workflow):
             timeout_minutes=10,
         ),
         Step(
-            name="create_library_defaults",
-            action="workflows.actions.create_library_defaults.create_default_categories",
-            input_map={"tenant_id": "result.tenantId"},
-            timeout_minutes=2,
-        ),
-        Step(
             name="schedule_login_reminder",
             step_type=StepType.HITL_WAIT,
             action="hitl_wait",
-            depends_on="create_library_defaults",
             wait_for=EventTrigger(
                 namespace="identity",
                 type="user.logged_in",
