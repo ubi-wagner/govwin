@@ -1,6 +1,7 @@
 """Agent archetypes — specialized AI roles for the proposal lifecycle."""
 
 from .base import BaseArchetype
+from .advisory_manager import AdvisoryManagerArchetype
 from .amendment_monitor import AmendmentMonitorArchetype
 from .capture_strategist import CaptureStrategistArchetype
 from .color_team_reviewer import ColorTeamReviewerArchetype
@@ -38,6 +39,7 @@ from .traceability_auditor import TraceabilityAuditorArchetype
 
 __all__ = [
     "BaseArchetype",
+    "AdvisoryManagerArchetype",
     "AmendmentMonitorArchetype",
     "CaptureStrategistArchetype",
     "ColorTeamReviewerArchetype",

@@ -81,6 +81,10 @@ EXPECTED_ARCHETYPES = {
     "traceability_auditor",
     "redaction_guard",
     "market_analyst",
+    # Advisory Overlay cohort (P1.5) — greenfielded DORMANT (registered + AI_INVOKE-mapped, woken
+    # only by the reusable AdvisoryOverlay sub-workflow, which nothing emits): the fan-out PLANNER +
+    # RECONCILER (discrepancy → adversarial survival → remediation) + advisory-memory writer.
+    "advisory_manager",
 }
 
 
@@ -93,7 +97,7 @@ class TestAgentFabricConstruction:
         self.fabric = AgentFabric()
 
     def test_archetype_class_list_has_all_entries(self):
-        """_ARCHETYPE_CLASSES must contain exactly the expected roster (34 after P1)."""
+        """_ARCHETYPE_CLASSES must contain exactly the expected roster (35 after P1.5)."""
         assert len(_ARCHETYPE_CLASSES) == len(EXPECTED_ARCHETYPES)
 
     def test_fabric_registers_all_archetypes(self):

@@ -60,6 +60,7 @@ from datetime import datetime, timedelta, timezone
 import anthropic
 
 from .archetypes import (
+    AdvisoryManagerArchetype,
     AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
@@ -102,6 +103,7 @@ from .tools import ToolRegistry, create_default_registry
 
 # All archetype classes to auto-register on fabric init
 _ARCHETYPE_CLASSES = [
+    AdvisoryManagerArchetype,
     AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
