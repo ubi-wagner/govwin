@@ -6,8 +6,10 @@ Workflow: OnFullDraftRequested  (the Proposal Draft Manager orchestration — 3 
 TRIGGER:    proposal:proposal.full_draft_requested:end
             Condition: payload.proposal_id present AND payload.mode in {a, b, c}
             Optional payload.voice (the Voice-of-Proposal register, threaded into drafting).
-            NOTHING emits this event yet → these workflows are INERT (trigger-gated). The admin-run
-            "Run full draft" control (P3 UI) will emit it; until then nothing fires. Reversible.
+            The admin-run "Run full draft" control (P3: the full-draft/route.ts POST) is the SOLE
+            producer of this event, so these workflows FIRE on an admin request; each agent STEP then
+            runs when the pipeline ANTHROPIC_API_KEY is set (advisory, like section_drafter — an
+            unkeyed AI_INVOKE safe-skips). No producer outside that admin control.
 
 PURPOSE:    The Proposal Draft Manager composes the drafting/format/style/cost/package agents + the
             review gate cohort into an admin-run "skeleton + matrix → drafted V0 artifacts" flow, with
