@@ -31,14 +31,21 @@ trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migrations at 13
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, **27 archetypes, all auto-registered — dormant ≠ dead**)
+The pipeline agent workforce (`AgentFabric`, **35 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY`);
 `compliance_reviewer` INLINE in `ai/compliance`; `color_team_reviewer` via the advance `agent_task_queue`;
 plus the greenfielded `librarian` (onto `library_atoms`, atomize→`agent_task_queue`, injection-fenced) and
-`scoring_strategist` (tenant-discretion) producers. The rest are greenfielded + registry-wired, pending the
-**global automation-policy wiring — the phase we are starting**. Wiring pattern: realign to the current
+`scoring_strategist` (tenant-discretion) producers. The **Proposal Draft Manager program** (P1–P4) added +8
+archetypes (27→35): the G1 integrity cohort (`formatter`/`stylist`/`continuity_manager`), the P1 cohort
+(`proposal_manager` planner + `traceability_auditor`/`redaction_guard`/`market_analyst`), and the P1.5
+`advisory_manager` — orchestrated by the admin-run `OnFullDraftRequested{ModeA,B,C}` (V0.1 HITL / V0.2
+restyle / V0.5 full auto), with `cost_estimator` **woken** (its `compute_budget` tool is backed by the
+deterministic `proposal.budget_model` burden-waterfall engine) and the **adversarial gate** = the reusable
+`AdvisoryOverlay` applied with `policy=auto` (Mode C's `request_overlay` elevates the review-gate cohort to a
+1:n fan-out → `advisory_manager` reconcile → HITL-or-AUTO landing; advisory, never advances a gate). The rest
+are greenfielded + registry-wired, pending the **global automation-policy wiring**. Wiring pattern: realign to the current
 spine, then either a **per-tenant producer** (fan-out agents) or a declarative **`AI_INVOKE` `Step`**
 (single-entity agents; `TOOL_ACTION_TO_ARCHETYPE` maps them — `validate()` rejects an unmapped `AI_INVOKE`
 at boot). **Agent invariants (non-negotiable):** tenant-space agents are **tenant-bound** (tenant_user
