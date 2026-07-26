@@ -62,16 +62,21 @@ try {
   ok(inTenant.role === before.role && (inTenant.role === 'rfp_admin' || inTenant.role === 'master_admin'),
     `role stays the platform-admin identity inside the tenant — NOT downgraded to tenant_admin (${inTenant.role})`);
 
-  // Perform a tenant_admin-GATED write (automation preferences PATCH).
-  const g = await page.request.get(`${BASE}/api/portal/${TENANT}/automation-preferences`);
-  ok(g.ok(), `shadow admin can READ the tenant_admin-gated automation prefs (${g.status()})`);
-  const prior = (await g.json())?.data?.preferences?.aiReviewOnAdvance ?? false;
+  // Perform a tenant_admin-GATED write: upsert one automation policy for a fixed
+  // catalog trigger. This is the live successor to the retired automation-preferences
+  // route; its PATCH still emits automation_preferences.updated (scoped + attributed
+  // below), so the audit assertions are unchanged.
+  const SCOPE = 'build';
+  const TRIGGER = 'proposal:document.locked';
+  const g = await page.request.get(`${BASE}/api/portal/${TENANT}/automation-policies`);
+  ok(g.ok(), `shadow admin can READ the tenant_admin-gated automation policies (${g.status()})`);
+  const policies = ((await g.json())?.data?.policies ?? []) as Array<{ scope?: string; triggerKey?: string; row?: { enabled?: boolean } | null }>;
+  const prior = policies.find((p) => p.scope === SCOPE && p.triggerKey === TRIGGER)?.row?.enabled ?? true;
 
-  const marker = `SHADOW-114-${adminId.slice(0, 8)}`;
-  const patch = await page.request.fetch(`${BASE}/api/portal/${TENANT}/automation-preferences`, {
+  const patch = await page.request.fetch(`${BASE}/api/portal/${TENANT}/automation-policies`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    data: { aiReviewOnAdvance: !prior },
+    data: { scope: SCOPE, triggerKey: TRIGGER, enabled: !prior },
   });
   ok(patch.ok(), `shadow admin can WRITE a tenant_admin-gated action inside the customer tenant (${patch.status()})`);
 
@@ -86,10 +91,10 @@ try {
   ok(ev?.actorId === adminId, 'audit event attributes to the ADMIN\'s real user id (not a tenant_admin stand-in)');
   ok(ev?.tenantId === tenantId, 'audit event is scoped to the CUSTOMER tenant');
 
-  // Restore the preference so the test leaves no side effect.
-  await page.request.fetch(`${BASE}/api/portal/${TENANT}/automation-preferences`, {
+  // Restore the policy so the test leaves no side effect.
+  await page.request.fetch(`${BASE}/api/portal/${TENANT}/automation-policies`, {
     method: 'PATCH', headers: { 'content-type': 'application/json' },
-    data: { aiReviewOnAdvance: prior },
+    data: { scope: SCOPE, triggerKey: TRIGGER, enabled: prior },
   });
 
   console.log('\nShadow tenant-admin drive-test complete.');

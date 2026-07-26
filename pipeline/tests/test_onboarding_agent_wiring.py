@@ -52,4 +52,6 @@ def test_is_an_ai_invoke_step_actor_with_kickoff_trigger():
     s = steps["ai_onboarding_concierge"]
     assert s.step_type == StepType.AI_INVOKE
     assert s.action == "tool.onboarding.concierge"
-    assert steps["create_library_defaults"].depends_on != "ai_onboarding_concierge"
+    # INDEPENDENT (no depends_on): a skip/failure never dead-ends onboarding. (It used
+    # to run beside a create_library_defaults step, retired with the library_units cutover.)
+    assert s.depends_on is None

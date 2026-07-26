@@ -45,7 +45,6 @@ const ROUTES = [
   ['purchases', `/api/portal/${S}/purchases`, 'any'],
   ['tasks', `/api/portal/${S}/tasks`, 'any'],
   ['notifications', `/api/portal/${S}/notifications`, 'any'],
-  ['expert-time', `/api/portal/${S}/expert-time`, 'any'],
   ['guardrail-templates', `/api/portal/${S}/guardrail-templates`, 'any'],
   ['automation-policies', `/api/portal/${S}/automation-policies`, 'any'],
   ['automation-overview', `/api/portal/${S}/automation-overview`, 'any'],

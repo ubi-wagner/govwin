@@ -13,6 +13,7 @@ import time
 import uuid
 
 from .models.database import get_pool as _get_cms_pool, get_event_pool
+from .models.events import emit_system_event
 from .workers.gmail_client import send_email as _gmail_send
 from .templates import render_template, render_db_template, build_trigger_metadata
 from .sender_identity import resolve_sender, load_sender_identities
@@ -1063,25 +1064,13 @@ async def _action_unpublish_content(config: dict, payload: dict, event):
 
 async def _emit_action_event(*, event_type: str, phase: str, payload: dict,
                               parent_event_id: str | None = None) -> str:
-    """Emit an action event to the shared system_events table."""
-    pool = get_event_pool()
-    if not pool:
-        return ""
-    event_id = str(uuid.uuid4())
-    try:
-        payload['correlationId'] = payload.get('correlationId', str(uuid.uuid4()))
-        await pool.execute(
-            """INSERT INTO system_events
-                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
-               VALUES ($1, 'system', $2, $3, 'system', 'event_listener', $4, $5::jsonb)""",
-            uuid.UUID(event_id), event_type, phase,
-            uuid.UUID(parent_event_id) if parent_event_id else None,
-            json.dumps(payload),
-        )
-        return event_id
-    except Exception as e:
-        logger.error('_emit_action_event failed: %s', e)
-        return ""
+    """Emit an action event to the shared system_events table (system actor)."""
+    return await emit_system_event(
+        event_type=event_type, phase=phase,
+        actor_type='system', actor_id='event_listener',
+        parent_event_id=parent_event_id, payload=payload,
+        ensure_correlation_id=True,
+    )
 
 
 async def _do_action(action_type: str, config: dict, payload: dict, event):

@@ -17,7 +17,7 @@ The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and n
 `tenant_opportunity_cards` (including the rebuilt `v_opportunity_rollup` view + the CMS
 `matched_opportunities` variable). The compliance matrix (`proposal_compliance_matrix`) populates
 at provision and advances on section lock. Verified end-to-end (Playwright + the live Python workflow
-engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 828 · `next build`).
+engine creating `process_instances` that carry `opportunity_id`; `tsc` 0 · `vitest` 796 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -93,7 +93,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Before writing SQL, verify column names in CLAUDE_CLIFFNOTES.md section 1
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (828 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (796 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 

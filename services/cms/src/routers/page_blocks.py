@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..models.database import get_event_pool, get_pool
+from ..models.events import emit_system_event
 from ..routers.auth import verify_session_token
 
 logger = logging.getLogger('cms.page_blocks')
@@ -70,23 +71,11 @@ def _get_cms_pool():
 
 
 async def _emit_shared_event(pool, event_type: str, user_id: str, payload: dict) -> None:
-    """Emit event to shared system_events table (best-effort)."""
-    if not pool:
-        return
-    try:
-        await pool.execute(
-            """
-            INSERT INTO system_events
-                (namespace, type, phase, actor_type, actor_id, payload)
-            VALUES ($1, $2, 'single', 'user', $3, $4::jsonb)
-            """,
-            'system',
-            event_type,
-            user_id,
-            json.dumps(payload),
-        )
-    except Exception as e:
-        logger.error('[page_blocks] event emit failed for %s: %s', event_type, e)
+    """Emit event to shared system_events table (best-effort, user actor)."""
+    await emit_system_event(
+        event_type=event_type, actor_type='user', actor_id=user_id,
+        payload=payload, pool=pool,
+    )
 
 
 # ── Request models ───────────────────────────────────────────────────────────
