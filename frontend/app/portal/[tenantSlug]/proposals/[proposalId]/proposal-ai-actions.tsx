@@ -51,6 +51,11 @@ export function ProposalAiActions({
   // Full-draft (Proposal Draft Manager) state
   const [fullDraftMode, setFullDraftMode] = useState<'a' | 'b' | 'c'>('a');
   const [voice, setVoice] = useState<string[]>([]);
+  // Adversarial-gate (P4-D) — Mode C only. When on, Mode C elevates its review-gate cohort
+  // to the reusable AdvisoryOverlay (1:n fan-out → reconcile). Policy picks the overlay's
+  // landing: 'hitl' (a human review) or 'auto' (records the reconciled verdict, no TODO).
+  const [adversarial, setAdversarial] = useState(false);
+  const [adversarialPolicy, setAdversarialPolicy] = useState<'hitl' | 'auto'>('hitl');
   const [fullDraftLoading, setFullDraftLoading] = useState(false);
   const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
@@ -131,12 +136,19 @@ export function ProposalAiActions({
     setFullDraftLoading(true);
     setFullDraftMsg(null);
     try {
+      // The adversarial gate applies only to Mode C (the only mode with a gate cohort).
+      const useAdversarial = fullDraftMode === 'c' && adversarial;
       const res = await fetch(
         `/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: fullDraftMode, voice }),
+          body: JSON.stringify({
+            mode: fullDraftMode,
+            voice,
+            adversarial: useAdversarial,
+            ...(useAdversarial ? { adversarialPolicy } : {}),
+          }),
         },
       );
       if (!res.ok) {
@@ -146,9 +158,12 @@ export function ProposalAiActions({
           text: err.error || 'Full draft request failed',
         });
       } else {
+        const gateNote = useAdversarial
+          ? ` Adversarial gate on (${adversarialPolicy === 'auto' ? 'auto-reconcile' : 'human review'}).`
+          : '';
         setFullDraftMsg({
           type: 'success',
-          text: `Full draft (Mode ${fullDraftMode.toUpperCase()}) requested. Drafts land in review — watch the section version history as they arrive.`,
+          text: `Full draft (Mode ${fullDraftMode.toUpperCase()}) requested. Drafts land in review — watch the section version history as they arrive.${gateNote}`,
         });
       }
     } catch {
@@ -156,7 +171,7 @@ export function ProposalAiActions({
     } finally {
       setFullDraftLoading(false);
     }
-  }, [canDraft, fullDraftLoading, fullDraftMode, voice, tenantSlug, proposalId]);
+  }, [canDraft, fullDraftLoading, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -373,6 +388,60 @@ export function ProposalAiActions({
             Threaded into narrative drafting as tone &amp; emphasis. Cost/spec artifacts ignore it.
           </p>
         </fieldset>
+
+        {/* Adversarial gate — Mode C only (the only mode with a review-gate cohort) */}
+        {fullDraftMode === 'c' && (
+          <fieldset className="mb-4 rounded-lg border border-gray-200 p-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={adversarial}
+                onChange={(e) => setAdversarial(e.target.checked)}
+                disabled={fullDraftLoading}
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="text-sm font-medium text-gray-900">Adversarial gate</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Elevate the review-gate cohort to a directed 1:n adversarial pass
+                  (fan-out → discrepancy → remediation) via the Advisory Overlay.
+                </span>
+              </span>
+            </label>
+
+            {adversarial && (
+              <div className="mt-3 pl-7">
+                <span className="block text-xs font-medium text-gray-700 mb-2">Landing</span>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: 'hitl', label: 'Human review', desc: 'Findings land in a review task.' },
+                    { value: 'auto', label: 'Auto-reconcile', desc: 'Records the reconciled verdict — no review task.' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setAdversarialPolicy(opt.value)}
+                      disabled={fullDraftLoading}
+                      aria-pressed={adversarialPolicy === opt.value}
+                      title={opt.desc}
+                      className={`px-3 py-1.5 text-xs font-medium border rounded-full transition-colors disabled:opacity-50 ${
+                        adversarialPolicy === opt.value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500'
+                          : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  The overlay is advisory — it never advances a gate. Mode C still ends in a
+                  full-draft review.
+                </p>
+              </div>
+            )}
+          </fieldset>
+        )}
 
         <button
           onClick={handleFullDraft}

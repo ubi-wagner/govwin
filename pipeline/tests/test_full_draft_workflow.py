@@ -123,9 +123,16 @@ def test_every_mode_ends_in_hitl_review_and_never_auto_advances():
         for s in cls.steps:
             assert "advanced" not in (s.action or "")
             assert "advance" not in (s.action or "")
-            # Every non-HITL step is an advisory AI_INVOKE — none auto-writes/advances a gate.
+            # Every non-HITL step is advisory: an AI_INVOKE agent, OR the request_overlay
+            # ACTION (P4-D) which only EMITS the advisory-overlay request event — it writes
+            # no business table and advances no gate (the overlay itself is advisory).
             if s.step_type != StepType.TODO:
-                assert s.step_type == StepType.AI_INVOKE, f"mode {mode} step {s.name} not advisory"
+                if s.name == "request_overlay":
+                    assert s.step_type == StepType.ACTION
+                    assert s.action == "workflows.actions.advisory_actions.request_advisory_overlay"
+                    assert s.depends_on is None  # independent — never blocks the human gate
+                else:
+                    assert s.step_type == StepType.AI_INVOKE, f"mode {mode} step {s.name} not advisory"
 
 
 def test_all_ai_invoke_actions_resolve_to_registered_archetypes():

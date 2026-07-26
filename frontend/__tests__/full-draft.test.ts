@@ -153,7 +153,8 @@ describe('POST /api/portal/[tenantSlug]/proposals/[proposalId]/full-draft', () =
       makeCtx(),
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ data: { requested: true, mode: 'c' } });
+    // adversarial defaults to false (not requested) → present but off.
+    expect(await res.json()).toEqual({ data: { requested: true, mode: 'c', adversarial: false } });
 
     // Event type/namespace EXACTLY match the pipeline trigger
     // (proposal:proposal.full_draft_requested:end).
@@ -194,5 +195,64 @@ describe('POST /api/portal/[tenantSlug]/proposals/[proposalId]/full-draft', () =
         payload: expect.objectContaining({ mode: 'b', voice: null }),
       }),
     );
+  });
+
+  // ── Adversarial gate (P4-D) ──────────────────────────────────────────
+  it('threads the adversarial gate + auto policy into the workflow payload (Mode C)', async () => {
+    wireHappyGate();
+    const res = await POST(
+      makeRequest({ mode: 'c', adversarial: true, adversarialPolicy: 'auto' }),
+      makeCtx(),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      data: { requested: true, mode: 'c', adversarial: true, adversarialPolicy: 'auto' },
+    });
+    // The END event carries the snake_case gate fields the pipeline's request_overlay reads.
+    expect(emitEventEndMock).toHaveBeenCalledWith(
+      'evt-start-id',
+      expect.objectContaining({
+        result: expect.objectContaining({
+          mode: 'c',
+          adversarial: true,
+          adversarial_policy: 'auto',
+          adversarial_resolution: 'majority',
+        }),
+      }),
+    );
+  });
+
+  it('defaults the adversarial policy to hitl when omitted', async () => {
+    wireHappyGate();
+    const res = await POST(makeRequest({ mode: 'c', adversarial: true }), makeCtx());
+    expect(res.status).toBe(200);
+    expect(emitEventEndMock).toHaveBeenCalledWith(
+      'evt-start-id',
+      expect.objectContaining({
+        result: expect.objectContaining({ adversarial: true, adversarial_policy: 'hitl' }),
+      }),
+    );
+  });
+
+  it('ignores the adversarial gate for non-C modes (no gate cohort)', async () => {
+    wireHappyGate();
+    const res = await POST(makeRequest({ mode: 'a', adversarial: true }), makeCtx());
+    expect(res.status).toBe(200);
+    expect(emitEventStartMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ mode: 'a', adversarial: false }),
+      }),
+    );
+  });
+
+  it('returns 400 when adversarialPolicy is not hitl/auto', async () => {
+    wireHappyGate();
+    const res = await POST(
+      makeRequest({ mode: 'c', adversarial: true, adversarialPolicy: 'bogus' }),
+      makeCtx(),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('VALIDATION_ERROR');
+    expect(emitEventStartMock).not.toHaveBeenCalled();
   });
 });

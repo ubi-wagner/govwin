@@ -36,9 +36,12 @@ pattern as OnProposalAdvancedToReview / …ToFinal):
   Mode C (V0.5) — Full auto-draft. The full per-section pipeline [seed_suggester → section_drafter →
       formatter → stylist] → cost_estimator (cost volume) → packaging_specialist (assemble) → the
       REVIEW GATE COHORT (continuity_manager + traceability_auditor + redaction_guard). The gate cohort
-      is the SAME advisor set the reusable AdvisoryOverlay wraps — a gate may elevate it to the overlay's
-      1:n fan-out + reconcile by emitting proposal.advisory_overlay_requested. Ends at a full-draft
-      review TODO (the human — or, later, the adversarial cohort under an auto policy — passes the gate).
+      is the SAME advisor set the reusable AdvisoryOverlay wraps. When the admin selects the ADVERSARIAL
+      GATE (payload.adversarial), the request_overlay ACTION (P4-D) elevates that cohort to the overlay's
+      1:n fan-out + reconcile by emitting proposal.advisory_overlay_requested — landing HITL or AUTO per
+      payload.adversarial_policy. Either way Mode C ends at a full-draft review TODO; the overlay is
+      advisory and never advances the gate (the human — or, under an auto policy, the recorded
+      adversarial verdict — accompanies the human gate).
 
 VOICE-OF-PROPOSAL: payload.voice (a register / weighting over passive · persuasive · technical ·
       commercial · research · development) is threaded into every drafting/regen step (plan / draft /
@@ -288,6 +291,30 @@ class OnFullDraftRequestedModeC(Workflow):
             depends_on="package",
             input_map={"proposal_id": "payload.proposal_id", "tenant_id": "payload.tenant_id"},
             timeout_minutes=10,
+        ),
+        # ── ADVERSARIAL-GATE ELEVATION (P4-D). INDEPENDENT ACTION that, WHEN the admin
+        #    selected the adversarial gate (payload.adversarial), emits
+        #    proposal.advisory_overlay_requested to elevate the gate cohort to the reusable
+        #    AdvisoryOverlay's 1:n fan-out + reconcile — landing HITL or AUTO per
+        #    payload.adversarial_policy. The gate lives IN the action (Python), NOT a
+        #    declarative CONDITION: the managed engine marks a false CONDITION step
+        #    'completed', so a CONDITION-gated dependent would wrongly run. When adversarial
+        #    is unset the action is a safe no-op (never dead-ends). Placed BEFORE review_gate
+        #    so it runs before the instance parks; the human gate below still stands (the
+        #    overlay is advisory — it never advances the gate).
+        Step(
+            name="request_overlay",
+            step_type=StepType.ACTION,
+            action="workflows.actions.advisory_actions.request_advisory_overlay",
+            input_map={
+                "adversarial": "payload.adversarial",
+                "proposal_id": "payload.proposal_id",
+                "tenant_id": "payload.tenant_id",
+                "opportunity_id": "payload.opportunity_id",
+                "policy": "payload.adversarial_policy",
+                "resolution": "payload.adversarial_resolution",
+            },
+            timeout_minutes=5,
         ),
         # HITL: the human (or, later, the adversarial cohort under a #190 auto policy) reviews the
         # auto-drafted V0.5 artifacts + gate findings and passes the gate. NEVER auto-advances.
