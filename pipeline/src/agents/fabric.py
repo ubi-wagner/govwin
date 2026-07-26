@@ -74,6 +74,7 @@ from .archetypes import (
     LibrarianArchetype,
     LibrarySeedMapperArchetype,
     LibrarySeedSuggesterArchetype,
+    MarketAnalystArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
@@ -84,12 +85,15 @@ from .archetypes import (
     PartnerCoordinatorArchetype,
     PpMatcherArchetype,
     ProposalArchitectArchetype,
+    ProposalManagerArchetype,
+    RedactionGuardArchetype,
     ResearchScoutArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
     SkeletonArchitectArchetype,
     SocialSchedulerArchetype,
     StylistArchetype,
+    TraceabilityAuditorArchetype,
 )
 from .context import ContextAssembler
 from .guardrails import enforce_guardrails, load_guardrail_config
@@ -112,6 +116,7 @@ _ARCHETYPE_CLASSES = [
     LibrarianArchetype,
     LibrarySeedMapperArchetype,
     LibrarySeedSuggesterArchetype,
+    MarketAnalystArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
@@ -122,12 +127,15 @@ _ARCHETYPE_CLASSES = [
     PartnerCoordinatorArchetype,
     PpMatcherArchetype,
     ProposalArchitectArchetype,
+    ProposalManagerArchetype,
+    RedactionGuardArchetype,
     ResearchScoutArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
     SkeletonArchitectArchetype,
     SocialSchedulerArchetype,
     StylistArchetype,
+    TraceabilityAuditorArchetype,
 ]
 
 logger = logging.getLogger("pipeline.agents")

@@ -243,6 +243,16 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     "tool.proposal.reformat_section": "formatter",
     "tool.proposal.restyle": "stylist",
     "tool.proposal.check_continuity": "continuity_manager",
+    # Proposal Draft Manager cohort (P1, greenfielded DORMANT — mapped so a future AI_INVOKE
+    # step validates at boot; no step references these yet, so inert):
+    #   proposal_manager     — PLANNER: skeleton + matrix + ranked atoms → a per-section draft plan
+    #   traceability_auditor — requirement→coverage map (unaddressed + orphan content)
+    #   redaction_guard      — cross-boundary / OPSEC leak scan over assembled content
+    #   market_analyst       — SOTA/market web context for commercialization + related-work
+    "tool.proposal.plan_draft": "proposal_manager",
+    "tool.proposal.audit_traceability": "traceability_auditor",
+    "tool.proposal.scan_redaction": "redaction_guard",
+    "tool.market.analyze_sota": "market_analyst",
     "tool.proposal.package": "packaging_specialist",
     "tool.library.curate": "librarian",
     # library_seed flow — fires on provision, then on admin selection

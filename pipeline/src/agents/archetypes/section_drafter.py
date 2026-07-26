@@ -197,6 +197,17 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
 
         user_content += "First, use search_library to find relevant company capabilities, then draft the section."
 
+        # Voice-of-Proposal (mig 139 proposals.voice, additive) — thread a short register
+        # instruction into the drafting prompt ONLY when a voice is supplied (top-level context
+        # or the payload). When absent, this is a byte-identical no-op: _voice_register(None)
+        # returns "" so nothing is appended and today's prompt is unchanged.
+        voice = context.get("voice")
+        if voice is None:
+            voice = payload.get("voice")
+        register = _voice_register(voice)
+        if register:
+            user_content += register
+
         messages.append({"role": "user", "content": user_content})
         return messages
 
@@ -403,3 +414,59 @@ Include [PLACEHOLDER: description] markers for any claims that need verification
             # First 200 chars of the draft
             return f"Drafted section: {text[:200]}"
         return "Section draft completed (tool-based)"
+
+
+# ── Voice of Proposal (mig 139 proposals.voice) ─────────────────────────────────
+# The register a narrative section is drafted in — a list/weighting over these six
+# tokens. Threaded into build_messages ADDITIVELY: absent/empty → "" (no prompt change).
+_VOICE_REGISTERS = {
+    "passive": "measured, third-person passive voice",
+    "persuasive": "persuasive, benefit-forward emphasis",
+    "technical": "precise technical depth",
+    "commercial": "commercial, market-facing framing",
+    "research": "research-oriented, evidence-and-citation framing",
+    "development": "engineering and development, build-and-deliver framing",
+}
+
+
+def _normalize_voice(voice) -> list[str]:
+    """Coerce a voice value (list of tokens, weighting dict, or JSON/comma string) to an
+    ordered list of KNOWN tokens. Unknown tokens are dropped; anything falsy → []. A
+    weighting dict is ordered by descending weight (positive weights only)."""
+    if not voice:
+        return []
+    raw = voice
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            raw = [t.strip() for t in raw.split(",")]
+    if isinstance(raw, dict):
+        weighted = [(k, v) for k, v in raw.items() if isinstance(v, (int, float)) and v > 0]
+        weighted.sort(key=lambda kv: kv[1], reverse=True)
+        raw = [k for k, _ in weighted] or list(raw.keys())
+    if not isinstance(raw, list):
+        return []
+    ordered: list[str] = []
+    for t in raw:
+        if not isinstance(t, str):
+            continue
+        tok = t.strip().lower()
+        if tok in _VOICE_REGISTERS and tok not in ordered:
+            ordered.append(tok)
+    return ordered
+
+
+def _voice_register(voice) -> str:
+    """Return the short register instruction to append to the drafting prompt, or "" when no
+    valid voice is supplied (the no-op path that keeps the prompt byte-identical)."""
+    tokens = _normalize_voice(voice)
+    if not tokens:
+        return ""
+    joined = ", ".join(tokens)
+    desc = "; ".join(_VOICE_REGISTERS[t] for t in tokens)
+    return (
+        f"\n\nVoice of Proposal — render this section in a {joined} register "
+        f"({desc}). Apply this as tone and emphasis only: do not change the factual "
+        f"content, the compliance coverage, or the required structure."
+    )

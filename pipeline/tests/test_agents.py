@@ -75,6 +75,12 @@ EXPECTED_ARCHETYPES = {
     "formatter",
     "stylist",
     "continuity_manager",
+    # Proposal Draft Manager cohort (P1) — greenfielded DORMANT (registered + AI_INVOKE-mapped,
+    # no firing hook wired): the draft PLANNER + requirement-coverage / redaction / market gates.
+    "proposal_manager",
+    "traceability_auditor",
+    "redaction_guard",
+    "market_analyst",
 }
 
 
@@ -87,7 +93,7 @@ class TestAgentFabricConstruction:
         self.fabric = AgentFabric()
 
     def test_archetype_class_list_has_all_entries(self):
-        """_ARCHETYPE_CLASSES must contain exactly the expected roster (19 after #117-#129)."""
+        """_ARCHETYPE_CLASSES must contain exactly the expected roster (34 after P1)."""
         assert len(_ARCHETYPE_CLASSES) == len(EXPECTED_ARCHETYPES)
 
     def test_fabric_registers_all_archetypes(self):
