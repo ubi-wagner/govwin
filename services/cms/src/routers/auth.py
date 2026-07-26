@@ -235,7 +235,7 @@ async def _emit_login_event(
             """,
             'identity',
             event_type,
-            'user' if user_id else 'anonymous',
+            'user' if user_id else 'system',
             user_id or 'anonymous',
             json.dumps(payload),
         )

@@ -87,7 +87,17 @@ async def publish_section_draft(conn: asyncpg.Connection, **inputs: Any) -> dict
                  section_id, row["status"])
         return {"published": False, "skipped": True, "reason": f"status_{row['status']}"}
 
-    content_json = content if isinstance(content, str) else json.dumps(content)
+    # canvas_versions.content is jsonb NOT NULL. A str must be valid JSON text; a bare
+    # plain-text string would fail the jsonb bind (invalid input syntax for type json).
+    # Validate, and JSON-encode plain text so it lands as a JSON string value, not a 500.
+    if isinstance(content, str):
+        try:
+            json.loads(content)
+            content_json = content
+        except (json.JSONDecodeError, ValueError):
+            content_json = json.dumps(content)
+    else:
+        content_json = json.dumps(content)
     new_version = int(row["version"] or 0) + 1
     char_count, word_count = _counts(content)
     # canvas_versions.source is a constrained enum; map the logical source label

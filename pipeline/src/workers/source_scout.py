@@ -312,6 +312,10 @@ async def scout_source(
         is_meaningful = analysis["changed"] if analysis else hash_changed
         summary = analysis["summary"] if analysis else "Content hash changed but Claude analysis unavailable"
         severity = analysis["severity"] if analysis else "low"
+        # source_diffs.severity is CHECK-constrained; an LLM-returned value outside the
+        # set would abort the whole scout run at INSERT (not per-row wrapped). Clamp it.
+        if severity not in ("info", "low", "medium", "high", "critical"):
+            severity = "medium"
         extracted_opps = analysis.get("extracted_opportunities", []) if analysis else []
 
         # Create diff record
