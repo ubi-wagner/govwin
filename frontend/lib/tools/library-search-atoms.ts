@@ -19,7 +19,6 @@ import { ToolAuthorizationError } from './errors';
 // ─── Input schema ──────────────────────────────────────────────────
 
 const InputSchema = z.object({
-  tenantId: z.string().uuid(),
   category: z.string().max(100).optional(),
   tags: z.array(z.string()).optional(),
   query: z.string().max(500).optional(),

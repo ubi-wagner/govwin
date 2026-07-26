@@ -181,6 +181,14 @@ export async function confirmTags(
   actorId: string,
 ): Promise<{ updated: number }> {
   return withTenant(tenantId, async (tx) => {
+    // Vault fence: confirmTags is a main-library curation op (only ever called from the
+    // main-library atom route). Guard that the target is a non-vault atom in this tenant
+    // before writing any tags, so a main-library call can never touch a vault atom's tags
+    // — mirrors the AND vault_id IS NULL on every library_atoms read in this file.
+    const [own] = await tx<Array<{ id: string }>>`
+      SELECT id FROM library_atoms
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid AND vault_id IS NULL`;
+    if (!own) return { updated: 0 };
     let updated = 0;
     for (const t of tags) {
       const rows = await tx<Array<{ atom_id: string }>>`

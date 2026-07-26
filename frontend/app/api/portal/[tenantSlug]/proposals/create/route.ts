@@ -426,7 +426,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           let templateDoc: CanvasDocument | null = null;
           if (item.templateId) {
             const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`
-              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1
+              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid AND (tenant_id = ${tenantId}::uuid OR is_system = true) LIMIT 1
             `;
             if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
               templateDoc = tpl.canvasDocument;

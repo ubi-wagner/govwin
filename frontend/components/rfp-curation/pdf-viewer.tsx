@@ -33,7 +33,9 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 
 import type { SourceAnchor, AnchorRect } from '@/lib/types/source-anchor';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Self-hosted worker (copied from node_modules/pdfjs-dist/build at the installed
+// version) — avoids an external CDN fetch that a strict CSP / offline env would block.
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export interface TextSelection {
   text: string;

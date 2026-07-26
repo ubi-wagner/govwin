@@ -104,7 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       // Only record atomIds that belong to THIS tenant's library, so a supplied id
       // can't create cross-tenant lineage / usage bumps when the section is locked.
       const owned = ids.length
-        ? (await tx<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${ids}::uuid[])`).map((r: { id: string }) => r.id)
+        ? (await tx<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${ids}::uuid[]) AND vault_id IS NULL`).map((r: { id: string }) => r.id)
         : [];
       const existing = Array.isArray(row.ids) ? (row.ids as string[]) : [];
       const union = Array.from(new Set([...existing, ...owned]));
