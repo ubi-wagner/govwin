@@ -235,6 +235,14 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     # generic content drafting invocations
     "tool.proposal.draft_section": "section_drafter",
     "tool.proposal.review_color_team": "color_team_reviewer",
+    # production-integrity cohort (G1, greenfielded DORMANT — mapped so a future
+    # AI_INVOKE step validates at boot; no step references these yet, so inert):
+    #   formatter — per-section CanvasDocument v2 scaffold integrity + revectoring
+    #   stylist   — style normalization across atom pedigrees (section/artifact)
+    #   continuity_manager — phase-gate whole-proposal cross-artifact + RFP-alignment QA
+    "tool.proposal.reformat_section": "formatter",
+    "tool.proposal.restyle": "stylist",
+    "tool.proposal.check_continuity": "continuity_manager",
     "tool.proposal.package": "packaging_specialist",
     "tool.library.curate": "librarian",
     # library_seed flow — fires on provision, then on admin selection

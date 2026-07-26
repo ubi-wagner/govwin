@@ -7,8 +7,10 @@ from .color_team_reviewer import ColorTeamReviewerArchetype
 from .compliance_reviewer import ComplianceReviewerArchetype
 from .content_curator import ContentCuratorArchetype
 from .content_generator import ContentGeneratorArchetype
+from .continuity_manager import ContinuityManagerArchetype
 from .cost_estimator import CostEstimatorArchetype
 from .curation_qa import CurationQaArchetype
+from .formatter import FormatterArchetype
 from .ingest_analyst import IngestAnalystArchetype
 from .librarian import LibrarianArchetype
 from .library_seed_mapper import LibrarySeedMapperArchetype
@@ -28,6 +30,7 @@ from .scoring_strategist import ScoringStrategistArchetype
 from .section_drafter import SectionDrafterArchetype
 from .skeleton_architect import SkeletonArchitectArchetype
 from .social_scheduler import SocialSchedulerArchetype
+from .stylist import StylistArchetype
 
 __all__ = [
     "BaseArchetype",
@@ -37,8 +40,10 @@ __all__ = [
     "ComplianceReviewerArchetype",
     "ContentCuratorArchetype",
     "ContentGeneratorArchetype",
+    "ContinuityManagerArchetype",
     "CostEstimatorArchetype",
     "CurationQaArchetype",
+    "FormatterArchetype",
     "IngestAnalystArchetype",
     "LibrarianArchetype",
     "LibrarySeedMapperArchetype",
@@ -58,4 +63,5 @@ __all__ = [
     "SectionDrafterArchetype",
     "SkeletonArchitectArchetype",
     "SocialSchedulerArchetype",
+    "StylistArchetype",
 ]

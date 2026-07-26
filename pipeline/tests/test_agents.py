@@ -70,6 +70,11 @@ EXPECTED_ARCHETYPES = {
     # Library-seed pair (provision-time starter suggestion/mapping)
     "library_seed_suggester",
     "library_seed_mapper",
+    # Production-integrity cohort (G1) — greenfielded DORMANT (registered + AI_INVOKE-mapped,
+    # no firing hook wired): canvas scaffold integrity, style normalization, phase-gate QA.
+    "formatter",
+    "stylist",
+    "continuity_manager",
 }
 
 
