@@ -394,8 +394,8 @@ Export is now unlocked (`lock_count ≥ 1`, or stage `submitted`).
 
 ## Live verification (what was driven vs traced)
 
-The headline chain was **driven live** through the real route handlers by
-`frontend/e2e/hitl-onboard-tvs.spec.ts` (self-authenticating as the seeded `e2e-rfpadmin`), and passes:
+The **entire chain A → C7 was driven live** through the real route handlers and passes — producing a
+real provisioned, unlocked Fondation build with the exact 6-volume TVS format + matrix:
 
 | Step | Call | Result (example run) |
 |---|---|---|
@@ -406,16 +406,32 @@ The headline chain was **driven live** through the real route handlers by
 | C3 spotlight_summary | `PATCH …/rfp-curation/<solId>` | **200** |
 | C4 request_review + approve | `POST …/triage`, `…/solicitation.approve` | **200** → `approved` |
 | C5 push → bridge/cards | `POST …/solicitation.push` | **200** → `pushed_to_pipeline`; card fans to Fondation |
+| C6 comp-code purchase | `POST /api/portal/<slug>/purchase` | **200** → portal `curation_pending`, `comp:true` |
+| C7 release + provision | `POST …/portals/<portalId>?action=release` | **200** → `{released:true, proposalId}` |
 
-Run it yourself (after §1 spin-up + seed, in a window where postgres is up):
+**Provisioned build verified in the DB:** the proposal is `stage='draft', is_locked=false`; **6
+`proposal_artifacts`** materialized from the custom TVS volumes (Budget & Match correctly typed `cost`,
+the rest `narrative`); **6 `proposal_sections`** (all `status='empty'`, ready to draft); **6
+`proposal_compliance_matrix`** rows (`not_addressed`, advance to `satisfied` on lock); portal `launched`.
+→ **Phase D is walkable on this build.**
+
+Run the two drivers (after §1 spin-up + seed, in a window where postgres is up):
 ```bash
-cd frontend && TEST_BASE_URL=http://localhost:3000 npx playwright test e2e/hitl-onboard-tvs.spec.ts --project=hitl
+cd frontend
+# A → C5 (rfp_admin: create → ingest → curate → push)
+TEST_BASE_URL=http://localhost:3000 npx playwright test e2e/hitl-onboard-tvs.spec.ts --project=hitl
+# C6 → C7 (tenant_admin buys, rfp_admin releases) — supply the pushed card + a login-able admin:
+FOND_SLUG=<slug> FOND_OPP=<opportunityId> FOND_ADMIN=<tenant_admin_email> \
+  npx playwright test e2e/hitl-onboard-tvs-build.spec.ts --project=hitl
 ```
+> The new tenant_admin's temp password must be reset before the C6 login (Phase A gotcha): either set a
+> real one via `/change-password`, or `UPDATE users SET password_hash=crypt('…',gen_salt('bf',12)),
+> temp_password=false WHERE email=…`.
 
-**Trace-verified (not driven live here):** C6 purchase + C7 release/provision require the *new tenant's*
-`tenant_admin` (whose temp password must be reset first) and the shadow grant — every route/payload/DB
-write is cited above from the handlers. **Phase D's full-draft** (the P4 route) is separately proven green
-by `frontend/e2e/hitl-full-draft.spec.ts`; the draft/lock/advance/package chain is trace-verified.
+**Phase D's full-draft** (the P4 route) is separately proven green by `frontend/e2e/hitl-full-draft.spec.ts`;
+the draft → lock (matrix advance) → advance → package/download chain is trace-verified (§D). *Minor
+finding:* the card `pin` route returned 500 in the drive but is not required — `POST …/purchase` takes
+`opportunityId` directly.
 
 ## Reuse — onboarding the next company
 
