@@ -4,12 +4,26 @@ A **reusable, code-verified, one-off operator playbook**: stand up a brand-new c
 ingest a NON-federal custom-format opportunity (a state Economic-Development grant) into the master
 Opportunities list, curate its format, and walk the proposal build to a downloadable package.
 
-> **Worked example:** company **Fondation**, opportunity **TVS** (Technology Validation & Startup — a
-> representative Ohio Third-Frontier / Econ-Development format; mock RFP at
-> `docs/runbook-assets/fondation-tvs/TVS_RFP_Fondation_MOCK.md`). The *procedure* is format- and
-> company-agnostic — swap the name + RFP to onboard the next company. Every step below is verified
-> against the real route handlers / components / migrations (paths cited); example outputs are from a
-> live sandbox drive.
+> **Worked example:** company **Fondation**, opportunity **TVSF** — the **real Ohio Third Frontier ·
+> Technology Validation & Startup Fund** format, digested from the Economic-Development team's DMVEC
+> Round-45 template into **`docs/runbook-assets/fondation-tvs/TVSF_FORMAT.md`** (a Proposal of 12
+> questions at a 7-page limit with the Abstract excluded, plus a Budget by spend type). The *procedure*
+> is format- and company-agnostic — swap the name + format to onboard the next company. Every step below
+> is verified against the real route handlers / components / migrations (paths cited); example outputs
+> are from a live sandbox drive. (An earlier `TVS_RFP_Fondation_MOCK.md` in the same folder is a
+> superseded placeholder — use `TVSF_FORMAT.md`.)
+>
+> **Loading the TVSF opportunity itself** (dated "opened 2 weeks ago, closes in 2 weeks") is scripted in
+> **`frontend/e2e/hitl-load-tvsf.spec.ts`** — the same proven `intake → curate(2 volumes) → approve →
+> push` chain, with the real 2-volume TVSF format. Run it, then set the "opened" date (intake sets close
+> + posted; `open_date` is not an intake field and push defaults it to `now()`), all in one window:
+> ```bash
+> cd frontend && npx playwright test e2e/hitl-load-tvsf.spec.ts --project=hitl   # prints OPPID=… SOLID=…
+> psql "$DATABASE_URL" -c "UPDATE opportunities SET open_date=now()-interval '14 days',
+>   posted_date=now()-interval '14 days', close_date=now()+interval '14 days' WHERE id='<OPPID>';"
+> # refresh the fanned card with the corrected dates:
+> curl -s -X POST http://localhost:3000/api/admin/opportunities/<OPPID>/publish -d '{"eventType":"updated"}'
+> ```
 
 ## Conventions
 
