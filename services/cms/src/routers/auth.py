@@ -5,7 +5,6 @@ Provides login/logout/me endpoints. Authenticates against the shared
 database users table (master_admin and rfp_admin roles only).
 Issues a signed JWT session cookie on successful login.
 """
-import json
 import logging
 import os
 import time
@@ -16,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from ..models.database import get_event_pool
+from ..models.events import emit_system_event
 
 logger = logging.getLogger('cms.auth')
 
@@ -226,18 +226,11 @@ async def _emit_login_event(
     if reason:
         payload['reason'] = reason
 
-    try:
-        await shared_pool.execute(
-            """
-            INSERT INTO system_events
-                (namespace, type, phase, actor_type, actor_id, payload)
-            VALUES ($1, $2, 'single', $3, $4, $5::jsonb)
-            """,
-            'identity',
-            event_type,
-            'user' if user_id else 'anonymous',
-            user_id or 'anonymous',
-            json.dumps(payload),
-        )
-    except Exception as e:
-        logger.error('[auth] Failed to emit %s event: %s', event_type, e)
+    # Login audit events live in the 'identity' namespace; a failed/no-user login
+    # attributes to the 'anonymous' system actor (not the 'cms_service' default).
+    await emit_system_event(
+        event_type=event_type, namespace='identity',
+        actor_type='user' if user_id else 'system',
+        actor_id=user_id or 'anonymous',
+        payload=payload, pool=shared_pool,
+    )

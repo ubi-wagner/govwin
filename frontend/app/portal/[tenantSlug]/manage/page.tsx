@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { ManageConsole, type ManageMember, type ManagePurchase } from '@/components/portal/manage-console';
 
@@ -39,6 +39,7 @@ export default async function ManagePage({
 
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   const companyName = (tenant.name as string) ?? tenantSlug;
   const isExpert = role === 'rfp_admin' || role === 'master_admin';

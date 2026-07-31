@@ -81,7 +81,7 @@ export default defineConfig({
    - `createdb -p <port> govtech_intel_test`.
    - Set `process.env.DATABASE_URL = 'postgresql://localhost:<port>/govtech_intel_test'`.
    - Run all migrations via `bash db/migrations/run.sh` (with the temp `DATABASE_URL`).
-3. **`beforeEach` in each suite**: `TRUNCATE` all tenant-scoped tables, cascade. Keep seed data in `system_config`, `compliance_variables`, `agent_archetypes`, `promo_codes` (the `rfppipelinetest` comp code, migration 105), and the `master_admin` user row.
+3. **`beforeEach` in each suite**: `TRUNCATE` all tenant-scoped tables, cascade. Keep seed data in `compliance_variables`, `agent_archetypes`, `promo_codes` (the `rfppipelinetest` comp code, migration 105), and the `master_admin` user row.
 4. **`afterAll`**: stop PG via `pg_ctl stop`, remove the temp data directory.
 
 The helper exports:
@@ -259,8 +259,8 @@ The test pyramid above is *what* to write; this is the ordered sequence every ch
 before it is called done. Each gate must pass before the next is meaningful:
 
 1. **Type check** — `cd frontend && npx tsc --noEmit` → **0 errors**. First gate, always.
-2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**729/729** at migration
-   head 125). Run on every change, not only schema changes.
+2. **Unit + integration** — `cd frontend && npx vitest run` → full suite green (**828/828** at migration
+   head 137). Run on every change, not only schema changes.
 3. **Migration (schema changes only)** — apply the new migration through the `db/migrations/migrate.mjs`
    runner with `DATABASE_URL` pointed at the sandbox, then confirm with a probe query. The runner tracks
    applied files in `_migration_history`, so re-running must be a clean no-op (idempotency proof).

@@ -214,7 +214,7 @@ Tenant-scoped tables (from `001_baseline.sql`):
 - `agent_task_results`
 - `curated_solicitations` (via `tenant_id` if applicable)
 
-**NOT** tenant-scoped (global): `opportunities`, `compliance_variables`, `agent_archetypes`, `system_config`, `api_key_registry`, `pipeline_schedules`, `system_events` (tenant_id is nullable), `tool_invocation_metrics` (tenant_id is nullable).
+**NOT** tenant-scoped (global): `opportunities`, `compliance_variables`, `agent_archetypes`, `api_key_registry`, `pipeline_schedules`, `system_events` (tenant_id is nullable), `tool_invocation_metrics` (tenant_id is nullable).
 
 When in doubt: if the row represents a user's private data, it's tenant-scoped and needs the `WHERE` clause.
 

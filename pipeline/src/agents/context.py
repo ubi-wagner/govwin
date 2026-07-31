@@ -507,6 +507,7 @@ class ContextAssembler:
                            usage_count, updated_at
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                     ORDER BY embedding <=> $2::vector
                     LIMIT $3
@@ -523,6 +524,7 @@ class ContextAssembler:
                            usage_count, updated_at
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                     ORDER BY usage_count DESC, updated_at DESC
                     LIMIT $2
@@ -793,10 +795,23 @@ class ContextAssembler:
         if not has_context:
             return base_prompt
 
-        # Helper: wrap a block in untrusted_data delimiters
+        # Helper: wrap a block in untrusted_data delimiters. FIRST neutralize any fence/sentinel
+        # delimiter the attacker embedded inside `content` — otherwise a tenant-editable string
+        # (profile, memory, atom) containing a literal "</untrusted_data>" could close the block
+        # early and land the text that follows in the region the defense rule declares TRUSTED
+        # (adversarial-sweep fence-escape). Swap the delimiter's slash/brackets for look-alikes so
+        # the literal no longer matches while staying human-legible. Applies to the open tag (a fake
+        # nested open) and the outer BEGIN/END TENANT CONTEXT sentinels too.
         def _wrap(source: str, content: str) -> str:
+            safe = (
+                content
+                .replace(_UNTRUSTED_CLOSE, "<∕untrusted_data>")       # </untrusted_data> → <∕…>
+                .replace("<untrusted_data", "<​untrusted_data")        # opening tag (any source=)
+                .replace("--- END TENANT CONTEXT ---", "--- END TENANT CONTEXT [escaped] ---")
+                .replace("--- BEGIN TENANT CONTEXT ---", "--- BEGIN TENANT CONTEXT [escaped] ---")
+            )
             open_tag = _UNTRUSTED_OPEN.format(source=source)
-            return f"{open_tag}\n{content}\n{_UNTRUSTED_CLOSE}"
+            return f"{open_tag}\n{safe}\n{_UNTRUSTED_CLOSE}"
 
         context_sections: list[str] = []
 

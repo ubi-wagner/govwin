@@ -1,4 +1,5 @@
 import { sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
@@ -182,7 +183,10 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   let lockedSections = 0;
   let forcedOpenSections: { sectionId: string; title: string; volumeName: string | null }[] = [];
   try {
-    await sql.begin(async (tx: any) => {
+    await withTenant(tenantId, async (tx: any) => {
+      // RLS cutover: withTenant (not sql.begin) so this transaction runs with SET LOCAL
+      // app.tenant_id under govtech_app — the Proxy does not route `.begin` through context,
+      // so a bare sql.begin would DENY-ALL its proposal_sections/proposals writes. (RLS_CUTOVER)
       // ── Gate: every section must be accepted + locked (all documents
       //    closed) before the proposal advances as one unit. force=true
       //    overrides but records the still-open sections as the audit trail

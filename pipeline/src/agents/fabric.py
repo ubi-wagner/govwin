@@ -60,16 +60,22 @@ from datetime import datetime, timedelta, timezone
 import anthropic
 
 from .archetypes import (
+    AdvisoryManagerArchetype,
     AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
     ContentCuratorArchetype,
     ContentGeneratorArchetype,
+    ContinuityManagerArchetype,
     CostEstimatorArchetype,
     CurationQaArchetype,
+    FormatterArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
+    LibrarySeedMapperArchetype,
+    LibrarySeedSuggesterArchetype,
+    MarketAnalystArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
@@ -80,11 +86,15 @@ from .archetypes import (
     PartnerCoordinatorArchetype,
     PpMatcherArchetype,
     ProposalArchitectArchetype,
+    ProposalManagerArchetype,
+    RedactionGuardArchetype,
     ResearchScoutArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
     SkeletonArchitectArchetype,
     SocialSchedulerArchetype,
+    StylistArchetype,
+    TraceabilityAuditorArchetype,
 )
 from .context import ContextAssembler
 from .guardrails import enforce_guardrails, load_guardrail_config
@@ -93,16 +103,22 @@ from .tools import ToolRegistry, create_default_registry
 
 # All archetype classes to auto-register on fabric init
 _ARCHETYPE_CLASSES = [
+    AdvisoryManagerArchetype,
     AmendmentMonitorArchetype,
     CaptureStrategistArchetype,
     ColorTeamReviewerArchetype,
     ComplianceReviewerArchetype,
     ContentCuratorArchetype,
     ContentGeneratorArchetype,
+    ContinuityManagerArchetype,
     CostEstimatorArchetype,
     CurationQaArchetype,
+    FormatterArchetype,
     IngestAnalystArchetype,
     LibrarianArchetype,
+    LibrarySeedMapperArchetype,
+    LibrarySeedSuggesterArchetype,
+    MarketAnalystArchetype,
     MatrixStagerArchetype,
     OnboardingAgentArchetype,
     OpportunityAnalystArchetype,
@@ -113,11 +129,15 @@ _ARCHETYPE_CLASSES = [
     PartnerCoordinatorArchetype,
     PpMatcherArchetype,
     ProposalArchitectArchetype,
+    ProposalManagerArchetype,
+    RedactionGuardArchetype,
     ResearchScoutArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
     SkeletonArchitectArchetype,
     SocialSchedulerArchetype,
+    StylistArchetype,
+    TraceabilityAuditorArchetype,
 ]
 
 logger = logging.getLogger("pipeline.agents")
@@ -1038,7 +1058,19 @@ class AgentFabric:
             "default_rate_limit": RATE_LIMIT_PER_HOUR,
             "default_per_call_ceiling": PER_CALL_CEILING_USD,
             "platform_monthly_cap": None,
+            "agent_budget_ceiling": None,
         }
+        # #190 decision ⑨: the RFP-admin-tunable per-tenant agent budget CEILING
+        # (automation_framework, mig 126) — a tenant may only LOWER below it. Best-effort;
+        # a missing table keeps the ceiling None (uncapped), never disables AI.
+        try:
+            fw = await conn.fetchrow(
+                "SELECT agent_monthly_budget_ceiling_usd FROM automation_framework WHERE id = 1"
+            )
+            if fw and fw["agent_monthly_budget_ceiling_usd"] is not None:
+                fallback["agent_budget_ceiling"] = float(fw["agent_monthly_budget_ceiling_usd"])
+        except Exception:
+            pass
         try:
             row = await conn.fetchrow(
                 """
@@ -1057,6 +1089,7 @@ class AgentFabric:
                 "default_rate_limit": int(row["default_rate_limit_per_hour"]),
                 "default_per_call_ceiling": float(row["default_per_call_ceiling"]),
                 "platform_monthly_cap": float(cap) if cap is not None else None,
+                "agent_budget_ceiling": fallback["agent_budget_ceiling"],
             }
         except Exception as exc:
             logger.warning("[platform_config] read failed, using constants: %s", exc)
@@ -1144,6 +1177,16 @@ class AgentFabric:
                 monthly_budget = float(config_row["monthly_budget"])
             else:
                 monthly_budget = platform["default_monthly_budget"]
+
+            # #190 decision ⑨: cap the tenant's effective budget at the framework ceiling
+            # (a tenant may only LOWER below it, never raise). None = uncapped.
+            ceiling = platform.get("agent_budget_ceiling")
+            if ceiling is not None and monthly_budget > ceiling:
+                logger.info(
+                    "[budget] tenant %s budget $%.2f capped at framework ceiling $%.2f",
+                    tenant_id, monthly_budget, ceiling,
+                )
+                monthly_budget = ceiling
 
             # Explicit zero budget means AI is disabled for this tenant
             if monthly_budget == 0:

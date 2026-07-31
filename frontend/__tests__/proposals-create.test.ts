@@ -59,7 +59,10 @@ vi.mock('@/auth', () => ({
   auth: authMock,
 }));
 
-vi.mock('@/lib/db', () => ({
+// withTenant now wraps the proposal-creation transaction (RLS cutover — was sql.begin).
+// Delegate to sqlMock.begin so the existing sqlBeginMock/txMock setup drives it unchanged.
+vi.mock('@/lib/rls', () => ({ withTenant: (_t, fn) => sqlMock.begin(fn) }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,
   verifyTenantAccess: verifyTenantAccessMock,
@@ -348,8 +351,10 @@ describe('POST /api/portal/[tenantSlug]/proposals/create', () => {
     expect(json.data.proposalId).toBe(PROPOSAL_ID);
     expect(typeof json.data.sectionCount).toBe('number');
 
-    // sql.begin was called (the transaction ran)
-    expect(sqlBeginMock).toHaveBeenCalledOnce();
+    // The proposal-creation transaction ran (RLS cutover: it is now withTenant→begin, and
+    // resolveGatePolicy opens its own withTenant read too, so begin runs ≥1 time — the atomic
+    // proposal write is proven by the proposalId/sectionCount assertions above).
+    expect(sqlBeginMock).toHaveBeenCalled();
 
     // S3 putObject called at least once (compliance.json artifact)
     expect(putObjectMock).toHaveBeenCalled();

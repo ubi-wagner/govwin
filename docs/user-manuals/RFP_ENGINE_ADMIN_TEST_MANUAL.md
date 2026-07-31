@@ -12,7 +12,7 @@
 - **Two admin accounts** for the curation flow (an "Approve" requires a *different* admin than the curator — segregation of duties is enforced in SQL). At least one `master_admin` for the master-only checks (§6).
 - A real solicitation PDF (or a public source URL) to ingest.
 - Email delivery configured if you want to verify outbound emails; otherwise verify the in-app result panels.
-- **Platform:** migrations high-water **108** (`node db/migrations/migrate.mjs`, tracked in `_migration_history`); migs **105–108** shipped the comp-code purchase → curation → release flow + promo codes (105), the purchase→notify-admin rule (106), `spotlight_summary` (107), and marketing content (108). Seed via `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true`.
+- **Platform:** migrations high-water **137** (`node db/migrations/migrate.mjs`; disk is the source of truth — `_migration_history` lags); migs **105–108** shipped the comp-code purchase → curation → release flow + promo codes (105), the purchase→notify-admin rule (106), `spotlight_summary` (107), and marketing content (108). Seed via `SEED_DEV_ACCOUNTS=true` (`scripts/seed_dev_accounts.mjs`) + `SEED_PAGE_CONTENT=true`.
 
 ---
 

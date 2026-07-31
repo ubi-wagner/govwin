@@ -10,7 +10,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -86,48 +87,47 @@ export async function GET(request: Request, ctx: RouteContext) {
 
     // ── Business logic ───────────────────────────────────────────
     try {
-      const filters = [sql`p.tenant_id = ${tenantId}::uuid`];
-      if (stageFilter) {
-        filters.push(sql`p.stage = ${stageFilter}`);
-      }
-
-      const where = filters.reduce(
-        (acc, fragment, i) => (i === 0 ? fragment : sql`${acc} AND ${fragment}`),
-      );
-
-      // Count
-      const [countResult] = await sql<{ count: string }[]>`
-        SELECT count(*)::text AS count FROM proposals p WHERE ${where}
-      `;
-      const total = parseInt(countResult.count, 10);
-
-      // Sort order
-      const orderClause =
-        sort === 'created_asc' ? sql`p.created_at ASC` :
-        sort === 'created_desc' ? sql`p.created_at DESC` :
-        sort === 'updated_asc' ? sql`p.updated_at ASC` :
-        sql`p.updated_at DESC`;
-
-      // Main query
-      const proposals = await sql`
-        SELECT
-          p.id,
-          p.title,
-          p.stage,
-          p.is_locked,
-          p.created_at,
-          p.updated_at,
-          o.title AS solicitation_title,
-          o.agency,
-          o.close_date,
-          (SELECT count(*)::int FROM proposal_sections WHERE proposal_id = p.id) AS section_count
-        FROM proposals p
-        LEFT JOIN opportunities o ON o.id = p.opportunity_id
-        WHERE ${where}
-        ORDER BY ${orderClause}
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `;
+      // RLS cutover (docs/RLS_CUTOVER.md): this route composes dynamic `sql``` WHERE/ORDER
+      // fragments, which the context-aware `sql` Proxy would eagerly EXECUTE instead of splice.
+      // So it runs inside withTenant() — the fragments are built with the raw tx client (`tx```),
+      // and the whole query is scoped by SET LOCAL app.tenant_id under govtech_app. Inert pre-flip.
+      const { proposals, total } = await withTenant(tenantId, async (tx) => {
+        const filters = [tx`p.tenant_id = ${tenantId}::uuid`];
+        if (stageFilter) {
+          filters.push(tx`p.stage = ${stageFilter}`);
+        }
+        const where = filters.reduce(
+          (acc: unknown, fragment: unknown, i: number) => (i === 0 ? fragment : tx`${acc} AND ${fragment}`),
+        );
+        const [countResult] = await tx<{ count: string }[]>`
+          SELECT count(*)::text AS count FROM proposals p WHERE ${where}
+        `;
+        const orderClause =
+          sort === 'created_asc' ? tx`p.created_at ASC` :
+          sort === 'created_desc' ? tx`p.created_at DESC` :
+          sort === 'updated_asc' ? tx`p.updated_at ASC` :
+          tx`p.updated_at DESC`;
+        const rows = await tx`
+          SELECT
+            p.id,
+            p.title,
+            p.stage,
+            p.is_locked,
+            p.created_at,
+            p.updated_at,
+            o.title AS solicitation_title,
+            o.agency,
+            o.close_date,
+            (SELECT count(*)::int FROM proposal_sections WHERE proposal_id = p.id) AS section_count
+          FROM proposals p
+          LEFT JOIN opportunities o ON o.id = p.opportunity_id
+          WHERE ${where}
+          ORDER BY ${orderClause}
+          LIMIT ${limit}
+          OFFSET ${offset}
+        `;
+        return { proposals: rows, total: parseInt(countResult.count, 10) };
+      });
 
       return NextResponse.json({ data: { proposals, total } });
     } catch (dbErr) {

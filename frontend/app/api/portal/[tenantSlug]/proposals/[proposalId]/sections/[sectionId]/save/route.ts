@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -62,6 +62,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Proposal access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // ── Input validation ─────────────────────────────────────────────
     let body: { content?: unknown; status?: unknown; source?: unknown; aiInstruction?: unknown; aiModel?: unknown; editSummary?: unknown; baseVersion?: unknown };
@@ -220,6 +221,11 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
       // Archive even on first save (null content) to record the empty state
       const contentToArchive = currentContent ?? '{}';
+      // canvas_versions.content is jsonb: write the PARSED object via sql.json, NOT ${string}::jsonb
+      // — the latter double-encodes to a jsonb STRING scalar, so the Version History preview renders
+      // raw JSON instead of the node text (CLIFFNOTES §4b jsonb bug-class; the admin route is correct).
+      let archiveJson: Parameters<typeof sql.json>[0];
+      try { archiveJson = JSON.parse(contentToArchive); } catch { archiveJson = contentToArchive; }
       try {
         await sql`
           INSERT INTO canvas_versions
@@ -228,7 +234,7 @@ export async function PUT(request: Request, ctx: RouteContext) {
           VALUES (
             ${sectionId}::uuid,
             ${section.version},
-            ${contentToArchive}::jsonb,
+            ${sql.json(archiveJson)},
             'save',
             'human_edit',
             ${sessionUser.id}::uuid,

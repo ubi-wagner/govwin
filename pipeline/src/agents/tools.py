@@ -488,6 +488,7 @@ async def _library_search(
                            '{}'::text[] AS tags, confidence, status, usage_count
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                       AND EXISTS (SELECT 1 FROM atom_tags t
                                   WHERE t.atom_id = library_atoms.id AND t.value ILIKE $3)
@@ -503,6 +504,7 @@ async def _library_search(
                            '{}'::text[] AS tags, confidence, status, usage_count
                     FROM library_atoms
                     WHERE tenant_id = $1
+                      AND vault_id IS NULL
                       AND status != 'archived'
                     ORDER BY embedding <=> $2::vector
                     LIMIT $3
@@ -518,6 +520,7 @@ async def _library_search(
                        '{}'::text[] AS tags, confidence, status, usage_count
                 FROM library_atoms
                 WHERE tenant_id = $1
+                  AND vault_id IS NULL
                   AND status != 'archived'
                   AND content ILIKE $2
                   AND EXISTS (SELECT 1 FROM atom_tags t
@@ -535,6 +538,7 @@ async def _library_search(
                        '{}'::text[] AS tags, confidence, status, usage_count
                 FROM library_atoms
                 WHERE tenant_id = $1
+                  AND vault_id IS NULL
                   AND status != 'archived'
                   AND content ILIKE $2
                 ORDER BY confidence DESC, usage_count DESC
@@ -550,6 +554,7 @@ async def _library_search(
                        '{}'::text[] AS tags, confidence, status, usage_count
                 FROM library_atoms
                 WHERE tenant_id = $1
+                  AND vault_id IS NULL
                   AND status != 'archived'
                   AND EXISTS (SELECT 1 FROM atom_tags t
                               WHERE t.atom_id = library_atoms.id AND t.value ILIKE $2)
@@ -565,6 +570,7 @@ async def _library_search(
                        '{}'::text[] AS tags, confidence, status, usage_count
                 FROM library_atoms
                 WHERE tenant_id = $1
+                  AND vault_id IS NULL
                   AND status != 'archived'
                 ORDER BY usage_count DESC, confidence DESC
                 LIMIT $2
@@ -607,7 +613,7 @@ async def _library_get_unit(
                    source AS source_type, usage_count,
                    created_at, updated_at
             FROM library_atoms
-            WHERE id = $1 AND tenant_id = $2
+            WHERE id = $1 AND tenant_id = $2 AND vault_id IS NULL
             """,
             uuid.UUID(unit_id),
             uuid.UUID(tenant_id),

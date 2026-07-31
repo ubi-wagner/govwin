@@ -19,10 +19,14 @@ import type { CanvasNode } from '@/lib/types/canvas-document';
 // Re-export the pure size API so callers keep `import { atomSize } from '@/lib/atoms'`.
 export { atomSize, type AtomSize };
 
-export type Grain = 'primitive' | 'group' | 'reference';
+// Foundation-artifact containment (docs/LIBRARY_AND_VAULTS_DESIGN.md §1):
+// foundation ⊃ section ⊃ group ⊃ primitive. The three container grains aggregate
+// members (via atom_members); primitive is the leaf; reference is a pointer.
+export type Grain = 'foundation' | 'section' | 'group' | 'primitive' | 'reference';
+const CONTAINER_GRAINS: ReadonlySet<Grain> = new Set<Grain>(['foundation', 'section', 'group']);
 export type CreatorKind = 'admin' | 'ai' | 'collaborator' | 'system' | 'import';
 export type AtomSource = 'upload' | 'harvest' | 'download_derivative' | 'manual';
-export type Visibility = 'tenant' | 'owner_only' | 'shared_for_proposal' | 'admin_only';
+export type Visibility = 'tenant' | 'owner_only' | 'shared_for_proposal' | 'admin_only' | 'vault';
 export type AtomStatus = 'draft' | 'approved' | 'archived';
 
 export interface AtomTagInput {
@@ -46,6 +50,7 @@ export interface CreateAtomInput {
   originProposalId?: string | null;
   originSectionId?: string | null;
   visibility?: Visibility;
+  vaultId?: string | null;             // segregates the atom into a collaboration vault (nook)
   status?: AtomStatus;
   memberAtomIds?: string[];            // grain='group'
   parentAtomIds?: string[];            // lineage: derived_from
@@ -102,13 +107,13 @@ export async function createAtom(
       const [atom] = await tx<Array<{ id: string }>>`
         INSERT INTO library_atoms
           (tenant_id, grain, title, content, canvas_nodes, summary, word_count, char_count,
-           status, source, creator_kind, created_by, owner_user_id, visibility,
+           status, source, creator_kind, created_by, owner_user_id, visibility, vault_id,
            cocoon_id, source_anchor, origin_proposal_id, origin_section_id)
         VALUES
           (${tenantId}::uuid, ${input.grain}, ${input.title ?? null}, ${input.content ?? null},
            ${input.canvasNodes ? tx.json(input.canvasNodes) : null}, ${input.summary ?? null},
            ${size.words}, ${size.chars}, ${input.status ?? 'draft'}, ${input.source ?? 'manual'},
-           ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'},
+           ${creatorKind}, ${actor.id}::uuid, ${actor.id}::uuid, ${input.visibility ?? 'tenant'}, ${input.vaultId ?? null}::uuid,
            ${input.cocoonId ?? null}, ${input.sourceAnchor ? tx.json(input.sourceAnchor) : null},
            ${input.originProposalId ?? null}, ${input.originSectionId ?? null})
         RETURNING id
@@ -128,8 +133,8 @@ export async function createAtom(
       `;
     }
 
-    // members (group aggregates ordered members)
-    const members = input.grain === 'group' ? (input.memberAtomIds ?? []) : [];
+    // members: a container grain (foundation/section/group) aggregates ordered members.
+    const members = CONTAINER_GRAINS.has(input.grain) ? (input.memberAtomIds ?? []) : [];
     for (let i = 0; i < members.length; i++) {
       await tx`
         INSERT INTO atom_members (group_atom_id, member_atom_id, ordinal)
@@ -176,6 +181,14 @@ export async function confirmTags(
   actorId: string,
 ): Promise<{ updated: number }> {
   return withTenant(tenantId, async (tx) => {
+    // Vault fence: confirmTags is a main-library curation op (only ever called from the
+    // main-library atom route). Guard that the target is a non-vault atom in this tenant
+    // before writing any tags, so a main-library call can never touch a vault atom's tags
+    // — mirrors the AND vault_id IS NULL on every library_atoms read in this file.
+    const [own] = await tx<Array<{ id: string }>>`
+      SELECT id FROM library_atoms
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid AND vault_id IS NULL`;
+    if (!own) return { updated: 0 };
     let updated = 0;
     for (const t of tags) {
       const rows = await tx<Array<{ atom_id: string }>>`
@@ -247,6 +260,7 @@ export async function selectForSection(tenantId: string, q: SectionQuery, viewer
                     AND t.value = ANY(${context}::text[])) AS "ctxMatches"
         FROM library_atoms a
         WHERE a.tenant_id = ${tenantId}::uuid
+          AND a.vault_id IS NULL
           AND a.status = 'approved'
           AND a.grain <> 'reference'
           AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
@@ -287,6 +301,7 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
       FROM library_atoms a
       LEFT JOIN users u ON u.id = a.owner_user_id
       WHERE a.tenant_id = ${tenantId}::uuid
+        AND a.vault_id IS NULL
         AND (${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)
         ${f.mine ? tx`AND a.owner_user_id = ${viewer.userId}::uuid` : tx``}
         ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
@@ -299,12 +314,80 @@ export async function listAtoms(tenantId: string, f: AtomListFilter, viewer: Vie
   );
 }
 
+// ── faceted library list (P3.1): intersect taxonomy dimensions + facet counts ──
+export interface FacetFilter {
+  kind?: string; form?: string; context?: string; collection?: string; vehicle?: string;
+  grain?: Grain; q?: string; page?: number; pageSize?: number;
+}
+export interface FacetResult {
+  atoms: Array<Record<string, unknown>>;
+  total: number;
+  /** dimension → { value → count } over the visible library (for the filter chips). */
+  facets: Record<string, Record<string, number>>;
+}
+
+/**
+ * List the library with an ANDed taxonomy filter (kind × form × context × collection ×
+ * vehicle), grain filter, escaped search + pagination, plus facet counts for the chips.
+ * Visibility is the same viewer predicate as listAtoms. Every taxonomy filter is an
+ * EXISTS on atom_tags, so they intersect. Facet counts respect grain+q but NOT the
+ * taxonomy filters, so a chip always shows every available option with its total.
+ */
+export async function listAtomsFaceted(tenantId: string, f: FacetFilter, viewer: Viewer): Promise<FacetResult> {
+  const pageSize = Math.min(100, Math.max(1, f.pageSize ?? 30));
+  const page = Math.max(1, f.page ?? 1);
+  const offset = (page - 1) * pageSize;
+  const esc = (s: string) => '%' + s.replace(/[%_\\]/g, '\\$&') + '%';
+  return withTenant(tenantId, async (tx) => {
+    const vis = tx`(${viewer.isAdmin} OR a.visibility = 'tenant' OR a.owner_user_id = ${viewer.userId}::uuid)`;
+    const tagF = (dim: string, val?: string) =>
+      val ? tx`AND EXISTS (SELECT 1 FROM atom_tags t WHERE t.atom_id = a.id AND t.dimension = ${dim} AND t.value = ${val})` : tx``;
+    const where = tx`
+      a.tenant_id = ${tenantId}::uuid
+      AND a.grain <> 'reference'
+      AND a.vault_id IS NULL
+      AND ${vis}
+      ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
+      ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
+      ${tagF('kind', f.kind)} ${tagF('form', f.form)} ${tagF('context', f.context)} ${tagF('collection', f.collection)} ${tagF('vehicle', f.vehicle)}`;
+
+    const atoms = await tx<Array<Record<string, unknown>>>`
+      SELECT a.id, a.grain, a.title, a.summary, a.word_count, a.status, a.usage_count, a.created_at,
+             (a.owner_user_id = ${viewer.userId}::uuid) AS is_mine,
+             (SELECT count(*)::int FROM atom_members m WHERE m.group_atom_id = a.id) AS member_count,
+             coalesce((SELECT array_agg(t.dimension || ':' || t.value ORDER BY t.dimension) FROM atom_tags t WHERE t.atom_id = a.id), '{}') AS tags
+      FROM library_atoms a
+      WHERE ${where}
+      ORDER BY a.created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}`;
+    const [{ total }] = await tx<Array<{ total: number }>>`SELECT count(*)::int AS total FROM library_atoms a WHERE ${where}`;
+
+    // Facet counts reflect the coarse SCOPE (grain + q + collection) but not the
+    // chip dimensions themselves, so each chip always shows every option available
+    // within the current library section.
+    const facetRows = await tx<Array<{ dimension: string; value: string; n: number }>>`
+      SELECT t.dimension, t.value, count(*)::int AS n
+      FROM library_atoms a JOIN atom_tags t ON t.atom_id = a.id
+      WHERE a.tenant_id = ${tenantId}::uuid AND a.grain <> 'reference' AND a.vault_id IS NULL AND ${vis}
+        AND t.dimension IN ('kind','form','context','collection','vehicle')
+        ${f.grain ? tx`AND a.grain = ${f.grain}` : tx``}
+        ${f.q ? tx`AND (a.title ILIKE ${esc(f.q)} OR a.summary ILIKE ${esc(f.q)})` : tx``}
+        ${f.collection ? tx`AND EXISTS (SELECT 1 FROM atom_tags c WHERE c.atom_id = a.id AND c.dimension = 'collection' AND c.value = ${f.collection})` : tx``}
+      GROUP BY t.dimension, t.value`;
+    const facets: Record<string, Record<string, number>> = {};
+    for (const r of facetRows) { (facets[r.dimension] ??= {})[r.value] = Number(r.n); }
+
+    return { atoms, total: Number(total), facets };
+  });
+}
+
 // ── full atom (tags + members + lineage) ──
 export async function getAtom(tenantId: string, atomId: string, viewer: Viewer): Promise<Record<string, unknown> | null> {
   return withTenant(tenantId, async (tx) => {
     const [atom] = await tx<Array<Record<string, unknown>>>`
       SELECT * FROM library_atoms
       WHERE tenant_id = ${tenantId}::uuid AND id = ${atomId}::uuid
+        AND vault_id IS NULL
         AND (${viewer.isAdmin} OR visibility = 'tenant' OR owner_user_id = ${viewer.userId}::uuid)
       LIMIT 1
     `;

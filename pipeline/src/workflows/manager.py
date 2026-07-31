@@ -1091,9 +1091,43 @@ class WorkflowManager:
         On the FINAL nudge we ALSO emit a SEPARATE escalation email to the tenant's
         manager (tenant_admin) — cleaner than a CC and needs no listener change.
         """
-        assignee_user_id = t["assignee_user_id"]
+        assignee_user_id = t.get("assignee_user_id")
         if not assignee_user_id:
-            return  # role-bucket task → in-app nudge only
+            # Role-bucket ADMIN tasks (no single assignee) STILL nudge the RFP-pipeline
+            # admin distribution by EMAIL — the 72h curation SLA must reach the admins,
+            # not merely render in-app. The CMS resolves to_role∈{rfp_admin,master_admin}
+            # → ADMIN_NOTIFICATION_EMAIL (see docs/GMAIL_SETUP.md). This is an INTERNAL
+            # SLA, so it deliberately does NOT escalate to the tenant admin (the is_final
+            # tenant-manager path below is only for user-assigned tenant tasks).
+            assignee_role = t.get("assignee_role")
+            if assignee_role in ("rfp_admin", "master_admin"):
+                base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
+                if not base:
+                    logger.warning(
+                        "[_sweep_task_nudges] PORTAL_BASE_URL/NEXTAUTH_URL unset — skipping ADMIN "
+                        "nudge EMAIL for task %s (in-app nudge still delivered)", t["id"],
+                    )
+                    return
+                tenant_str = str(t["tenant_id"]) if t["tenant_id"] else None
+                await self._emit_event(
+                    conn, "system", "notification.requested", tenant_str,
+                    {
+                        "channel": "email",
+                        "template": "task_nudge",
+                        "to_role": assignee_role,
+                        # A task nudge is automation/robot traffic → send as the automation
+                        # identity (sender_identity maps namespace 'system' → automation),
+                        # not the human engagement voice.
+                        "senderNamespace": "system",
+                        "title": t["title"],
+                        "due_at": t["due_at"].isoformat(),
+                        "login_url": f"{base}/go?task={t['id']}",
+                        "nudge_index": nudge_index,
+                        "is_final": is_final,
+                        "task_id": str(t["id"]),
+                    },
+                )
+            return  # role-bucket task → (admin cohort emailed above) in-app nudge only
 
         base = (os.getenv("PORTAL_BASE_URL") or os.getenv("NEXTAUTH_URL") or "").rstrip("/")
         if not base:
@@ -1111,6 +1145,7 @@ class WorkflowManager:
             "channel": "email",
             "template": "task_nudge",
             "user_id": str(assignee_user_id),
+            "senderNamespace": "system",   # automation/robot voice (see admin branch above)
             "title": t["title"],
             "due_at": t["due_at"].isoformat(),
             "login_url": login_url,
@@ -1165,6 +1200,7 @@ class WorkflowManager:
             logger.error("[_final_notice] admin default lookup failed: %s", e)
 
         # A portal task ALSO notifies its delegated managers (added or not).
+        portal_opted_out = False  # rfpOversight explicitly declined for this portal (§13)
         if t.get("entity_type") == "portal" and t.get("entity_id"):
             cfg = None
             try:
@@ -1179,6 +1215,9 @@ class WorkflowManager:
                     cfg = json.loads(cfg or "{}")
                 except Exception:
                     cfg = None
+            # If the tenant explicitly declined RFP-Pipeline oversight on this portal
+            # (guardrail-editor opt-out), suppress the platform backstop below.
+            portal_opted_out = (cfg or {}).get("rfpOversight") is False
             emails = [
                 c.get("email")
                 for c in ((cfg or {}).get("collaborators") or [])
@@ -1201,6 +1240,26 @@ class WorkflowManager:
             if i not in seen:
                 seen.add(i)
                 out.append(i)
+
+        # RFP-Pipeline shadow backstop (AUTOMATION_POLICY_DESIGN decision ①): if the
+        # tenant has NO active admin/manager to receive the final notice, route it to us
+        # — the oldest active rfp_admin/master_admin — so an escalation never lands on
+        # nobody. The floor is admin-always + managers + THIS platform backstop —
+        # UNLESS the portal explicitly opted out of RFP-Pipeline oversight (§13).
+        if not out and not portal_opted_out:
+            try:
+                backstop = await conn.fetchrow(
+                    """
+                    SELECT id FROM users
+                    WHERE role IN ('rfp_admin', 'master_admin') AND is_active = true
+                    ORDER BY created_at ASC LIMIT 1
+                    """
+                )
+                if backstop:
+                    out.append(backstop["id"])
+            except Exception as e:
+                logger.error("[_final_notice] RFP-Pipeline backstop lookup failed: %s", e)
+
         return out
 
     async def _sweep_date_anchored_tasks(self, conn: asyncpg.Connection) -> int:
@@ -1825,19 +1884,10 @@ class WorkflowManager:
                             pt_payload = json.loads(pt_payload)
                         except (json.JSONDecodeError, TypeError):
                             pt_payload = {}
-                    # INC-6: run on_timeout escalation (best-effort) before failing.
-                    if pool:
-                        async with pool.acquire() as esc_conn:
-                            await self._run_on_timeout(
-                                esc_conn, pt_row["workflow_name"],
-                                pt_row["current_step"], pt_payload or {},
-                                tenant_str, pt_id,
-                            )
-                    else:
-                        await self._run_on_timeout(
-                            conn, pt_row["workflow_name"], pt_row["current_step"],
-                            pt_payload or {}, tenant_str, pt_id,
-                        )
+                    # B3 (deepest-review sweep): the on_timeout escalation now runs INSIDE the
+                    # CAS-success branch below — only when the fail actually took effect — so a
+                    # task completed in the SELECT→UPDATE window no longer fires a spurious
+                    # "you missed the deadline" escalation.
                     # COMPARE-AND-SWAP on status='paused': if a human completed the
                     # task in the SELECT→UPDATE window (resume flipped it to
                     # 'retrying'), this UPDATE affects 0 rows and we DON'T clobber the
@@ -1857,6 +1907,11 @@ class WorkflowManager:
                                 pt_row["id"], pt_row["current_step"],
                             )
                             if _tag.endswith(" 1"):
+                                # Escalate only on a real timeout (the fail took effect) — B3.
+                                await self._run_on_timeout(
+                                    u_conn, pt_row["workflow_name"], pt_row["current_step"],
+                                    pt_payload or {}, tenant_str, pt_id,
+                                )
                                 await u_conn.execute(
                                     "UPDATE tasks SET status='expired', updated_at=now() "
                                     "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",
@@ -1886,6 +1941,11 @@ class WorkflowManager:
                             pt_row["id"], pt_row["current_step"],
                         )
                         if _tag.endswith(" 1"):
+                            # Escalate only on a real timeout (the fail took effect) — B3.
+                            await self._run_on_timeout(
+                                conn, pt_row["workflow_name"], pt_row["current_step"],
+                                pt_payload or {}, tenant_str, pt_id,
+                            )
                             await conn.execute(
                                 "UPDATE tasks SET status='expired', updated_at=now() "
                                 "WHERE process_instance_id=$1 AND status IN ('open','in_progress')",

@@ -373,7 +373,7 @@ Then provide your analysis as JSON:
                 SELECT t.value AS category, COUNT(DISTINCT a.id) as count
                 FROM library_atoms a
                 JOIN atom_tags t ON t.atom_id = a.id AND t.dimension = 'vol'
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                 GROUP BY t.value
                 ORDER BY count DESC
                 LIMIT 10
@@ -484,7 +484,7 @@ Then provide your analysis as JSON:
                                 FILTER (WHERE t.dimension IS NOT NULL), '{}') AS tags
                 FROM library_atoms a
                 LEFT JOIN atom_tags t ON t.atom_id = a.id
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                   AND (a.content ILIKE $2 OR a.title ILIKE $2)
             """
             if vol:

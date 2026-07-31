@@ -52,7 +52,8 @@ export async function GET(
         return tx`
           SELECT c.id, c.opportunity_id, c.card, c.bridge_version, c.lifecycle_status, c.submission_stage, c.pursuit_status,
                  c.is_pinned, c.pin_update_available, c.pinned_at, c.created_at, c.updated_at,
-                 bs.top_score, bs.top_bucket_id
+                 bs.top_score, bs.top_bucket_id,
+                 COALESCE(rk.rankings, '[]'::json) AS rankings
           FROM tenant_opportunity_cards c
           LEFT JOIN LATERAL (
             SELECT s.score AS top_score, s.bucket_id AS top_bucket_id
@@ -61,6 +62,15 @@ export async function GET(
             ORDER BY s.score DESC
             LIMIT 1
           ) bs ON true
+          LEFT JOIN LATERAL (
+            -- The per-bucket ranking array: one card, N lenses (bucket id · name · summary · score).
+            SELECT json_agg(json_build_object(
+                     'bucketId', b.id, 'name', b.name, 'summary', b.description, 'score', s.score
+                   ) ORDER BY s.score DESC) AS rankings
+            FROM tenant_bucket_scores s
+            JOIN tenant_spotlight_buckets b ON b.id = s.bucket_id AND b.is_active
+            WHERE s.tenant_id = c.tenant_id AND s.opportunity_id = c.opportunity_id
+          ) rk ON true
           WHERE c.tenant_id = ${tenantId}::uuid
             ${includeClosed ? tx`` : tx`AND c.lifecycle_status <> 'archived'`}
             ${pinnedOnly ? tx`AND c.is_pinned = true` : tx``}

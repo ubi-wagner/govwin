@@ -15,7 +15,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
@@ -65,6 +65,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (access.role !== 'admin') {
       return NextResponse.json({ error: 'Only an admin can lock/push', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // ── Input ─────────────────────────────────────────────────────────────
     let body: { scope?: unknown; artifactId?: unknown; volumeNumber?: unknown };

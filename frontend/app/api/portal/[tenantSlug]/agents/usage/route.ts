@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -89,6 +89,13 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
         { status: 403 },
       );
     }
+
+    // RLS cutover: agent_task_log is force-RLS. Pin the per-request tenant context
+    // (after the access gate) so the context-aware sql Proxy scopes every query below
+    // to this tenant post-flip; the app-layer WHERE tenant_id stays as the precise
+    // filter. Without this, RLS would deny-all under govtech_app and the usage view
+    // would render empty. (Canonical portal pattern — matches the other ~49 routes.)
+    enterTenant(tenantId);
 
     // ── Parse period parameter ───────────────────────────────────
     const periodParam = request.nextUrl.searchParams.get('period') ?? '30d';

@@ -27,7 +27,17 @@ import type {
   CaptionContent,
   FootnoteContent,
   UrlContent,
+  TextBoxContent,
+  CalloutContent,
+  CodeBlockContent,
+  BlockquoteContent,
+  EquationContent,
+  DividerContent,
+  VideoContent,
+  SignatureContent,
 } from '@/lib/types/canvas-document';
+import { renderShapeSvg, renderChartSvg } from '@/lib/export/canvas-html';
+import type { ChartContent } from '@/lib/types/canvas-document';
 import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collaboration';
 
 interface Props {
@@ -315,6 +325,93 @@ function TocRenderer({ nodes, isSelected, onSelect, readOnly, nodeId, isDragging
 
 // ─── Per-node renderer ──────────────────────────────────────────────
 
+// The extended element types get a compact WYSIWYG preview in the editor (the
+// full fidelity is in the exporters). shape/chart reuse the exact SVG the
+// exporters rasterize, so what you see is what you get.
+const EXTENDED_TYPES = new Set<CanvasNode['type']>([
+  'shape', 'text_box', 'callout', 'code_block', 'blockquote', 'chart', 'equation', 'divider', 'video', 'signature',
+]);
+
+const CALLOUT_UI: Record<string, { bg: string; fg: string; border: string }> = {
+  info: { bg: '#EFF6FF', fg: '#1D4ED8', border: '#1D4ED8' },
+  warning: { bg: '#FEF3C7', fg: '#B45309', border: '#B45309' },
+  tip: { bg: '#ECFDF5', fg: '#047857', border: '#047857' },
+  success: { bg: '#ECFDF5', fg: '#047857', border: '#047857' },
+  note: { bg: '#F1F5F9', fg: '#475569', border: '#475569' },
+};
+
+function cssColorOf(hex?: string, opacity?: number): string | undefined {
+  if (!hex) return undefined;
+  const h = hex.replace('#', '');
+  if (opacity === undefined || opacity >= 1 || h.length < 6) return `#${h}`;
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${opacity})`;
+}
+
+/** A compact in-editor preview for the extended element types. */
+function ExtendedNodePreview({ node }: { node: CanvasNode }) {
+  const s = node.style ?? {};
+  const c = (node.content ?? {}) as Record<string, unknown>;
+  switch (node.type) {
+    case 'shape':
+      return <div className="max-w-[340px] my-1" dangerouslySetInnerHTML={{ __html: renderShapeSvg(node) }} />;
+    case 'chart':
+      return <div className="max-w-[460px] my-1" dangerouslySetInnerHTML={{ __html: renderChartSvg(node.content as ChartContent) }} />;
+    case 'text_box': {
+      const box = c as unknown as TextBoxContent;
+      return (
+        <div style={{
+          border: s.border ? `${s.border.width ?? 1}px ${s.border.style ?? 'solid'} ${s.border.color ?? '#CBD5E1'}` : '1px dashed #CBD5E1',
+          background: cssColorOf(s.fill?.color, s.fill?.opacity), borderRadius: s.border?.radius, opacity: s.opacity,
+          padding: '6px 8px',
+        }} className="text-sm my-1">{box.text || 'Text box'}</div>
+      );
+    }
+    case 'callout': {
+      const cc = c as unknown as CalloutContent;
+      const ui = CALLOUT_UI[cc.variant] ?? CALLOUT_UI.note;
+      return (
+        <div style={{ background: ui.bg, borderLeft: `4px solid ${ui.border}` }} className="rounded px-3 py-2 my-1 text-sm">
+          {cc.title && <div style={{ color: ui.fg }} className="font-semibold">{cc.title}</div>}
+          <div className="text-gray-700">{cc.text}</div>
+        </div>
+      );
+    }
+    case 'code_block':
+      return <pre className="bg-slate-800 text-slate-100 rounded px-3 py-2 my-1 text-xs overflow-x-auto"><code>{(c as unknown as CodeBlockContent).code || '// code'}</code></pre>;
+    case 'blockquote': {
+      const bq = c as unknown as BlockquoteContent;
+      return (
+        <blockquote className="border-l-4 border-slate-400 pl-3 my-1 italic text-gray-600 text-sm">
+          {bq.text}{bq.cite && <footer className="text-xs text-gray-400 not-italic mt-0.5">— {bq.cite}</footer>}
+        </blockquote>
+      );
+    }
+    case 'equation':
+      return <div className="text-center my-1 font-serif italic text-gray-800">{(c as unknown as EquationContent).latex ?? (c as unknown as EquationContent).mathml ?? '(equation)'}</div>;
+    case 'divider': {
+      const d = c as unknown as DividerContent;
+      return <hr style={{ borderTopWidth: d.thickness ?? 1, borderTopStyle: d.line_style ?? 'solid', borderColor: d.color ?? '#CBD5E1' }} className="my-2" />;
+    }
+    case 'video': {
+      const v = c as unknown as VideoContent;
+      return <div className="bg-slate-900 text-white rounded my-1 py-6 text-center text-sm"><span className="text-2xl">▶</span><div className="text-xs mt-1 text-slate-300">{v.caption ?? v.url ?? 'Video'}</div></div>;
+    }
+    case 'signature': {
+      const sig = c as unknown as SignatureContent;
+      return (
+        <div className="my-2">
+          {sig.signed && sig.signer_name && <div className="italic text-blue-900" style={{ fontFamily: 'cursive' }}>{sig.signer_name}</div>}
+          <div className="border-b border-slate-700 w-56 h-4" />
+          <div className="text-xs text-gray-500 mt-0.5">{sig.label ?? 'Signature'}{sig.signed_at ? `   ·   ${sig.signed_at}` : ''}</div>
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
 function NodeRenderer({
   node,
   isSelected,
@@ -350,16 +447,22 @@ function NodeRenderer({
     ? 'bg-gray-100 text-gray-500'
     : null;
 
+  const isReuse = node.style.reuse_marker === true;
   const nodeStyle: React.CSSProperties = {
     fontFamily: node.style.family ?? fontDefault.family,
     fontSize: node.style.size ? `${node.style.size * scale}pt` : undefined,
     fontWeight: node.style.weight,
-    fontStyle: node.style.style,
+    fontStyle: isReuse ? 'italic' : node.style.style,
     textAlign: node.style.alignment,
     marginLeft: node.style.indent ? node.style.indent * scale : undefined,
     paddingTop: (node.style.space_before ?? 4) * scale,
     paddingBottom: (node.style.space_after ?? 4) * scale,
-    color: node.style.color ?? undefined,
+    color: isReuse ? '#dc2626' : (node.style.color ?? undefined),
+    textDecoration: [
+      node.style.underline ? 'underline' : null,
+      node.style.strikethrough ? 'line-through' : null,
+    ].filter(Boolean).join(' ') || undefined,
+    backgroundColor: node.style.background ?? undefined,
   };
 
   return (
@@ -407,6 +510,7 @@ function NodeRenderer({
       {node.type === 'url' && <UrlNode content={node.content as UrlContent} readOnly={readOnly} onUpdate={onUpdate} isSelected={isSelected} />}
       {node.type === 'page_break' && <div className="border-t-2 border-dashed border-gray-300 my-4" />}
       {node.type === 'spacer' && <div className="h-8" />}
+      {EXTENDED_TYPES.has(node.type) && <ExtendedNodePreview node={node} />}
       {/* toc nodes are rendered by TocRenderer at the parent level */}
     </div>
   );

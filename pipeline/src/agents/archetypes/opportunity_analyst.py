@@ -204,7 +204,7 @@ Steps:
                 SELECT t.value AS category, COUNT(DISTINCT a.id) AS count
                 FROM library_atoms a
                 JOIN atom_tags t ON t.atom_id = a.id AND t.dimension = 'vol'
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                 GROUP BY category
                 ORDER BY count DESC
                 LIMIT 10

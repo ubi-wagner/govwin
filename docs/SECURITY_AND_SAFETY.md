@@ -9,8 +9,9 @@ the binding rules — it cites them.
   `SOP: Data Layer`, `SOP: Events`). Every rule below traces to one of them.
 - **docs/AGENT_WORKFORCE.md** — the agent safety contract + the wake-one-at-a-time plan.
   **That doc owns the agent invariants**; §5 here is a pointer, not a fork.
-- **docs/DEPRECATION_CLEANUP_2026-07-22.md** — the RLS-cutover checklist (the cross-tenant-read
-  caveat) and the "empty ≠ dead" drop rule.
+- **docs/RLS_CUTOVER.md** — the authoritative as-built RLS cutover record (mig 136 policies/grants/
+  context layer, the cross-tenant-read caveat, and the one-op prod `DATABASE_URL` flip that remains).
+- **docs/DEPRECATION_CLEANUP_2026-07-22.md** — the "empty ≠ dead" drop rule.
 - **docs/LAUNCH_READINESS_2026-07-22.md** — launch-readiness items #9 (RLS) and the paywall.
 
 ---
@@ -36,35 +37,40 @@ a repo-readable password was a full multi-tenant compromise.
 
 ---
 
-## 2. Tenant isolation & RLS — forced, single-layer today, non-owner cutover pending
+## 2. Tenant isolation & RLS — forced; app-side cutover BUILT + APPLIED; single-layer in effect until the prod `DATABASE_URL` flip
 
 **Model.** Tenant-scoped tables (`proposals`, `proposal_sections`, `tenant_profiles`, `atom_tags`,
 agent memory, …) have RLS **ENABLEd + FORCEd** (mig 116 forced RLS on `episodic_memories`;
-mig 117 forces it across the tenant tables and defines the policies keyed on
-`current_setting('app.tenant_id')`). Portal routes additionally enforce access **in the app**:
-every tenant query verifies membership (`verifyTenantAccess`) — **never query by ID alone**
-(CLAUDE.md `SOP: Code Quality`).
+mig 117 forces it across the core tenant tables and defines the policies keyed on
+`current_setting('app.tenant_id')`; **mig 136_rls_cutover** completes the app-side cutover — see below).
+Portal routes additionally enforce access **in the app**: every tenant query verifies membership
+(`verifyTenantAccess`) — **never query by ID alone** (CLAUDE.md `SOP: Code Quality`).
 
-**Single-layer caveat (today).** The app connects as the database **owner** role (sandbox:
-`claude`, `rolbypassrls=t`), which **bypasses RLS**. So today isolation rests on the **application
-layer** (`WHERE tenant_id` + `verifyTenantAccess`); the FORCEd policies are correct but **inert in
-prod** until the connection role changes. This is a deliberate, documented state — not a gap that
-bites at current scale — but it means the RLS policies are a **backstop not yet load-bearing**.
+**Single-layer caveat (in effect today).** The app still connects as the database **owner** role
+(sandbox: `claude`, `rolbypassrls=t`), which **bypasses RLS**. So *in effect* today isolation rests on
+the **application layer** (`WHERE tenant_id` + `verifyTenantAccess`); the FORCEd policies are correct
+but not yet load-bearing **only because the app connects as the owner** — not because they are unbuilt.
+This is a deliberate, documented state — not a gap that bites at current scale.
 
-**The backstop (pending).** mig 117 creates a dedicated **`rfp_agent` NOBYPASSRLS** role (NOLOGIN
-group; ops attaches a LOGIN member + points `AGENT_DATABASE_URL` at it), and the grant surface for
-the non-owner **`govtech_app`** application role exists (migs 096/101/…). Cutting the app + agents
-over to these `NOBYPASSRLS` roles (with `SET app.tenant_id` per request/agent — wiring specified in
-AGENT_WORKFORCE.md) makes RLS the **second enforced layer**. This is **launch-readiness item #9**.
+**The backstop — BUILT + APPLIED in schema; only the prod `DATABASE_URL` flip remains.**
+**mig 136_rls_cutover** has landed and is applied: the current schema carries **19 force-RLS tables**
+and **35 `tenant_isolation` policies**, and both non-owner **`NOBYPASSRLS`** roles now exist — **`govtech_app`**
+(the application role, LOGIN-capable) and **`rfp_agent`** (the agent role, NOLOGIN group; ops attaches a
+LOGIN member + points `AGENT_DATABASE_URL` at it). The **per-request context layer is built**, not merely
+specified: `frontend/lib/tenant-context.ts` + `frontend/lib/db.ts` provide `enterTenant`/`enterBypass`
+(a Proxy that `SET`s `app.tenant_id` per request/agent), and **mig 137_validate_namespace_check** validates
+the namespace CHECK. The **one remaining step** is the prod **`DATABASE_URL` flip** off the owner role onto
+`govtech_app` — a single operational change that makes RLS the **second enforced layer** (launch-readiness
+item #9). This is **not done yet** (the app still connects as owner). As-built record + the flip checklist:
+**docs/RLS_CUTOVER.md** (recorded there as **BUILT + PROVEN**).
 
 **Cross-tenant-read caveat (from the 2026-07-22 repoints).** The retired-table repoints swapped
 two **direct cross-tenant admin/CMS reads** onto `tenant_opportunity_cards` (RLS FORCED):
 `app/admin/rfp-curation/[solId]` "Customer Interest" and `services/cms/src/templates.py`
-(`matched_opportunities`). **Fine today** (owner bypasses RLS), but on the `govtech_app`/`rfp_agent`
-cutover they'd return **0** (predicate `tenant_id = NULL`) unless run on a BYPASSRLS connection or
-routed through owner-views (the `v_opportunity_rollup` view is already safe). **This is on the
-RLS-cutover checklist** — see docs/DEPRECATION_CLEANUP_2026-07-22.md (the "⚠ RLS-cutover checklist"
-section), not a pre-launch blocker.
+(`matched_opportunities`). **Fine today** (owner bypasses RLS), but once the `DATABASE_URL` flips to
+`govtech_app` they'd return **0** (predicate `tenant_id = NULL`) unless run on a BYPASSRLS/owner
+connection (`enterBypass`) or routed through owner-views (the `v_opportunity_rollup` view is already
+safe). **This is on the RLS-cutover checklist** — see docs/RLS_CUTOVER.md, not a pre-launch blocker.
 
 ---
 

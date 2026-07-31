@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
@@ -57,6 +57,8 @@ export async function POST(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     let proposal: {
       id: string;
@@ -266,6 +268,8 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     let proposal: {
       id: string;

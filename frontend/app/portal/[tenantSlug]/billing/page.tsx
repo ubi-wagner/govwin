@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import BillingPanel from '@/components/portal/billing-panel';
 
@@ -50,6 +50,7 @@ export default async function BillingPage({
   if (!hasAccess) {
     redirect('/portal');
   }
+  enterTenant(tenantId);
 
   // ── Data fetching ──────────────────────────────────────────────
 

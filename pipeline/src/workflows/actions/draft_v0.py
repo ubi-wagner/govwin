@@ -152,6 +152,7 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
 
     drafted = 0
     skipped = 0
+    held = 0
     for s in rows:
         section_id = str(s["id"])
         try:
@@ -176,6 +177,23 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
 
             markdown = (result.get("result") or {}).get("text") or ""
             if not markdown.strip():
+                skipped += 1
+                continue
+
+            # Guardrail gate (the "advisory → guardrail → land-or-review" contract). The fabric
+            # COMPUTES a verdict (result["guardrail"]) but does not enforce it; draft_v0 is the
+            # site that lands content into the proposal_sections business table, so it must. A
+            # "review" decision (secret/PII denylist hit, injection heuristic, …) means the draft
+            # is NOT safe to auto-land — leave the section empty so the human's pre-staged review
+            # ToDo picks it up, instead of publishing flagged text. Compounds the C1 fence: an
+            # injection that makes the drafter emit forbidden content is now caught before landing.
+            guardrail = result.get("guardrail") or {}
+            if guardrail.get("decision") == "review":
+                log.warning(
+                    "draft_v0: section %s HELD for review (guardrail) — not auto-landed; reasons=%s",
+                    section_id, guardrail.get("reasons"),
+                )
+                held += 1
                 skipped += 1
                 continue
 
@@ -211,11 +229,11 @@ async def draft_v0(conn: asyncpg.Connection, **inputs: Any) -> dict[str, Any]:
         await emit_event(
             conn, namespace="proposal", type="draft.completed", phase="end",
             parent_event_id=draft_start_id or None,
-            payload={"proposalId": str(proposal_id), "drafted": drafted, "skipped": skipped},
+            payload={"proposalId": str(proposal_id), "drafted": drafted, "skipped": skipped, "held": held},
             tenant_id=tenant_id,
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("draft_v0: draft.completed:end emit failed (non-fatal): %s", exc)
 
-    log.info("draft_v0: proposal %s — drafted %d, skipped %d", proposal_id, drafted, skipped)
-    return {"drafted": drafted, "skipped_sections": skipped}
+    log.info("draft_v0: proposal %s — drafted %d, skipped %d (held %d for review)", proposal_id, drafted, skipped, held)
+    return {"drafted": drafted, "skipped_sections": skipped, "held_for_review": held}

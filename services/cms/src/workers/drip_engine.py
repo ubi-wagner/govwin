@@ -14,11 +14,10 @@ import json
 import logging
 import os
 import time
-import uuid as uuid_mod
 from datetime import datetime, timedelta, timezone
 
 from ..models.database import get_pool, get_event_pool
-from ..models.events import emit_event
+from ..models.events import emit_event, emit_system_event
 
 logger = logging.getLogger('cms.drip_engine')
 
@@ -34,25 +33,13 @@ def _fire_event(event_type: str, **kwargs):
 
 async def _emit_shared_event(*, namespace: str, event_type: str, phase: str,
                               payload: dict, parent_event_id: str | None = None) -> str:
-    """Emit an event to the shared system_events table. Returns event id."""
-    pool = get_event_pool()
-    if not pool:
-        return ""
-    event_id = str(uuid_mod.uuid4())
-    try:
-        payload['correlationId'] = payload.get('correlationId', str(uuid_mod.uuid4()))
-        await pool.execute(
-            """INSERT INTO system_events
-                (id, namespace, type, phase, actor_type, actor_id, parent_event_id, payload)
-               VALUES ($1, $2, $3, $4, 'system', 'drip_engine', $5, $6::jsonb)""",
-            uuid_mod.UUID(event_id), namespace, event_type, phase,
-            uuid_mod.UUID(parent_event_id) if parent_event_id else None,
-            json.dumps(payload),
-        )
-        return event_id
-    except Exception as e:
-        logger.error('_emit_shared_event failed: %s', e)
-        return ""
+    """Emit an event to the shared system_events table (system actor). Returns event id."""
+    return await emit_system_event(
+        event_type=event_type, namespace=namespace, phase=phase,
+        actor_type='system', actor_id='drip_engine',
+        parent_event_id=parent_event_id, payload=payload,
+        ensure_correlation_id=True,
+    )
 
 
 async def process_due_enrollments() -> int:

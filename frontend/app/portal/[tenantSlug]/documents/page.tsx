@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import Link from 'next/link';
 import { SupportingDocActions } from '@/components/portal/supporting-doc-actions';
@@ -79,6 +79,7 @@ export default async function DocumentsPage({ params }: Props) {
   const tenantId = tenant.id as string;
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   if (!hasRoleAtLeast(role, 'tenant_user')) {
     redirect(`/portal/${tenantSlug}/proposals`);

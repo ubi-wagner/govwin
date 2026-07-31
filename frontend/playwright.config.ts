@@ -3,9 +3,10 @@ import { defineConfig } from '@playwright/test';
 /**
  * E2E config. Drives a running, seeded instance at TEST_BASE_URL (default
  * :3000). The `setup` project authenticates each persona once (auth.setup.ts)
- * and saves storageState under e2e/.auth; persona projects reuse it. Boot + seed
- * are external (see docs/HITL_WIRING_AUDIT_RUNBOOK.md Step 0) so one instance
- * serves many specs.
+ * and saves storageState under e2e/.auth; persona projects reuse it. The `hitl`
+ * project is self-authenticating (each spec logs in fresh) and drives the E2E
+ * HITL cohort seeded by scripts/seed-e2e-hitl.mjs. Boot + seed are external
+ * (see docs/E2E_HITL_RUNBOOK.md §1) so one instance serves many specs.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -36,6 +37,13 @@ export default defineConfig({
       testMatch: /.*\.tenant\.spec\.ts/,
       use: { storageState: 'e2e/.auth/lighthouse.json' },
       dependencies: ['setup'],
+    },
+    {
+      // Self-authenticating E2E-HITL specs (one login per role). No storageState /
+      // setup dependency — each spec signs in fresh as an e2e-* account
+      // (scripts/seed-e2e-hitl.mjs). Run: `npx playwright test --project=hitl`.
+      name: 'hitl',
+      testMatch: /hitl.*\.spec\.ts/,
     },
   ],
 });

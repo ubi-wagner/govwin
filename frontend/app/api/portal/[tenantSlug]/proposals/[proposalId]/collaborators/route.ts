@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
@@ -52,6 +53,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId);
 
     // Verify proposal belongs to tenant
     let proposal: { id: string } | undefined;
@@ -195,6 +197,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId);
 
     // Parse body
     let body: {
@@ -296,7 +299,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     let isNewUser = false;
     let tempPassword: string | undefined;
 
-    const { collaboratorId, finalUserId } = await sql.begin(async (tx: any) => {
+    const { collaboratorId, finalUserId } = await withTenant(tenantId, async (tx: any) => {
       // Check if user exists, create if not
       let [existingUser] = await tx<{ id: string; tenantId: string | null }[]>`
         SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1

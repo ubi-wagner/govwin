@@ -128,16 +128,25 @@ class ContradictionResolver:
 
         return False
 
-    def _is_human_set(self, metadata: dict | None) -> bool:
-        """Check if a memory was explicitly set by a human."""
-        if not metadata:
+    def _is_human_set(self, provenance: dict | None) -> bool:
+        """Check if a memory was explicitly set by a human.
+
+        Reads the memory's `relationships` jsonb provenance blob. No producer
+        stamps human-set provenance today (the column defaults to []), so this
+        is inert until such a writer exists — but it degrades safely: any
+        non-dict value (the default [] array, None, or a bare string) yields
+        False rather than raising.
+        """
+        if not provenance:
             return False
-        if isinstance(metadata, str):
+        if isinstance(provenance, str):
             try:
-                metadata = json.loads(metadata)
+                provenance = json.loads(provenance)
             except (json.JSONDecodeError, TypeError):
                 return False
-        return metadata.get("source") == "explicit_preference" or metadata.get("human_set", False)
+        if not isinstance(provenance, dict):
+            return False
+        return provenance.get("source") == "explicit_preference" or provenance.get("human_set", False)
 
     async def resolve_for_tenant(self, conn, tenant_id: str) -> dict:
         """Find potentially contradictory semantic memories and resolve.
@@ -158,7 +167,7 @@ class ContradictionResolver:
             rows = await conn.fetch(
                 """
                 SELECT id, agent_role, content, category, confidence,
-                       evidence_count, metadata, created_at, updated_at
+                       evidence_count, relationships, created_at, updated_at
                 FROM semantic_memories
                 WHERE tenant_id = $1
                   AND is_active = true
@@ -212,8 +221,8 @@ class ContradictionResolver:
                         # Found a contradiction — resolve it
                         conf_a = float(mem_a["confidence"])
                         conf_b = float(mem_b["confidence"])
-                        human_a = self._is_human_set(mem_a.get("metadata"))
-                        human_b = self._is_human_set(mem_b.get("metadata"))
+                        human_a = self._is_human_set(mem_a.get("relationships"))
+                        human_b = self._is_human_set(mem_b.get("relationships"))
 
                         resolution = {
                             "memory_a_id": str(mem_a["id"]),

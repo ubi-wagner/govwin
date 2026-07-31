@@ -34,7 +34,8 @@ import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import { ForbiddenError, UnauthenticatedError } from '@/lib/errors';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { extractTopicsForSolicitation } from '@/lib/extract-topics';
@@ -47,6 +48,14 @@ import { isValidUUID } from '@/lib/validation';
 // via the Request.formData() streaming path.
 const MAX_TOTAL_BYTES = 30 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md'];
+
+// solicitation_documents.document_type CHECK set — validate client input against
+// it so a bad value fails fast as a 400 instead of a 500 CHECK violation on the
+// attach-to-existing insert path (effectiveType = docType).
+const VALID_DOCUMENT_TYPES = [
+  'source', 'rfp', 'nofo', 'instructions', 'amendment', 'qa',
+  'template', 'supporting', 'attachment', 'topic', 'other',
+] as const;
 
 const MetaSchema = z.object({
   title: z.string().min(1).max(500),
@@ -122,6 +131,15 @@ export async function POST(request: Request) {
     );
   }
   const requestedDocType = formData.get('documentType') ? String(formData.get('documentType')) : null;
+  if (
+    requestedDocType !== null &&
+    !VALID_DOCUMENT_TYPES.includes(requestedDocType as (typeof VALID_DOCUMENT_TYPES)[number])
+  ) {
+    return NextResponse.json(
+      { error: `Invalid documentType (allowed: ${VALID_DOCUMENT_TYPES.join(', ')})`, code: 'VALIDATION_ERROR' },
+      { status: 400 },
+    );
+  }
   const requestedIsPrimary = formData.get('isPrimary') === 'true';
 
   // Metadata is only required when creating a new solicitation

@@ -313,7 +313,7 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
                 SELECT t.value AS category, COUNT(DISTINCT a.id) AS count
                 FROM library_atoms a
                 JOIN atom_tags t ON t.atom_id = a.id AND t.dimension = 'vol'
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                 GROUP BY t.value
                 ORDER BY count DESC
                 LIMIT 10
@@ -365,9 +365,13 @@ IMPORTANT: The sum of all factor impacts must equal the total score_adjustment. 
                   AND content ILIKE $1
                   AND is_archived = false
             """
-            if tenant_id:
-                sql += " AND tenant_id = $3"
-                params.append(uuid.UUID(tenant_id))
+            # Fail CLOSED on a missing tenant — a tenant-scoped agent must never widen the
+            # memory search to every tenant (RLS is inert under the bypass role, so this
+            # predicate is the sole guard). Matches the registry's fail-closed contract.
+            if not tenant_id:
+                return {"memories": []}
+            sql += " AND tenant_id = $3"
+            params.append(uuid.UUID(tenant_id))
 
             sql += " ORDER BY importance DESC, created_at DESC LIMIT $2"
 

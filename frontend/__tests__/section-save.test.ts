@@ -23,7 +23,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, getTenantBySlugMock, verifyProposalAccessMock,
   emitEventSingleMock, isValidUUIDMock, resolveUserAccessMock } = vi.hoisted(() => {
-  const sqlMock = vi.fn();
+  // Mirror the real postgres.js `sql` shape: it also exposes `sql.json(x)` (used by the
+  // canvas_versions archive to write jsonb correctly). Without it the route's sql.json() call
+  // throws and the snapshot INSERT is silently skipped, desyncing the mocked call sequence.
+  const sqlMock = Object.assign(vi.fn(), { json: (x: unknown) => x });
   return {
     authMock: vi.fn(),
     sqlMock,
@@ -39,7 +42,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyProposalAccessMock,
 
 vi.mock('@/auth', () => ({ auth: authMock }));
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,
   verifyProposalAccess: verifyProposalAccessMock,

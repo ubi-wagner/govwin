@@ -63,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
     // ── apply in one tenant-scoped transaction; only in-tenant ids are touched ──
     const result = await withTenant(tenantId, async (tx) => {
       const valid = await tx<Array<{ id: string }>>`
-        SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND id = ANY(${atomIds}::uuid[])`;
+        SELECT id FROM library_atoms WHERE tenant_id = ${tenantId}::uuid AND vault_id IS NULL AND id = ANY(${atomIds}::uuid[])`;
       const validIds = valid.map((r: { id: string }) => r.id);
       if (validIds.length === 0) return { statusUpdated: 0, tagged: 0 };
 

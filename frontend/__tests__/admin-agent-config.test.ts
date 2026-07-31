@@ -17,7 +17,7 @@ const { authMock, sqlMock, emitStartMock, emitEndMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, sqlBypass: sqlMock }));
 vi.mock('@/lib/events', () => ({
   emitEventStart: emitStartMock,
   emitEventEnd: emitEndMock,

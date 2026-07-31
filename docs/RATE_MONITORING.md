@@ -407,7 +407,7 @@ Monitoring is **derived from the event ledger, not a separate metrics store.** T
 
 | Surface | Route | Shows |
 |---------|-------|-------|
-| **Agent Workforce** | `/admin/agents` | Agent roster (**25 archetypes, all auto-registered**; wired/dormant status per archetype) + tool registry + **per-tenant AI usage** (calls, cost, budget %) + recent tool invocations. Pipeline AI Controls (platform default budget/rate + master switch). |
+| **Agent Workforce** | `/admin/agents` | Agent roster (**27 archetypes, all auto-registered**; wired/dormant status per archetype) + tool registry + **per-tenant AI usage** (calls, cost, budget %) + recent tool invocations. Pipeline AI Controls (platform default budget/rate + master switch). |
 | **Workflows** | `/admin/workflows` | Live **Process Instance** state off `process_instances`/`_transitions`/`tasks` — current step, status, deadline, force-advance (the sanctioned HITL override). Cross-tenant, tenant-filterable. |
 | **Events** | `/admin/events` | The raw **audit river** — a live `system_events` stream (namespace/type/phase/actor/duration/error), the ground truth the other two are derived from. |
 

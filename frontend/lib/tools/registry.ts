@@ -174,7 +174,10 @@ export async function invoke<O = unknown>(
   };
   const startEventId = await emitEventStart({
     namespace: 'tool',
-    type: 'invoke.start',
+    // Type carries the action only; the phase (start/end) lives in the event's phase column, so
+    // the row reads tool·invoke·start / tool·invoke·end (not the self-contradictory
+    // "invoke.start" with phase='end"). emitEventEnd re-derives this type from the start row.
+    type: 'invoke',
     actor: eventActor,
     tenantId: ctx.tenantId,
     payload: {

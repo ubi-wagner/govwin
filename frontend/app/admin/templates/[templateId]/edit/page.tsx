@@ -7,7 +7,8 @@
  */
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import { createEmptyCanvas, CANVAS_PRESETS, type CanvasRules, type CanvasDocument } from '@/lib/types/canvas-document';
 import { TemplateCanvasEditor } from '@/components/admin/template-canvas-editor';
 

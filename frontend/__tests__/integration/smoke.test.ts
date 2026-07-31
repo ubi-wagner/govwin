@@ -16,7 +16,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
 
 vi.mock('@/lib/events', async () => {
   const actual = await vi.importActual<typeof import('@/lib/events')>('@/lib/events');

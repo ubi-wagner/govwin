@@ -26,7 +26,7 @@ const { authMock, sqlMock, getTenantBySlugMock, verifyTenantAccessMock, emitEven
 }));
 
 vi.mock('@/auth', () => ({ auth: authMock }));
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
   getTenantBySlug: getTenantBySlugMock,
   verifyTenantAccess: verifyTenantAccessMock,

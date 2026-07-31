@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { redirect, notFound } from 'next/navigation';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveDocumentCapabilities, type CanvasArtifactType } from '@/lib/canvas/capabilities';
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
@@ -52,6 +52,7 @@ export default async function PortalDocumentEditorPage({ params }: Props) {
   if (!hasRoleAtLeast(role, 'tenant_user')) redirect(`/portal/${tenantSlug}/proposals`);
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   const userId = sessionUser.id;
   const userName = sessionUser.name ?? sessionUser.email ?? 'Unknown';

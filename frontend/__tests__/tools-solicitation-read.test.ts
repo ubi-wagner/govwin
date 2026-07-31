@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 // Use vi.hoisted() to keep the mock fn reachable from test bodies.
 const { sqlMock } = vi.hoisted(() => ({ sqlMock: vi.fn() }));
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
 }));
 

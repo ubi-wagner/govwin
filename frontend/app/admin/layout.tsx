@@ -23,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/intake">Intake</AdminNavLink>
           <AdminNavLink href="/admin/rfp-curation">RFP Curation</AdminNavLink>
           <AdminNavLink href="/admin/cards">Opportunity Cards</AdminNavLink>
+          <AdminNavLink href="/admin/opportunities">Opportunity Rollup</AdminNavLink>
           <AdminNavLink href="/admin/sources">Sources</AdminNavLink>
           <AdminNavLink href="/admin/scouts">Scout Monitor</AdminNavLink>
           <AdminNavLink href="/admin/pipeline">Pipeline Jobs</AdminNavLink>
@@ -36,6 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/waitlist">Waitlist</AdminNavLink>
           <AdminNavLink href="/admin/purchases">Purchases</AdminNavLink>
           <AdminNavLink href="/admin/proposals">Proposals</AdminNavLink>
+          <AdminNavLink href="/admin/expert-time">Expert Time</AdminNavLink>
 
           <span className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-1">Content</span>
           <AdminNavLink href="/admin/site">Site Content</AdminNavLink>
@@ -47,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <AdminNavLink href="/admin/events">Event Stream</AdminNavLink>
           <AdminNavLink href="/admin/agents">Agents</AdminNavLink>
           <AdminNavLink href="/admin/automation">Automation</AdminNavLink>
+          <AdminNavLink href="/admin/automation-framework">Automation Framework</AdminNavLink>
           <AdminNavLink href="/admin/process">Process Monitor</AdminNavLink>
           <AdminNavLink href="/admin/workflows">Workflows</AdminNavLink>
           <AdminNavLink href="/admin/processes">Process Ledger</AdminNavLink>

@@ -1,0 +1,92 @@
+/**
+ * Shared system-scaffold catalog + copy-on-use (docs/LIBRARY_AND_VAULTS_DESIGN.md §4).
+ *   GET  — list the shared system starter foundations any tenant can add.
+ *   POST { foundationId } — copy that foundation into MY library (derived_from
+ *          lineage), materializing a per-tenant copy on demand instead of
+ *          deep-seeding every template into every tenant.
+ * tenant_user+ with verified tenant access.
+ */
+import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+import { listSystemFoundations, isSystemFoundation, copyFoundationToTenant, copyStarterSetToTenant } from '@/lib/library/foundation';
+import { emitEventSingle, userActor } from '@/lib/events';
+
+async function gate(tenantSlug: string, minRole: Role) {
+  const session = await auth();
+  if (!session?.user) return { error: NextResponse.json({ error: 'Authentication required', code: 'UNAUTHENTICATED' }, { status: 401 }) };
+  const u = session.user as { id?: string; role?: unknown };
+  const role: Role | null = isRole(u.role) ? u.role : null;
+  if (!role || !u.id) return { error: NextResponse.json({ error: 'Invalid session', code: 'UNAUTHENTICATED' }, { status: 401 }) };
+  if (!hasRoleAtLeast(role, minRole)) return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 }) };
+  const tenant = await getTenantBySlug(tenantSlug);
+  if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found', code: 'NOT_FOUND' }, { status: 404 }) };
+  const tenantId = tenant.id as string;
+  if (!(await verifyTenantAccess(u.id, role, tenantId))) return { error: NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 }) };
+  return { tenantId, userId: u.id };
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
+  try {
+    const { tenantSlug } = await params;
+    const g = await gate(tenantSlug, 'tenant_user');
+    if ('error' in g) return g.error;
+    return NextResponse.json({ data: await listSystemFoundations() });
+  } catch (e) {
+    console.error('[library/system-templates GET]', e);
+    return NextResponse.json({ error: 'Failed to load system templates', code: 'DB_ERROR' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ tenantSlug: string }> }) {
+  try {
+    const { tenantSlug } = await params;
+    const g = await gate(tenantSlug, 'tenant_user');
+    if ('error' in g) return g.error;
+    let body: { foundationId?: unknown; all?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body', code: 'BAD_REQUEST' }, { status: 400 });
+    }
+
+    // Bulk: copy the WHOLE starter set into MY library (P5.2 — the empty-library
+    // "Add starter set" offer). Idempotent — re-adding skips starters already held.
+    if (body.all === true) {
+      const r = await copyStarterSetToTenant(g.tenantId, { id: g.userId }, { collection: 'my_library' });
+      // No silent no-op: added=0 AND skipped=0 means the shared starter catalog itself is
+      // empty (not yet seeded), which would otherwise report success while the tenant's
+      // baseline library stays empty. Surface it so the failure is visible (sweep finding).
+      if (r.added === 0 && r.skipped === 0) {
+        return NextResponse.json(
+          { error: 'The starter template catalog is not available yet — contact your RFP Pipeline admin to seed it.', code: 'CATALOG_EMPTY' },
+          { status: 409 },
+        );
+      }
+      await emitEventSingle({
+        namespace: 'library', type: 'starter_set.added', actor: userActor(g.userId), tenantId: g.tenantId,
+        payload: { added: r.added, skipped: r.skipped },
+      });
+      return NextResponse.json({ data: r }, { status: 201 });
+    }
+
+    const foundationId = typeof body.foundationId === 'string' ? body.foundationId : '';
+    if (!foundationId) return NextResponse.json({ error: 'foundationId or all=true is required', code: 'BAD_REQUEST' }, { status: 400 });
+    // Guard: only shared system-scaffold foundations may be copied this way.
+    if (!(await isSystemFoundation(foundationId))) {
+      return NextResponse.json({ error: 'Not a system template', code: 'NOT_FOUND' }, { status: 404 });
+    }
+    const d = await copyFoundationToTenant(foundationId, g.tenantId, { id: g.userId }, { collection: 'my_library' });
+    await emitEventSingle({
+      namespace: 'library', type: 'template.added', actor: userActor(g.userId), tenantId: g.tenantId,
+      payload: { foundationId: d.foundationId, atoms: d.atomIds.length },
+    });
+    return NextResponse.json({
+      data: { foundationId: d.foundationId, sections: d.sectionIds.length, groups: d.groupIds.length, atoms: d.atomIds.length },
+    }, { status: 201 });
+  } catch (e) {
+    console.error('[library/system-templates POST]', e);
+    return NextResponse.json({ error: 'Failed to add template to library', code: 'DB_ERROR' }, { status: 500 });
+  }
+}

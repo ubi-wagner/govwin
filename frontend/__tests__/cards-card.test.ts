@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // card.ts imports @/lib/db (which throws without DATABASE_URL at import time).
 // coerceOriginCard is pure and never touches sql, so a trivial mock suffices.
-vi.mock('@/lib/db', () => ({ sql: Object.assign(vi.fn(), { json: vi.fn() }) }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: Object.assign(vi.fn(), { json: vi.fn() }) }));
 
 import { coerceOriginCard } from '@/lib/cards/card';
 

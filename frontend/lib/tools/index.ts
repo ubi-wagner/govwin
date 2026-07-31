@@ -52,8 +52,6 @@ import { volumeDeleteTool } from './volume-delete';
 import { volumeAddRequiredItemTool } from './volume-add-required-item';
 import { volumeUpdateRequiredItemTool } from './volume-update-required-item';
 import { volumeDeleteRequiredItemTool } from './volume-delete-required-item';
-// Canvas document system: library atom persistence
-import { librarySaveAtomTool } from './library-save-atom';
 // Canvas document system: proposal drafting + library search
 import { proposalDraftSectionTool } from './proposal-draft-section';
 import { librarySearchAtomsTool } from './library-search-atoms';
@@ -92,7 +90,6 @@ register(volumeDeleteTool);
 register(volumeAddRequiredItemTool);
 register(volumeUpdateRequiredItemTool);
 register(volumeDeleteRequiredItemTool);
-register(librarySaveAtomTool);
 register(proposalDraftSectionTool);
 register(librarySearchAtomsTool);
 // Source Scout

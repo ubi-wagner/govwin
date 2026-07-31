@@ -8,6 +8,9 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+// Admin cross-tenant route — the @/lib/tasks helpers query across tenants, so route their
+// global-`sql` to the owner (BYPASSRLS) pool via enterBypass() after the gate. (docs/RLS_CUTOVER.md)
+import { enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { listOpenTasksForActor, completeTask } from '@/lib/tasks/tasks';
 
@@ -33,6 +36,7 @@ export async function GET() {
   try {
     const r = await resolveAdmin();
     if ('error' in r) return r.error;
+    enterBypass();
     // tenantId null → admin-scoped tasks only (admin queue). Cross-tenant
     // filtering by a specific tenant is the monitor view's job (#5).
     const tasks = await listOpenTasksForActor(r.actor);
@@ -47,6 +51,7 @@ export async function POST(request: Request) {
   try {
     const r = await resolveAdmin();
     if ('error' in r) return r.error;
+    enterBypass();
 
     let body: { taskId?: unknown; result?: unknown };
     try {

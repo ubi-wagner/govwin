@@ -11,7 +11,7 @@ const { sqlMock, emitEventSingleMock } = vi.hoisted(() => {
   return { sqlMock, emitEventSingleMock: vi.fn() };
 });
 
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
 vi.mock('@/lib/events', () => ({
   emitEventSingle: emitEventSingleMock,
   userActor: (id: string, email?: string) => ({ type: 'user', id, email }),

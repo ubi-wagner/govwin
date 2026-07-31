@@ -16,7 +16,7 @@
  */
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { isValidUUID } from '@/lib/validation';
@@ -73,6 +73,11 @@ async function guard(ctx: RouteContext): Promise<Resolved | NextResponse> {
   if (!hasAccess) {
     return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
   }
+  // This guard reads forced tables (resolveUserAccess + the proposal_sections/proposals fetch
+  // below) in its OWN frame, so it must self-enter the tenant context here (same-frame forward
+  // flow) — the caller's enterTenant runs only AFTER guard() returns and would not cover these.
+  // Mirrors verifyProposalAccess. Harmless pre-flip (owner bypasses RLS). (docs/RLS_CUTOVER.md)
+  enterTenant(tenantId);
 
   const access = await resolveUserAccess(sessionUser.id, proposalId, tenantId);
   if (access.role !== 'admin') {
@@ -128,6 +133,7 @@ function isErr(x: Resolved | NextResponse): x is NextResponse {
 export async function POST(_request: Request, ctx: RouteContext) {
   const g = await guard(ctx);
   if (isErr(g)) return g;
+  enterTenant(g.tenantId); // RLS choke point: pin tenant context in the handler's own frame
   const { section, proposalStage } = g;
 
   // The per-section lock stricture now lives in lockSectionCore (shared with the
@@ -160,6 +166,7 @@ export async function POST(_request: Request, ctx: RouteContext) {
 export async function DELETE(_request: Request, ctx: RouteContext) {
   const g = await guard(ctx);
   if (isErr(g)) return g;
+  enterTenant(g.tenantId); // RLS choke point: pin tenant context in the handler's own frame
   const { tenantId, proposalId, userId, email, proposalStage, section } = g;
 
   let unlockedRows: { id: string }[];

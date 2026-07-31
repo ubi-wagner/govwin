@@ -129,11 +129,20 @@ async function executeTodoAction(
   const title = interpolate(rawTitle, event.payload).slice(0, 300) || `Automation: ${event.namespace}.${event.type}`;
   const description = `Auto-created by an automation rule on ${event.namespace}.${event.type}.`;
   const params = isNotify ? { kind: 'acknowledge', automated: true } : { automated: true };
+  // Optional SLA on the ToDo: a rule can set due_hours (a deadline) + nudge_days (escalation
+  // cadence, in days-before-due). The 'Purchase needs curation' rule uses these for the 72h
+  // curation SLA so the admin ToDo counts down and escalates (nudges) to the RFP-pipeline admins.
+  // Absent → no deadline / no nudge (today's behavior for every other admin rule).
+  const dueHours = typeof cfg.due_hours === 'number' && cfg.due_hours > 0 ? Math.floor(cfg.due_hours) : null;
+  const dueAt = dueHours ? new Date(Date.now() + dueHours * 3_600_000).toISOString() : null;
+  const nudgeDays = Array.isArray(cfg.nudge_days)
+    ? (cfg.nudge_days as unknown[]).map(Number).filter((n) => Number.isFinite(n) && n >= 0).slice(0, 3)
+    : [];
 
   await sql`
-    INSERT INTO tasks (tenant_id, assignee_role, task_type, title, description, status, nudge_schedule, params)
+    INSERT INTO tasks (tenant_id, assignee_role, task_type, title, description, status, due_at, nudge_schedule, params)
     VALUES (${event.tenantId}::uuid, 'rfp_admin', ${taskType}, ${title}, ${description}, 'open',
-            ${sql.json([])}, ${sql.json(params as JsonArg)})
+            ${dueAt}, ${sql.json(nudgeDays)}, ${sql.json(params as JsonArg)})
   `;
 }
 

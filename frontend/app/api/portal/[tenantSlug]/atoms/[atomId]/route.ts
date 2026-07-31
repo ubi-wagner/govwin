@@ -57,7 +57,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
     }
     if (body.status && ['draft', 'approved', 'archived'].includes(body.status)) {
       await withTenant(g.tenantId, async (tx) => {
-        await tx`UPDATE library_atoms SET status = ${body.status} WHERE tenant_id = ${g.tenantId}::uuid AND id = ${atomId}::uuid`;
+        await tx`UPDATE library_atoms SET status = ${body.status} WHERE tenant_id = ${g.tenantId}::uuid AND id = ${atomId}::uuid AND vault_id IS NULL`;
       });
     }
     await emitEventSingle({

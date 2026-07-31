@@ -67,17 +67,29 @@ export async function getGuardrailLimits(): Promise<GuardrailLimits> {
 /** Validate a customer's guardrail config against the RFP-admin limits. */
 export function validateGuardrailConfig(config: GuardrailConfig, limits: GuardrailLimits): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  const stages = config.stages ?? [];
-  const collaborators = config.collaborators ?? [];
-  const nudgeDays = config.nudgeDays ?? [];
+  // Runtime-shape guards: config arrives from JSON (a saved template, a launch body), so a
+  // mistyped field (stages: 5, collaborators: {}) must NOT throw an un-iterable error — it must
+  // fall through to a validation error. `?? []` alone doesn't catch a non-null non-array.
+  const stages = Array.isArray(config.stages) ? config.stages : [];
+  const collaborators = Array.isArray(config.collaborators) ? config.collaborators : [];
+  const nudgeDays = Array.isArray(config.nudgeDays) ? config.nudgeDays : [];
   if (stages.length < 1) errors.push('at least one stage is required');
   if (stages.length > limits.maxStages) errors.push(`too many stages (max ${limits.maxStages})`);
+  // Every stage element must be a non-null object with a non-empty string key. A null/degenerate
+  // element passes Array.isArray but then (a) crashes createStageTodos on `null.todos` AFTER the
+  // portal row has ALREADY advanced — landing it on a stage with zero gate ToDos, which the
+  // all-or-nothing gate then waves straight through (gate-bypass + corrupt state, sweep DEFECT#1),
+  // and (b) crashes the editor's applyConfig on `null.key` (DEFECT#2). Reject at this one choke
+  // point (the `!s` short-circuits before any property access). A keyless stage also breaks the
+  // gate match `params->>'stage' = key`, so the key is required, not just the object shape.
+  const hasBadStage = stages.some((s) => !s || typeof s !== 'object' || Array.isArray(s) || typeof s.key !== 'string' || s.key.trim() === '');
+  if (hasBadStage) errors.push('each stage must be an object with a non-empty key');
   if (collaborators.length > limits.maxCollaborators) errors.push(`too many collaborators (max ${limits.maxCollaborators})`);
-  const managers = collaborators.filter((c) => c.role === 'manager').length;
+  const managers = collaborators.filter((c) => c && c.role === 'manager').length;
   if (managers > limits.maxManagers) errors.push(`too many managers (max ${limits.maxManagers})`);
   if (nudgeDays.length > limits.maxNudges) errors.push(`too many nudges (max ${limits.maxNudges})`);
   for (const s of stages) {
-    for (const t of s.todos ?? []) {
+    for (const t of (Array.isArray(s?.todos) ? s.todos : [])) {
       if (!TODO_TYPES.has(t.type)) errors.push(`invalid todo type "${t.type}" (allowed: ${[...TODO_TYPES].join(', ')})`);
     }
   }
@@ -93,7 +105,9 @@ async function createStageTodos(
   nudgeDays: number[],
 ): Promise<number> {
   let n = 0;
-  for (const t of stage.todos ?? []) {
+  // Defense-in-depth: a legacy row persisted before the validator rejected null stages could
+  // still carry one; `stage?.todos` keeps advancePortalStage from throwing on it (sweep DEFECT#1).
+  for (const t of stage?.todos ?? []) {
     const dueAt = t.dueDays ? new Date(Date.now() + t.dueDays * 86_400_000).toISOString() : null;
     const res = await createTask({
       actor,

@@ -30,8 +30,9 @@ const { sqlMock, sqlBeginMock, emitEventSingleMock, bcryptHashMock } = vi.hoiste
 
 // ─── Mocks ─────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: sqlMock,
+  sqlBypass: sqlMock,
 }));
 
 vi.mock('@/lib/events', () => ({

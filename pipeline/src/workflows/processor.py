@@ -235,8 +235,35 @@ TOOL_ACTION_TO_ARCHETYPE: dict[str, str] = {
     # generic content drafting invocations
     "tool.proposal.draft_section": "section_drafter",
     "tool.proposal.review_color_team": "color_team_reviewer",
+    # production-integrity cohort (G1, greenfielded DORMANT — mapped so a future
+    # AI_INVOKE step validates at boot; no step references these yet, so inert):
+    #   formatter — per-section CanvasDocument v2 scaffold integrity + revectoring
+    #   stylist   — style normalization across atom pedigrees (section/artifact)
+    #   continuity_manager — phase-gate whole-proposal cross-artifact + RFP-alignment QA
+    "tool.proposal.reformat_section": "formatter",
+    "tool.proposal.restyle": "stylist",
+    "tool.proposal.check_continuity": "continuity_manager",
+    # Proposal Draft Manager cohort (P1, greenfielded DORMANT — mapped so a future AI_INVOKE
+    # step validates at boot; no step references these yet, so inert):
+    #   proposal_manager     — PLANNER: skeleton + matrix + ranked atoms → a per-section draft plan
+    #   traceability_auditor — requirement→coverage map (unaddressed + orphan content)
+    #   redaction_guard      — cross-boundary / OPSEC leak scan over assembled content
+    #   market_analyst       — SOTA/market web context for commercialization + related-work
+    "tool.proposal.plan_draft": "proposal_manager",
+    "tool.proposal.audit_traceability": "traceability_auditor",
+    "tool.proposal.scan_redaction": "redaction_guard",
+    "tool.market.analyze_sota": "market_analyst",
+    # Advisory Overlay cohort (P1.5, greenfielded DORMANT — mapped so the AdvisoryOverlay
+    # sub-workflow's reconcile step validates at boot; the overlay is inert until a gate emits
+    # proposal.advisory_overlay_requested):
+    #   advisory_manager — PLANS the 1:n fan-out + RECONCILES the results (discrepancy → adversarial
+    #   survival → remediation) + records ADVISORY MEMORY only. Never writes a business table.
+    "tool.advisory.reconcile": "advisory_manager",
     "tool.proposal.package": "packaging_specialist",
     "tool.library.curate": "librarian",
+    # library_seed flow — fires on provision, then on admin selection
+    "tool.proposal.seed_suggest": "library_seed_suggester",
+    "tool.proposal.seed_map": "library_seed_mapper",
     "tool.partner.coordinate": "partner_coordinator",
     "tool.proposal.architect": "proposal_architect",
     # on_application_accepted.py — new-tenant cold-start (Batch B)

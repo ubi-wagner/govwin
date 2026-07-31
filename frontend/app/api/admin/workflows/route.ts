@@ -13,7 +13,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql, enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { launchTemplate } from '@/lib/process/launch-template';
 
@@ -174,6 +175,8 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
+    // Cross-tenant helper (launchTemplate) uses global sql — route it to the owner pool. (docs/RLS_CUTOVER.md)
+    enterBypass();
 
     // ── Validate input ────────────────────────────────────────────
     let body: unknown;

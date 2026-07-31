@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
@@ -48,6 +48,7 @@ export async function GET(_request: Request, ctx: RouteContext) {
     if (!hasRoleAtLeast(role, 'tenant_user')) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point
 
     let members: {
       id: string;
@@ -124,6 +125,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+    enterTenant(tenantId); // RLS choke point
 
     let body: { email?: unknown; name?: unknown; role?: unknown };
     try {
@@ -155,11 +157,14 @@ export async function POST(request: Request, ctx: RouteContext) {
       );
     }
 
-    // Check if user already exists
-    let existing: { id: string; tenantId: string | null } | undefined;
+    // Check if the user already exists. The multi-membership model allows one
+    // email across many orgs, so existence at ANOTHER tenant is NOT a rejection —
+    // only an existing ACTIVE membership at THIS tenant is. Read by id only (the
+    // legacy fused users.tenant_id is retired for the membership decision).
+    let existing: { id: string } | undefined;
     try {
-      [existing] = await sql<{ id: string; tenantId: string | null }[]>`
-        SELECT id, tenant_id FROM users WHERE email = ${email} LIMIT 1
+      [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM users WHERE email = ${email} LIMIT 1
       `;
     } catch (dbErr) {
       console.error('[api/portal/team] POST user lookup failed:', dbErr);
@@ -167,13 +172,21 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     if (existing) {
-      if (existing.tenantId === tenantId) {
+      let activeHere = false;
+      try {
+        const [m] = await sql<{ id: string }[]>`
+          SELECT id FROM user_memberships
+          WHERE user_id = ${existing.id} AND tenant_id = ${tenantId} AND status = 'active'
+          LIMIT 1
+        `;
+        activeHere = !!m;
+      } catch (dbErr) {
+        console.error('[api/portal/team] POST membership check failed:', dbErr);
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
+      if (activeHere) {
         return NextResponse.json({ error: 'User is already a team member', code: 'VALIDATION_ERROR' }, { status: 409 });
       }
-      return NextResponse.json(
-        { error: 'User belongs to another organization', code: 'VALIDATION_ERROR' },
-        { status: 409 },
-      );
     }
 
     // ── Start event for team member invitation ────────────────────
@@ -185,21 +198,27 @@ export async function POST(request: Request, ctx: RouteContext) {
       payload: { email, name, role: memberRole },
     });
 
-    // Create new user with temp password
-    const tempPassword = randomUUID().slice(0, 12);
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
-
-    let newUser: { id: string };
-    try {
-      [newUser] = await sql<{ id: string }[]>`
-        INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
-        VALUES (${email}, ${name || null}, ${memberRole}, ${tenantId}, ${passwordHash}, true)
-        RETURNING id
-      `;
-    } catch (dbErr) {
-      console.error('[api/portal/team] POST user insert failed:', dbErr);
-      await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
-      return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+    // New users get a temp-password account; an existing user (joining from
+    // another org) reuses their account and is added via membership only.
+    const isNewUser = !existing;
+    const tempPassword = isNewUser ? randomUUID().slice(0, 12) : '';
+    let userId: string;
+    if (existing) {
+      userId = existing.id;
+    } else {
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+      try {
+        const [newUser] = await sql<{ id: string }[]>`
+          INSERT INTO users (email, name, role, tenant_id, password_hash, temp_password)
+          VALUES (${email}, ${name || null}, ${memberRole}, ${tenantId}, ${passwordHash}, true)
+          RETURNING id
+        `;
+        userId = newUser.id;
+      } catch (dbErr) {
+        console.error('[api/portal/team] POST user insert failed:', dbErr);
+        await emitEventEnd(startId, { error: { message: String(dbErr), code: 'DB_ERROR' } });
+        return NextResponse.json({ error: 'Internal error', code: 'DB_ERROR' }, { status: 500 });
+      }
     }
 
     // Materialize the login-selectable HOME membership (multi-membership identity) so
@@ -208,7 +227,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     try {
       await sql`
         INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
-        VALUES (${newUser.id}, ${tenantId}, ${memberRole}, 'active', 'home', ${sessionUser.id})
+        VALUES (${userId}, ${tenantId}, ${memberRole}, 'active', 'home', ${sessionUser.id})
         ON CONFLICT (user_id, tenant_id) DO UPDATE
           SET status = 'active', role = EXCLUDED.role
           WHERE user_memberships.status <> 'active'
@@ -231,7 +250,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         proposalTitle: 'Team Membership',
         role: memberRole,
         permission: 'full',
-        isNewUser: true,
+        isNewUser,
         tempPassword,
         loginUrl,
       });
@@ -250,7 +269,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         tenantId,
         payload: {
           recipientEmail: email,
-          userId: newUser.id,
+          userId,
           status: teamEmailResult.provider !== 'skipped' && !teamEmailResult.error ? 'sent' : 'failed',
           provider: teamEmailResult.provider,
           error: teamEmailResult.error ?? null,
@@ -266,7 +285,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         correlationId: randomUUID(),
         tenantId,
         tenantSlug,
-        userId: newUser.id,
+        userId,
         email,
         name,
         role: memberRole,
@@ -275,7 +294,7 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     return NextResponse.json({
       data: {
-        id: newUser.id,
+        id: userId,
         email,
         name,
         role: memberRole,

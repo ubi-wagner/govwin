@@ -11,6 +11,29 @@ type Props = {
   isLocked: boolean;
 };
 
+// ── Proposal Draft Manager (P3) — mode + voice controls ─────────────────
+// Mode picker → the pipeline workflow branch (OnFullDraftRequested{A,B,C});
+// Voice multi-select → proposals.voice, threaded into narrative drafting.
+const DRAFT_MODE_OPTIONS: {
+  value: 'a' | 'b' | 'c';
+  label: string;
+  version: string;
+  desc: string;
+}[] = [
+  { value: 'a', label: 'A · HITL + AI', version: 'V0.1', desc: 'Stage ranked atoms + merge — you drive section-by-section.' },
+  { value: 'b', label: 'B · Restyle', version: 'V0.2', desc: 'Controlled restyle + reformat — locking sets the style.' },
+  { value: 'c', label: 'C · Full auto', version: 'V0.5', desc: 'Full auto-draft across volumes + the review gate cohort.' },
+];
+
+const VOICE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'passive', label: 'Passive' },
+  { value: 'persuasive', label: 'Persuasive' },
+  { value: 'technical', label: 'Technical' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'research', label: 'Research' },
+  { value: 'development', label: 'Development' },
+];
+
 export function ProposalAiActions({
   tenantSlug,
   proposalId,
@@ -21,6 +44,20 @@ export function ProposalAiActions({
   const router = useRouter();
   const [draftLoading, setDraftLoading] = useState(false);
   const [message, setMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Full-draft (Proposal Draft Manager) state
+  const [fullDraftMode, setFullDraftMode] = useState<'a' | 'b' | 'c'>('a');
+  const [voice, setVoice] = useState<string[]>([]);
+  // Adversarial-gate (P4-D) — Mode C only. When on, Mode C elevates its review-gate cohort
+  // to the reusable AdvisoryOverlay (1:n fan-out → reconcile). Policy picks the overlay's
+  // landing: 'hitl' (a human review) or 'auto' (records the reconciled verdict, no TODO).
+  const [adversarial, setAdversarial] = useState(false);
+  const [adversarialPolicy, setAdversarialPolicy] = useState<'hitl' | 'auto'>('hitl');
+  const [fullDraftLoading, setFullDraftLoading] = useState(false);
+  const [fullDraftMsg, setFullDraftMsg] = useState<{
     type: 'success' | 'error';
     text: string;
   } | null>(null);
@@ -87,6 +124,54 @@ export function ProposalAiActions({
       setDraftLoading(false);
     }
   }, [canDraft, draftLoading, tenantSlug, proposalId]);
+
+  const toggleVoice = useCallback((token: string) => {
+    setVoice((prev) =>
+      prev.includes(token) ? prev.filter((t) => t !== token) : [...prev, token],
+    );
+  }, []);
+
+  const handleFullDraft = useCallback(async () => {
+    if (!canDraft || fullDraftLoading) return;
+    setFullDraftLoading(true);
+    setFullDraftMsg(null);
+    try {
+      // The adversarial gate applies only to Mode C (the only mode with a gate cohort).
+      const useAdversarial = fullDraftMode === 'c' && adversarial;
+      const res = await fetch(
+        `/api/portal/${tenantSlug}/proposals/${proposalId}/full-draft`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: fullDraftMode,
+            voice,
+            adversarial: useAdversarial,
+            ...(useAdversarial ? { adversarialPolicy } : {}),
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        setFullDraftMsg({
+          type: 'error',
+          text: err.error || 'Full draft request failed',
+        });
+      } else {
+        const gateNote = useAdversarial
+          ? ` Adversarial gate on (${adversarialPolicy === 'auto' ? 'auto-reconcile' : 'human review'}).`
+          : '';
+        setFullDraftMsg({
+          type: 'success',
+          text: `Full draft (Mode ${fullDraftMode.toUpperCase()}) requested. Drafts land in review — watch the section version history as they arrive.${gateNote}`,
+        });
+      }
+    } catch {
+      setFullDraftMsg({ type: 'error', text: 'Network error' });
+    } finally {
+      setFullDraftLoading(false);
+    }
+  }, [canDraft, fullDraftLoading, fullDraftMode, voice, adversarial, adversarialPolicy, tenantSlug, proposalId]);
 
   const handleResearch = useCallback(async () => {
     if (researching || !researchQ.trim()) return;
@@ -228,6 +313,165 @@ export function ProposalAiActions({
             AI Review (coming soon)
           </button>
         </div>
+      </div>
+
+      {/* ── Run full draft (Proposal Draft Manager) ─────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Run full draft</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          The Proposal Draft Manager plans from the skeleton, compliance matrix, and your
+          library, then drafts across the proposal. Every output lands in review (redlined
+          &amp; reversible) — it never advances a gate on its own.
+        </p>
+
+        {/* Mode picker */}
+        <fieldset className="mb-4">
+          <legend className="text-xs font-medium text-gray-700 mb-2">Mode</legend>
+          <div className="space-y-2">
+            {DRAFT_MODE_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                  fullDraftMode === opt.value
+                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="full-draft-mode"
+                  value={opt.value}
+                  checked={fullDraftMode === opt.value}
+                  onChange={() => setFullDraftMode(opt.value)}
+                  disabled={fullDraftLoading}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">{opt.label}</span>
+                    <span className="text-xs font-semibold text-indigo-600">{opt.version}</span>
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{opt.desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        {/* Voice multi-select */}
+        <fieldset className="mb-4">
+          <legend className="text-xs font-medium text-gray-700 mb-2">
+            Voice of Proposal <span className="font-normal text-gray-400">(optional)</span>
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {VOICE_OPTIONS.map((opt) => {
+              const active = voice.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => toggleVoice(opt.value)}
+                  disabled={fullDraftLoading}
+                  aria-pressed={active}
+                  className={`px-3 py-1.5 text-xs font-medium border rounded-full transition-colors disabled:opacity-50 ${
+                    active
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500'
+                      : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Threaded into narrative drafting as tone &amp; emphasis. Cost/spec artifacts ignore it.
+          </p>
+        </fieldset>
+
+        {/* Adversarial gate — Mode C only (the only mode with a review-gate cohort) */}
+        {fullDraftMode === 'c' && (
+          <fieldset className="mb-4 rounded-lg border border-gray-200 p-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={adversarial}
+                onChange={(e) => setAdversarial(e.target.checked)}
+                disabled={fullDraftLoading}
+                className="mt-0.5"
+              />
+              <span className="min-w-0">
+                <span className="text-sm font-medium text-gray-900">Adversarial gate</span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Elevate the review-gate cohort to a directed 1:n adversarial pass
+                  (fan-out → discrepancy → remediation) via the Advisory Overlay.
+                </span>
+              </span>
+            </label>
+
+            {adversarial && (
+              <div className="mt-3 pl-7">
+                <span className="block text-xs font-medium text-gray-700 mb-2">Landing</span>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: 'hitl', label: 'Human review', desc: 'Findings land in a review task.' },
+                    { value: 'auto', label: 'Auto-reconcile', desc: 'Records the reconciled verdict — no review task.' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setAdversarialPolicy(opt.value)}
+                      disabled={fullDraftLoading}
+                      aria-pressed={adversarialPolicy === opt.value}
+                      title={opt.desc}
+                      className={`px-3 py-1.5 text-xs font-medium border rounded-full transition-colors disabled:opacity-50 ${
+                        adversarialPolicy === opt.value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500'
+                          : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  The overlay is advisory — it never advances a gate. Mode C still ends in a
+                  full-draft review.
+                </p>
+              </div>
+            )}
+          </fieldset>
+        )}
+
+        <button
+          onClick={handleFullDraft}
+          disabled={!canDraft || fullDraftLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-indigo-200 rounded-lg bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {fullDraftLoading ? (
+            <span className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+          ) : (
+            <span className="text-indigo-400">&#x2726;</span>
+          )}
+          {fullDraftLoading ? 'Requesting…' : `Run full draft (Mode ${fullDraftMode.toUpperCase()})`}
+        </button>
+        {isLocked && (
+          <p className="text-xs text-amber-600 mt-2">
+            This proposal is locked — unlock it to run a full draft.
+          </p>
+        )}
+
+        {fullDraftMsg && (
+          <div
+            className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+              fullDraftMsg.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border border-red-200 text-red-700'
+            }`}
+          >
+            {fullDraftMsg.text}
+          </div>
+        )}
       </div>
 
       {/* ── R&D — Research this opportunity (Research Scout) ─────────── */}

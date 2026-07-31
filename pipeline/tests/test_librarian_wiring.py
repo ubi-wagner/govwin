@@ -19,7 +19,7 @@ def test_librarian_handles_current_triggers():
 
 def test_librarian_tools_are_modern():
     names = [t["name"] for t in LibrarianArchetype().get_tools()]
-    assert names == ["search_atoms", "get_tenant_profile", "search_memory"]
+    assert names == ["search_atoms", "match_section_skeleton", "get_tenant_profile", "search_memory"]
 
 
 def test_librarian_prompt_targets_atoms_not_units():

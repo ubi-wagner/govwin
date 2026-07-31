@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { randomUUID } from 'crypto';
 import { emitEventSingle, userActor } from '@/lib/events';
@@ -55,6 +55,8 @@ export async function GET(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // Verify proposal belongs to tenant
     let proposal: { id: string } | undefined;
@@ -156,6 +158,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // Verify proposal belongs to tenant and is not locked
     let proposal: { id: string; isLocked: boolean; stage: string } | undefined;

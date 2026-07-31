@@ -7,6 +7,8 @@ import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
+import { offerStarterSet } from '@/lib/library/starter-offer';
+import { isRole, type Role } from '@/lib/rbac';
 import bcrypt from 'bcryptjs';
 
 interface RouteContext {
@@ -169,21 +171,30 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const { tenantId, finalSlug, newUserId } = result;
 
-    // Send welcome email with credentials
-    const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
-    const emailContent = applicationAcceptedEmail({
-      contactName: app.contactName,
-      contactEmail: app.contactEmail,
-      companyName: app.companyName,
-      tempPassword: tempPw,
-      tenantSlug: finalSlug,
-      loginUrl,
-    });
-    const emailResult = await sendEmail({
-      to: app.contactEmail,
-      subject: emailContent.subject,
-      html: emailContent.html,
-    });
+    // Send welcome email with credentials. Post-commit + BEST-EFFORT: the tenant+user+membership
+    // are already committed above, so an email-layer throw must NEVER 500 and swallow the temp
+    // password — that would leave an approved customer with no way in (sweep F1). sendEmail is
+    // contractually no-throw today; this wrap keeps the guarantee even if that ever changes.
+    let emailResult: Awaited<ReturnType<typeof sendEmail>> = { provider: 'skipped', error: 'not-sent' };
+    try {
+      const loginUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
+      const emailContent = applicationAcceptedEmail({
+        contactName: app.contactName,
+        contactEmail: app.contactEmail,
+        companyName: app.companyName,
+        tempPassword: tempPw,
+        tenantSlug: finalSlug,
+        loginUrl,
+      });
+      emailResult = await sendEmail({
+        to: app.contactEmail,
+        subject: emailContent.subject,
+        html: emailContent.html,
+      });
+    } catch (emailErr) {
+      console.error('[applications/accept] welcome email failed (non-fatal, account already created):', emailErr);
+      emailResult = { provider: 'skipped', error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
+    }
 
     // ── Carbon-copy mirror: clone the opportunity river onto the new tenant so a
     //    fresh customer lands with a populated /cards (not an empty pipeline).
@@ -210,6 +221,18 @@ export async function POST(request: Request, ctx: RouteContext) {
       });
     } catch (backfillErr) {
       console.error('[api/admin/applications/accept] card backfill failed (non-fatal):', backfillErr);
+    }
+
+    // Offer the dogfooded starter template set to the new tenant_admin (P5.3) — a
+    // one-time dismissible ToDo routing them to the Library's one-click bulk add.
+    // Best-effort: a failure must NEVER fail the accept.
+    try {
+      await offerStarterSet({
+        tenantId, tenantSlug: finalSlug, adminUserId: newUserId,
+        actor: { id: userId, email: (session.user as { email?: string }).email ?? null, role: (isRole(role) ? role : 'rfp_admin') as Role, tenantId: null },
+      });
+    } catch (offerErr) {
+      console.error('[api/admin/applications/accept] starter-set offer failed (non-fatal):', offerErr);
     }
 
     await emitEventEnd(eventId, {

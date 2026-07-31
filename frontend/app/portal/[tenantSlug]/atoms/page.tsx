@@ -4,6 +4,9 @@ import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { AtomsWorkbench } from '@/components/portal/atoms-workbench';
 import { TemplifyPastProposals } from '@/components/portal/templify-past-proposals';
+import { CreateCanvasButton } from '@/components/portal/create-canvas-button';
+import { StarterCatalog } from '@/components/portal/starter-catalog';
+import { LibraryBrowser } from '@/components/portal/library-browser';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,13 +25,23 @@ export default async function AtomsPage({ params }: { params: Promise<{ tenantSl
 
   return (
     <div>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Library Atoms</h1>
+          <p className="text-gray-500 mt-1 text-sm">
+            Shred your own documents by hand — deconstruct into objects, keep only the content you like, tag it
+            against the one taxonomy, and it&apos;s sized to drop into section molds. Primitives (a bio, a figure)
+            combine into groups (a Team) with lineage back to their source. Or <strong>create a canvas</strong> from
+            scratch — a foundation artifact that decomposes into those same atoms.
+          </p>
+        </div>
+        <div className="shrink-0 pt-1">
+          <CreateCanvasButton tenantSlug={tenantSlug} />
+        </div>
+      </div>
+      <StarterCatalog tenantSlug={tenantSlug} />
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Library Atoms</h1>
-        <p className="text-gray-500 mt-1 text-sm">
-          Shred your own documents by hand — deconstruct into objects, keep only the content you like, tag it
-          against the one taxonomy, and it&apos;s sized to drop into section molds. Primitives (a bio, a figure)
-          combine into groups (a Team) with lineage back to their source.
-        </p>
+        <LibraryBrowser tenantSlug={tenantSlug} />
       </div>
       <div className="mb-6">
         <TemplifyPastProposals tenantSlug={tenantSlug} />

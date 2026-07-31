@@ -218,6 +218,10 @@ class ResearchScoutArchetype(BaseArchetype):
         limit = int(tool_input.get("limit", 5))
         if not query:
             return {"memories": [], "note": "No query provided"}
+        # Fail-closed: without a tenant context, never run an unfiltered cross-tenant
+        # query — return no rows rather than leaking other tenants' memories.
+        if not tenant_id:
+            return {"memories": [], "note": "No tenant context — memory search skipped (fail-closed)."}
         try:
             esc = query[:100].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             params: list = [f"%{esc}%", limit]

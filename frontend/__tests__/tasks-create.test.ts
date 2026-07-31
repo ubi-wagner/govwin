@@ -12,7 +12,7 @@ const { sqlMock, emitMock } = vi.hoisted(() => ({
   sqlMock: Object.assign(vi.fn(), { json: (v: unknown) => v }),
   emitMock: vi.fn(),
 }));
-vi.mock('@/lib/db', () => ({ sql: sqlMock, forceAdvanceProcess: vi.fn(), getTenantBySlug: vi.fn(), verifyTenantAccess: vi.fn() }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock, forceAdvanceProcess: vi.fn(), getTenantBySlug: vi.fn(), verifyTenantAccess: vi.fn() }));
 vi.mock('@/lib/process/force-advance', () => ({ forceAdvanceProcess: vi.fn() }));
 vi.mock('@/lib/events', () => ({ emitEventSingle: emitMock, userActor: (id: string, email?: string) => ({ type: 'user', id, email }) }));
 

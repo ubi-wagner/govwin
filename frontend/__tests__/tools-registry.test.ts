@@ -22,7 +22,7 @@ import { z } from 'zod';
 
 // Mock the DB-touching modules BEFORE importing anything that uses them.
 // This keeps the test hermetic — no PG, no network, no slow tests.
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {},
   sql: vi.fn(),
 }));
 
@@ -350,7 +350,8 @@ describe('invoke() — audit + metrics integration', () => {
     expect(events.emitEventStart).toHaveBeenCalledWith(
       expect.objectContaining({
         namespace: 'tool',
-        type: 'invoke.start',
+        // Action-only type; the phase (start/end) lives in the phase column (SOP §events).
+        type: 'invoke',
       }),
     );
     expect(events.emitEventEnd).toHaveBeenCalled();

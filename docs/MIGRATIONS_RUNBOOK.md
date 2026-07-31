@@ -21,7 +21,7 @@ PSQL="psql -h /tmp/pgtest -p 55432 -U postgres -d postgres -v ON_ERROR_STOP=1"
 $PSQL -f db/migrations/007_system_events.sql
 
 # Apply the whole sequence
-# NOTE: glob must be [0-9]*.sql — high-water is now 108, so the old `0*.sql` SILENTLY SKIPS 100–108.
+# NOTE: glob must be [0-9]*.sql — high-water is now 137, so the old `0*.sql` SILENTLY SKIPS 100–137.
 for f in db/migrations/[0-9]*.sql; do $PSQL -f "$f"; done
 
 # Verify a table

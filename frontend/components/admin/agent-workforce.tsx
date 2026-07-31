@@ -34,7 +34,7 @@ const POD_ORDER: Pod[] = [
   'Our-org — CMS content',
 ];
 
-// The 21 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
+// The 25 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
 // agents are role-bound to their assigned tenant (tenant_user authority; the trigger's
 // tenant_id is fixed by the task, never chosen by the model). Platform/our-org agents run at
 // our authority on master + cross-tenant data (no tenant to bind), and land into admin review.

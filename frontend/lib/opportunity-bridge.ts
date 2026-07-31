@@ -86,6 +86,10 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       LEFT JOIN users ub ON ub.id = o.built_by
       LEFT JOIN users ur ON ur.id = o.released_by
       WHERE o.id = ${opportunityId}::uuid
+      -- Deterministic tiebreak if an opportunity matches TWO curated_solicitations (one via each
+      -- join arm): prefer the direct solicitation_id (topic) arm, then stable by cs.id, so the
+      -- snapshot's namespace/compliance/volume_count can't flip between runs (sweep F6).
+      ORDER BY (cs.id = o.solicitation_id) DESC NULLS LAST, cs.id
       LIMIT 1
     `;
     if (!o) return null;
@@ -156,15 +160,26 @@ export async function publishToBridge(
 ): Promise<BridgeEvent | null> {
   const card = await buildCardSnapshot(opportunityId, now);
   if (!card) return null;
+  // Race-safe version allocation. Two concurrent publishes for the SAME opportunity can both
+  // read max(version)=N and compute N+1; the UNIQUE(opportunity_id,version) index lets exactly
+  // one win. `ON CONFLICT DO NOTHING` turns the loser into a no-op (empty RETURNING) instead of
+  // a duplicate-key throw — so we recompute the now-higher max and retry, rather than nulling
+  // out (and never fanning out) a real lifecycle transition. Bounded so a pathological hot opp
+  // can't spin forever.
   try {
-    const [row] = await sql<Array<{ id: string; version: number }>>`
-      INSERT INTO opportunity_bridge (opportunity_id, version, event_type, card, posted_by)
-      SELECT ${opportunityId}::uuid,
-             COALESCE((SELECT max(version) FROM opportunity_bridge WHERE opportunity_id = ${opportunityId}::uuid), 0) + 1,
-             ${eventType}, ${jsonParam(card)}, ${postedBy}
-      RETURNING id, version
-    `;
-    return { id: row.id, opportunityId, version: row.version, eventType, card };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const [row] = await sql<Array<{ id: string; version: number }>>`
+        INSERT INTO opportunity_bridge (opportunity_id, version, event_type, card, posted_by)
+        SELECT ${opportunityId}::uuid,
+               COALESCE((SELECT max(version) FROM opportunity_bridge WHERE opportunity_id = ${opportunityId}::uuid), 0) + 1,
+               ${eventType}, ${jsonParam(card)}, ${postedBy}
+        ON CONFLICT (opportunity_id, version) DO NOTHING
+        RETURNING id, version
+      `;
+      if (row) return { id: row.id, opportunityId, version: row.version, eventType, card };
+    }
+    console.error('[bridge] publishToBridge exhausted version-allocation retries', opportunityId);
+    return null;
   } catch (e) {
     console.error('[bridge] publishToBridge failed', e);
     return null;
@@ -186,8 +201,14 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
     : ev.card.lifecycleStatus === 'closed' ? 'closed'
     : 'open';
   const lifecycle = coarseStatus(stage);
-  await withTenant(tenantId, async (tx) => {
-    await tx`
+  // Forward-only apply. A stale (lower-or-equal bridge_version) event must NOT overwrite a
+  // newer card — otherwise an out-of-order fan-out (v_N applied after v_{N+1}, e.g. two
+  // overlapping lifecycle changes) would resurface a closed opp as 'open' in the customer
+  // feed. The `WHERE EXCLUDED.bridge_version > current` makes a stale apply a no-op; RETURNING
+  // tells us whether the card actually advanced, so we skip the cursor bump AND the rescore
+  // emit for a no-op (the mirror already holds newer state).
+  const applied = await withTenant(tenantId, async (tx) => {
+    const rows = await tx`
       INSERT INTO tenant_opportunity_cards (tenant_id, opportunity_id, card, bridge_version, lifecycle_status, submission_stage)
       VALUES (${tenantId}::uuid, ${ev.opportunityId}::uuid, ${jsonParam(ev.card)}, ${ev.version}, ${lifecycle}, ${stage})
       ON CONFLICT (tenant_id, opportunity_id) DO UPDATE SET
@@ -199,9 +220,14 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent): Promise<void> {
           WHEN tenant_opportunity_cards.is_pinned AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
           THEN true ELSE tenant_opportunity_cards.pin_update_available END,
         updated_at = now()
+      WHERE EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
+      RETURNING tenant_id
     `;
+    return rows.length > 0;
   });
-  // System cursor (not tenant-RLS'd) — records forward-only progress.
+  if (!applied) return;
+  // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
+  // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`
     INSERT INTO tenant_bridge_cursor (tenant_id, last_posted_at, last_event_id, last_applied_at)
     VALUES (${tenantId}::uuid, now(), ${ev.id}::uuid, now())

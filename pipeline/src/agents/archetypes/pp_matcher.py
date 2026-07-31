@@ -162,7 +162,7 @@ Use get_compliance for the PP requirements and search_library (vol=past_performa
                 """
                 SELECT a.id, a.title, a.content, a.grain
                 FROM library_atoms a
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                   AND (a.content ILIKE $2 OR a.title ILIKE $2)
                   AND EXISTS (SELECT 1 FROM atom_tags tv WHERE tv.atom_id = a.id
                               AND tv.dimension = 'vol' AND tv.value = 'past_performance')

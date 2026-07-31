@@ -1,11 +1,50 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-07-22 (launch-readiness sweep + deprecation cleanup + doc refresh → automation phase next)
+**Last updated:** 2026-07-25 (library + collaboration-vaults build → two-sided nook UI shipped)
 **Branch:** `claude/nice-hamilton-kBqtD`
 
 ---
 
-## 0. LATEST — 2026-07-22 (launch-readiness → automation-prep; READ THIS FIRST)
+## 0a. LATEST — 2026-07-25 (library + collaboration vaults; READ THIS FIRST)
+
+Shipped the **library/vaults build plan** (docs/LIBRARY_VAULTS_BUILD_PLAN.md, tasks #231–275).
+Grain model `foundation ⊃ section ⊃ group ⊃ atom`; the **starter set** seeds + agent hookup;
+and **collaboration vaults ("nooks")** — a per-partner, RLS-segregated branch library with a
+full **two-sided UI** now live (design: docs/LIBRARY_AND_VAULTS_DESIGN.md §9).
+
+- **Tenant side:** `/portal/<slug>/vaults` (index + create-a-nook) and `/vaults/<id>` (NookDetail,
+  full rights: invite/revoke · copy-in · any-grain download · Harvest → library). "Vaults" nav
+  link beside Library (tenant_admin-gated).
+- **Collaborator side (NEW top-level surface):** `app/vaults/` — a vault-only partner holds NO
+  tenant membership, so it lives OUTSIDE the portal (`resolveVaultAccess`, not
+  `verifyTenantAccess`). `/vaults` lists their own nook(s) only; `/vaults/<id>` reuses NookDetail
+  with COLLAB_RIGHTS (upload · atomize · download-WHOLE-only — no members panel, no Harvest). The
+  portal dispatcher routes a vault-only collaborator to `/vaults` at sign-in.
+- **P8.7 HITL:** a collaborator upload emits `library:vault.artifact_uploaded` + raises ONE
+  standing `tenant_admin` `vault_artifact_review` ToDo per nook (idempotent). **P8.8:**
+  instruction-based sharing copy per side (partial-share/signatures deferred).
+- **Isolation contract (proven 0-leak):** every nook grain carries `vault_id`; ~20 main-library
+  readers + all pipeline agents are fenced `vault_id IS NULL`, so nook content is invisible to
+  the main library AND the agents until a tenant harvests it.
+
+**Migrations:** 134 (collaboration_vaults + vault_members + library_atoms.vault_id + visibility
+CHECK += 'vault' + FORCE RLS), 135 (starter-offer partial-unique idempotency).
+
+**Verification (all green):** `tsc` 0 · `vitest` **828** · `next build` (all four vault routes) ·
+drives: `drive-vault-collab-surface` 5/5, `drive-vault-{isolation 7/7, content 5/5, leak 0-leak}` ·
+both sides captured in-browser → Customer-Admin (§13) + Collaborator (§8) manuals re-rendered.
+
+**Sandbox demo nook (screenshots):** `scripts/seed-vault-demo.mts` seeds a nook "Acme Robotics"
+owned by Immobileyes + a login-capable partner **partner@acme.test / Sandbox2026!** (partner_user,
+no tenant membership → lands on `/vaults`). `scripts/capture-vaults.mjs` captures both sides.
+**Screenshots need the DEV server** (`next dev -p 3001`) — the prod `next start` build hit a client
+hydration error ("Something went wrong") in this sandbox; dev hydrates cleanly. Login via Playwright:
+`goto(domcontentloaded)` → `waitForTimeout(2500)` (let hydration finish) → `waitForSelector('#email')`
+→ fill; `networkidle` on the login goto starves and the pre-hydration node detaches.
+
+---
+
+## 0. EARLIER — 2026-07-22 (launch-readiness → automation-prep)
 
 The last several days were a **both-sides launch-readiness pass** on top of the identity/agent work
 below. State entering the automation phase (task **#190**):
@@ -76,7 +115,7 @@ AUTOMATION_SPINE_MAP, LAUNCH_READINESS_2026-07-22.
 
 ---
 
-**AGENT WORKFORCE — COMPLETE + EXPANDED (19 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
+**AGENT WORKFORCE — COMPLETE + EXPANDED (27 archetypes). Source of truth: `docs/AGENT_WORKFORCE.md`;
 forward plan: `docs/archive/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_FABRIC_DESIGN.md`.**
 
 - **#117 DONE — all 10 original archetypes awake as workflow actors.** section_drafter / compliance_reviewer /
@@ -91,7 +130,7 @@ forward plan: `docs/archive/AGENT_ROADMAP.md`; fabric §0 summary: `docs/AGENT_F
   via `AGENT_DATABASE_URL`). `agents/guardrails.py::enforce_guardrails` gates every result (advisory →
   guardrail → land-or-review): disallowed content → review, scoring adjustment clamped to ±15, fail-safe.
   **Deploy step (gated):** provision a login member of `rfp_agent` + set `AGENT_DATABASE_URL`.
-- **Batches A/B/C DONE — fabric now 19.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
+- **Batches A/B/C DONE — fabric then 19; POD4/CMS + the library-seed pair have since taken it to 27.** Batch B onboarding_agent (OnApplicationAccepted). Batch A
   platform-scope opportunity_scout/ingest_analyst/matrix_stager/skeleton_architect (OnOpportunitiesDetected +
   OnRfpUploaded). Batch C outcome_analyst/amendment_monitor/cost_estimator/pp_matcher (OnProposalOutcomeRecorded
   / OnSourceChangeDetected / OnProposalCreated). Platform agents skip tenant-discretion (no tenant) but KEEP

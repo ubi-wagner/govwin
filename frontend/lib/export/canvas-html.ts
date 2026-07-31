@@ -24,6 +24,16 @@ import type {
   CaptionContent,
   UrlContent,
   FootnoteContent,
+  ShapeContent,
+  TextBoxContent,
+  CalloutContent,
+  CodeBlockContent,
+  BlockquoteContent,
+  ChartContent,
+  EquationContent,
+  DividerContent,
+  VideoContent,
+  SignatureContent,
 } from '@/lib/types/canvas-document';
 
 function esc(s: unknown): string {
@@ -80,16 +90,60 @@ function renderRuns(tb: TextBlockContent, vars: Record<string, string>): string 
   return out;
 }
 
-function styleAttr(node: CanvasNode): string {
+/** Hex (+optional opacity) → a CSS color. */
+function cssColor(hex?: string, opacity?: number): string | undefined {
+  if (!hex) return undefined;
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (opacity === undefined || opacity >= 1 || h.length < 6) return `#${h}`;
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, opacity))})`;
+}
+
+/** All the CSS bits for a node's style + box + free-position. */
+function styleBits(node: CanvasNode): string[] {
   const s = node.style ?? {};
   const bits: string[] = [];
+  // text/run
   if (s.color) bits.push(`color:${s.color}`);
   if (s.alignment) bits.push(`text-align:${s.alignment}`);
   if (typeof s.size === 'number') bits.push(`font-size:${s.size}pt`);
   if (s.family) bits.push(`font-family:${JSON.stringify(s.family)}`);
+  if (s.weight === 'bold') bits.push('font-weight:bold');
+  if (s.style === 'italic') bits.push('font-style:italic');
+  const deco: string[] = [];
+  if (s.underline) deco.push('underline');
+  if (s.strikethrough) deco.push('line-through');
+  if (deco.length) bits.push(`text-decoration:${deco.join(' ')}`);
+  if (s.highlight) bits.push(`background-color:${s.highlight}`);
   if (typeof s.indent === 'number' && s.indent > 0) bits.push(`margin-left:${s.indent}pt`);
   if (typeof s.space_before === 'number') bits.push(`margin-top:${s.space_before}pt`);
   if (typeof s.space_after === 'number') bits.push(`margin-bottom:${s.space_after}pt`);
+  // box: fill / border / radius / opacity / rotation / shadow
+  const fill = cssColor(s.fill?.color, s.fill?.opacity);
+  if (fill) bits.push(`background-color:${fill}`);
+  if (s.border && s.border.style !== 'none' && (s.border.color || s.border.width)) {
+    bits.push(`border:${s.border.width ?? 1}pt ${s.border.style ?? 'solid'} ${cssColor(s.border.color ?? '#000000', s.border.opacity)}`);
+  }
+  if (typeof s.border?.radius === 'number') bits.push(`border-radius:${s.border.radius}pt`);
+  if (typeof s.opacity === 'number' && s.opacity < 1) bits.push(`opacity:${s.opacity}`);
+  if (typeof s.rotation === 'number' && s.rotation) bits.push(`transform:rotate(${s.rotation}deg)`);
+  if (s.shadow) bits.push('box-shadow:0 2px 6px rgba(0,0,0,0.15)');
+  // free position (content box that does NOT snap to margins)
+  const p = node.position;
+  if (p && (p.wrap === 'float' || p.wrap === 'behind' || p.wrap === 'front')) {
+    bits.push('position:absolute');
+    if (typeof p.x === 'number') bits.push(`left:${p.x}in`);
+    if (typeof p.y === 'number') bits.push(`top:${p.y}in`);
+    if (typeof p.w === 'number') bits.push(`width:${p.w}in`);
+    if (typeof p.h === 'number') bits.push(`height:${p.h}in`);
+    bits.push(`z-index:${p.wrap === 'behind' ? -1 : (p.z ?? 5)}`);
+  }
+  return bits;
+}
+
+function styleAttr(node: CanvasNode): string {
+  const bits = styleBits(node);
   return bits.length ? ` style="${bits.join(';')}"` : '';
 }
 
@@ -164,6 +218,102 @@ function renderImage(img: ImageContent): string {
   return `<figure style="margin:12px 0;text-align:center">${inner}${cap}</figure>`;
 }
 
+const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
+
+/** A self-contained inline SVG chart (bar / line / area / pie / doughnut). Embeddable
+ *  anywhere HTML goes; docx/pptx pick it up as an image, pdf renders it directly. */
+export function renderChartSvg(ch: ChartContent): string {
+  const W = 460, H = 240, pad = 32;
+  const cats = ch.categories ?? [];
+  const series = ch.series ?? [];
+  const max = Math.max(1, ...series.flatMap((s) => s.data ?? []));
+  const title = ch.title ? `<text x="${W / 2}" y="16" text-anchor="middle" font-size="12" font-weight="bold">${esc(ch.title)}</text>` : '';
+  let body = '';
+  if (ch.chart_type === 'pie' || ch.chart_type === 'doughnut') {
+    const vals = series[0]?.data ?? [];
+    const total = vals.reduce((a, b) => a + b, 0) || 1;
+    const cx = W / 2, cy = H / 2 + 8, r = 84;
+    let a0 = -Math.PI / 2;
+    body = vals.map((v, i) => {
+      const a1 = a0 + (v / total) * 2 * Math.PI;
+      const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0), x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+      const large = a1 - a0 > Math.PI ? 1 : 0;
+      const d = `M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`;
+      a0 = a1;
+      return `<path d="${d}" fill="${CHART_PALETTE[i % CHART_PALETTE.length]}"/>`;
+    }).join('');
+    if (ch.chart_type === 'doughnut') body += `<circle cx="${cx}" cy="${cy}" r="42" fill="#fff"/>`;
+  } else if (ch.chart_type === 'line' || ch.chart_type === 'area') {
+    const xw = (W - 2 * pad) / Math.max(1, cats.length - 1);
+    body = series.map((s, si) => {
+      const pts = (s.data ?? []).map((v, i) => `${(pad + i * xw).toFixed(1)},${(H - pad - (v / max) * (H - 2 * pad)).toFixed(1)}`);
+      const col = s.color || CHART_PALETTE[si % CHART_PALETTE.length];
+      return `<polyline fill="none" stroke="${col}" stroke-width="2" points="${pts.join(' ')}"/>`;
+    }).join('');
+  } else { // bar (default)
+    const gw = (W - 2 * pad) / Math.max(1, cats.length);
+    const bw = (gw / Math.max(1, series.length)) * 0.7;
+    body = series.map((s, si) => (s.data ?? []).map((v, i) => {
+      const h = (v / max) * (H - 2 * pad);
+      const x = pad + i * gw + si * bw;
+      return `<rect x="${x.toFixed(1)}" y="${(H - pad - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${s.color || CHART_PALETTE[si % CHART_PALETTE.length]}"/>`;
+    }).join('')).join('');
+  }
+  const axes = ch.chart_type === 'pie' || ch.chart_type === 'doughnut' ? ''
+    : `<line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="#94a3b8"/><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="#94a3b8"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin:10pt 0" xmlns="http://www.w3.org/2000/svg" data-chart="${esc(ch.chart_type)}">${title}${axes}${body}</svg>`;
+}
+
+/** A regular N-pointed star polygon centered at (cx,cy). */
+function starPoints(cx: number, cy: number, rOuter: number, points = 5): string {
+  const rInner = rOuter * 0.4;
+  const pts: string[] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? rOuter : rInner;
+    const a = -Math.PI / 2 + (i * Math.PI) / points;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return pts.join(' ');
+}
+
+/**
+ * A self-contained SVG for a shape primitive — fill (+opacity), border (color/
+ * width/style), whole-shape opacity, rotation, and optional centered text. The
+ * raster exporters (docx/xlsx, which have no vector-shape primitive) rasterize
+ * this to a PNG; the HTML/PDF path draws shapes as styled divs, so this is
+ * export-only. Covers every ShapeKind.
+ */
+export function renderShapeSvg(node: CanvasNode): string {
+  const sc = (node.content ?? {}) as ShapeContent;
+  const sh = sc.shape ?? 'rectangle';
+  const s = node.style ?? {};
+  const W = 320, H = 200, m = 8;
+  const x = m, y = m, w = W - 2 * m, h = H - 2 * m;
+  const fill = cssColor(s.fill?.color, s.fill?.opacity) ?? '#DCE6F1';
+  const strokeCol = cssColor(s.border?.color) ?? (s.border && s.border.style !== 'none' ? '#334155' : null);
+  const sw = s.border?.width ?? (strokeCol ? 1 : 0);
+  const dash = s.border?.style === 'dashed' ? ' stroke-dasharray="7,4"' : s.border?.style === 'dotted' ? ' stroke-dasharray="2,3"' : '';
+  const stroke = sw > 0 && strokeCol ? ` stroke="${strokeCol}" stroke-width="${sw}"${dash}` : '';
+  let el: string;
+  switch (sh) {
+    case 'ellipse': el = `<ellipse cx="${W / 2}" cy="${H / 2}" rx="${w / 2}" ry="${h / 2}" fill="${fill}"${stroke}/>`; break;
+    case 'rounded_rectangle': el = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" ry="18" fill="${fill}"${stroke}/>`; break;
+    case 'triangle': el = `<polygon points="${W / 2},${y} ${W - m},${H - m} ${m},${H - m}" fill="${fill}"${stroke}/>`; break;
+    case 'diamond': el = `<polygon points="${W / 2},${y} ${W - m},${H / 2} ${W / 2},${H - m} ${m},${H / 2}" fill="${fill}"${stroke}/>`; break;
+    case 'star': el = `<polygon points="${starPoints(W / 2, H / 2, Math.min(w, h) / 2)}" fill="${fill}"${stroke}/>`; break;
+    case 'line': el = `<line x1="${m}" y1="${H / 2}" x2="${W - m}" y2="${H / 2}" stroke="${strokeCol ?? '#334155'}" stroke-width="${sw || 2}"${dash}/>`; break;
+    case 'arrow': el = `<path d="M${m},${H * 0.38} L${W * 0.66},${H * 0.38} L${W * 0.66},${H * 0.2} L${W - m},${H / 2} L${W * 0.66},${H * 0.8} L${W * 0.66},${H * 0.62} L${m},${H * 0.62} Z" fill="${fill}"${stroke}/>`; break;
+    case 'callout_bubble': el = `<path d="M${x + 18},${y} h${w - 36} q18,0 18,18 v${h - 60} q0,18 -18,18 h-${(w - 36) * 0.55} l-22,26 v-26 h-${(w - 36) * 0.45} q-18,0 -18,-18 v-${h - 60} q0,-18 18,-18 Z" fill="${fill}"${stroke}/>`; break;
+    default: el = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"${stroke}/>`; // rectangle
+  }
+  const txt = sc.text;
+  const textEl = txt
+    ? `<text x="${W / 2}" y="${H / 2}" dominant-baseline="central" text-anchor="middle" font-size="16" font-family="${esc(s.family ?? 'Arial')}" fill="${s.color ?? '#1E293B'}">${esc(txt)}</text>`
+    : '';
+  const g = `<g opacity="${s.opacity ?? 1}"${s.rotation ? ` transform="rotate(${s.rotation} ${W / 2} ${H / 2})"` : ''}>${el}${textEl}</g>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" data-shape="${esc(sh)}">${g}</svg>`;
+}
+
 function renderNode(node: CanvasNode, vars: Record<string, string>): string {
   const c = node.content;
   switch (node.type) {
@@ -194,6 +344,56 @@ function renderNode(node: CanvasNode, vars: Record<string, string>): string {
     case 'url': {
       const u = c as UrlContent;
       return `<p><a href="${esc(u.href)}">${esc(subst(u.display_text, vars))}</a></p>`;
+    }
+    case 'text_box': {
+      const tb = c as TextBoxContent;
+      return `<div${styleAttr(node)}>${renderRuns({ text: tb.text, inline_formats: tb.inline_formats }, vars)}</div>`;
+    }
+    case 'shape': {
+      const sh = c as ShapeContent;
+      const extra = [...styleBits(node), 'min-height:40pt', 'padding:8pt', 'box-sizing:border-box'];
+      if (!node.style?.fill?.color) extra.push('background:#e2e8f0');
+      if (sh.shape === 'ellipse') extra.push('border-radius:50%');
+      else if (sh.shape === 'rounded_rectangle' && typeof node.style?.border?.radius !== 'number') extra.push('border-radius:8pt');
+      const inner = sh.text ? `<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center">${esc(subst(sh.text, vars))}</div>` : '';
+      return `<div data-shape="${esc(sh.shape)}" style="${extra.join(';')}">${inner}</div>`;
+    }
+    case 'callout': {
+      const ca = c as CalloutContent;
+      const col = ({ info: '#3b82f6', warning: '#f59e0b', tip: '#10b981', success: '#22c55e', note: '#64748b' } as Record<string, string>)[ca.variant] ?? '#64748b';
+      const title = ca.title ? `<strong>${esc(subst(ca.title, vars))}</strong><br/>` : '';
+      return `<div data-callout="${esc(ca.variant)}" style="border-left:3pt solid ${col};background:${col}18;padding:10pt 12pt;margin:10pt 0;border-radius:4pt">${title}${esc(subst(ca.text, vars))}</div>`;
+    }
+    case 'code_block': {
+      const cb = c as CodeBlockContent;
+      return `<pre style="background:#0f172a;color:#e2e8f0;padding:12pt;border-radius:6pt;overflow-x:auto;font-family:'Courier New',monospace;font-size:9pt;white-space:pre-wrap"><code>${esc(cb.code)}</code></pre>`;
+    }
+    case 'blockquote': {
+      const bq = c as BlockquoteContent;
+      const cite = bq.cite ? `<footer style="color:#64748b;font-size:9pt;margin-top:6pt">— ${esc(bq.cite)}</footer>` : '';
+      return `<blockquote style="border-left:3pt solid #cbd5e1;padding:6pt 14pt;margin:10pt 0;color:#334155;font-style:italic">${esc(subst(bq.text, vars))}${cite}</blockquote>`;
+    }
+    case 'chart':
+      return renderChartSvg(c as ChartContent);
+    case 'equation': {
+      const eq = c as EquationContent;
+      const tex = eq.latex ?? eq.mathml ?? '';
+      return `<div data-latex="${esc(tex)}" style="text-align:center;font-family:'Cambria Math','Times New Roman',serif;font-style:italic;margin:8pt 0">${esc(tex)}</div>`;
+    }
+    case 'divider': {
+      const dv = c as DividerContent;
+      return `<hr style="border:0;border-top:${dv.thickness ?? 1}pt ${dv.line_style ?? 'solid'} ${dv.color ?? '#cbd5e1'};margin:12pt 0" />`;
+    }
+    case 'video': {
+      const vd = c as VideoContent;
+      const href = vd.url ?? vd.storage_key ?? '#';
+      return `<div style="border:1px solid #e2e8f0;border-radius:6pt;padding:12pt;text-align:center;color:#475569">&#9654; <a href="${esc(href)}">${esc(vd.caption || 'Video')}</a></div>`;
+    }
+    case 'signature': {
+      const sg = c as SignatureContent;
+      const nm = sg.signer_name ? `<div style="font-size:10pt">${esc(sg.signer_name)}</div>` : '';
+      const em = sg.signer_email ? `<div style="font-size:8pt;color:#64748b">${esc(sg.signer_email)}</div>` : '';
+      return `<div data-signature style="margin:16pt 0"><div style="border-bottom:1pt solid #334155;width:240pt;height:28pt"></div><div style="font-size:8pt;color:#64748b;margin-top:2pt">${esc(sg.label || 'Signature')}</div>${nm}${em}</div>`;
     }
     case 'page_break':
       return `<div style="page-break-after:always"></div>`;

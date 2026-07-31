@@ -162,8 +162,19 @@ shipping the table changes nothing until a tenant edits a rule.)
 
 ## 4. The resolver (the single injection point)
 
+> **AS-BUILT (Phase B, mig-127-backed).** Shipped as `resolveGatePolicy(opts)` in
+> `frontend/lib/automation/policy.ts` — `opts = { tenantId, scope, triggerKey, gateDefaults,
+> pinnedToCurationSla? }`. It returns `{ enabled, assigneeRole, nudgeDays, dueInMinutes, channel,
+> cooldownMinutes, maxFiresPerHour, source }` and is **fail-safe**: any DB error returns the
+> caller's `gateDefaults` verbatim (today's constants), so the layer can never break a launch.
+> `enabled=false` → the caller safe-skips the launch. The four gate call-sites (purchase, stripe
+> webhook, proposals/create, proposals/outcome) now resolve through it; the raw admin
+> launch-collaboration route stays the explicit-override tier. Unit tests:
+> `__tests__/automation-policy.test.ts` (7). The recipient-set + relative-timing resolution lands
+> with the notify beats in Phase C.
+
 ```
-resolveAutomationPolicy(tenantId, triggerKey, ctx) → ResolvedOverlay | null
+resolveGatePolicy({ tenantId, scope, triggerKey, gateDefaults, pinnedToCurationSla }) → ResolvedGatePolicy
 ```
 
 - **Precedence (highest wins, §12):** explicit per-launch override → **portal** config → **tenant** policy

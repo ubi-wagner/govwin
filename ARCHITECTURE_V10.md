@@ -3,8 +3,8 @@
 **Date:** 2026-07-03
 
 > **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19; roster count refreshed 2026-07-22).** The pipeline
-> `AgentFabric` (**25 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
-> as workflow actors, since expanded to 25) is a
+> `AgentFabric` (**27 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
+> as workflow actors, since expanded to 27) is a
 > **tenant-bound advisory workforce** being woken one at a time. Each tenant-space agent runs with
 > **tenant_user authority** scoped to its assigned tenant (the trusted task context; tool schemas expose no
 > `tenant_id`), produces **advisory** output that goes **through guardrails to land-or-review** (never
@@ -52,6 +52,21 @@ carrying `opportunity_id`). Not a code-read.
 > orphaned modules**. The full ingest→outcome spine and the `system_events` start/end river are traced
 > end to end in **§3.1**; the workflow engine that rides that river has its own canonical map in
 > **`docs/AUTOMATION_SPINE_MAP.md`**. Cleanup ledger: `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
+
+> **Update (2026-07-26) — schema now at migration 137; automation framework → library/vaults → RLS cutover.**
+> Since the mig-125 pass, migrations **126–137** landed: the **declarative automation framework + policies**
+> (126–129), the **curation-SLA ToDo** (130), the **expert-time calendar** (131), the **foundation artifact
+> grains** (`foundation ⊃ section ⊃ group ⊃ atom`, 132), **library seed jobs** (133), **collaboration vaults
+> ("nooks")** with per-partner RLS segregation (134), the **starter-offer** partial-unique idempotency (135),
+> and the **RLS cutover** (136) + **namespace-CHECK validation** (137). The `AgentFabric` registry has since
+> expanded to **27 archetypes** (added `library_seed_mapper` + `library_seed_suggester`). **RLS status
+> refreshed:** the non-owner cutover is now **built + applied in schema** — mig 136_rls_cutover created the
+> `govtech_app` (app) + `rfp_agent` (agents) `NOBYPASSRLS` roles, **19 force-RLS tables**, **35
+> `tenant_isolation` policies**, and the per-request `SET app.tenant_id` context layer
+> (`frontend/lib/tenant-context.ts` + `lib/db.ts` enterTenant/enterBypass); it is **single-layer in effect
+> today only until the one-op prod `DATABASE_URL` flip** to `govtech_app` (still pending). As-built RLS record:
+> **`docs/RLS_CUTOVER.md`**; library/vaults design: **`docs/LIBRARY_AND_VAULTS_DESIGN.md`**. Verify snapshot:
+> `tsc` 0 · `vitest` 828 · `next build`.
 
 ## Status Legend
 

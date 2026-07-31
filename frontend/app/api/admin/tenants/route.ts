@@ -9,11 +9,15 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql } from '@/lib/db';
+// Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql, enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { backfillTenant } from '@/lib/opportunity-bridge';
 import { seedDefaultBuckets } from '@/lib/spotlight/default-buckets';
+import { offerStarterSet } from '@/lib/library/starter-offer';
+import { sendEmail } from '@/lib/email';
+import { applicationAcceptedEmail } from '@/lib/email-templates';
 import bcrypt from 'bcryptjs';
 
 function slugify(name: string): string {
@@ -185,6 +189,8 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
+    // Cross-tenant helper (offerStarterSet) uses global sql — route it to the owner pool. (docs/RLS_CUTOVER.md)
+    enterBypass();
 
     // Body: create a company + its admin POC directly (the "we/expert add them" path,
     // vs. the customer self-serve /apply → accept flow). See MULTI_MEMBERSHIP_IDENTITY_DESIGN.
@@ -253,6 +259,14 @@ export async function POST(request: Request) {
     let cardsBackfilled = 0;
     try { cardsBackfilled = await backfillTenant(created.tenantId); } catch (e) { console.error('[admin/tenants/create] backfill failed', e); }
 
+    // Offer the starter template set to the new tenant_admin (P5.3, best-effort).
+    try {
+      await offerStarterSet({
+        tenantId: created.tenantId, tenantSlug: created.slug, adminUserId: created.adminUserId,
+        actor: { id: sessionUser.id ?? '', email: (session.user as { email?: string }).email ?? null, role: role ?? 'rfp_admin', tenantId: null },
+      });
+    } catch (e) { console.error('[admin/tenants/create] starter-set offer failed', e); }
+
     await emitEventSingle({
       namespace: 'finder',
       type: 'tenant.created',
@@ -262,12 +276,30 @@ export async function POST(request: Request) {
       payload: { tenantId: created.tenantId, slug: created.slug, name, adminEmail, source: 'admin_manual', cardsBackfilled },
     });
 
+    // Onboard the POC the same way self-serve accept does (sweep gap: this path never
+    // emailed). New user → temp-pw acceptance mail; existing user → an "added as admin"
+    // notice. Best-effort; the tempPassword also returns below as an admin-relay backstop.
+    let emailSent = false;
+    try {
+      const base = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+      if (created.isNewUser) {
+        const c = applicationAcceptedEmail({ contactName: adminName ?? adminEmail, contactEmail: adminEmail, companyName: name, tempPassword: tempPw, tenantSlug: created.slug, loginUrl: `${base}/login` });
+        const r = await sendEmail({ to: adminEmail, subject: c.subject, html: c.html });
+        emailSent = r.provider !== 'skipped' && !r.error;
+      } else {
+        const safe = (s: string | null) => String(s ?? '').replace(/[<>&"]/g, '');
+        const r = await sendEmail({ to: adminEmail, subject: `You've been added as an administrator of ${safe(name)}`,
+          html: `<p>Hi ${safe(adminName) || 'there'},</p><p>You now have <strong>administrator</strong> access to <strong>${safe(name)}</strong> on RFP Pipeline. Sign in with your existing account to manage the workspace.</p><p><a href="${base}/login">Sign in</a></p>` });
+        emailSent = r.provider !== 'skipped' && !r.error;
+      }
+    } catch (e) { console.error('[admin/tenants/create] acceptance email failed', e); }
+
     return NextResponse.json({
       data: {
         tenantId: created.tenantId,
         slug: created.slug,
         name,
-        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null },
+        adminPoc: { email: adminEmail, isNewUser: created.isNewUser, tempPassword: created.isNewUser ? tempPw : null, emailSent },
         cardsBackfilled,
       },
     }, { status: 201 });

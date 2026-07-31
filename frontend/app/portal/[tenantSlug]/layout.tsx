@@ -120,6 +120,9 @@ export default async function PortalLayout({
                 {isTenantAdmin && <PortalNavLink href={`${basePath}/cards`}>Opportunities</PortalNavLink>}
                 {isTenantAdmin && <PortalNavLink href={`${basePath}/buckets`}>Buckets</PortalNavLink>}
                 <PortalNavLink href={`${basePath}/atoms`}>Library</PortalNavLink>
+                {/* Collaboration vaults ("nooks") — segregated per-partner branch
+                    libraries. tenant_admin only (manage members + harvest). */}
+                {isTenantAdmin && <PortalNavLink href={`${basePath}/vaults`}>Vaults</PortalNavLink>}
                 {isTenantAdmin && <PortalNavLink href={`${basePath}/portals`}>Builds</PortalNavLink>}
               </>
             )}

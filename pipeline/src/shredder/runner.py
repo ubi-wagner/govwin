@@ -55,7 +55,7 @@ log = logging.getLogger("pipeline.shredder.runner")
 MAX_INPUT_TOKENS_PER_RUN = 150_000
 
 # Model name env var. Defaults to Sonnet 4.6 per the V2 conventions.
-DEFAULT_MODEL = os.environ.get("SHREDDER_MODEL", "claude-sonnet-4-6")
+DEFAULT_MODEL = os.environ.get("SHREDDER_MODEL", "claude-sonnet-4-20250514")
 
 # Rough token estimation — 1 token ≈ 4 chars for English text.
 # Good enough for budget enforcement; exact counts come back from the

@@ -72,23 +72,47 @@ live:
 > records a **$0 audited purchase** (a comped build shows up in the books exactly like a real
 > one) and needs the opportunity to already exist. A regular customer admin never sees it.
 
+- **Agent-first (recommended, on by default):** let AI agents draft a **V0 of every section**
+  on release, with the compliance + color-team reviewers making a first pass. Your team's
+  ToDos become **review & confirm**, not write-from-scratch. Uncheck it to draft manually.
 - **Phases (up to 3, selectable):** Kickoff & Compliance → Draft (V0.5) → Review, Lock &
   Submit — spanning **purchase → close → +30 days**, deadlines anchored to the close date.
 - **HITL ToDos per phase:** add as many as you need (type · title · assignee · due-days).
 - **Managers (delegated, per portal):** your admins always get the final notice; delegate
   it to more people — a teammate or one of our experts (e.g. Econ-dev) — added or not, as
   many as you want.
+- **RFP Pipeline oversight (pre-checked):** we stay on the escalation path as the ultimate
+  backstop if no one on your side is active. Unchecking it opens an **explicit opt-out
+  confirmation** — decline only if you're sure.
 - **Nudges:** up to 3 reminders (days before due). The last is the **final notice** — it
   goes to your admins plus any delegated managers.
 
 On **Launch build**, the config is validated, the portal provisions, and the first phase's
-ToDos land in your task queue. Advance a stage once its ToDos are done (or force-advance).
+ToDos land in your task queue. With Agent-first on, the drafts are already there to review.
+Advance a stage once its ToDos are done (or force-advance). Each new portal you build is
+**templated from your last one** — set it up once, then refine.
 
 ## Automation
 
-Global, tenant-level notification preferences: who gets ToDos / notifications / nudges, and
-on what triggers (document ready, collaborator get-ready, stage advanced, new priority
-opportunity), plus AI-review-on-advance and auto-advance-when-all-locked. **Save** to apply.
+The **automation grammar editor** — no longer just on/off toggles. For each governable trigger
+(grouped **Discovery** and **Build**) you set the four dimensions:
+
+- **Who** — role chips (Admins / Team / Collaborators) + "delegated managers" / "stage
+  collaborators".
+- **Escalate** — the nudge cadence (e.g. `1, 3` days).
+- **How** — Email · in-app ToDo · both.
+- plus the **on/off** per trigger.
+
+A **locked chip** at the top makes the one rule you can't switch off explicit: **you (admin)
+always get the final notice** — add managers to share it; if no one's active it reaches RFP
+Pipeline. Governable triggers include *new priority opportunity* (Discovery) and *document
+ready · collaborator get-ready · stage advanced · draft review · final review* (Build). Two of
+them are **AI-capable** — they can run an agent whose advice lands in your review queue. **Save**
+each row to apply.
+
+> The platform-wide defaults + ceilings (the 72h curation SLA, max buckets, the agent budget
+> ceiling) are set by the RFP-Pipeline team on their framework control plane — they look fixed
+> to you because they're tuned one level up.
 
 ## AI usage
 

@@ -1,7 +1,14 @@
 # The Agent Workforce — wiring, oversight, tenant-discretion (#117)
 
+> **As-built correction (deepest-review sweep).** See **docs/START_END_FRAMEWORK.md** §4 for the verified
+> agent×scope map. Corrections: every one of the 35 archetypes now has a concrete invocation site (a
+> producer or an `AI_INVOKE` step) — the "15 dormant" framing is stale; `research_scout` is invocable via a
+> queue producer (`ai/research/route.ts`), just not as an `AI_INVOKE` step. The injection fence was hardened
+> this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
+> `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
+
 **Audience:** RFP-admin ops (setup + monitoring), engineering (wiring), marketing (how to talk about it).
-**As-built:** the pipeline `AgentFabric` auto-registers **25 archetypes** (`_ARCHETYPE_CLASSES` in
+**As-built:** the pipeline `AgentFabric` auto-registers **35 archetypes** (`_ARCHETYPE_CLASSES` in
 `fabric.py`) — **dormant ≠ dead**: all are registry-wired and invocable; "dormant" means only that no
 producer/step fires one yet. This doc is the pattern for waking them, the tenant-isolation rules they run
 under, and the RFP-admin oversight surface. The fabric mechanics + how to add an archetype are in
@@ -31,6 +38,14 @@ spine this run (tenant-discretion + injection-fence + `library_atoms`); each is 
 `test_<agent>_wiring.py`. LLM reasoning runs live on deploy (Railway `ANTHROPIC_API_KEY`); in-sandbox we
 verify routing + producer/step + tool SQL against the live schema.
 
+> **Live-count reconciliation (2026-07 rebaseline).** "Awake as workflow actors" here means
+> *registered + AI_INVOKE/producer-wired* (the #117 batch, since grown to the full 35). That is a
+> different measure from a **proven live enqueue/inline site**, of which there are **9** today
+> (`section_drafter`, `compliance_reviewer`, `color_team_reviewer`, `librarian`, `scoring_strategist`,
+> `opportunity_analyst`, `research_scout`, `library_seed_suggester`, `library_seed_mapper`). The other
+> 26 are dormant-but-mapped, woken one at a time under the automation-policy phase. Use **9** when a doc
+> means "actively firing." (CLAUDE.md's shorter "live today" list understated this.)
+
 **Then the fabric grew to 19 (#127–#129, see `docs/archive/AGENT_ROADMAP.md`)** — 9 new agents on the same
 pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a wiring test):
 
@@ -43,7 +58,7 @@ pattern (advisory, injection-fenced, independent AI_INVOKE/producer, each with a
 | **Skeleton Architect** (`skeleton_architect`) | 🌐 platform | RFP uploaded | Matrix → master response skeleton (tenant architect tailors it). |
 | **Outcome Analyst** (`outcome_analyst`) | 🔒 tenant | Outcome recorded | Win/loss lesson → memory → scoring calibration. |
 | **Amendment Monitor** (`amendment_monitor`) | 🌐 platform | Source change detected | Flags compliance-affecting amendments. |
-| **Cost Estimator** (`cost_estimator`) | 🔒 tenant | Proposal created | Cost-volume realism guidance. |
+| **Cost Estimator** (`cost_estimator`) | 🔒 tenant | Proposal created; **woken** in Mode C (`cost_estimate` step) | Cost-volume realism guidance — now **WOKEN** with a `compute_budget` tool over the deterministic `proposal.budget_model` burden-waterfall/PoP engine (exact bucketed costs, no invented dollars). |
 | **PP Matcher** (`pp_matcher`) | 🔒 tenant | Proposal created | Surfaces PP atoms + flags teaming gaps. |
 
 **And now the fabric registers 25** — a further 6 on the same pattern (our-org RFP-admin ops + the CMS
@@ -62,6 +77,49 @@ content loop), so the whole platform runs on one fabric:
 tenant to bind to), so tenant-discretion is N/A — but they keep the **mandatory injection fence** (they read
 the most untrusted text in the system) and land into an admin review. **Full suite: 332
 agent/workflow/guardrail/security tests green.**
+
+**And now the fabric auto-registers 35** — eight more on the same advisory pattern (the Proposal Draft
+Manager **P1** + production-integrity **G1** + advisory-overlay **P1.5** cohorts), all tenant-scope,
+injection-fenced, and mapped to an `AI_INVOKE` action but **LLM-gated**: their `OnFullDraftRequested` /
+`AdvisoryOverlay` steps exist and now FIRE — the P3 admin "Run full draft" control emits the full-draft
+trigger, and Mode C's `request_overlay` ACTION emits the overlay trigger — so each agent step runs when the
+pipeline `ANTHROPIC_API_KEY` is set (advisory, like `section_drafter`; an unkeyed step safe-skips).
+
+| Agent | Scope | Wakes on | What it does |
+|---|---|---|---|
+| **Proposal Manager** (`proposal_manager`) | 🔒 tenant | Full-draft plan step (head of Modes A/B/C) | PLANS the per-section draft from the skeleton + compliance matrix + ranked atoms (atoms to seed, mode a/b/c, voice); emits a plan, writes nothing. |
+| **Formatter** (`formatter`) | 🔒 tenant | Full-draft `reformat` step (Modes B/C) | Checks a section's CanvasDocument v2 scaffold vs the target artifact; stages a re-scaffold when a reused atom's grain/budget/structure mismatches. Sonnet. |
+| **Stylist** (`stylist`) | 🔒 tenant | Full-draft `restyle` step (Modes B/C) | Normalizes styling across atom pedigrees to the artifact house style (staged), preserving purposeful callout emphasis. Haiku. |
+| **Continuity Manager** (`continuity_manager`) | 🔒 tenant | Mode C `gate_continuity`; overlay fan-out target | Whole-proposal cross-artifact QA vs the RFP — flags alignment gaps, contradictions, and incongruous non-customer entity (provenance) leaks. |
+| **Traceability Auditor** (`traceability_auditor`) | 🔒 tenant | Mode C `gate_traceability` step | Maps every compliance requirement to its covering section; flags unaddressed requirements and orphan sections. |
+| **Redaction Guard** (`redaction_guard`) | 🔒 tenant | Mode C `gate_redaction` step | Scans assembled content for cross-boundary agency names, CUI/markings, and competitor-sensitive text leaked by reused atoms. |
+| **Market Analyst** (`market_analyst`) | 🔒 tenant | Overlay `pre_augment` (advisory web step) | Injects fresh, cited SOTA/market/competitive context (Commercialization + Related-Work) via the controlled browser — injection-fenced, safe-skips. |
+| **Advisory Manager** (`advisory_manager`) | 🔒 tenant | Advisory-overlay `reconcile` step | Wraps any advisor in a 1:n adversarial fan-out; reconciles discrepancies (majority/consensus/refute-vote) + remediation; records advisory memory only. |
+
+### The Proposal Draft Manager program (P1–P4)
+
+The eight newest archetypes compose into an **admin-run full-draft orchestration** — `OnFullDraftRequested`,
+three `Workflow` classes sharing the `proposal.full_draft_requested` trigger and branching on
+`payload.mode`. All share one spine head — **`proposal_manager`** plans the per-section draft from the
+skeleton + compliance matrix + ranked `library_atoms` — then diverge: **Mode A → V0.1** (HITL + AI
+enablement: stage atoms → merge → the admin drives), **Mode B → V0.2** (informed `stylist` restyle →
+`formatter` re-scaffold, lock-sets-style), **Mode C → V0.5** (full auto: seed → draft → `formatter` →
+`stylist` → the now-**woken `cost_estimator`** → `packaging_specialist` assembly across volumes → the
+review-gate cohort). The cost step is exact, not a guess: `cost_estimator` gained a `compute_budget` tool
+over the deterministic **`proposal.budget_model`** burden-waterfall/PoP engine (Direct Labor → Fringe →
+OH → G&A → Fee, bucketed across the period of performance), so its dollars equal the exported cost sheet.
+The P3 admin "Run full draft" control is the sole producer of the trigger; each agent step runs when the
+pipeline `ANTHROPIC_API_KEY` is set (advisory, like `section_drafter`).
+
+The **adversarial gate** is the reusable **`AdvisoryOverlay`** over that same cohort (`continuity_manager`
++ `traceability_auditor` + `redaction_guard`, optionally pre-augmented by `market_analyst`'s fenced SOTA
+scout). Mode C's `request_overlay` ACTION emits `proposal.advisory_overlay_requested`, elevating one
+advisor call into a 1:n perspective-diverse fan-out → **`advisory_manager`** reconcile (discrepancy →
+majority/consensus/refute-vote survival → remediation) → land **HITL** (`policy != auto`) or **AUTO**
+(`policy == auto`, recorded as an advisory audit event). Every step holds the invariants: purely
+**advisory** (outputs land in review-staged `canvas_versions`, `persisted=false` — never a business-table
+write), **never advances a gate** (each mode ends in a human review ToDo), **never dead-ends** (independent
+gate agents never strand the review), and **runaway-bounded** (`OVERLAY_FANOUT_SLOTS` / `MAX_FANOUT`).
 
 ---
 
@@ -84,7 +142,7 @@ atomize-package route, wiring proven by `pipeline/tests/test_librarian_wiring.py
 LLM reasoning runs live on deploy (Railway key); in-sandbox we verify routing + producer + tool SQL.
 
 **Tools go through the canonical registry.** Agent actions map to the frontend tool registry
-(`POST /api/tools/:name` — `library.save_atom`, `proposal.draft_section`, `solicitation.*`, …), which is
+(`POST /api/tools/:name` — `library.search_atoms`, `proposal.draft_section`, `solicitation.*`, …), which is
 role-scoped, tenant-scoped, and audited (one `tool.invoke.start`/`end` per call).
 
 ---
@@ -219,7 +277,7 @@ registry) is where the guardrail check runs — so "advisory → guardrail → l
 
 | Property | Status | How |
 |---|---|---|
-| **No prompt injection** | ✅ all 25 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
+| **No prompt injection** | ✅ all 35 (per-agent tests) | Untrusted tenant text (atoms/RFP/opportunity/partner identity) is fenced (`--- BEGIN/END USER CONTENT ---` / `UNTRUSTED …`) with a treat-as-data / ignore-embedded-instructions guard in `build_messages`. Each `test_<agent>_wiring.py` asserts the fence. |
 | **No runaway** | ✅ enforced by the runtime | `MAX_TOOL_ROUNDS=20` + `PER_CALL_CEILING_USD=$0.50` mid-loop + rate limit 50 calls/hr/tenant + $50/mo budget (fabric). Producers stay **bounded** — one task per package / per tenant, never per-atom; and an agent's output event must **not re-trigger the same agent** (no self-loop); task enqueue is idempotent. |
 | **No dead-ending a workflow/automation** | ✅ enforced by the runtime | The processor catches/logs/continues (never crashes the poll loop); an unmapped or failed `AI_INVOKE` action is a **safe skip** (no fabric call, no DB write); agent output is **advisory** (never writes business tables directly); the fabric returns an error status dict, **never raises**. So a failing agent-actor degrades gracefully — the human loop continues. `AI_INVOKE` steps also carry `on_failure`/`on_timeout`/`retry_count`. |
 | **Tenant isolation** | discretion ✅; RLS ✅ **built** (deploy-gated) | §7b: tenant-discretion holds today; **RLS backstop built** — mig 117 adds the `rfp_agent` NOBYPASSRLS role + FORCE-RLS on the gap tables (proposals/proposal_sections/tenant_profiles/atom_tags), and `fabric.invoke_agent` sets/resets `app.tenant_id` per call. **Proven in sandbox**: as `rfp_agent`, a cross-tenant / unset read returns 0 rows. Deploy step: provision a login member + `AGENT_DATABASE_URL`. |

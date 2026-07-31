@@ -19,7 +19,6 @@ import { ToolAuthorizationError } from './errors';
 // ─── Input schema ──────────────────────────────────────────────────
 
 const InputSchema = z.object({
-  tenantId: z.string().uuid(),
   category: z.string().max(100).optional(),
   tags: z.array(z.string()).optional(),
   query: z.string().max(500).optional(),
@@ -119,9 +118,9 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       SELECT
         id,
         content,
-        NULL AS category,
-        NULL AS subcategory,
-        '{}'::text[] AS tags,
+        (SELECT value FROM atom_tags t WHERE t.atom_id = library_atoms.id AND t.dimension = 'kind' LIMIT 1) AS category,
+        (SELECT value FROM atom_tags t WHERE t.atom_id = library_atoms.id AND t.dimension = 'form' LIMIT 1) AS subcategory,
+        COALESCE((SELECT array_agg(value ORDER BY dimension, value) FROM atom_tags t WHERE t.atom_id = library_atoms.id), '{}'::text[]) AS tags,
         confidence,
         outcome_score,
         outcome,
@@ -132,6 +131,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
         updated_at
       FROM library_atoms
       WHERE tenant_id = ${tenantId}::uuid
+        AND vault_id IS NULL
         AND status = 'approved'
         ${categoryFilter}
         ${tagsFilter}
@@ -145,6 +145,7 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
         SELECT COUNT(*)::text AS count
         FROM library_atoms
         WHERE tenant_id = ${tenantId}::uuid
+          AND vault_id IS NULL
           AND status = 'approved'
           ${categoryFilter}
           ${tagsFilter}

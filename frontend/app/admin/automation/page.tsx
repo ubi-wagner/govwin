@@ -1,9 +1,11 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { sql } from '@/lib/db';
+// Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
+import { sqlBypass as sql } from '@/lib/db';
 import Link from 'next/link';
 import { AutomationClient } from './automation-client';
 import { StatCard, type StatPreview } from '@/components/admin/stat-card';
+import { AutomationHealth, type AutomationHealthProps } from '@/components/admin/automation-health';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +82,56 @@ export default async function AutomationPage() {
     console.error('[admin/automation] stats query failed:', e);
   }
 
+  // ── Automation health roll-up (UI-gaps R2/R5/R11): fires/errors/todos/workflows +
+  //    agent spend vs the framework ceiling + a correctly-statused firings log. ──
+  let logStatus = { success: 0, error: 0, deferred: 0, skipped: 0, running: 0 };
+  let openTodos = 0;
+  let instances = { failed: 0, active: 0 };
+  let agent: { spend: number; ceiling: number | null } = { spend: 0, ceiling: null };
+  let firings: AutomationHealthProps['firings'] = [];
+  try {
+    const statusRows = await sql<Array<{ status: string; n: number }>>`
+      SELECT status, count(*)::int AS n FROM automation_log
+      WHERE executed_at > now() - '24 hours'::interval GROUP BY status`;
+    for (const r of statusRows) {
+      if (Object.prototype.hasOwnProperty.call(logStatus, r.status)) {
+        (logStatus as Record<string, number>)[r.status] = r.n;
+      }
+    }
+    const [todoRow] = await sql<Array<{ n: number }>>`
+      SELECT count(*)::int AS n FROM tasks WHERE status IN ('open', 'in_progress')`;
+    openTodos = todoRow?.n ?? 0;
+    const [instRow] = await sql<Array<{ failed: number; active: number }>>`
+      SELECT count(*) FILTER (WHERE status = 'failed')::int AS failed,
+             count(*) FILTER (WHERE status IN ('running', 'retrying', 'paused'))::int AS active
+      FROM process_instances`;
+    if (instRow) instances = instRow;
+    const [spendRow] = await sql<Array<{ spend: number; ceiling: number | null }>>`
+      SELECT COALESCE((SELECT SUM(cost_usd) FROM agent_task_log WHERE created_at >= date_trunc('month', now())), 0)::float AS spend,
+             (SELECT agent_monthly_budget_ceiling_usd FROM automation_framework WHERE id = 1)::float AS ceiling`;
+    if (spendRow) agent = { spend: spendRow.spend ?? 0, ceiling: spendRow.ceiling ?? null };
+    const logRows = await sql<Array<{ id: string; status: string; actionType: string; executedAt: string | Date | null; ruleName: string | null; result: Record<string, unknown> | null; errorMessage: string | null }>>`
+      SELECT l.id, l.status, l.action_type AS "actionType", l.executed_at AS "executedAt",
+             r.name AS "ruleName", l.result, l.error_message AS "errorMessage"
+      FROM automation_log l LEFT JOIN automation_rules r ON r.id = l.rule_id
+      ORDER BY COALESCE(l.executed_at, l.created_at) DESC LIMIT 15`;
+    firings = logRows.map((l) => {
+      const res = (l.result ?? {}) as Record<string, unknown>;
+      const detail =
+        (typeof res.error === 'string' && res.error) ||
+        (typeof res.reason === 'string' && res.reason) ||
+        l.errorMessage ||
+        (typeof res.name === 'string' ? res.name : null);
+      return {
+        id: l.id, status: l.status, actionType: l.actionType,
+        executedAt: l.executedAt instanceof Date ? l.executedAt.toISOString() : (l.executedAt as string | null),
+        ruleName: l.ruleName, detail: (detail || null) as string | null,
+      };
+    });
+  } catch (e) {
+    console.error('[admin/automation] health query failed:', e);
+  }
+
   const serializedRules = rules.map((r) => ({
     id: r.id,
     name: r.name,
@@ -125,8 +177,10 @@ export default async function AutomationPage() {
         <StatCard label="Total Rules" value={stats.total} preview={allRulesPreview} />
         <StatCard label="Active" value={<span className="text-green-600">{stats.active}</span>} preview={activeRulesPreview} />
         <StatCard label="Inactive" value={<span className="text-gray-400">{stats.inactive}</span>} preview={inactiveRulesPreview} />
-        <StatCard label="Executions (24h)" value={<span className="text-blue-600">{stats.recentExecutions}</span>} href="/admin/events" />
+        <StatCard label="Executions (24h)" value={<span className="text-blue-600">{stats.recentExecutions}</span>} href="#firings" />
       </div>
+
+      <AutomationHealth logStatus={logStatus} openTodos={openTodos} instances={instances} agent={agent} firings={firings} />
 
       <AutomationClient initialRules={serializedRules} />
     </div>

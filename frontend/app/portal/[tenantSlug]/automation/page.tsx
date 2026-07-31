@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
-import { AutomationPreferencesCard } from '@/components/portal/automation-preferences-card';
+import { AutomationOverviewCard } from '@/components/portal/automation-overview-card';
+import { AutomationPoliciesCard } from '@/components/portal/automation-policies-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,12 @@ export default async function PortalAutomationPage({
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Automation</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Choose what runs automatically as your proposals move through the pipeline.
-          You can change these anytime.
+          See what your automation is doing, then choose what runs automatically as your
+          proposals move through the pipeline. You can change these anytime.
         </p>
       </header>
-      <AutomationPreferencesCard tenantSlug={tenantSlug} />
+      <AutomationOverviewCard tenantSlug={tenantSlug} />
+      <AutomationPoliciesCard tenantSlug={tenantSlug} />
     </div>
   );
 }

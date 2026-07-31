@@ -20,7 +20,7 @@ const { sqlMock } = vi.hoisted(() => {
 });
 const { emitSingleMock } = vi.hoisted(() => ({ emitSingleMock: vi.fn() }));
 
-vi.mock('@/lib/db', () => ({ sql: sqlMock }));
+vi.mock('@/lib/db', () => ({ enterTenant: () => {}, enterBypass: () => {}, sql: sqlMock }));
 
 vi.mock('@/lib/events', async () => {
   const actual = await vi.importActual<typeof import('@/lib/events')>('@/lib/events');
@@ -256,6 +256,7 @@ describe('solicitation.push', () => {
         customVariables: {}, hasSubmissionFormat: true,
         spotlightSummary: 'Navy CV property-intelligence SBIR — agencies: Navy/DoD; tech: computer vision, edge inference.',
       }])
+      .mockResolvedValueOnce([{ n: 0 }]) // date-guard: 0 activated opps missing close_date (⑤)
       .mockResolvedValueOnce([{ pushedAt: new Date('2026-04-22T15:00:00Z') }])
       .mockResolvedValueOnce(undefined) // opportunities UPDATE
       .mockResolvedValueOnce(undefined) // triage_actions
@@ -273,9 +274,9 @@ describe('solicitation.push', () => {
     expect(emitSingleMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'solicitation.pushed' }),
     );
-    // 8 sql: SELECT preflight + UPDATE sol + UPDATE opp + triage + revision + COUNT topics
-    //        + memory + SELECT activated-set (multi-topic fan-out publishes each opp)
-    expect(sqlMock).toHaveBeenCalledTimes(8);
+    // 9 sql: SELECT preflight + date-guard COUNT + UPDATE sol + UPDATE opp + triage + revision
+    //        + COUNT topics + memory + SELECT activated-set (multi-topic fan-out publishes each opp)
+    expect(sqlMock).toHaveBeenCalledTimes(9);
   });
 
   it('throws ValidationError when submission_format is missing', async () => {

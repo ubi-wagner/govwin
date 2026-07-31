@@ -101,10 +101,15 @@ export async function lockSectionCore(g: LockSectionCtx): Promise<LockSectionRes
 
   // 4. Snapshot the accepted canvas version.
   if (section.content) {
+    // jsonb: parse then sql.json — NOT ${string}::jsonb, which double-encodes to a jsonb STRING
+    // scalar and makes the Version History preview render raw JSON (CLIFFNOTES §4b; same fix as the
+    // save-route archive above).
+    let snapshotJson: Parameters<typeof sql.json>[0];
+    try { snapshotJson = JSON.parse(section.content); } catch { snapshotJson = section.content; }
     try {
       await sql`
         INSERT INTO canvas_versions (section_id, version_number, content, snapshot_reason, source, created_by)
-        VALUES (${section.id}::uuid, ${section.version}, ${section.content}::jsonb,
+        VALUES (${section.id}::uuid, ${section.version}, ${sql.json(snapshotJson)},
                 ${'section_accepted:' + proposalStage}, 'system', ${userId}::uuid)
         ON CONFLICT (section_id, version_number) DO NOTHING
       `;

@@ -473,7 +473,7 @@ async def _upsert_topic(
            content_hash, is_active,
            solicitation_id, topic_number, topic_branch,
            topic_status, tech_focus_areas,
-           poc_name, poc_email, topic_metadata)
+           poc_name, poc_email, topic_metadata, program_type)
         VALUES
           ($1, $2, $3, $4, $5,
            $6, '{}'::text[],
@@ -481,7 +481,7 @@ async def _upsert_topic(
            $10, true,
            $11::uuid, $12, $13,
            $14, $15::text[],
-           $16, $17, $18::jsonb)
+           $16, $17, $18::jsonb, $19)
         ON CONFLICT (source, source_id) DO UPDATE SET
           title = EXCLUDED.title,
           agency = EXCLUDED.agency,
@@ -499,6 +499,7 @@ async def _upsert_topic(
           poc_name = EXCLUDED.poc_name,
           poc_email = EXCLUDED.poc_email,
           topic_metadata = EXCLUDED.topic_metadata,
+          program_type = COALESCE(EXCLUDED.program_type, opportunities.program_type),
           updated_at = now()
         """,
         source,
@@ -519,6 +520,7 @@ async def _upsert_topic(
         row.get("poc_name"),
         row.get("poc_email"),
         json.dumps(topic_meta),
+        row.get("program_type"),
     )
     return "inserted"
 

@@ -14,6 +14,8 @@ interface Card {
   pursuitStatus: string;
   isPinned: boolean;
   pinUpdateAvailable: boolean;
+  /** Per-bucket ranking array — one card, N scoring lenses (mig 096 · bucket id·name·summary·score). */
+  rankings?: { bucketId: string; name: string; summary: string | null; score: number }[];
 }
 
 type SortKey = 'pinned' | 'close' | 'agency' | 'title';
@@ -119,6 +121,18 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
             </div>
             <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${str(c, 'programType')}` : ''}</p>
             {str(c, 'closeDate') && <p className="text-[11px] text-gray-400 mt-1">Closes {new Date(str(c, 'closeDate') as string).toLocaleDateString()}</p>}
+            {Array.isArray(c.rankings) && c.rankings.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1" title="Ranked by your spotlight buckets">
+                {c.rankings.slice(0, 4).map((r) => (
+                  <span key={r.bucketId} title={r.summary ?? r.name}
+                    className="inline-flex items-center gap-1 rounded bg-gray-50 border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">
+                    <span className="font-medium text-gray-700">{r.name}</span>
+                    <span className="tabular-nums text-gray-500">{Math.round(r.score)}</span>
+                  </span>
+                ))}
+                {c.rankings.length > 4 && <span className="self-center text-[10px] text-gray-400">+{c.rankings.length - 4}</span>}
+              </div>
+            )}
             {c.pinUpdateAvailable && (
               <div className="mt-2 flex items-center justify-between rounded bg-amber-50 border border-amber-200 px-2 py-1">
                 <span className="text-[11px] text-amber-700">Update available</span>

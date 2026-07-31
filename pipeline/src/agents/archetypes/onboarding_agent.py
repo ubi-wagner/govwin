@@ -184,7 +184,7 @@ Output your plan as a structured JSON object."""
         try:
             tid = uuid.UUID(tenant_id)
             atoms = await conn.fetchval(
-                "SELECT COUNT(*) FROM library_atoms WHERE tenant_id = $1 AND status <> 'archived'", tid
+                "SELECT COUNT(*) FROM library_atoms WHERE tenant_id = $1 AND status <> 'archived' AND vault_id IS NULL", tid
             )
             buckets = await conn.fetchval(
                 "SELECT COUNT(*) FROM tenant_spotlight_buckets WHERE tenant_id = $1", tid
@@ -255,7 +255,7 @@ Output your plan as a structured JSON object."""
                 """
                 SELECT a.id, a.title, a.grain
                 FROM library_atoms a
-                WHERE a.tenant_id = $1 AND a.status <> 'archived'
+                WHERE a.tenant_id = $1 AND a.status <> 'archived' AND a.vault_id IS NULL
                   AND (a.content ILIKE $2 OR a.title ILIKE $2)
                 ORDER BY a.updated_at DESC
                 LIMIT $3

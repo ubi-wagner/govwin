@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { coerceJsonb } from '@/lib/jsonb';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
@@ -81,6 +81,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // Verify proposal belongs to tenant
     let proposal: { id: string } | undefined;
@@ -256,6 +257,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // Verify proposal belongs to tenant and fetch its gate_config
     let proposal: { id: string; gateConfig: string[] | null; isLocked: boolean } | undefined;
@@ -469,6 +471,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point: pin tenant context in the handler's own frame
 
     // Verify proposal belongs to tenant
     let proposal: { id: string; isLocked: boolean } | undefined;

@@ -83,7 +83,7 @@ class MemoryGC:
                 """
                 DELETE FROM episodic_memories
                 WHERE is_archived = true
-                  AND updated_at < now() - interval '6 months'
+                  AND created_at < now() - interval '6 months'
                   AND importance < 0.9
                 """
             )

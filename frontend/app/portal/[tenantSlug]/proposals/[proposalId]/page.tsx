@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyProposalAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyProposalAccess, enterTenant } from '@/lib/db';
 import { isRole, isTenantWideMember, type Role } from '@/lib/rbac';
 import { resolveUserAccess } from '@/lib/proposal-access';
 import { ProposalWorkspace } from '@/components/portal/proposal-workspace';
@@ -39,6 +39,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
   // scopes what they can actually see/edit.
   const hasAccess = await verifyProposalAccess(sessionUser.id, role, sessionUser.tenantId, tenantId, proposalId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId);
 
   // ── Load proposal with opportunity + solicitation context ───────────
   interface ProposalRow {
@@ -314,6 +315,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       label?: string;
       met?: boolean;
       value?: string;
+      sectionId?: string | null;
     }>;
     source?: string;
   } | null = null;
@@ -338,6 +340,7 @@ export default async function ProposalWorkspacePage({ params }: Props) {
           label: row.requirementText,
           status: row.status,
           details: row.notes,
+          sectionId: row.sectionId,
         })),
         source: 'database',
       };

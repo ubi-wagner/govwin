@@ -14,6 +14,7 @@ import {
   Packer,
   Paragraph,
   TextRun,
+  ExternalHyperlink,
   HeadingLevel,
   Table,
   TableRow,
@@ -30,10 +31,12 @@ import {
   convertInchesToTwip,
 } from 'docx';
 import { rasterizeDataUri, type RasterPng } from '@/lib/export/image-raster';
+import { renderChartSvg, renderShapeSvg } from '@/lib/export/canvas-html';
 import { docNodes } from '@/lib/types/canvas-document';
 import type {
   CanvasDocument,
   CanvasNode,
+  NodeStyle,
   CanvasSection,
   HeadingContent,
   TextBlockContent,
@@ -43,7 +46,35 @@ import type {
   CaptionContent,
   FootnoteContent,
   UrlContent,
+  ShapeContent,
+  TextBoxContent,
+  CalloutContent,
+  CodeBlockContent,
+  BlockquoteContent,
+  ChartContent,
+  EquationContent,
+  DividerContent,
+  VideoContent,
+  SignatureContent,
 } from '@/lib/types/canvas-document';
+
+/** Shapes that render as a native docx box (bordered/shaded cell); the rest
+ *  rasterize as a vector figure. text_box + callout reuse the same box idiom. */
+const BOX_SHAPES: ReadonlySet<string> = new Set(['rectangle', 'rounded_rectangle']);
+const CALLOUT_PALETTE: Record<string, { bg: string; fg: string }> = {
+  info: { bg: 'EFF6FF', fg: '1D4ED8' }, warning: { bg: 'FEF3C7', fg: 'B45309' },
+  tip: { bg: 'ECFDF5', fg: '047857' }, success: { bg: 'ECFDF5', fg: '047857' }, note: { bg: 'F1F5F9', fg: '475569' },
+};
+
+/** An SVG string → a utf8 data URI (encoded so the payload's commas/hashes don't
+ *  confuse the rasterizer's header/payload split). */
+function svgDataUri(svg: string): string {
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+const hx = (c?: string | null): string | undefined => (c ? c.replace(/^#/, '').trim().toUpperCase() : undefined);
+const BORDER_STYLE: Record<string, (typeof BorderStyle)[keyof typeof BorderStyle]> = {
+  solid: BorderStyle.SINGLE, dashed: BorderStyle.DASHED, dotted: BorderStyle.DOTTED, none: BorderStyle.NONE,
+};
 
 /** Paragraph-level pagination flags applied to a keep-together group's content. */
 type ParaOpts = { keepLines?: boolean; keepNext?: boolean };
@@ -135,13 +166,22 @@ export async function exportToDocx(
     left: margins.left * 20,
   };
 
-  // Pre-rasterize image nodes (SVG/data-URI → PNG) so the sync node walker can
-  // embed real pictures instead of a "[Image: …]" stub.
+  // Pre-rasterize the picture-backed nodes (SVG/data-URI → PNG) so the sync node
+  // walker can embed a real picture: image nodes, chart nodes (chart SVG), and
+  // the vector shapes docx has no primitive for (ellipse/triangle/line/arrow/
+  // star/diamond/callout-bubble). Box shapes (rect/rounded) render natively.
   const raster = new Map<CanvasNode, RasterPng | null>();
+  const needsRaster = (n: CanvasNode): boolean =>
+    n.type === 'image' || n.type === 'chart' ||
+    (n.type === 'shape' && !BOX_SHAPES.has((n.content as ShapeContent)?.shape ?? 'rectangle'));
   await Promise.all(
-    nodes.filter((n) => n.type === 'image').map(async (n) => {
-      const key = (n.content as { storage_key?: string })?.storage_key;
-      raster.set(n, await rasterizeDataUri(key));
+    nodes.filter(needsRaster).map(async (n) => {
+      const uri = n.type === 'image'
+        ? (n.content as { storage_key?: string })?.storage_key
+        : n.type === 'chart'
+          ? svgDataUri(renderChartSvg(n.content as ChartContent))
+          : svgDataUri(renderShapeSvg(n));
+      raster.set(n, await rasterizeDataUri(uri));
     }),
   );
 
@@ -235,6 +275,44 @@ function sectionsToDocxChildren(
   return children;
 }
 
+/**
+ * A native docx "box" — a single-cell table with a fill (shading) + border,
+ * holding the given paragraphs. This is the idiom behind the box-like extended
+ * elements: shape(rectangle/rounded), text_box, and callout. `leftAccent` draws a
+ * thick colored left rule (callouts); a border `style:'none'` suppresses the frame.
+ */
+function boxTable(paras: Paragraph[], opts: { fill?: string; border?: NodeStyle['border']; leftAccent?: string } = {}): Table {
+  const b = opts.border;
+  const edge = b?.style === 'none'
+    ? { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+    : b
+      ? { style: BORDER_STYLE[b.style ?? 'solid'] ?? BorderStyle.SINGLE, size: Math.max(2, Math.round((b.width ?? 1) * 8)), color: hx(b.color) ?? '334155' }
+      : { style: BorderStyle.SINGLE, size: 4, color: 'CBD5E1' };
+  const left = opts.leftAccent ? { style: BorderStyle.SINGLE, size: 28, color: hx(opts.leftAccent) ?? '334155' } : edge;
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [new TableRow({
+      children: [new DocxTableCell({
+        shading: opts.fill ? { type: ShadingType.SOLID, color: hx(opts.fill)!, fill: hx(opts.fill)! } : undefined,
+        borders: { top: edge, bottom: edge, left, right: edge },
+        margins: { top: 80, bottom: 80, left: 120, right: 120 },
+        children: paras,
+      })],
+    })],
+  });
+}
+
+/** A centered image paragraph from a pre-rastered PNG, capped to the content column. */
+function pngParagraph(r: RasterPng, maxW: number, paraOpts: ParaOpts = {}): Paragraph {
+  const aspect = r.width > 0 && r.height > 0 ? r.width / r.height : 1.6;
+  const w = Math.min(r.width || maxW, maxW);
+  const h = Math.round(w / aspect);
+  return new Paragraph({
+    ...paraOpts, keepLines: true, alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 },
+    children: [new ImageRun({ type: 'png', data: r.buffer, transformation: { width: w, height: h } })],
+  });
+}
+
 function nodeToDocx(
   node: CanvasNode,
   fontDefault: { family: string; size: number },
@@ -278,6 +356,9 @@ function nodeToDocx(
         color: style.color,
         bold: style.weight === 'bold',
         italic: style.style === 'italic',
+        underline: style.underline,
+        strikethrough: style.strikethrough,
+        highlight: style.highlight,
       });
       return [new Paragraph({
         ...paraOpts,
@@ -486,6 +567,107 @@ function nodeToDocx(
       return out;
     }
 
+    // ── Extended elements ──────────────────────────────────────────────
+    case 'shape': {
+      const sc = node.content as ShapeContent;
+      if (BOX_SHAPES.has(sc.shape)) {
+        // rectangle / rounded → native bordered+shaded box (crisp, editable text)
+        const runs = [new TextRun({ text: sc.text ?? '', font, size, color: hx(style.color), bold: style.weight === 'bold', italics: style.style === 'italic' })];
+        return [boxTable([new Paragraph({ alignment: AlignmentType.CENTER, children: runs })], { fill: style.fill?.color, border: style.border })];
+      }
+      // ellipse/triangle/line/arrow/star/diamond/bubble → rasterized vector figure
+      const r = raster?.get(node);
+      if (r) return [pngParagraph(r, 360, paraOpts)];
+      return [new Paragraph({ ...paraOpts, alignment: AlignmentType.CENTER, children: [new TextRun({ text: `[${sc.shape}]`, italics: true, color: '999999', font, size })] })];
+    }
+
+    case 'text_box': {
+      const c = node.content as TextBoxContent;
+      const runs = createFormattedRuns({ text: c.text, inline_formats: c.inline_formats }, font, size, {
+        color: style.color, bold: style.weight === 'bold', italic: style.style === 'italic',
+        underline: style.underline, strikethrough: style.strikethrough, highlight: style.highlight,
+      });
+      return [boxTable([new Paragraph({ alignment, children: runs })], { fill: style.fill?.color, border: style.border ?? { color: '#CBD5E1', width: 1 } })];
+    }
+
+    case 'callout': {
+      const c = node.content as CalloutContent;
+      const pal = CALLOUT_PALETTE[c.variant] ?? CALLOUT_PALETTE.note;
+      const paras: Paragraph[] = [];
+      if (c.title) paras.push(new Paragraph({ children: [new TextRun({ text: c.title, bold: true, color: pal.fg, font, size })] }));
+      paras.push(new Paragraph({ children: [new TextRun({ text: c.text, font, size, color: '1E293B' })] }));
+      return [boxTable(paras, { fill: pal.bg, leftAccent: pal.fg, border: { color: pal.fg, width: 1 } })];
+    }
+
+    case 'code_block': {
+      const c = node.content as CodeBlockContent;
+      const paras = (c.code || ' ').split('\n').map((ln) =>
+        new Paragraph({ spacing: { after: 0, line: 240 }, children: [new TextRun({ text: ln || ' ', font: 'Courier New', size, color: 'E2E8F0' })] }));
+      return [boxTable(paras, { fill: '#1E293B', border: { style: 'none' } })];
+    }
+
+    case 'blockquote': {
+      const c = node.content as BlockquoteContent;
+      const rule = { left: { style: BorderStyle.SINGLE, size: 24, color: hx(style.color) ?? '1F4E79', space: 12 } };
+      const out: Paragraph[] = [new Paragraph({
+        ...paraOpts, indent: { left: 240 }, border: rule, spacing: { before: 80, after: c.cite ? 0 : 80 },
+        children: [new TextRun({ text: c.text, italics: true, font, size, color: '334155' })],
+      })];
+      if (c.cite) out.push(new Paragraph({ indent: { left: 240 }, border: rule, spacing: { after: 80 }, children: [new TextRun({ text: `— ${c.cite}`, font, size: size - 2, color: '64748B' })] }));
+      return out;
+    }
+
+    case 'chart': {
+      const r = raster?.get(node);
+      if (r) return [pngParagraph(r, 470, paraOpts)];
+      const c = node.content as ChartContent;
+      return [new Paragraph({ ...paraOpts, alignment: AlignmentType.CENTER, children: [new TextRun({ text: `[Chart: ${c.chart_type}]`, italics: true, color: '999999', font, size })] })];
+    }
+
+    case 'equation': {
+      const c = node.content as EquationContent;
+      const tex = c.latex ?? c.mathml ?? '(equation)';
+      return [new Paragraph({
+        ...paraOpts, alignment: c.display === false ? AlignmentType.LEFT : AlignmentType.CENTER, spacing: { before: 80, after: 80 },
+        children: [new TextRun({ text: tex, font: 'Cambria Math', size: size + 2, italics: true, color: '1E293B' })],
+      })];
+    }
+
+    case 'divider': {
+      const c = node.content as DividerContent;
+      const st = c.line_style === 'dashed' ? BorderStyle.DASHED : c.line_style === 'dotted' ? BorderStyle.DOTTED : BorderStyle.SINGLE;
+      return [new Paragraph({
+        ...paraOpts, spacing: { before: 80, after: 80 },
+        border: { bottom: { style: st, size: Math.max(4, Math.round((c.thickness ?? 1) * 8)), color: hx(c.color) ?? 'CBD5E1' } },
+        children: [],
+      })];
+    }
+
+    case 'video': {
+      const c = node.content as VideoContent;
+      const label = c.caption ?? c.url ?? 'Video';
+      const play = new TextRun({ text: '▶  ', font, size: size + 4, color: 'FFFFFF' });
+      const text = c.url
+        ? new ExternalHyperlink({ link: c.url, children: [new TextRun({ text: label, font, size, color: 'FFFFFF', underline: {} })] })
+        : new TextRun({ text: label, font, size, color: 'FFFFFF' });
+      return [boxTable([new Paragraph({ alignment: AlignmentType.CENTER, children: [play, text] })], { fill: '#0F172A', border: { style: 'none' } })];
+    }
+
+    case 'signature': {
+      const c = node.content as SignatureContent;
+      const out: Paragraph[] = [];
+      if (c.signed && c.signer_name) {
+        out.push(new Paragraph({ spacing: { before: 160, after: 0 }, children: [new TextRun({ text: c.signer_name, italics: true, font: 'Segoe Script', size: size + 6, color: '1E3A8A' })] }));
+      }
+      out.push(new Paragraph({
+        spacing: { before: c.signed && c.signer_name ? 0 : 260, after: 20 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '1E293B' } },
+        children: [new TextRun({ text: ' '.repeat(48), font, size })],
+      }));
+      out.push(new Paragraph({ children: [new TextRun({ text: (c.label ?? 'Signature') + (c.signed_at ? `   ·   ${c.signed_at}` : ''), font, size: size - 2, color: '64748B' })] }));
+      return out;
+    }
+
     default:
       return [];
   }
@@ -499,14 +681,20 @@ function createFormattedRuns(
   content: TextBlockContent,
   font: string,
   size: number,
-  nodeStyle?: { color?: string; bold?: boolean; italic?: boolean },
+  nodeStyle?: { color?: string; bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; highlight?: string },
 ): TextRun[] {
   const defaultColor = nodeStyle?.color?.replace('#', '') || undefined;
   const defaultBold = nodeStyle?.bold || undefined;
   const defaultItalic = nodeStyle?.italic || undefined;
+  const defaultUnderline = nodeStyle?.underline || undefined;
+  const defaultStrike = nodeStyle?.strikethrough || undefined;
+  const defaultShading = nodeStyle?.highlight ? { fill: nodeStyle.highlight.replace('#', '') } : undefined;
 
   if (!content.inline_formats || content.inline_formats.length === 0) {
-    return [new TextRun({ text: content.text, font, size, color: defaultColor, bold: defaultBold, italics: defaultItalic })];
+    return [new TextRun({
+      text: content.text, font, size, color: defaultColor, bold: defaultBold, italics: defaultItalic,
+      underline: defaultUnderline ? {} : undefined, strike: defaultStrike, shading: defaultShading,
+    })];
   }
 
   const text = content.text;
@@ -546,7 +734,9 @@ function createFormattedRuns(
       size,
       bold: isBold || defaultBold || undefined,
       italics: isItalic || defaultItalic || undefined,
-      underline: isUnderline ? {} : undefined,
+      underline: (isUnderline || defaultUnderline) ? {} : undefined,
+      strike: defaultStrike,
+      shading: defaultShading,
       superScript: isSuperscript || undefined,
       subScript: isSubscript || undefined,
       color: defaultColor,

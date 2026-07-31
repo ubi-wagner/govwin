@@ -1,5 +1,12 @@
 # Automation Spine — End-to-End Map (for review, 2026-07-22)
 
+> **As-built correction (deepest-review sweep).** The authoritative, `file:line`-verified spine is now
+> **docs/START_END_FRAMEWORK.md**. Corrected here: the trigger keys `proposal:outcome.recorded:end` and
+> `finder:solicitation.triaged:end` (the earlier `proposal:proposal.outcome_recorded` /
+> `finder:solicitation.review_requested` are emitted by no producer). Also: **cron dispatch is
+> `tick_schedules` in `ingest/dispatcher.py`, NOT the time-sweeper** (START_END_FRAMEWORK §5), and the
+> per-portal build is the `proposal_portals` phase-machine, not a `process_instances` template (§2).
+
 **TL;DR.** The start→end pattern you described is already the engine's contract, not a
 thing to build from scratch. A workflow is a **declarative template** (trigger + a DAG of
 steps); every step emits a **start** and an **end** into the `system_events` river; all
@@ -141,7 +148,7 @@ arrow is a `phase='end'` event that triggers the next template.
 flowchart TD
     subgraph RFP["RFP-Admin + Agents (finder side)"]
       U[admin uploads solicitation+topics] -->|finder:rfp.uploaded| W1[OnRfpUploaded: shred→matrix→skeleton]
-      W1 -->|finder:solicitation.review_requested| G1{{TODO curation_qa gate\nrfp_admin · nudges}}
+      W1 -->|finder:solicitation.triaged:end (cond toState=review_requested)| G1{{TODO curation_qa gate\nrfp_admin · nudges}}
       G1 -->|admin releases| PUSH[solicitation.push]
       PUSH -->|finder:solicitation.pushed| W2[OnSolicitationPushed: fan every OPP onto opportunity_bridge → tenant_opportunity_cards]
     end
@@ -155,7 +162,7 @@ flowchart TD
       W4 --> BUILD[[Portal guardrail workflow — per portal, up to 3 phases\nKickoff→Draft→Review; HITL ToDos per phase; delegated managers; 3-nudge cadence, final→admin]]
       BUILD -->|proposal:proposal.advanced| W5[OnProposalAdvancedToReview: color_team_reviewer via agent_task_queue]
       W5 -->|lock all / force-advance → submitted| SUB[submission package exported]
-      SUB -->|proposal:proposal.outcome_recorded| W6[OnProposalOutcomeRecorded: harvest atoms → resurface]
+      SUB -->|proposal:outcome.recorded:end| W6[OnProposalOutcomeRecorded: harvest atoms → resurface]
       W6 -.->|rinse / wash / repeat| NB
     end
     subgraph SCHED["Scheduled (cron sweeper)"]
@@ -169,7 +176,7 @@ Per-stage detail (trigger · actors · gates · staged nudges · cron-vs-trigger
 | Stage | Workflow (trigger) | Actor(s) | Gate / step kind | Nudges → escalation | Spawn | Status |
 |---|---|---|---|---|---|---|
 | Ingest | `OnRfpUploaded` (`finder:rfp.uploaded`) | agents: ingest→matrix→skeleton | ACTION + AI_INVOKE | — | trigger | wired |
-| Curation QA | `OnSolicitationReviewRequested` (`finder:solicitation.review_requested`) | rfp_admin, curation_qa agent | TODO gate | staged → admin | trigger | wired |
+| Curation QA | `OnSolicitationReviewRequested` (`finder:solicitation.triaged:end (cond toState=review_requested)`) | rfp_admin, curation_qa agent | TODO gate | staged → admin | trigger | wired |
 | Fan-out | `OnSolicitationPushed` (`finder:solicitation.pushed`) | system | ACTION (bridge→cards) | — | trigger | wired |
 | Rescore | `OnCardApplied` (`capture:card.applied`) | scoring agent | ACTION + AI overlay | — | trigger | wired |
 | **Buy → Curate** | `ProjectCollaboration` via `capture:purchase.completed` | tenant_admin → **rfp_admin** | **TODO** proposal_setup, due **72h** | **[1,3]** → **admin** | imperative | wired |
@@ -178,7 +185,7 @@ Per-stage detail (trigger · actors · gates · staged nudges · cron-vs-trigger
 | **Build V0→V1** | Portal **guardrail workflow** (per-portal template) | tenant_admin + **delegated managers** + collaborators | **TODO per phase** (≤3 phases) | **≤3 nudges** → **admin+managers** | imperative (on accept) | wired |
 | Color-team | `OnProposalAdvancedToReview` (`proposal:proposal.advanced`) | color_team_reviewer agent | AI_INVOKE via `agent_task_queue` | — | trigger | wired |
 | Collaborator onboarding | `OnCollaboratorInvited` (`proposal:collaborator.invited`) | collaborator | NOTIFY + TODO | staged | trigger | wired |
-| Close out / learn | `OnProposalOutcomeRecorded` (`proposal:proposal.outcome_recorded`) | outcome_analyst agent | AI_INVOKE (harvest→resurface) | — | trigger | wired |
+| Close out / learn | `OnProposalOutcomeRecorded` (`proposal:outcome.recorded:end`) | outcome_analyst agent | AI_INVOKE (harvest→resurface) | — | trigger | wired |
 | Amendment watch | `OnSolicitationUpdateScan` | scout agents | scheduled ACTION | — | **cron** | wired (dormant scouts) |
 | Ops digest | `OnOpsDigestRequested` | ops_digest agent | scheduled AI_INVOKE | — | **cron** | wired |
 
@@ -228,7 +235,7 @@ The spine is built; these are the wiring jobs on top of clean rivers:
 2. **Cron dispatch** for the scheduled sweeper (nudge sweep + `OnSolicitationUpdateScan` +
    `OnOpsDigestRequested`) — confirm the cron cadence + the fail-safe (a missed tick just
    re-derives next tick; no state lost).
-3. **Wake the dormant agent archetypes** one at a time per `AGENT_WORKFORCE.md` (all 25 are
+3. **Wake the dormant agent archetypes** one at a time per `AGENT_WORKFORCE.md` (all 27 are
    registry-wired; dormant ≠ dead) — each is either an `AI_INVOKE` step or a per-tenant producer,
    gated advisory→guardrail→land-or-review, injection-fenced, RLS-backstopped.
 4. **Uniform start→end coverage audit** — confirm every step (esp. the newly-woken agent steps)

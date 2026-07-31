@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 
 interface RouteContext {
@@ -66,6 +66,7 @@ export async function GET(request: Request, ctx: RouteContext) {
         { status: 403 },
       );
     }
+    enterTenant(tenantId); // RLS choke point
 
     // ── Business logic ───────────────────────────────────────────
     try {
@@ -98,7 +99,7 @@ export async function GET(request: Request, ctx: RouteContext) {
       // Library units count
       const [libraryCount] = await sql<{ count: string }[]>`
         SELECT count(*)::text AS count FROM library_atoms
-        WHERE tenant_id = ${tenantId}::uuid
+        WHERE tenant_id = ${tenantId}::uuid AND vault_id IS NULL
       `;
 
       // Team members count

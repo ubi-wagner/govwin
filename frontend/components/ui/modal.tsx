@@ -26,15 +26,21 @@ export interface ModalProps {
   /** Tailwind max-width class, e.g. 'max-w-md', 'max-w-lg', 'max-w-2xl'. */
   maxWidth?: string;
   ariaLabel?: string;
+  /**
+   * When true, Esc and backdrop-click do NOT close the modal. Use when the modal is a
+   * nested confirm layered over a bigger surface (e.g. an opt-out prompt in front of an
+   * editor) so that dismissing the small prompt doesn't tear down the surface behind it.
+   */
+  disableEsc?: boolean;
   children: React.ReactNode;
 }
 
-export function Modal({ open, onClose, maxWidth = 'max-w-lg', ariaLabel = 'Dialog', children }: ModalProps) {
+export function Modal({ open, onClose, maxWidth = 'max-w-lg', ariaLabel = 'Dialog', disableEsc = false, children }: ModalProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || disableEsc) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation(); // don't let a wrapping Drawer's Esc also fire
@@ -43,7 +49,7 @@ export function Modal({ open, onClose, maxWidth = 'max-w-lg', ariaLabel = 'Dialo
     };
     window.addEventListener('keydown', onKey, true); // capture → runs before the Drawer's
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, onClose]);
+  }, [open, onClose, disableEsc]);
 
   if (!open || !mounted) return null;
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
@@ -13,6 +14,7 @@ import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { isValidUUID } from '@/lib/validation';
 import { isProposalPaywallBypassed } from '@/lib/paywall';
 import { launchProjectCollaboration } from '@/lib/process/project-collaboration';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -94,6 +96,8 @@ export async function POST(request: Request, ctx: RouteContext) {
     if (!hasAccess) {
       return NextResponse.json({ error: 'Tenant access denied', code: 'FORBIDDEN' }, { status: 403 });
     }
+
+    enterTenant(tenantId);
 
     // Stripe gate — founding cohort. FAIL-SAFE: the paywall is ENFORCED by default; a
     // founding-cohort deploy must EXPLICITLY set FOUNDING_COHORT_BYPASS=true to allow free
@@ -331,7 +335,7 @@ export async function POST(request: Request, ctx: RouteContext) {
       frozenAt: new Date().toISOString(),
     };
 
-    const { proposal, sectionCount, artifacts } = await sql.begin(async (tx: any) => {
+    const { proposal, sectionCount, artifacts } = await withTenant(tenantId, async (tx: any) => {
       const [proposalRow] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (
@@ -422,7 +426,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           let templateDoc: CanvasDocument | null = null;
           if (item.templateId) {
             const [tpl] = await tx<{ canvasDocument: CanvasDocument | null }[]>`
-              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid LIMIT 1
+              SELECT canvas_document FROM document_templates WHERE id = ${item.templateId}::uuid AND (tenant_id = ${tenantId}::uuid OR is_system = true) LIMIT 1
             `;
             if (tpl?.canvasDocument && Array.isArray((tpl.canvasDocument as { nodes?: unknown }).nodes)) {
               templateDoc = tpl.canvasDocument;
@@ -756,24 +760,34 @@ export async function POST(request: Request, ctx: RouteContext) {
     // above stay as the immediate ping; this adds the tracked, nudged queue item.
     // Non-fatal: a launch failure never breaks proposal creation.
     try {
-      const launch = await launchProjectCollaboration({
-        actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+      // #190: the RFP-admin review window is the framework-hard curation SLA.
+      const pol = await resolveGatePolicy({
         tenantId,
-        scope: 'project',
-        opportunityId: topicId,
-        proposalId: proposal.id,
-        stage: 'draft',
-        taskType: 'admin_review',
-        taskTitle: `Review & unlock: ${proposalTitle}`,
-        assigneeRole: 'rfp_admin',
-        entityType: 'proposal',
-        entityRef: proposal.id,
-        nudgeDays: [1, 3],
-        dueMinutes: 4320, // 72h review SLA
-        completeTemplate: 'proposal_unlocked',
+        scope: 'build',
+        triggerKey: 'admin_review',
+        gateDefaults: { assigneeRole: 'rfp_admin', nudgeDays: [1, 3], dueInMinutes: 4320 },
+        pinnedToCurationSla: true,
       });
-      if (!launch.ok) {
-        console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+      if (pol.enabled) {
+        const launch = await launchProjectCollaboration({
+          actor: { id: userId, email: sessionUser.email ?? null, role, tenantId },
+          tenantId,
+          scope: 'project',
+          opportunityId: topicId,
+          proposalId: proposal.id,
+          stage: 'draft',
+          taskType: 'admin_review',
+          taskTitle: `Review & unlock: ${proposalTitle}`,
+          assigneeRole: pol.assigneeRole,
+          entityType: 'proposal',
+          entityRef: proposal.id,
+          nudgeDays: pol.nudgeDays,
+          dueMinutes: pol.dueInMinutes, // 72h review SLA (framework-pinned)
+          completeTemplate: 'proposal_unlocked',
+        });
+        if (!launch.ok) {
+          console.error('[proposals/create] ProjectCollaboration launch refused:', launch.code, launch.error);
+        }
       }
     } catch (launchErr) {
       console.error('[proposals/create] ProjectCollaboration launch failed (non-fatal):', launchErr);

@@ -14,11 +14,14 @@
  */
 
 import { sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
+import { preStageProposalReviewTodos } from '@/lib/automation/prestage-todos';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
 import { buildArtifactSpecs } from '@/lib/artifact-spec';
 import { inferSectionType, type SectionStandard } from '@/lib/section-standards';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
+import { requestAgentTask } from '@/lib/agent-client';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 
 export interface ProvisionResult { proposalId: string; sectionCount: number }
@@ -95,7 +98,10 @@ export async function provisionProposalForPortal(opts: {
   });
 
   try {
-    const out = await sql.begin(async (tx: any) => {
+    // RLS cutover: withTenant (not sql.begin) so the provision transaction runs with SET LOCAL
+    // app.tenant_id under govtech_app (the Proxy does not route `.begin` through context). Works
+    // from both the portal self-provision and the admin release-for-tenant callers. (RLS_CUTOVER)
+    const out = await withTenant(tenantId, async (tx: any) => {
       const [p] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
         VALUES (${tenantId}, ${opportunityId}, ${t.solicitationId}, ${proposalTitle}, 'draft', ${sql.json(gateConfig)}, false, ${sql.json(originCard)}, ${null})
@@ -177,6 +183,42 @@ export async function provisionProposalForPortal(opts: {
     });
 
     await emitEventEnd(eventId, { result: { tenantId, tenantSlug, proposalId: out.proposalId, sectionCount: out.sectionCount, title: proposalTitle } });
+    // #190 C3: pre-stage the review-gate ToDos (agent drafts V0 → human reviews),
+    // policy-parameterized + agent-first aware. Best-effort: never fails provisioning.
+    try {
+      await preStageProposalReviewTodos({ tenantId, proposalId: out.proposalId, opportunityId, label, actorId, actorEmail });
+    } catch (e) {
+      console.error('[provision-proposal] prestage review todos failed (non-fatal)', e);
+    }
+
+    // Create library seed job + enqueue suggester (best-effort, non-blocking).
+    // The suggester scans existing library atoms for prior-proposal content that
+    // matches the new compliance matrix, surfaces ranked candidates to the admin.
+    try {
+      // ON CONFLICT restates the partial-unique predicate of idx_library_seed_jobs_active
+      // (one active job per proposal): a re-provision no-ops instead of throwing a
+      // duplicate-key error. On conflict RETURNING yields no row, so the suggester
+      // isn't re-enqueued — the existing active job already owns that work.
+      const [seedJob] = await sql<{ id: string }[]>`
+        INSERT INTO library_seed_jobs (tenant_id, proposal_id, status)
+        VALUES (${tenantId}, ${out.proposalId}, 'analyzing')
+        ON CONFLICT (proposal_id) WHERE status <> ALL (ARRAY['applied', 'skipped'])
+        DO NOTHING
+        RETURNING id
+      `;
+      if (seedJob?.id) {
+        await requestAgentTask({
+          tenantId,
+          agentRole: 'library_seed_suggester',
+          taskType: 'seed_suggest',
+          input: { proposal_id: out.proposalId, tenant_id: tenantId, seed_job_id: seedJob.id },
+          proposalId: out.proposalId,
+        });
+      }
+    } catch (e) {
+      // Non-blocking — provision succeeds even if seed job creation fails
+      console.error('[provision-proposal] seed job init failed (non-blocking)', e);
+    }
     return out;
   } catch (e) {
     console.error('[provision-proposal] transaction failed', e);

@@ -16,6 +16,11 @@ export interface FontSpec {
   weight?: 'normal' | 'bold';
   style?: 'normal' | 'italic';
   color?: string;
+  // The rest of the run-formatting common to Word / PowerPoint / Excel / PDF, so
+  // every primitive can carry the full set (NodeStyle extends FontSpec).
+  underline?: boolean;
+  strikethrough?: boolean;
+  highlight?: string;   // hex background/highlight color, e.g. '#FFFF00'
 }
 
 // ─── Canvas rules (from volume_required_items) ──────────────────────
@@ -134,7 +139,18 @@ export type NodeType =
   | 'toc'
   | 'page_break'
   | 'url'
-  | 'spacer';
+  | 'spacer'
+  // Extended element types (Word/PPT/Excel/PDF common set):
+  | 'shape'          // rectangle/ellipse/line/arrow/… with fill+border+opacity
+  | 'text_box'       // a free-positioned content box (does NOT snap to margins)
+  | 'callout'        // info/warning/tip/note box
+  | 'code_block'     // monospace code
+  | 'blockquote'     // quote / pull-quote
+  | 'chart'          // bar/line/pie/…
+  | 'equation'       // math (LaTeX/MathML)
+  | 'divider'        // horizontal rule
+  | 'video'          // embedded media
+  | 'signature';     // signature block (→ vault/contract future)
 
 export type NodeSource = 'ai_draft' | 'library' | 'manual' | 'imported' | 'template';
 
@@ -219,6 +235,76 @@ export interface UrlContent {
   display_text: string;
 }
 
+// ─── Extended element content ───────────────────────────────────────
+
+export type ShapeKind =
+  | 'rectangle' | 'rounded_rectangle' | 'ellipse' | 'triangle'
+  | 'line' | 'arrow' | 'star' | 'diamond' | 'callout_bubble';
+
+export interface ShapeContent {
+  shape: ShapeKind;
+  text?: string;                 // optional text inside the shape
+}
+
+/** A free-positioned content box (rectangle that does NOT snap to margins). Positioning
+ *  lives on node.position; look (fill/border/opacity/radius) lives on node.style. */
+export interface TextBoxContent {
+  text: string;
+  inline_formats?: TextBlockContent['inline_formats'];
+}
+
+export interface CalloutContent {
+  variant: 'info' | 'warning' | 'tip' | 'success' | 'note';
+  title?: string;
+  text: string;
+  icon?: string;
+}
+
+export interface CodeBlockContent {
+  code: string;
+  language?: string;
+}
+
+export interface BlockquoteContent {
+  text: string;
+  cite?: string;
+}
+
+export interface ChartContent {
+  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'area' | 'doughnut';
+  categories: string[];
+  series: Array<{ name: string; data: number[]; color?: string }>;
+  title?: string;
+}
+
+export interface EquationContent {
+  latex?: string;
+  mathml?: string;
+  display?: boolean;             // block (true) vs inline (false)
+}
+
+export interface DividerContent {
+  thickness?: number;
+  color?: string;
+  line_style?: 'solid' | 'dashed' | 'dotted';
+}
+
+export interface VideoContent {
+  storage_key?: string;
+  url?: string;
+  poster?: string;               // poster image storage key
+  caption?: string;
+}
+
+export interface SignatureContent {
+  label?: string;                // e.g. "Authorized Representative"
+  signer_name?: string;
+  signer_email?: string;
+  signed?: boolean;
+  signed_at?: string;
+  document_ref?: string;         // the agreement being signed (vault/contract future)
+}
+
 export type NodeContent =
   | HeadingContent
   | TextBlockContent
@@ -229,6 +315,16 @@ export type NodeContent =
   | FootnoteContent
   | TocContent
   | UrlContent
+  | ShapeContent
+  | TextBoxContent
+  | CalloutContent
+  | CodeBlockContent
+  | BlockquoteContent
+  | ChartContent
+  | EquationContent
+  | DividerContent
+  | VideoContent
+  | SignatureContent
   | null;
 
 // ─── Node comments (collaborative annotations) ─────────────────────
@@ -256,11 +352,45 @@ export interface NodeEdit {
 
 // ─── Node style overrides ───────────────────────────────────────────
 
+/** Box fill (shapes, content boxes, callouts) with transparency. */
+export interface BoxFill {
+  color?: string;
+  opacity?: number;    // 0..1 (transparency — "easy peasy")
+}
+
+/** Box outline/border (shapes, content boxes, images) with radius + transparency. */
+export interface BoxBorder {
+  color?: string;
+  width?: number;      // pt
+  style?: 'solid' | 'dashed' | 'dotted' | 'none';
+  radius?: number;     // rounded corners, pt
+  opacity?: number;    // 0..1
+}
+
+/** Free positioning for a content box / shape / image that does NOT snap to the
+ *  text margins — like Word's "in front of / behind / with text wrap" options. */
+export interface NodePosition {
+  x?: number;          // inches from the page/content-left
+  y?: number;          // inches from the top
+  w?: number;
+  h?: number;
+  z?: number;          // stacking order (bring to front/back)
+  wrap?: 'inline' | 'float' | 'behind' | 'front';
+}
+
 export interface NodeStyle extends Partial<FontSpec> {
   alignment?: 'left' | 'center' | 'right' | 'justify';
   indent?: number;
   space_before?: number;
   space_after?: number;
+  // ── box / shape / image look (the ribbon's Shape Format tab) ──
+  fill?: BoxFill;
+  border?: BoxBorder;
+  opacity?: number;    // whole-node transparency 0..1 (shapes + images)
+  shadow?: boolean;
+  rotation?: number;   // degrees
+  reuse_marker?: boolean; // imported from a prior proposal — rendered red italic
+  background?: string;    // hex highlight (section-ribbon alias for `highlight`)
 }
 
 // ─── Canvas Node (the atom) ─────────────────────────────────────────
@@ -281,6 +411,9 @@ export interface CanvasNode {
   comments?: NodeComment[];
   library_eligible: boolean;
   library_tags?: string[];
+  // Free placement (content boxes / shapes / floating images that don't snap to
+  // the text margins). Absent ⇒ normal in-flow layout.
+  position?: NodePosition;
 }
 
 // ─── Section layer (v2) — Section → Group → Node ────────────────────

@@ -138,9 +138,21 @@ export async function revokeShadowAdmin(tenantId: string, portalId: string, revo
   });
 }
 
-/** Advance a portal's lifecycle (execute → closeout → archived / abandoned). */
-export async function setPortalStatus(tenantId: string, portalId: string, status: string): Promise<void> {
-  await withTenant(tenantId, async (tx) => {
-    await tx`UPDATE proposal_portals SET status = ${status} WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid`;
+/**
+ * Advance a portal's lifecycle (launched/executing/closeout → executing/closeout/archived/abandoned).
+ * CAS on a LIVE source state: a portal can only be advanced FROM an already-launched state, so a
+ * buying tenant_admin can NEVER flip a pre-launch (curation_pending / guardrails_pending) portal
+ * out-of-band and re-enter the accept→provision flow to self-release an UNLOCKED build, skipping the
+ * expert curation + 72h SLA (adversarial-sweep B4 bypass). Returns whether a row actually moved.
+ */
+export async function setPortalStatus(tenantId: string, portalId: string, status: string): Promise<{ changed: boolean }> {
+  return withTenant(tenantId, async (tx) => {
+    const rows = await tx<Array<{ id: string }>>`
+      UPDATE proposal_portals SET status = ${status}
+      WHERE tenant_id = ${tenantId}::uuid AND id = ${portalId}::uuid
+        AND status IN ('launched', 'executing', 'closeout')
+      RETURNING id
+    `;
+    return { changed: rows.length > 0 };
   });
 }

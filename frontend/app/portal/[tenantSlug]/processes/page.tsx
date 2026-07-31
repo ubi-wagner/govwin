@@ -10,7 +10,7 @@
  * error (not silently rendered as "no processes").
  */
 import { redirect } from 'next/navigation';
-import { sql, getTenantBySlug, verifyTenantAccess } from '@/lib/db';
+import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { ProcessesClient, type ProcessRow } from './processes-client';
@@ -36,6 +36,7 @@ export default async function ProcessesPage({
 
   const hasAccess = await verifyTenantAccess(sessionUser.id, role, tenantId);
   if (!hasAccess) redirect('/portal');
+  enterTenant(tenantId); // RLS choke point
 
   // View floor: tenant_user and above (the process ledger is tenant-staff
   // only; partners are stage-scoped to a proposal).

@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
+import { createTask } from '@/lib/tasks/tasks';
 import { sendEmail } from '@/lib/email';
 import { adminNewApplicationAlert } from '@/lib/email-templates';
 
@@ -190,6 +191,19 @@ export async function POST(request: Request) {
       subject: adminEmailContent.subject,
       html: adminEmailContent.html,
     });
+
+    // Raise an rfp_admin triage ToDo so the application lands in the work-item ledger
+    // (with nudges), not only an email — the emitted event otherwise has no consumer.
+    // Best-effort: a task failure never 500s the public submit.
+    try {
+      await createTask({
+        actor: { id: 'public-apply', email: null, role: 'master_admin', tenantId: null },
+        tenantId: null, assigneeRole: 'rfp_admin', taskType: 'application_triage',
+        title: `Review application: ${input.companyName}`,
+        description: `${input.contactName} (${input.contactEmail}) applied. ${input.techSummary.slice(0, 200)}`,
+        entityType: 'application', entityId: rows[0]?.id, nudgeDays: [1, 3],
+      });
+    } catch (e) { console.error('[applications] triage task failed', e); }
 
     return NextResponse.json({ data: { id: rows[0].id } }, { status: 201 });
   } catch (err) {
