@@ -13,6 +13,9 @@
 BASE="${TEST_BASE_URL:-http://localhost:3000}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# Root-level .mjs (seed-foundation.mjs, seed-e2e-hitl.mjs) import `postgres`, which only resolves
+# under frontend/node_modules — symlink it at the root (gitignored) so ESM resolution finds it.
+[ -e node_modules ] || ln -sfn frontend/node_modules node_modules
 export DATABASE_URL AWS_S3_BUCKET_NAME="${AWS_S3_BUCKET_NAME:-rfp-pipeline-local}" AWS_REGION="${AWS_REGION:-us-east-1}"
 
 echo "== 1/5  HITL cohort + load Foundation-relevant opportunities =="

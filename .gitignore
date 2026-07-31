@@ -5,6 +5,8 @@
 
 # Node / Next.js
 node_modules/
+/node_modules
+
 frontend/.next/
 .next/
 frontend/out/
