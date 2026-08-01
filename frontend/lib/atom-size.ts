@@ -6,7 +6,7 @@
  */
 
 import { wordsPerPage } from '@/lib/section-budget';
-import type { CanvasNode } from '@/lib/types/canvas-document';
+import type { CanvasNode, TableCell } from '@/lib/types/canvas-document';
 
 export interface AtomSize {
   words: number;
@@ -27,6 +27,43 @@ export function textOfNodes(nodes: CanvasNode[] | null | undefined): string {
     if (Array.isArray(c.rows)) for (const row of c.rows as unknown[]) if (Array.isArray(row)) for (const cell of row) parts.push(typeof cell === 'string' ? cell : String((cell as { text?: unknown })?.text ?? ''));
   }
   return parts.join(' ');
+}
+
+/** A table cell → display text (bare string or {text}). */
+const cellText = (cell: string | TableCell): string => (typeof cell === 'string' ? cell : String(cell?.text ?? ''));
+
+/**
+ * Harvest-quality text for a section returned to the atom library (lock-time atom loop).
+ * Unlike `textOfNodes` (a flat sizing dump) this (a) DROPS the section-title heading so the
+ * atom body doesn't start with "#9 Competitive Landscape …", and (b) renders tables WITH
+ * their header row, one row per line ("a | b | c"), so a harvested table stays readable
+ * instead of collapsing to a headerless "✓ ✗ ✓" stream. Pure (no DB) — unit-testable.
+ */
+export function harvestTextOfNodes(nodes: CanvasNode[] | null | undefined, sectionTitle: string | null): string {
+  if (!Array.isArray(nodes)) return '';
+  const norm = (s: string) => s.toLowerCase().replace(/^#+\s*/, '').replace(/\s+/g, ' ').trim();
+  const titleKey = sectionTitle ? norm(sectionTitle) : '';
+  const lines: string[] = [];
+  for (const n of nodes) {
+    const c = n?.content as Record<string, unknown> | undefined;
+    if (!c) continue;
+    if (n.type === 'heading') {
+      const t = String(c.text ?? '').trim();
+      const lvl = Number((c as { level?: unknown }).level ?? 1);
+      // drop the redundant section-title heading (H1, or an exact title match); keep real sub-headings
+      if (t && lvl > 1 && norm(t) !== titleKey) lines.push(t);
+      continue;
+    }
+    if (Array.isArray(c.rows)) {
+      const headers = Array.isArray(c.headers) ? (c.headers as (string | TableCell)[]).map(cellText) : [];
+      if (headers.some((h) => h.trim())) lines.push(headers.join(' | '));
+      for (const row of c.rows as (string | TableCell)[][]) if (Array.isArray(row)) lines.push(row.map(cellText).join(' | '));
+      continue;
+    }
+    if (typeof c.text === 'string') lines.push(c.text);
+    if (Array.isArray(c.items)) for (const it of c.items) { const t = (it as { text?: unknown })?.text; if (typeof t === 'string') lines.push(`• ${t}`); }
+  }
+  return lines.join('\n');
 }
 
 export function wordChar(content?: string | null, nodes?: CanvasNode[] | null): { words: number; chars: number } {
