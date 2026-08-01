@@ -18,7 +18,7 @@
  */
 import { withTenant } from '@/lib/rls';
 import { createAtom, type AtomTagInput } from '@/lib/atoms';
-import { textOfNodes } from '@/lib/atom-size';
+import { harvestTextOfNodes } from '@/lib/atom-size';
 import { docNodes, type CanvasNode, type CanvasDocument } from '@/lib/types/canvas-document';
 
 /** One document cocoon per proposal — created on the first section return. */
@@ -78,7 +78,7 @@ export async function harvestSectionToAtomLibrary(
         ? docNodes(parsed as CanvasDocument)
         : [];
   } catch { /* not valid canvas JSON → treat as empty */ }
-  const text = textOfNodes(nodes);
+  const text = harvestTextOfNodes(nodes, section.title);
   if (!text.trim()) return null; // nothing drafted yet — don't return an empty atom
 
   const cocoonId = await getOrCreateProposalCocoon(tenantId, proposalId, `Proposal ${proposalId}`);
