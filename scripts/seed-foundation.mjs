@@ -180,9 +180,12 @@ async function run() {
     console.log(`✓ ${f.role.padEnd(12)} ${f.name} (${f.title}) ${f.email}`);
   }
 
-  // 3) Paul Jackson — native partner_user (no home tenant), appointed SHADOW ADMIN of
-  //    Foundation via a tenant_admin membership (source='collaborator').
-  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'partner_user', tenantId: null });
+  // 3) Paul Jackson — EC mentor appointed SHADOW ADMIN of Foundation. Native role tenant_admin
+  //    so a NORMAL login lands him in the workspace with full access (buckets/pipeline/download);
+  //    external (no home tenant) — the dispatcher resolves Foundation from his membership. His
+  //    EC-partner origin is captured by the proposal-collaborator grant (added by the build driver).
+  //    (partner_user was too low a role: below tenant_user, so it 403'd buckets + download.)
+  const paulId = await upsertUser({ email: PARTNER.email, name: PARTNER.name, role: 'tenant_admin', tenantId: null });
   await sql`
     INSERT INTO user_memberships (user_id, tenant_id, role, status, source, created_by)
     VALUES (${paulId}::uuid, ${tid}::uuid, 'tenant_admin', 'active', 'collaborator', ${kateId}::uuid)
