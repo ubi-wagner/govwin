@@ -6,7 +6,10 @@
 > (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
 > 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
-> ~11 remain **dormant-by-design** (registered, not yet in a live flow). Schema = **105 live tables (20
+> — traced by actual call-site + whether the trigger event is emitted live — **34 are wired and exactly 1 is
+> dormant** (`content_generator`; its `library:content.requested` trigger has no emitter). Earlier "~11 dormant"
+> was a reference-count artifact (queue-producer / `AI_INVOKE`-step agents show few name-refs yet are wired).
+> Schema = **105 live tables (20
 > dropped)**; the `accounts` / `sessions` / `verification_tokens` NextAuth adapter tables are **dead**
 > (the app uses JWT sessions, no adapter), as are `agent_archetypes`, `system_health_snapshots`,
 > `audit_log`, `rate_limit_state`, `scout_runs`, and `tenant_automation_preferences` (superseded by

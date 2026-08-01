@@ -43,22 +43,33 @@ real INSERT/UPDATE sites.
 
 ---
 
-## 2. Agent workforce — wired vs dormant (of 36 archetypes)
+## 2. Agent workforce — wiring (VERIFIED — 35 archetypes + `base`)
 
-**Actively wired (invoked in live flows):** `section_drafter` (21 call sites), `continuity_manager` (12),
-`color_team_reviewer` (11), `advisory_manager` (8), `partner_coordinator` (8), `formatter` (7),
-`content_generator` (7), `stylist` (6), `cost_estimator` (6), `scoring_strategist` (6), plus
-`compliance_reviewer`, `proposal_manager`, `traceability_auditor`, `redaction_guard`, `market_analyst`,
-`librarian`, `packaging_specialist`, `proposal_architect` (4–5 each).
+⚠️ **Correction: my first-pass "~11 dormant" was wrong.** Reference-*count* is a bad proxy — an archetype
+invoked via a workflow `AI_INVOKE` step (`TOOL_ACTION_TO_ARCHETYPE`) or an `agent_task_queue` producer shows
+almost no name-references yet is fully wired. Traced by **actual call-site + whether its trigger event is
+emitted by live code: 34 of 35 are wired; exactly ONE is dormant.** (There is no automation-policy gate on
+AI steps — the tenant automation_framework governs notifications, not workflow AI.)
 
-**Dormant (registered-only, ~1–2 refs = just the registry line):** `library_seed_mapper`,
-`library_seed_suggester`, `ingest_analyst`, `matrix_stager`, `opportunity_scout`, `outcome_analyst`,
-`pp_matcher`, `skeleton_architect`, `research_scout`, `content_curator`, `social_scheduler`.
+- **LIVE-prod (18)** — tenant/admin queue-producers + core-flow inline: `section_drafter`,
+  `compliance_reviewer`, `color_team_reviewer`, `librarian`, `scoring_strategist`, `opportunity_analyst`,
+  `library_seed_suggester`, `research_scout`, `library_seed_mapper`, `proposal_manager`, `formatter`,
+  `stylist`, `continuity_manager`, `traceability_auditor`, `redaction_guard`, `market_analyst`,
+  `advisory_manager`, `cost_estimator`.
+- **WIRED (16)** — auto-workflow step whose trigger IS emitted live (rfp-upload / proposal-created /
+  advanced / outcome / collaborator-invited / application-accepted / opportunities-detected / curation-review;
+  + 4 **cron-seeded** at mig 118): `packaging_specialist`, `proposal_architect`, `capture_strategist`,
+  `pp_matcher`, `partner_coordinator`, `onboarding_agent`, `outcome_analyst`, `curation_qa`, `ingest_analyst`,
+  `matrix_stager`, `skeleton_architect`, `opportunity_scout`, `amendment_monitor`, `ops_digest`,
+  `content_curator`, `social_scheduler`.
+- **DORMANT (1 — the only genuine one):** ⚠️ **`content_generator`** — its trigger `library:content.requested`
+  has **no emitter** anywhere (CMS emits `content_pipeline.generation.*` instead; not cron-seeded). I'd wrongly
+  listed it as wired.
 
-**Verdict:** the dormant set is **dormant-by-design** — CLAUDE.md / AGENT_WORKFORCE.md state all 36
-auto-register and are woken one at a time behind the pending **global automation-policy wiring**
-("dormant ≠ dead"). This is *unwired functionality by intent*, not a bug — but the roster and the
-"35 vs 36" count should be reconciled in the docs (see §6).
+Notes: `base` is the shared ABC parent (excluded from the 35-entry auto-register) → **35 archetypes + base**.
+Tenant rescore uses deterministic `rescore.py::score_card`, not `scoring_strategist` (AI overlay is future).
+⚠️ **`components/admin/agent-workforce.tsx` is stale** — hardcodes 25 agents "live", **omits 10** (the P1–P4
+cohort + both `library_seed_*`), header still says "25 archetypes" (actual 35). Fix the roster UI.
 
 ---
 
@@ -176,15 +187,67 @@ locked" preference **always misses and silently defaults**. Inert until those re
 
 ---
 
-## 5. Deprecated / legacy markers (source files carrying them)
-`lib/proposal-advance.ts`, `lib/proposal-atom-harvest.ts`, `lib/process/force-advance.ts`,
-`lib/opportunity-bridge.ts`, `lib/cards/card.ts`, `lib/proposal-access.ts`, `lib/provision-proposal.ts`,
-`lib/db.ts`, `lib/proposal/lock-section.ts`, `lib/tools/library-search-atoms.ts`, `lib/content-admin.ts`,
-`lib/atomize-package.ts`, `lib/cms.ts`, `lib/terms.ts`, `lib/portal-workflow.ts`, `lib/calendar.ts`,
-`pipeline/src/agents/memory.py`, `pipeline/src/agents/context.py`,
-`pipeline/src/agents/learning/pattern_promoter.py`, `pipeline/src/agents/lifecycle/decay.py`.
-Most are **historical notes** ("the legacy X was removed / superseded by Y"), not live deprecated code —
-they document the cutover. The dead-code agent is separating live-deprecated from historical.
+## 5. Deprecated / legacy markers (VERIFIED — read the actual text, not just the keyword)
+
+⚠️ **Correction to my first pass and to the dead-code agent's "cms.ts + proposal-advance.ts are live-deprecated"
+split — both are wrong.** I read every marker. **There is NO live function that is deprecated-and-should-be-
+removed.** The markers fall into three buckets, none of which is "delete this code":
+
+- **Live transition-compat code (KEEP — intentional):** `lib/cms.ts` ("fall back to legacy `cms_content`
+  during transition"; returns the legacy `ContentRow` shape so marketing components render unchanged) and
+  `lib/proposal-advance.ts` ("legacy manual gate requirements … COALESCE true"; handles pre-backfill gate rows)
+  are **live backward-compat branches**, not deprecated code. The agent mislabeled these.
+- **Historical notes (comments only):** `proposal-atom-harvest.ts` ("the legacy `harvestSectionToLibrary` →
+  `library_units` …" — that table was dropped mig 121), `opportunity-bridge.ts` (LEGACY-card JSON fallback),
+  `db.ts` (the retired `users.tenant_id` read-through), `force-advance.ts`, `cards/card.ts`, `content-admin.ts`,
+  and the four `pipeline/src/agents/*` files — all document a cutover in prose; the code is current.
+- **False-positive keyword hits (not deprecation at all):** `lib/terms.ts` ("no longer needed" is **ToS legal
+  text**), `lib/calendar.ts` ("slot no longer available" is a **runtime user message**).
+
+Net: nothing here is a removal target. The real removal targets are the **dead exports** (§5b), not these markers.
+
+---
+
+## 5b. Dead exports — VERIFIED split (self-swept; corrects the agent's crude "29 dead exports, delete them")
+
+I re-derived this myself with a two-stage scan (cross-file reference **then** in-file internal use), because
+"exported but never imported" alone is a **trap**: a symbol can be unimported yet called by another function in
+its own file (live — only the `export` is redundant), or unimported *and* deliberately staged infrastructure.
+`frontend/lib/**` totals **222 exports with no cross-file reference**, which breaks down as:
+
+| bucket | count | meaning | action |
+|---|---:|---|---|
+| **Over-exported but LIVE** | 49 | used by another fn *in the same file* (e.g. `opportunity-bridge` `publishToBridge`/`fanOutBridgeEvent`, both called by the live `publishAndFanOut`). Code runs; only the `export` keyword is surplus. | **Do NOT delete code.** Optional lint: drop the `export`. |
+| **Fully dead — runtime** | 41 | no cross-file ref **and** no in-file use. | Safe delete — **except the two KEEP rows below.** |
+| **Dead — type-only** | 132 | exported `type`/`interface`/`enum` consumed only internally or nowhere; erased at compile. | Near-zero cost; leave or bulk-trim. Not a priority. |
+
+⚠️ **Two "fully dead" rows are NOT dead — do not delete:**
+- **`lib/tenant-context.ts` → `runInTenant`, `runInBypass`** — these are the **RLS cutover per-request context
+  layer** (`SET app.tenant_id`). CLAUDE.md + docs/RLS_CUTOVER.md: the cutover is *built + applied in schema but
+  inert until the one-op prod `DATABASE_URL` flip* off the owner role. They read as dead **by design** — they're
+  the staged security machinery awaiting the flip. Deleting them guts the cutover.
+
+⚠️ **Two "fully dead" clusters are unwired FEATURES, not stray helpers (product decision, not a delete):**
+- **`lib/calendar.ts` → `bookSlot`, `cancelBooking`, `listOpenSlots`, `getExpertTimeBalance`,
+  `listTenantBookings`** — the whole **expert-time booking** capability. Only `/api/admin/expert-time/availability`
+  imports from this module (and not these fns) → availability is half-wired; booking/cancel/balance reach no route
+  or UI. Wire the Terms §7 expert-time feature or shelve it.
+- **`lib/crypto.ts` → `encryptApiKey`, `decryptApiKey`** — tenant **API-key encryption** (pairs with the seed-only
+  `api_key_registry`, §1). Staged for bring-your-own-key; unwired today.
+
+**Genuinely dead — safe delete (the rest of the 41):** `portal-launch` `assumeShadowAdmin`/`portalAdminAccess`
+(the live shadow-admin path uses `releaseFromCuration`/`revokeShadowAdmin`), `db.auditLog` (its one in-file hit is
+its own `console.error('[auditLog]…')` tag — §1's "zero callers" **stands**), `bucket-ranking.rankBucket`,
+`email-templates` `spotlightDigestEmail`/`welcomeOnboardedEmail` (spotlight retired), `email.createDeadlineReminder`,
+`rbac.canManageTenant`, `library/house-docs.ingestHouseDoc` + `house-artifacts.ingestHouseArtifact`,
+`types/canvas-document` `createSection`/`estimatePageCount`, `types/source-anchor`
+`findCharOffset`/`formatAnchorProvenance`, `validation` `zEmail`/`zUuid`/`zRole`/`zSortOrder`/`zDottedName`,
+`storage/paths` `rfpAdminInboxPath`/`rfpAdminDiscardedPath`, `errors` `RateLimitError`/`ServiceUnavailableError`,
+`events` `agentActor`/`pipelineActor`, `vaults.getVaultAtom`, `canvas/format-controls.FONT_FAMILIES`,
+`automation/catalog` `TRIGGER_KEYS`/`VALID_SCOPES`, `ai/agent-guard.PER_CALL_CEILING_USD`,
+`tasks/workflows.TASK_WORKFLOW_LIST`, `library/starter-set.STARTER_SET`. **Low priority** — TS tree-shakes them;
+they're hygiene, not risk. The takeaway is the *method*: a blind "delete every unimported export" script would have
+(a) broken the bridge, (b) broken the RLS cutover, and (c) silently deleted two half-built features.
 
 ---
 
@@ -214,6 +277,13 @@ they document the cutover. The dead-code agent is separating live-deprecated fro
    REST/RLS-proof surface (§3 caveat).
 5. **Wire-or-drop (dead pages/UI):** `/dashboard` (dup dispatcher), `proposals/[id]/review`, the admin
    section editor (+ its 404 back-link); the Paste-Topics action, the AI-Review button, the CRM placeholder.
-6. **Product decisions:** `proposals/[id]/activity` (live table, no UI) — wire or retire; the ~11 dormant
-   archetypes — wire (automation-policy) or shelve so they stop reading as half-built.
-7. **Reconcile docs (§6).**
+6. **Delete (genuinely dead exports — §5b):** the ~41-item fully-dead runtime list (shadow-admin alternates,
+   `auditLog`, `rankBucket`, spotlight email templates, unused zod/path/error/event helpers). **Low priority
+   (tree-shaken).** ⚠️ **Exclude `tenant-context` `runInTenant`/`runInBypass` (RLS staged infra) and the
+   `calendar`/`crypto` feature clusters** — those are keep-or-wire, not delete. Optional lint: drop the surplus
+   `export` on the 49 over-exported-but-live symbols.
+7. **Product decisions:** `proposals/[id]/activity` (live table, no UI) — wire or retire; **expert-time booking**
+   (`calendar.ts`, §5b) and **tenant API-key encryption** (`crypto.ts`, §5b) — wire or shelve; the **1 dormant
+   archetype** `content_generator` (§2 — its `library:content.requested` trigger has no emitter) — wire or shelve.
+   (Earlier drafts said "~11 dormant"; verified count is **1**.)
+8. **Reconcile docs (§6).**
