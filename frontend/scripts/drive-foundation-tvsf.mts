@@ -211,6 +211,9 @@ try {
   }
   ok('drafted 13 sections', drafted === secs.length, `${drafted}/${secs.length}`);
 
+  if (process.env.DRAFT_ONLY) {
+    console.log(`\nPROPOSAL_ID=${proposalId}\nDRAFT_ONLY — stopped after drafting; UI will lock/advance/export.`);
+  } else {
   // lock every section → matrix satisfied; roll up artifacts; set lock_count
   for (const s of secs) {
     await sql`UPDATE proposal_sections SET status='approved', accepted_by=${kate.id}::uuid, accepted_at=now(), completed_stage='draft', completed_at=now(), is_locked=true, locked_at=now(), locked_by=${kate.id}::uuid, editing_by=NULL, editing_since=NULL WHERE id=${s.id}::uuid AND is_locked=false`;
@@ -246,6 +249,7 @@ try {
 
   console.log(`\nPROPOSAL_ID=${proposalId}`);
   console.log('FILES=' + JSON.stringify(outFiles));
+  }
 } finally {
   await sql.end();
 }
