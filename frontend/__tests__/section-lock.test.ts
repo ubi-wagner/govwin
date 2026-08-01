@@ -61,9 +61,10 @@ function wireGuard(accessRole: 'admin' | 'contributor' | 'external', sectionFoun
           : [],
       );
     }
-    // Auto-advance opt-in lookup. The db client camelCases columns, so the
-    // row key is autoAdvanceWhenAllLocked (postgres.toCamel), matching prod.
-    if (q.includes('auto_advance_when_all_locked')) return Promise.resolve([{ autoAdvanceWhenAllLocked: autoAdvance }]);
+    // Auto-advance opt-in: reads condition->>'auto_advance' from tenant_automation_policies
+    // (mig 127; the tenant_automation_preferences read was retired in mig 142). The query
+    // aliases the boolean AS "autoAdvance".
+    if (q.includes("condition->>'auto_advance'")) return Promise.resolve([{ autoAdvance }]);
     // Document-close + proposal-ready counts: report all sections locked.
     if (q.includes('count(*)')) return Promise.resolve([{ total: 1, locked: 1 }]);
     // The section lock/unlock is a compare-and-swap with RETURNING id — return a

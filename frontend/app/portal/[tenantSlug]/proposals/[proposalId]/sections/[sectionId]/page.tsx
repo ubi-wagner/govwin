@@ -7,6 +7,7 @@ import { resolveCanvasCapabilities, type CanvasPermission, type CanvasArtifactTy
 import { CanvasEditorPage } from '@/components/canvas/canvas-editor-page';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { CANVAS_PRESETS, createEmptyCanvas } from '@/lib/types/canvas-document';
+import { coerceJsonb } from '@/lib/jsonb';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,10 +129,14 @@ export default async function PortalSectionEditorPage({ params }: Props) {
     if (!permission) notFound();
   }
 
-  // If no canvas content yet, create an empty one with default preset
+  // If no canvas content yet, create an empty one with default preset.
+  // content is TEXT (mig 071) → postgres.js returns a STRING; coerceJsonb parses it so a
+  // reopened section rehydrates its saved canvas instead of rendering blank (the old
+  // `typeof content === 'object'` guard was always false for the string ⇒ blank-on-reload).
   let canvasDoc: CanvasDocument;
-  if (section.content && typeof section.content === 'object' && 'version' in (section.content as object)) {
-    canvasDoc = section.content as CanvasDocument;
+  const parsedContent = coerceJsonb<CanvasDocument | null>(section.content, null);
+  if (parsedContent && typeof parsedContent === 'object' && 'version' in parsedContent) {
+    canvasDoc = parsedContent;
   } else {
     canvasDoc = createEmptyCanvas({
       documentId: sectionId,

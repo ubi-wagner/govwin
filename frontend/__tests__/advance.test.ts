@@ -21,7 +21,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Hoisted mock factories ────────────────────────────────────────────────
 const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccessMock,
-  emitEventStartMock, emitEventEndMock, isValidUUIDMock, requestAgentTaskMock, getNodeTextMock } = vi.hoisted(() => {
+  emitEventStartMock, emitEventEndMock, isValidUUIDMock, requestAgentTaskMock, getNodeTextMock,
+  resolveGatePolicyMock } = vi.hoisted(() => {
   const sqlBeginMock = vi.fn();
   const sqlMock = Object.assign(vi.fn(), { begin: sqlBeginMock, json: (v) => v });
   return {
@@ -35,6 +36,7 @@ const { authMock, sqlMock, sqlBeginMock, getTenantBySlugMock, verifyTenantAccess
     isValidUUIDMock: vi.fn(),
     requestAgentTaskMock: vi.fn(),
     getNodeTextMock: vi.fn(),
+    resolveGatePolicyMock: vi.fn(),
   };
 });
 
@@ -59,6 +61,10 @@ vi.mock('@/lib/validation', () => ({
 }));
 
 vi.mock('@/lib/agent-client', () => ({ requestAgentTask: requestAgentTaskMock }));
+
+// AI review on advance is now gated by resolveGatePolicy('proposal:proposal.advanced'),
+// not the retired tenant_automation_preferences read (mig 142). Mock the resolver directly.
+vi.mock('@/lib/automation/policy', () => ({ resolveGatePolicy: resolveGatePolicyMock }));
 
 vi.mock('@/lib/types/canvas-document', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/types/canvas-document')>();
@@ -595,11 +601,16 @@ describe('POST advance — AI review on advance (Phase 3, C3)', () => {
     getTenantBySlugMock.mockResolvedValue(makeTenant());
     verifyTenantAccessMock.mockResolvedValue(true);
     isValidUUIDMock.mockReturnValue(true);
+    // The 'Stage advanced' gate governs AI review on advance (enabled ⇔ opted in).
+    resolveGatePolicyMock.mockReset().mockResolvedValue({
+      enabled: aiReviewOnAdvance, assigneeRole: 'tenant_admin', nudgeDays: [], dueInMinutes: 0,
+      channel: 'email', cooldownMinutes: 0, maxFiresPerHour: 0,
+      source: { tenantPolicy: false, frameworkPinned: false },
+    });
     sqlMock.mockImplementation((strings: TemplateStringsArray) => {
       const q = Array.isArray(strings) ? strings.join('?') : String(strings);
       if (q.includes('gate_config')) return Promise.resolve([makeProposal()]);
       if (q.includes('count(*)::text')) return Promise.resolve([{ count: '1' }]);
-      if (q.includes('ai_review_on_advance')) return Promise.resolve([{ aiReviewOnAdvance }]);
       if (q.includes('is_locked = true')) return Promise.resolve(reviewSections);
       return Promise.resolve([]); // activity log + anything else
     });

@@ -1,6 +1,7 @@
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { coerceJsonb } from '@/lib/jsonb';
+import { resolveGatePolicy } from '@/lib/automation/policy';
 import { randomUUID } from 'crypto';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { requestAgentTask } from '@/lib/agent-client';
@@ -426,12 +427,18 @@ export async function advanceProposalStage(params: AdvanceParams): Promise<Advan
   // box (proposal_comments, recommendation_type='ai_review'). Best-effort +
   // cost-guarded downstream — never blocks the advance.
   try {
-    const [pref] = await sql<{ aiReviewOnAdvance: boolean }[]>`
-      SELECT ai_review_on_advance FROM tenant_automation_preferences
-      WHERE tenant_id = ${tenantId}::uuid
-    `;
-    const aiReviewEnabled = pref ? pref.aiReviewOnAdvance : true; // default on
-    if (aiReviewEnabled) {
+    // AI review on advance is governed by the live 'Stage advanced' automation gate — the
+    // agent-capable catalog trigger 'proposal:proposal.advanced'. resolveGatePolicy defaults
+    // enabled=true (regression-safe: AI review stays on unless a tenant disables the gate) and
+    // honors a tenant policy row when configured. (Previously read tenant_automation_preferences,
+    // which nothing writes since mig 127 introduced tenant_automation_policies.)
+    const advancedGate = await resolveGatePolicy({
+      tenantId,
+      scope: 'build',
+      triggerKey: 'proposal:proposal.advanced',
+      gateDefaults: { assigneeRole: 'tenant_admin', nudgeDays: [], dueInMinutes: 0 },
+    });
+    if (advancedGate.enabled) {
       const reviewSections = await sql<{ id: string; title: string | null; content: string | null; sectionType: string | null }[]>`
         SELECT id, title, content, section_type
         FROM proposal_sections
