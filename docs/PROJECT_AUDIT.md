@@ -87,11 +87,10 @@ from a truly-dead route — this is the human read):
 - **jsonb char-iteration trap (`${JSON.stringify(x)}::jsonb`):** **0 real instances** — all 4 hits are
   *warning comments* (`lib/jsonb.ts`, `lib/cards/card.ts`, `lib/events.ts`, `app/api/waitlist/route.ts`).
   The codebase writes jsonb via `sql.json()` — disciplined.
-- **ILIKE injection:** the tenant/library search paths escape correctly (`lib/atoms.ts`,
-  `lib/tools/library-search-atoms.ts` use `.replace(/[%_\\]/g, '\\$&')`). **Verify:**
-  `lib/tools/memory-search.ts` (lines 94/124/154) and the admin routes `admin/waitlist` +
-  `admin/tenants` pass `${pattern}` — confirm the pattern is escaped upstream (admin-only, low blast
-  radius, but worth a look).
+- **ILIKE injection: clean (verified).** Every ILIKE path escapes user input with
+  `.replace(/[%_\\]/g, '\\$&')` before building the `%…%` pattern — `lib/atoms.ts`,
+  `lib/tools/library-search-atoms.ts`, `lib/tools/memory-search.ts:77`, `app/api/admin/tenants/route.ts:59`,
+  `app/api/admin/waitlist/route.ts:59`. No unescaped ILIKE found.
 - **The section-editor rehydration issue** (already known from this sprint): `proposal_sections.content`
   is stored as a stringified `CanvasDocument` in a TEXT column, but the editor page
   (`app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx:133`) only renders when
