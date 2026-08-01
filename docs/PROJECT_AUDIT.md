@@ -62,28 +62,35 @@ auto-register and are woken one at a time behind the pending **global automation
 
 ---
 
-## 3. API routes — orphan candidates (28 of 191)
+## 3. API routes — orphan classification (VERIFIED; 28 flagged → reclassified)
 
-Routes whose path is not referenced by any in-repo caller. **Classified** (a scan can't tell a webhook
-from a truly-dead route — this is the human read):
+> ⚠️ **Read this before deleting any route.** "Orphaned from the UI" ≠ "dead." Per
+> `docs/DEPRECATION_CLEANUP_2026-07-22.md:76-82` (the origin of the ~28 number), many UI-orphaned routes are
+> **deliberately retained as the REST / RLS-proof surface** — `scripts/drive-rls-admin.mjs` +
+> `drive-rls-portal.mjs` GET them to prove tenant isolation under the `govtech_app` cutover. Blind-deleting
+> them breaks the RLS test harness.
 
-- **External / not-orphaned (keep):** `/api/stripe/webhook` (Stripe is descoped but the webhook stub
-  remains), `/api/cms/revalidate`, `/api/events` (SSE/consumed out-of-band).
-- **Superseded by server-component DB reads (redundant — candidates to remove):** `/api/admin/dashboard`,
-  `/api/admin/analytics`, `/api/admin/pipeline`, `/api/admin/processes`, `/api/admin/purchases`,
-  `/api/portal/[tenantSlug]/dashboard`, `/api/portal/[tenantSlug]/purchases` — the corresponding pages
-  query the DB directly in their server components, so these API routes appear unused.
-- **Genuinely unwired / half-built (verify + wire or remove):** the `seed-job/*` trio
-  (`seed-job/apply|decide|select`), the vault-atoms routes (`vaults/[vaultId]/atoms`,
-  `.../atoms/[atomId]/download`, `.../atoms/[atomId]/ingest`, `vaults/[vaultId]/members`),
-  `/api/portal/[tenantSlug]/proposals/create` (superseded by purchase→release provisioning),
-  `/api/portal/[tenantSlug]/proposals/[proposalId]/compliance` and `/ai/review` and `/activity` and
-  `/stage`, `/api/admin/opportunities/[oppId]/publish`, `/api/admin/tenants/[tenantId]/backfill-cards`,
-  `/api/admin/site/pages/[pageKey]/versions`, `/api/consent`, `/api/content/[slug]`, `/api/admin/waitlist`.
+Verified verdicts on the 28: **3 EXTERNAL · 10 REDUNDANT · 8 TRULY-ORPHANED · 7 FALSE-POSITIVE.** My
+first-pass bucketing was wrong on **7 of 28** (⚠️):
 
-> Some in the last group are hit via constructed (non-literal) paths and are false positives — each needs
-> a 30-second confirm. The scan's job is to narrow 191 → 28; the deep route-map agent is producing the
-> authoritative per-route caller list to finalize this.
+- ⚠️ **FALSE-POSITIVES (actually wired — remove from any "unwired" list):** `seed-job/{apply,decide,select}`
+  (called by `library-seed-panel.tsx`), `vaults/[id]/{atoms, atoms/[id]/download, atoms/[id]/ingest, members}`
+  (called by `nook-detail.tsx`). **Consequence: the §4b-1 destructive bug is on a live path.**
+- ⚠️ Also relabeled: `content/[slug]` = **public API** (keep); `events` = auth'd **polling** GET with zero
+  pollers = **orphaned** (not "SSE"); `admin/waitlist` = **redundant** SSR (not "unwired").
+- **REDUNDANT — the page reads the DB directly in a `force-dynamic` server component** (true set ~15+, not
+  the 7 I listed): `admin/{dashboard, analytics, pipeline, processes, purchases, waitlist, agents,
+  rfp-curation, automation, tenants/[id]}`, `portal/[slug]/{dashboard, purchases, proposals(base),
+  proposals/[id](base), proposals/[id]/{sections, compliance, stage}}`, site base-lists. Some also keep an
+  unused base POST/PATCH. **Kept as REST/RLS surface — leave unless pruning the REST layer wholesale.**
+- **TRUE HARD-DELETE candidates** (no UI *and* no ops/e2e/script caller): `consent`,
+  `admin/site/pages/[pageKey]/versions`, `admin/sbir-data/ingest` (first pass missed this one),
+  `portal/[slug]/uploads`(base), `admin/opportunities/[oppId]/publish`, and `proposals/[id]/ai/review`
+  (emits a phantom `proposal.review_requested` nothing consumes; its UI caller file was already deleted).
+  `proposals/create` is superseded (provisioning goes via release) but self-docs as a retained billing hook.
+- **Notable, not a delete:** `proposals/[id]/activity` is a fully-built, **live-fed** (`proposal_activity_log`,
+  ~10 writers) paginated API with **zero UI consumer** — the timeline renders `system_events` instead. A
+  product decision (wire it, or retire the table).
 
 **Dead components: 0** — all 122 `components/**` files are imported somewhere. Clean (spot-check of 11
 confirmed). Note: `pipeline-cards`/`spotlight-buckets` are named for retired features but the components
@@ -150,7 +157,7 @@ with `coerceJsonb<CanvasDocument>(section.content, …)` (or `JSON.parse` + try/
 
 | # | severity | site | effect |
 |---|---|---|---|
-| 1 | **HIGH (data loss)** | `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts:174-217` | Header says "merge into existing canvas," but `existingDoc` is always null → it writes `[] + seedNodes`, **replacing** the section's real content, and does **not** archive to `canvas_versions` first → **unrecoverable**. (Mitigant: the library-seed feature is dormant, so this isn't on the live path — but it's armed.) |
+| 1 | **HIGH (data loss, LIVE path)** | `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts:174-217` | Header says "merge into existing canvas," but `existingDoc` is always null → it writes `[] + seedNodes`, **replacing** the section's real content, and does **not** archive to `canvas_versions` first → **unrecoverable**. ⚠️ **This IS reachable from the UI** — `components/portal/library-seed-panel.tsx:166` calls it (mounted in `proposal-admin-panel.tsx:1056`); the earlier "dormant, off the live path" note was wrong (routes-verify). Top fix priority. |
 | 2 | **HIGH** | `app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx:133` | Portal section editor renders **blank** for any section with saved content (the bug from §4); client doesn't re-fetch, so a type+save can overwrite live content (recoverable via `canvas_versions`). Masked in single-session e2e; bites on reload/return. |
 | 3 | MED-HIGH | `app/admin/proposals/[proposalId]/section/[sectionId]/page.tsx:49` | Identical guard in the admin co-draft editor (via `sqlBypass`) — same blank-on-open + overwrite risk during the 72h admin window. |
 
@@ -191,12 +198,22 @@ they document the cutover. The dead-code agent is separating live-deprecated fro
 
 ---
 
-## 7. Recommended cleanup (prioritized)
-1. **Fix (real bug):** section-editor content rehydration (§4) — reopened sections render empty.
-2. **Drop (dead):** `verification_tokens`, `agent_archetypes`, `system_health_snapshots` (a `DROP TABLE
-   IF EXISTS` migration; each has zero readers/writers).
-3. **Verify + remove (redundant routes):** the `/api/admin/dashboard|analytics|pipeline|processes` +
-   `portal/*/dashboard|purchases` group once confirmed the pages read the DB directly.
-4. **Decide (dormant):** the ~11 dormant archetypes + their thin tables (scout/seed-job/vault-atoms) —
-   wire them (automation-policy) or shelve them explicitly so they stop reading as "half-built."
-5. **Reconcile docs (§6).**
+## 7. Recommended cleanup (prioritized, post-cross-check)
+1. **FIX FIRST — data loss on a live path:** the mig-071 bug cluster (§4b). One root fix — replace the
+   `typeof content === 'object'` guard with `coerceJsonb<CanvasDocument>(section.content, …)` at the 3 sites
+   — and add an archive-to-`canvas_versions` before the `seed-job/apply` write. #1 (destructive) is
+   UI-reachable; #2/#3 blank the portal + admin editors on reload.
+2. **Fix (latent):** repoint the auto-advance reads (§4b-4) from the dead `tenant_automation_preferences`
+   to `tenant_automation_policies` (mig 127) — otherwise auto-advance-on-lock silently never fires.
+3. **Drop (dead tables — all zero-writer):** `accounts`, `sessions`, `verification_tokens` (NextAuth),
+   `agent_archetypes`, `system_health_snapshots`, `audit_log`, `rate_limit_state`, `scout_runs` — one
+   `DROP TABLE IF EXISTS` migration.
+4. **Delete (dead routes — the SHORT verified list only):** `consent`, `admin/site/pages/[pageKey]/versions`,
+   `admin/sbir-data/ingest`, `portal/[slug]/uploads`(base), `admin/opportunities/[oppId]/publish`,
+   `proposals/[id]/ai/review`. ⚠️ **Do NOT delete the "redundant" SSR routes** — they're the deliberate
+   REST/RLS-proof surface (§3 caveat).
+5. **Wire-or-drop (dead pages/UI):** `/dashboard` (dup dispatcher), `proposals/[id]/review`, the admin
+   section editor (+ its 404 back-link); the Paste-Topics action, the AI-Review button, the CRM placeholder.
+6. **Product decisions:** `proposals/[id]/activity` (live table, no UI) — wire or retire; the ~11 dormant
+   archetypes — wire (automation-policy) or shelve so they stop reading as half-built.
+7. **Reconcile docs (§6).**
