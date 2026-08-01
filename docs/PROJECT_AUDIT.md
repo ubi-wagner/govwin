@@ -78,7 +78,41 @@ from a truly-dead route — this is the human read):
 > a 30-second confirm. The scan's job is to narrow 191 → 28; the deep route-map agent is producing the
 > authoritative per-route caller list to finalize this.
 
-**Dead components: 0** — all 122 `components/**` files are imported somewhere. Clean.
+**Dead components: 0** — all 122 `components/**` files are imported somewhere. Clean (spot-check of 11
+confirmed). Note: `pipeline-cards`/`spotlight-buckets` are named for retired features but the components
+are **live** (reused on `/cards` + `/buckets`) — stale naming, not dead code.
+
+### §3b — Pages & flows (verified; 104 pages)
+Role gating (from `middleware.ts` + `lib/rbac.ts` `PATH_MIN_ROLE` — note: not `ROUTE_ACCESS`): all
+`/admin/*` = rfp_admin+ (`/admin/system` = master_admin); all `/portal/*` has a partner_user floor +
+`verifyTenantAccess` + per-page `tenant_admin` guards on the admin surfaces. Every nav item resolves to a
+real page — **no dead nav.**
+
+**Unreachable pages (3 genuine orphans):**
+1. **`/dashboard`** (`app/dashboard/page.tsx`) — a **duplicate** of the `/portal` post-login dispatcher;
+   nothing redirects to it (all flows use `/portal`). Dead — delete.
+2. **`/portal/[tenantSlug]/proposals/[proposalId]/review`** — compliance-readiness view; the only `/review`
+   link is its own back-link. Orphan (wire it into the workspace, or drop).
+3. **`/admin/proposals/[proposalId]/section/[sectionId]`** — legacy admin section editor; nothing links in
+   (admins shadow into the portal editor), and its own "Back to Proposal" builds `/admin/proposals/[id]`
+   which **has no page → 404**. Dead path (also carries bug §4b-3).
+
+**Legacy redirect stubs (intentional, keep):** `/portal/[slug]/{spotlights, spotlights/[id], pipeline}`→`/cards`;
+`/portal/[slug]/{library, library/review, library/upload}`→`/atoms`.
+
+**Unwired UI (4):**
+- `app/admin/crm/page.tsx:34` — "CRM Console" is a **"Coming soon"** placeholder when `CMS_PUBLIC_URL` unset.
+- `proposal-ai-actions.tsx:306` — **"AI Review (coming soon)"** button permanently disabled (color-team
+  review built, not wired for V1).
+- `components/admin/source-card-actions.tsx:196` — **"Paste Topics"** POSTs to `/api/admin/extract-topics`,
+  which never reads pasted rows → **always 400s** (self-flagged `TODO(paste-topics)`).
+- `components/canvas/canvas-editor-page.tsx:125` — admin "Back to Proposal" → `/admin/proposals/[id]` (404,
+  latent — only via the orphan admin editor above).
+
+**Core flows verified wired end-to-end:** auth/onboarding (`/login`→`/portal` dispatcher→role landing;
+temp-pw→`/change-password`; multi-membership→`/select-company`; vault-only→`/vaults`), admin curation→push,
+customer purchase→release→build→section-editor→lock, and partner/collaborator (`/invite/[token]`, `/go`
+deep-link, restricted sidebar). Only dead-ends are the orphaned `/review` page + the abandoned admin editor.
 
 ---
 
@@ -97,9 +131,29 @@ from a truly-dead route — this is the human read):
   `typeof section.content === 'object'` — so a reopened section shows an empty canvas. Export is faithful;
   the editor reload is not. **This is a real bug worth fixing** (parse content, or store/return JSONB).
 
-> A dedicated adversarial bug-sweep is running in parallel to add any *proven* logic bugs (FK-order,
-> CAS/optimistic-lock gaps, missing error+code, tenant-scoping) with file:line + failure scenario; those
-> get appended here as §4b once verified.
+### §4b — Verified bug cluster: the incomplete mig-071 fix (3 sites, one root cause)
+
+**Root cause:** `proposal_sections.content` is **TEXT** (mig `071_revert_proposal_sections_content_to_text.sql`
+reverted it from JSONB; consumers must `JSON.parse`). postgres.js returns TEXT as a **string** (`lib/db.ts`
+only camelCases column *names*, no value parser). Three readers still use the JSONB-era guard
+`typeof content === 'object' && 'version' in content` — **always false for a string** — so they never load
+saved content. Every *other* reader (`save`, `package`, `proposal-atom-harvest`, `lock-section`,
+`proposal-advance`, `artifact-export`) correctly `JSON.parse`s it. Fix all three: replace the `typeof` guard
+with `coerceJsonb<CanvasDocument>(section.content, …)` (or `JSON.parse` + try/catch).
+
+| # | severity | site | effect |
+|---|---|---|---|
+| 1 | **HIGH (data loss)** | `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts:174-217` | Header says "merge into existing canvas," but `existingDoc` is always null → it writes `[] + seedNodes`, **replacing** the section's real content, and does **not** archive to `canvas_versions` first → **unrecoverable**. (Mitigant: the library-seed feature is dormant, so this isn't on the live path — but it's armed.) |
+| 2 | **HIGH** | `app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx:133` | Portal section editor renders **blank** for any section with saved content (the bug from §4); client doesn't re-fetch, so a type+save can overwrite live content (recoverable via `canvas_versions`). Masked in single-session e2e; bites on reload/return. |
+| 3 | MED-HIGH | `app/admin/proposals/[proposalId]/section/[sectionId]/page.tsx:49` | Identical guard in the admin co-draft editor (via `sqlBypass`) — same blank-on-open + overwrite risk during the 72h admin window. |
+
+**Everything else the bug-hunt checked came back CLEAN (verified):** FK-before-audit ordering (purchase/portals
+wrap portal+purchase+grant in one `withTenant` tx — a bad FK rolls back, no orphan), optimistic-lock/CAS
+(solid across advance/lock/save/portal-status/force-release/workflow-cancel), ON CONFLICT partial-index
+predicates (all restated correctly), CHECK-set literals (mig 132 widened `library_atoms.grain`), jsonb writes
+(all via `sql.json`), cross-tenant scoping + try/catch + `{error,code}` on the portal sub-resource routes, and
+bridge race-safety (bounded retry + forward-only version guard). One cosmetic: `purchase/route.ts` returns an
+opaque 500 (not 404) for a valid-but-nonexistent `opportunityId` — fails safe.
 
 ---
 
