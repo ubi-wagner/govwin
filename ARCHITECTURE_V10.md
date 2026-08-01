@@ -2,6 +2,15 @@
 
 **Date:** 2026-07-03
 
+> **FULL-PROJECT AUDIT (2026-08-01) — see `docs/PROJECT_AUDIT.md` for the canonical current-state map**
+> (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
+> (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
+> 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
+> ~11 remain **dormant-by-design** (registered, not yet in a live flow). **No `accounts` table exists**
+> (never did); **21 tables have been dropped**; the confirmed-dead tables are `verification_tokens`,
+> `agent_archetypes`, and `system_health_snapshots`. Known real bug: the section-canvas editor does not
+> rehydrate stored content on reload (content is TEXT, editor expects an object) — export is unaffected.
+
 > **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19; roster count refreshed 2026-07-22).** The pipeline
 > `AgentFabric` (**27 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
 > as workflow actors, since expanded to 27) is a
