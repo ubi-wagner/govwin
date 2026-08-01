@@ -6,10 +6,13 @@
 > (schema · 191 routes · 104 pages · agent wiring · bugs). Reconciliations: migration head is now **142**
 > (140 = Foundation TVSF demo seed, 141 = Paul shadow-admin role fix); the archetype roster is **36 files =
 > 35 archetypes + the shared `base` parent** (the "27"/"35" counts in older notes are superseded), of which
-> ~11 remain **dormant-by-design** (registered, not yet in a live flow). **No `accounts` table exists**
-> (never did); **21 tables have been dropped**; the confirmed-dead tables are `verification_tokens`,
-> `agent_archetypes`, and `system_health_snapshots`. Known real bug: the section-canvas editor does not
-> rehydrate stored content on reload (content is TEXT, editor expects an object) — export is unaffected.
+> ~11 remain **dormant-by-design** (registered, not yet in a live flow). Schema = **105 live tables (20
+> dropped)**; the `accounts` / `sessions` / `verification_tokens` NextAuth adapter tables are **dead**
+> (the app uses JWT sessions, no adapter), as are `agent_archetypes`, `system_health_snapshots`,
+> `audit_log`, `rate_limit_state`, `scout_runs`, and `tenant_automation_preferences` (superseded by
+> `tenant_automation_policies`). **Verified bug cluster** (mig-071 TEXT vs object): the portal + admin
+> section editors render blank on reload, and `seed-job/apply` silently destroys section content — export
+> is unaffected. See `docs/PROJECT_AUDIT.md §4b`.
 
 > **AS-BUILT UPDATE (#117 agent workforce, 2026-07-19; roster count refreshed 2026-07-22).** The pipeline
 > `AgentFabric` (**27 registered archetypes, all auto-registered — dormant ≠ dead**; #117 woke the original 10
