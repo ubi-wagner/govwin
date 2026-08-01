@@ -256,12 +256,34 @@ they're hygiene, not risk. The takeaway is the *method*: a blind "delete every u
   not an archetype; the count should exclude it).
 - **ARCHITECTURE_V10.md** — add the dead-table + dormant-agent facts; note `accounts` never existed.
 - Migration head references across docs say **137/139/140** in various places — now **142**
-  (140 demo seed, 141 Paul shadow-admin fix, 142 not-yet-created placeholder).
+  (140 demo seed, 141 Paul shadow-admin fix, 142 drops the 3 superseded tables).
 - Any doc referencing `library_units`/`spotlights`/`tenant_pipeline_items` as live is stale (dropped).
 
 ---
 
 ## 7. Recommended cleanup (prioritized, post-cross-check)
+
+> ### ✅ IMPLEMENTATION STATUS — 2026-08-01 (commit "Audit fixes …", verified `tsc` 0 · `vitest` 811 · `next build` · Playwright hitl-deep-sweep 5/5)
+> **Items 1–6 DONE**, with two deliberate SOP-driven narrowings (called out so the record is honest):
+> - **①②③ DONE** — the mig-071 guard cluster is fixed at all 3 sites via `coerceJsonb` (seed-job/apply now
+>   MERGES + archives to `canvas_versions`); the auto-advance/AI-review reads were repointed off the dead
+>   `tenant_automation_preferences` (F3). **F2 proven live** (Foundation TVSF section rehydrates);
+>   F3 proven by updated unit tests.
+> - **④ NARROWED (SOP)** — dropped only the **3 tables with a real successor** (`tenant_automation_preferences`,
+>   `audit_log`, `agent_archetypes`; mig 142). **KEPT** the NextAuth trio + `system_health_snapshots` +
+>   `rate_limit_state` + `scout_runs` — no successor, so the CLAUDE.md drop-SOP forbids it (mig 138 held
+>   several explicitly). My original "drop 8" over-reached the SOP; this is the correction.
+> - **⑤ NARROWED (risk)** — deleted only the one unambiguously-dead route (`proposals/[id]/ai/review`,
+>   phantom event). Kept the other UI-orphaned routes: each is a functional REST/RLS-proof surface, and
+>   deleting functional endpoints before a demo is net-negative (invisible + my route classification has a
+>   proven error rate). `/dashboard` KEPT — it's a *working* redirect dispatcher, not a dead end.
+> - **⑥ DONE (the demo-critical part)** — `agent-workforce.tsx` roster now shows all **35** (+P1–P4 cohort +
+>   both library_seed_*), `content_generator` marked dormant; the 404 back-link → `/admin`. **F6 proven live.**
+> - **DEFERRED as product decisions (⑦):** dead-export deletion (low value, tree-shaken), Paste-Topics
+>   raw-row ingestion (degrades gracefully today), expert-time booking, API-key encryption, the 1 dormant
+>   archetype, `proposals/[id]/activity`. These are wire-or-shelve calls, not cleanup.
+
+**Original prioritized list (for reference):**
 1. **FIX FIRST — data loss on a live path:** the mig-071 bug cluster (§4b). One root fix — replace the
    `typeof content === 'object'` guard with `coerceJsonb<CanvasDocument>(section.content, …)` at the 3 sites
    — and add an archive-to-`canvas_versions` before the `seed-job/apply` write. #1 (destructive) is
